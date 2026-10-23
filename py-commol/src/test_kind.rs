@@ -16,7 +16,7 @@ use std::sync::Mutex;
 use std::thread::ThreadId;
 
 use commol_core::{
-    DecayOutput, Model, ModelStructure, ModelValue, ParameterValue, SimulationEngine,
+    DecayOutput, EngineType, Model, ModelStructure, ModelValue, ParameterValue, SimulationEngine,
     SimulationError, TestStructure, ValuePlan,
 };
 use commol_random::{Generator, SumTree, sample};
@@ -150,21 +150,11 @@ fn test_model(model: &Model) -> Result<(&TestStructure, HashMap<String, f64>), S
     Ok((structure, parameters))
 }
 
-fn check_position(position: f64) -> Result<(), String> {
-    if position.is_finite() && position >= 0.0 {
-        Ok(())
-    } else {
-        Err(format!(
-            "a test model reports at finite, non-negative positions; {position} is not one"
-        ))
-    }
-}
-
 impl SimulationEngine for TestEngine {
     type ValuePlan = TestValuePlan;
 
     fn check_position(&self, position: f64) -> Result<(), String> {
-        check_position(position)
+        EngineType::TestEngine.check_position(position)
     }
 
     fn run_at_positions_into_buffer(
@@ -173,7 +163,9 @@ impl SimulationEngine for TestEngine {
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), SimulationError> {
         record_thread();
-        commol_core::check_positions(positions, self.position, check_position)?;
+        commol_core::check_positions(positions, self.position, |position| {
+            EngineType::TestEngine.check_position(position)
+        })?;
         buffer.clear();
         for &position in positions {
             buffer.push(self.row(position)?);
@@ -342,7 +334,7 @@ impl SimulationEngine for TestStochasticEngine {
     type ValuePlan = TestValuePlan;
 
     fn check_position(&self, position: f64) -> Result<(), String> {
-        check_position(position)
+        EngineType::TestStochasticEngine.check_position(position)
     }
 
     fn run_at_positions_into_buffer(
@@ -351,7 +343,9 @@ impl SimulationEngine for TestStochasticEngine {
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), SimulationError> {
         record_thread();
-        commol_core::check_positions(positions, self.position, check_position)?;
+        commol_core::check_positions(positions, self.position, |position| {
+            EngineType::TestStochasticEngine.check_position(position)
+        })?;
         buffer.clear();
         for &position in positions {
             self.advance_to(position)?;

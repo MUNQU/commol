@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A calibration, a sensitivity analysis or any other method that sets a
+  model parameter raises `ValueError` when it is built if the parameter is
+  a formula or a series parameter. The engine computes such a parameter at
+  each step, so a value set on it was lost and the method fitted nothing.
+  The message is the engine's, for this case and for a parameter the model
+  does not have: `Parameter 'k9' is not in the model; the parameters that
+  can be set are k1, k2`. Python keeps no copy of this check.
+- The four engines of the aggregate kind name themselves in their messages
+  by the name of the engine: a position an engine does not report at gives
+  `The DifferenceEquations engine reports only at integer steps; 2.5 is not
+  one`, and an impulse or a series point between two steps names `the
+  DifferenceEquations engine` or `the StochasticSteps engine`.
+
 ## [0.10.1] - 2026-10-23
 
 This release ships the fixes of the audit at 0.9.0 that change no API. In the

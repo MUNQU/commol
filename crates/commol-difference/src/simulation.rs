@@ -1,9 +1,7 @@
 //! The difference equations engine: one step adds the right-hand side once.
 
-use commol_core::{ModelValue, SimulationError};
-use commol_model::{
-    CompartmentalEngine, CompiledModel, InitialConditionPlan, OutputLabels, output_sums,
-};
+use commol_core::{EngineType, SimulationError};
+use commol_model::{CompartmentalEngine, CompiledModel, IntegerStepper, record_steps, rounded};
 
 /// How far below zero, relative to the total at the start of a step, an
 /// amount may fall: the rounding of flows that empty a compartment exactly.
@@ -13,11 +11,6 @@ const AMOUNT_TOLERANCE: f64 = 1e-12;
 /// `amounts`.
 fn lowest_amount(amounts: &[f64]) -> f64 {
     -AMOUNT_TOLERANCE * amounts.iter().sum::<f64>()
-}
-
-/// `value` to six significant digits, for a message.
-fn rounded(value: f64) -> f64 {
-    format!("{value:.5e}").parse().unwrap_or(value)
 }
 
 /// Difference equations simulation engine.
@@ -39,29 +32,26 @@ pub struct DifferenceEquations {
 }
 
 impl DifferenceEquations {
-    /// Create a new DifferenceEquations instance from a model.
-    ///
-    /// # Panics
-    ///
-    /// Panics when [`Self::try_from_model`] returns an error.
-    pub fn from_model(model: &commol_core::Model) -> Self {
-        Self::try_from_model(model)
-            .unwrap_or_else(|error| panic!("Failed to build the engine: {error}"))
+    /// The engine of a model, which a test builds without an error.
+    #[cfg(test)]
+    fn from_model(model: &commol_core::Model) -> Self {
+        Self::try_from_model(model).unwrap()
     }
 
-    /// Fallible counterpart of [`Self::from_model`].
+    /// Compile a model of the `DifferenceEquations` engine.
     ///
     /// # Errors
     ///
-    /// Returns a message when the model is not a difference-equations model,
-    /// or when [`CompiledModel::try_from_model`] fails: among its checks
+    /// Returns a message when the model is not of this engine, or when
+    /// [`CompiledModel::try_from_model`] fails: among its checks
     /// ([`commol_model::check_model`]), an impulse or a series point that is
     /// not at an integer step.
     pub fn try_from_model(model: &commol_core::Model) -> Result<Self, String> {
         let engine_type = model.engine.engine_type();
-        if engine_type != commol_core::EngineType::DifferenceEquations {
+        if engine_type != EngineType::DifferenceEquations {
             return Err(format!(
-                "The DifferenceEquations engine cannot solve a {} model",
+                "The {} engine cannot run a {} model",
+                EngineType::DifferenceEquations.name(),
                 engine_type.name()
             ));
         }
@@ -159,25 +149,6 @@ impl DifferenceEquations {
         self.state[..self.model.num_compartments()].to_vec()
     }
 
-    /// Get the list of compartment names.
-    pub fn compartments(&self) -> Vec<String> {
-        self.model.compartments().to_vec()
-    }
-
-    /// Get all simulation output names: state compartments followed by accumulators.
-    pub fn output_names(&self) -> Vec<String> {
-        self.model.output_names().to_vec()
-    }
-
-    fn output_len(&self) -> usize {
-        self.state.len()
-    }
-
-    /// Copy the state into a row that `record_steps` sized to the outputs.
-    fn copy_output_row(&self, row: &mut [f64]) {
-        row.copy_from_slice(&self.state);
-    }
-
     /// Execute a single simulation step.
     ///
     /// The impulses of the current step act first. Then every flow is
@@ -216,62 +187,34 @@ impl DifferenceEquations {
         self.settled = false;
         Ok(())
     }
+}
 
-    /// Step through the largest of `steps`, recording the outputs at each of
-    /// them into `buffer`.
-    ///
-    /// `steps` are sorted, unique and not before the current step; the
-    /// caller checks them ([`commol_core::check_positions`]).
-    fn record_steps(
-        &mut self,
-        steps: &[u32],
-        buffer: &mut Vec<Vec<f64>>,
-    ) -> Result<(), SimulationError> {
-        let output_len = self.output_len();
+impl IntegerStepper for DifferenceEquations {
+    const ENGINE: EngineType = EngineType::DifferenceEquations;
 
-        // Keep existing row allocations alive across repeated calls. This is
-        // especially important for calibration, where the same buffer is reused
-        // for hundreds or thousands of full simulations.
-        buffer.resize_with(steps.len(), Vec::new);
-        for row in buffer.iter_mut() {
-            if row.len() != output_len {
-                row.resize(output_len, 0.0);
-            }
-        }
+    fn current_step(&self) -> f64 {
+        self.current_step
+    }
 
-        self.settle()?;
-        let mut next = 0;
-        loop {
-            while next < steps.len() && f64::from(steps[next]) == self.current_step {
-                self.copy_output_row(&mut buffer[next]);
-                next += 1;
-            }
-            if next == steps.len() {
-                return Ok(());
-            }
-            self.step()?;
-            self.settle()?;
-        }
+    fn settle(&mut self) -> Result<(), SimulationError> {
+        DifferenceEquations::settle(self)
+    }
+
+    fn advance(&mut self) -> Result<(), SimulationError> {
+        DifferenceEquations::step(self)
+    }
+
+    fn copy_row(&self, row: &mut Vec<f64>) {
+        row.clear();
+        row.extend_from_slice(&self.state);
     }
 }
 
-/// Why a difference engine does not report at `position`, if it does not.
-fn check_step(position: f64) -> Result<(), String> {
-    if position >= 0.0 && position.fract() == 0.0 && position <= f64::from(u32::MAX) {
-        Ok(())
-    } else {
-        Err(format!(
-            "a difference-equations model reports only at integer steps; {position} is not one"
-        ))
-    }
-}
-
-/// Implementation of the SimulationEngine trait.
 impl commol_core::SimulationEngine for DifferenceEquations {
-    type ValuePlan = InitialConditionPlan;
+    commol_model::delegate_to_compiled_model!();
 
     fn check_position(&self, position: f64) -> Result<(), String> {
-        check_step(position)
+        EngineType::DifferenceEquations.check_position(position)
     }
 
     fn run_at_positions_into_buffer(
@@ -279,18 +222,11 @@ impl commol_core::SimulationEngine for DifferenceEquations {
         positions: &[f64],
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), SimulationError> {
-        commol_core::check_positions(positions, self.current_step, check_step)?;
-        // `check_step` accepts only integers that fit in a `u32`.
-        let steps: Vec<u32> = positions.iter().map(|&position| position as u32).collect();
-        self.record_steps(&steps, buffer)
+        record_steps(self, positions, buffer)
     }
 
     fn step(&mut self) -> Result<(), SimulationError> {
         DifferenceEquations::step(self)
-    }
-
-    fn output_names(&self) -> Vec<String> {
-        DifferenceEquations::output_names(self)
     }
 
     fn reset(&mut self) {
@@ -299,51 +235,18 @@ impl commol_core::SimulationEngine for DifferenceEquations {
         self.settled = false;
     }
 
-    fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
-        self.model.set_parameter(parameter_id, value);
-        Ok(())
-    }
-
     fn current_position(&self) -> f64 {
         self.current_step
-    }
-
-    fn state_outputs(&self) -> usize {
-        self.model.num_compartments()
-    }
-
-    fn output_sums(&self) -> Vec<(String, Vec<usize>)> {
-        output_sums(self.model.output_labels())
-    }
-
-    fn plan_values(
-        &self,
-        values: &[ModelValue],
-        remainder: Option<&str>,
-    ) -> Result<InitialConditionPlan, String> {
-        InitialConditionPlan::new(self, values, remainder)
-    }
-
-    fn apply_values(&mut self, plan: &InitialConditionPlan, values: &[f64]) -> Result<f64, String> {
-        plan.apply(self, values)
     }
 }
 
 impl CompartmentalEngine for DifferenceEquations {
-    fn compartments(&self) -> Vec<String> {
-        DifferenceEquations::compartments(self)
+    fn model(&self) -> &CompiledModel {
+        &self.model
     }
 
-    fn output_labels(&self) -> Vec<OutputLabels> {
-        self.model.output_labels().to_vec()
-    }
-
-    fn initial_state(&self) -> Vec<f64> {
-        self.model.initial_state()[..self.model.num_compartments()].to_vec()
-    }
-
-    fn total(&self) -> f64 {
-        self.model.total()
+    fn model_mut(&mut self) -> &mut CompiledModel {
+        &mut self.model
     }
 
     fn set_initial_condition(

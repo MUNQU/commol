@@ -878,8 +878,8 @@ fn calibrated_initial_state(
     Ok((applied, state, covered))
 }
 
-/// Check that the engine resolves every value of its model kind, such as an
-/// initial condition, and the remainder
+/// Check that the engine sets every parameter and resolves every value of
+/// its model kind, such as an initial condition, and the remainder
 ///
 /// Args:
 ///     engine: The simulation engine
@@ -889,9 +889,11 @@ fn calibrated_initial_state(
 ///         compartmental model), if any
 ///
 /// Raises:
-///     ValueError: If the kind does not accept a type of value, or a value
-///         or the remainder cannot be resolved; for example a category of a
-///         stratification that is not binary
+///     ValueError: If the engine does not set a parameter (one the model
+///         does not have, or one a formula or a series sets), the kind does
+///         not accept a type of value, or a value or the remainder cannot be
+///         resolved; for example a category of a stratification that is not
+///         binary
 #[pyfunction]
 #[pyo3(signature = (engine, parameters, initial_condition_remainder=None))]
 fn check_model_values(

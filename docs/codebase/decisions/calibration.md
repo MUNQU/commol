@@ -55,6 +55,22 @@ the property, not only in `run`.
 
 **Guard:** `tests/simulation/test_runs.py`.
 
+## The engine says which parameters a caller sets
+
+`SimulationEngine::set_parameter` returns an error for an id the engine does
+not let a caller set. An engine of the aggregate kind sets a constant or a
+parameter to calibrate, and rejects any other id
+(`CompiledModel::set_parameter` in `crates/commol-model/src/system.rs`): one
+the model does not have, or a formula or a series parameter, which the model
+writes again at each evaluation, so a value set on it is lost. A calibration
+or any method on `ForwardModel` sets each parameter on a copy of the engine
+when it is built (`ValueWriter::new` in `crates/commol-calibration/src/values.rs`),
+so the engine's message reaches the user before any run, and Python checks no
+parameter id (`check_values` in `api/calibrator.py`).
+
+**Guards:** `crates/commol-model/tests/parameters.rs`,
+`tests/calibration/test_problem.py::TestProblemAgainstTheModel`.
+
 ## One observation operator
 
 `ObservationOperator` (`crates/commol-calibration/src/observation.rs`) is the

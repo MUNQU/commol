@@ -142,13 +142,8 @@ fn on(engine: EngineType, mut model: Model) -> Model {
 
 #[test]
 fn an_engine_that_steps_at_integers_rejects_a_position_between_steps_at_the_check() {
-    for (engine, stepper) in [
-        (
-            EngineType::DifferenceEquations,
-            "a difference-equations model",
-        ),
-        (EngineType::StochasticSteps, "the StochasticSteps engine"),
-    ] {
+    for engine in [EngineType::DifferenceEquations, EngineType::StochasticSteps] {
+        let stepper = format!("the {} engine", engine.name());
         for (extra, message) in [
             (
                 r#","impulse_at":[3,1.5,2.5]"#,

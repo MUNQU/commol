@@ -39,7 +39,7 @@ from tests.support.models import a_to_b_builder, build_stochastic
 class TestInputs:
     def test_unknown_input_is_rejected(self, simulation: Simulation) -> None:
         inputs = InputSpace.uniform_on_bounds([bounded("k1"), bounded("k9")])
-        with pytest.raises(ValueError, match=r"'k9' not found in model parameters"):
+        with pytest.raises(ValueError, match=r"Parameter 'k9' is not in the model"):
             SensitivityAnalysis(simulation, inputs)
 
     def test_an_unknown_initial_condition_is_rejected(

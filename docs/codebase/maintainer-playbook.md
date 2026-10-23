@@ -152,11 +152,15 @@ To add an engine to the list:
       file: its name, the model kinds it runs (`kinds`), whether it is
       stochastic (`is_stochastic`), its settings (`EngineSettings`, parsed
       and validated with `deny_unknown_fields`), the form of its dynamics
-      (`dynamics_form`) and the meaning of a rate (see
+      (`dynamics_form`) and the meaning of a rate, which sets the positions it
+      reports at (`check_position`; see
       [One list of engines](decisions/engines.md#one-list-of-engines)).
 - [ ] Write the engine in its own crate and implement `SimulationEngine`
       (for an engine of the aggregate kind, also `CompartmentalEngine` from
-      `commol-model`); `try_from_model` rejects a model of another engine. A
+      `commol-model`: it gives its compiled model, `delegate_to_compiled_model!`
+      writes the methods that read it, and `record_steps` runs an engine that
+      reports only at integer steps); `check_position` is the rule of
+      `EngineType`, and `try_from_model` rejects a model of another engine. A
       stochastic engine draws every random number from one
       `commol_random::Generator`, implements `set_seed`, and restores the
       generator in `reset`, so a run repeats from its seed.

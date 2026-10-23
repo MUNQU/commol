@@ -13,6 +13,7 @@ from commol import (
     Simulation,
     SimulationResults,
 )
+from commol.context.engine import EngineName
 from commol.context.model import Model
 from tests.support import (
     ENGINE_REL,
@@ -230,3 +231,29 @@ def test_a_rate_that_is_not_a_number_stops_the_run(ode: bool, position: str) -> 
         match=f"The rate of flow 't_ab' at {position} is not a number",
     ):
         simulation.run(3)
+
+
+@pytest.mark.parametrize(
+    "engine",
+    [
+        "DifferenceEquations",
+        "DifferentialEquations",
+        "StochasticEvents",
+        "StochasticSteps",
+    ],
+)
+def test_each_engine_names_itself_when_it_rejects_a_position(
+    engine: EngineName,
+) -> None:
+    builder = abc_builder()
+    simulation = Simulation(builder.build(builder.structure, engine=engine))
+    integer = engine in ("DifferenceEquations", "StochasticSteps")
+    positions = [2.5, -1.0] if integer else [-1.0]
+
+    for position in positions:
+        with pytest.raises(ValueError) as error:
+            simulation.run_at([position], seed=1)
+        assert str(error.value).startswith(f"The {engine} engine reports")
+        assert f"{position:g} is not one" in str(error.value)
+    if not integer:
+        assert simulation.run_at([2.5], seed=1).positions == [2.5]

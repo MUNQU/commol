@@ -5,7 +5,10 @@
 /// Each leaf holds the rate of one event, and each inner node the sum of its
 /// children, so the total, a change of one rate and the pick of the event
 /// that holds a point of the total all cost `O(log n)`. An engine of events
-/// keeps one tree and changes only the rates an event touches.
+/// keeps one tree and changes only the rates an event touches: the
+/// stochastic engine of the test model kind (`TestStochasticEngine`) does.
+/// `StochasticEvents` evaluates every propensity after each event, and picks
+/// an event by a scan of them.
 #[derive(Clone, Debug)]
 pub struct SumTree {
     /// The number of events.

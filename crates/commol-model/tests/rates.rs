@@ -40,9 +40,9 @@ fn expected(rate: &str, extra: usize, t: f64) -> f64 {
     for i in 0..extra {
         context.set_parameter(format!("v{i}"), i as f64);
     }
-    for (id, value) in AMOUNTS {
-        context.set_compartment(id.to_string(), value);
-    }
+    context.init_compartments(AMOUNTS.iter().map(|(id, _)| id.to_string()).collect());
+    let amounts: Vec<f64> = AMOUNTS.iter().map(|&(_, value)| value).collect();
+    context.set_compartments_by_index(&amounts);
     context.set_parameter("total".to_string(), 1000.0);
     context.set_step(t.floor());
     context.set_time(t);

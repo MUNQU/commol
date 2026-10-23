@@ -16,8 +16,8 @@ use commol_core::math_expression::preprocessing::{
     SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX,
 };
 use commol_core::{
-    Aggregate, EngineType, MathExpression, MathExpressionContext, Model, NEIGHBORS,
-    NEIGHBORS_PREFIX, ParameterValue, Process, RateMathExpression, Rounding, SeriesMode,
+    Aggregate, MathExpression, MathExpressionContext, Model, NEIGHBORS, NEIGHBORS_PREFIX,
+    ParameterValue, Process, RateMathExpression, Rounding, SeriesMode,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -105,7 +105,7 @@ impl CompiledModel {
         // Formula parameters will be evaluated on each step
         let mut constant_parameters: HashMap<String, f64> = HashMap::new();
         // Constant parameters and parameters that calibration sets: their
-        // values do not change during a run.
+        // values do not change during a run, and a caller may set them.
         let mut fixed_parameters: HashSet<String> = HashSet::new();
         let mut formula_parameters: Vec<(String, RateMathExpression)> = Vec::new();
         // Collect series payloads first; final struct construction happens
@@ -161,7 +161,7 @@ impl CompiledModel {
         // use direct indexed parameter reads where possible.
         expression_context.reserve_parameters(
             std::iter::once(SPECIAL_VAR_TOTAL.to_string())
-                .chain(std::iter::once("t".to_string()))
+                .chain(std::iter::once(SPECIAL_VAR_T.to_string()))
                 .chain(model.parameters.iter().map(|p| p.id.clone()))
                 .chain(
                     subgroup_total_layout
@@ -175,7 +175,7 @@ impl CompiledModel {
             .parameter_index(SPECIAL_VAR_TOTAL)
             .expect("total parameter slot must be reserved");
         let t_parameter_index = expression_context
-            .parameter_index("t")
+            .parameter_index(SPECIAL_VAR_T)
             .expect("t parameter slot must be reserved");
 
         let mut subgroup_total_mappings: Vec<SubgroupTotalMapping> = subgroup_total_layout
@@ -299,6 +299,7 @@ impl CompiledModel {
             subgroup_total_mappings,
             formula_parameters,
             series_parameters,
+            settable_parameters: fixed_parameters,
             total_parameter_index,
             t_parameter_index,
             requires_compartment_context,
@@ -387,16 +388,6 @@ fn check_whole_units(model: &Model, aggregate: &Aggregate) -> Result<(), String>
     ))
 }
 
-/// How the message of an engine that steps only at integers names it, or
-/// `None` when the engine runs at any position.
-fn integer_stepper(engine: EngineType) -> Option<&'static str> {
-    match engine {
-        EngineType::DifferenceEquations => Some("a difference-equations model"),
-        EngineType::StochasticSteps => Some("the StochasticSteps engine"),
-        _ => None,
-    }
-}
-
 /// Whether `position` is a valid position that is not an integer. A
 /// position that is not finite or is negative is not one: the compilation of
 /// the model rejects it with its own message.
@@ -414,9 +405,9 @@ fn first_between_integers(positions: impl Iterator<Item = f64>) -> Option<f64> {
 /// Check the series points and the impulse positions against the engine.
 ///
 /// A `"pulse"` series acts on one whole step, so each of its points must be
-/// an integer, whatever the engine. An engine that steps only at integers
-/// ([`integer_stepper`]) cannot run a series point or an impulse between two
-/// steps either.
+/// an integer, whatever the engine. An engine that reports only at integer
+/// steps ([`commol_core::EngineType::reports_at_integer_steps`]) cannot run a series point
+/// or an impulse between two steps either.
 fn check_positions_of_engine(model: &Model) -> Result<(), String> {
     let series = || {
         model
@@ -439,9 +430,10 @@ fn check_positions_of_engine(model: &Model) -> Result<(), String> {
             ));
         }
     }
-    let Some(stepper) = integer_stepper(model.engine.engine_type()) else {
+    let engine = model.engine.engine_type();
+    if !engine.reports_at_integer_steps() {
         return Ok(());
-    };
+    }
     for transition in &model.process.transitions {
         let position = match (&transition.impulse_at, transition.impulse_every) {
             (Some(positions), None) => first_between_integers(positions.iter().copied()),
@@ -453,8 +445,9 @@ fn check_positions_of_engine(model: &Model) -> Result<(), String> {
         if let Some(position) = position {
             return Err(format!(
                 "Impulse transition '{}' acts at {position}, which is not an integer \
-                 step; {stepper} steps only at integers",
-                transition.id
+                 step; the {} engine steps only at integers",
+                transition.id,
+                engine.name()
             ));
         }
     }
@@ -462,7 +455,8 @@ fn check_positions_of_engine(model: &Model) -> Result<(), String> {
         if let Some(position) = first_between_integers(data.iter().map(|&(p, _)| p)) {
             return Err(format!(
                 "Series parameter '{id}' has a point at {position}, which is not an \
-                 integer step; {stepper} steps only at integers"
+                 integer step; the {} engine steps only at integers",
+                engine.name()
             ));
         }
     }
@@ -1187,9 +1181,10 @@ fn reads_variable<'a>(
 /// The values that a rate or a formula parameter compares `t` with (`t < c`,
 /// `c <= t`, ...), when `c` reads only numbers and `fixed_parameters`.
 ///
-/// A rate that reads `t` can jump where `t` reaches such a value; a
-/// differential engine restarts its integration there, so it cannot step over
-/// a short window. A comparison of `t` with the state is not a fixed position
+/// A rate that reads `t` can jump where `t` reaches such a value; the engines
+/// in continuous time stop there (`DifferentialEquations` restarts its
+/// integration, `StochasticEvents` its wait), so neither steps over a short
+/// window. A comparison of `t` with the state is not a fixed position
 /// and is not collected.
 fn time_thresholds<'a>(
     transition_flows: impl IntoIterator<Item = &'a TransitionFlow>,
@@ -1628,9 +1623,9 @@ fn resolve_var_slot(
 ) -> VarSlot {
     if let Some(&idx) = compartment_map.get(name) {
         VarSlot::Compartment(idx)
-    } else if name == "step" {
+    } else if name == SPECIAL_VAR_STEP {
         VarSlot::Step
-    } else if name == "t" {
+    } else if name == SPECIAL_VAR_T {
         VarSlot::Time
     } else if name == SPECIAL_VAR_PI {
         VarSlot::Constant(std::f64::consts::PI)

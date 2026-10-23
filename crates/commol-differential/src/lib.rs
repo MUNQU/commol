@@ -19,12 +19,22 @@
 //!
 //! ## Example Usage
 //!
-//! ```rust,ignore
-//! use commol_core::SimulationEngine;
+//! ```rust
+//! use commol_core::{Model, SimulationEngine};
 //! use commol_differential::DifferentialEquations;
 //!
-//! let mut engine = DifferentialEquations::try_from_model(&model)?;
-//! let rows = engine.run_at(&[0.0, 0.5, 2.25])?;
+//! // A → B at the rate k1, from A = 900 and B = 100.
+//! let json = r#"{"name":"m","parameters":[{"id":"k1","value":0.1}],
+//!     "engine":{"type":"DifferentialEquations"},
+//!     "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
+//!     "accumulators":[],"stratifications":[],
+//!     "transitions":[{"id":"ab","source":["A"],"target":["B"],"rate":"k1"}]},
+//!     "structure":{"kind":"aggregate","bin_amounts":{"A":900.0,"B":100.0}}}"#;
+//! let model: Model = serde_json::from_str(json).unwrap();
+//! let mut engine = DifferentialEquations::try_from_model(&model).unwrap();
+//! let rows = engine.run_at(&[0.0, 0.5, 2.25]).unwrap();
+//! assert_eq!(rows.len(), 3);
+//! assert!(rows[2][0] < rows[1][0]);
 //! ```
 
 #![warn(missing_docs)]
@@ -33,10 +43,8 @@ mod solve;
 
 pub use solve::SPARSE_THRESHOLD;
 
-use commol_core::{EngineSettings, ModelValue, OdeSolver, SimulationError};
-use commol_model::{
-    CompartmentalEngine, CompiledModel, InitialConditionPlan, OutputLabels, output_sums,
-};
+use commol_core::{EngineSettings, EngineType, OdeSolver, SimulationError};
+use commol_model::{CompartmentalEngine, CompiledModel};
 
 /// Differential equations simulation engine.
 ///
@@ -54,17 +62,18 @@ pub struct DifferentialEquations {
 }
 
 impl DifferentialEquations {
-    /// Compile a differential-equations model into an engine.
+    /// Compile a model of the `DifferentialEquations` engine.
     ///
     /// # Errors
     ///
-    /// Returns a message when the model is not a differential-equations
-    /// model, when a tolerance is not positive, or when
+    /// Returns a message when the model is not of this engine, when a
+    /// tolerance is not positive, or when
     /// [`CompiledModel::try_from_model`] fails.
     pub fn try_from_model(model: &commol_core::Model) -> Result<Self, String> {
         let EngineSettings::DifferentialEquations(settings) = *model.engine.settings() else {
             return Err(format!(
-                "The DifferentialEquations engine cannot solve a {} model",
+                "The {} engine cannot run a {} model",
+                EngineType::DifferentialEquations.name(),
                 model.engine.engine_type().name()
             ));
         };
@@ -89,24 +98,9 @@ impl DifferentialEquations {
         })
     }
 
-    /// The solver settings.
-    pub fn settings(&self) -> &OdeSolver {
-        &self.settings
-    }
-
     /// Current amount of each compartment, without the accumulators.
     pub fn state(&self) -> Vec<f64> {
         self.state[..self.model.num_compartments()].to_vec()
-    }
-
-    /// Names of the compartments.
-    pub fn compartments(&self) -> Vec<String> {
-        self.model.compartments().to_vec()
-    }
-
-    /// Names of every output: compartments, then accumulators.
-    pub fn output_names(&self) -> Vec<String> {
-        self.model.output_names().to_vec()
     }
 
     /// Apply the impulses at the current time, once.
@@ -136,7 +130,9 @@ impl DifferentialEquations {
         positions: &[f64],
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), String> {
-        commol_core::check_positions(positions, self.current_time, check_time)?;
+        commol_core::check_positions(positions, self.current_time, |position| {
+            EngineType::DifferentialEquations.check_position(position)
+        })?;
         let output_len = self.state.len();
         buffer.resize_with(positions.len(), Vec::new);
         for row in buffer.iter_mut() {
@@ -170,23 +166,11 @@ impl DifferentialEquations {
     }
 }
 
-/// Why a differential engine does not report at `position`, if it does not.
-fn check_time(position: f64) -> Result<(), String> {
-    if position.is_finite() && position >= 0.0 {
-        Ok(())
-    } else {
-        Err(format!(
-            "a differential-equations model reports at finite, non-negative positions; \
-             {position} is not one"
-        ))
-    }
-}
-
 impl commol_core::SimulationEngine for DifferentialEquations {
-    type ValuePlan = InitialConditionPlan;
+    commol_model::delegate_to_compiled_model!();
 
     fn check_position(&self, position: f64) -> Result<(), String> {
-        check_time(position)
+        EngineType::DifferentialEquations.check_position(position)
     }
 
     fn step(&mut self) -> Result<(), SimulationError> {
@@ -201,10 +185,6 @@ impl commol_core::SimulationEngine for DifferentialEquations {
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), SimulationError> {
         Ok(self.integrate_to(positions, buffer)?)
-    }
-
-    fn output_names(&self) -> Vec<String> {
-        DifferentialEquations::output_names(self)
     }
 
     /// The relative tolerance of the solver.
@@ -223,51 +203,18 @@ impl commol_core::SimulationEngine for DifferentialEquations {
         self.settled = false;
     }
 
-    fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
-        self.model.set_parameter(parameter_id, value);
-        Ok(())
-    }
-
     fn current_position(&self) -> f64 {
         self.current_time
-    }
-
-    fn state_outputs(&self) -> usize {
-        self.model.num_compartments()
-    }
-
-    fn output_sums(&self) -> Vec<(String, Vec<usize>)> {
-        output_sums(self.model.output_labels())
-    }
-
-    fn plan_values(
-        &self,
-        values: &[ModelValue],
-        remainder: Option<&str>,
-    ) -> Result<InitialConditionPlan, String> {
-        InitialConditionPlan::new(self, values, remainder)
-    }
-
-    fn apply_values(&mut self, plan: &InitialConditionPlan, values: &[f64]) -> Result<f64, String> {
-        plan.apply(self, values)
     }
 }
 
 impl CompartmentalEngine for DifferentialEquations {
-    fn compartments(&self) -> Vec<String> {
-        DifferentialEquations::compartments(self)
+    fn model(&self) -> &CompiledModel {
+        &self.model
     }
 
-    fn output_labels(&self) -> Vec<OutputLabels> {
-        self.model.output_labels().to_vec()
-    }
-
-    fn initial_state(&self) -> Vec<f64> {
-        self.model.initial_state()[..self.model.num_compartments()].to_vec()
-    }
-
-    fn total(&self) -> f64 {
-        self.model.total()
+    fn model_mut(&mut self) -> &mut CompiledModel {
+        &mut self.model
     }
 
     fn set_initial_condition(

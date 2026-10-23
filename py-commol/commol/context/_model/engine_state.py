@@ -382,15 +382,16 @@ def check_model_values(
     remainder: str | None = None,
 ) -> None:
     """
-    Check the values of the model kind that a calibration sets.
+    Check the parameters and the values of the model kind that a calibration sets.
 
-    ``parameter``, ``factor`` and ``noise`` values are not checked here: they
-    belong to no model kind. Every other type
-    must be one the kind of the model accepts
-    (`ModelStructure.calibration_value_types`), and the engine must resolve
-    each value and the remainder as the calibration objective does, so its
-    message names the problem: an unknown id, an ambiguous category, or a
-    category of a stratification that is not binary.
+    The engine sets each ``parameter`` value as the calibration objective
+    does, so its message names a parameter the model does not have or one
+    that a formula or a series sets. ``factor`` and ``noise`` values belong
+    to no model kind. Every other type must be one the kind of the model
+    accepts (`ModelStructure.calibration_value_types`), and the engine must
+    resolve each value and the remainder as the calibration objective does,
+    so its message names the problem: an unknown id, an ambiguous category,
+    or a category of a stratification that is not binary.
 
     Parameters
     ----------
@@ -407,8 +408,9 @@ def check_model_values(
     Raises
     ------
     ValueError
-        If the kind does not accept a type of value, or a value or the
-        remainder cannot be resolved.
+        If the engine does not set a parameter, the kind does not accept a
+        type of value, or a value or the remainder cannot be resolved; the
+        message of the engine names the parameter or the initial condition.
     """
     accepted = model.structure.calibration_value_types()
     generic = {
@@ -424,14 +426,11 @@ def check_model_values(
                 f"model does not accept. It accepts: "
                 f"{sorted(generic | accepted)}"
             )
-    try:
-        commol_rs.calibration.check_model_values(
-            engine,
-            rust_parameters(parameters),
-            initial_condition_remainder=remainder,
-        )
-    except ValueError as error:
-        raise ValueError(f"Calibration initial condition: {error}") from error
+    commol_rs.calibration.check_model_values(
+        engine,
+        rust_parameters(parameters),
+        initial_condition_remainder=remainder,
+    )
 
 
 def initial_condition_coverage(

@@ -109,25 +109,105 @@ pub trait ValuePlan: Clone + Debug + Send + Sync {
 /// kind that calibration sets, such as initial conditions, are resolved and
 /// written by the engine ([`Self::plan_values`], [`Self::apply_values`]).
 ///
-/// # Example Implementation
+/// # Example
 ///
-/// ```rust,ignore
-/// use commol_core::SimulationEngine;
+/// An engine of one output that keeps the value of its one parameter:
+///
+/// ```rust
+/// use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan, check_positions};
 ///
 /// #[derive(Clone)]
-/// struct MyModel {
-///     // ... model fields
+/// struct Constant {
+///     value: f64,
+///     position: f64,
 /// }
 ///
-/// impl SimulationEngine for MyModel {
-///     type ValuePlan = MyValuePlan;
+/// /// The engine sets no value of a model kind.
+/// #[derive(Clone, Debug)]
+/// struct NoValues;
+///
+/// impl ValuePlan for NoValues {
+///     fn infeasibility(&self, excess: f64) -> String {
+///         format!("The state is {excess} from feasible")
+///     }
+/// }
+///
+/// impl SimulationEngine for Constant {
+///     type ValuePlan = NoValues;
 ///
 ///     fn check_position(&self, position: f64) -> Result<(), String> {
-///         // Implementation
+///         if position.is_finite() && position >= 0.0 {
+///             Ok(())
+///         } else {
+///             Err(format!("{position} is not a finite, non-negative position"))
+///         }
 ///     }
 ///
-///     // ... implement other required methods
+///     fn run_at_positions_into_buffer(
+///         &mut self,
+///         positions: &[f64],
+///         buffer: &mut Vec<Vec<f64>>,
+///     ) -> Result<(), SimulationError> {
+///         check_positions(positions, self.position, |position| {
+///             self.check_position(position)
+///         })?;
+///         buffer.clear();
+///         buffer.extend(positions.iter().map(|_| vec![self.value]));
+///         if let Some(&last) = positions.last() {
+///             self.position = last;
+///         }
+///         Ok(())
+///     }
+///
+///     fn step(&mut self) -> Result<(), SimulationError> {
+///         self.position += 1.0;
+///         Ok(())
+///     }
+///
+///     fn output_names(&self) -> Vec<String> {
+///         vec!["A".to_string()]
+///     }
+///
+///     fn state_outputs(&self) -> usize {
+///         1
+///     }
+///
+///     fn reset(&mut self) {
+///         self.position = 0.0;
+///     }
+///
+///     fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
+///         if parameter_id != "k1" {
+///             return Err(format!("The model has no parameter '{parameter_id}'"));
+///         }
+///         self.value = value;
+///         Ok(())
+///     }
+///
+///     fn current_position(&self) -> f64 {
+///         self.position
+///     }
+///
+///     fn plan_values(
+///         &self,
+///         values: &[ModelValue],
+///         _remainder: Option<&str>,
+///     ) -> Result<NoValues, String> {
+///         match values.first() {
+///             None => Ok(NoValues),
+///             Some(value) => Err(format!("The engine sets no value '{}'", value.id)),
+///         }
+///     }
+///
+///     fn apply_values(&mut self, _plan: &NoValues, _values: &[f64]) -> Result<f64, String> {
+///         Ok(0.0)
+///     }
 /// }
+///
+/// let mut engine = Constant { value: 2.0, position: 0.0 };
+/// engine.set_parameter("k1", 3.0).unwrap();
+/// assert!(engine.set_parameter("k9", 1.0).is_err());
+/// assert_eq!(engine.run(2).unwrap().rows, vec![vec![3.0]; 3]);
 /// ```
 pub trait SimulationEngine: Clone {
     /// The values of the model kind, resolved by [`Self::plan_values`].
@@ -138,9 +218,10 @@ pub trait SimulationEngine: Clone {
     /// # Errors
     ///
     /// Returns why the position is not accepted, without naming the object
-    /// that holds it: the caller adds that name. A difference engine accepts
-    /// only non-negative integers; a differential engine any finite,
-    /// non-negative position.
+    /// that holds it: the caller adds that name. An engine of the list
+    /// returns the rule of its entry ([`crate::EngineType::check_position`]):
+    /// only integer steps for an engine whose rate is per step, any finite,
+    /// non-negative position for the others.
     fn check_position(&self, position: f64) -> Result<(), String>;
 
     /// Run from the current position through the last of `positions`,
@@ -267,24 +348,21 @@ pub trait SimulationEngine: Clone {
     /// The new value acts from the current position
     /// ([`Self::current_position`]), never before it: a stochastic engine
     /// first settles at the position what it drew with the old value, such
-    /// as a pending wait or leap.
+    /// as a pending wait or leap. Calibration sets its parameters through
+    /// this method, and checks each one with it when it is built.
     ///
     /// # Arguments
     ///
     /// * `parameter_id` - The unique identifier of the parameter (e.g., "k1", "k2")
     /// * `value` - The new value to assign
     ///
-    /// # Returns
+    /// # Errors
     ///
-    /// `Ok(())` if successful, or an error message if the parameter doesn't exist
-    /// or the value is invalid.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// engine.set_parameter("k1", 0.3)?;
-    /// engine.set_parameter("k2", 0.1)?;
-    /// ```
+    /// Returns a message that names the parameter when the engine does not
+    /// let a caller set it: an id that is not a parameter of the model, or a
+    /// parameter whose value the engine writes itself, such as one an
+    /// engine of the aggregate kind computes from its formula or its series
+    /// at each step. The engine is unchanged after an error.
     fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String>;
 
     /// The current position on the axis.

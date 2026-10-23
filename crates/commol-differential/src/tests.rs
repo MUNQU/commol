@@ -867,7 +867,7 @@ fn an_engine_solves_only_a_model_of_its_own_type() {
 
     assert_eq!(
         error,
-        "The DifferenceEquations engine cannot solve a DifferentialEquations model"
+        "The DifferenceEquations engine cannot run a DifferentialEquations model"
     );
 }
 

@@ -105,13 +105,6 @@ class TestUncalibratedParameters:
         assert "not found" in str(error.value).lower()
 
 
-STEPPERS = {
-    "DifferenceEquations": "a difference-equations model",
-    "StochasticSteps": "the StochasticSteps engine",
-}
-"""The engines that step only at integers, as their messages name them."""
-
-
 @pytest.mark.parametrize("engine", ["DifferenceEquations", "StochasticSteps"])
 def test_a_point_the_engine_cannot_run_is_rejected_at_build_and_update(
     engine: EngineName,
@@ -119,7 +112,7 @@ def test_a_point_the_engine_cannot_run_is_rejected_at_build_and_update(
     between = SeriesValue(data=[(0, 0.1), (1.5, 0.2)], mode="step_function")
     point = (
         r"Series parameter 'k' has a point at 1\.5, which is not an integer step; "
-        f"{STEPPERS[engine]} steps only at integers"
+        f"the {engine} engine steps only at integers"
     )
     with_point = a_to_b_builder(parameters={}, rate="k")
     with_point.add_parameter("k", between.data, mode=between.mode)

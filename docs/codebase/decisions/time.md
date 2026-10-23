@@ -204,10 +204,13 @@ public Python name (`at`); a length is `window` or `period`; a count of steps
 keeps `num_steps`. The `SimulationEngine` trait
 (`crates/commol-core/src/simulation_engine.rs`) runs only at positions
 (`run_at_positions_into_buffer`); `run(n)` runs on the grid the engine builds,
-`grid(n)`, and returns it. Each engine says which positions its model type
-accepts (`check_position`): the difference engine and the chain binomial
-(`StochasticSteps`) non-negative integers, the differential engine and the
-events engine (`StochasticEvents`) any finite, non-negative position. The engine checks every
+`grid(n)`, and returns it. One rule says which positions each engine accepts
+(`EngineType::check_position` in `crates/commol-core/src/types/engine.rs`),
+and each engine's `check_position` and the builder read it: an engine whose
+rate is per step (`DifferenceEquations`, `StochasticSteps`,
+`EngineType::reports_at_integer_steps`) non-negative integers, the others
+(`DifferentialEquations`, `StochasticEvents`) any finite, non-negative
+position. Its message starts with "The <engine> engine". The engine checks every
 position where it receives it, and its message names the object that holds a
 rejected one: the observation or constraint (`check_positions` in
 `crates/commol-calibration/src/calibration_problem.rs`), the impulse transition
@@ -220,6 +223,8 @@ runs (`Predictive::new` in `crates/commol-inference/src/predictive.rs`).
 checks whether a model type accepts a position.
 
 **Guards:** `crates/commol-calibration/tests/test_positions.rs`,
+`crates/commol-core/tests/positions.rs::only_the_engines_of_rates_per_step_report_at_integer_steps_alone`,
+`tests/simulation/test_runs.py::test_each_engine_names_itself_when_it_rejects_a_position`,
 `crates/commol-difference/src/simulation.rs::integer_positions_are_accepted_and_others_rejected`,
 `crates/commol-differential/src/tests.rs::a_difference_engine_names_a_series_point_between_steps`,
 `crates/commol-model/tests/schedules.rs::an_engine_that_steps_at_integers_rejects_a_position_between_steps_at_the_check`,
@@ -235,9 +240,11 @@ checks whether a model type accepts a position.
 `json.dumps` and `pandas.DataFrame(results)` working; a reserved key could clash
 with an output name. Windows, reports and plots read a value at a position
 (`index_at`, which matches within a relative `1e-9`), never at a list index, so
-a model type that reports between integers fits them. A predictive holds the
-positions it was asked for (`Predictive.positions`).
+a model type that reports between integers fits them. The engines take the
+same tolerance (`same_position` in `crates/commol-core/src/position.rs`). A
+predictive holds the positions it was asked for (`Predictive.positions`).
 
 **Guards:** `tests/simulation/test_runs.py::TestResults`,
+`crates/commol-core/tests/positions.rs::same_position_is_relative_to_the_larger_magnitude`,
 `tests/reporting/test_simulation_report.py::TestNonIntegerPositions`,
 `tests/plotting/test_figures.py::TestDifferentialModel`.

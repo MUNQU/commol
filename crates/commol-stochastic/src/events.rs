@@ -2,14 +2,13 @@
 //! direct method), or many in a leap (tau-leaping).
 
 use commol_core::{
-    EngineSettings, EngineType, EventMethod, ModelValue, SimulationError, StochasticEventsSettings,
+    EngineSettings, EngineType, EventMethod, SimulationError, StochasticEventsSettings,
+    same_position,
 };
-use commol_model::{
-    CompartmentalEngine, CompiledModel, InitialConditionPlan, OutputLabels, output_sums,
-};
+use commol_model::{CompartmentalEngine, CompiledModel, rounded};
 use commol_random::sample;
 
-use crate::units::{Units, rounded};
+use crate::units::Units;
 
 /// The order of the reactions Cao, Gillespie and Petzold (2006) bound a leap
 /// with. A rate of commol is a formula, whose order is unknown, so the engine
@@ -28,13 +27,6 @@ const LEAP_HALVINGS: usize = 30;
 
 /// The deepest recursion of the adaptive Simpson rule.
 const SIMPSON_DEPTH: u32 = 40;
-
-/// Relative tolerance with which two positions on the axis are the same.
-const POSITION_TOLERANCE: f64 = 1e-9;
-
-fn same_position(a: f64, b: f64) -> bool {
-    (a - b).abs() <= POSITION_TOLERANCE * a.abs().max(b.abs()).max(1.0)
-}
 
 /// What happens next, from the last change of the state.
 enum Next {
@@ -117,7 +109,8 @@ impl StochasticEvents {
     pub fn try_from_model(model: &commol_core::Model) -> Result<Self, String> {
         let EngineSettings::StochasticEvents(settings) = *model.engine.settings() else {
             return Err(format!(
-                "The StochasticEvents engine cannot run a {} model",
+                "The {} engine cannot run a {} model",
+                EngineType::StochasticEvents.name(),
                 model.engine.engine_type().name()
             ));
         };
@@ -137,11 +130,6 @@ impl StochasticEvents {
         })
     }
 
-    /// The compiled model the engine runs.
-    pub fn model(&self) -> &CompiledModel {
-        &self.units.model
-    }
-
     /// Current amount of each compartment, without the accumulators.
     pub fn state(&self) -> Vec<f64> {
         self.units.state[..self.units.model.num_compartments()].to_vec()
@@ -154,7 +142,9 @@ impl StochasticEvents {
         positions: &[f64],
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), SimulationError> {
-        commol_core::check_positions(positions, self.position, check_time)?;
+        commol_core::check_positions(positions, self.position, |position| {
+            EngineType::StochasticEvents.check_position(position)
+        })?;
         buffer.resize_with(positions.len(), Vec::new);
         self.units.begin();
         if !self.settled {
@@ -644,23 +634,11 @@ enum Change {
     Break(f64),
 }
 
-/// Why the engine does not report at `position`, if it does not.
-fn check_time(position: f64) -> Result<(), String> {
-    if position.is_finite() && position >= 0.0 {
-        Ok(())
-    } else {
-        Err(format!(
-            "a StochasticEvents model reports at finite, non-negative positions; \
-             {position} is not one"
-        ))
-    }
-}
-
 impl commol_core::SimulationEngine for StochasticEvents {
-    type ValuePlan = InitialConditionPlan;
+    commol_model::delegate_to_compiled_model!(except set_parameter);
 
     fn check_position(&self, position: f64) -> Result<(), String> {
-        check_time(position)
+        EngineType::StochasticEvents.check_position(position)
     }
 
     fn run_at_positions_into_buffer(
@@ -674,18 +652,6 @@ impl commol_core::SimulationEngine for StochasticEvents {
     fn step(&mut self) -> Result<(), SimulationError> {
         let mut buffer = Vec::with_capacity(1);
         self.run_to(&[self.position + 1.0], &mut buffer)
-    }
-
-    fn output_names(&self) -> Vec<String> {
-        self.units.model.output_names().to_vec()
-    }
-
-    fn state_outputs(&self) -> usize {
-        self.units.model.num_compartments()
-    }
-
-    fn output_sums(&self) -> Vec<(String, Vec<usize>)> {
-        output_sums(self.units.model.output_labels())
     }
 
     fn reset(&mut self) {
@@ -706,45 +672,26 @@ impl commol_core::SimulationEngine for StochasticEvents {
     }
 
     /// Settle at the position (`StochasticEvents::settle`), then change the
-    /// parameter, which acts from the position.
+    /// parameter, which acts from the position. A parameter that the model
+    /// does not let a caller set leaves the engine as it was.
     fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
+        self.model().check_parameter(parameter_id)?;
         self.settle();
-        self.units.model.set_parameter(parameter_id, value);
-        Ok(())
+        self.model_mut().set_parameter(parameter_id, value)
     }
 
     fn current_position(&self) -> f64 {
         self.position
     }
-
-    fn plan_values(
-        &self,
-        values: &[ModelValue],
-        remainder: Option<&str>,
-    ) -> Result<InitialConditionPlan, String> {
-        InitialConditionPlan::new(self, values, remainder)
-    }
-
-    fn apply_values(&mut self, plan: &InitialConditionPlan, values: &[f64]) -> Result<f64, String> {
-        plan.apply(self, values)
-    }
 }
 
 impl CompartmentalEngine for StochasticEvents {
-    fn compartments(&self) -> Vec<String> {
-        self.units.model.compartments().to_vec()
+    fn model(&self) -> &CompiledModel {
+        &self.units.model
     }
 
-    fn output_labels(&self) -> Vec<OutputLabels> {
-        self.units.model.output_labels().to_vec()
-    }
-
-    fn initial_state(&self) -> Vec<f64> {
-        self.units.model.initial_state()[..self.units.model.num_compartments()].to_vec()
-    }
-
-    fn total(&self) -> f64 {
-        self.units.model.total()
+    fn model_mut(&mut self) -> &mut CompiledModel {
+        &mut self.units.model
     }
 
     fn set_initial_condition(

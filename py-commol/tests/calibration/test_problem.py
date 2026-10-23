@@ -219,9 +219,23 @@ class TestProblemAgainstTheModel:
         assert calibrator.num_observations == 3
         assert calibrator.parameter_names == ["k1", "k2"]
 
-    def test_a_parameter_is_one_of_the_model(self, truth: Model) -> None:
-        with pytest.raises(ValueError, match=r"'k9' not found .*\['k1', 'k2'\]"):
+    def test_the_engine_rejects_an_unknown_calibration_parameter(
+        self, truth: Model
+    ) -> None:
+        with pytest.raises(
+            ValueError,
+            match="^Parameter 'k9' is not in the model; the parameters that can be "
+            "set are k1, k2$",
+        ):
             self._calibrator(truth, [bounded("k9")])
+
+    def test_the_engine_rejects_a_formula_calibration_parameter(self) -> None:
+        model = build(abc_builder(parameters={"k1": 0.1, "k2": "2 * k1"}))
+
+        with pytest.raises(
+            ValueError, match="^Parameter 'k2' cannot be set: its formula sets it"
+        ):
+            self._calibrator(model, [bounded("k2")])
 
     def test_a_factor_has_positive_bounds(self, truth: Model) -> None:
         with pytest.raises(ValueError, match="'f' must have positive bounds"):

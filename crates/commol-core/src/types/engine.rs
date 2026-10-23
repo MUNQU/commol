@@ -175,7 +175,8 @@ pub enum DynamicsForm {
 
 impl DynamicsForm {
     /// Every form.
-    pub const ALL: &'static [Self] = &[
+    #[cfg(test)]
+    pub(crate) const ALL: &'static [Self] = &[
         Self::DifferenceEquation,
         Self::DifferentialEquation,
         Self::StochasticEvents,
@@ -359,6 +360,43 @@ impl EngineType {
             kind.name(),
             kind.name(),
             engines
+        ))
+    }
+
+    /// Whether the engine reports only at integer steps: the engines whose
+    /// rate is a change per step ([`RateMeaning::PerStep`]) advance one whole
+    /// step at a time, so a position, an impulse or a series point between
+    /// two steps is not one they run.
+    pub fn reports_at_integer_steps(self) -> bool {
+        self.rate_meaning() == RateMeaning::PerStep
+    }
+
+    /// Check that the engine reports at a position on the axis: an integer
+    /// step from 0 for an engine that reports only at integer steps
+    /// ([`Self::reports_at_integer_steps`]), any finite, non-negative
+    /// position for the others. Each engine's
+    /// [`crate::SimulationEngine::check_position`] is this rule.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that starts with "The" and the name of the engine,
+    /// and names the position.
+    pub fn check_position(self, position: f64) -> Result<(), String> {
+        if self.reports_at_integer_steps() {
+            if position >= 0.0 && position.fract() == 0.0 && position <= f64::from(u32::MAX) {
+                return Ok(());
+            }
+            return Err(format!(
+                "The {} engine reports only at integer steps; {position} is not one",
+                self.name()
+            ));
+        }
+        if position.is_finite() && position >= 0.0 {
+            return Ok(());
+        }
+        Err(format!(
+            "The {} engine reports at finite, non-negative positions; {position} is not one",
+            self.name()
         ))
     }
 
@@ -704,9 +742,6 @@ pub enum Rounding {
 }
 
 impl Rounding {
-    /// Every rounding, as a stochastic engine lists them.
-    pub const ALL: &'static [Self] = &[Self::LargestRemainder, Self::Random];
-
     /// Name of the rounding, as the settings write it.
     pub fn name(self) -> &'static str {
         match self {

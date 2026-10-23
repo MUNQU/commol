@@ -8,7 +8,7 @@ use super::libm::LibmRegistry;
 use super::parser::parse_expression;
 use crate::math_expression::MathExpressionContext;
 use crate::math_expression::error::MathExpressionError;
-use crate::math_expression::preprocessing::SPECIAL_VAR_TOTAL;
+use crate::math_expression::preprocessing::{SPECIAL_VAR_STEP, SPECIAL_VAR_T, SPECIAL_VAR_TOTAL};
 use cranelift::prelude::*;
 use cranelift_codegen::ir::AbiParam;
 use cranelift_jit::{JITBuilder, JITModule};
@@ -73,9 +73,9 @@ impl JITFunction {
                 v
             } else if let Some(v) = context.compartments.get(name).copied() {
                 v
-            } else if name == "step" {
+            } else if name == SPECIAL_VAR_STEP {
                 context.step
-            } else if name == "t" {
+            } else if name == SPECIAL_VAR_T {
                 context.time
             } else if name == SPECIAL_VAR_TOTAL {
                 // Fallback: sum all compartments in sorted order for
@@ -105,8 +105,8 @@ impl JITFunction {
     ///
     /// The caller is responsible for filling `buffer` in the same order as
     /// `self.variable_names`. This skips the name-keyed HashMap resolution
-    /// performed by `call`, so the difference-equations engine can short-circuit
-    /// to direct compartment/parameter access via pre-resolved slots.
+    /// performed by `call`, so an engine evaluates a rate from slots of the
+    /// state and the parameters that it resolved when the model was built.
     pub fn call_with_buffer(&self, buffer: &[f64]) -> Result<f64, MathExpressionError> {
         if buffer.len() != self.variable_names.len() {
             return Err(MathExpressionError::InvalidExpression(format!(
@@ -120,12 +120,14 @@ impl JITFunction {
 }
 
 /// JIT compiler for mathematical expressions
+#[derive(Debug, Default)]
 pub struct JITCompiler;
 
 impl JITCompiler {
-    /// Create a new JIT compiler
-    pub fn new() -> Result<Self, MathExpressionError> {
-        Ok(Self)
+    /// Create a new JIT compiler. Each [`Self::compile`] makes its own
+    /// module, so the compiler holds nothing.
+    pub fn new() -> Self {
+        Self
     }
 
     /// Compile a preprocessed expression to a JIT function

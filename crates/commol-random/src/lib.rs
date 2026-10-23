@@ -1,6 +1,6 @@
 //! Reproducible random numbers for the stochastic engines of commol.
 //!
-//! What every stochastic engine of every model kind shares, and no model:
+//! What the stochastic engines of every model kind share, and no model:
 //!
 //! - [`Generator`]: one `Xoshiro256PlusPlus` generator, seeded from a `u64`
 //!   by SplitMix64, whose sequence is the same on every platform and version;
@@ -10,7 +10,8 @@
 //!   multinomial), written here so that their values do not change with a
 //!   dependency;
 //! - [`SumTree`]: the rates of a set of events, to pick the next one in
-//!   `O(log n)`;
+//!   `O(log n)`. The stochastic engine of the test model kind uses it;
+//!   `StochasticEvents` picks an event by a scan of its propensities;
 //! - [`latin_hypercube`]: a Latin hypercube on the unit cube, which the
 //!   starts of a calibration and the designs of the inference methods map to
 //!   their parameters.

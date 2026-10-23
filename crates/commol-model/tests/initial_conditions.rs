@@ -2,31 +2,43 @@
 //! calibration sets (`InitialConditionPlan`), through `plan_values` and
 //! `apply_values` of `SimulationEngine`.
 
-use std::collections::HashMap;
+use commol_core::{
+    Model, ModelValue, ModelValueType, SimulationEngine, SimulationError, ValuePlan,
+};
+use commol_model::{CompartmentalEngine, CompiledModel, OutputLabels};
 
-use commol_core::{ModelValue, ModelValueType, SimulationEngine, SimulationError, ValuePlan};
-use commol_model::{CompartmentalEngine, InitialConditionPlan, OutputLabels};
-
-/// A compartmental engine that holds its state and does not move it.
-/// Compartment names are `<bin>` or `<bin>_<category>` of one stratification
-/// `group`, and the total is the sum of the state it starts with.
+/// A compartmental engine that holds its state and does not move it: one bin
+/// of the compiled model per compartment. Compartment names are `<bin>` or
+/// `<bin>_<category>` of one stratification `group`, which its labels read,
+/// and the total is the sum of the state it starts with.
 #[derive(Clone)]
 struct FrozenEngine {
-    compartments: Vec<String>,
-    total: f64,
-    initial_state: Vec<f64>,
+    model: CompiledModel,
     state: Vec<f64>,
-    parameters: HashMap<String, f64>,
 }
 
 impl FrozenEngine {
     fn with(compartments: &[&str], state: &[f64]) -> Self {
+        let bins: Vec<String> = compartments
+            .iter()
+            .map(|id| format!(r#"{{"id":"{id}","name":"{id}"}}"#))
+            .collect();
+        let amounts: Vec<String> = compartments
+            .iter()
+            .zip(state)
+            .map(|(id, amount)| format!(r#""{id}":{amount:?}"#))
+            .collect();
+        let json = format!(
+            r#"{{"name":"frozen","parameters":[],"engine":{{"type":"DifferenceEquations"}},
+            "process":{{"bins":[{}],"accumulators":[],"stratifications":[],"transitions":[]}},
+            "structure":{{"kind":"aggregate","bin_amounts":{{{}}}}}}}"#,
+            bins.join(","),
+            amounts.join(",")
+        );
+        let model: Model = serde_json::from_str(&json).expect("valid model JSON");
         Self {
-            compartments: compartments.iter().map(|name| name.to_string()).collect(),
-            total: state.iter().sum(),
-            initial_state: state.to_vec(),
+            model: CompiledModel::try_from_model(&model).unwrap(),
             state: state.to_vec(),
-            parameters: HashMap::new(),
         }
     }
 
@@ -56,7 +68,7 @@ impl FrozenEngine {
 }
 
 impl SimulationEngine for FrozenEngine {
-    type ValuePlan = InitialConditionPlan;
+    commol_model::delegate_to_compiled_model!();
 
     fn check_position(&self, _position: f64) -> Result<(), String> {
         Ok(())
@@ -76,67 +88,38 @@ impl SimulationEngine for FrozenEngine {
         Ok(())
     }
 
-    fn output_names(&self) -> Vec<String> {
-        self.compartments.clone()
-    }
-
-    fn state_outputs(&self) -> usize {
-        self.compartments.len()
-    }
-
     fn reset(&mut self) {
-        self.state.clone_from(&self.initial_state);
-    }
-
-    fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
-        self.parameters.insert(parameter_id.to_string(), value);
-        Ok(())
+        self.state = self.model.initial_state().to_vec();
     }
 
     fn current_position(&self) -> f64 {
         0.0
     }
-
-    fn plan_values(
-        &self,
-        values: &[ModelValue],
-        remainder: Option<&str>,
-    ) -> Result<InitialConditionPlan, String> {
-        InitialConditionPlan::new(self, values, remainder)
-    }
-
-    fn apply_values(&mut self, plan: &InitialConditionPlan, values: &[f64]) -> Result<f64, String> {
-        plan.apply(self, values)
-    }
 }
 
 impl CompartmentalEngine for FrozenEngine {
-    fn compartments(&self) -> Vec<String> {
-        self.compartments.clone()
+    fn model(&self) -> &CompiledModel {
+        &self.model
+    }
+
+    fn model_mut(&mut self) -> &mut CompiledModel {
+        &mut self.model
     }
 
     fn output_labels(&self) -> Vec<OutputLabels> {
-        self.compartments
-            .iter()
+        self.compartments()
+            .into_iter()
             .map(|name| match name.split_once('_') {
                 Some((bin, category)) => OutputLabels {
                     source: bin.to_string(),
                     categories: vec![("group".to_string(), category.to_string())],
                 },
                 None => OutputLabels {
-                    source: name.clone(),
+                    source: name,
                     categories: vec![],
                 },
             })
             .collect()
-    }
-
-    fn initial_state(&self) -> Vec<f64> {
-        self.initial_state.clone()
-    }
-
-    fn total(&self) -> f64 {
-        self.total
     }
 
     fn set_initial_condition(
@@ -144,7 +127,7 @@ impl CompartmentalEngine for FrozenEngine {
         compartment_index: usize,
         value: f64,
     ) -> Result<(), String> {
-        self.initial_state[compartment_index] = value;
+        self.model.set_initial_condition(compartment_index, value)?;
         self.state[compartment_index] = value;
         Ok(())
     }
@@ -203,7 +186,7 @@ fn a_bin_and_the_remainder_keep_the_split_of_the_initial_state_after_a_run() {
 
     assert_eq!(engine.apply_values(&plan, &[100.0]).unwrap(), 0.0);
 
-    assert_close(&engine.initial_state, &[60.0, 40.0, 720.0, 180.0]);
+    assert_close(&engine.initial_state(), &[60.0, 40.0, 720.0, 180.0]);
 }
 
 #[test]
