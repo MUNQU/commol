@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://munqu.github.io/commol/dev/codebase/decisions/security/">
       
       
-        <link rel="prev" href="../results/">
+        <link rel="prev" href="../figures/">
       
       
         <link rel="next" href="../../conventions/">
@@ -2708,6 +2708,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../figures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Figures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -3002,34 +3030,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../development/design-per-compartment-initial-conditions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Design: Per-compartment initial conditions
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3219,6 +3219,8 @@ and calibration constraints (<code>context/calibration.py</code>) pass through
 engine. The limits are in
 <code>SecurityConfig</code>.</p>
 <p><strong>Rule:</strong> any new field that accepts an expression must call it.</p>
+<p><strong>Guard:</strong> <code>tests/rates/test_security.py</code> (the limits and the rejected
+expressions); <code>tests/axis_patterns/test_patterns.py</code> (a pattern calls it).</p>
 
 
 

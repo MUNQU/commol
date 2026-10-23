@@ -2846,6 +2846,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../figures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Figures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../security/" class="md-nav__link">
         
   
@@ -3066,34 +3094,6 @@
     
   
     Release Process
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../development/design-per-compartment-initial-conditions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Design: Per-compartment initial conditions
   
 
     
@@ -3380,7 +3380,7 @@ be whole is the engine's check, not the converter's.</p>
 <code>window_index</code> and <code>window_ends</code> take the width as a span and a unit, as
 <code>steps</code> does, and check that it is a positive whole number of steps. They call
 the grid in steps of <code>context/_windows.py</code>, private, the one grid that
-<code>windowed_totals</code> and <code>observed_report</code> read; those two take a <code>window</code> of any
+<code>windowed_totals</code> and <code>_observed_report</code> read; those two take a <code>window</code> of any
 positive length, because the window of an observation of a differential model
 need not be whole. No public function takes a width in steps: a width of <code>n</code>
 steps is the span <code>n</code> in the step unit. The grid is in the context layer, so
@@ -3466,8 +3466,8 @@ a piece (<code>breakpoints</code> in <code>crates/commol-differential/src/solve.
 <p>A <code>"step_function"</code> or <code>"linear"</code> series reads <code>t</code>
 (<code>SeriesParameter::evaluate</code>), so it holds or interpolates from any position.
 The engine ends a piece at each of its points (<code>CompiledModel::series_points</code>),
-where the series jumps or bends. A difference engine reads <code>t = step</code>, so it
-gives the same values as before, and it rejects a point between integers.</p>
+where the series jumps or bends. A difference engine reads <code>t = step</code>, so a
+series gives its value at each step, and it rejects a point between integers.</p>
 <p>A rate can also jump where <code>t</code> reaches a value it compares <code>t</code> with
 (<code>t &gt;= t_on</code>, and so <code>AxisPattern.interval</code> and <code>linear_ramp</code>). The compiler
 collects those values when they read only numbers, <code>pi</code>, <code>e</code> and parameters
@@ -3498,7 +3498,8 @@ length, so it would never act.</p>
 <code>tests/axis_patterns/test_pattern_runs.py::TestDifferentialIntegration</code>.</p>
 <h2 id="impulses-come-before-the-flows-of-their-step">Impulses come before the flows of their step<a class="headerlink" href="#impulses-come-before-the-flows-of-their-step" title="Permanent link">&para;</a></h2>
 <p>At step <code>n</code> the state jumps first, then the flows of the step run from the new
-state, in both engines (<code>CompiledModel::apply_impulses</code>). Every jump of one
+state, in every engine of the aggregate kind (<code>CompiledModel::apply_impulses</code>;
+<code>Units::apply_impulses</code> for the stochastic engines). Every jump of one
 step is computed from the state before any of them. The output at <code>n</code> shows the
 state after the jump. With the other order, the differential output at <code>n</code>
 would show the state before the jump and the difference output the state after
@@ -3532,8 +3533,9 @@ keeps <code>num_steps</code>. The <code>SimulationEngine</code> trait
 (<code>crates/commol-core/src/simulation_engine.rs</code>) runs only at positions
 (<code>run_at_positions_into_buffer</code>); <code>run(n)</code> runs on the grid the engine builds,
 <code>grid(n)</code>, and returns it. Each engine says which positions its model type
-accepts (<code>check_position</code>): a difference engine non-negative integers, a
-differential engine any finite, non-negative position. The engine checks every
+accepts (<code>check_position</code>): the difference engine and the chain binomial
+(<code>StochasticSteps</code>) non-negative integers, the differential engine and the
+events engine (<code>StochasticEvents</code>) any finite, non-negative position. The engine checks every
 position where it receives it, and its message names the object that holds a
 rejected one: the observation or constraint (<code>check_positions</code> in
 <code>crates/commol-calibration/src/calibration_problem.rs</code>), the impulse transition

@@ -2824,6 +2824,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../figures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Figures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../security/" class="md-nav__link">
         
   
@@ -3044,34 +3072,6 @@
     
   
     Release Process
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../development/design-per-compartment-initial-conditions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Design: Per-compartment initial conditions
   
 
     
@@ -3441,8 +3441,8 @@ rejected with the fields to use (<code>InitialConditions.reject_fractions_of_a_t
 </tr>
 </tbody>
 </table>
-<p>The cost: a model of one unit writes <code>{"A": 990, "B": 10}</code> where it wrote
-<code>total=1000</code> and <code>{"A": 0.99, "B": 0.01}</code>.</p>
+<p>The cost: a model of one unit writes the amount of each bin, such as
+<code>{"A": 990, "B": 10}</code>, not a total and fractions.</p>
 <p><strong>Guards:</strong> <code>tests/initial_conditions/test_bin_amounts.py</code>,
 <code>tests/reference_models/test_quadratic_decay.py::test_zero_is_the_solution_from_zero</code>,
 <code>builder.rs</code> tests <code>bins_that_all_start_at_zero_build</code> and

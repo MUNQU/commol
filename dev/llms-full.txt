@@ -3651,11 +3651,11 @@ So an expanded-compartment id always becomes an override, and so does a bin or c
 
 ## Next steps
 
-| To learn                            | Read                                                                                                                                       |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| The rules of initial conditions     | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#the-structure-aggregate)                                    |
-| Reporting fitted initial conditions | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                                                                    |
-| The design behind this page         | [Per-compartment initial conditions](https://munqu.github.io/commol/latest/development/design-per-compartment-initial-conditions/index.md) |
+| To learn                            | Read                                                                                                       |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| The rules of initial conditions     | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#the-structure-aggregate)    |
+| Reporting fitted initial conditions | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                                    |
+| The design behind this page         | [Initial conditions](https://munqu.github.io/commol/latest/codebase/decisions/initial-conditions/index.md) |
 
 # Observations
 

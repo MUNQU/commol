@@ -2824,6 +2824,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../figures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Figures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../security/" class="md-nav__link">
         
   
@@ -3044,34 +3072,6 @@
     
   
     Release Process
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../development/design-per-compartment-initial-conditions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Design: Per-compartment initial conditions
   
 
     
@@ -3535,7 +3535,7 @@ renormalises their weights; the user writes the condition.</p>
 (<code>crates/commol-inference/src/quantity.rs</code>). <code>Quantities::terms</code> gives each
 scalar of a run as a numerator and a denominator (1 for a scalar that is not
 a ratio), and <code>Quantities::combine</code> reduces the terms of the replicates of a
-point by the <code>Replicates</code> rule of the scalar: <code>Within</code> (E[N/D], the mean that
+point by the <code>ReplicateRule</code> of the scalar: <code>Within</code> (E[N/D], the mean that
 every other scalar takes), <code>WithinPositive</code> (E[N/D | D &gt; 0]) or <code>Pooled</code>
 (E[N]/E[D]). <code>BatchRunner::means</code> reads <code>combine</code>, so PRCC, Morris, Sobol and
 the polynomial chaos see one value per point; <code>Quantities::evaluate</code> gives
@@ -3544,7 +3544,7 @@ denominator of 0 makes the ratio of a run NaN, whatever the numerator. A point
 with no value is <code>Undefined::Replicate</code> (the first replicate that is NaN) or
 <code>Undefined::Point</code> (no replicate with D &gt; 0, or a pooled denominator of 0),
 and <code>NanRun::replicate</code> is <code>None</code> for the second. The rule has no default:
-the Python class requires <code>replicates</code>.</p>
+<code>Ratio</code> requires <code>replicate_rule</code>.</p>
 <table>
 <thead>
 <tr>

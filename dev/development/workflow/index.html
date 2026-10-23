@@ -2707,6 +2707,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/figures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Figures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/security/" class="md-nav__link">
         
   
@@ -3301,34 +3329,6 @@
     
   
     Release Process
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../design-per-compartment-initial-conditions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Design: Per-compartment initial conditions
   
 
     
@@ -3988,7 +3988,7 @@ them too, and so does, at any time:</p>
 </span></code></pre></div>
 <p>A level is as fresh as the last of these runs. To see the whole plan:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>gh<span class="w"> </span>issue<span class="w"> </span>list<span class="w"> </span>--label<span class="w"> </span>proposal<span class="w"> </span>--state<span class="w"> </span>open
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>gh<span class="w"> </span>issue<span class="w"> </span>list<span class="w"> </span>--milestone<span class="w"> </span><span class="m">0</span>.5.0
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>gh<span class="w"> </span>issue<span class="w"> </span>list<span class="w"> </span>--milestone<span class="w"> </span>&lt;version&gt;
 </span></code></pre></div>
 <p>An issue is ready when every issue that blocks it is closed.</p>
 <p>The project adds a new issue of the repository (its workflow "Auto-add to
@@ -4134,12 +4134,10 @@ each time it runs. The <code>area:</code> labels filter the same zones
 </ol>
 <h2 id="development-process">Development Process<a class="headerlink" href="#development-process" title="Permanent link">&para;</a></h2>
 <h3 id="1-starting-new-work">1. Starting New Work<a class="headerlink" href="#1-starting-new-work" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Always start from the latest main</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>git<span class="w"> </span>checkout<span class="w"> </span>main
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>git<span class="w"> </span>pull<span class="w"> </span>origin<span class="w"> </span>main
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="c1"># Create a feature branch</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>feature/your-feature-name
+<p>Start the issue with <code>start.sh</code>, never by hand
+(<a href="#lifecycle-of-a-proposal">Lifecycle of a proposal</a>). It creates the branch
+from the latest <code>main</code>, linked to the issue, in a sibling worktree:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>.github/scripts/start.sh<span class="w"> </span>&lt;number&gt;<span class="w"> </span>feature/your-feature-name
 </span></code></pre></div>
 <h3 id="2-making-changes">2. Making Changes<a class="headerlink" href="#2-making-changes" title="Permanent link">&para;</a></h3>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Make your changes to the code</span>

@@ -18,7 +18,7 @@
         <link rel="prev" href="../contributing/">
       
       
-        <link rel="next" href="../design-per-compartment-initial-conditions/">
+        <link rel="next" href="../../about/license/">
       
       
         
@@ -2707,6 +2707,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/figures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Figures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/security/" class="md-nav__link">
         
   
@@ -3214,34 +3242,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../design-per-compartment-initial-conditions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Design: Per-compartment initial conditions
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3653,7 +3653,7 @@
 <p>Incremented for backwards-compatible new features:</p>
 <ul>
 <li>New functionality added</li>
-<li>New compartment states, stratifications, or transition types</li>
+<li>New kinds of bins, stratifications or transitions</li>
 <li>Performance improvements without API changes</li>
 <li>Deprecation notices (without removal)</li>
 <li>Example: Adding new mathematical functions, new model types</li>
@@ -3695,7 +3695,9 @@ or <code>None</code> when the source has no git metadata (a source distribution)
 <code>tests/suite/test_version.py</code> checks the version and the commit of the build
 that the tests run on, and the Rust tests of <code>build_info.rs</code> check the rule.</p>
 <h2 id="release-workflow">Release Workflow<a class="headerlink" href="#release-workflow" title="Permanent link">&para;</a></h2>
-<p>A release is always made from <code>main</code>. Publishing a GitHub release starts the
+<p>A release is a tag on <code>main</code>. Only a fix of a version that <code>main</code> has left
+behind is a tag on its branch <code>release/X.Y</code>
+(<a href="../workflow/#branching-strategy">Branching Strategy</a>). Publishing a GitHub release starts the
 <strong>Release to PyPI</strong> workflow (<code>.github/workflows/release.yaml</code>), which
 publishes to PyPI immediately: the <code>pypi</code> environment has no approval step.
 The release issue (label <code>release</code>) holds the checklist of this page, and the

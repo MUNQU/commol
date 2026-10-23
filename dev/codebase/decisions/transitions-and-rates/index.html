@@ -2802,6 +2802,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../figures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Figures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../security/" class="md-nav__link">
         
   
@@ -3035,34 +3063,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../development/design-per-compartment-initial-conditions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Design: Per-compartment initial conditions
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3281,38 +3281,11 @@
 <h2 id="absolute-and-proportional-rates">Absolute and proportional rates<a class="headerlink" href="#absolute-and-proportional-rates" title="Permanent link">&para;</a></h2>
 <p>The flow planner (<code>plan_transition_flows</code> in
 <code>crates/commol-model/src/flows.rs</code>) decides for each flow whether the rate
-is absolute or proportional:</p>
-<table>
-<thead>
-<tr>
-<th>Case</th>
-<th>Rate is</th>
-<th>Flow per step</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>A stratified rate sets <code>absolute</code></td>
-<td>As set</td>
-<td>—</td>
-</tr>
-<tr>
-<td>The rate references a compartment, a bin total, <code>total</code> or a <code>total_…</code> variable</td>
-<td>Absolute</td>
-<td><code>rate</code></td>
-</tr>
-<tr>
-<td>The transition has no source</td>
-<td>Absolute</td>
-<td><code>rate</code></td>
-</tr>
-<tr>
-<td>Otherwise</td>
-<td>Proportional</td>
-<td><code>rate × source</code></td>
-</tr>
-</tbody>
-</table>
+is absolute or proportional; the cases are in the table of
+<a href="../../../guide/transitions/#absolute-and-proportional-rates">Absolute and proportional rates</a>.
+The closure <code>is_absolute</code> reads only the compartment names and the names of
+<code>subgroup_total_names</code> (<code>builder.rs</code>): <code>total</code> is not one of them, so a rate
+that reads <code>total</code> and no compartment stays proportional.</p>
 <p>A transition with several sources and a proportional rate is rejected, because
 it has no single source to multiply. <code>Model.describe</code> shows the planned flows,
 so a proportional rate prints as <code>k1 * A</code>.</p>
@@ -3328,6 +3301,7 @@ largest number of conditions wins (<code>helpers.rs</code>). On a tie, the first
 the list wins. If none matches, the transition's default <code>rate</code> applies.
 Building a model fails if a stratified rate matches no compartment that the
 transition starts from.</p>
+<p><strong>Guard:</strong> <code>crates/commol-model/tests/flows.rs::the_most_specific_stratified_rate_wins_and_the_first_on_a_tie</code>.</p>
 <h2 id="formula-parameters-are-evaluated-every-step-in-order">Formula parameters are evaluated every step, in order<a class="headerlink" href="#formula-parameters-are-evaluated-every-step-in-order" title="Permanent link">&para;</a></h2>
 <p>Parameters with a formula are evaluated again at each step, in the order they
 were declared (<code>prepare_context</code> in <code>crates/commol-model/src/system.rs</code>). A

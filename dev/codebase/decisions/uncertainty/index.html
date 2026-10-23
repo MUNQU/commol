@@ -2846,6 +2846,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../figures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Figures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../security/" class="md-nav__link">
         
   
@@ -3066,34 +3094,6 @@
     
   
     Release Process
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../development/design-per-compartment-initial-conditions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Design: Per-compartment initial conditions
   
 
     
@@ -3406,8 +3406,10 @@ point; each entry point refuses another kind with a <code>TypeError</code> that 
 right one.
 A method is three parts: a configuration that subclasses <code>UncertaintyMethod</code>
 with its result type (<code>context/inference/</code>), a runner in Rust bound in
-<code>py-commol/src/inference.rs</code>, and a result (<code>context/inference/</code>). It registers
-its runner in <code>api/inference/registry.py</code>; the entry point looks the runner up
+<code>py-commol/src/</code>, in the module of its family, and a result
+(<code>context/inference/</code>). The module of its family under <code>api/inference/</code>
+registers its runner with <code>register</code> (<code>api/inference/registry.py</code>); the entry
+point looks the runner up
 by the configuration's type and knows no method. A static type checker infers
 <code>R</code> from the configuration's type.</p>
 <table>
@@ -3489,11 +3491,11 @@ of each method lists <code>ValueError</code> and <code>RuntimeError</code> by th
 <tbody>
 <tr>
 <td>One error enum per method family</td>
-<td>The same mistake raised <code>ValueError</code> in one family and <code>RuntimeError</code> in another, and each binding chose again.</td>
+<td>The same mistake raises <code>ValueError</code> in one family and <code>RuntimeError</code> in another, and each binding chooses again.</td>
 </tr>
 <tr>
 <td>A <code>String</code> error</td>
-<td>The binding cannot tell an input error from a failure, so it chose one exception for both.</td>
+<td>The binding cannot tell an input error from a failure, so it chooses one exception for both.</td>
 </tr>
 <tr>
 <td>One variant per cause</td>
@@ -3658,9 +3660,12 @@ has residuals of.</p>
 <td>Residual noise on the band at positions</td>
 <td>A series may sum outputs with a factor: a residual has no correct split among outputs, and none for an output nobody observed.</td>
 </tr>
+<tr>
+<td>A kernel density of the draws for the log score</td>
+<td>A bandwidth to choose, and bias in the tails the log score weighs most.</td>
+</tr>
 </tbody>
 </table>
-<p>| A kernel density of the draws for the log score | A bandwidth to choose, and bias in the tails the log score weighs most. |</p>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_resampling.rs::residual_noise_rejects_a_series_with_no_residuals</code>,
 <code>tests/uncertainty/test_resampling.py::TestResidualNoise</code>,
 <code>crates/commol-inference/tests/test_likelihood_target.rs</code>,

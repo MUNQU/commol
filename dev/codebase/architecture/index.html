@@ -2811,6 +2811,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/figures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Figures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/security/" class="md-nav__link">
         
   
@@ -3031,34 +3059,6 @@
     
   
     Release Process
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../development/design-per-compartment-initial-conditions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Design: Per-compartment initial conditions
   
 
     
@@ -3395,7 +3395,7 @@ top to bottom. The dashed box is the base that every box uses.</p>
 <tr>
 <td>Stochastic</td>
 <td><code>commol-stochastic</code></td>
-<td>Moves whole units by random events.</td>
+<td>Moves whole units at random: events in continuous time, or a chain binomial draw per step.</td>
 </tr>
 <tr>
 <td>Calibration</td>
@@ -3435,21 +3435,17 @@ calibration problem.</p>
    returns a validated <code>Model</code> (<code>context/model.py</code>).</li>
 <li><code>Simulation</code> (<code>api/simulation.py</code>) sends the model to Rust once, through
    <code>build_engine</code> (<code>context/_model/engine_state.py</code>). Rust compiles it.</li>
-<li>
-<p>Each <code>run</code> calls the Rust engine and returns <code>SimulationResults</code>
-   (<code>api/results.py</code>).</p>
-</li>
-<li>
-<p><code>Calibrator</code> (<code>api/calibrator.py</code>) takes the compiled engine of a
+<li>Each <code>run</code> calls the Rust engine and returns <code>SimulationResults</code>
+   (<code>api/results.py</code>).</li>
+<li><code>Calibrator</code> (<code>api/calibrator.py</code>) takes the compiled engine of a
    <code>Simulation</code> and builds the calibration problem in Rust once
    (<code>commol_rs.inference.CalibrationProblem</code>, <code>py-commol/src/inference.rs</code>).
    <code>run(starts=n)</code> runs the optimizer loop in Rust from each start, the
    starts and the particles of a swarm in parallel in the pool of
-   <code>commol.threads</code>, and returns the best <code>CalibrationResult</code>.</p>
-</li>
+   <code>commol.threads</code>, and returns the best <code>CalibrationResult</code>.</li>
 <li><code>apply_calibration_parameters</code> writes the result back into the <code>Model</code>.</li>
 <li><code>Calibrator.uncertainty(method)</code> runs a method on the same problem. A method
-   with draws returns a <code>ParameterSample</code>; a <code>Predictive</code>
+   with draws returns a result that holds a <code>ParameterSample</code>; a <code>Predictive</code>
    (<code>api/inference/predictive.py</code>) runs its draws, and <code>commol.scores</code> checks
    them against observations.</li>
 </ol>

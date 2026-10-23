@@ -2709,6 +2709,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/figures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Figures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/security/" class="md-nav__link">
         
   
@@ -3182,34 +3210,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../development/design-per-compartment-initial-conditions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Design: Per-compartment initial conditions
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3670,11 +3670,11 @@ changing it (<a href="../decisions/uncertainty/#methods-plug-into-one-entry-poin
       <code>SmcSampler</code> (<code>crates/commol-inference/src/smc/</code>), not a sampler of its
       own, and its configuration takes required <code>priors</code> (<code>WithPriors</code>)
       (<a href="../decisions/uncertainty/#one-smc-core-many-targets">Design decisions</a>).</li>
-<li>[ ] The runner, bound in <code>py-commol/src/inference.rs</code>, which runs the
-      method through <code>parallel</code> (<code>py-commol/src/parallelism.rs</code>), and its
-      stub in <code>_commol_rs.pyi</code>; a row in the table of
-      <code>docs/guide/parallelism.md</code> and a case of
-      <code>test_one_thread_keeps_every_parallel_method_on_one_core</code>.</li>
+<li>[ ] The runner, bound in <code>py-commol/src/</code> (<code>inference.rs</code> or the module
+      of its family), which runs the method through <code>parallel</code>
+      (<code>py-commol/src/parallelism.rs</code>), and its stub in <code>_commol_rs.pyi</code>; a
+      row in the table of <code>docs/guide/parallelism.md</code> and a case of <code>METHODS</code>
+      in <code>tests/parallelism/test_threads.py</code>.</li>
 <li>[ ] The configuration, a subclass of <code>UncertaintyMethod[YourResult]</code>, and
       the result, in <code>context/inference/</code>; a result with draws holds a
       <code>ParameterSample</code>.</li>
@@ -3689,8 +3689,9 @@ changing it (<a href="../decisions/uncertainty/#methods-plug-into-one-entry-poin
       binding maps it with <code>method_error</code>, and the "Raises" section of its
       docstring lists <code>ValueError</code> and <code>RuntimeError</code> by that rule
       (<a href="../decisions/uncertainty/#methods-raise-one-error-type">Design decisions</a>).</li>
-<li>[ ] <code>register(YourMethod, runner)</code> in <code>api/inference/registry.py</code> (import it
-      from <code>commol.api.inference</code>).</li>
+<li>[ ] The Python runner in the module of its family under <code>api/inference/</code>,
+      which calls <code>register(YourMethod, runner)</code> (<code>api/inference/registry.py</code>);
+      <code>api/inference/__init__.py</code> imports every such module.</li>
 <li>[ ] A coverage study (<code>tests/support/coverage.py</code>, marker <code>coverage_study</code>)
       that shows its intervals cover at their level.</li>
 <li>[ ] A guide page under <code>docs/guide/uncertainty/</code>, a row in the table

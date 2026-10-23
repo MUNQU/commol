@@ -2791,6 +2791,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../figures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Figures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../security/" class="md-nav__link">
         
   
@@ -3011,34 +3039,6 @@
     
   
     Release Process
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../development/design-per-compartment-initial-conditions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Design: Per-compartment initial conditions
   
 
     
@@ -3283,17 +3283,17 @@ nothing that exists changes.</p>
 </tr>
 <tr>
 <td>Engine kinds</td>
-<td>An engine names a method, not a kind: each entry of <code>EngineType</code> names the kinds it runs (<code>EngineType::kinds</code>). <code>Model</code> asks the list (<code>check_kind</code>) when it is made, and <code>Engine::build</code> asks it again and picks the implementation by the pair of the engine and the kind; the error names the engine, both kinds and the engines of the kind of the model (<code>EngineType::engines_of</code>).</td>
+<td>An engine names a method, not a kind: each entry of <code>EngineType</code> names the kinds it runs (<code>EngineType::kinds</code>). <code>Model</code> asks the list (<code>check_kind</code>) when it is made, and <code>Engine::build</code> asks it again and picks the implementation by the pair of the engine and the kind; the message of a mismatch lists the engines that run the kind (<code>EngineType::engines_of</code>).</td>
 <td>Without the check, a model of one kind reaches the engine of another and fails deep in its compilation. One engine per kind would multiply the names: a stochastic engine runs every structure that implements it.</td>
 </tr>
 <tr>
 <td>Values calibration sets</td>
-<td><code>parameter</code> and <code>factor</code> are generic. Each kind declares the types of value of its own it accepts (<code>ModelKind::value_types</code>, which <code>ModelStructure.calibration_value_types</code> asks); the aggregate kind accepts <code>initial_condition</code>. The engine resolves and writes them (<code>SimulationEngine::plan_values</code>, <code>apply_values</code>).</td>
+<td><code>parameter</code>, <code>factor</code> and <code>noise</code> are generic. Each kind declares the types of value of its own it accepts (<code>ModelKind::value_types</code>, which <code>ModelStructure.calibration_value_types</code> asks); the aggregate kind accepts <code>initial_condition</code>. The engine resolves and writes them (<code>SimulationEngine::plan_values</code>, <code>apply_values</code>).</td>
 <td>The calibration crate would know compartments, and a new kind could not calibrate values of its own without editing it.</td>
 </tr>
 <tr>
 <td>Report sections</td>
-<td><code>ModelStructure.report_sections</code> adds the sections of a kind to <code>Model.applied_parameters</code> (default: none); the aggregate kind adds <code>initial_conditions</code>.</td>
+<td><code>ModelStructure.report_sections</code> adds the sections of a kind to <code>Model.applied_parameters</code> (default: none); the aggregate kind adds <code>initial_amounts</code> and <code>category_splits</code> (<code>Aggregate.report_sections</code>).</td>
 <td>A check of the kind in <code>reporting.py</code> brings back a branch per kind.</td>
 </tr>
 <tr>
@@ -3317,8 +3317,9 @@ an engine that is not of the aggregate kind: values through <code>plan_values</c
 <code>crates/commol-core/src/types/engine.rs::an_engine_rejects_a_model_of_another_kind</code>.</p>
 <h2 id="a-model-is-a-header-a-process-a-structure-and-an-engine">A model is a header, a process, a structure and an engine<a class="headerlink" href="#a-model-is-a-header-a-process-a-structure-and-an-engine" title="Permanent link">&para;</a></h2>
 <p><code>Model</code> (Python <code>context/model.py</code>, Rust <code>crates/commol-core/src/types/model.rs</code>)
-is one class for every kind: <code>name</code>, <code>description</code>, <code>version</code>, <code>step_unit</code>,
-<code>parameters</code>, <code>engine</code> (<code>{type, settings}</code>), <code>process</code> and <code>structure</code>. The
+is one class for every kind: <code>name</code>, <code>description</code>, <code>version</code>, <code>parameters</code>,
+<code>engine</code> (<code>{type, settings}</code>), <code>process</code> and <code>structure</code>, and in Python only,
+<code>step_unit</code> and <code>origin</code> (the engines never read them). The
 <strong>process</strong> (<code>Process</code>: bins, accumulators, stratifications, transitions) is
 what changes and how, written once. The <strong>structure</strong> is what changes between
 kinds of model: <code>Aggregate</code> lays the process out as amounts per compartment;

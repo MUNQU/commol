@@ -2709,6 +2709,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/figures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Figures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/security/" class="md-nav__link">
         
   
@@ -3050,34 +3078,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../development/design-per-compartment-initial-conditions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Design: Per-compartment initial conditions
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -3339,8 +3339,9 @@ input reaches is removed, not tested.</p>
 </tr>
 </tbody>
 </table>
-<p>The bindings have no Rust tests: <code>pytest</code> runs them. So the script builds the
-Rust tests and the extension with the instrumentation of <code>cargo llvm-cov</code>,
+<p>The bindings have few Rust tests (<code>py-commol/src/engine.rs</code>,
+<code>py-commol/src/build_info.rs</code>); <code>pytest</code> runs the rest of them. So the script
+builds the Rust tests and the extension with the instrumentation of <code>cargo llvm-cov</code>,
 runs both, and writes one report. It builds in the debug profile, so
 <code>debug_assert!</code> runs and each line keeps its own count; the time budget
 (<code>test_slow_tests_are_listed</code>) stays out, as the job Test of Build times the

@@ -2824,6 +2824,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../figures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Figures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../security/" class="md-nav__link">
         
   
@@ -3044,34 +3072,6 @@
     
   
     Release Process
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../development/design-per-compartment-initial-conditions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Design: Per-compartment initial conditions
   
 
     
@@ -3388,11 +3388,11 @@ accumulator. Every engine reads them, and none has flow logic of its own:</p>
 </tr>
 </tbody>
 </table>
-<p><code>derivatives</code> is <code>flow_changes</code>ᵀ · <code>flow_rates</code>, computed piece by piece in the
-order of the old right-hand side, so the deterministic runs did not change by
-a bit. The deterministic engines are the mean-field limits of the stochastic
-ones, which gives the main test oracle. The positions where a rate can jump
-come from the same model (<code>CompiledModel::breakpoints</code>), so the differential
+<p><code>derivatives</code> is <code>flow_changes</code>ᵀ · <code>flow_rates</code>, computed piece by piece in one
+fixed order; another order changes the last bits of a deterministic run. The
+deterministic engines are the mean-field limits of the stochastic ones, which
+gives the main test oracle. The positions where a rate can jump come from the
+same model (<code>CompiledModel::breakpoints</code>), so the differential
 and the continuous-time stochastic engines stop at the same positions.</p>
 <p>A rate that is not a number stops the run in every engine, with a
 <code>RuntimeError</code> that names the flow and the position: a calibration fails with
@@ -3477,7 +3477,7 @@ there.</p>
 <p>A stochastic engine draws every random number from one generator seeded by
 <code>SimulationEngine::set_seed</code> (<code>crates/commol-core/src/simulation_engine.rs</code>);
 <code>reset</code> restores it, so a run is reproducible from its seed. The default
-<code>set_seed</code> does nothing, so the deterministic engines did not change.
+<code>set_seed</code> does nothing, so a deterministic engine ignores a seed.
 <code>EngineType::is_stochastic</code> says which engines draw: <code>StochasticEvents</code> and
 <code>StochasticSteps</code> (<code>crates/commol-stochastic/</code>). A run does not depend on the
 positions it reports at: <code>StochasticEvents</code> measures each wait from the last
