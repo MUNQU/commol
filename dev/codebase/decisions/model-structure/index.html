@@ -3333,6 +3333,7 @@ display only. Its identity is its label: <code>OutputLabels</code> in
 stratification gives some compartments fewer suffixes than others. Use
 <code>CompartmentLayout::find</code> or <code>of_bin</code> in Rust, and the labels that the engine
 queries return in Python.</p>
+<p><strong>Guard:</strong> <code>crates/commol-model/tests/flows.rs::a_bin_whose_id_starts_with_another_finds_only_its_compartments</code>.</p>
 <h2 id="state-amount-total-and-subgroup-total">State, amount, total and subgroup total<a class="headerlink" href="#state-amount-total-and-subgroup-total" title="Permanent link">&para;</a></h2>
 <p>The library names what the compartments hold without assuming individuals:</p>
 <table>
@@ -3455,6 +3456,7 @@ stratification declared before it (<code>ModelBuilder.add_stratification</code> 
 this).</p>
 <p><strong>Rule:</strong> changing the order of <code>add_stratification</code> calls changes which
 compartments exist and what they are named.</p>
+<p><strong>Guard:</strong> <code>tests/building/test_stratifications.py::test_the_order_of_the_stratifications_sets_the_compartments</code>.</p>
 <h2 id="outputs-are-resolved-by-label">Outputs are resolved by label<a class="headerlink" href="#outputs-are-resolved-by-label" title="Permanent link">&para;</a></h2>
 <p><code>Aggregate.outputs_by_source(model)</code> maps each bin or accumulator id to its
 output names in engine order. It uses the engine expansion (<code>expanded_outputs</code>), so
