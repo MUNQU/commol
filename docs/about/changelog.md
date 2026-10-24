@@ -89,8 +89,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   seed of its start, which a calibration always gives: a verbose calibration
   with a swarm is the calibration without `verbose`, and
   `Calibrator.run_with_history` is start 0 of `Calibrator.run`.
+- The summaries of `PropagationResult`, of the scenarios and of
+  `member_statistics`, the effective size of a propagation and the densities
+  of observation models and priors keep their values: one Rust function
+  computes each, and Python calls the summary as
+  `commol_rs.inference.weighted_summary`. The error of a `Laplace` fit on its
+  bound points to `ProfileLikelihood` and cites no issue.
+- `BootstrapCoverageEta` takes `η` with the one quantile of commol, the one
+  of `weighted_quantiles`, on the logs of the thresholds, so `η` changes
+  once. It needs at least `1/(2(1 − c))` replicates times parameters, where
+  it needed `1/(1 − c) − 1`.
 
 ### Fixed
+
+- A profile reads a parameter with one finite bound, such as `[0, +∞)`, on
+  its bound within `1e-8` of `max(1, |bound|)`, the rule of `Laplace`.
+  Before, every value of such a parameter was on its bound, so a profile
+  never saw the ridge leave the box through it, and the structure of a flat
+  profile gave `undetermined="on_bound"` with that parameter in place of a
+  reading.
 
 - A window whose start rounds to just below 0, such as a window of
   `1000 + 1e-7` that ends at 1000, starts at 0 in an observation, a

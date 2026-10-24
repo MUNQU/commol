@@ -74,7 +74,7 @@ def _square_calibrator(values: list[float], low: float, high: float) -> Calibrat
 
 
 class TestCurvature:
-    def test_a_fit_on_a_bound_is_refused(self) -> None:
+    def test_a_fit_on_its_bound_points_to_a_profile(self) -> None:
         # Values below 5 put the fit of c on its lower bound.
         calibrator = flow_calibrator(
             [1.0, 2.0, 1.0],
@@ -85,8 +85,12 @@ class TestCurvature:
 
         with pytest.raises(
             ValueError, match=r"'c' is on its bound 5.*profile likelihood"
-        ):
+        ) as error:
             calibrator.uncertainty(Laplace(draws=10))
+
+        message = str(error.value)
+        assert "ProfileLikelihood" in message
+        assert "#" not in message
 
     def test_the_hessian_of_a_correct_normal_model_is_its_information(self) -> None:
         # With a known sd, −log L is quadratic in c: its Hessian is n / sd².

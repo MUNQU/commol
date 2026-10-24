@@ -13,8 +13,8 @@ use commol_inference::global_sensitivity::{
 use commol_inference::quantity::{
     MissingPositions, Quantities, Quantity, ReplicateRule, Series, Undefined,
 };
-use commol_inference::statistics::{self, NotANumber};
 use commol_inference::{MethodError, NanRun, PredictiveError, Priors};
+use commol_statistics::statistics::{self, NotANumber};
 use commol_stochastic::StochasticSteps;
 
 fn names(outputs: &[&str]) -> Vec<String> {

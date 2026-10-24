@@ -7,6 +7,8 @@
 
 use std::f64::consts::{PI, SQRT_2};
 
+use commol_statistics::numeric::{ln_beta, ln_gamma};
+
 /// Relative accuracy the series and continued fractions stop at.
 const ACCURACY: f64 = 1e-16;
 /// Terms of a series or continued fraction before it stops.
@@ -18,16 +20,6 @@ const TINY: f64 = 1e-300;
 /// modified Lentz method.
 fn away_from_zero(x: f64) -> f64 {
     if x.abs() < TINY { TINY } else { x }
-}
-
-/// `ln Γ(x)` for `x > 0`.
-pub(crate) fn ln_gamma(x: f64) -> f64 {
-    libm::lgamma(x)
-}
-
-/// `ln B(a, b)`.
-pub(crate) fn ln_beta(a: f64, b: f64) -> f64 {
-    ln_gamma(a) + ln_gamma(b) - ln_gamma(a + b)
 }
 
 /// The standard normal density `φ(z)`; 0 at `±∞`.

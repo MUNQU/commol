@@ -42,7 +42,8 @@ One compiler reads the model. Each engine runs the compiled model with its own
 method and gives one series per output. Calibration runs an engine many times
 and compares the series with the observations. Inference reads the
 calibration problem to measure uncertainty. The arrows show this flow, from
-top to bottom. The dashed box is the base that every box uses.
+top to bottom. The dashed boxes are shared: the base that every box uses, and
+the statistics that calibration and inference use.
 
 ```mermaid
 flowchart TB
@@ -55,14 +56,16 @@ flowchart TB
     C["Calibration<br/>the problem in layers, optimizers"]
     I["Inference<br/>parameter sample, predictive, scores,<br/>resampling, conformal, sensitivities, identifiability,<br/>priors, sequential Monte Carlo, global sensitivity"]
     F["Base: commol-core, commol-random<br/>used by every box"]
+    G["Statistics: commol-statistics<br/>used by calibration and inference"]
     J --> M
     M --> E1 & E2 & E3
     E1 & E2 & E3 --> O
     O --> C
     C --> I
     I ~~~ F
+    I ~~~ G
     classDef base stroke-dasharray: 5 5
-    class F base
+    class F,G base
 ```
 
 | Box | Crate | Job |
@@ -71,12 +74,15 @@ flowchart TB
 | Difference | `commol-difference` | Adds the change of each step: `X += derivatives`. |
 | Differential | `commol-differential` | Integrates the ODEs with `diffsol`. |
 | Stochastic | `commol-stochastic` | Moves whole units at random: events in continuous time, or a chain binomial draw per step. |
-| Calibration | `commol-calibration` | The calibration problem in layers (forward model, observation operator, feasibility, discrepancy: a loss or the likelihood of observation models, optimization objective), and the optimizers that find the values that make an engine match observations, from one or several starts, or with one parameter or prediction held fixed (`Subproblem`); the one quantile of commol (`statistics`), which the summary of the replicates and every method of inference take. |
+| Calibration | `commol-calibration` | The calibration problem in layers (forward model, observation operator, feasibility, discrepancy: a loss or the likelihood of observation models, optimization objective), and the optimizers that find the values that make an engine match observations, from one or several starts, or with one parameter or prediction held fixed (`Subproblem`). |
+| Statistics | `commol-statistics` | One copy of each numerical helper (`log Σ exp`, `x ln y`, the special functions of the gamma family), of the log densities of the normal, the log-normal and the Student t, and of the weighted statistics: the one quantile of commol, the weighted summary of a column, the covariance and the effective size. It depends on no crate of commol. |
 | Inference | `commol-inference` | What every uncertainty method returns or reads: the weighted parameter sample, the predictive of a sample, its observation noise and its scores; the resampling methods, which fit copies of the problem with other data (`CalibrationProblem::with_data`); the conformal prediction intervals; the port of sensitivities and the identifiability analyses; the distributions and priors, and the sequential Monte Carlo sampler with its targets (Gibbs posterior, ABC, the posterior of observation models); the noise, the parametric bootstrap and the log score of observation models; the input spaces, designs, quantities of interest and estimators of global sensitivity, which run on a forward model with no observations; the profile likelihood of parameters and predictions and its thresholds. It depends on calibration, never the reverse. |
 
 Every box uses `commol-core` (shared types, rate formulas, the
 `SimulationEngine` trait). The stochastic engines and calibration also use
-`commol-random` (random numbers), and so does inference. Calibration works
+`commol-random` (random numbers), and so does inference. Calibration and
+inference also use `commol-statistics`, whose quantile the summary of the
+replicates and every method of inference take. Calibration works
 through the `SimulationEngine` trait, so it does not depend on a specific
 engine; inference reaches an engine only through the forward model of a
 calibration problem.

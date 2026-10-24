@@ -10,15 +10,16 @@
 //! a calibration, is the caller's choice.
 
 use commol_calibration::{CalibrationProblem, ObservedDataPoint, SeriesIndex, weighted_crps};
-use commol_core::SimulationEngine;
+use commol_core::{SimulationEngine, check_confidence_level};
 use commol_random::Generator;
+use commol_statistics::numeric::log_sum_exp;
+use commol_statistics::statistics;
 
 use crate::predictive::{
     DistributionNoise, ObservationDraws, ObservationNoise, PredictiveError, check_names,
     observe_sets,
 };
 use crate::sample::ParameterSample;
-use crate::statistics;
 use commol_random::Stream;
 
 fn column(draws: &ObservationDraws, observation: usize) -> Vec<f64> {
@@ -44,7 +45,8 @@ fn intervals(
     confidence_level: f64,
 ) -> Result<Vec<(f64, f64)>, String> {
     check(draws, observed)?;
-    let levels = statistics::interval_levels(confidence_level)?;
+    check_confidence_level(confidence_level)?;
+    let levels = statistics::interval_levels(confidence_level);
     (0..observed.len())
         .map(|i| {
             let q = statistics::quantiles(&column(draws, i), &draws.weights, &levels)?;
@@ -111,7 +113,8 @@ pub fn weighted_interval_score(
     check(draws, observed)?;
     let mut levels = vec![0.5];
     for &c in confidence_levels {
-        levels.extend(statistics::interval_levels(c)?);
+        check_confidence_level(c)?;
+        levels.extend(statistics::interval_levels(c));
     }
     let k = confidence_levels.len() as f64;
     observed
@@ -233,15 +236,6 @@ where
         .collect())
 }
 
-/// `log Σ exp(xᵢ)`, from the largest term; `−∞` when every term is.
-fn log_sum_exp(terms: &[f64]) -> f64 {
-    let largest = terms.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-    if largest == f64::NEG_INFINITY {
-        return largest;
-    }
-    largest + libm::log(terms.iter().map(|&x| libm::exp(x - largest)).sum::<f64>())
-}
-
 /// The mean of `values` per series, named by `labels`, in the order each
 /// series first appears.
 ///
@@ -335,13 +329,6 @@ mod tests {
             seed: 0,
         };
         assert!(crps(&empty, &[]).unwrap_err().contains("at least one draw"));
-    }
-
-    #[test]
-    fn the_log_sum_of_no_mass_is_minus_infinity() {
-        assert_eq!(log_sum_exp(&[f64::NEG_INFINITY; 2]), f64::NEG_INFINITY);
-        let value = log_sum_exp(&[libm::log(0.25), libm::log(0.5)]);
-        assert!((value - libm::log(0.75)).abs() < 1e-15);
     }
 
     #[test]

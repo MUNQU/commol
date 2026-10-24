@@ -18,7 +18,7 @@
 //! series from [`SeriesIndex`].
 //!
 //! The summary of the replicates of a stochastic engine and every method of
-//! `commol-inference` take the one quantile of [`statistics`].
+//! `commol-inference` take the one quantile of `commol_statistics::statistics`.
 //!
 //! [`optimize_starts`] minimizes the objective with Nelder-Mead or a
 //! particle swarm from several start points ([`start_points`]) in parallel,
@@ -72,7 +72,6 @@ pub mod observation;
 pub mod optimization;
 pub mod series;
 pub mod starts;
-pub mod statistics;
 pub mod subproblem;
 pub mod types;
 pub mod values;

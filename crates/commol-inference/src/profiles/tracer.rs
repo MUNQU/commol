@@ -23,6 +23,7 @@ use rayon::prelude::*;
 
 use crate::error::MethodError;
 use crate::profiles::verdict::ProfileVerdict;
+use crate::transform::on_bound;
 use commol_random::Stream;
 
 /// The share of the threshold a step aims to rise by.
@@ -82,14 +83,10 @@ pub struct ProfilePoint {
     /// Whether the refit converged.
     pub converged: bool,
     /// The first free parameter, by index, that sits on a bound here that
-    /// it is not on at the fit ([`ON_BOUND`]): the ridge of the profile has left the
+    /// it is not on at the fit ([`on_bound`]): the ridge of the profile has left the
     /// box of the parameters, and the bound, not the data, shapes the rise.
     pub on_bound: Option<usize>,
 }
-
-/// How close to a bound, as a share of the width of the bounds, a value is
-/// on it; the tolerance of #133.
-pub const ON_BOUND: f64 = 1e-8;
 
 /// The profile of one quantity.
 #[derive(Debug, Clone, PartialEq)]
@@ -579,9 +576,9 @@ where
         })
     }
 
-    /// The first free parameter of `parameters` within [`ON_BOUND`] of the
-    /// width of its bounds of a bound the fit is not on; the held parameter
-    /// of a parameter profile is not free.
+    /// The first free parameter of `parameters` on a bound ([`on_bound`])
+    /// that the fit is not on; the held parameter of a parameter profile is
+    /// not free.
     fn on_bound(&self, quantity: &ProfiledQuantity, parameters: &[f64]) -> Option<usize> {
         let held = match quantity {
             ProfiledQuantity::Parameter(index) => Some(*index),
@@ -589,8 +586,8 @@ where
         };
         let bounds = self.problem.parameter_bounds();
         (0..parameters.len()).find(|&i| {
-            let now = bound_side(parameters[i], bounds[i]);
-            Some(i) != held && now != 0 && now != bound_side(self.fit[i], bounds[i])
+            let now = on_bound(parameters[i], bounds[i]);
+            Some(i) != held && now.is_some() && now != on_bound(self.fit[i], bounds[i])
         })
     }
 
@@ -607,12 +604,12 @@ where
         let (crossing, before) = side.split_last()?;
         let bounds = self.problem.parameter_bounds();
         (0..crossing.parameters.len()).find(|&i| {
-            let bound = bound_side(crossing.parameters[i], bounds[i]);
+            let bound = on_bound(crossing.parameters[i], bounds[i]);
             Some(i) != held
-                && bound != 0
+                && bound.is_some()
                 && std::iter::once(fit)
                     .chain(before)
-                    .any(|point| bound_side(point.parameters[i], bounds[i]) != bound)
+                    .any(|point| on_bound(point.parameters[i], bounds[i]) != bound)
         })
     }
 
@@ -729,19 +726,6 @@ fn term_magnitude<E: SimulationEngine>(
         LossConfig::MeanAbsoluteError => {
             unreachable!("the mean absolute error has no term derivatives")
         }
-    }
-}
-
-/// Which bound `value` sits on, within [`ON_BOUND`] of the width: -1 the
-/// lower, 1 the upper, 0 neither.
-fn bound_side(value: f64, (lo, hi): (f64, f64)) -> i8 {
-    let tolerance = ON_BOUND * (hi - lo);
-    if value - lo <= tolerance {
-        -1
-    } else if hi - value <= tolerance {
-        1
-    } else {
-        0
     }
 }
 

@@ -15,14 +15,15 @@
 //! no indices, and then the interval is NaN: raise `base` rather than drop
 //! it, since dropping such replicates would bias the interval.
 
+use commol_core::check_confidence_level;
 use commol_random::Generator;
 use commol_random::sample::index;
+use commol_statistics::statistics::{interval_levels, quantiles};
 use rayon::prelude::*;
 
 use super::check_numbers;
 use crate::design::SaltelliDesign;
 use crate::error::MethodError;
-use crate::statistics::{interval_levels, quantiles};
 
 /// The first-order and the total index of each input.
 type Indices = (Vec<f64>, Vec<f64>);
@@ -87,7 +88,8 @@ fn estimate(
             "Sobol needs at least 2 bootstrap replicates, got {replicates}"
         ));
     }
-    let levels = interval_levels(confidence_level)?;
+    check_confidence_level(confidence_level)?;
+    let levels = interval_levels(confidence_level);
     let (base, inputs) = (design.base, design.inputs);
     let quantities = outputs.first().map_or(0, Vec::len);
     let all_rows: Vec<usize> = (0..base).collect();

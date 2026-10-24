@@ -6,10 +6,39 @@
 //! identity with none. A random walk on that scale never proposes a point
 //! outside the bounds, and its acceptance adds the log Jacobian
 //! [`Transform::log_jacobian`] of the map back.
+//!
+//! [`on_bound`] is the one rule of a value on a bound, which the curvature,
+//! the Laplace mixture and the profiles read.
 
 /// The largest magnitude of a value on the unbounded scale: a parameter on
 /// its bound maps to it instead of to an infinity.
 const LIMIT: f64 = 700.0;
+
+/// How close to a bound a value is on it ([`on_bound`]): this share of the
+/// width of two finite bounds, or of the larger of 1 and the magnitude of
+/// the bound when only one is finite. It is about the square root of the
+/// machine epsilon, where an optimizer that the bound stops ends.
+pub const ON_BOUND: f64 = 1e-8;
+
+/// The bound of `(lower, upper)` that `value` is on, the lower first: within
+/// [`ON_BOUND`] of it, or beyond it. An infinite bound is no bound, so a
+/// value with none is on no bound.
+pub fn on_bound(value: f64, (lower, upper): (f64, f64)) -> Option<f64> {
+    let scale = match (lower.is_finite(), upper.is_finite()) {
+        (true, true) => upper - lower,
+        (true, false) => lower.abs().max(1.0),
+        (false, true) => upper.abs().max(1.0),
+        (false, false) => return None,
+    };
+    let tolerance = ON_BOUND * scale;
+    if lower.is_finite() && value - lower <= tolerance {
+        Some(lower)
+    } else if upper.is_finite() && upper - value <= tolerance {
+        Some(upper)
+    } else {
+        None
+    }
+}
 
 /// How one parameter maps to the real line.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -33,6 +62,18 @@ pub enum Scale {
     },
     /// `u = θ`.
     Identity,
+}
+
+impl Scale {
+    /// The bounds of the parameter, an infinity where it has none.
+    pub fn bounds(&self) -> (f64, f64) {
+        match *self {
+            Self::Logit { lower, upper } => (lower, upper),
+            Self::Log { lower } => (lower, f64::INFINITY),
+            Self::LogFromAbove { upper } => (f64::NEG_INFINITY, upper),
+            Self::Identity => (f64::NEG_INFINITY, f64::INFINITY),
+        }
+    }
 }
 
 /// The scale of every parameter.
@@ -62,6 +103,18 @@ impl Transform {
     /// The scale of each parameter.
     pub fn scales(&self) -> &[Scale] {
         &self.scales
+    }
+
+    /// The first parameter of `values` on one of its bounds ([`on_bound`]),
+    /// and that bound.
+    pub fn on_bound(&self, values: &[f64]) -> Option<(usize, f64)> {
+        self.scales
+            .iter()
+            .zip(values)
+            .enumerate()
+            .find_map(|(index, (scale, &value))| {
+                on_bound(value, scale.bounds()).map(|bound| (index, bound))
+            })
     }
 
     /// The values on the unbounded scale; a value on its bound maps to

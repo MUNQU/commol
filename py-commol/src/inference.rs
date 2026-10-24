@@ -18,8 +18,9 @@ use commol_inference::resampling::{
 };
 use commol_inference::{
     DistributionNoise, ErrorKind, MethodError, NoNoise, ObservationDraws, ObservationNoise,
-    ParameterSample, Predictive, PredictiveError, observation_draws, scores, statistics,
+    ParameterSample, Predictive, PredictiveError, observation_draws, scores,
 };
+use commol_statistics::statistics;
 use pyo3::prelude::*;
 use rayon::prelude::*;
 
@@ -992,17 +993,8 @@ impl PyObservationDraws {
     }
 }
 
-/// The weighted quantiles of `values` at `levels`
-///
-/// The inverse of the weighted empirical distribution, interpolated between
-/// the midpoints of the cumulative weights; with equal weights it is NumPy's
-/// `method="hazen"`.
-///
-/// Raises:
-///     ValueError: If the lengths differ, no weight is positive, a level is
-///         not in [0, 1] or a value is NaN
-#[pyfunction]
-fn weighted_quantiles(values: Vec<f64>, weights: Vec<f64>, levels: Vec<f64>) -> PyResult<Vec<f64>> {
+/// One weight per value, and some weight positive.
+fn check_weights(values: &[f64], weights: &[f64]) -> PyResult<()> {
     if values.len() != weights.len() {
         return Err(value_error(format!(
             "One weight per value: {} values, {} weights",
@@ -1015,6 +1007,21 @@ fn weighted_quantiles(values: Vec<f64>, weights: Vec<f64>, levels: Vec<f64>) -> 
             "A quantile needs a positive weight".to_string(),
         ));
     }
+    Ok(())
+}
+
+/// The weighted quantiles of `values` at `levels`
+///
+/// The inverse of the weighted empirical distribution, interpolated between
+/// the midpoints of the cumulative weights; with equal weights it is NumPy's
+/// `method="hazen"`.
+///
+/// Raises:
+///     ValueError: If the lengths differ, no weight is positive, a level is
+///         not in [0, 1] or a value is NaN
+#[pyfunction]
+fn weighted_quantiles(values: Vec<f64>, weights: Vec<f64>, levels: Vec<f64>) -> PyResult<Vec<f64>> {
+    check_weights(&values, &weights)?;
     statistics::check_levels(&levels).map_err(value_error)?;
     statistics::quantiles(&values, &weights, &levels)
         .map_err(|error| value_error(error.to_string()))
@@ -1028,7 +1035,8 @@ fn weighted_quantiles(values: Vec<f64>, weights: Vec<f64>, levels: Vec<f64>) -> 
 ///     ValueError: If `confidence_level` is not strictly between 0 and 1
 #[pyfunction]
 fn interval_levels(confidence_level: f64) -> PyResult<(f64, f64)> {
-    let [lower, upper] = statistics::interval_levels(confidence_level).map_err(value_error)?;
+    commol_core::check_confidence_level(confidence_level).map_err(value_error)?;
+    let [lower, upper] = statistics::interval_levels(confidence_level);
     Ok((lower, upper))
 }
 
@@ -1055,14 +1063,58 @@ fn check_levels(levels: Vec<f64>) -> PyResult<()> {
     statistics::check_levels(&levels).map_err(value_error)
 }
 
-/// The weighted mean of `values`, one weight per value and some positive
+/// The weighted summary of one column of runs
+#[pyclass(name = "WeightedSummary", frozen, get_all)]
+pub struct PyWeightedSummary {
+    /// The weighted mean
+    mean: f64,
+    /// The weighted median
+    median: f64,
+    /// The quantile `(1 - c)/2`
+    lower: f64,
+    /// The quantile `(1 + c)/2`
+    upper: f64,
+    /// The smallest value of positive weight
+    minimum: f64,
+    /// The largest value of positive weight
+    maximum: f64,
+}
+
+/// The weighted summary of `values`: the mean, the median, the central
+/// interval of `confidence_level`, and the smallest and largest values of
+/// positive weight
+///
+/// The reduction of every band, with the one quantile of commol.
+///
+/// Raises:
+///     ValueError: If the lengths differ, no weight is positive,
+///         `confidence_level` is not strictly between 0 and 1 or a value is
+///         NaN
 #[pyfunction]
-fn weighted_mean(values: Vec<f64>, weights: Vec<f64>) -> f64 {
-    debug_assert!(
-        values.len() == weights.len() && weights.iter().any(|w| *w > 0.0),
-        "member_statistics checks the weights with weighted_quantiles first"
-    );
-    statistics::mean(&values, &weights)
+fn weighted_summary(
+    values: Vec<f64>,
+    weights: Vec<f64>,
+    confidence_level: f64,
+) -> PyResult<PyWeightedSummary> {
+    commol_core::check_confidence_level(confidence_level).map_err(value_error)?;
+    let levels = statistics::interval_levels(confidence_level);
+    check_weights(&values, &weights)?;
+    let summary = statistics::summary(&values, &weights, levels)
+        .map_err(|error| value_error(error.to_string()))?;
+    Ok(PyWeightedSummary {
+        mean: summary.mean,
+        median: summary.median,
+        lower: summary.lower,
+        upper: summary.upper,
+        minimum: summary.minimum,
+        maximum: summary.maximum,
+    })
+}
+
+/// Kish's effective size of `weights`, `(Σw)²/Σw²`
+#[pyfunction]
+fn effective_size(weights: Vec<f64>) -> f64 {
+    statistics::effective_size(&weights)
 }
 
 /// The Monte Carlo error of the quantile at `level` of equally weighted
@@ -1102,7 +1154,9 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(check_open_unit, m)?)?;
     m.add_function(wrap_pyfunction!(check_levels, m)?)?;
     m.add_function(wrap_pyfunction!(by_series, m)?)?;
-    m.add_function(wrap_pyfunction!(weighted_mean, m)?)?;
+    m.add_class::<PyWeightedSummary>()?;
+    m.add_function(wrap_pyfunction!(weighted_summary, m)?)?;
+    m.add_function(wrap_pyfunction!(effective_size, m)?)?;
     crate::identifiability::register(m)?;
     crate::smc::register(m)?;
     crate::local::register(m)?;

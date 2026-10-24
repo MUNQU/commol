@@ -19,13 +19,13 @@ use commol_calibration::likelihood::log_location;
 use commol_calibration::{
     CalibrationProblem, EvaluationError, ForwardModel, Likelihood, Noise, ObservedDataPoint,
 };
-use commol_core::SimulationEngine;
+use commol_core::{SimulationEngine, check_confidence_level};
 use commol_random::sample::{binomial, gamma, normal, poisson};
 use commol_random::{Generator, replicate_seed};
+use commol_statistics::statistics;
 use rayon::prelude::*;
 
 use crate::sample::ParameterSample;
-use crate::statistics;
 use commol_random::Stream;
 
 /// Below this share of extra variance, `φμ`, a negative binomial draw is a
@@ -338,8 +338,9 @@ impl Band {
     }
 
     /// The reducer of every band: at each of `positions` and `outputs`, the
-    /// weighted mean, median and central interval of `value(draw, position,
-    /// output)` across the draws of `weights`.
+    /// weighted summary ([`statistics::summary`]) of `value(draw, position,
+    /// output)` across the draws of `weights`, of which a band keeps the
+    /// mean, the median and the central interval.
     fn reduce(
         positions: usize,
         outputs: usize,
@@ -347,7 +348,8 @@ impl Band {
         confidence_level: f64,
         value: impl Fn(usize, usize, usize) -> f64,
     ) -> Result<Self, String> {
-        let [low, high] = statistics::interval_levels(confidence_level)?;
+        check_confidence_level(confidence_level)?;
+        let levels = statistics::interval_levels(confidence_level);
         let table = vec![vec![0.0; outputs]; positions];
         let mut band = Self {
             mean: table.clone(),
@@ -361,11 +363,11 @@ impl Band {
                 for (draw, slot) in column.iter_mut().enumerate() {
                     *slot = value(draw, position, output);
                 }
-                let q = statistics::quantiles(&column, weights, &[low, 0.5, high])?;
-                band.mean[position][output] = statistics::mean(&column, weights);
-                band.lower[position][output] = q[0];
-                band.median[position][output] = q[1];
-                band.upper[position][output] = q[2];
+                let summary = statistics::summary(&column, weights, levels)?;
+                band.mean[position][output] = summary.mean;
+                band.lower[position][output] = summary.lower;
+                band.median[position][output] = summary.median;
+                band.upper[position][output] = summary.upper;
             }
         }
         Ok(band)

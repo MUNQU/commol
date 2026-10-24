@@ -120,7 +120,8 @@ Carlo proposes its moves. The curvature there is
 `H_u = D · H · D` with `D = dθ/du` at the fit, and `covariance` is on that
 scale. Every draw maps back inside the bounds, so a fit near a bound gives a
 skewed sample, not draws outside it. A fit **on** a bound of its parameter
-(within `1e-8` of the width of its bounds) raises a `ValueError`: its
+(within `1e-8` of the width of its bounds, or of `max(1, |bound|)` when the
+parameter has one finite bound) raises a `ValueError`: its
 variance on the unbounded scale is infinite there, and a
 [profile likelihood](profiles.md) describes it.
 

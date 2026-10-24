@@ -171,6 +171,7 @@ dependencies = [
  "commol-inference",
  "commol-model",
  "commol-random",
+ "commol-statistics",
  "commol-stochastic",
  "pyo3",
  "rayon",
@@ -187,6 +188,7 @@ dependencies = [
  "commol-difference",
  "commol-differential",
  "commol-random",
+ "commol-statistics",
  "commol-stochastic",
  "libm",
  "rayon",
@@ -240,6 +242,7 @@ dependencies = [
  "commol-difference",
  "commol-differential",
  "commol-random",
+ "commol-statistics",
  "commol-stochastic",
  "finitediff",
  "libm",
@@ -265,6 +268,13 @@ dependencies = [
  "libm",
  "rand_core 0.10.1",
  "rand_xoshiro",
+]
+
+[[package]]
+name = "commol-statistics"
+version = "0.1.0"
+dependencies = [
+ "libm",
 ]
 
 [[package]]

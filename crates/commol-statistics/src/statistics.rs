@@ -1,5 +1,5 @@
 //! Weighted statistics of a sample: the one quantile convention of commol,
-//! and the weighted mean, covariance and effective size.
+//! and the weighted mean, covariance, summary and effective size.
 //!
 //! # The quantile
 //!
@@ -10,8 +10,6 @@
 //! sum to 1). Below the first midpoint the quantile is the smallest value,
 //! above the last one the largest. With equal weights `pᵢ = (i − ½)/n`,
 //! which is NumPy's `method="hazen"`.
-
-use commol_core::check_open_unit;
 
 /// Weights that sum to 1 from log weights of any scale.
 ///
@@ -126,25 +124,70 @@ pub fn quantiles(values: &[f64], weights: &[f64], levels: &[f64]) -> Result<Vec<
 }
 
 /// The two quantiles of a central interval of `confidence_level`:
-/// `(1 − c)/2` and `(1 + c)/2`. It is the one check of a confidence level.
+/// `(1 − c)/2` and `(1 + c)/2`.
 ///
-/// # Errors
-///
-/// Returns the message of [`check_open_unit`] for `confidence_level`, with
-/// the example 0.95, when it is not strictly between 0 and 1.
-pub fn interval_levels(confidence_level: f64) -> Result<[f64; 2], String> {
-    check_open_unit("confidence_level", confidence_level)
-        .map_err(|error| format!("{error}; use 0.95 for a 95% interval"))?;
-    Ok([
+/// The caller checks the level first (`commol_core::check_confidence_level`):
+/// `confidence_level` is strictly between 0 and 1.
+pub fn interval_levels(confidence_level: f64) -> [f64; 2] {
+    debug_assert!(
+        confidence_level > 0.0 && confidence_level < 1.0,
+        "the caller checks the confidence level, got {confidence_level}"
+    );
+    [
         (1.0 - confidence_level) / 2.0,
         (1.0 + confidence_level) / 2.0,
-    ])
+    ]
 }
 
 /// The weighted mean of `values`.
 pub fn mean(values: &[f64], weights: &[f64]) -> f64 {
     let total: f64 = weights.iter().sum();
     values.iter().zip(weights).map(|(v, w)| v * w).sum::<f64>() / total
+}
+
+/// The weighted summary of one column of values: the reduction of every
+/// band and of every summary of runs.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Summary {
+    /// The weighted mean.
+    pub mean: f64,
+    /// The weighted median.
+    pub median: f64,
+    /// The lower end of the central interval, the quantile `(1 − c)/2`.
+    pub lower: f64,
+    /// The upper end of the central interval, the quantile `(1 + c)/2`.
+    pub upper: f64,
+    /// The smallest value of positive weight.
+    pub minimum: f64,
+    /// The largest value of positive weight.
+    pub maximum: f64,
+}
+
+/// The weighted summary of `values`, with the ends `[lower, upper]` of the
+/// central interval from [`interval_levels`].
+///
+/// # Errors
+///
+/// [`NotANumber`] with every value that is NaN ([`quantiles`]).
+///
+/// # Panics
+///
+/// Panics when `values` and `weights` differ in length, or no weight is
+/// positive.
+pub fn summary(
+    values: &[f64],
+    weights: &[f64],
+    [lower, upper]: [f64; 2],
+) -> Result<Summary, NotANumber> {
+    let q = quantiles(values, weights, &[0.0, lower, 0.5, upper, 1.0])?;
+    Ok(Summary {
+        mean: mean(values, weights),
+        median: q[2],
+        lower: q[1],
+        upper: q[3],
+        minimum: q[0],
+        maximum: q[4],
+    })
 }
 
 /// The weighted covariance of two series, with the correction of
@@ -289,11 +332,24 @@ mod tests {
     }
 
     #[test]
-    fn an_interval_level_is_strictly_between_zero_and_one() {
-        assert_eq!(interval_levels(0.5), Ok([0.25, 0.75]));
-        for level in [0.0, 1.0] {
-            assert!(interval_levels(level).is_err(), "{level} is accepted");
-        }
+    fn a_central_interval_splits_the_rest_of_its_level_in_two() {
+        assert_eq!(interval_levels(0.5), [0.25, 0.75]);
+        assert!(close(interval_levels(0.9)[0], 0.05));
+        assert!(close(interval_levels(0.9)[1], 0.95));
+    }
+
+    #[test]
+    fn a_summary_reads_its_extremes_over_positive_weights() {
+        let values = [5.0, 1.0, 100.0, 3.0];
+        let weights = [1.0, 1.0, 0.0, 2.0];
+        let summary = summary(&values, &weights, [0.25, 0.75]).unwrap();
+        let q = quantiles(&values, &weights, &[0.5, 0.25, 0.75]).unwrap();
+        assert_eq!((summary.minimum, summary.maximum), (1.0, 5.0));
+        assert_eq!(
+            [summary.median, summary.lower, summary.upper],
+            [q[0], q[1], q[2]]
+        );
+        assert!(close(summary.mean, 3.0));
     }
 
     #[test]

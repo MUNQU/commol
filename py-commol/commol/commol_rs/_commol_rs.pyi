@@ -148,14 +148,6 @@ class CalibrationParameterProtocol(Protocol):
         max_bound: float,
         initial_guess: float | None = None,
     ) -> None: ...
-    @property
-    def id(self) -> str: ...
-    @property
-    def parameter_type(self) -> CalibrationParameterTypeProtocol: ...
-    @property
-    def min_bound(self) -> float: ...
-    @property
-    def max_bound(self) -> float: ...
 
 class CalibrationConstraintProtocol(Protocol):
     def __init__(
@@ -638,6 +630,14 @@ class ObservationDrawsProtocol(Protocol):
     def crps(self, observed: list[float]) -> list[float]: ...
     def pit(self, observed: list[float]) -> list[float]: ...
 
+class WeightedSummaryProtocol(Protocol):
+    mean: float
+    median: float
+    lower: float
+    upper: float
+    minimum: float
+    maximum: float
+
 class PointRankProtocol(Protocol):
     @property
     def values(self) -> list[float]: ...
@@ -897,6 +897,16 @@ class InferenceModule(Protocol):
     ProfileRun: type[ProfileRunProtocol]
     ProfileStructure: type[ProfileStructureProtocol]
     BootstrapSettings: type[BootstrapSettingsProtocol]
+    WeightedSummary: type[WeightedSummaryProtocol]
+    PointRank: type[PointRankProtocol]
+    StructuralAnalysis: type[StructuralAnalysisProtocol]
+    CollinearityAnalysis: type[CollinearityAnalysisProtocol]
+    CollinearityVerdict: type[CollinearityVerdictProtocol]
+    SampleAnalysis: type[SampleAnalysisProtocol]
+    SampleVerdict: type[SampleVerdictProtocol]
+    StartsAnalysis: type[StartsAnalysisProtocol]
+    LocalRun: type[LocalRunProtocol]
+    MixtureRun: type[MixtureRunProtocol]
     def trace_profiles(
         self,
         problem: CalibrationProblemProtocol,
@@ -936,7 +946,10 @@ class InferenceModule(Protocol):
     def interval_levels(self, confidence_level: float) -> tuple[float, float]: ...
     def check_open_unit(self, name: str, value: float) -> None: ...
     def check_levels(self, levels: list[float]) -> None: ...
-    def weighted_mean(self, values: list[float], weights: list[float]) -> float: ...
+    def weighted_summary(
+        self, values: list[float], weights: list[float], confidence_level: float
+    ) -> WeightedSummaryProtocol: ...
+    def effective_size(self, weights: list[float]) -> float: ...
     def quantities_as_read(self, json: str) -> str: ...
     def quantity_schedule(self, json: str) -> list[float]: ...
     def quantities_of_runs(
@@ -1168,20 +1181,11 @@ class CoreModule(Protocol):
     MathExpression: type[MathExpressionProtocol]
     FUNCTIONS: list[str]
 
-class RustCommolModule(Protocol):
-    core: CoreModule
-    model: ModelModule
-    engine: EngineModule
-    calibration: CalibrationModule
-    inference: InferenceModule
-    parallelism: ParallelismModule
-
 core: CoreModule
 model: ModelModule
 engine: EngineModule
 calibration: CalibrationModule
 inference: InferenceModule
 parallelism: ParallelismModule
-rust_commol: RustCommolModule
 __version__: str
 __commit__: str | None

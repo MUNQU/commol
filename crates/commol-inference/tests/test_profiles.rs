@@ -15,6 +15,7 @@ use commol_inference::profiles::{
     ProfileEnd, ProfileTracer, ProfiledQuantity, beale, bootstrap_thresholds, chi_square,
 };
 use commol_inference::resampling::{Perturbation, ReplicateRunner, Resampler};
+use commol_inference::transform::{Transform, on_bound};
 use commol_random::Generator;
 use commol_random::Stream;
 
@@ -780,7 +781,7 @@ fn a_bootstrap_threshold_of_a_prediction_reads_the_rise_of_each_replicate() {
     let weights = vec![1.0; 8];
     assert_eq!(
         run.thresholds[0],
-        commol_inference::statistics::quantiles(&run.rises[0], &weights, &[0.9]).unwrap()[0]
+        commol_statistics::statistics::quantiles(&run.rises[0], &weights, &[0.9]).unwrap()[0]
     );
 }
 
@@ -838,4 +839,20 @@ fn thresholds_fail_when_every_refit_fails() {
         "{error}"
     );
     assert!(error.contains("z above 0.9"), "{error}");
+}
+
+#[test]
+fn a_value_on_a_bound_follows_one_rule_with_an_infinite_bound() {
+    let half_line = (0.0, f64::INFINITY);
+    // `1e-8` of `max(1, |0|)` from the lower bound.
+    assert_eq!(on_bound(1e-10, half_line), Some(0.0));
+    assert_eq!(on_bound(1.0, half_line), None);
+    // `1e-8` of the width of finite bounds.
+    assert_eq!(on_bound(10.0 - 1e-8, (0.0, 10.0)), Some(10.0));
+    assert_eq!(on_bound(1e-6, (0.0, 10.0)), None);
+    assert_eq!(on_bound(0.0, (f64::NEG_INFINITY, f64::INFINITY)), None);
+    // The curvature reads the bounds of its transform with the same rule.
+    let transform = Transform::new(&[(-1.0, 1.0), half_line]);
+    assert_eq!(transform.on_bound(&[0.5, 1e-10]), Some((1, 0.0)));
+    assert_eq!(transform.on_bound(&[0.5, 1.0]), None);
 }

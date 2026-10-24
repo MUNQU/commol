@@ -14,9 +14,11 @@ live.
 identity with none), centred on the fit mapped to that scale, with no
 curvature of the log Jacobian. Every draw maps back with `from_unbounded`,
 so it lies inside the bounds; every density on that scale, as the importance
-weights of the mixture, adds `log_jacobian`. A fit on a bound, within `1e-8`
-of the width of its bounds (`on_bound`), is refused with a message that
-names the parameter: its variance on that scale is infinite. The tolerance
+weights of the mixture, adds `log_jacobian`. A fit on a bound is refused with
+a message that names the parameter and points to a profile likelihood: its
+variance on that scale is infinite. The one rule of a value on a bound,
+`on_bound` in `transform.rs`, which the profiles also read, is `1e-8` of the
+width of two finite bounds, or of `max(1, |bound|)` with one. The tolerance
 comes from the optimizer: Nelder-Mead searches on a sine (`SineTransform`) of the unbounded
 coordinate, which approaches a bound quadratically in `u` and ends about
 `1e-15` of the width from it; `1e-8` of the width is a step `δu ≈ 2e-4`, far

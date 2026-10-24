@@ -20,6 +20,7 @@ argmin-math = { workspace = true }
 # Commol dependencies
 commol-core = { path = "../commol-core" }
 commol-random = { path = "../commol-random" }
+commol-statistics = { path = "../commol-statistics" }
 
 libm = { workspace = true }
 

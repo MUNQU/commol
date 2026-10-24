@@ -16,13 +16,13 @@
 use commol_calibration::{CalibrationProblem, Workspace};
 use commol_core::SimulationEngine;
 use commol_random::Generator;
+use commol_statistics::numeric::log_sum_exp;
 
 use super::approximation::{CurvatureKind, curvature_at};
-use super::curvature::on_bound;
 use super::gaussian::{Gaussian, inverse};
 use crate::error::MethodError;
 use crate::importance::{ImportanceRun, Proposal, importance_sample};
-use crate::psis::{RELIABLE_K_HAT, log_sum_exp};
+use crate::psis::RELIABLE_K_HAT;
 use crate::target::{Target, discrepancy_in_support};
 use crate::transform::Transform;
 
@@ -144,7 +144,7 @@ where
         if merged {
             continue;
         }
-        if let Some((j, bound)) = on_bound(&transform, end) {
+        if let Some((j, bound)) = transform.on_bound(end) {
             on_bounds.push((objective, end));
             notes.push(format!(
                 "The end {end:?} gives no component: '{}' is on its bound {bound}",

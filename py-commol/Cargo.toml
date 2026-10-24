@@ -28,6 +28,7 @@ commol-stochastic = { path = "../crates/commol-stochastic" }
 commol-calibration = { path = "../crates/commol-calibration" }
 commol-inference = { path = "../crates/commol-inference" }
 commol-random = { path = "../crates/commol-random" }
+commol-statistics = { path = "../crates/commol-statistics" }
 rayon = { workspace = true }
 
 # Required for custom argmin observer

@@ -10,6 +10,7 @@
 //! with the blocks as folds.
 
 use commol_core::SimulationEngine;
+use commol_statistics::statistics;
 
 use crate::conformal::intervals::{ConformalRun, PredictionIntervals};
 use crate::conformal::predict::{ensemble_spread, set_predictions, targets};
@@ -17,7 +18,6 @@ use crate::conformal::quantile::{lower_quantile, upper_quantile};
 use crate::conformal::score::{ConformalSettings, NonconformityScore, scales};
 use crate::error::MethodError;
 use crate::resampling::{BlockScheme, FitUnit, Perturbation, ReplicateRunner};
-use crate::statistics;
 
 /// The coverage jackknife+ guarantees under exchangeable blocks, with `n`
 /// scored observations in `k` blocks and `α = 1 − confidence_level`: the bound of

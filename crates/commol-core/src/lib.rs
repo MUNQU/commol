@@ -17,6 +17,7 @@
 //!   each one reports at
 //! - [`same_position`]: When two positions on the axis are one
 //! - [`check_open_unit`]: The one check of a share, strictly between 0 and 1
+//! - [`check_confidence_level`]: The one check of a confidence level
 //! - [`types`]: All data structures for defining a model: its process and
 //!   its structure
 
@@ -41,7 +42,7 @@ pub use parallelism::{Levels, Parallelism, inner_levels_in_parallel};
 
 pub use position::{POSITION_TOLERANCE, same_position};
 
-pub use share::check_open_unit;
+pub use share::{check_confidence_level, check_open_unit};
 
 // Re-export simulation engine trait
 pub use simulation_engine::{

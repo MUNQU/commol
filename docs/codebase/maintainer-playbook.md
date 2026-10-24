@@ -110,13 +110,17 @@ changing it ([Design decisions](decisions/uncertainty.md#methods-plug-into-one-e
       from a stream of the problem's seed: a new `Stream` of
       `crates/commol-random/src/streams.rs`, with a number of its own, and
       `Stream::replicate` for each draw or replicate; never the seed itself.
+      It takes its numerical helpers and log densities from
+      `commol_statistics::numeric` and its quantiles and weighted statistics
+      from `commol_statistics::statistics`, and writes no copy of them.
 - [ ] A method that samples a posterior is a `TemperedTarget` on
       `SmcSampler` (`crates/commol-inference/src/smc/`), not a sampler of its
       own, and its configuration takes required `priors` (`WithPriors`)
       ([Design decisions](decisions/uncertainty.md#one-smc-core-many-targets)).
 - [ ] The runner, bound in `py-commol/src/` (`inference.rs` or the module
       of its family), which runs the method through `parallel`
-      (`py-commol/src/parallelism.rs`), and its stub in `_commol_rs.pyi`; a
+      (`py-commol/src/parallelism.rs`), and its stub in `_commol_rs.pyi`
+      (`tests/suite/test_rules.py::test_the_stub_declares_what_the_extension_has`); a
       row in the table of `docs/guide/parallelism.md` and a case of `METHODS`
       in `tests/parallelism/test_threads.py`.
 - [ ] The configuration, a subclass of `UncertaintyMethod[YourResult]`, and

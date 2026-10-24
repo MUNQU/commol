@@ -386,6 +386,24 @@ class TestFilter:
         with pytest.raises(ValueError, match=r"positive weight"):
             zero.where([True, False, False, True])
 
+    def test_the_effective_size_of_a_propagation_comes_from_the_engine(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        engine = commol_rs.inference.effective_size
+        read: list[list[float]] = []
+
+        def recorded(weights: list[float]) -> float:
+            read.append(weights)
+            return engine(weights)
+
+        monkeypatch.setattr(commol_rs.inference, "effective_size", recorded)
+        # Two runs of weights 3 and 1: (3 + 1)² / (3² + 1²).
+        weights = [0.75, 0.25, 0.0, 0.0]
+        result = _propagation().model_copy(update={"weights": weights})
+
+        assert result.effective_size == pytest.approx(16 / 10)
+        assert read == [weights]
+
 
 @pytest.mark.parametrize("rule", ["within", "within_positive", "pooled"])
 def test_a_ratio_takes_a_replicate_rule(rule: str) -> None:

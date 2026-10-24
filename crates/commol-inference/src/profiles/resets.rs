@@ -23,9 +23,9 @@
 use commol_calibration::{CalibrationParameterType, OptimizationObjective};
 use commol_core::SimulationEngine;
 
-use crate::profiles::tracer::{ON_BOUND, Profile, ProfilePoint, ProfileTracer};
+use crate::profiles::tracer::{Profile, ProfilePoint, ProfileTracer};
 use crate::profiles::verdict::ProfileVerdict;
-use crate::transform::Transform;
+use crate::transform::{Transform, on_bound};
 
 /// The structural verdict of a profile.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -183,11 +183,8 @@ where
         let within_floor = infeasible == 0 && all.flatten().all(|rise| rise.abs() <= floor);
 
         let free = |i: usize| i != index;
-        let on_bound_at_fit = (0..self.fit.len()).find(|&i| {
-            let (lo, hi) = bounds[i];
-            let tolerance = ON_BOUND * (hi - lo);
-            free(i) && (self.fit[i] - lo <= tolerance || hi - self.fit[i] <= tolerance)
-        });
+        let on_bound_at_fit =
+            (0..self.fit.len()).find(|&i| free(i) && on_bound(self.fit[i], bounds[i]).is_some());
         let rises_above = inside_rises.iter().flatten().any(|&rise| rise > threshold);
         let verdict = if within_floor {
             match on_bound_at_fit {

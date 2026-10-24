@@ -29,12 +29,12 @@
 
 use commol_calibration::Workspace;
 use commol_random::Generator;
+use commol_statistics::statistics::{effective_size, normalized_weights};
 use rayon::prelude::*;
 
 use super::TemperedTarget;
 use super::kernel::Kernel;
 use crate::error::MethodError;
-use crate::statistics::{effective_size, normalized_weights};
 use commol_core::check_open_unit;
 use commol_random::Stream;
 

@@ -537,3 +537,50 @@ def test_a_setting_has_one_name() -> None:
         "Name a count with a plural noun (particles, draws, replicates) and the "
         "level of an interval confidence_level:\n" + "\n".join(wrong)
     )
+
+
+# The stub of the extension
+
+STUB = REPO_ROOT / "py-commol" / "commol" / "commol_rs" / "_commol_rs.pyi"
+UNDECLARED = {"test_kind": "the queries of the test model kind, only in a test build"}
+"""The members of the extension that the stub leaves out, and why."""
+
+
+def declared(node: ast.Module | ast.ClassDef) -> dict[str, str]:
+    """The names the stub declares in ``node``, each with its annotation."""
+    return {
+        item.target.id: ast.unparse(item.annotation)
+        for item in node.body
+        if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name)
+    } | {
+        item.name: ""
+        for item in node.body
+        if isinstance(item, ast.FunctionDef) and item.name != "__init__"
+    }
+
+
+def test_the_stub_declares_what_the_extension_has() -> None:
+    """Each module and class of ``_commol_rs.pyi`` declares the members of
+    the built extension and nothing else."""
+    from commol.commol_rs import _commol_rs as extension
+
+    tree = ast.parse(STUB.read_text(encoding="utf-8"))
+    classes = {node.name: node for node in tree.body if isinstance(node, ast.ClassDef)}
+    pending = [("_commol_rs", tree, extension)]
+    wrong = []
+    while pending:
+        name, node, built = pending.pop()
+        names = {key: value for key, value in declared(node).items() if key[:2] != "__"}
+        members = {key for key in vars(built) if key[:2] != "__"} - set(UNDECLARED)
+        if set(names) != members:
+            wrong.append(
+                f"{name}: only in the stub {sorted(set(names) - members)}, "
+                f"only in the extension {sorted(members - set(names))}"
+            )
+        for member, annotation in names.items():
+            protocol = annotation.removeprefix("type[").removesuffix("]")
+            if protocol in classes and member in members:
+                pending.append((member, classes[protocol], getattr(built, member)))
+    assert not wrong, "Make the stub declare what the extension has:\n" + "\n".join(
+        wrong
+    )

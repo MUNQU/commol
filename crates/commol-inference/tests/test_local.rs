@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use commol_calibration::Workspace;
 use commol_calibration::{
     Argument, CalibrationParameter, CalibrationParameterType, CalibrationProblem,
-    DiscrepancyConfig, LossConfig, ObservationModel, ObservedDataPoint, ReplicateSummary,
+    DiscrepancyConfig, LossConfig, Noise, ObservationModel, ObservedDataPoint, ReplicateSummary,
     Replicates,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
@@ -931,4 +931,26 @@ fn a_mixture_whose_optima_the_prior_rules_out_is_refused() {
         error,
         MethodError::Invalid("Every optimum of the starts has a target density of 0".to_string())
     );
+}
+
+#[test]
+fn a_one_dimensional_student_t_has_the_density_of_an_observation_model() {
+    let (df, scale, center) = (3.0, 2.0, 1.0);
+    let unbounded = Transform::new(&[(f64::NEG_INFINITY, f64::INFINITY)]);
+    let gaussian = Gaussian::new(
+        unbounded,
+        vec![center],
+        nalgebra::DMatrix::from_element(1, 1, scale * scale),
+        Some(df),
+    )
+    .unwrap();
+    let noise = Noise::StudentT { df, scale };
+    for point in [-4.0, 1.0, 3.0, 25.0] {
+        let observation = noise.log_density(point, center);
+        let local = gaussian.log_density(&[point]);
+        assert!(
+            (observation - local).abs() <= 1e-15 * observation.abs(),
+            "{point}: {observation} {local}"
+        );
+    }
 }
