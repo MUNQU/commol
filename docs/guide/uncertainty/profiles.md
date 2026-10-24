@@ -238,7 +238,9 @@ estimate, not a bound. A threshold at or below `ε` gives no verdict: the
 profile cannot tell a rise from numerical error, and `notes` says so.
 
 The box of the parameters is the space inside their bounds. A free parameter
-of a refit is on a bound when it is within `1e-8` of the width of its bounds.
+of a refit is on a bound when it is within `1e-8` of the width of its bounds,
+or of the larger of 1 and the size of its one finite bound, the rule of the
+[local approximations](local.md).
 When it is on a bound that it is not on at the fit, the refit has left the
 box: the bound makes its rise, not the data. The flatness reads only the
 points inside the box, and a note names the parameter and the value where

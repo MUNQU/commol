@@ -9,7 +9,7 @@ its runs. Figures have [a page of their own](figures.md).
 
 Every interval is a weighted quantile: the inverse of the weighted empirical
 distribution, interpolated between the midpoints of the cumulative weights
-(`statistics::quantiles` in `crates/commol-calibration/src/statistics.rs`). With
+(`statistics::quantiles` in `crates/commol-statistics/src/statistics.rs`). With
 equal weights it equals NumPy's `method="hazen"`; a weight of zero removes a
 value. `ci_percentiles` (`api/inference/intervals.py`) turns a confidence level
 into the two percentile points of `statistics::interval_levels`. `member_statistics` reduces each member to the
@@ -22,22 +22,25 @@ quantile. So a calibration with `Quantile(0.25)` compares the observations
 with the value that `SimulationReplicates.quantiles([0.25])` gives for the
 same runs.
 
-The module lives in `commol-calibration`, the lowest crate that takes a
-quantile, and `commol-inference` re-exports it (`pub use
-commol_calibration::statistics`), so there is one copy.
+The module lives in `commol-statistics`, a crate with no model and no
+optimizer that calibration, inference and the bindings depend on and import
+directly (`commol_statistics::statistics`), so there is one copy and one path. Every band and every summary of runs reduces a column with
+its `summary` (the mean, the median, the central interval, the minimum and the
+maximum), which Python calls as `weighted_summary`.
 
 | Alternative | Why not |
 |---|---|
 | NumPy's default (`linear`) with equal weights and another rule with weights | Two conventions: a sample would change its interval when it gains weights. |
 | Harrell–Davis | Smoother, but with no simple weighted form, and slower. |
-| The module in `commol-core` | No crate below calibration takes a quantile, and `commol-core` holds the model types and the engine contract. |
+| The module in `commol-core` | `commol-core` holds the model types, the engine contract and the threads. |
+| The module in `commol-calibration` | A quantile is not calibration, and a crate that needs it would depend on the problem and its optimizers. |
 | A copy of Hazen's rule in `commol-calibration` | Two quantiles again, which can drift apart. |
 
 **Rule:** every new interval goes through `weighted_quantiles` or
 `member_statistics`, and every quantile in Rust through
 `statistics::quantiles`.
 
-**Guards:** `crates/commol-calibration/src/statistics.rs` tests,
+**Guards:** `crates/commol-statistics/src/statistics.rs` tests,
 `crates/commol-calibration/tests/test_replicate_summary.rs`,
 `tests/uncertainty/test_intervals.py`,
 `tests/stochastic/test_calibration.py::test_a_quantile_summary_agrees_with_the_quantiles_of_the_replicates`,
@@ -65,11 +68,16 @@ One Rust function checks each kind of setting, with one message:
 
 | Check | Function | Message |
 |---|---|---|
-| A confidence level | `statistics::interval_levels` | `confidence_level is strictly between 0 and 1, got 1.5; use 0.95 for a 95% interval` |
+| A confidence level | `check_confidence_level` (`crates/commol-core/src/share.rs`) | `confidence_level is strictly between 0 and 1, got 1.5; use 0.95 for a 95% interval` |
 | Any other setting strictly between 0 and 1 (`target_cess`, `stay_probability`, `min_acceptance`, the `quantile` of ABC, `correlation_threshold`, the `epsilon` of an adaptive leap) | `check_open_unit(name, value)` (`crates/commol-core/src/share.rs`) | `<name> is strictly between 0 and 1, got <value>` |
 | A quantile level, `Quantile(level)` included | `statistics::check_levels` | `A quantile level is between 0 and 1, got 1.5` |
 
-Python calls the first through the binding `commol_rs.inference.interval_levels`:
+A caller checks a confidence level at its boundary, then computes the two
+quantiles of its interval with `statistics::interval_levels`, a pure function
+of `commol-statistics` that checks nothing: the rule of a setting stays in the
+layer of the settings, and the crate of statistics depends on no crate of
+commol. Python calls the check through the binding
+`commol_rs.inference.interval_levels`, which checks, then computes:
 `ci_percentiles`, `BootstrapResult.interval_error`, `PropagationResult.summary`,
 the scenario summaries, and every `confidence_level` field, whose type is
 `ConfidenceLevel` (`context/inference/levels.py`). A field of a share has the
@@ -83,9 +91,12 @@ reaches the check through the engine (`check_settings`).
 |---|---|
 | A check in each method, with `Field(gt=0.0, lt=1.0)` | The same mistake gives a different message in each method, and the rule is written many times. |
 | An alias for an old name | Two names for one setting, which is what the rule removes. |
+| `statistics::interval_levels` checks the level and returns a `Result` | `commol-statistics` depends on `commol-core` only to word a message, and a computation and a rule of a setting stay mixed. |
+| `check_open_unit` and the check of a confidence level in `commol-statistics` | The settings of an engine depend on the crate of statistics, and the rules of the settings split across two crates. |
 
 **Rule:** a new setting takes the name its meaning already has, and a new
-setting strictly between 0 and 1 is checked by one of the two functions.
+setting strictly between 0 and 1 is checked by one of the two functions of
+`share.rs`.
 
 **Guards:** `tests/suite/test_rules.py::test_a_setting_has_one_name`,
 `tests/uncertainty/test_intervals.py::test_every_confidence_level_has_one_check`,

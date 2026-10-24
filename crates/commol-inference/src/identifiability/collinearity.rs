@@ -16,12 +16,12 @@
 //! (its sensitivity measure is 0), or when a pair that holds it has an index
 //! at or above the threshold; otherwise it is determined.
 
+use commol_statistics::statistics::quantiles;
 use rayon::prelude::*;
 
 use super::{PracticalVerdict, skippable};
 use crate::error::MethodError;
 use crate::sensitivity::{Matrix, SensitivitySource};
-use crate::statistics::quantiles;
 
 /// The size up to which every subset is evaluated; a greedy search goes
 /// above it.

@@ -1,8 +1,8 @@
 //! The summary of the replicates of a stochastic engine: the one quantile of
 //! commol and the one check of its level.
 
-use commol_calibration::statistics::{check_levels, quantiles};
 use commol_calibration::{ReplicateSummary, Replicates};
+use commol_statistics::statistics::{check_levels, quantiles};
 
 fn summary_of_one_to_five(summary: ReplicateSummary) -> f64 {
     summary.summarize(&[4.0, 1.0, 5.0, 3.0, 2.0])

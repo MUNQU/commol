@@ -8,11 +8,11 @@
 
 use commol_calibration::Workspace;
 use commol_random::Generator;
+use commol_statistics::statistics::effective_size;
 use rayon::prelude::*;
 
 use crate::psis::smooth;
 use crate::smc::TemperedTarget;
-use crate::statistics::effective_size;
 use crate::target::Target;
 use crate::transform::Transform;
 use commol_random::Stream;

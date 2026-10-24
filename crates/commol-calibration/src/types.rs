@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::statistics;
+use commol_statistics::statistics;
 
 /// Type of value being calibrated
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

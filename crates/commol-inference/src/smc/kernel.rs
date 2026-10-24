@@ -3,9 +3,9 @@
 
 use commol_random::Generator;
 use commol_random::sample::normal;
+use commol_statistics::statistics::covariance;
 use nalgebra::{DMatrix, DVector};
 
-use crate::statistics::covariance;
 use crate::transform::Transform;
 
 /// The scale of the covariance of a random walk in `d` dimensions:

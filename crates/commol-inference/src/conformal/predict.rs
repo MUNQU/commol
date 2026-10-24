@@ -3,10 +3,10 @@
 
 use commol_calibration::{CalibrationProblem, ObservedDataPoint, SeriesIndex, replicate_mean};
 use commol_core::SimulationEngine;
+use commol_statistics::statistics;
 
 use crate::predictive::{NoNoise, PredictiveError, observation_draws, observe_sets};
 use crate::sample::ParameterSample;
-use crate::statistics;
 
 /// What gives the point prediction of a variant that does not refit.
 #[derive(Debug, Clone, Copy)]

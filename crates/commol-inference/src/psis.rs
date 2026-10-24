@@ -10,6 +10,8 @@
 //! `(r + ½)/M` of the fit, kept at most the largest weight. `k̂ > 0.7` marks
 //! an estimate as unreliable.
 
+use commol_statistics::numeric::log_sum_exp;
+
 /// Above this `k̂` the smoothed weights do not give a reliable estimate.
 pub const RELIABLE_K_HAT: f64 = 0.7;
 
@@ -115,15 +117,6 @@ pub fn smooth(log_weights: &[f64]) -> Result<Smoothed, String> {
     })
 }
 
-/// `log Σ exp(xᵢ)`, from the largest term.
-pub(crate) fn log_sum_exp(values: &[f64]) -> f64 {
-    let largest = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-    if !largest.is_finite() {
-        return largest;
-    }
-    largest + values.iter().map(|v| (v - largest).exp()).sum::<f64>().ln()
-}
-
 /// The empirical Bayes estimate `(k, σ)` of a generalized Pareto
 /// distribution of the ascending excesses `x` (Zhang and Stephens 2009),
 /// with `k` shrunk to 0.5 by a prior worth 10 draws; `(NaN, NaN)` when the
@@ -224,10 +217,6 @@ mod tests {
         for (w, raw) in smoothed.log_weights.iter().zip(&log_weights) {
             assert!((w - (raw - total)).abs() < 1e-12);
         }
-        assert_eq!(
-            log_sum_exp(&[f64::NEG_INFINITY, f64::NEG_INFINITY]),
-            f64::NEG_INFINITY
-        );
     }
 
     #[test]

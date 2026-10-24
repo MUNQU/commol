@@ -179,7 +179,7 @@ jobs:
       # Public items must have docs (`missing_docs`, denied by clippy above), and
       # their docs must not have broken links.
       - name: Check Rust documentation
-        run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-random -p commol-stochastic -p commol-inference
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-random -p commol-statistics -p commol-stochastic -p commol-inference
 
       # The bindings (py-commol/src/) run only under pytest, so the coverage
       # of Rust joins the Rust tests and pytest on an instrumented extension.

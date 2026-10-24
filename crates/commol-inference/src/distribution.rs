@@ -16,10 +16,13 @@ use std::fmt;
 use argmin::core::{CostFunction, Error, Executor, Gradient};
 use argmin::solver::newtonroot::NewtonRoot;
 use commol_random::Generator;
+use commol_statistics::numeric::{
+    ln_beta, ln_gamma, log_normal_log_density, normal_log_density, x_log_y,
+};
 
 use crate::special::{
-    beta_i, gamma_p, gamma_q, ln_beta, ln_gamma, normal_cdf, normal_density, normal_quantile,
-    normal_quantile_sf, normal_sf,
+    beta_i, gamma_p, gamma_q, normal_cdf, normal_density, normal_quantile, normal_quantile_sf,
+    normal_sf,
 };
 
 /// Iterations of the inversion of a distribution function by safeguarded
@@ -301,14 +304,13 @@ impl Distribution {
             }
             Family::Normal { mean, sd } => {
                 let z = (x - mean) / sd;
-                -0.5 * z * z - libm::log(sd) - 0.5 * libm::log(2.0 * std::f64::consts::PI)
+                normal_log_density(z * z, 1, libm::log(sd))
             }
             Family::LogNormal { mu, sigma } => {
                 if x <= 0.0 {
                     return f64::NEG_INFINITY;
                 }
-                let z = (libm::log(x) - mu) / sigma;
-                -0.5 * z * z - libm::log(x * sigma) - 0.5 * libm::log(2.0 * std::f64::consts::PI)
+                log_normal_log_density(x, mu, sigma)
             }
             Family::Gamma { shape, rate } => {
                 if x < 0.0 || (x == 0.0 && shape > 1.0) {
@@ -497,11 +499,6 @@ impl Distribution {
     pub fn sample(&self, generator: &mut Generator) -> f64 {
         self.quantile(generator.open_uniform())
     }
-}
-
-/// `c · ln y`, 0 when `c` is 0, also at `y = 0`.
-fn x_log_y(c: f64, y: f64) -> f64 {
-    if c == 0.0 { 0.0 } else { c * libm::log(y) }
 }
 
 /// `cdf(x) − p`, whose root is the quantile at `p`, and its derivative, the

@@ -145,7 +145,7 @@ def test_every_ignored_rust_test_says_how_it_runs() -> None:
 
 RUST_SORT = re.compile(r"\.sort(?:_unstable)?(?:_by(?:_key)?)?\s*\(")
 QUANTILE_FILES = {
-    "crates/commol-calibration/src/statistics.rs": "the one quantile of commol",
+    "crates/commol-statistics/src/statistics.rs": "the one quantile of commol",
     "crates/commol-inference/src/conformal/quantile.rs": (
         "the conformal rank, an order statistic that gives an interval its "
         "coverage, not an estimate of a quantile"

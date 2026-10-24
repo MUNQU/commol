@@ -7,8 +7,9 @@
 //! common random numbers, so the loss is a function of the parameters.
 
 use commol_calibration::{CalibrationProblem, LossConfig, Workspace};
-use commol_core::SimulationEngine;
+use commol_core::{SimulationEngine, check_confidence_level};
 use commol_random::Generator;
+use commol_statistics::statistics::{interval_levels, normalized_weights, quantiles};
 use nalgebra::DMatrix;
 
 use super::TemperedTarget;
@@ -18,7 +19,6 @@ use crate::error::MethodError;
 use crate::local::{CurvatureKind, block_meat, blocks_at, curvature_at};
 use crate::priors::Priors;
 use crate::resampling::{BayesianBootstrap, BlockScheme};
-use crate::statistics::{interval_levels, normalized_weights, quantiles};
 use crate::target::discrepancy_in_support;
 use commol_random::Stream;
 
@@ -308,43 +308,51 @@ fn threshold(
 }
 
 /// Check that `count` thresholds have an `η` at `confidence_level`: the
-/// lowest position of [`interpolated_eta`], `(1 − confidence_level)(count + 1)`,
-/// is at least 1.
+/// level `1 − confidence_level` is at least the first position of the one
+/// quantile with equal weights, `1 / (2 count)`, so that no level falls below
+/// the smallest threshold.
 fn check_threshold_count(count: usize, confidence_level: f64) -> Result<(), MethodError> {
-    if (1.0 - confidence_level) * (count + 1) as f64 >= 1.0 {
+    let reaches = |count: usize| (1.0 - confidence_level) * (2 * count) as f64 >= 1.0;
+    if reaches(count) {
         return Ok(());
     }
-    let needed = (count..)
-        .find(|&more| (1.0 - confidence_level) * (more + 1) as f64 >= 1.0)
-        .unwrap_or(count);
+    let needed = (count..).find(|&more| reaches(more)).unwrap_or(count);
     Err(MethodError::Invalid(format!(
         "Bootstrap coverage at confidence_level = {confidence_level} needs at least \
          {needed} replicates times parameters, got {count}; use more replicates"
     )))
 }
 
-/// The `η` whose share of thresholds above it is `confidence_level`: the
-/// order statistics of the thresholds `t₁ ≤ … ≤ t_M` sit at the positions
-/// `i / (M + 1)`, which their distribution function has in expectation, and
-/// `log η` interpolates between the two around `1 − confidence_level`.
-fn interpolated_eta(thresholds: &mut [f64], confidence_level: f64) -> Result<f64, MethodError> {
-    thresholds.sort_by(f64::total_cmp);
-    let m = thresholds.len();
-    check_threshold_count(m, confidence_level)?;
-    let position = (1.0 - confidence_level) * (m + 1) as f64;
-    let below = position.floor() as usize;
-    let lower = thresholds[below - 1];
-    if lower <= 0.0 {
+/// The `η` whose share of thresholds above it is `confidence_level`:
+/// `exp` of the one quantile (equal weights) of the log thresholds at
+/// `1 − confidence_level`.
+///
+/// An infinite threshold, an interval that holds the fit at every `η` of the
+/// bracket, counts as the largest finite one: the bracket grows until fewer
+/// than `confidence_level` of the thresholds are infinite, so above the
+/// largest finite threshold the coverage is below the level, and `η` is at
+/// most that threshold.
+fn interpolated_eta(thresholds: &[f64], confidence_level: f64) -> Result<f64, MethodError> {
+    check_threshold_count(thresholds.len(), confidence_level)?;
+    let largest = thresholds
+        .iter()
+        .copied()
+        .filter(|t| t.is_finite())
+        .fold(0.0, f64::max);
+    let logs: Vec<f64> = thresholds
+        .iter()
+        .map(|&t| libm::log(t.min(largest)))
+        .collect();
+    let weights = vec![1.0; logs.len()];
+    let log_eta =
+        quantiles(&logs, &weights, &[1.0 - confidence_level]).expect("a threshold is not NaN")[0];
+    if !log_eta.is_finite() {
         return Err(MethodError::Invalid(format!(
             "Even the prior intervals cover the fit less often than confidence_level = \
              {confidence_level}; widen the priors"
         )));
     }
-    let Some(&upper) = thresholds.get(below).filter(|upper| upper.is_finite()) else {
-        return Ok(lower);
-    };
-    let fraction = position - below as f64;
-    Ok((lower.ln() + fraction * (upper.ln() - lower.ln())).exp())
+    Ok(libm::exp(log_eta))
 }
 
 /// `η` by bootstrap coverage (Syring and Martin 2019): the `η` at which the
@@ -360,10 +368,10 @@ fn interpolated_eta(thresholds: &mut [f64], confidence_level: f64) -> Result<f64
 /// `1 / loss(θ̂)`, where the kernel of the fit is `e⁻¹`, and grows four times,
 /// each sampler going on from its particles, while its intervals still cover
 /// too often. Each replicate and parameter has a threshold, the `η` at which its
-/// interval stops holding the fit (bisection on `log η`), and `η` is the
-/// interpolated quantile of the thresholds, whose expected coverage is the
-/// level: the largest `η` that covers at the level would be an order
-/// statistic, biased to cover less.
+/// interval stops holding the fit (bisection on `log η`), and `η` is the one
+/// quantile of the log thresholds at `1 − confidence_level`, which
+/// interpolates between two order statistics: the largest `η` that covers at
+/// the level would be an order statistic, biased to cover less.
 ///
 /// # Errors
 ///
@@ -388,7 +396,8 @@ where
     E: SimulationEngine + Send + Sync,
     K: Kernel,
 {
-    let levels = interval_levels(confidence_level).map_err(MethodError::Invalid)?;
+    check_confidence_level(confidence_level).map_err(MethodError::Invalid)?;
+    let levels = interval_levels(confidence_level);
     check_threshold_count(replicates * fit.len(), confidence_level)?;
     let mut workspace = Workspace::default();
     let loss = discrepancy_in_support(problem, fit, &mut workspace)
@@ -476,13 +485,13 @@ where
     }
 
     let bracket = (eta_max * f64::EPSILON, eta_max);
-    let mut thresholds: Vec<f64> = runs
+    let thresholds: Vec<f64> = runs
         .iter()
         .flat_map(|(_, _, snapshots)| {
             (0..fit.len()).map(|j| threshold(snapshots, j, fit, &levels, bracket))
         })
         .collect();
-    let eta = interpolated_eta(&mut thresholds, confidence_level)?;
+    let eta = interpolated_eta(&thresholds, confidence_level)?;
     Ok(CoverageCalibration {
         eta,
         coverage: coverage(&runs, eta),
@@ -495,30 +504,48 @@ mod tests {
     use super::*;
 
     #[test]
-    fn eta_interpolates_the_thresholds_at_their_expected_positions() {
-        // Nine thresholds sit at 0.1, …, 0.9: the level 0.8 is the second.
-        let mut thresholds: Vec<f64> = (1..=9).rev().map(f64::from).collect();
-        let eta = interpolated_eta(&mut thresholds, 0.8).unwrap();
-        assert!((eta - 2.0).abs() < 1e-12, "{eta}");
-        // Between the first two, on the scale of log η.
-        let mut thresholds = vec![1.0, 4.0, f64::INFINITY];
-        let eta = interpolated_eta(&mut thresholds, 0.625).unwrap();
-        assert!((eta - 2.0).abs() < 1e-12, "{eta}");
-        let mut thresholds = vec![1.0, f64::INFINITY];
-        assert_eq!(interpolated_eta(&mut thresholds, 0.5), Ok(1.0));
+    fn eta_is_the_one_quantile_of_the_log_thresholds() {
+        // Nine thresholds 1, …, 9 at the level 0.2: Hazen's positions
+        // (i − ½)/9 put it 0.3 of the way from ln 2 to ln 3.
+        let thresholds: Vec<f64> = (1..=9).rev().map(f64::from).collect();
+        let eta = interpolated_eta(&thresholds, 0.8).unwrap();
+        let logs: Vec<f64> = thresholds.iter().map(|t| t.ln()).collect();
+        let quantile = quantiles(&logs, &[1.0; 9], &[0.2]).unwrap()[0];
+        assert!((eta - quantile.exp()).abs() < 1e-12, "{eta}");
+        assert!((eta - 2.0 * 1.5f64.powf(0.3)).abs() < 1e-12, "{eta}");
+    }
+
+    #[test]
+    fn an_infinite_threshold_leaves_eta_at_the_largest_finite_one() {
+        // The level reads only finite thresholds: half way from ln 4 to ln 9.
+        let eta = interpolated_eta(&[1.0, 4.0, 9.0, f64::INFINITY], 0.5).unwrap();
+        assert!((eta - 6.0).abs() < 1e-12, "{eta}");
+        // The level lies between 4 and the infinite thresholds: every η above
+        // 4 covers less than 0.6, so η is 4.
+        let eta = interpolated_eta(&[f64::INFINITY, 1.0, 4.0, f64::INFINITY], 0.6).unwrap();
+        assert!((eta - 4.0).abs() < 1e-12, "{eta}");
     }
 
     #[test]
     fn too_few_thresholds_or_none_above_zero_have_no_eta() {
-        let mut few = vec![1.0, 2.0];
-        let error = interpolated_eta(&mut few, 0.9).unwrap_err().to_string();
+        // The level 0.25 is the first position of two thresholds, 1/4.
+        assert!(interpolated_eta(&[1.0, 2.0], 0.75).is_ok());
+        let error = interpolated_eta(&[1.0], 0.75).unwrap_err().to_string();
         assert!(
-            error.contains("needs at least") && error.contains("got 2"),
+            error.contains("needs at least 2") && error.contains("got 1"),
             "{error}"
         );
-        let mut zeros = vec![0.0; 9];
+        // The level 1/8 needs four thresholds, whose first position is 1/8.
+        assert!(interpolated_eta(&[1.0, 2.0, 3.0, 4.0], 0.875).is_ok());
+        let error = interpolated_eta(&[1.0, 2.0, 3.0], 0.875)
+            .unwrap_err()
+            .to_string();
         assert!(
-            interpolated_eta(&mut zeros, 0.8)
+            error.contains("needs at least 4") && error.contains("got 3"),
+            "{error}"
+        );
+        assert!(
+            interpolated_eta(&[0.0; 9], 0.8)
                 .unwrap_err()
                 .to_string()
                 .contains("widen the priors")

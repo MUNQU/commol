@@ -255,14 +255,15 @@ def _summaries(
     runs: list[dict[str, float]], weights: list[float], confidence_level: float
 ) -> list[ScenarioSummary]:
     """The weighted mean, median and central interval of each label of `runs`."""
-    levels = [0.5, *commol_rs.inference.interval_levels(confidence_level)]
+    # The level is checked before the values, also when there are none.
+    commol_rs.inference.interval_levels(confidence_level)
     one_run = len(runs) == 1
     summaries = []
     for label in runs[0]:
         column = [run[label] for run in runs]
         try:
-            median, lower, upper = commol_rs.inference.weighted_quantiles(
-                column, weights, levels
+            summary = commol_rs.inference.weighted_summary(
+                column, weights, confidence_level
             )
         except ValueError as error:
             raise ValueError(
@@ -272,10 +273,10 @@ def _summaries(
             ScenarioSummary(
                 label=label,
                 confidence_level=confidence_level,
-                mean=commol_rs.inference.weighted_mean(column, weights),
-                median=median,
-                lower=None if one_run else lower,
-                upper=None if one_run else upper,
+                mean=summary.mean,
+                median=summary.median,
+                lower=None if one_run else summary.lower,
+                upper=None if one_run else summary.upper,
             )
         )
     return summaries

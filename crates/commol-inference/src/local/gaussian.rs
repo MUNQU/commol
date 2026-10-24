@@ -3,6 +3,7 @@
 
 use commol_random::Generator;
 use commol_random::sample::{gamma, normal};
+use commol_statistics::numeric::{normal_log_density, student_t_log_density};
 use nalgebra::DVector;
 
 use super::curvature::Curvature;
@@ -91,20 +92,16 @@ impl Gaussian {
             .collect()
     }
 
-    /// The log density at a point `u` of the unbounded scale.
+    /// The log density at a point `u` of the unbounded scale: its squared
+    /// Mahalanobis distance from the centre and the log determinant of the
+    /// Cholesky factor, read by the one normal or Student t density.
     pub fn log_density(&self, unbounded: &[f64]) -> f64 {
-        let d = self.center.len() as f64;
+        let dimensions = self.center.len();
         let squared: f64 = self.standardized(unbounded).iter().map(|z| z * z).sum();
-        let log_determinant: f64 = self.factor.diagonal().iter().map(|l| 2.0 * l.ln()).sum();
+        let log_scale: f64 = self.factor.diagonal().iter().map(|&l| libm::log(l)).sum();
         match self.degrees_of_freedom {
-            None => -0.5 * (d * (2.0 * std::f64::consts::PI).ln() + log_determinant + squared),
-            Some(nu) => {
-                libm::lgamma(0.5 * (nu + d))
-                    - libm::lgamma(0.5 * nu)
-                    - 0.5 * d * (nu * std::f64::consts::PI).ln()
-                    - 0.5 * log_determinant
-                    - 0.5 * (nu + d) * (squared / nu).ln_1p()
-            }
+            None => normal_log_density(squared, dimensions, log_scale),
+            Some(nu) => student_t_log_density(squared, nu, dimensions, log_scale),
         }
     }
 

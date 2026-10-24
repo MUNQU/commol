@@ -249,7 +249,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
                 "Sobol needs at least 2 bootstrap replicates, got {replicates}"
             )));
         }
-        crate::statistics::interval_levels(confidence_level).map_err(MethodError::Invalid)?;
+        commol_core::check_confidence_level(confidence_level).map_err(MethodError::Invalid)?;
         let design = self
             .inputs
             .saltelli("Sobol", draws, self.design_seed())

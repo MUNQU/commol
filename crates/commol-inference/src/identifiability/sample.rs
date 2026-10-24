@@ -6,12 +6,13 @@
 //! the threshold, or when its marginal has several modes; otherwise it is
 //! determined.
 
+use commol_core::check_open_unit;
+use commol_statistics::statistics::{effective_size, quantiles};
+
 use super::PracticalVerdict;
 use crate::error::MethodError;
 use crate::priors::Priors;
 use crate::sample::ParameterSample;
-use crate::statistics::{effective_size, quantiles};
-use commol_core::check_open_unit;
 
 /// Points of the grid a kernel density is evaluated on.
 const GRID: usize = 512;

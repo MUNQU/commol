@@ -126,14 +126,14 @@ impl ConformalSettings {
     ///
     /// [`MethodError::Invalid`] when the pair is rejected
     /// ([`Self::check_pair`]) or `confidence_level` is not strictly between 0
-    /// and 1 ([`crate::statistics::interval_levels`]).
+    /// and 1 ([`commol_core::check_confidence_level`]).
     pub fn new(
         score: NonconformityScore,
         by: Pooling,
         confidence_level: f64,
     ) -> Result<Self, MethodError> {
         Self::check_pair(score, by)?;
-        crate::statistics::interval_levels(confidence_level).map_err(MethodError::Invalid)?;
+        commol_core::check_confidence_level(confidence_level).map_err(MethodError::Invalid)?;
         Ok(Self {
             score,
             by,

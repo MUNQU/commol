@@ -16,6 +16,7 @@ crate-type = ["rlib"]
 commol-calibration = { path = "../commol-calibration" }
 commol-core = { path = "../commol-core" }
 commol-random = { path = "../commol-random" }
+commol-statistics = { path = "../commol-statistics" }
 anyhow = "1.0"
 argmin = { workspace = true }
 finitediff = { workspace = true }

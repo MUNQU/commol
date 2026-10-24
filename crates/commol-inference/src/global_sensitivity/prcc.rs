@@ -16,12 +16,12 @@
 //! A NaN has no rank, so PRCC refuses a NaN input or quantity before it
 //! ranks any value.
 
+use commol_statistics::statistics::{self, effective_size};
 use nalgebra::DMatrix;
 
 use super::check_numbers;
 use crate::error::MethodError;
 use crate::special::beta_i;
-use crate::statistics::effective_size;
 
 /// The PRCC of every input for every quantity.
 #[derive(Debug, Clone, PartialEq)]
@@ -184,20 +184,10 @@ fn weighted_ranks(values: &[f64], weights: &[f64]) -> Vec<f64> {
     ranks
 }
 
-/// The weighted covariance matrix of the columns, for weights that sum
-/// to 1; its scale does not change a correlation.
+/// The weighted covariance matrix of the columns ([`statistics::covariance`]).
 fn covariance(columns: &[Vec<f64>], weights: &[f64]) -> DMatrix<f64> {
-    let means: Vec<f64> = columns
-        .iter()
-        .map(|column| column.iter().zip(weights).map(|(v, w)| v * w).sum())
-        .collect();
     DMatrix::from_fn(columns.len(), columns.len(), |a, b| {
-        columns[a]
-            .iter()
-            .zip(&columns[b])
-            .zip(weights)
-            .map(|((x, y), w)| w * (x - means[a]) * (y - means[b]))
-            .sum()
+        statistics::covariance(&columns[a], &columns[b], weights)
     })
 }
 

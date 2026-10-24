@@ -1,8 +1,9 @@
 //! The weighted parameter sample every method with draws returns.
 
+use commol_core::check_confidence_level;
 use commol_random::Generator;
+use commol_statistics::statistics;
 
-use crate::statistics;
 use commol_random::Stream;
 
 /// Draws of the parameters of a calibration problem, each with a weight.
@@ -213,7 +214,8 @@ impl ParameterSample {
     /// Returns a message when `confidence_level` is not strictly between 0
     /// and 1.
     pub fn interval(&self, confidence_level: f64) -> Result<[Vec<f64>; 2], String> {
-        let levels = statistics::interval_levels(confidence_level)?;
+        check_confidence_level(confidence_level)?;
+        let levels = statistics::interval_levels(confidence_level);
         let mut rows = self.quantiles(&levels)?.into_iter();
         Ok([
             rows.next().expect("two levels"),

@@ -30,10 +30,10 @@ impl AdaptiveLevel {
     /// # Errors
     ///
     /// [`MethodError::Invalid`] when `confidence_level` is not strictly
-    /// between 0 and 1 ([`crate::statistics::interval_levels`]) or `step` is
+    /// between 0 and 1 ([`commol_core::check_confidence_level`]) or `step` is
     /// not positive and finite.
     pub fn new(confidence_level: f64, step: f64) -> Result<Self, MethodError> {
-        crate::statistics::interval_levels(confidence_level).map_err(MethodError::Invalid)?;
+        commol_core::check_confidence_level(confidence_level).map_err(MethodError::Invalid)?;
         if !(step > 0.0 && step.is_finite()) {
             return Err(MethodError::Invalid(format!(
                 "step is {step}; it must be positive"

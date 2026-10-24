@@ -9,13 +9,13 @@
 //! median, as the normal and the Student t are symmetric.
 
 use commol_calibration::{CalibrationProblem, ObservedDataPoint};
-use commol_core::SimulationEngine;
+use commol_core::{SimulationEngine, check_confidence_level};
+use commol_statistics::statistics::interval_levels;
 
 use crate::error::MethodError;
 use crate::predictive::Band;
 use crate::sensitivity::{FiniteDifferences, Matrix, SensitivityError, SensitivitySource};
 use crate::special::{normal_quantile, student_t_quantile};
-use crate::statistics::interval_levels;
 use crate::transform::Transform;
 
 /// The linearized band of every output at some positions.
@@ -48,7 +48,8 @@ pub fn delta_band<E>(
 where
     E: SimulationEngine + Send + Sync,
 {
-    let [_, upper_level] = interval_levels(confidence_level).map_err(MethodError::Invalid)?;
+    check_confidence_level(confidence_level).map_err(MethodError::Invalid)?;
+    let upper_level = interval_levels(confidence_level)[1];
     let quantile = match degrees_of_freedom {
         Some(df) => student_t_quantile(upper_level, df),
         None => normal_quantile(upper_level),

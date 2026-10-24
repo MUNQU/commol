@@ -4,7 +4,10 @@
 //! Every elementary function comes from `libm`, so a value is the same on
 //! every platform.
 
-use std::f64::consts::PI;
+use commol_statistics::numeric::{
+    digamma, ln_gamma, log_normal_log_density, normal_log_density, student_t_log_density, trigamma,
+    x_log_y, x_log1p_y,
+};
 
 /// Above this observed count, the negative binomial reads `ln Γ` instead of
 /// the sum of its first terms, unless the overdispersion is below
@@ -102,19 +105,14 @@ impl Noise {
         match *self {
             Self::Normal { sd } => {
                 let z = (y - mean) / sd;
-                -0.5 * libm::log(2.0 * PI) - libm::log(sd) - 0.5 * z * z
+                normal_log_density(z * z, 1, libm::log(sd))
             }
             Self::LogNormal { sigma, center } => {
-                let z = (libm::log(y) - log_location(mean, sigma, center)) / sigma;
-                -libm::log(y) - libm::log(sigma) - 0.5 * libm::log(2.0 * PI) - 0.5 * z * z
+                log_normal_log_density(y, log_location(mean, sigma, center), sigma)
             }
             Self::StudentT { df, scale } => {
                 let z = (y - mean) / scale;
-                libm::lgamma(0.5 * (df + 1.0))
-                    - libm::lgamma(0.5 * df)
-                    - 0.5 * libm::log(df * PI)
-                    - libm::log(scale)
-                    - 0.5 * (df + 1.0) * libm::log1p(z * z / df)
+                student_t_log_density(z * z, df, 1, libm::log(scale))
             }
             Self::Poisson => negative_binomial(y, mean, 0.0),
             Self::NegativeBinomial { overdispersion } => negative_binomial(y, mean, overdispersion),
@@ -124,9 +122,9 @@ impl Noise {
                     return 0.0;
                 }
                 let p = mean / n;
-                libm::lgamma(n + 1.0) - libm::lgamma(y + 1.0) - libm::lgamma(n - y + 1.0)
-                    + x_log(y, p)
-                    + x_log1p(n - y, -p)
+                ln_gamma(n + 1.0) - ln_gamma(y + 1.0) - ln_gamma(n - y + 1.0)
+                    + x_log_y(y, p)
+                    + x_log1p_y(n - y, -p)
             }
         }
     }
@@ -282,16 +280,6 @@ pub fn log_location(mean: f64, sigma: f64, center: Center) -> f64 {
     }
 }
 
-/// `x · ln y`, with `0 · ln 0 = 0`.
-fn x_log(x: f64, y: f64) -> f64 {
-    if x == 0.0 { 0.0 } else { x * libm::log(y) }
-}
-
-/// `x · ln(1 + y)`, with `0 · ln 0 = 0`.
-fn x_log1p(x: f64, y: f64) -> f64 {
-    if x == 0.0 { 0.0 } else { x * libm::log1p(y) }
-}
-
 /// The log probability of the count `y` under a negative binomial of mean
 /// `mean ≥ 0` and overdispersion `φ ≥ 0`, written so that `φ = 0` is the
 /// Poisson:
@@ -308,7 +296,7 @@ fn negative_binomial(y: f64, mean: f64, overdispersion: f64) -> f64 {
             .sum::<f64>()
     } else {
         let r = 1.0 / phi;
-        libm::lgamma(y + r) - libm::lgamma(r) - y * libm::log(r)
+        ln_gamma(y + r) - ln_gamma(r) - y * libm::log(r)
     };
     let a = phi * mean;
     let size_term = if phi == 0.0 {
@@ -316,7 +304,7 @@ fn negative_binomial(y: f64, mean: f64, overdispersion: f64) -> f64 {
     } else {
         libm::log1p(a) / phi
     };
-    first_terms + y * libm::log(mean) - x_log1p(y, a) - size_term - libm::lgamma(y + 1.0)
+    first_terms + y * libm::log(mean) - x_log1p_y(y, a) - size_term - ln_gamma(y + 1.0)
 }
 
 /// Below this `φμ`, `ln(1 + φμ) − φμ/(1 + φμ)` is read from its series.
@@ -386,61 +374,9 @@ fn dispersion_information(mean: f64, phi: f64) -> f64 {
     }
 }
 
-/// Where the asymptotic series of digamma and trigamma start: their next
-/// terms are below `1e-14` there.
-const ASYMPTOTIC: f64 = 12.0;
-
-/// The digamma function `ψ(x) = d ln Γ(x)/dx` for `x > 0`: the recurrence
-/// `ψ(x) = ψ(x + 1) − 1/x` up to [`ASYMPTOTIC`], then its asymptotic series.
-pub(crate) fn digamma(mut x: f64) -> f64 {
-    let mut shift = 0.0;
-    while x < ASYMPTOTIC {
-        shift -= 1.0 / x;
-        x += 1.0;
-    }
-    let inverse = 1.0 / (x * x);
-    shift + libm::log(x)
-        - 0.5 / x
-        - inverse
-            * (1.0 / 12.0
-                - inverse
-                    * (1.0 / 120.0
-                        - inverse * (1.0 / 252.0 - inverse * (1.0 / 240.0 - inverse / 132.0))))
-}
-
-/// The trigamma function `ψ'(x)` for `x > 0`: the recurrence
-/// `ψ'(x) = ψ'(x + 1) + 1/x²` up to [`ASYMPTOTIC`], then its asymptotic
-/// series.
-pub(crate) fn trigamma(mut x: f64) -> f64 {
-    let mut shift = 0.0;
-    while x < ASYMPTOTIC {
-        shift += 1.0 / (x * x);
-        x += 1.0;
-    }
-    let inverse = 1.0 / (x * x);
-    shift
-        + 1.0 / x
-        + 0.5 * inverse
-        + inverse / x
-            * (1.0 / 6.0
-                - inverse
-                    * (1.0 / 30.0
-                        - inverse * (1.0 / 42.0 - inverse * (1.0 / 30.0 - inverse * 5.0 / 66.0))))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn digamma_and_trigamma_have_their_values_at_one_and_one_half() {
-        let euler = std::f64::consts::EULER_GAMMA;
-        assert!((digamma(1.0) + euler).abs() < 1e-14);
-        assert!((digamma(0.5) + euler + 2.0 * std::f64::consts::LN_2).abs() < 1e-14);
-        let pi2 = std::f64::consts::PI * std::f64::consts::PI;
-        assert!((trigamma(1.0) - pi2 / 6.0).abs() < 1e-14);
-        assert!((trigamma(0.5) - pi2 / 2.0).abs() < 1e-13);
-    }
 
     #[test]
     fn large_counts_sum_the_dispersion_score_by_digamma() {
@@ -486,7 +422,7 @@ mod tests {
         let phi = 0.01;
         let summed: f64 = (0..1500).map(|j| libm::log1p(j as f64 * phi)).sum();
         let r = 1.0 / phi;
-        let gamma = libm::lgamma(y + r) - libm::lgamma(r) - y * libm::log(r);
+        let gamma = ln_gamma(y + r) - ln_gamma(r) - y * libm::log(r);
         assert!((summed - gamma).abs() < 1e-8 * summed.abs());
     }
 

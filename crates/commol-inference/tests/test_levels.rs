@@ -5,7 +5,7 @@ use commol_calibration::{
     CalibrationParameter, CalibrationProblem, LossConfig, NelderMeadConfig, ObservedDataPoint,
     OptimizationConfig,
 };
-use commol_core::{Model, check_open_unit};
+use commol_core::{Model, check_confidence_level, check_open_unit};
 use commol_difference::DifferenceEquations;
 use commol_inference::conformal::{AdaptiveLevel, ConformalSettings, NonconformityScore, Pooling};
 use commol_inference::identifiability::{Reference, sample_identifiability};
@@ -13,7 +13,6 @@ use commol_inference::profiles::{ProfiledQuantity, beale, bootstrap_thresholds, 
 use commol_inference::resampling::{BayesianBootstrap, BlockScheme, ReplicateRunner};
 use commol_inference::scores::coverage;
 use commol_inference::smc::{AbcTarget, Distance, RandomWalk, SmcSampler, abc_rejection};
-use commol_inference::statistics::interval_levels;
 use commol_inference::{ObservationDraws, ParameterSample, Priors};
 
 /// A → B at the rate `k`, from A = 1000.
@@ -69,7 +68,7 @@ fn every_confidence_level_has_one_check() {
     };
 
     let errors = [
-        interval_levels(0.0).unwrap_err(),
+        check_confidence_level(0.0).unwrap_err(),
         sample().interval(0.0).unwrap_err(),
         coverage(&draws, &[1.5], 0.0).unwrap_err(),
         ConformalSettings::new(NonconformityScore::Absolute, Pooling::All, 0.0)

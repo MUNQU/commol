@@ -8,15 +8,15 @@
 //! | [`bootstrap_thresholds`] | Any loss | That the bootstrap mimics the data |
 
 use commol_calibration::{CalibrationProblem, LossConfig, Subproblem, optimize_subproblem};
-use commol_core::SimulationEngine;
+use commol_core::{SimulationEngine, check_confidence_level};
 use commol_random::replicate_seed;
+use commol_statistics::statistics;
 use rayon::prelude::*;
 
 use crate::error::MethodError;
 use crate::profiles::tracer::ProfiledQuantity;
 use crate::resampling::{FitUnit, ReplicateRunner, Resampler};
 use crate::special::{f_one_quantile, normal_quantile};
-use crate::statistics;
 use commol_random::Stream;
 
 /// `½ χ²₁(confidence_level)`: the threshold of `−log L` for a pointwise
@@ -26,12 +26,12 @@ use commol_random::Stream;
 ///
 /// [`MethodError::Invalid`] when the problem has a loss instead of
 /// observation models, or `confidence_level` is not strictly between 0 and
-/// 1 ([`statistics::interval_levels`]).
+/// 1 ([`check_confidence_level`]).
 pub fn chi_square<E: SimulationEngine>(
     problem: &CalibrationProblem<E>,
     confidence_level: f64,
 ) -> Result<f64, MethodError> {
-    statistics::interval_levels(confidence_level).map_err(MethodError::Invalid)?;
+    check_confidence_level(confidence_level).map_err(MethodError::Invalid)?;
     if problem.discrepancy().likelihood().is_none() {
         return Err(MethodError::Invalid(
             "The chi-square threshold reads −log L and needs observation models; the problem \
@@ -59,7 +59,7 @@ pub fn beale<E: SimulationEngine>(
     fit_loss: f64,
     confidence_level: f64,
 ) -> Result<f64, MethodError> {
-    statistics::interval_levels(confidence_level).map_err(MethodError::Invalid)?;
+    check_confidence_level(confidence_level).map_err(MethodError::Invalid)?;
     if problem.discrepancy().loss() != Some(LossConfig::SumSquaredError) {
         return Err(MethodError::Invalid(
             "Beale's threshold reads a sum of squares; the problem needs the loss 'sse'"
@@ -130,7 +130,7 @@ pub fn bootstrap_thresholds<E>(
 where
     E: SimulationEngine + Send + Sync,
 {
-    statistics::interval_levels(confidence_level).map_err(MethodError::Invalid)?;
+    check_confidence_level(confidence_level).map_err(MethodError::Invalid)?;
     if quantities.len() != centers.len() {
         return Err(MethodError::Invalid(format!(
             "One center per quantity: {} quantities, {} centers",

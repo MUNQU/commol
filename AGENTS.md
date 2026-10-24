@@ -3,12 +3,12 @@
 Commol is a compartment-modeling library: a Python API (`py-commol/commol/`)
 on top of Rust engines (`crates/`): a model compiler (`commol-model`), a
 difference engine and an ODE engine on `diffsol`, two stochastic engines of
-whole units (`commol-stochastic`), reproducible random numbers for stochastic
-engines (`commol-random`), the calibration problem and its optimizers
-(`commol-calibration`), the uncertainty methods with their parameter sample,
-predictive and scores (`commol-inference`), joined by PyO3 bindings
-(`py-commol/src/`). This file is an index. The details live in `docs/`, and
-the code is the final authority.
+whole units (`commol-stochastic`), random numbers (`commol-random`), numerical
+helpers and weighted statistics (`commol-statistics`), the calibration problem
+and its optimizers (`commol-calibration`), the uncertainty methods with their
+parameter sample, predictive and scores (`commol-inference`), joined by PyO3
+bindings (`py-commol/src/`). This file is an index. The details live in
+`docs/`, and the code is the final authority.
 
 **Golden rule: the Rust engine is the single source of truth**
 ([Mental model](docs/codebase/mental-model.md#the-golden-rule)).
@@ -38,11 +38,11 @@ Run them from `py-commol/` with the virtual environment `py-commol/.venv`.
 | Documentation checks (examples, API coverage) | `pytest -m docs` |
 | Coverage studies of the uncertainty methods (slow; CI runs them when what they run changes, and before a release) | `pytest -m coverage_study` |
 | Python lint, types and dead code | `ruff check . ../.github/scripts && ruff format --check . ../.github/scripts && ty check commol && vulture commol .vulture_allowlist.py --min-confidence 80` |
-| Rust tests (from the root) | `cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-inference -p commol-random -p commol-stochastic -p commol && cargo test -p commol --features test-kind` |
+| Rust tests (from the root) | `cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-inference -p commol-random -p commol-statistics -p commol-stochastic -p commol && cargo test -p commol --features test-kind` |
 | Test coverage, as CI measures it | `pytest --cov=commol --cov-fail-under=100`; from the root, with `py-commol/.venv` active (the script runs `maturin` and `pytest`), `.github/scripts/rust_coverage.sh --summary-only` (the Rust tests and `pytest` on an instrumented extension, failing on a line that no test runs and that has no `// coverage: <reason>`; needs `cargo-llvm-cov` and the `llvm-tools-preview` component). Policy: `docs/codebase/coverage.md` |
 | Rust lint (from the root) | `cargo fmt --all -- --check && cargo clippy --workspace --all-targets --all-features -- -D warnings` |
 | Documentation (from the root) | `mkdocs build --strict` |
-| Rust docs (from the root) | `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-inference -p commol-random -p commol-stochastic` |
+| Rust docs (from the root) | `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-inference -p commol-random -p commol-statistics -p commol-stochastic` |
 
 Rebuild the extension after every Rust change and every `uv sync`, before you
 run `pytest`; uv never builds it (`package = false`).
@@ -92,7 +92,7 @@ run `pytest`; uv never builds it (`package = false`).
 | Change a conformal method, its scores or its quantile | `crates/commol-inference/src/conformal/` | `py-commol/src/conformal.rs`, `py-commol/commol/context/inference/conformal.py`, `api/inference/conformal.py`, `docs/guide/uncertainty/conformal.md` |
 | Change a sensitivity method, a design or a quantity of interest | `crates/commol-inference/src/global_sensitivity/`; `design.rs`, `crates/commol-inference/src/quantity.rs`, `batch.rs` | `crates/commol-calibration/src/forward.rs` (`unobserved`), `py-commol/src/sensitivity.rs`, `py-commol/src/quantity.rs`, `py-commol/commol/context/inference/quantities.py`, `context/inference/global_sensitivity.py`, `api/sensitivity.py`, `api/inference/global_sensitivity.py`, `api/results.py` (`quantities`), `docs/guide/uncertainty/sensitivity.md` |
 | Change a local approximation (the curvature, Laplace, the sandwich, the Laplace mixture) or PSIS | `crates/commol-inference/src/local/`; `psis.rs`, `importance.rs` | `crates/commol-calibration/src/likelihood/density.rs` (`information`, `scores`), `discrepancy.rs` (`term_derivatives`), `py-commol/src/local.rs`, `py-commol/commol/context/inference/local.py`, `api/inference/local.py`, `docs/guide/uncertainty/local.md` |
-| Change the parameter sample, the predictive, the scenarios, the scores or the quantile | `crates/commol-inference/src/sample.rs`, `predictive.rs`, `scores.rs`; `crates/commol-calibration/src/statistics.rs` (the one quantile, also of the replicates of a calibration) | `py-commol/commol/context/inference/sample.py`, `api/inference/` (`scenarios.py`), `docs/guide/uncertainty/index.md` |
+| Change the parameter sample, the predictive, the scenarios, the scores or the quantile | `crates/commol-inference/src/sample.rs`, `predictive.rs`, `scores.rs`; `crates/commol-statistics/src/statistics.rs` (the one quantile, also of the replicates of a calibration) | `py-commol/commol/context/inference/sample.py`, `api/inference/` (`scenarios.py`), `docs/guide/uncertainty/index.md` |
 | Change the Python API | `py-commol/commol/api/` | `docs/api/`, the guide page of that feature |
 | Expose a Rust function to Python | `py-commol/src/`; `py-commol/src/engine.rs` for a function that takes an engine; `parallel` (`py-commol/src/parallelism.rs`) to run parallel work | `py-commol/commol/commol_rs/_commol_rs.pyi`, `py-commol/commol/context/_model/engine_state.py` (the only Python caller of the engine queries) |
 | Change the threads of parallel work | `crates/commol-core/src/parallelism.rs` (`Parallelism`) | `py-commol/src/parallelism.rs` (`parallel`), `py-commol/commol/api/parallelism.py` (`commol.threads`), `docs/guide/parallelism.md` |
