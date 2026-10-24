@@ -362,7 +362,7 @@ fn a_nan_run_is_named_by_its_point_and_inputs() {
         None,
         None,
         inputs,
-        5,
+        Some(5),
     )
     .unwrap();
     let quantities = [
@@ -567,7 +567,7 @@ fn all_over_b(at: f64, rule: ReplicateRule) -> Quantity {
 /// The forward model of [`one_unit`], 8 replicates of `k`.
 fn one_unit_forward() -> ForwardModel<StochasticSteps> {
     let k = vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)];
-    ForwardModel::unobserved(one_unit(), k, None, Some(8), 3).unwrap()
+    ForwardModel::unobserved(one_unit(), k, None, Some(8), Some(3)).unwrap()
 }
 
 /// The replicates of `quantity` at two points of `k = 0.5`, combined.
@@ -659,7 +659,7 @@ fn gated() -> ForwardAnalysis<DifferenceEquations> {
         None,
         None,
         InputSpace::Independent(Priors::uniform_on_bounds(&names(&["k"]), &[(0.0, 1.0)]).unwrap()),
-        5,
+        Some(5),
     )
     .unwrap()
 }

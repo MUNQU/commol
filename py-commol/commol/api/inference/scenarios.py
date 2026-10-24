@@ -67,7 +67,7 @@ class Scenarios(Mapping[str, Predictive]):
         sample: ParameterSample,
         scenarios: Mapping[str, Mapping[str, "ParameterUpdate"]],
         positions: Sequence[float],
-    ):
+    ) -> None:
         """
         Run every draw of `sample` under each scenario, at `positions`.
 

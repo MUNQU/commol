@@ -116,3 +116,25 @@ def test_a_start_whose_run_fails_is_named_in_the_error(verbose: bool) -> None:
 
     with pytest.raises(RuntimeError, match="Start 0 failed: .*is not a number"):
         calibrator.run()
+
+
+def test_the_engine_asks_for_replicates() -> None:
+    problem = CalibrationProblem(
+        observed_data=[ObservedDataPoint(at=2.0, output="A", value=800.0)],
+        parameters=[bounded("k", 0.01, 0.5, initial_guess=0.3)],
+        loss_function="sse",
+        optimization_config=NelderMeadConfig(max_iterations=1),
+        replicate_summary="mean",
+        seed=7,
+    )
+    simulation = Simulation(
+        build_stochastic(a_to_b_builder(parameters={"k": None}), "StochasticEvents")
+    )
+
+    with pytest.raises(ValueError) as error:
+        Calibrator(simulation, problem)
+
+    assert str(error.value) == (
+        "The StochasticEvents engine is stochastic: set replicates, how many "
+        "replicates each evaluation runs."
+    )

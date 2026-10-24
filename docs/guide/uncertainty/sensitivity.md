@@ -105,7 +105,8 @@ mean of `replicates` replicates, and they come close to those of the expected
 value as `replicates` grows. A propagation, and the `Predictive` of its draws,
 keep every replicate, each with a seed of its own. A deterministic engine
 does not use `replicates`, so the same analysis runs on either engine; with no
-seed, one is drawn and logged.
+seed, the engine draws one, which `analysis.seed` gives and the analysis logs.
+A negative `replicates` raises `ValueError` that names the setting.
 
 ## Quantities of interest
 

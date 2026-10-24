@@ -173,6 +173,10 @@ impl commol_core::SimulationEngine for DifferentialEquations {
         EngineType::DifferentialEquations.check_position(position)
     }
 
+    fn engine_type(&self) -> Option<EngineType> {
+        Some(EngineType::DifferentialEquations)
+    }
+
     fn step(&mut self) -> Result<(), SimulationError> {
         let end = self.current_time + 1.0;
         let mut buffer = Vec::with_capacity(1);

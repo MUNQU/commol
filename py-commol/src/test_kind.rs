@@ -157,6 +157,10 @@ impl SimulationEngine for TestEngine {
         EngineType::TestEngine.check_position(position)
     }
 
+    fn engine_type(&self) -> Option<EngineType> {
+        Some(EngineType::TestEngine)
+    }
+
     fn run_at_positions_into_buffer(
         &mut self,
         positions: &[f64],
@@ -335,6 +339,10 @@ impl SimulationEngine for TestStochasticEngine {
 
     fn check_position(&self, position: f64) -> Result<(), String> {
         EngineType::TestStochasticEngine.check_position(position)
+    }
+
+    fn engine_type(&self) -> Option<EngineType> {
+        Some(EngineType::TestStochasticEngine)
     }
 
     fn run_at_positions_into_buffer(

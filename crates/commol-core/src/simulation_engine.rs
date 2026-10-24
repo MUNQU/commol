@@ -343,6 +343,23 @@ pub trait SimulationEngine: Clone {
     /// nothing after it.
     fn set_seed(&mut self, _seed: u64) {}
 
+    /// The entry of the list of engines that the engine runs
+    /// ([`crate::EngineType`]), which names it in messages. None by default:
+    /// an engine off the list, such as an engine of a test.
+    fn engine_type(&self) -> Option<crate::EngineType> {
+        None
+    }
+
+    /// Whether the engine draws random numbers ([`Self::set_seed`]), so one
+    /// run is one draw of the model and a calibration or an analysis of it
+    /// runs replicates on seeds its caller sets: the rule of its entry of the
+    /// list ([`crate::EngineType::is_stochastic`]). An engine off the list is
+    /// deterministic: it gives the same run for every seed.
+    fn is_stochastic(&self) -> bool {
+        self.engine_type()
+            .is_some_and(crate::EngineType::is_stochastic)
+    }
+
     /// Update a parameter value by its identifier.
     ///
     /// The new value acts from the current position

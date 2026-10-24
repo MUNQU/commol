@@ -128,3 +128,14 @@ fn a_new_seed_acts_from_the_position() {
         .collect();
     assert!(after.iter().any(|&amount| amount != after[0]), "{after:?}");
 }
+
+#[test]
+fn the_engine_of_events_is_the_stochastic_entry_of_its_name() {
+    let engine = death("null", 10.0, 0.1);
+
+    assert_eq!(
+        engine.engine_type(),
+        Some(commol_core::EngineType::StochasticEvents)
+    );
+    assert!(engine.is_stochastic());
+}

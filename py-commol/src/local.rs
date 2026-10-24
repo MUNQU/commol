@@ -73,7 +73,7 @@ fn laplace(
     problem: &PyCalibrationProblem,
     fit: Vec<f64>,
     curvature: &str,
-    draws: usize,
+    #[pyo3(from_py_with = crate::counts::required::draws)] draws: usize,
     seed: u64,
 ) -> PyResult<PyLocalRun> {
     let kind = curvature_kind(curvature)?;
@@ -117,8 +117,8 @@ fn sandwich(
     problem: &PyCalibrationProblem,
     fit: Vec<f64>,
     curvature: &str,
-    block_length: Option<usize>,
-    draws: usize,
+    #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
+    #[pyo3(from_py_with = crate::counts::required::draws)] draws: usize,
     seed: u64,
 ) -> PyResult<SandwichTables> {
     let kind = curvature_kind(curvature)?;
@@ -263,7 +263,7 @@ fn laplace_mixture(
     priors: Option<Vec<PriorArgs>>,
     eta: Option<f64>,
     ends: Vec<Vec<f64>>,
-    draws: usize,
+    #[pyo3(from_py_with = crate::counts::required::draws)] draws: usize,
     curvature: &str,
     seed: u64,
 ) -> PyResult<PyMixtureRun> {

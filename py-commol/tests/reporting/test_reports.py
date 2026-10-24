@@ -24,6 +24,8 @@ from commol import (
     SimulationResults,
     member_statistics,
 )
+from commol.api import reporting
+from commol.context.inference import identifiability
 from commol.api.reporting import ReportLeaf, SimulationReport
 from commol.context.inference.identifiability import (
     ParameterVerdicts,
@@ -292,6 +294,27 @@ def test_an_identifiability_report_has_a_section_of_each_method() -> None:
     ]
     assert list(sections) == methods
     assert sections["profile"] == [report.profile[0].model_dump()]
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        "PointRank",
+        "Combination",
+        "StructuralSection",
+        "SubsetIndex",
+        "CollinearitySection",
+        "CorrelatedPair",
+        "SampleSection",
+        "StartsSection",
+        "ProfileSection",
+    ],
+)
+def test_the_data_of_a_section_has_the_fields_of_its_model(model: str) -> None:
+    fields = getattr(identifiability, model).model_fields
+    data = getattr(reporting, f"{model}Data")
+
+    assert list(data.__annotations__) == list(fields)
 
 
 def test_reports_are_only_methods() -> None:

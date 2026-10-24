@@ -54,6 +54,12 @@ class TestInvariants:
                 ["k1", "k1"], [(0, 1), (0, 1)], [[0.5, 0.5]], METHOD
             )
 
+    def test_a_field_that_is_not_valid_gets_the_message_of_pydantic(self) -> None:
+        with pytest.raises(ValidationError) as error:
+            _sample([0.0], [["a", 1.0]])  # ty: ignore[invalid-argument-type]
+
+        assert [e["loc"] for e in error.value.errors()] == [("values", 0, 0)]
+
     def test_a_sample_is_read_from_a_mapping(self) -> None:
         with pytest.raises(ValidationError, match="a valid dictionary"):
             ParameterSample.model_validate([1.0, 2.0])

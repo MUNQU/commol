@@ -43,9 +43,9 @@ impl PyBootstrapSettings {
     #[pyo3(signature = (method, replicates, starts, block_length=None, residual_scale=None, scheme=None, multipliers=None))]
     fn new(
         method: &str,
-        replicates: usize,
-        starts: usize,
-        block_length: Option<usize>,
+        #[pyo3(from_py_with = crate::counts::required::replicates)] replicates: usize,
+        #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
+        #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
         residual_scale: Option<&str>,
         scheme: Option<&str>,
         multipliers: Option<&str>,
@@ -277,7 +277,7 @@ fn trace_profiles(
     predictions: Vec<PyObservedDataPoint>,
     threshold: &str,
     confidence_level: f64,
-    max_steps: usize,
+    #[pyo3(from_py_with = crate::counts::required::max_steps)] max_steps: usize,
     seed: u64,
     bootstrap: Option<PyRef<'_, PyBootstrapSettings>>,
 ) -> PyResult<PyProfileRun> {

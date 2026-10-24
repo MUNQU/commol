@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from commol.constants import SUBGROUP_TOTAL_PREFIX, TOTAL_VARIABLE
 from commol.context._model import engine_state
 from commol.context.neighbors import NEIGHBORS_PREFIX, NEIGHBORS_VARIABLE
@@ -8,11 +10,14 @@ from commol.utils.equations import (
     get_predefined_variable_units,
 )
 
+if TYPE_CHECKING:
+    from commol.context.model import Model
+
 
 class ModelCompartmentHelper:
     """Utilities shared by the description of the dynamics and UnitChecker."""
 
-    def __init__(self, model) -> None:
+    def __init__(self, model: "Model") -> None:
         self._model = model
 
     # ------------------------------------------------------------------
@@ -141,7 +146,7 @@ class ModelCompartmentHelper:
             if param.id in variable_units or not isinstance(param.value, str):
                 continue
             try:
-                if _infer_single_formula_unit(param, variable_units):
+                if _infer_single_formula_unit(param.id, param.value, variable_units):
                     inferred_any = True
             except Exception as error:
                 failures[param.id] = error
@@ -222,9 +227,11 @@ class ModelCompartmentHelper:
 # ------------------------------------------------------------------
 
 
-def _infer_single_formula_unit(param, variable_units: dict[str, str]) -> bool:
+def _infer_single_formula_unit(
+    parameter_id: str, formula: str, variable_units: dict[str, str]
+) -> bool:
     """Infer unit for a single formula parameter. Returns True if successful."""
-    formula_vars = engine_state.formula_inputs(param.value)
+    formula_vars = engine_state.formula_inputs(formula)
     formula_var_units: dict[str, str] = {}
     for var in formula_vars:
         if var in variable_units:
@@ -234,8 +241,8 @@ def _infer_single_formula_unit(param, variable_units: dict[str, str]) -> bool:
     if formula_var_units:
         from commol.utils.equations import parse_equation_unit
 
-        inferred_unit = parse_equation_unit(param.value, formula_var_units)
-        variable_units[param.id] = str(inferred_unit.units)
+        inferred_unit = parse_equation_unit(formula, formula_var_units)
+        variable_units[parameter_id] = str(inferred_unit.units)
     else:
-        variable_units[param.id] = "dimensionless"
+        variable_units[parameter_id] = "dimensionless"
     return True

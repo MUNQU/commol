@@ -42,6 +42,7 @@ mod build_info;
 mod calibration;
 mod conformal;
 mod core;
+mod counts;
 mod engine;
 mod identifiability;
 mod inference;

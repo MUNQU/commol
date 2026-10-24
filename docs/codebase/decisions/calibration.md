@@ -66,7 +66,10 @@ writes again at each evaluation, so a value set on it is lost. A calibration
 or any method on `ForwardModel` sets each parameter on a copy of the engine
 when it is built (`ValueWriter::new` in `crates/commol-calibration/src/values.rs`),
 so the engine's message reaches the user before any run, and Python checks no
-parameter id (`check_values` in `api/calibrator.py`).
+parameter id (`check_values` in `api/calibrator.py`). `ValueWriter::new` also
+checks that a factor has positive bounds, the observed outputs and positions
+are checked by `CalibrationProblem::new` alone, and Python passes each
+message with no prefix.
 
 **Guards:** `crates/commol-model/tests/parameters.rs`,
 `tests/calibration/test_problem.py::TestProblemAgainstTheModel`.

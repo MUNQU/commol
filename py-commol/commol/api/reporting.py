@@ -23,13 +23,20 @@ from commol.context.calibration import (
     ObservedDataPoint,
     calibrated_values,
 )
-from commol.context._model.report import CategorySplitEntry, InitialAmountEntry
 from commol.context.constants import CalibrationParameterType
 from commol.context.model import Model
 from commol.context.inference.conformal import PredictionIntervals
-from commol.context.inference.identifiability import IdentifiabilityReport
+from commol.context.inference.identifiability import (
+    IdentifiabilityReport,
+    ProfileThresholdName,
+    ProfileVerdictName,
+    SampleReference,
+    StructuralDesign,
+    StructuralVerdictName,
+)
 from commol.context.inference.sample import ParameterSample, ParameterSummary
 from commol.context.report_entry import Interval, entry_interval
+from commol.context.structure import ReportSections
 
 
 class ParameterEntry(TypedDict):
@@ -40,19 +47,14 @@ class ParameterEntry(TypedDict):
     interval: NotRequired[Interval]
 
 
-class AppliedParametersReport(TypedDict):
+class AppliedParametersReport(ReportSections):
     """
-    Every parameter of a calibrated model, and the sections of its kind.
-
-    An aggregate model adds ``initial_amounts`` and ``category_splits``;
-    another kind adds the sections its structure gives
-    (`ModelStructure.report_sections`).
+    Every parameter of a calibrated model, and the sections of its kind
+    (`ReportSections`, which `ModelStructure.report_sections` gives).
     """
 
     confidence_level: NotRequired[float]
     parameters: dict[str, ParameterEntry]
-    initial_amounts: NotRequired[dict[str, InitialAmountEntry]]
-    category_splits: NotRequired[dict[str, CategorySplitEntry]]
 
 
 def _parameter_entry(
@@ -116,15 +118,14 @@ def _applied_parameters_report(
                 parameter_statistics,
             )
 
-    report: dict[str, object] = {}
     # `confidence_level` leads the report, so it is written first.
+    report: AppliedParametersReport = {"parameters": parameters}
     if confidence_level is not None:
-        report["confidence_level"] = confidence_level
-    report["parameters"] = parameters
+        report = {"confidence_level": confidence_level, "parameters": parameters}
     report.update(
         model.structure.report_sections(model, calibrated_ids, parameter_statistics)
     )
-    return cast(AppliedParametersReport, report)
+    return report
 
 
 def _observation_parameter_ids(problem: CalibrationProblem | None) -> list[str]:
@@ -415,16 +416,113 @@ class VerdictsEntry(TypedDict):
     practical: PracticalVerdictEntry | None
 
 
+class PointRankData(TypedDict):
+    """`PointRank` as plain data."""
+
+    values: dict[str, float]
+    singular_values: list[float]
+    threshold: float
+    rank: int
+
+
+class CombinationData(TypedDict):
+    """`Combination` as plain data."""
+
+    exponents: dict[str, float]
+    text: str
+
+
+class StructuralSectionData(TypedDict):
+    """`StructuralSection` as plain data."""
+
+    design: StructuralDesign
+    points: list[PointRankData]
+    skipped: list[str]
+    generic_rank: int
+    projections: dict[str, float]
+    verdicts: dict[str, StructuralVerdictName]
+    combinations: list[CombinationData]
+
+
+class SubsetIndexData(TypedDict):
+    """`SubsetIndex` as plain data."""
+
+    parameters: list[str]
+    gamma: float
+    share_below: float
+
+
+class CollinearitySectionData(TypedDict):
+    """`CollinearitySection` as plain data."""
+
+    threshold: float
+    points: int
+    skipped: list[str]
+    sensitivity: dict[str, float]
+    pair_gamma: dict[str, dict[str, float]]
+    best_by_size: list[SubsetIndexData]
+    admissible: list[SubsetIndexData]
+
+
+class CorrelatedPairData(TypedDict):
+    """`CorrelatedPair` as plain data."""
+
+    first: str
+    second: str
+    correlation: float
+
+
+class SampleSectionData(TypedDict):
+    """`SampleSection` as plain data."""
+
+    reference: SampleReference
+    correlation_threshold: float
+    contraction: dict[str, float]
+    correlation: dict[str, dict[str, float]]
+    correlated_pairs: list[CorrelatedPairData]
+    modes: dict[str, list[float]]
+
+
+class StartsSectionData(TypedDict):
+    """`StartsSection` as plain data."""
+
+    parameter_tolerance: float
+    loss_tolerance: float
+    near_best: list[int]
+    spread: dict[str, float]
+    flagged: list[str]
+
+
+class ProfileSectionData(TypedDict):
+    """`ProfileSection` as plain data: each interval is a pair of ends."""
+
+    threshold: ProfileThresholdName
+    confidence_level: float
+    tolerance: float
+    verdicts: dict[str, ProfileVerdictName | None]
+    intervals: dict[str, tuple[float | None, float | None]]
+
+
+class IdentifiabilitySections(TypedDict):
+    """The sections of each method of an identifiability report."""
+
+    structural: list[StructuralSectionData]
+    collinearity: list[CollinearitySectionData]
+    sample: list[SampleSectionData]
+    starts: list[StartsSectionData]
+    profile: list[ProfileSectionData]
+
+
 class IdentifiabilityReportData(TypedDict):
     """
     The identifiability of each parameter, and the evidence of each method.
 
-    ``sections`` maps ``structural``, ``collinearity``, ``sample`` and
-    ``starts`` to the list of their sections, as plain data.
+    ``sections`` holds the sections of each method, as plain data
+    (`IdentifiabilitySections`).
     """
 
     parameters: dict[str, VerdictsEntry]
-    sections: dict[str, list[dict[str, object]]]
+    sections: IdentifiabilitySections
 
 
 def _identifiability_report(report: IdentifiabilityReport) -> IdentifiabilityReportData:
@@ -446,11 +544,23 @@ def _identifiability_report(report: IdentifiabilityReport) -> IdentifiabilityRep
             if practical is None
             else {"verdict": practical.verdict, "reasons": list(practical.reasons)},
         }
-    sections: dict[str, list[dict[str, object]]] = {
-        "structural": [section.model_dump() for section in report.structural],
-        "collinearity": [section.model_dump() for section in report.collinearity],
-        "sample": [section.model_dump() for section in report.sample],
-        "starts": [section.model_dump() for section in report.starts],
-        "profile": [section.model_dump() for section in report.profile],
+    sections: IdentifiabilitySections = {
+        "structural": [
+            cast(StructuralSectionData, section.model_dump())
+            for section in report.structural
+        ],
+        "collinearity": [
+            cast(CollinearitySectionData, section.model_dump())
+            for section in report.collinearity
+        ],
+        "sample": [
+            cast(SampleSectionData, section.model_dump()) for section in report.sample
+        ],
+        "starts": [
+            cast(StartsSectionData, section.model_dump()) for section in report.starts
+        ],
+        "profile": [
+            cast(ProfileSectionData, section.model_dump()) for section in report.profile
+        ],
     }
     return {"parameters": parameters, "sections": sections}

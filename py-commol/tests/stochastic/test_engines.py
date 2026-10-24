@@ -13,6 +13,8 @@ import pytest
 
 from commol import (
     InfeasibleStateError,
+    InputSpace,
+    SensitivityAnalysis,
     Simulation,
     SimulationReplicates,
     SimulationResults,
@@ -23,6 +25,7 @@ from tests.support import (
     STOCHASTIC_ENGINES,
     TIGHT,
     a_to_b_builder,
+    bounded,
     build_stochastic,
 )
 
@@ -195,3 +198,16 @@ def test_replicates_takes_a_count() -> None:
     replicates = simulation.replicates(count=3, seed=7).run(5)
 
     assert len(replicates) == 3
+
+
+def test_a_sensitivity_analysis_gets_the_seed_rule_of_the_engine() -> None:
+    simulation = Simulation(build_stochastic(a_to_b_builder(), "StochasticSteps"))
+    inputs = InputSpace.uniform_on_bounds([bounded("k", 0.01, 0.5)])
+
+    with pytest.raises(ValueError) as error:
+        SensitivityAnalysis(simulation, inputs, replicates=2)
+
+    assert str(error.value) == (
+        "The StochasticSteps engine is stochastic: set seed, so the replicates "
+        "and the analysis are reproducible."
+    )

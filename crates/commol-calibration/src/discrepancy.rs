@@ -136,8 +136,11 @@ impl Discrepancy {
     /// set the scale of each series themselves.
     pub(crate) fn set_normalization(&mut self, enabled: bool) -> Result<(), String> {
         if enabled && self.likelihood().is_some() {
-            return Err("normalize_observations needs a loss: the observation models set the                         scale of each series with their noise"
-                .to_string());
+            return Err(
+                "normalize_observations needs a loss: the observation models set the \
+                 scale of each series with their noise"
+                    .to_string(),
+            );
         }
         self.normalized = enabled;
         self.normalization = if enabled {
@@ -157,8 +160,12 @@ impl Discrepancy {
     /// stochastic engine needs a loss.
     pub(crate) fn set_summary(&mut self, summary: Option<ReplicateSummary>) -> Result<(), String> {
         if summary.is_some() && self.likelihood().is_some() {
-            return Err("A stochastic engine needs a loss: the likelihood of a summary of its                         replicates ignores the noise of the process, so observation models                         need a deterministic engine"
-                .to_string());
+            return Err(
+                "A stochastic engine needs a loss: the likelihood of a summary of its \
+                 replicates ignores the noise of the process, so observation models \
+                 need a deterministic engine"
+                    .to_string(),
+            );
         }
         self.summary = summary;
         Ok(())

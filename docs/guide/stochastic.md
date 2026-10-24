@@ -212,6 +212,11 @@ takes `StochasticStepsSettings` (only `rounding`):
 | `tolerance` | `1e-8` | Relative tolerance of the time of an event when a rate reads `t` |
 | `rounding` | `None` | See [Whole units](#whole-units) |
 
+The defaults are the engine's, and the engine checks the settings when they
+are built: `StochasticEventsSettings(epsilon=1.5)` raises `ValidationError`
+with the message of the engine, `epsilon is strictly between 0 and 1, got
+1.5`.
+
 - **Cost of the direct method.** The number of events grows with the total
   and with the rates: every unit that moves is one event. For a large total,
   use `"tau_leaping"` or a deterministic engine.

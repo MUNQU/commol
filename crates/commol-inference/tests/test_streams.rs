@@ -75,8 +75,15 @@ fn two_methods_with_one_seed_draw_from_two_streams() {
     let k = vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)];
     let inputs = Priors::uniform_on_bounds(&["k".to_string()], &[(0.0, 1.0)]).unwrap();
     let engine = DifferenceEquations::try_from_model(&decay()).unwrap();
-    let analysis =
-        ForwardAnalysis::new(engine, k, None, None, InputSpace::Independent(inputs), SEED).unwrap();
+    let analysis = ForwardAnalysis::new(
+        engine,
+        k,
+        None,
+        None,
+        InputSpace::Independent(inputs),
+        Some(SEED),
+    )
+    .unwrap();
     let design_unit = analysis.draws("PRCC", Some(1)).unwrap().values()[0][0];
     let design_stream = Generator::from_seed(Stream::SensitivityDesign.seed(SEED));
     assert_eq!(design_unit, design_stream.clone().uniform());

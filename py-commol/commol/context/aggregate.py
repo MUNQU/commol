@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING, Literal, Self
 
 from pydantic import Field
 
-from commol.constants import RESERVED_VARIABLE_NAMES
 from commol.context.constants import CalibrationParameterType
 from commol.context._model import engine_state
 from commol.context._model.engine_state import InitialCompartment
@@ -85,10 +84,11 @@ class Aggregate(ModelStructure, InitialConditions):
         Check the structure against the process and the parameters.
 
         The process needs a bin and a transition, the amounts must name every
-        bin and the fractions every category of the process, parameter ids
-        must not be engine variables or bin ids, and the engine must plan
-        every transition, resolve the neighbors, find every variable a rate or
-        a formula parameter reads, and build the initial state.
+        bin and the fractions every category of the process, and the engine
+        must plan every transition, accept every id (no parameter id is an
+        engine variable, a bin, a compartment or a subgroup total), resolve
+        the neighbors, find every variable a rate or a formula parameter
+        reads, and build the initial state.
 
         Parameters
         ----------
@@ -107,7 +107,6 @@ class Aggregate(ModelStructure, InitialConditions):
             raise ValueError("At least one transition must be defined.")
         self._check_bin_amounts(process)
         self._check_stratification_fractions(process)
-        self._check_parameter_names(model)
         engine_state.transition_flows(process, self)
         engine_state.check_model(model)
         if self.compartment_amounts:
@@ -536,33 +535,6 @@ class Aggregate(ModelStructure, InitialConditions):
                     f"Stratification fractions for '{strat_id}' must sum to 1.0, "
                     f"but got {total:.7}."
                 )
-
-    def _check_parameter_names(self, model: "Model[Self]") -> None:
-        """
-        Check that parameter ids are not engine variables or bin ids.
-
-        Expanded compartment names, subgroup totals and the names of the
-        neighbors are checked by the engine (``engine_state.check_model``).
-        """
-        bin_ids = {bin_item.id for bin_item in model.process.bins}
-        parameter_ids = {p.id for p in model.parameters}
-
-        special = sorted(parameter_ids & set(RESERVED_VARIABLE_NAMES))
-        if special:
-            raise ValueError(
-                f"Parameter IDs conflict with engine variables: {special}. "
-                f"{', '.join(RESERVED_VARIABLE_NAMES)} are reserved. "
-                f"Please rename the conflicting parameters."
-            )
-
-        conflicting_names = bin_ids & parameter_ids
-        if conflicting_names:
-            raise ValueError(
-                f"Parameter IDs conflict with reserved compartment names: "
-                f"{sorted(conflicting_names)}. "
-                f"Bin IDs ({sorted(bin_ids)}) are reserved variables. "
-                f"Please rename the conflicting parameters."
-            )
 
 
 def _unit_name(unit: str | None) -> str:

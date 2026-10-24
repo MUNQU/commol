@@ -33,6 +33,7 @@ use crate::engine::{Engine, InfeasibleStateError, PyEngine};
 #[pyclass(name = "CalibrationProblem", frozen)]
 pub struct PyCalibrationProblem {
     pub(crate) inner: CalibrationProblem<Engine>,
+    seed: u64,
 }
 
 /// The Python error of a parameter set that has no prediction:
@@ -219,6 +220,8 @@ impl PyCalibrationProblem {
     }
 }
 
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
 #[pymethods]
 impl PyCalibrationProblem {
     /// Build a calibration problem
@@ -235,13 +238,18 @@ impl PyCalibrationProblem {
     ///         if any
     ///     observation_models: `(series label, model)` of each series; None
     ///         with a loss
+    ///     seed: The seed of every random number of the calibration; None
+    ///         draws one, which `seed` reports, and a stochastic engine needs
+    ///         it set
     ///
     /// Raises:
     ///     ValueError: If the problem is not valid for the engine, it has
-    ///         both or neither of a loss and observation models, or it has
-    ///         observation models and a stochastic engine
+    ///         both or neither of a loss and observation models, it has
+    ///         observation models and a stochastic engine, or a stochastic
+    ///         engine lacks a setting of its replicates
     #[new]
-    #[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config=None, initial_condition_remainder=None, observation_models=None))]
+    #[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config=None, initial_condition_remainder=None, observation_models=None, seed=None))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         engine: PyRef<'_, PyEngine>,
         observed_data: Vec<PyObservedDataPoint>,
@@ -250,18 +258,11 @@ impl PyCalibrationProblem {
         loss_config: Option<PyRef<'_, PyLossConfig>>,
         initial_condition_remainder: Option<String>,
         observation_models: Option<Vec<(String, PyObservationModel)>>,
+        seed: Option<u64>,
     ) -> PyResult<Self> {
         let engine = engine.engine();
         let discrepancy = match (&loss_config, observation_models) {
             (Some(loss), None) => DiscrepancyConfig::Loss(loss.inner),
-            (None, Some(_)) if engine.engine_type().is_stochastic() => {
-                return Err(value_error(
-                    "A stochastic engine needs a loss: the likelihood of a stochastic model \
-                     integrates its hidden path, which observation models of one run do not \
-                     do; set loss_function instead of observation_models"
-                        .to_string(),
-                ));
-            }
             (None, Some(models)) => DiscrepancyConfig::Likelihood(
                 models
                     .into_iter()
@@ -286,7 +287,9 @@ impl PyCalibrationProblem {
         if let Some(loss) = loss_config {
             problem = problem
                 .with_observation_normalization(loss.normalize_observations)
-                .and_then(|problem| problem.with_replicates(loss.replicates.clone()))
+                .and_then(|problem| {
+                    problem.with_replicate_settings(loss.replicates, seed, loss.summary)
+                })
                 .map_err(value_error)?;
         }
         if let Some(remainder) = initial_condition_remainder {
@@ -294,7 +297,17 @@ impl PyCalibrationProblem {
                 .with_initial_condition_remainder(&remainder)
                 .map_err(value_error)?;
         }
-        Ok(Self { inner: problem })
+        Ok(Self {
+            inner: problem,
+            seed: commol_random::seed_or_drawn(seed),
+        })
+    }
+
+    /// The seed of every random number of the calibration: the seed given,
+    /// or the one drawn when it was built
+    #[getter]
+    fn seed(&self) -> u64 {
+        self.seed
     }
 
     /// Optimize from `starts` start points in parallel
@@ -316,7 +329,7 @@ impl PyCalibrationProblem {
         &self,
         py: Python<'_>,
         config: &PyOptimizationConfig,
-        starts: usize,
+        #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
         seed: u64,
     ) -> PyResult<Vec<PyStartOutcome>> {
         let outcomes = if config.verbose {
@@ -446,7 +459,11 @@ impl PyCalibrationProblem {
         sample: &PyParameterSample,
         observations: Vec<PyObservedDataPoint>,
         seed: u64,
-        residual_noise: Option<(Vec<f64>, usize, String)>,
+        #[pyo3(from_py_with = crate::counts::residual_noise)] residual_noise: Option<(
+            Vec<f64>,
+            usize,
+            String,
+        )>,
         distribution_noise: bool,
     ) -> PyResult<PyObservationDraws> {
         let observations: Vec<_> = observations.into_iter().map(|o| o.inner).collect();
@@ -535,8 +552,8 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         config: &PyOptimizationConfig,
         fit: Vec<f64>,
-        replicates: usize,
-        starts: usize,
+        #[pyo3(from_py_with = crate::counts::required::replicates)] replicates: usize,
+        #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
         seed: u64,
     ) -> PyResult<PyBootstrapRun> {
         self.run_bootstrap(py, config, &fit, replicates, starts, seed, |fit| {
@@ -565,9 +582,9 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         config: &PyOptimizationConfig,
         fit: Vec<f64>,
-        replicates: usize,
-        block_length: Option<usize>,
-        starts: usize,
+        #[pyo3(from_py_with = crate::counts::required::replicates)] replicates: usize,
+        #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
+        #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
         seed: u64,
     ) -> PyResult<PyBootstrapRun> {
         self.run_bootstrap(py, config, &fit, replicates, starts, seed, |fit| {
@@ -599,9 +616,9 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         config: &PyOptimizationConfig,
         fit: Vec<f64>,
-        replicates: usize,
-        block_length: Option<usize>,
-        starts: usize,
+        #[pyo3(from_py_with = crate::counts::required::replicates)] replicates: usize,
+        #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
+        #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
         seed: u64,
         residual_scale: &str,
         scheme: &str,
@@ -635,9 +652,9 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         config: &PyOptimizationConfig,
         fit: Vec<f64>,
-        replicates: usize,
-        block_length: Option<usize>,
-        starts: usize,
+        #[pyo3(from_py_with = crate::counts::required::replicates)] replicates: usize,
+        #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
+        #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
         seed: u64,
         multipliers: &str,
     ) -> PyResult<PyBootstrapRun> {
@@ -666,8 +683,8 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         config: &PyOptimizationConfig,
         fit: Vec<f64>,
-        block_length: Option<usize>,
-        starts: usize,
+        #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
+        #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
         seed: u64,
     ) -> PyResult<PyJackknifeRun> {
         let runner = ReplicateRunner::new(&self.inner, &config.inner, &fit, starts, seed)
@@ -845,7 +862,11 @@ impl PyParameterSample {
     }
 
     /// The indices of `count` draws taken with replacement by weight
-    fn resample(&self, count: usize, seed: u64) -> Vec<usize> {
+    fn resample(
+        &self,
+        #[pyo3(from_py_with = crate::counts::required::count)] count: usize,
+        seed: u64,
+    ) -> Vec<usize> {
         self.inner.resample(count, seed)
     }
 }
@@ -1010,6 +1031,29 @@ fn interval_levels(confidence_level: f64) -> PyResult<(f64, f64)> {
     Ok((lower, upper))
 }
 
+/// Check that the setting `name` is strictly between 0 and 1
+///
+/// The one check of a share.
+///
+/// Raises:
+///     ValueError: If `value` is not strictly between 0 and 1; the message
+///         names the setting
+#[pyfunction]
+fn check_open_unit(name: &str, value: f64) -> PyResult<()> {
+    commol_core::check_open_unit(name, value).map_err(value_error)
+}
+
+/// Check that every level of `levels` is a quantile level, from 0 to 1
+///
+/// The one check of a quantile level.
+///
+/// Raises:
+///     ValueError: If a level is outside [0, 1]; the message gives it
+#[pyfunction]
+fn check_levels(levels: Vec<f64>) -> PyResult<()> {
+    statistics::check_levels(&levels).map_err(value_error)
+}
+
 /// The weighted mean of `values`, one weight per value and some positive
 #[pyfunction]
 fn weighted_mean(values: Vec<f64>, weights: Vec<f64>) -> f64 {
@@ -1054,6 +1098,8 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(quantile_error, m)?)?;
     m.add_function(wrap_pyfunction!(weighted_quantiles, m)?)?;
     m.add_function(wrap_pyfunction!(interval_levels, m)?)?;
+    m.add_function(wrap_pyfunction!(check_open_unit, m)?)?;
+    m.add_function(wrap_pyfunction!(check_levels, m)?)?;
     m.add_function(wrap_pyfunction!(by_series, m)?)?;
     m.add_function(wrap_pyfunction!(weighted_mean, m)?)?;
     crate::identifiability::register(m)?;

@@ -641,6 +641,10 @@ impl commol_core::SimulationEngine for StochasticEvents {
         EngineType::StochasticEvents.check_position(position)
     }
 
+    fn engine_type(&self) -> Option<EngineType> {
+        Some(EngineType::StochasticEvents)
+    }
+
     fn run_at_positions_into_buffer(
         &mut self,
         positions: &[f64],

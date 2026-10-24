@@ -79,7 +79,8 @@ impl Default for NelderMeadConfig {
 /// Inertia weight strategy for PSO
 #[derive(Debug, Clone)]
 pub enum InertiaWeightStrategy {
-    /// Constant inertia weight (default: 1/(2*ln(2)) ≈ 0.721)
+    /// Constant inertia weight ([`Self::DEFAULT_FACTOR`] when no strategy
+    /// is set)
     Constant(f64),
     /// Chaotic inertia weight using logistic map
     Chaotic {
@@ -90,10 +91,17 @@ pub enum InertiaWeightStrategy {
     },
 }
 
+impl InertiaWeightStrategy {
+    /// The constant weight of canonical PSO, `1/(2 ln 2) ≈ 0.72135`: the
+    /// weight of a swarm with no inertia strategy (argmin's default).
+    pub const DEFAULT_FACTOR: f64 = 1.0 / (2.0 * std::f64::consts::LN_2);
+}
+
 /// Acceleration coefficient strategy for PSO
 #[derive(Debug, Clone)]
 pub enum AccelerationStrategy {
-    /// Constant coefficients (default: cognitive=0.5+ln(2), social=0.5+ln(2))
+    /// Constant coefficients ([`Self::DEFAULT_COEFFICIENT`] for both when
+    /// no strategy is set)
     Constant {
         /// Pull towards each particle's best position (c1).
         cognitive: f64,
@@ -111,6 +119,13 @@ pub enum AccelerationStrategy {
         /// Social coefficient at the last iteration.
         c2_final: f64,
     },
+}
+
+impl AccelerationStrategy {
+    /// The cognitive and the social coefficient of canonical PSO,
+    /// `0.5 + ln 2 ≈ 1.19315`: the coefficients of a swarm with no
+    /// acceleration strategy (argmin's default).
+    pub const DEFAULT_COEFFICIENT: f64 = 0.5 + std::f64::consts::LN_2;
 }
 
 /// Particle initialization strategy
@@ -219,11 +234,12 @@ pub struct ParticleSwarmConfig {
     pub target_cost: Option<f64>,
 
     /// Inertia weight strategy (constant or chaotic)
-    /// Defaults to Constant(1/(2*ln(2)) ≈ 0.721)
+    /// `None` is [`InertiaWeightStrategy::DEFAULT_FACTOR`], constant.
     pub inertia_strategy: Option<InertiaWeightStrategy>,
 
     /// Acceleration coefficient strategy (constant or time-varying)
-    /// Defaults to Constant with cognitive=0.5+ln(2), social=0.5+ln(2)
+    /// `None` is [`AccelerationStrategy::DEFAULT_COEFFICIENT`] for both,
+    /// constant.
     pub acceleration_strategy: Option<AccelerationStrategy>,
 
     /// Particle initialization strategy
@@ -980,6 +996,25 @@ pub(crate) fn build_particle_swarm_solver(
 mod tests {
     use super::*;
     use commol_core::{Levels, Parallelism};
+
+    #[test]
+    fn the_default_strategies_are_the_defaults_of_argmin() {
+        use argmin::solver::particleswarm::{
+            AccelerationCoefficientStrategy, InertiaWeightStrategy as ArgminInertia,
+        };
+
+        assert_eq!(
+            ArgminInertia::<f64>::default(),
+            ArgminInertia::Constant(InertiaWeightStrategy::DEFAULT_FACTOR)
+        );
+        assert_eq!(
+            AccelerationCoefficientStrategy::<f64>::default(),
+            AccelerationCoefficientStrategy::Constant {
+                cognitive: AccelerationStrategy::DEFAULT_COEFFICIENT,
+                social: AccelerationStrategy::DEFAULT_COEFFICIENT,
+            }
+        );
+    }
 
     /// `(x − 0.7)²`, NaN below 0.5.
     struct HalfNan;

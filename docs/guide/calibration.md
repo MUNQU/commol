@@ -101,7 +101,7 @@ also when it was created while a parameter was `None`. See
 | `initial_condition_remainder` | `str \| None` | `None` | The compartment or bin that absorbs the difference when initial conditions are calibrated. See [Calibrating Initial Conditions](calibration-initial-conditions.md). |
 | `replicates` | `int \| None` | `None` | How many replicates of a stochastic engine each evaluation runs. Required with a stochastic engine. See [Stochastic engines](#stochastic-engines) and [Stochastic Simulation](stochastic.md). |
 | `replicate_summary` | `"mean"`, `"median"`, `"crps"`, `Quantile(q)` or `None` | `None` | What each observation is compared with when an evaluation runs replicates. Required with a stochastic engine. See [Stochastic engines](#stochastic-engines). |
-| `seed` | `int \| None` | `None` | The seed of every random number of a calibration: the replicates of a stochastic engine, the starts, a particle swarm and the uncertainty methods. Without it, `Calibrator.seed` draws one. See [Reproducibility](calibration-optimizers.md#reproducibility). |
+| `seed` | `int \| None` | `None` | The seed of every random number of a calibration: the replicates of a stochastic engine, the starts, a particle swarm and the uncertainty methods. Without it, the engine draws one, which `Calibrator.seed` gives. See [Reproducibility](calibration-optimizers.md#reproducibility). |
 
 ### Observations
 
@@ -211,9 +211,9 @@ print(round(result.best_parameters["k1"], 1))  # 0.4
 
 | Rule | Where |
 |---|---|
-| A stochastic engine needs `replicates`, `replicate_summary` and `seed`; without one, `Calibrator` raises and the message lists the summaries | `rust_loss_config` in `py-commol/commol/context/_model/engine_state.py` |
+| A stochastic engine needs `replicates`, `replicate_summary` and `seed`; without one, `Calibrator` raises a `ValueError` that names the engine, and the message lists the summaries | `CalibrationProblem::with_replicate_settings` in `crates/commol-calibration/src/calibration_problem.rs`; `SimulationEngine::is_stochastic` |
 | A deterministic engine does not use `replicates` and `replicate_summary` | The same |
-| A stochastic engine needs a loss: with `observation_models`, `Calibrator` raises a `ValueError` | `PyCalibrationProblem::new` in `py-commol/src/inference.rs`; `Discrepancy::set_summary` |
+| A stochastic engine needs a loss: with `observation_models`, `Calibrator` raises a `ValueError` | `CalibrationProblem::new`; `Discrepancy::set_summary` |
 | The summaries and the CRPS are computed in `LossConfig`, and the observation weights apply to every option | `LossConfig::replicate_loss` in `crates/commol-calibration/src/types.rs` |
 | The median and `Quantile(q)` are the one quantile of commol, the one of `weighted_quantiles` and `SimulationReplicates.quantiles` (NumPy's `method="hazen"`): `Quantile(0.25)` of the replicates 1, 2, 3, 4, 5 is 1.75 | `ReplicateSummary::summarize`; `statistics::quantiles` in `crates/commol-calibration/src/statistics.rs` |
 | A constraint at positions is checked on every replicate | `CalibrationProblem::evaluate` |

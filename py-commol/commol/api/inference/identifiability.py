@@ -165,11 +165,6 @@ def run_collinearity(
     """Run `Collinearity` on `calibrator`."""
     _deterministic(calibrator, "Collinearity")
     names = calibrator.parameter_names
-    if method.max_subset_size > len(names):
-        raise ValueError(
-            f"max_subset_size must be at most the number of parameters "
-            f"({len(names)}), got {method.max_subset_size}."
-        )
     points, weights = _points_of(calibrator, method.at)
     analysis = rust.collinearity(
         calibrator.rust_problem,

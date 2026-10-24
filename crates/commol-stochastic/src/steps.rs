@@ -260,6 +260,10 @@ impl commol_core::SimulationEngine for StochasticSteps {
         EngineType::StochasticSteps.check_position(position)
     }
 
+    fn engine_type(&self) -> Option<EngineType> {
+        Some(EngineType::StochasticSteps)
+    }
+
     fn run_at_positions_into_buffer(
         &mut self,
         positions: &[f64],

@@ -10,11 +10,11 @@ model.
 from collections.abc import Mapping
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from commol.context.calibration import CalibrationResult
 from commol.context.inference.distributions import WithPriors
-from commol.context.inference.levels import ConfidenceLevel
+from commol.context.inference.levels import ConfidenceLevel, Share
 from commol.context.inference.method import UncertaintyMethod
 from commol.context.inference.resampling import BlockLength
 from commol.context.inference.sample import ParameterSample
@@ -230,7 +230,7 @@ class GibbsResult(SMCResult):
     failed: list[str] = Field(default_factory=list)
 
 
-def _require(data: object, name: str, hint: str) -> None:
+def _require(data: JsonValue, name: str, hint: str) -> None:
     if isinstance(data, Mapping) and data.get(name) is None:
         raise ValueError(f"{name} is required: {hint}.")
 
@@ -270,17 +270,15 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult]):
 
     eta: Eta = Field(description="The scale of the loss, or its calibration.")
     particles: int = Field(ge=2, description="Number of particles.")
-    target_cess: float = Field(gt=0.0, lt=1.0, description="Share kept per step.")
+    target_cess: Share = Field(description="Share kept per step.")
     resample_threshold: float = Field(
         gt=0.0, le=1.0, description="Resample below this share."
     )
-    stay_probability: float = Field(
-        gt=0.0, lt=1.0, description="Probability a particle does not move."
-    )
+    stay_probability: Share = Field(description="Probability a particle does not move.")
 
     @model_validator(mode="before")
     @classmethod
-    def require_eta(cls, data: object) -> object:
+    def require_eta(cls, data: JsonValue) -> JsonValue:
         """Name the choices of `eta` when it is missing."""
         _require(data, "eta", f"give {ETA_CHOICES}")
         if isinstance(data, Mapping):
@@ -321,13 +319,11 @@ class BayesianPosterior(WithPriors, UncertaintyMethod[SMCResult]):
     """
 
     particles: int = Field(ge=2, description="Number of particles.")
-    target_cess: float = Field(gt=0.0, lt=1.0, description="Share kept per step.")
+    target_cess: Share = Field(description="Share kept per step.")
     resample_threshold: float = Field(
         gt=0.0, le=1.0, description="Resample below this share."
     )
-    stay_probability: float = Field(
-        gt=0.0, lt=1.0, description="Probability a particle does not move."
-    )
+    stay_probability: Share = Field(description="Probability a particle does not move.")
 
 
 class ABCSMC(WithPriors, UncertaintyMethod[SMCResult]):
@@ -365,13 +361,11 @@ class ABCSMC(WithPriors, UncertaintyMethod[SMCResult]):
 
     distance: ABCDistance = Field(description="The distance.")
     particles: int = Field(ge=2, description="Number of particles.")
-    target_cess: float = Field(gt=0.0, lt=1.0, description="Share kept per step.")
-    min_acceptance: float = Field(
-        gt=0.0, lt=1.0, description="Acceptance rate below which the run stops."
+    target_cess: Share = Field(description="Share kept per step.")
+    min_acceptance: Share = Field(
+        description="Acceptance rate below which the run stops."
     )
-    stay_probability: float = Field(
-        gt=0.0, lt=1.0, description="Probability a particle does not move."
-    )
+    stay_probability: Share = Field(description="Probability a particle does not move.")
 
 
 class ABCRejection(WithPriors, UncertaintyMethod[SMCResult]):
@@ -396,4 +390,4 @@ class ABCRejection(WithPriors, UncertaintyMethod[SMCResult]):
 
     distance: ABCDistance = Field(description="The distance.")
     draws: int = Field(ge=2, description="Number of draws.")
-    quantile: float = Field(gt=0.0, lt=1.0, description="The share of draws kept.")
+    quantile: Share = Field(description="The share of draws kept.")

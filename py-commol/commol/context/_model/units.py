@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from commol.context._model import engine_state
 from commol.context._model.helpers import ModelCompartmentHelper
 from commol.utils.equations import (
@@ -6,6 +8,9 @@ from commol.utils.equations import (
     check_equation_units,
     ureg,
 )
+
+if TYPE_CHECKING:
+    from commol.context.model import Model
 
 
 def check_step_unit(unit: str) -> str:
@@ -59,7 +64,7 @@ class UnitChecker:
     per step or an instantaneous rate) is the engine's; the unit is the same.
     """
 
-    def __init__(self, model) -> None:
+    def __init__(self, model: "Model") -> None:
         self._model = model
         self._helper = ModelCompartmentHelper(model)
         self._mixed_unit_totals = self._helper.mixed_unit_totals()

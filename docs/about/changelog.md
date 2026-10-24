@@ -37,6 +37,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Simulation.outputs_for`, and a sum of outputs that the results do not hold
   gives one message, `Missing output series in results`, in a simulation, a
   report and a figure.
+- The engine checks a model, a calibration and the engine settings, and
+  Python repeats none of its checks, so each mistake gets the message of the
+  engine. A parameter named after an engine variable, a bin, a compartment
+  or a subgroup total names each conflict and asks to rename the parameter.
+  An observation of an output the model does not have names the output, the
+  observation and the outputs: `Invalid observed output name 'X' for
+  observation 'series1' (available: A, B, C)`. A factor with a bound of 0 or
+  below fails with `Factor parameter 'f' must have positive bounds (got
+  min=0, max=2)`. `Collinearity` checks `max_subset_size` when it runs, with
+  `max_subset_size must be from 2 to the number of parameters (3), got 9`.
+  The needs of a stochastic engine (`replicates`, `seed` and
+  `replicate_summary` of a calibration; `replicates` and `seed` of a
+  sensitivity analysis) keep their messages, which the engine now gives.
+- `ODESolver` and `StochasticEventsSettings` take their defaults from the
+  engine and check themselves with the engine when they are built:
+  `StochasticEventsSettings(epsilon=1.5)` gives `epsilon is strictly between
+  0 and 1, got 1.5`. Every other setting strictly between 0 and 1
+  (`target_cess`, `stay_probability`, `min_acceptance`, the `quantile` of
+  `ABCRejection`, `correlation_threshold`) gives `<name> is strictly between
+  0 and 1, got <value>`, `Quantile(1.5)` gives `A quantile level is between 0
+  and 1, got 1.5`, and a Sobol analysis of the Rust API with fewer than 2
+  draws says `draws`, the name of the setting.
+- A negative count that reaches the engine, such as `Simulation.run(-1)`, the
+  `replicates` of a `SensitivityAnalysis` or the `max_subset_size` of
+  `Collinearity`, raises `ValueError` that names the setting,
+  `num_steps is a whole number from 0, got -1`, in place of an
+  `OverflowError` with no name. Every count of the bindings reads this way.
+- The engine draws a seed that its user does not set, in one place, and the
+  result gives the seed it ran with, as before: `results.seed`,
+  `SimulationReplicates.seed`, `Calibrator.seed` and
+  `SensitivityAnalysis.seed`. A calibrator with no seed logs the seed it drew
+  when it is built, not when it first runs.
+- Ruff checks that every signature of the package has annotations and that
+  none is `typing.Any`; the raw input of a validator is a `JsonValue`. A
+  keyword that
+  `Quantile`, `Groups`, `Level` or `Increments` does not take raises
+  `TypeError` that names it, such as `Quantile(0.5, unknown=1)`, in place of
+  the `ValidationError` `Extra inputs are not permitted`. A `ParameterSample`
+  whose `names`, `bounds` or `values` are not valid gets the pydantic message
+  of that field before the engine checks the log weights.
 
 ### Fixed
 
@@ -87,6 +127,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   crashed near 20 000 terms, or near 2 000 on a thread of the parallel work.
 - A chain of powers groups from the right, as in Python: `2 ** 3 ** 2` is
   512. Before, it was 64, `(2 ** 3) ** 2`.
+
+- `ParticleSwarmConfig.inertia("constant")` and
+  `.acceleration("constant")` take the weight and the coefficients of
+  canonical particle swarm, `1/(2 ln 2)` and `0.5 + ln 2`, which a swarm with
+  no inertia or acceleration strategy uses. Before, their defaults were the
+  rounded `0.721` and `1.193`, so a swarm that named the constant strategy
+  moved a little differently from one that did not.
+- Three messages of a calibration with observation models no longer hold a
+  run of spaces in the middle of a sentence.
 
 ## [0.10.1] - 2026-10-23
 

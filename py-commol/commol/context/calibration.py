@@ -2,9 +2,10 @@
 
 import math
 from collections.abc import Mapping
-from typing import Literal, Self, overload, override
+from typing import Annotated, Literal, Self, overload, override
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     ConfigDict,
     Field,
@@ -30,6 +31,13 @@ from commol.utils.security import validate_expression_security
 
 # Re-export for documentation
 __all__ = ["OptimizationAlgorithm", "calibrated_values"]
+
+PSO_DEFAULT_INERTIA_FACTOR: float = commol_rs.calibration.PSO_DEFAULT_INERTIA_FACTOR
+"""The inertia weight of canonical PSO, 1/(2 ln 2): the engine's default."""
+
+PSO_DEFAULT_ACCELERATION: float = commol_rs.calibration.PSO_DEFAULT_ACCELERATION
+"""The cognitive and social coefficient of canonical PSO, 0.5 + ln 2: the
+engine's default."""
 
 
 class ObservedDataPoint(BaseModel):
@@ -762,7 +770,9 @@ class ParticleSwarmConfig(BaseModel):
         return v
 
     @overload
-    def inertia(self, type: str, *, factor: float = 0.721) -> Self: ...
+    def inertia(
+        self, type: str, *, factor: float = PSO_DEFAULT_INERTIA_FACTOR
+    ) -> Self: ...
 
     @overload
     def inertia(self, type: str, *, w_min: float, w_max: float) -> Self: ...
@@ -780,9 +790,10 @@ class ParticleSwarmConfig(BaseModel):
 
         Other Parameters
         ----------------
-        factor : float, default=0.721
-            Fixed inertia weight (canonical PSO: 1/(2*ln(2)) ≈ 0.721).
-            Only used when type="constant".
+        factor : float, default=PSO_DEFAULT_INERTIA_FACTOR
+            Fixed inertia weight; the default is the weight of canonical PSO,
+            1/(2 ln 2) ≈ 0.72135, which a swarm with no inertia strategy
+            uses. Only used when type="constant".
         w_min : float
             Minimum inertia weight. Only used when type="chaotic".
         w_max : float
@@ -798,7 +809,9 @@ class ParticleSwarmConfig(BaseModel):
                 f"Invalid inertia type: {type}. Must be one of {list(PSOInertiaType)}"
             )
         if type == PSOInertiaType.CONSTANT:
-            self._inertia = PSOConstantInertia(factor=kwargs.get("factor", 0.721))
+            self._inertia = PSOConstantInertia(
+                factor=kwargs.get("factor", PSO_DEFAULT_INERTIA_FACTOR)
+            )
         else:
             self._inertia = PSOChaoticInertia(
                 w_min=kwargs["w_min"], w_max=kwargs["w_max"]
@@ -810,8 +823,8 @@ class ParticleSwarmConfig(BaseModel):
         self,
         type: str,
         *,
-        cognitive: float = 1.193,
-        social: float = 1.193,
+        cognitive: float = PSO_DEFAULT_ACCELERATION,
+        social: float = PSO_DEFAULT_ACCELERATION,
     ) -> Self: ...
 
     @overload
@@ -838,12 +851,14 @@ class ParticleSwarmConfig(BaseModel):
 
         Other Parameters
         ----------------
-        cognitive : float, default=1.193
-            Cognitive coefficient (c1) - attraction to personal best.
-            Only used when type="constant".
-        social : float, default=1.193
-            Social coefficient (c2) - attraction to swarm best.
-            Only used when type="constant".
+        cognitive : float, default=PSO_DEFAULT_ACCELERATION
+            Cognitive coefficient (c1) - attraction to personal best; the
+            default is the coefficient of canonical PSO, 0.5 + ln 2 ≈ 1.19315,
+            which a swarm with no acceleration strategy uses. Only used when
+            type="constant".
+        social : float, default=PSO_DEFAULT_ACCELERATION
+            Social coefficient (c2) - attraction to swarm best, with the
+            same default. Only used when type="constant".
         c1_initial : float
             Initial cognitive factor (typically high, e.g., 2.5).
             Only used when type="time_varying".
@@ -869,8 +884,8 @@ class ParticleSwarmConfig(BaseModel):
             )
         if type == PSOAccelerationType.CONSTANT:
             self._acceleration = PSOConstantAcceleration(
-                cognitive=kwargs.get("cognitive", 1.193),
-                social=kwargs.get("social", 1.193),
+                cognitive=kwargs.get("cognitive", PSO_DEFAULT_ACCELERATION),
+                social=kwargs.get("social", PSO_DEFAULT_ACCELERATION),
             )
         else:
             self._acceleration = PSOTimeVaryingAcceleration(
@@ -1179,6 +1194,33 @@ class CalibrationHistory(BaseModel):
     )
 
 
+def check_quantile_level(level: float) -> float:
+    """
+    Check a quantile level with the one check of commol.
+
+    Parameters
+    ----------
+    level : float
+        The level, such as 0.5 for the median.
+
+    Returns
+    -------
+    float
+        The level.
+
+    Raises
+    ------
+    ValueError
+        If ``level`` is not from 0 to 1.
+    """
+    commol_rs.inference.check_levels([level])
+    return level
+
+
+type QuantileLevel = Annotated[float, AfterValidator(check_quantile_level)]
+"""The level of a quantile, from 0 to 1."""
+
+
 class Quantile(BaseModel):
     """
     A quantile of the replicates of a stochastic engine, for
@@ -1197,9 +1239,9 @@ class Quantile(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    level: float = Field(..., ge=0.0, le=1.0, description="Level of the quantile.")
+    level: QuantileLevel = Field(..., description="Level of the quantile.")
 
-    def __init__(self, level: float, **data: object) -> None:
+    def __init__(self, level: float) -> None:
         """
         A quantile of the replicates.
 
@@ -1207,10 +1249,8 @@ class Quantile(BaseModel):
         ----------
         level : float
             The level, between 0 and 1.
-        **data : object
-            The other fields, as JSON holds them.
         """
-        super().__init__(level=level, **data)
+        super().__init__(level=level)
 
 
 type ReplicateSummary = Literal["mean", "median", "crps"] | Quantile
@@ -1275,7 +1315,8 @@ class CalibrationProblem(BaseModel):
         modelling choice.
     seed : int | None
         Seed of every random number of a calibration (default: None, a seed
-        drawn from the operating system, which `Calibrator.run` logs):
+        the engine draws when the calibrator is built, which `Calibrator.seed`
+        gives and the calibrator logs):
         the replicates of a stochastic engine, the starts of
         ``Calibrator.run(starts=n)``, a particle swarm, and the uncertainty
         methods. Required with a stochastic engine.

@@ -819,12 +819,7 @@ impl StochasticEventsSettings {
                 );
             }
         }
-        if !(self.epsilon > 0.0 && self.epsilon < 1.0) {
-            return Err(format!(
-                "epsilon must be between 0 and 1, got {}",
-                self.epsilon
-            ));
-        }
+        crate::check_open_unit("epsilon", self.epsilon)?;
         if !(self.tolerance.is_finite() && self.tolerance > 0.0) {
             return Err(format!(
                 "The tolerance must be a positive number, got {}",

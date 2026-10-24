@@ -130,8 +130,19 @@ fn start_and_k() -> Vec<CalibrationParameter> {
     vec![
         parameter("k", CalibrationParameterType::Parameter),
         parameter("start", CalibrationParameterType::InitialCondition),
-        parameter("f", CalibrationParameterType::Factor),
+        factor(0.5),
     ]
+}
+
+/// The factor `f`, from `min_bound` to 2.
+fn factor(min_bound: f64) -> CalibrationParameter {
+    CalibrationParameter::with_type_and_guess(
+        "f".to_string(),
+        CalibrationParameterType::Factor,
+        min_bound,
+        2.0,
+        1.0,
+    )
 }
 
 fn problem(
@@ -206,6 +217,24 @@ fn a_value_the_engine_does_not_resolve_stops_the_problem() {
     .err()
     .expect("the engine rejects the value");
     assert!(error.contains("no value 'other'"), "{error}");
+}
+
+#[test]
+fn a_factor_needs_positive_bounds() {
+    let message = "Factor parameter 'f' must have positive bounds (got min=0, max=2)";
+
+    let error = check_model_values(&StartEngine::new(), &[factor(0.0)], None).unwrap_err();
+    assert_eq!(error, message);
+    let error = CalibrationProblem::new(
+        StartEngine::new(),
+        vec![ObservedDataPoint::new(1.0, "x".to_string(), 0.5)],
+        vec![factor(0.0)],
+        vec![],
+        LossConfig::SumSquaredError,
+    )
+    .err()
+    .expect("a factor at 0 is rejected");
+    assert_eq!(error, message);
 }
 
 #[test]

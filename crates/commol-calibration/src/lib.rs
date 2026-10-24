@@ -75,7 +75,7 @@ pub mod subproblem;
 pub mod types;
 pub mod values;
 
-pub use calibration_problem::{CalibrationProblem, check_positions};
+pub use calibration_problem::CalibrationProblem;
 pub use discrepancy::{Discrepancy, DiscrepancyConfig, TermError};
 pub use feasibility::{EvaluationError, Feasibility, Violation};
 pub use forward::{ForwardModel, Workspace, replicate_mean, schedule_of};

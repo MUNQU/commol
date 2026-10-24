@@ -15,11 +15,15 @@ if TYPE_CHECKING:
         ObservationDrawsProtocol,
         OptimizationConfigProtocol,
         PredictiveProtocol,
+        PSOAccelerationConstantProtocol,
+        PSOAccelerationTimeVaryingProtocol,
+        PSOInertiaChaoticProtocol,
+        PSOInertiaConstantProtocol,
     )
     from commol.context.model import Model
 
 from commol.api.inference.predictive import by_output
-from commol.api.simulation import Simulation, check_seed, draw_seed
+from commol.api.simulation import Simulation, check_seed
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context._model import engine_state
 from commol.context.calibration import (
@@ -37,10 +41,7 @@ from commol.context.calibration import (
     PSOTimeVaryingAcceleration,
     StartSummary,
 )
-from commol.context.constants import (
-    CalibrationParameterType,
-    OptimizationAlgorithm,
-)
+from commol.context.constants import OptimizationAlgorithm
 from commol.context.inference.local import DeltaBand, LocalResult
 from commol.context.inference.method import IdentifiabilityMethod, UncertaintyMethod
 from commol.context.inference.noise import (
@@ -70,7 +71,7 @@ class Calibrator:
         self,
         simulation: Simulation,
         problem: CalibrationProblem,
-    ):
+    ) -> None:
         """
         Initializes the calibration from a Simulation and CalibrationProblem.
 
@@ -103,7 +104,6 @@ class Calibrator:
 
         loss_config = self._build_loss_config()
         self._validate_calibration_parameters()
-        self._validate_observed_data()
         self._warn_constraint_positions_beyond_observations()
         models = problem.observation_models
         self._rust_problem: "CalibrationProblemProtocol" = (
@@ -119,8 +119,14 @@ class Calibrator:
                     if models is None
                     else engine_state.rust_observation_models(models)
                 ),
+                seed=None if problem.seed is None else check_seed(problem.seed),
             )
         )
+        if problem.seed is None:
+            logger.info(
+                "No seed set; drew the seed %d, which repeats this calibration.",
+                self._rust_problem.seed,
+            )
 
     @property
     def rust_problem(self) -> "CalibrationProblemProtocol":
@@ -367,18 +373,10 @@ class Calibrator:
         Returns
         -------
         int
-            ``problem.seed``, or a seed drawn from the operating system once
-            per calibrator and logged.
+            ``problem.seed``, or the seed the engine drew when the
+            calibrator was built, which it logs.
         """
-        if self.problem.seed is not None:
-            return check_seed(self.problem.seed)
-        if not hasattr(self, "_drawn_seed"):
-            self._drawn_seed = draw_seed()
-            logger.info(
-                "No seed set; drew the seed %d, which repeats this calibration.",
-                self._drawn_seed,
-            )
-        return self._drawn_seed
+        return self._rust_problem.seed
 
     def run(self, starts: int = 1) -> CalibrationResult:
         """
@@ -596,15 +594,11 @@ class Calibrator:
         return run_method(self, method, IdentifiabilityMethod)
 
     def _build_loss_config(self) -> "LossConfigProtocol | None":
-        """The Rust loss, with the replicates of a stochastic engine; None with
+        """The Rust loss, with the settings of the replicates; None with
         observation models."""
         if self.problem.loss_function is None:
             return None
-        return engine_state.rust_loss_config(
-            self.problem,
-            self.problem.loss_function,
-            self.simulation.model_definition.engine.type,
-        )
+        return engine_state.rust_loss_config(self.problem, self.problem.loss_function)
 
     def _build_optimization_config(self) -> "OptimizationConfigProtocol":
         """Convert Python OptimizationConfig to Rust OptimizationConfig."""
@@ -676,7 +670,7 @@ class Calibrator:
 
     def _build_rust_inertia(
         self, inertia: PSOConstantInertia | PSOChaoticInertia | None
-    ):
+    ) -> "PSOInertiaConstantProtocol | PSOInertiaChaoticProtocol | None":
         """Convert Python inertia config to Rust type."""
         if inertia is None:
             return None
@@ -688,7 +682,7 @@ class Calibrator:
 
     def _build_rust_acceleration(
         self, acceleration: PSOConstantAcceleration | PSOTimeVaryingAcceleration | None
-    ):
+    ) -> "PSOAccelerationConstantProtocol | PSOAccelerationTimeVaryingProtocol | None":
         """Convert Python acceleration config to Rust type."""
         if acceleration is None:
             return None
@@ -735,34 +729,6 @@ class Calibrator:
             self.problem.initial_condition_remainder,
         )
 
-    def _validate_observed_data(self) -> None:
-        """Validate that observed data compartments exist and have valid steps.
-
-        Raises
-        ------
-        ValueError
-            If observed data contains invalid compartments or negative positions.
-        """
-        simulation_output_names = set(self._engine.output_names)
-
-        for obs in self.problem.observed_data:
-            observed_outputs = obs.observed_outputs
-            missing_outputs = [
-                output
-                for output in observed_outputs
-                if output not in simulation_output_names
-            ]
-            if missing_outputs:
-                raise ValueError(
-                    f"Observed data output(s) {missing_outputs} for observation "
-                    f"'{obs.label}' not found in model simulation outputs. "
-                    f"Available outputs: {sorted(simulation_output_names)}"
-                )
-
-        engine_state.check_positions(
-            self._engine, self.problem.observed_data, self.problem.constraints
-        )
-
     def _warn_constraint_positions_beyond_observations(self) -> None:
         """Warn when constraints at positions extend beyond observed data."""
         max_observed_position = max(obs.at for obs in self.problem.observed_data)
@@ -785,9 +751,9 @@ def check_values(
     """
     Check that a model has every value a calibration or an analysis sets.
 
-    A factor must have positive bounds. The engine checks each parameter, as
-    its ``set_parameter`` does: one the model does not have, or one that a
-    formula or a series sets, is not a value to set. The structure and the
+    The engine checks that a factor has positive bounds, and each parameter
+    as its ``set_parameter`` does: one the model does not have, or one that
+    a formula or a series sets, is not a value to set. The structure and the
     engine check the values of the model kind, such as initial conditions,
     and the remainder.
 
@@ -809,12 +775,5 @@ def check_values(
         parameter or the structure or the engine rejects a value; the message
         is theirs.
     """
-    for param in parameters:
-        if param.parameter_type == CalibrationParameterType.FACTOR:
-            if param.min_bound <= 0 or param.max_bound <= 0:
-                raise ValueError(
-                    f"Factor parameter '{param.id}' must have positive bounds "
-                    f"(got min={param.min_bound}, max={param.max_bound})"
-                )
     engine_state.check_model_values(model, engine, parameters, remainder)
     model.structure.check_calibration_values(model, engine, parameters, remainder)

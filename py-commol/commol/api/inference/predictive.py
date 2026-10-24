@@ -132,7 +132,7 @@ class ObservationDraws:
         self,
         observations: Sequence[ObservedDataPoint],
         draws: "ObservationDrawsProtocol",
-    ):
+    ) -> None:
         """
         Wrap the draws of `observations`.
 
@@ -232,7 +232,7 @@ class Predictive:
         source: PredictiveSource,
         sample: ParameterSample,
         positions: Sequence[float],
-    ):
+    ) -> None:
         """
         Run every draw of `sample` at `positions`.
 

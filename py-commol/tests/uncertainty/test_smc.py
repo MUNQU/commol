@@ -244,9 +244,22 @@ class TestSampler:
         abc_settings = _abc().model_dump(exclude={"stay_probability"})
         with pytest.raises(ValidationError, match="stay_probability"):
             ABCSMC.model_validate(abc_settings)
-        for value in (0.0, 1.0, -0.5, 1.5):
-            with pytest.raises(ValidationError, match="stay_probability"):
-                _gibbs(stay_probability=value)
+
+    @pytest.mark.parametrize(
+        ("build", "name"),
+        [
+            (_gibbs, "target_cess"),
+            (_gibbs, "stay_probability"),
+            (_abc, "min_acceptance"),
+        ],
+    )
+    @pytest.mark.parametrize("value", [0.0, 1.0, -0.5, 1.5])
+    def test_a_share_gets_the_message_of_the_engine(
+        self, build, name: str, value: float
+    ) -> None:
+        message = f"{name} is strictly between 0 and 1, got {value:g}"
+        with pytest.raises(ValidationError, match=message):
+            build(**{name: value})
 
 
 class TestGibbsPosterior:

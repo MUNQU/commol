@@ -8,6 +8,8 @@
 //!   by SplitMix64, whose sequence is the same on every platform and version;
 //! - [`replicate_seed`]: the seed of replicate `index` of a run seeded with
 //!   `seed`, and [`stream_seed`]: the seed of one purpose of a method;
+//! - [`seed_or_drawn`]: the one place a seed is drawn, from the entropy of the
+//!   operating system, for a caller that sets none;
 //! - the samplers of [`sample`] (exponential, Poisson, binomial,
 //!   multinomial, normal, gamma, an index below `n`) and the uniforms of
 //!   [`Generator`], written here so that their values do not change with a
@@ -26,11 +28,13 @@
 
 #![warn(missing_docs)]
 
+mod drawn;
 mod generator;
 mod hypercube;
 pub mod sample;
 mod sum_tree;
 
+pub use drawn::seed_or_drawn;
 pub use generator::{Generator, replicate_seed, splitmix64, stream_seed};
 pub use hypercube::latin_hypercube;
 pub use sum_tree::SumTree;

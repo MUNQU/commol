@@ -299,21 +299,45 @@ class TestCollinearity:
                 Collinearity(at=sample, max_subset_size=2, threshold=20)
             )
 
-    def test_collinearity_rejects_invalid_settings(self, product: Calibrator) -> None:
-        at = CalibrationResult(
-            best_parameters={"k1": 0.3, "s": 1.0, "k2": 0.1},
-            final_loss=0.0,
-            iterations=0,
-            converged=True,
-            termination_reason="given",
-            seed=0,
-        )
+    def test_collinearity_rejects_invalid_settings(self) -> None:
         with pytest.raises(ValidationError, match="threshold"):
-            Collinearity(at=at, max_subset_size=2)  # ty: ignore[missing-argument]
-        with pytest.raises(ValueError, match="max_subset_size"):
+            Collinearity(at=_best(), max_subset_size=2)  # ty: ignore[missing-argument]
+
+    @pytest.mark.parametrize("size", [1, 9])
+    def test_max_subset_size_gets_the_message_of_the_engine(
+        self, product: Calibrator, size: int
+    ) -> None:
+        with pytest.raises(ValueError) as error:
             product.identifiability(
-                Collinearity(at=at, max_subset_size=4, threshold=20)
+                Collinearity(at=_best(), max_subset_size=size, threshold=20)
             )
+
+        assert str(error.value) == (
+            "max_subset_size must be from 2 to the number of parameters (3), "
+            f"got {size}"
+        )
+
+    def test_a_negative_max_subset_size_names_the_setting(
+        self, product: Calibrator
+    ) -> None:
+        with pytest.raises(ValueError) as error:
+            product.identifiability(
+                Collinearity(at=_best(), max_subset_size=-1, threshold=20)
+            )
+
+        assert str(error.value) == "max_subset_size is a whole number from 0, got -1"
+
+
+def _best() -> CalibrationResult:
+    """A fit of the three parameters of `product`."""
+    return CalibrationResult(
+        best_parameters={"k1": 0.3, "s": 1.0, "k2": 0.1},
+        final_loss=0.0,
+        iterations=0,
+        converged=True,
+        termination_reason="given",
+        seed=0,
+    )
 
 
 def _result(ends: list[dict[str, float]], losses: list[float]) -> CalibrationResult:

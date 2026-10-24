@@ -172,7 +172,9 @@ To add an engine to the list:
       `commol-model`: it gives its compiled model, `delegate_to_compiled_model!`
       writes the methods that read it, and `record_steps` runs an engine that
       reports only at integer steps); `check_position` is the rule of
-      `EngineType`, and `try_from_model` rejects a model of another engine. A
+      `EngineType`, `engine_type` returns its entry (so `is_stochastic` and
+      the messages of a calibration read it), and `try_from_model` rejects a
+      model of another engine. A
       stochastic engine draws every random number from one
       `commol_random::Generator`, implements `set_seed`, and restores the
       generator in `reset`, so a run repeats from its seed.
@@ -241,6 +243,10 @@ To add a kind of model, such as an agent network (see
 ### PyO3 bindings
 
 - [ ] Keep logic out of `py-commol/src/`: convert types and call the crate.
+- [ ] Read each count a user sets with the reader of its name,
+      `#[pyo3(from_py_with = crate::counts::required::<name>)]` (or
+      `optional::<name>`), so a negative count raises `ValueError` that names
+      the setting; add the case to `tests/uncertainty/test_counts.py`.
 - [ ] Update `_commol_rs.pyi`.
 - [ ] Rebuild the extension with the test model kind
       ([Quick commands](../development/workflow.md#quick-commands)) before you run

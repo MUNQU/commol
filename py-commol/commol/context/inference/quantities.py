@@ -27,9 +27,16 @@ quantities of that run (`SimulationResults.quantities`).
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import Annotated, Any, Literal, Self
+from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    JsonValue,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from commol.commol_rs import _commol_rs as commol_rs
 
@@ -42,7 +49,7 @@ def _position_text(at: float) -> str:
     return repr(at).removesuffix(".0")
 
 
-def _output_list(value: object) -> object:
+def _output_list(value: JsonValue) -> JsonValue:
     """One output as a list of one."""
     return [value] if isinstance(value, str) else value
 
@@ -56,7 +63,7 @@ class _Outputs(BaseModel):
 
     @field_validator("outputs", mode="before")
     @classmethod
-    def one_output(cls, value: object) -> object:
+    def one_output(cls, value: JsonValue) -> JsonValue:
         """One name is a list of one."""
         return _output_list(value)
 
@@ -80,8 +87,10 @@ class Level(_Outputs):
 
     kind: Literal["level"] = "level"
 
-    def __init__(self, outputs: str | list[str], **data: Any) -> None:
-        super().__init__(outputs=outputs, **data)
+    def __init__(
+        self, outputs: str | list[str], *, kind: Literal["level"] = "level"
+    ) -> None:
+        BaseModel.__init__(self, outputs=outputs, kind=kind)
 
     @property
     def text(self) -> str:
@@ -114,8 +123,14 @@ class Increments(_Outputs):
     kind: Literal["increments"] = "increments"
     window: float = Field(gt=0.0, allow_inf_nan=False, description="The width.")
 
-    def __init__(self, outputs: str | list[str], window: float, **data: Any) -> None:
-        super().__init__(outputs=outputs, **{**data, "window": window})
+    def __init__(
+        self,
+        outputs: str | list[str],
+        window: float,
+        *,
+        kind: Literal["increments"] = "increments",
+    ) -> None:
+        BaseModel.__init__(self, outputs=outputs, window=window, kind=kind)
 
     @property
     def text(self) -> str:
@@ -149,10 +164,10 @@ type Series = Annotated[Level | Increments, Field(discriminator="kind")]
 """What a quantity reads at each position: a `Level` or `Increments`."""
 
 
-def _series(value: object) -> object:
+def _series(value: JsonValue) -> JsonValue | Level:
     """A name or a list of names as the `Level` of those outputs."""
     if isinstance(value, str | list):
-        return Level(outputs=value)
+        return Level.model_validate({"outputs": value})
     return value
 
 
@@ -195,7 +210,7 @@ class _OfSeries(QuantityBase):
 
     @field_validator("series", mode="before")
     @classmethod
-    def level_of_outputs(cls, value: object) -> object:
+    def level_of_outputs(cls, value: JsonValue) -> JsonValue | Level:
         """A name or a list of names is the level of those outputs."""
         return _series(value)
 

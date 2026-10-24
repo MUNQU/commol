@@ -487,12 +487,13 @@ def _format_equation(raw_terms: list[tuple[int, str]], latex: bool) -> str:
     return equation[2:] if equation.startswith("+ ") else equation
 
 
-def _impulse_schedule(transition) -> str:
+def _impulse_schedule(transition: "Transition") -> str:
     """Where an impulse acts, in words: ``impulse at 1, 3`` or ``every 7 from 0``."""
-    if transition.impulse_at is not None:
-        return "impulse at " + ", ".join(f"{p:g}" for p in transition.impulse_at)
-    period, offset = transition.impulse_every
-    return f"impulse every {period:g} from {offset:g}"
+    if transition.impulse_every is not None:
+        period, offset = transition.impulse_every
+        return f"impulse every {period:g} from {offset:g}"
+    positions = transition.impulse_at or []
+    return "impulse at " + ", ".join(f"{p:g}" for p in positions)
 
 
 def _equation_lhs(variable_name: str, latex: bool, engine_type: str) -> str:

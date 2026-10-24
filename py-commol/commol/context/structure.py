@@ -15,7 +15,7 @@ Its ``variant`` is a ``Literal`` default; the registry holds one class per
 import inspect
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, ClassVar, NamedTuple, Self
+from typing import TYPE_CHECKING, ClassVar, NamedTuple, Self, TypedDict
 
 from pydantic import BaseModel, ConfigDict
 
@@ -24,6 +24,7 @@ from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.constants import CalibrationParameterType
 
 if TYPE_CHECKING:
+    from commol.context._model.report import CategorySplitEntry, InitialAmountEntry
     from commol.commol_rs._commol_rs import EngineProtocol
     from commol.context.calibration import CalibrationParameter, CalibrationProblem
     from commol.context.description import Section
@@ -31,8 +32,15 @@ if TYPE_CHECKING:
     from commol.context.inference.sample import ParameterSummary
 
 
-type ReportSections = dict[str, Mapping[str, Mapping[str, object]]]
-"""Sections a kind adds to a report of applied values, by key."""
+class ReportSections(TypedDict, total=False):
+    """
+    The sections a kind adds to a report of applied values, by key: an
+    aggregate model adds ``initial_amounts`` and ``category_splits``, and a
+    new kind adds the keys of its sections here.
+    """
+
+    initial_amounts: "dict[str, InitialAmountEntry]"
+    category_splits: "dict[str, CategorySplitEntry]"
 
 
 class SeriesLabel(NamedTuple):

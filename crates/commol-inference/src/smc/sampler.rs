@@ -34,8 +34,9 @@ use rayon::prelude::*;
 use super::TemperedTarget;
 use super::kernel::Kernel;
 use crate::error::MethodError;
-use crate::statistics::{check_open_unit, effective_size, normalized_weights};
+use crate::statistics::{effective_size, normalized_weights};
 use crate::streams::Stream;
+use commol_core::check_open_unit;
 
 /// One step of a run.
 #[derive(Debug, Clone, PartialEq)]

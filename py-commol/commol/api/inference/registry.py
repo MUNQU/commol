@@ -6,7 +6,7 @@ A method registers its runner with `register`; ``Calibrator.uncertainty``,
 """
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, TypeVar, cast
 
 from pydantic import BaseModel
 
@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from commol.api.sensitivity import SensitivityAnalysis
 
 MethodT = TypeVar("MethodT", bound=InferenceMethod[BaseModel])
+EntryPointT = TypeVar("EntryPointT", bound="Calibrator | SensitivityAnalysis")
 ResultT = TypeVar("ResultT", bound=BaseModel)
 
 type EntryPoint = Calibrator | SensitivityAnalysis
@@ -41,7 +42,7 @@ _ENTRY_POINTS: dict[type[InferenceMethod[BaseModel]], str] = {
 
 def register(
     method_type: type[MethodT],
-    runner: Callable[[Any, MethodT], BaseModel],
+    runner: Callable[[EntryPointT, MethodT], BaseModel],
 ) -> None:
     """
     Register the runner of an inference method.

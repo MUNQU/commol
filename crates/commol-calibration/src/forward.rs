@@ -58,23 +58,25 @@ impl<E: SimulationEngine> ForwardModel<E> {
     /// A forward model with no observations, for a method that asks what a
     /// model does rather than how it fits data: the values of `parameters`
     /// reach the engine as a calibration writes them, with `remainder` for
-    /// the initial conditions, and with a stochastic engine each run is
-    /// `replicates` replicates seeded from `seed`, the same seeds at every
-    /// run. Its schedule is empty: it runs at the positions it is given
-    /// ([`Self::run_at`]).
+    /// the initial conditions, and with a stochastic engine
+    /// ([`SimulationEngine::is_stochastic`]) each run is `replicates`
+    /// replicates seeded from `seed`, the same seeds at every run. A
+    /// deterministic engine runs once, and reads neither. Its schedule is
+    /// empty: it runs at the positions it is given ([`Self::run_at`]).
     ///
     /// # Errors
     ///
     /// Returns a message when there is no parameter, a parameter is a factor
-    /// or a noise parameter (both belong to observations), `replicates` is 0,
-    /// or the engine
-    /// does not resolve a value of its model kind or the remainder.
+    /// or a noise parameter (both belong to observations), `replicates` is 0
+    /// ([`Replicates::check_count`]), the engine is stochastic and
+    /// `replicates` or `seed` is not set, or the engine does not resolve a
+    /// value of its model kind or the remainder.
     pub fn unobserved(
         base_engine: E,
         parameters: Vec<CalibrationParameter>,
         remainder: Option<&str>,
         replicates: Option<usize>,
-        seed: u64,
+        seed: Option<u64>,
     ) -> Result<Self, String> {
         if parameters.is_empty() {
             return Err("No parameters provided".to_string());
@@ -93,9 +95,27 @@ impl<E: SimulationEngine> ForwardModel<E> {
                 parameter.id
             ));
         }
-        let replicates = replicates
-            .map(|count| Replicates::new(count, seed, ReplicateSummary::Mean))
-            .transpose()?;
+        if let Some(count) = replicates {
+            Replicates::check_count(count)?;
+        }
+        let replicates = if base_engine.is_stochastic() {
+            let engine = the_engine(&base_engine);
+            let count = replicates.ok_or_else(|| {
+                format!(
+                    "{engine} is stochastic: set replicates, how many replicates each point of \
+                     a design runs."
+                )
+            })?;
+            let seed = seed.ok_or_else(|| {
+                format!(
+                    "{engine} is stochastic: set seed, so the replicates and the analysis are \
+                     reproducible."
+                )
+            })?;
+            Some(Replicates::new(count, seed, ReplicateSummary::Mean)?)
+        } else {
+            None
+        };
         let values = ValueWriter::new(&base_engine, &parameters, remainder)?;
         let observation =
             ObservationOperator::new(&[], &parameters, &base_engine.output_names(), &[])?;
@@ -411,6 +431,15 @@ pub fn replicate_mean<'a>(
         runs += 1;
     }
     sums.into_iter().map(|sum| sum / runs as f64).collect()
+}
+
+/// How a message names `engine`: "The StochasticSteps engine", by its entry
+/// of the list of engines, or "The engine" for an engine off the list.
+pub(crate) fn the_engine<E: SimulationEngine>(engine: &E) -> String {
+    let name = engine
+        .engine_type()
+        .map_or(String::new(), |entry| format!("{} ", entry.name()));
+    format!("The {name}engine")
 }
 
 fn simulation_error(error: SimulationError) -> EvaluationError {

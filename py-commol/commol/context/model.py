@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Generic, Self, TypeVar
 
 from pydantic import (
+    JsonValue,
     BaseModel,
     ConfigDict,
     Field,
@@ -116,7 +117,7 @@ class Model(BaseModel, Generic[StructureT]):
 
     @field_validator("structure", mode="before")
     @classmethod
-    def read_structure_kind(cls, value: object) -> object:
+    def read_structure_kind(cls, value: JsonValue) -> JsonValue | ModelStructure:
         """Read a structure mapping as the class of its ``kind`` and ``variant``."""
         if not isinstance(value, Mapping):
             return value

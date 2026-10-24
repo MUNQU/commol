@@ -1,6 +1,6 @@
 """The weighted parameter sample that every method with draws returns."""
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator
 from typing import TYPE_CHECKING, Self
 
 from pydantic import (
@@ -9,6 +9,8 @@ from pydantic import (
     Field,
     JsonValue,
     PrivateAttr,
+    ValidationInfo,
+    field_validator,
     model_validator,
 )
 
@@ -119,20 +121,22 @@ class ParameterSample(BaseModel):
 
     _rust: "ParameterSampleProtocol" = PrivateAttr()
 
-    @model_validator(mode="before")
+    @field_validator("log_weights")
     @classmethod
-    def normalize_log_weights(cls, data: object) -> object:
-        """Check the invariants in Rust and normalize the log weights."""
-        if not isinstance(data, Mapping):
-            return data
+    def normalize_log_weights(
+        cls, log_weights: list[float], info: ValidationInfo
+    ) -> list[float]:
+        """
+        Check the invariants in Rust and normalize the log weights; with a
+        field before them that is not valid, pydantic reports that field.
+        """
+        data = info.data
+        if not {"names", "bounds", "values"} <= data.keys():
+            return log_weights
         rust = commol_rs.inference.ParameterSample(
-            list(data.get("names", [])),
-            [tuple(bound) for bound in data.get("bounds", [])],
-            [list(row) for row in data.get("values", [])],
-            [float(w) for w in data.get("log_weights", [])],
-            data.get("groups"),
+            data["names"], data["bounds"], data["values"], log_weights, None
         )
-        return {**data, "log_weights": rust.log_weights}
+        return rust.log_weights
 
     @model_validator(mode="after")
     def build_rust_sample(self) -> Self:

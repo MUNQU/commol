@@ -95,6 +95,14 @@ class TestReplicates:
         rerun = simulation.run_at(POSITIONS, seed=replicates[5].seed)
         assert rerun == replicates[5]
 
+    def test_replicates_without_a_seed_keep_the_seed_they_drew(self) -> None:
+        simulation = _stochastic()
+
+        drawn = simulation.replicates(3).run_at(POSITIONS)
+        repeated = simulation.replicates(3, seed=drawn.seed).run_at(POSITIONS)
+
+        assert list(repeated) == list(drawn)
+
     def test_replicates_on_the_default_grid(self) -> None:
         replicates = _stochastic().replicates(4, seed=2).run(3)
 
@@ -225,9 +233,11 @@ class TestCalibration:
         assert result.best_parameters["k"] == pytest.approx(RATE, rel=1e-4)
 
     def test_a_quantile_level_is_between_zero_and_one(self) -> None:
-        with pytest.raises(ValueError, match="less than or equal to 1"):
+        with pytest.raises(
+            ValueError, match="A quantile level is between 0 and 1, got 1.5"
+        ):
             Quantile(1.5)
 
     def test_a_quantile_takes_no_other_field(self) -> None:
-        with pytest.raises(ValueError, match="Extra inputs"):
-            Quantile(0.5, unknown=1)
+        with pytest.raises(TypeError, match="unknown"):
+            Quantile(0.5, unknown=1)  # ty: ignore[unknown-argument]
