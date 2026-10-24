@@ -3773,7 +3773,9 @@ is a row of a Latin hypercube over the bounds, drawn from the problem's
 <code>seed</code>: with <code>n − 1</code> rows, each parameter has one start in each of <code>n − 1</code>
 equal strata of its bounds, so the starts cover the parameter space
 (<code>start_points</code> in <code>crates/commol-calibration/src/starts.rs</code>). A particle
-swarm draws its own population; its start <code>i &gt; 0</code> takes its own seed.</p>
+swarm draws its own population; each start takes its own seed, also drawn
+from the problem's <code>seed</code>, so start 0 of <code>run(starts=n)</code> is the result of
+<code>run()</code>, with or without <code>verbose</code>.</p>
 <p>A particle swarm also scores the particles of each iteration in parallel, in
 the order of the particles, so the result does not depend on the number of
 threads. <code>commol.threads</code> chooses the threads and whether the particles run
@@ -3811,8 +3813,8 @@ in parallel: see <a href="../parallelism/">Threads and Parallelism</a>.</p>
 </tr>
 </tbody>
 </table>
-<p>The result is the start of least loss; if every start fails, <code>run</code> raises a
-<code>RuntimeError</code> with every reason. Starts that end at distinct points with equal
+<p>The result is the start of least loss, the first of them on a tie; if every
+start fails, <code>run</code> raises a <code>RuntimeError</code> with the reason of each start. Starts that end at distinct points with equal
 losses are a sign that the data do not identify the parameters;
 <code>StartsIdentifiability</code> names the parameters that differ (see
 <a href="../uncertainty/identifiability/#starts">Identifiability</a>).</p>

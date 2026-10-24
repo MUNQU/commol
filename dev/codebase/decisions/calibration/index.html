@@ -3606,8 +3606,11 @@ the improvement rule, it stops when the constraint holds.</p>
 <code>a_swarm_fits_a_subproblem_and_repeats_from_its_seed</code>).</p>
 <h2 id="a-result-records-its-seed">A result records its seed<a class="headerlink" href="#a-result-records-its-seed" title="Permanent link">&para;</a></h2>
 <p>Every random number of a calibration and of its uncertainty methods comes from
-<code>Calibrator.seed</code>: <code>problem.seed</code>, or a seed the calibrator draws once and
-logs. A particle swarm takes it too, so the seed alone repeats a run. The
+<code>Calibrator.seed</code>: <code>problem.seed</code>, or the seed the engine draws when the
+calibrator is built (<code>commol_random::seed_or_drawn</code>), which the calibrator
+logs. A particle swarm takes the seed of its start, drawn from it
+(<a href="../optimizers/#a-swarm-takes-its-seed-from-its-caller">Optimizers</a>), so the
+seed alone repeats a run. The
 result records it, so a result read from a file repeats too:
 <code>CalibrationResult.seed</code>, and <code>settings["seed"]</code> of the <code>SampleMethod</code> of every
 sample a runner makes (<code>sample_method</code> in <code>api/inference/resampling.py</code>) or
@@ -3615,7 +3618,9 @@ sample a runner makes (<code>sample_method</code> in <code>api/inference/resampl
 <p><strong>Guards:</strong> <code>tests/calibration/test_problem.py</code>
 (<code>test_a_result_records_the_seed_of_its_calibration</code>);
 <code>tests/calibration/test_optimizers.py</code>
-(<code>test_the_seed_of_a_result_repeats_a_particle_swarm</code>).</p>
+(<code>test_the_seed_of_a_result_repeats_a_particle_swarm</code>);
+<code>tests/calibration/test_starts.py</code>
+(<code>test_a_verbose_swarm_repeats_its_fit_from_the_seed</code>).</p>
 <h2 id="parallel-work-runs-in-the-pool-of-the-setting">Parallel work runs in the pool of the setting<a class="headerlink" href="#parallel-work-runs-in-the-pool-of-the-setting" title="Permanent link">&para;</a></h2>
 <p>Every binding that runs parallel work calls <code>parallel</code> (<code>py-commol/src/parallelism.rs</code>),
 which releases the GIL and runs the job in <code>Parallelism::install</code>

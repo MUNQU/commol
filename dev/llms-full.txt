@@ -4050,7 +4050,7 @@ A swarm can stall for some iterations and then improve again, so a short `window
 
 ## Several starts
 
-`Calibrator.run(starts=n)` runs the optimizer from `n` start points in parallel and returns the best result. Start 0 is the initial guess of each parameter (its `initial_guess`, or the midpoint of its bounds). Start `i > 0` is a row of a Latin hypercube over the bounds, drawn from the problem's `seed`: with `n − 1` rows, each parameter has one start in each of `n − 1` equal strata of its bounds, so the starts cover the parameter space (`start_points` in `crates/commol-calibration/src/starts.rs`). A particle swarm draws its own population; its start `i > 0` takes its own seed.
+`Calibrator.run(starts=n)` runs the optimizer from `n` start points in parallel and returns the best result. Start 0 is the initial guess of each parameter (its `initial_guess`, or the midpoint of its bounds). Start `i > 0` is a row of a Latin hypercube over the bounds, drawn from the problem's `seed`: with `n − 1` rows, each parameter has one start in each of `n − 1` equal strata of its bounds, so the starts cover the parameter space (`start_points` in `crates/commol-calibration/src/starts.rs`). A particle swarm draws its own population; each start takes its own seed, also drawn from the problem's `seed`, so start 0 of `run(starts=n)` is the result of `run()`, with or without `verbose`.
 
 A particle swarm also scores the particles of each iteration in parallel, in the order of the particles, so the result does not depend on the number of threads. `commol.threads` chooses the threads and whether the particles run in parallel: see [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md).
 
@@ -4076,7 +4076,7 @@ print({name: round(value, 2) for name, value in result.best_parameters.items()})
 | `starts`                  | One `StartSummary` per start that finished, in order: `start`, `end`, `loss`, `converged`                                                |
 | `failed`                  | Each start that failed, `"Start <index> failed: <reason>"`; each is also logged as a warning (`logging`, logger `commol.api.calibrator`) |
 
-The result is the start of least loss; if every start fails, `run` raises a `RuntimeError` with every reason. Starts that end at distinct points with equal losses are a sign that the data do not identify the parameters; `StartsIdentifiability` names the parameters that differ (see [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)).
+The result is the start of least loss, the first of them on a tie; if every start fails, `run` raises a `RuntimeError` with the reason of each start. Starts that end at distinct points with equal losses are a sign that the data do not identify the parameters; `StartsIdentifiability` names the parameters that differ (see [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)).
 
 ## Reproducibility
 
@@ -4792,7 +4792,7 @@ problem = CalibrationProblem(
     ],
     loss_function="sse",
     optimization_config=NelderMeadConfig(max_iterations=2000),
-    seed=42,
+    seed=1,
 )
 calibrator = Calibrator(Simulation(basic_model(None, None, None)), problem)
 
@@ -9824,10 +9824,12 @@ class Calibrator:
 
         Start 0 is the initial guess of each parameter. Each further start is a
         row of a Latin hypercube over the bounds, drawn from `seed`, so the
-        starts cover the parameter space. They run in parallel, on the
-        threads of `commol.threads`; the result is the best of them, and lists
-        every start. Distinct ends with equal losses are a sign that the data
-        do not identify the parameters.
+        starts cover the parameter space; a particle swarm takes a seed of
+        its own at each start, also from `seed`. They run in parallel, on the
+        threads of `commol.threads`; the result is the best of them, the
+        first start of lowest loss, and lists every start. Distinct ends with
+        equal losses are a sign that the data do not identify the
+        parameters.
 
         Parameters
         ----------
@@ -9867,40 +9869,35 @@ class Calibrator:
         )
         if starts < 1:
             raise ValueError(f"A calibration needs at least one start, got {starts}.")
-        seed = self.seed if starts > 1 else 0
-        outcomes = self._rust_problem.optimize(
-            self._build_optimization_config(), starts, seed
+        run = self._rust_problem.optimize(
+            self._build_optimization_config(), starts, self.seed
         )
         names = self.parameter_names
-        summaries: list[tuple[StartSummary, "CalibrationResultProtocol"]] = []
+        summaries: list[StartSummary] = []
         failed: list[str] = []
-        for index, outcome in enumerate(outcomes):
+        for index, outcome in enumerate(run.outcomes):
             if outcome.result is None:
                 reason = f"Start {index} failed: {outcome.error}"
                 logger.warning(reason)
                 failed.append(reason)
                 continue
             summaries.append(
-                (
-                    StartSummary(
-                        start=dict(zip(names, outcome.start, strict=True)),
-                        end=dict(outcome.result.best_parameters),
-                        loss=outcome.result.final_loss,
-                        converged=outcome.result.converged,
-                    ),
-                    outcome.result,
+                StartSummary(
+                    start=dict(zip(names, outcome.start, strict=True)),
+                    end=dict(outcome.result.best_parameters),
+                    loss=outcome.result.final_loss,
+                    converged=outcome.result.converged,
                 )
             )
-        if not summaries:
-            raise RuntimeError("Every start failed: " + "; ".join(failed))
-        best = min(summaries, key=lambda summary: summary[0].loss)[1]
+        best = run.outcomes[run.best].result
+        assert best is not None, "the best start did not fail"
         result = CalibrationResult(
             best_parameters=dict(best.best_parameters),
             final_loss=best.final_loss,
             iterations=best.iterations,
             converged=best.converged,
             termination_reason=best.termination_reason,
-            starts=[summary for summary, _ in summaries],
+            starts=summaries,
             failed=failed,
             seed=self.seed,
         )
@@ -9930,7 +9927,7 @@ class Calibrator:
         """
         logger.info("Starting calibration with history tracking")
         history = self._rust_problem.optimize_with_history(
-            self._build_optimization_config()
+            self._build_optimization_config(), self.seed
         )
         names = self.parameter_names
         rust_result = history.result
@@ -10098,7 +10095,6 @@ class Calibrator:
             mutation=rust_mutation,
             velocity=rust_velocity,
             initialization=opt_config.initialization,
-            seed=self.seed,
             improvement_stop=(
                 None
                 if improvement is None
@@ -10734,7 +10730,7 @@ run(starts: int = 1) -> CalibrationResult
 
 Runs the calibration optimization from one or more starts.
 
-Start 0 is the initial guess of each parameter. Each further start is a row of a Latin hypercube over the bounds, drawn from `seed`, so the starts cover the parameter space. They run in parallel, on the threads of `commol.threads`; the result is the best of them, and lists every start. Distinct ends with equal losses are a sign that the data do not identify the parameters.
+Start 0 is the initial guess of each parameter. Each further start is a row of a Latin hypercube over the bounds, drawn from `seed`, so the starts cover the parameter space; a particle swarm takes a seed of its own at each start, also from `seed`. They run in parallel, on the threads of `commol.threads`; the result is the best of them, the first start of lowest loss, and lists every start. Distinct ends with equal losses are a sign that the data do not identify the parameters.
 
 Parameters:
 
@@ -10764,10 +10760,12 @@ def run(self, starts: int = 1) -> CalibrationResult:
 
     Start 0 is the initial guess of each parameter. Each further start is a
     row of a Latin hypercube over the bounds, drawn from `seed`, so the
-    starts cover the parameter space. They run in parallel, on the
-    threads of `commol.threads`; the result is the best of them, and lists
-    every start. Distinct ends with equal losses are a sign that the data
-    do not identify the parameters.
+    starts cover the parameter space; a particle swarm takes a seed of
+    its own at each start, also from `seed`. They run in parallel, on the
+    threads of `commol.threads`; the result is the best of them, the
+    first start of lowest loss, and lists every start. Distinct ends with
+    equal losses are a sign that the data do not identify the
+    parameters.
 
     Parameters
     ----------
@@ -10807,40 +10805,35 @@ def run(self, starts: int = 1) -> CalibrationResult:
     )
     if starts < 1:
         raise ValueError(f"A calibration needs at least one start, got {starts}.")
-    seed = self.seed if starts > 1 else 0
-    outcomes = self._rust_problem.optimize(
-        self._build_optimization_config(), starts, seed
+    run = self._rust_problem.optimize(
+        self._build_optimization_config(), starts, self.seed
     )
     names = self.parameter_names
-    summaries: list[tuple[StartSummary, "CalibrationResultProtocol"]] = []
+    summaries: list[StartSummary] = []
     failed: list[str] = []
-    for index, outcome in enumerate(outcomes):
+    for index, outcome in enumerate(run.outcomes):
         if outcome.result is None:
             reason = f"Start {index} failed: {outcome.error}"
             logger.warning(reason)
             failed.append(reason)
             continue
         summaries.append(
-            (
-                StartSummary(
-                    start=dict(zip(names, outcome.start, strict=True)),
-                    end=dict(outcome.result.best_parameters),
-                    loss=outcome.result.final_loss,
-                    converged=outcome.result.converged,
-                ),
-                outcome.result,
+            StartSummary(
+                start=dict(zip(names, outcome.start, strict=True)),
+                end=dict(outcome.result.best_parameters),
+                loss=outcome.result.final_loss,
+                converged=outcome.result.converged,
             )
         )
-    if not summaries:
-        raise RuntimeError("Every start failed: " + "; ".join(failed))
-    best = min(summaries, key=lambda summary: summary[0].loss)[1]
+    best = run.outcomes[run.best].result
+    assert best is not None, "the best start did not fail"
     result = CalibrationResult(
         best_parameters=dict(best.best_parameters),
         final_loss=best.final_loss,
         iterations=best.iterations,
         converged=best.converged,
         termination_reason=best.termination_reason,
-        starts=[summary for summary, _ in summaries],
+        starts=summaries,
         failed=failed,
         seed=self.seed,
     )
@@ -10894,7 +10887,7 @@ def run_with_history(self) -> CalibrationHistory:
     """
     logger.info("Starting calibration with history tracking")
     history = self._rust_problem.optimize_with_history(
-        self._build_optimization_config()
+        self._build_optimization_config(), self.seed
     )
     names = self.parameter_names
     rust_result = history.result
@@ -40915,6 +40908,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - A negative count that reaches the engine, such as `Simulation.run(-1)`, the `replicates` of a `SensitivityAnalysis` or the `max_subset_size` of `Collinearity`, raises `ValueError` that names the setting, `num_steps is a whole number from 0, got -1`, in place of an `OverflowError` with no name. Every count of the bindings reads this way.
 - The engine draws a seed that its user does not set, in one place, and the result gives the seed it ran with, as before: `results.seed`, `SimulationReplicates.seed`, `Calibrator.seed` and `SensitivityAnalysis.seed`. A calibrator with no seed logs the seed it drew when it is built, not when it first runs.
 - Ruff checks that every signature of the package has annotations and that none is `typing.Any`; the raw input of a validator is a `JsonValue`. A keyword that `Quantile`, `Groups`, `Level` or `Increments` does not take raises `TypeError` that names it, such as `Quantile(0.5, unknown=1)`, in place of the `ValidationError` `Extra inputs are not permitted`. A `ParameterSample` whose `names`, `bounds` or `values` are not valid gets the pydantic message of that field before the engine checks the log weights.
+- A calibration and every fit of a replicate of a bootstrap, the jackknife, a profile threshold or a conformal method run their starts with one rule: the engine chooses the best start, the first of lowest loss, and the seed gives the Latin hypercube and the seed of each start from two streams of its own. So a calibration with a seed, its structural rank and its fits of replicates give other values than in 0.10.1; a run stays reproducible from its seed on one version. When every start fails, the message lists the reason of each start, also in the message of a replicate that fails.
+- A particle swarm draws its numbers with the generator of commol from the seed of its start, which a calibration always gives: a verbose calibration with a swarm is the calibration without `verbose`, and `Calibrator.run_with_history` is start 0 of `Calibrator.run`.
 
 ### Fixed
 

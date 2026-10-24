@@ -3498,9 +3498,10 @@ setting strictly between 0 and 1 is checked by one of the two functions.</p>
 <p>Every uncertainty, identifiability and sensitivity method draws its random
 numbers from the seed of its source: <code>Calibrator.seed</code> (<code>problem.seed</code>) or
 <code>SensitivityAnalysis.seed</code>, split into streams (<code>Stream</code> in
-<code>crates/commol-inference/src/streams.rs</code>, each with its own number) and the
+<code>crates/commol-random/src/streams.rs</code>, each with its own number) and the
 replicates of a stream (<code>Stream::replicate</code>); no method draws from the seed
-itself. No method has a seed of its own, so one seed repeats a calibration
+itself. The starts of a calibration draw from two streams of the same
+registry (<code>Stream::StartPoints</code>, <code>Stream::StartSeeds</code>). No method has a seed of its own, so one seed repeats a calibration
 and every method on it. A score reads the seed its draws keep,
 <code>ObservationDraws.seed</code> (<code>crates/commol-inference/src/predictive.rs</code>):
 <code>scores::pit</code> randomizes ties from a stream of it. Every method that fits the

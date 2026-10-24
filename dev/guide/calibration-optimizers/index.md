@@ -172,7 +172,7 @@ A swarm can stall for some iterations and then improve again, so a short `window
 
 ## Several starts
 
-`Calibrator.run(starts=n)` runs the optimizer from `n` start points in parallel and returns the best result. Start 0 is the initial guess of each parameter (its `initial_guess`, or the midpoint of its bounds). Start `i > 0` is a row of a Latin hypercube over the bounds, drawn from the problem's `seed`: with `n − 1` rows, each parameter has one start in each of `n − 1` equal strata of its bounds, so the starts cover the parameter space (`start_points` in `crates/commol-calibration/src/starts.rs`). A particle swarm draws its own population; its start `i > 0` takes its own seed.
+`Calibrator.run(starts=n)` runs the optimizer from `n` start points in parallel and returns the best result. Start 0 is the initial guess of each parameter (its `initial_guess`, or the midpoint of its bounds). Start `i > 0` is a row of a Latin hypercube over the bounds, drawn from the problem's `seed`: with `n − 1` rows, each parameter has one start in each of `n − 1` equal strata of its bounds, so the starts cover the parameter space (`start_points` in `crates/commol-calibration/src/starts.rs`). A particle swarm draws its own population; each start takes its own seed, also drawn from the problem's `seed`, so start 0 of `run(starts=n)` is the result of `run()`, with or without `verbose`.
 
 A particle swarm also scores the particles of each iteration in parallel, in the order of the particles, so the result does not depend on the number of threads. `commol.threads` chooses the threads and whether the particles run in parallel: see [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md).
 
@@ -198,7 +198,7 @@ print({name: round(value, 2) for name, value in result.best_parameters.items()})
 | `starts`                  | One `StartSummary` per start that finished, in order: `start`, `end`, `loss`, `converged`                                                |
 | `failed`                  | Each start that failed, `"Start <index> failed: <reason>"`; each is also logged as a warning (`logging`, logger `commol.api.calibrator`) |
 
-The result is the start of least loss; if every start fails, `run` raises a `RuntimeError` with every reason. Starts that end at distinct points with equal losses are a sign that the data do not identify the parameters; `StartsIdentifiability` names the parameters that differ (see [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)).
+The result is the start of least loss, the first of them on a tie; if every start fails, `run` raises a `RuntimeError` with the reason of each start. Starts that end at distinct points with equal losses are a sign that the data do not identify the parameters; `StartsIdentifiability` names the parameters that differ (see [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)).
 
 ## Reproducibility
 

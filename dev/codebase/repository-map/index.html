@@ -3389,8 +3389,8 @@
 </tr>
 <tr>
 <td><code>crates/commol-random/</code></td>
-<td>What every stochastic engine and inference method shares and no model: the generator (<code>Generator</code>, <code>Xoshiro256PlusPlus</code> seeded by SplitMix64, with its uniforms), <code>replicate_seed</code>, <code>stream_seed</code>, <code>seed_or_drawn</code> (the one place a seed that its caller does not set is drawn), the samplers (<code>sample</code>: exponential, Poisson, binomial, multinomial, normal, gamma, an index below <code>n</code>), <code>SumTree</code>, the rates of a set of events, which the stochastic engine of the test kind uses (<code>StochasticEvents</code> scans its propensities), and <code>latin_hypercube</code> on the unit cube.</td>
-<td>Anything of a model or an engine; a sampler in another crate.</td>
+<td>What every stochastic engine and inference method shares and no model: the generator (<code>Generator</code>, <code>Xoshiro256PlusPlus</code> seeded by SplitMix64, with its uniforms and the generator trait of <code>rand_core</code>, which the particle swarm draws with), <code>replicate_seed</code>, <code>seed_or_drawn</code> (the one place a seed that its caller does not set is drawn), <code>Stream</code> (<code>streams.rs</code>), the one registry of the seed streams of every method that draws from a seed, the starts of a calibration and the inference methods: each stream with its own number, its method and its purpose (<code>Stream::ALL</code>), and the one scheme of a draw, seed, then <code>Stream::seed</code>, then <code>Stream::replicate</code> for each draw or replicate, the samplers (<code>sample</code>: exponential, Poisson, binomial, multinomial, normal, gamma, an index below <code>n</code>), <code>SumTree</code>, the rates of a set of events, which the stochastic engine of the test kind uses (<code>StochasticEvents</code> scans its propensities), and <code>latin_hypercube</code> on the unit cube.</td>
+<td>Anything of a model or an engine; a sampler in another crate; a stream number written in a method.</td>
 </tr>
 <tr>
 <td><code>crates/commol-model/src/builder.rs</code></td>
@@ -3514,7 +3514,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/starts.rs</code></td>
-<td>The starts of a multi-start optimization (<code>start_points</code>: the guess, then a Latin hypercube) and <code>optimize_starts</code>, in parallel.</td>
+<td>The starts of a multi-start optimization (<code>start_points</code>: the guess, then a Latin hypercube) and <code>optimize_starts</code>, the one function that runs them in parallel and chooses the best (<code>Starts</code>), for a calibration and every fit of a replicate.</td>
 <td>Statistics.</td>
 </tr>
 <tr>
@@ -3529,7 +3529,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/optimization.rs</code></td>
-<td>Nelder-Mead and particle swarm setup on the argmin fork, from a start point (<code>optimize</code>, <code>optimize_from</code>, <code>optimize_with_history</code>, <code>optimize_with_observer</code>), and on a subproblem (<code>optimize_subproblem</code>: a smaller search space, or the augmented Lagrangian of the fork around the problem's optimizer); no output to the process streams.</td>
+<td>Nelder-Mead and particle swarm setup on the argmin fork, from a start point and the seed of a swarm (<code>optimize</code>, <code>optimize_from</code>, <code>optimize_with_history</code>), and on a subproblem (<code>optimize_subproblem</code>: a smaller search space, or the augmented Lagrangian of the fork around the problem's optimizer); no output to the process streams.</td>
 <td>Loss definitions; numerical methods that know no model, such as the sine transform of the bounds or the handling of a NaN cost by the swarm (the argmin fork).</td>
 </tr>
 <tr>
@@ -3571,11 +3571,6 @@
 <td><code>crates/commol-inference/src/scores.rs</code></td>
 <td>Coverage, interval score, weighted interval score, sample CRPS, PIT, the log score of observation models, and their means per series.</td>
 <td>—</td>
-</tr>
-<tr>
-<td><code>crates/commol-inference/src/streams.rs</code></td>
-<td><code>Stream</code>, the one registry of the seed streams of the inference methods: each stream with its own number, its method and its purpose (<code>Stream::ALL</code>); the one scheme of a draw, seed, then <code>Stream::seed</code>, then <code>Stream::replicate</code> for each draw or replicate.</td>
-<td>A stream number written in a method; samplers (<code>commol-random</code>).</td>
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/sensitivity/</code></td>
@@ -4083,7 +4078,7 @@
 </tr>
 <tr>
 <td>Change a stochastic engine (events, chain binomial, whole units), seeds or samplers</td>
-<td><code>crates/commol-stochastic/src/</code> (<code>events.rs</code>, <code>steps.rs</code>, <code>units.rs</code>); <code>crates/commol-random/</code>; <code>crates/commol-inference/src/streams.rs</code> (the seed streams of the inference methods)</td>
+<td><code>crates/commol-stochastic/src/</code> (<code>events.rs</code>, <code>steps.rs</code>, <code>units.rs</code>); <code>crates/commol-random/</code> (<code>streams.rs</code>: the seed streams of every method that draws from a seed)</td>
 <td><code>crates/commol-core/src/types/engine.rs</code> (<code>StochasticEventsSettings</code>, <code>Rounding</code>, <code>is_stochastic</code>), <code>crates/commol-model/src/system.rs</code> (<code>flow_changes</code>, <code>breakpoints</code>), <code>crates/commol-core/src/simulation_engine.rs</code> (<code>set_seed</code>, <code>run_replicates</code>), <code>py-commol/commol/context/engine.py</code>, <code>py-commol/commol/api/simulation.py</code> (<code>replicates</code>), <code>docs/guide/stochastic.md</code></td>
 </tr>
 <tr>

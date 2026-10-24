@@ -339,10 +339,12 @@ class Calibrator:
 
         Start 0 is the initial guess of each parameter. Each further start is a
         row of a Latin hypercube over the bounds, drawn from `seed`, so the
-        starts cover the parameter space. They run in parallel, on the
-        threads of `commol.threads`; the result is the best of them, and lists
-        every start. Distinct ends with equal losses are a sign that the data
-        do not identify the parameters.
+        starts cover the parameter space; a particle swarm takes a seed of
+        its own at each start, also from `seed`. They run in parallel, on the
+        threads of `commol.threads`; the result is the best of them, the
+        first start of lowest loss, and lists every start. Distinct ends with
+        equal losses are a sign that the data do not identify the
+        parameters.
 
         Parameters
         ----------
@@ -382,40 +384,35 @@ class Calibrator:
         )
         if starts < 1:
             raise ValueError(f"A calibration needs at least one start, got {starts}.")
-        seed = self.seed if starts > 1 else 0
-        outcomes = self._rust_problem.optimize(
-            self._build_optimization_config(), starts, seed
+        run = self._rust_problem.optimize(
+            self._build_optimization_config(), starts, self.seed
         )
         names = self.parameter_names
-        summaries: list[tuple[StartSummary, "CalibrationResultProtocol"]] = []
+        summaries: list[StartSummary] = []
         failed: list[str] = []
-        for index, outcome in enumerate(outcomes):
+        for index, outcome in enumerate(run.outcomes):
             if outcome.result is None:
                 reason = f"Start {index} failed: {outcome.error}"
                 logger.warning(reason)
                 failed.append(reason)
                 continue
             summaries.append(
-                (
-                    StartSummary(
-                        start=dict(zip(names, outcome.start, strict=True)),
-                        end=dict(outcome.result.best_parameters),
-                        loss=outcome.result.final_loss,
-                        converged=outcome.result.converged,
-                    ),
-                    outcome.result,
+                StartSummary(
+                    start=dict(zip(names, outcome.start, strict=True)),
+                    end=dict(outcome.result.best_parameters),
+                    loss=outcome.result.final_loss,
+                    converged=outcome.result.converged,
                 )
             )
-        if not summaries:
-            raise RuntimeError("Every start failed: " + "; ".join(failed))
-        best = min(summaries, key=lambda summary: summary[0].loss)[1]
+        best = run.outcomes[run.best].result
+        assert best is not None, "the best start did not fail"
         result = CalibrationResult(
             best_parameters=dict(best.best_parameters),
             final_loss=best.final_loss,
             iterations=best.iterations,
             converged=best.converged,
             termination_reason=best.termination_reason,
-            starts=[summary for summary, _ in summaries],
+            starts=summaries,
             failed=failed,
             seed=self.seed,
         )
@@ -445,7 +442,7 @@ class Calibrator:
         """
         logger.info("Starting calibration with history tracking")
         history = self._rust_problem.optimize_with_history(
-            self._build_optimization_config()
+            self._build_optimization_config(), self.seed
         )
         names = self.parameter_names
         rust_result = history.result
@@ -613,7 +610,6 @@ class Calibrator:
             mutation=rust_mutation,
             velocity=rust_velocity,
             initialization=opt_config.initialization,
-            seed=self.seed,
             improvement_stop=(
                 None
                 if improvement is None
@@ -1249,7 +1245,7 @@ run(starts: int = 1) -> CalibrationResult
 
 Runs the calibration optimization from one or more starts.
 
-Start 0 is the initial guess of each parameter. Each further start is a row of a Latin hypercube over the bounds, drawn from `seed`, so the starts cover the parameter space. They run in parallel, on the threads of `commol.threads`; the result is the best of them, and lists every start. Distinct ends with equal losses are a sign that the data do not identify the parameters.
+Start 0 is the initial guess of each parameter. Each further start is a row of a Latin hypercube over the bounds, drawn from `seed`, so the starts cover the parameter space; a particle swarm takes a seed of its own at each start, also from `seed`. They run in parallel, on the threads of `commol.threads`; the result is the best of them, the first start of lowest loss, and lists every start. Distinct ends with equal losses are a sign that the data do not identify the parameters.
 
 Parameters:
 
@@ -1279,10 +1275,12 @@ def run(self, starts: int = 1) -> CalibrationResult:
 
     Start 0 is the initial guess of each parameter. Each further start is a
     row of a Latin hypercube over the bounds, drawn from `seed`, so the
-    starts cover the parameter space. They run in parallel, on the
-    threads of `commol.threads`; the result is the best of them, and lists
-    every start. Distinct ends with equal losses are a sign that the data
-    do not identify the parameters.
+    starts cover the parameter space; a particle swarm takes a seed of
+    its own at each start, also from `seed`. They run in parallel, on the
+    threads of `commol.threads`; the result is the best of them, the
+    first start of lowest loss, and lists every start. Distinct ends with
+    equal losses are a sign that the data do not identify the
+    parameters.
 
     Parameters
     ----------
@@ -1322,40 +1320,35 @@ def run(self, starts: int = 1) -> CalibrationResult:
     )
     if starts < 1:
         raise ValueError(f"A calibration needs at least one start, got {starts}.")
-    seed = self.seed if starts > 1 else 0
-    outcomes = self._rust_problem.optimize(
-        self._build_optimization_config(), starts, seed
+    run = self._rust_problem.optimize(
+        self._build_optimization_config(), starts, self.seed
     )
     names = self.parameter_names
-    summaries: list[tuple[StartSummary, "CalibrationResultProtocol"]] = []
+    summaries: list[StartSummary] = []
     failed: list[str] = []
-    for index, outcome in enumerate(outcomes):
+    for index, outcome in enumerate(run.outcomes):
         if outcome.result is None:
             reason = f"Start {index} failed: {outcome.error}"
             logger.warning(reason)
             failed.append(reason)
             continue
         summaries.append(
-            (
-                StartSummary(
-                    start=dict(zip(names, outcome.start, strict=True)),
-                    end=dict(outcome.result.best_parameters),
-                    loss=outcome.result.final_loss,
-                    converged=outcome.result.converged,
-                ),
-                outcome.result,
+            StartSummary(
+                start=dict(zip(names, outcome.start, strict=True)),
+                end=dict(outcome.result.best_parameters),
+                loss=outcome.result.final_loss,
+                converged=outcome.result.converged,
             )
         )
-    if not summaries:
-        raise RuntimeError("Every start failed: " + "; ".join(failed))
-    best = min(summaries, key=lambda summary: summary[0].loss)[1]
+    best = run.outcomes[run.best].result
+    assert best is not None, "the best start did not fail"
     result = CalibrationResult(
         best_parameters=dict(best.best_parameters),
         final_loss=best.final_loss,
         iterations=best.iterations,
         converged=best.converged,
         termination_reason=best.termination_reason,
-        starts=[summary for summary, _ in summaries],
+        starts=summaries,
         failed=failed,
         seed=self.seed,
     )
@@ -1409,7 +1402,7 @@ def run_with_history(self) -> CalibrationHistory:
     """
     logger.info("Starting calibration with history tracking")
     history = self._rust_problem.optimize_with_history(
-        self._build_optimization_config()
+        self._build_optimization_config(), self.seed
     )
     names = self.parameter_names
     rust_result = history.result

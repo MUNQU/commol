@@ -3436,7 +3436,7 @@ by the configuration's type and knows no method. A static type checker infers
 </table>
 <p>Every random number of a method comes from the generator and the samplers
 of <code>commol-random</code>, seeded from the seed of its source (<a href="../results/#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts">Results</a>)
-by one scheme: seed, then a <code>Stream</code> of <code>crates/commol-inference/src/streams.rs</code>, then the index of a draw.
+by one scheme: seed, then a <code>Stream</code> of <code>crates/commol-random/src/streams.rs</code>, then the index of a draw.
 Coverage studies (<code>tests/support/coverage.py</code>, marker <code>coverage_study</code>) check that a method's
 intervals cover the truth at their level; they run for a pull request that
 changes what they run and before a release
@@ -3514,9 +3514,11 @@ of each method lists <code>ValueError</code> and <code>RuntimeError</code> by th
 (<code>crates/commol-calibration/src/calibration_problem.rs</code>): a copy of the problem
 whose discrepancy is built as <code>new</code> builds it, so with normalization on its
 factors come from the replicate's own values, as the fit's do. The engine, the
-observation operator and the feasibility stay. A replicate starts from the fit
-and, with more starts, from a Latin hypercube, and keeps its best end
-(<code>ReplicateRunner</code>, <code>resampling/runner.rs</code>). Blocks hold every series in a
+observation operator and the feasibility stay. A replicate is the calibration
+of its data: it starts from the fit and, with more starts, from a Latin
+hypercube, and keeps the best start of <code>optimize_starts</code>, the function a
+calibration calls (<code>ReplicateRunner::fit_one</code>, <code>resampling/runner.rs</code>;
+<a href="../optimizers/#one-function-runs-the-starts-and-chooses-the-best">Optimizers</a>). Blocks hold every series in a
 window of positions (<code>BlockScheme</code>), and <code>block_length</code> has no default.</p>
 <table>
 <thead>
