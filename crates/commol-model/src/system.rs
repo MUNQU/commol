@@ -63,8 +63,9 @@ impl CompiledModel {
     ///
     /// # Errors
     ///
-    /// Returns a message when the index names no compartment or the value is
-    /// negative.
+    /// Returns a message when the index names no compartment, or the message
+    /// of the rule of an initial amount
+    /// ([`crate::rules::check_compartment_amount`]).
     pub fn set_initial_condition(
         &mut self,
         compartment_index: usize,
@@ -77,12 +78,7 @@ impl CompiledModel {
                 self.compartments.len()
             ));
         }
-        if value < 0.0 {
-            return Err(format!(
-                "Initial condition value must be non-negative, got: {}",
-                value
-            ));
-        }
+        crate::rules::check_compartment_amount(&self.compartments[compartment_index], value)?;
         self.initial_state[compartment_index] = value;
         Ok(())
     }

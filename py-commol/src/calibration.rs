@@ -1047,6 +1047,75 @@ fn window_start(at: f64, window: f64) -> f64 {
     commol_calibration::window_start(at, window)
 }
 
+/// The error of a window outside its rule, with the message of the rule.
+fn window_error(message: String) -> PyErr {
+    PyErr::new::<pyo3::exceptions::PyValueError, _>(message)
+}
+
+/// Check the length of a window
+///
+/// Raises:
+///     ValueError: If `window` is not a finite, positive length
+#[pyfunction]
+fn check_window(window: f64) -> PyResult<()> {
+    commol_calibration::ranges::WINDOW
+        .check(window)
+        .map_err(window_error)
+}
+
+/// Check the window of length `window` that ends at `at`, and give its
+/// start: it starts at 0 or after it
+///
+/// Raises:
+///     ValueError: If `window` is not a finite, positive length, or the
+///         window starts before 0
+#[pyfunction]
+fn check_window_end(at: f64, window: f64) -> PyResult<f64> {
+    commol_calibration::check_window_end(at, window).map_err(window_error)
+}
+
+/// The number of windows of length `window` in `span`, a whole number when
+/// it is one within the tolerance of the axis
+///
+/// Raises:
+///     ValueError: If `window` is not a finite, positive length
+#[pyfunction]
+fn windows_in(span: f64, window: f64) -> PyResult<f64> {
+    commol_calibration::windows_in(span, window).map_err(window_error)
+}
+
+/// The positions that bound window `index` of the grid of length `window`,
+/// `(index · window, (index + 1) · window)`
+///
+/// Raises:
+///     ValueError: If `window` is not a finite, positive length or `index`
+///         is negative
+#[pyfunction]
+fn window_bounds(index: i64, window: f64) -> PyResult<(f64, f64)> {
+    commol_calibration::window_bounds(index, window).map_err(window_error)
+}
+
+/// The window of the grid of length `window` that holds the position `at`
+///
+/// Raises:
+///     ValueError: If `window` is not a finite, positive length or `at` is
+///         not a position on the axis
+#[pyfunction]
+fn window_index(at: f64, window: f64) -> PyResult<usize> {
+    commol_calibration::window_index(at, window).map_err(window_error)
+}
+
+/// The end of each complete window of the grid of length `window` up to
+/// `end`
+///
+/// Raises:
+///     ValueError: If `window` is not a finite, positive length or `end` is
+///         not finite
+#[pyfunction]
+fn window_ends(window: f64, end: f64) -> PyResult<Vec<f64>> {
+    commol_calibration::window_ends(window, end).map_err(window_error)
+}
+
 /// The increment of `series` over the window of length `window` that ends at
 /// each of `ends`, as an observation with that window reads it
 ///
@@ -1057,8 +1126,9 @@ fn window_start(at: f64, window: f64) -> f64 {
 ///     ends: The end of each window
 ///
 /// Raises:
-///     ValueError: If a window starts before 0 at no position, or an end or
-///         a start is not one of `positions`
+///     ValueError: If `window` is not a finite, positive length, a window
+///         starts before 0 at no position, or an end or a start is not one
+///         of `positions`
 #[pyfunction]
 fn window_increments(
     series: Vec<f64>,
@@ -1066,10 +1136,12 @@ fn window_increments(
     window: f64,
     ends: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
+    use commol_calibration::WindowError;
     commol_calibration::window_increments(&series, &positions, window, &ends).map_err(|error| {
         match error {
-            commol_calibration::WindowError::Missing(at) => no_value(at),
-            incomplete => PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("{incomplete}.")),
+            WindowError::Missing(at) => no_value(at),
+            WindowError::Length(message) => window_error(message),
+            incomplete => window_error(format!("{incomplete}.")),
         }
     })
 }
@@ -1111,5 +1183,11 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(index_at, m)?)?;
     m.add_function(wrap_pyfunction!(window_start, m)?)?;
     m.add_function(wrap_pyfunction!(window_increments, m)?)?;
+    m.add_function(wrap_pyfunction!(check_window, m)?)?;
+    m.add_function(wrap_pyfunction!(check_window_end, m)?)?;
+    m.add_function(wrap_pyfunction!(windows_in, m)?)?;
+    m.add_function(wrap_pyfunction!(window_bounds, m)?)?;
+    m.add_function(wrap_pyfunction!(window_index, m)?)?;
+    m.add_function(wrap_pyfunction!(window_ends, m)?)?;
     Ok(())
 }

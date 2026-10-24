@@ -1,10 +1,10 @@
 """Transitions of a process and their stratified rates."""
 
-import math
 from typing import Self
 
 from pydantic import ConfigDict, BaseModel, Field, field_validator, model_validator
 
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.stratification_condition import StratificationCondition
 from commol.utils.security import validate_expression_security
 
@@ -191,34 +191,13 @@ class Transition(BaseModel):
 
     @model_validator(mode="after")
     def validate_impulse(self) -> Self:
-        """Check the impulse schedule: one kind, valid positions and period."""
-        if self.impulse_at is not None and self.impulse_every is not None:
-            raise ValueError(
-                f"Transition '{self.id}': set impulse_at or impulse_every, not both."
-            )
-        if self.impulse_at is not None:
-            if not self.impulse_at:
-                raise ValueError(
-                    f"Transition '{self.id}': impulse_at needs at least one position."
-                )
-            bad = [p for p in self.impulse_at if not math.isfinite(p) or p < 0]
-            if bad:
-                raise ValueError(
-                    f"Transition '{self.id}': impulse positions must be finite "
-                    f"and not negative, got {bad}."
-                )
-        if self.impulse_every is not None:
-            period, offset = self.impulse_every
-            if not (math.isfinite(period) and period > 0):
-                raise ValueError(
-                    f"Transition '{self.id}': the impulse period must be "
-                    f"positive, got {period}."
-                )
-            if not (math.isfinite(offset) and offset >= 0):
-                raise ValueError(
-                    f"Transition '{self.id}': the impulse offset must be finite "
-                    f"and not negative, got {offset}."
-                )
+        """
+        Check the impulse with the rule of the engine (`check_impulse` of
+        `crates/commol-model/src/values.rs`): one of `impulse_at` and
+        `impulse_every`, at least one position on the axis, a positive period
+        and an offset that is not negative.
+        """
+        commol_rs.model.check_impulse(self.id, self.impulse_at, self.impulse_every)
         return self
 
     @field_validator("rate", mode="before")

@@ -111,9 +111,10 @@ fn a_window_longer_than_its_position_is_rejected() {
     let error = problem(differential(), vec![observation], vec![])
         .err()
         .expect("a window start at -1 is rejected");
-    assert!(
-        error.contains("Observation 'A' at 1 with the window 2"),
-        "{error}"
+    assert_eq!(
+        error,
+        "Observation 'A' at 1: the window 2 that ends at 1 starts before 0; an end is at \
+         least its window"
     );
 }
 

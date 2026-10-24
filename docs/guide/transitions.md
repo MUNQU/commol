@@ -458,7 +458,7 @@ simulate as written:
 | A stratified rate whose `category` conditions match no source compartment | The transition; use `to` to reach another stratification |
 | A `to` condition on a transition without a source | The transition; use `category` to choose the compartment it enters |
 | A flow that ends in categories no compartment has | The transition; add a `to` condition |
-| `impulse_at` and `impulse_every` together, a negative step, or a period that is not positive | The transition |
+| `impulse_at` and `impulse_every` together, an `impulse_at` with no step, a step that is negative or not finite, a period that is not positive, or a negative offset; the `Transition` fails when it is made, with the rule of the engine (`check_impulse` in `crates/commol-model/src/rules.rs`) | The transition |
 | A non-integer impulse step in a `DifferenceEquations` or `StochasticSteps` model | The transition and the step |
 
 ## Next steps

@@ -292,7 +292,7 @@ print(len(per_week))  # 7: the complete windows of a 50-step run
 | Argument | Meaning |
 |---|---|
 | `ids` | Accumulator ids, each for all its outputs, and output names, each for itself, such as some strata of an accumulator. Their outputs are summed first. An id that is neither raises `KeyError`, with the bins, accumulators and outputs of the model. |
-| `window` | The window length on the axis. Must be positive. |
+| `window` | The window length on the axis: a finite number greater than 0. |
 | `at` | The positions where windows close. By default, every complete window of the results. Pass observation positions to get the values a calibration compares against. |
 
 The axis of a model gives the window grid of a width in a unit
@@ -311,7 +311,11 @@ print(windowed_totals([0, 1, 3, 6, 10, 15, 21, 28], range(8), 3))  # [6.0, 15.0]
 
 A window of the grid is a whole number of steps. The `window` of
 `windowed_totals` need not be: see
-[Reporting at any position](#reporting-at-any-position).
+[Reporting at any position](#reporting-at-any-position). The engine computes
+every window that results, reports and figures read, and checks its length
+(`window_ends` and the other functions of
+`crates/commol-calibration/src/observation.rs`), so a calibration and a report
+read the same windows.
 
 ## Values at positions
 

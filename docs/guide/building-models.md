@@ -169,6 +169,11 @@ the series reads `step` or `t` (`SeriesParameter::evaluate` in
 | `"step_function"` | `t` | 0 | the value | the value of the last point | the value of the last point |
 | `"linear"` | `t` | 0 | the value | linear interpolation in `t` | 0 |
 
+A series has at least one point, each position finite, not negative and in
+one point only, and each value finite. `SeriesValue(...)` checks its points
+with the rule of the engine (`check_series` in
+`crates/commol-model/src/rules.rs`), which the model compiler also reads.
+
 The engine decides which positions its model type accepts.
 `ModelBuilder.build` and `Model.update_parameters` reject a position the engine
 cannot run with `ValueError`, whose message names the parameter
@@ -340,9 +345,10 @@ structure = Aggregate(
 
 | Rule | Checked when |
 |---|---|
-| Every amount is finite and not negative; `0` is an amount | `Aggregate(...)` |
+| Every amount is finite and not negative; `0` is an amount. The engine holds the rule (`check_bin_amount` and `check_compartment_amount` in `crates/commol-model/src/rules.rs`) | `Aggregate(...)` and each update of an amount |
 | Every bin has an amount, and no other id | `build` |
-| Every stratification has fractions for its categories that sum to 1.0 | `build` |
+| Every stratification has a fraction for each of its categories, and no other category | `build` |
+| Every fraction is from 0 to 1, and the fractions of a stratification sum to 1 within 1e-6. The engine holds the rule (`check_fractions` in `crates/commol-model/src/rules.rs`) | `Aggregate(...)` and each `update_stratification_fractions` |
 | Override names are expanded compartments | `build` |
 | With a stochastic engine, the amount of each bin is a whole number | `build` |
 

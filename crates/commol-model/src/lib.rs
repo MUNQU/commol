@@ -25,6 +25,8 @@
 //! - `labels` - Labels of the outputs and the sums they name
 //! - `layout` - Structured index of the compartments
 //! - `rates` - Evaluation of a compiled rate
+//! - [`rules`] - The rules of the values of a model: an initial amount, an
+//!   impulse and the points of a series
 //! - `system` - The right-hand side and the accessors of a compiled model
 //!
 //! ## Example Usage
@@ -57,6 +59,7 @@ mod initial_conditions;
 mod labels;
 mod layout;
 mod rates;
+pub mod rules;
 mod system;
 mod types;
 

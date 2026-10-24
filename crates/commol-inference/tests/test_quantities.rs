@@ -230,9 +230,9 @@ fn increments_cannot_start_before_zero() {
     )
     .unwrap_err();
 
-    assert!(
-        early.contains("windows of 7") && early.contains("the end 5"),
-        "{early}"
+    assert_eq!(
+        early,
+        "Quantity 0: the window 7 that ends at 5 starts before 0; an end is at least its window"
     );
     assert!(empty.contains("greater than 0, got 0"), "{empty}");
     assert!(infinite.contains("finite"), "{infinite}");

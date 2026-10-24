@@ -162,6 +162,88 @@ fn subgroup_total_names(process: &PyProcess) -> Vec<String> {
     commol_model::subgroup_total_names(&process.inner)
 }
 
+/// The error of a value outside its rule, with the message of the rule.
+fn value_error(message: String) -> PyErr {
+    PyErr::new::<pyo3::exceptions::PyValueError, _>(message)
+}
+
+/// Check the initial amount of each bin, by bin id; None leaves an amount
+/// for calibration and has no rule
+///
+/// Raises:
+///     ValueError: With the message of the rule of the first amount outside
+///         it, which names its bin
+#[pyfunction]
+fn check_bin_amounts(amounts: Vec<(String, Option<f64>)>) -> PyResult<()> {
+    amounts
+        .iter()
+        .filter_map(|(bin, amount)| amount.map(|amount| (bin, amount)))
+        .try_for_each(|(bin, amount)| commol_model::rules::check_bin_amount(bin, amount))
+        .map_err(value_error)
+}
+
+/// Check each initial amount that overrides a compartment, by compartment
+/// name
+///
+/// Raises:
+///     ValueError: With the message of the rule of the first amount outside
+///         it, which names its compartment
+#[pyfunction]
+fn check_compartment_amounts(amounts: Vec<(String, f64)>) -> PyResult<()> {
+    amounts
+        .iter()
+        .try_for_each(|(compartment, amount)| {
+            commol_model::rules::check_compartment_amount(compartment, *amount)
+        })
+        .map_err(value_error)
+}
+
+/// Check the fractions of each stratification, as `(stratification,
+/// [(category, fraction)])`: each from 0 to 1, and a sum of 1 within 1e-6
+///
+/// Raises:
+///     ValueError: With the message of the first rule the fractions break,
+///         which names the stratification
+#[pyfunction]
+fn check_fractions(stratifications: Vec<(String, Vec<(String, f64)>)>) -> PyResult<()> {
+    stratifications
+        .iter()
+        .try_for_each(|(stratification, fractions)| {
+            commol_model::rules::check_fractions(
+                stratification,
+                fractions
+                    .iter()
+                    .map(|(category, fraction)| (category.as_str(), *fraction)),
+            )
+        })
+        .map_err(value_error)
+}
+
+/// Check the impulse of a transition: its positions `at` or its schedule
+/// `every`, `(period, offset)`
+///
+/// Raises:
+///     ValueError: With the message of the first rule the impulse breaks,
+///         which names the transition
+#[pyfunction]
+#[pyo3(signature = (transition, at, every))]
+fn check_impulse(
+    transition: &str,
+    at: Option<Vec<f64>>,
+    every: Option<(f64, f64)>,
+) -> PyResult<()> {
+    commol_model::rules::check_impulse(transition, at.as_deref(), every).map_err(value_error)
+}
+
+/// Check the `(position, value)` points of a series
+///
+/// Raises:
+///     ValueError: With the message of the first rule the points break
+#[pyfunction]
+fn check_series(data: Vec<(f64, f64)>) -> PyResult<()> {
+    commol_model::rules::check_series(&data).map_err(value_error)
+}
+
 /// Register the model helpers with the Python module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(initial_state, m)?)?;
@@ -169,6 +251,11 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(transition_flows, m)?)?;
     m.add_function(wrap_pyfunction!(check_model, m)?)?;
     m.add_function(wrap_pyfunction!(subgroup_total_names, m)?)?;
+    m.add_function(wrap_pyfunction!(check_bin_amounts, m)?)?;
+    m.add_function(wrap_pyfunction!(check_compartment_amounts, m)?)?;
+    m.add_function(wrap_pyfunction!(check_fractions, m)?)?;
+    m.add_function(wrap_pyfunction!(check_impulse, m)?)?;
+    m.add_function(wrap_pyfunction!(check_series, m)?)?;
     m.add("NEIGHBORS", commol_core::NEIGHBORS)?;
     m.add("NEIGHBORS_PREFIX", commol_core::NEIGHBORS_PREFIX)?;
     m.add("ENGINE_VARIABLES", commol_core::ENGINE_VARIABLES.to_vec())?;

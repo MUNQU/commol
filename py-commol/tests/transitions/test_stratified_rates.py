@@ -202,7 +202,7 @@ class TestConditions:
     def test_a_rate_names_each_stratification_once_by_a_category_it_has(
         self, conditions: list[dict[str, str]], message: str
     ) -> None:
-        builder = a_to_b_builder(stratifications={"g": ["g1", "g2"]})
+        builder = a_to_b_builder(stratifications={"g": {"g1": 0.5, "g2": 0.5}})
 
         with pytest.raises(ValidationError, match=message):
             builder.add_transition(

@@ -1,7 +1,5 @@
 """Bin amounts: the initial amount of each bin, in the unit of the bin."""
 
-import math
-
 import pytest
 from pydantic import ValidationError
 
@@ -56,7 +54,7 @@ class TestBinAmountUpdates:
     def test_rejected_update_leaves_the_bins_unchanged(self) -> None:
         conditions = _conditions()
 
-        with pytest.raises(ValueError, match="bin 'B' must be finite and not neg"):
+        with pytest.raises(ValueError, match="Bin 'B': initial amount is a finite"):
             conditions.update_bin_amounts({"A": 900, "B": -1})
 
         assert conditions.bin_amounts == {"A": 500, "B": 500}
@@ -71,15 +69,6 @@ class TestBinAmountUpdates:
 
 
 class TestAmounts:
-    @pytest.mark.parametrize("amount", [-10, math.nan, math.inf])
-    def test_an_amount_that_is_not_finite_or_is_negative_is_rejected(
-        self, amount: float
-    ) -> None:
-        with pytest.raises(
-            ValidationError, match="bin 'A' must be finite and not negative"
-        ):
-            Aggregate(bin_amounts={"A": amount})
-
     def test_bins_that_all_start_at_zero_build(self) -> None:
         model = build(a_to_b_builder(amounts={"A": 0, "B": 0}))
 

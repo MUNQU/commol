@@ -97,14 +97,6 @@ class TestSeriesParameterValue:
         with pytest.raises(ValidationError, match="at least one point"):
             ModelBuilder("M").add_parameter("x", [], mode="pulse")
 
-    def test_series_parameter_rejects_negative_positions(self):
-        with pytest.raises(ValidationError, match="non-negative"):
-            ModelBuilder("M").add_parameter("x", [(-1, 1.0)], mode="pulse")
-
-    def test_series_parameter_rejects_duplicate_positions(self):
-        with pytest.raises(ValidationError, match="unique"):
-            ModelBuilder("M").add_parameter("x", [(1, 1.0), (1, 2.0)], mode="pulse")
-
     @pytest.mark.parametrize(
         "pattern",
         [

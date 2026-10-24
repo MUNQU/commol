@@ -14,7 +14,7 @@ from commol import (
     SimulationResults,
 )
 from commol.api.reporting import ObservedSeries
-from commol.context._windows import window_index
+from commol.commol_rs import _commol_rs as commol_rs
 from tests.support import a_to_b_builder, build, build_ode
 
 
@@ -235,13 +235,13 @@ def test_observed_report_places_each_observation_by_window_index(
         ObservedDataPoint(at=at, output="events", value=float(i))
         for i, at in enumerate(positions)
     ]
-    windows = window_index(max(positions), window) + 1
+    windows = commol_rs.calibration.window_index(max(positions), window) + 1
 
     report = observed_report(observed, window, windows)
 
     expected: list[float | None] = [None] * windows
     for i, at in enumerate(positions):
-        expected[window_index(at, window)] = float(i)
+        expected[commol_rs.calibration.window_index(at, window)] = float(i)
     assert report["events"]["values"] == expected
 
 

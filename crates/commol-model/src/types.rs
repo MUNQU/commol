@@ -153,7 +153,7 @@ pub(crate) struct ImpulseFlow {
 pub(crate) struct SeriesParameter {
     pub(crate) parameter_name: String,
     pub(crate) parameter_index: usize,
-    /// Sorted by position for binary search.
+    /// At least one point, sorted by position for binary search.
     data: Vec<(f64, f64)>,
     mode: SeriesMode,
 }
@@ -163,8 +163,8 @@ impl SeriesParameter {
     ///
     /// # Errors
     ///
-    /// Returns a message that names the parameter when a position is not
-    /// finite and non-negative, or two positions are the same. The check of
+    /// Returns the message of the rule of its points
+    /// ([`crate::rules::check_series`]) after the parameter. The check of
     /// the model ([`crate::check_model`]) rejects a `"pulse"` series with a
     /// position that is not an integer.
     pub(crate) fn new(
@@ -173,19 +173,9 @@ impl SeriesParameter {
         mut data: Vec<(f64, f64)>,
         mode: SeriesMode,
     ) -> Result<Self, String> {
-        if let Some(&(position, _)) = data.iter().find(|(p, _)| !(p.is_finite() && *p >= 0.0)) {
-            return Err(format!(
-                "Series parameter '{parameter_name}' has a point at {position}; a \
-                 position must be finite and not negative"
-            ));
-        }
+        crate::rules::check_series(&data)
+            .map_err(|error| format!("Series parameter '{parameter_name}': {error}"))?;
         data.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
-        if let Some(pair) = data.windows(2).find(|pair| pair[0].0 == pair[1].0) {
-            return Err(format!(
-                "Series parameter '{parameter_name}' has two points at {}",
-                pair[0].0
-            ));
-        }
         Ok(Self {
             parameter_name,
             parameter_index,
@@ -217,9 +207,6 @@ impl SeriesParameter {
     /// The value of the series at `step` (pulse) or at `t` (step function,
     /// linear).
     pub(crate) fn evaluate(&self, step: f64, t: f64) -> f64 {
-        if self.data.is_empty() {
-            return 0.0;
-        }
         match self.mode {
             SeriesMode::Pulse => match self
                 .data

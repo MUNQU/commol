@@ -23,7 +23,7 @@ from commol.api.results import (
     total_series,
 )
 from commol.api.windows import windowed_totals
-from commol.context._windows import check_window, window_ends
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import CalibrationResult, ObservedDataPoint
 from commol.context.inference.noise import NoNoise
 
@@ -660,7 +660,7 @@ def compared_panels(
     """
     outputs = _compared_outputs(results)
     if window is not None:
-        check_window(window)
+        commol_rs.calibration.check_window(window)
     first = next(iter(results))
     selected = outputs[first].select(series)
     observed = list(observed_data or ())
@@ -842,7 +842,7 @@ def _windowed(
     the draws of a predictive, read through the observation operator.
     """
     components = outputs.components(series_id)
-    ends = window_ends(window, result.positions[-1])
+    ends = commol_rs.calibration.window_ends(window, result.positions[-1])
     if isinstance(result, SimulationReplicates):
         gains = [
             windowed_totals(total_series(run, components), run.positions, window, ends)

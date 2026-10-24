@@ -194,7 +194,10 @@ class TestSeriesParameters:
         [
             ({"k": [(1, 0.5)]}, "Parameter 'k' is not a series"),
             ({"d": []}, "Parameter 'd' cannot take .* at least one point"),
-            ({"k": 0.3, "d": [(-1, 0.5)]}, "Parameter 'd' cannot take .*non-negative"),
+            (
+                {"k": 0.3, "d": [(-1, 0.5)]},
+                "Parameter 'd' cannot take .*series position is a finite number",
+            ),
             ({"k": "  "}, "Parameter 'k' cannot take .* Formula cannot be empty"),
             ({"d": [1.0]}, "Parameter 'd' cannot take .* valid tuple"),
             ({"k": "total_g1"}, "Unknown subgroup total.*'total_g1'"),
@@ -224,10 +227,6 @@ class TestValues:
             ModelBuilder("M").add_parameter("x", [(0, 1.0)])
         with pytest.raises(ValueError, match="'x': 'mode' is only valid"):
             ModelBuilder("M").add_parameter("x", 1.0, mode="pulse")
-
-    def test_a_series_value_is_finite(self) -> None:
-        with pytest.raises(ValidationError, match="Series values must be finite"):
-            ModelBuilder("M").add_parameter("x", [(0, math.inf)], mode="pulse")
 
     def test_a_run_names_the_initial_conditions_left_to_calibrate(self) -> None:
         model = build(a_to_b_builder(amounts={"A": 500, "B": None}))

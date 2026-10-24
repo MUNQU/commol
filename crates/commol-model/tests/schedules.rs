@@ -1,7 +1,8 @@
 //! Where an engine in continuous time stops (impulses, the values a rate
 //! compares `t` with, the points of a series, every integer when a rate reads
-//! `step`), the checks of impulse schedules and of the series points and
-//! impulse positions an engine runs, and the flows that drain a compartment.
+//! `step`), the checks of the series points and impulse positions an engine
+//! runs, and the flows that drain a compartment. The rules of an impulse are
+//! in `value_rules.rs`.
 
 use commol_core::{EngineType, Model, ModelEngine, ParameterValue, SeriesMode};
 use commol_model::{CompiledModel, as_whole, check_model};
@@ -93,65 +94,6 @@ fn impulses_act_at_their_positions_inside_the_range() {
     assert_eq!(every.impulse_positions(6.0, 9.0), [6.5, 8.5]);
 }
 
-#[test]
-fn an_impulse_position_is_finite_and_not_negative() {
-    for (positions, accepted) in [
-        (vec![0.0, 2.0], true),
-        (vec![-1.0], false),
-        (vec![f64::INFINITY], false),
-    ] {
-        let mut model = model("k", "k", "step_function", r#","impulse_at":[1]"#);
-        model.process.transitions[0].impulse_at = Some(positions.clone());
-        let result = CompiledModel::try_from_model(&model);
-        assert_eq!(result.is_ok(), accepted, "{positions:?}");
-        if !accepted {
-            let error = result.err().unwrap();
-            assert!(error.contains("finite and not negative"), "{error}");
-        }
-    }
-}
-
-#[test]
-fn an_impulse_has_positions_or_a_period_not_both() {
-    let mut model = model("k", "k", "step_function", r#","impulse_at":[1]"#);
-    model.process.transitions[0].impulse_every = Some((2.0, 0.0));
-
-    let error = CompiledModel::try_from_model(&model).err().unwrap();
-
-    assert_eq!(
-        error,
-        "Transition 'ab' sets both impulse_at and impulse_every; set one"
-    );
-}
-
-#[test]
-fn an_impulse_period_that_is_not_positive_names_the_transition() {
-    for (period, offset, message) in [
-        (
-            0.0,
-            0.0,
-            "Transition 'ab' has the impulse period 0; it must be positive",
-        ),
-        (
-            f64::INFINITY,
-            0.0,
-            "Transition 'ab' has the impulse period inf; it must be positive",
-        ),
-        (
-            1.0,
-            f64::INFINITY,
-            "Transition 'ab' has the impulse offset inf; it must be finite and not negative",
-        ),
-    ] {
-        let mut model = model("k", "k", "step_function", r#","impulse_every":[1,0]"#);
-        model.process.transitions[0].impulse_every = Some((period, offset));
-        assert_eq!(
-            CompiledModel::try_from_model(&model).err().as_deref(),
-            Some(message)
-        );
-    }
-}
-
 /// `model` with the engine `engine`.
 fn on(engine: EngineType, mut model: Model) -> Model {
     model.engine = ModelEngine::new(engine);
@@ -231,12 +173,15 @@ fn a_position_that_is_not_valid_keeps_its_own_message_on_an_integer_engine() {
     let mut negative = on(engine, model("k", "k", "linear", r#","impulse_at":[1]"#));
     negative.process.transitions[0].impulse_at = Some(vec![-1.5, f64::INFINITY]);
     let error = CompiledModel::try_from_model(&negative).err().unwrap();
-    assert!(error.contains("finite and not negative"), "{error}");
+    assert!(
+        error.contains("is a finite number of at least 0"),
+        "{error}"
+    );
 
     let mut both = on(engine, model("k", "k", "linear", r#","impulse_at":[1.5]"#));
     both.process.transitions[0].impulse_every = Some((1.5, 0.0));
     let error = CompiledModel::try_from_model(&both).err().unwrap();
-    assert!(error.contains("sets both"), "{error}");
+    assert!(error.contains("not both"), "{error}");
 
     let mut series = on(engine, model("k", "k", "linear", ""));
     series.parameters[2].value = Some(ParameterValue::Series {
@@ -244,7 +189,10 @@ fn a_position_that_is_not_valid_keeps_its_own_message_on_an_integer_engine() {
         mode: SeriesMode::Linear,
     });
     let error = CompiledModel::try_from_model(&series).err().unwrap();
-    assert!(error.contains("finite and not negative"), "{error}");
+    assert!(
+        error.contains("is a finite number of at least 0"),
+        "{error}"
+    );
 }
 
 #[test]

@@ -38,7 +38,7 @@ from commol.api.plotting.panels import (
     ObservationPanel,
     Panel,
 )
-from commol.context._windows import is_whole
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.inference.global_sensitivity import SobolResult
 from commol.context.visualization import PlotConfig
 
@@ -704,7 +704,7 @@ def _draw_observation_model(
         xs: list[float] = []
         ys: list[float] = []
         for at, window, value, _ in windowed:
-            xs += [at - window, at, math.nan]
+            xs += [commol_rs.calibration.window_start(at, window), at, math.nan]
             ys += [value, value, math.nan]
         (steps,) = ax.plot(xs, ys, label=model.label, color=color)
         lines.append(steps)
@@ -732,7 +732,10 @@ def _draw_observation_model(
     if band is not None:
         if windowed:
             ax.bar(
-                [at - window for at, window, _, _ in windowed],
+                [
+                    commol_rs.calibration.window_start(at, window)
+                    for at, window, _, _ in windowed
+                ],
                 [band.upper[i] - band.lower[i] for _, _, _, i in windowed],
                 width=[window for _, window, _, _ in windowed],
                 bottom=[band.lower[i] for _, _, _, i in windowed],
@@ -963,10 +966,11 @@ def _apply_x_labels(
     """
     if tick_every is not None and positions:
         anchor = positions[0]
+        windows_in = commol_rs.calibration.windows_in
         ticks = [
             position
             for position in positions
-            if is_whole((position - anchor) / tick_every)
+            if windows_in(position - anchor, tick_every).is_integer()
         ]
     else:
         ticks = list(positions)

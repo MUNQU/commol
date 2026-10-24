@@ -2,7 +2,8 @@
 
 [Back to Design decisions](../design-decisions.md)
 
-How the Pydantic models of the Python package read their fields and compare.
+How the Pydantic models of the Python package read their fields, check their
+values and compare.
 
 ## Public models forbid unknown fields
 
@@ -11,6 +12,37 @@ An unknown field, such as a misspelt or an old name (`window_steps`), raises a
 `ValidationError` that names it, instead of being dropped with no error.
 
 **Guard:** `tests/building/test_unknown_fields.py`.
+
+## A value of a model has its rule in the engine
+
+An initial amount, the fractions of a stratification, an impulse and the
+points of a series have their rule once, in `crates/commol-model/src/rules.rs`
+(`check_bin_amount`, `check_compartment_amount`, `check_fractions`,
+`check_impulse`, `check_series`). The model
+compiler calls them when it compiles a model, `set_initial_condition` when a
+calibration writes an amount, and the Python object of the value when it is
+built: the validators of `InitialConditions`, `Transition` and `SeriesValue`
+call the bindings of `commol_rs.model`. A value outside its rule fails at the
+line that sets it, with the message of the engine. A range is a `Real` of
+`commol-core` after the owner of the value (`Bin 'B': initial amount is a
+finite number of at least 0, got -1`); a rule that is not a range, such as one
+point per position or fractions that sum to 1, has one message in the same
+module. `update_stratification_fractions` gives the one category left unnamed
+the rest of 1 and checks the result with `check_fractions`; the rule that at
+most one category is left unnamed stays in Python, because it is a rule of the
+update, not of a value, and the engine never gets an update.
+
+| Alternative | Why not |
+|---|---|
+| A check in Python and one in the compiler | Two messages for one rule, and rules that only one side has, such as the series without a point. |
+| A check only when the model compiles | The error comes far from the line that set the value. |
+| A row of `RANGES` for the object (`RangeChecked`) | A rule of `RANGES` has a fixed name, so the message cannot name the bin or the transition, and `(period, offset)` has two rules. |
+
+**Rule:** a new value of a model gets its rule in `rules.rs`, which the
+compiler and the validator of its Python object call.
+
+**Guards:** `tests/building/test_value_rules.py`,
+`crates/commol-model/tests/value_rules.rs`.
 
 ## Results compare by their values
 

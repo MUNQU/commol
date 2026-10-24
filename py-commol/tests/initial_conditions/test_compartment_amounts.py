@@ -1,7 +1,5 @@
 """Per-compartment initial conditions: the type, the builder and the model."""
 
-import math
-
 import pytest
 from pydantic import ValidationError
 
@@ -31,15 +29,6 @@ def _all_in_g1(overrides: Mapping[str, float]) -> FactoryBuilder:
 
 def _overrides(model: Model) -> dict[str, float]:
     return dict(model.structure.compartment_amounts)
-
-
-class TestCompartmentAmountType:
-    @pytest.mark.parametrize("amount", [-0.1, math.nan, math.inf])
-    def test_rejects_an_amount_that_is_not_finite_or_is_negative(
-        self, amount: float
-    ) -> None:
-        with pytest.raises(ValidationError, match="finite and not negative"):
-            Aggregate(bin_amounts={"A": 1000}, compartment_amounts={"A_g1": amount})
 
 
 class TestBuilderCompartmentAmounts:
@@ -105,8 +94,7 @@ class TestCompartmentAmountValidation:
             model.structure.update_compartment_amounts(model.process, {"A": -1.5})
 
         assert str(error.value) == (
-            "The initial amount of compartment 'A' must be finite and not "
-            "negative, got -1.5."
+            "Compartment 'A': initial amount is a finite number of at least 0, got -1.5"
         )
 
     def test_json_with_an_unknown_override_is_rejected(self) -> None:

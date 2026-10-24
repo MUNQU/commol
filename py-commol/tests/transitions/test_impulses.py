@@ -104,31 +104,6 @@ class TestDefinition:
         with pytest.raises(ValidationError, match="'jump' acts at 0.5"):
             _impulse_model(ode=False, impulse_at=[0.5])
 
-    def test_impulse_at_and_impulse_every_exclude_each_other(self) -> None:
-        with pytest.raises(ValidationError, match="not both"):
-            _impulse_model(ode=True, impulse_at=[1], impulse_every=(2, 0))
-
-    @pytest.mark.parametrize(
-        ("positions", "message"),
-        [
-            ([], "impulse_at needs at least one position"),
-            ([1.0, -1.0], r"finite and not negative, got \[-1.0\]"),
-            ([math.inf], r"finite and not negative, got \[inf\]"),
-        ],
-    )
-    def test_impulse_positions_are_on_the_axis(
-        self, positions: list[float], message: str
-    ) -> None:
-        with pytest.raises(ValidationError, match=message):
-            _impulse_model(ode=True, impulse_at=positions)
-
-    @pytest.mark.parametrize("schedule", [(0, 1), (-1, 0), (1, -1)])
-    def test_the_period_is_positive_and_the_offset_not_negative(
-        self, schedule: tuple[float, float]
-    ) -> None:
-        with pytest.raises(ValidationError, match="impulse"):
-            _impulse_model(ode=True, impulse_every=schedule)
-
     def test_a_time_pattern_cannot_be_an_impulse(self) -> None:
         builder = FactoryBuilder(name="m")
         builder.add_bin("A", "A").add_bin("B", "B")

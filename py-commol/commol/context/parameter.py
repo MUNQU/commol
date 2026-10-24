@@ -1,6 +1,5 @@
 """Model parameters: constants, formulas, series and uncalibrated values."""
 
-import math
 from typing import Self
 
 from pydantic import (
@@ -12,6 +11,7 @@ from pydantic import (
     model_validator,
 )
 
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.utils.security import validate_expression_security
 
 
@@ -45,21 +45,12 @@ class SeriesValue(BaseModel):
     def validate_data(
         cls, value: list[tuple[float, float]]
     ) -> list[tuple[float, float]]:
-        """Validate series points before they reach the Rust engine."""
-        if not value:
-            raise ValueError("Series data must contain at least one point")
-
-        positions: list[float] = []
-        for position, point_value in value:
-            if not (math.isfinite(position) and position >= 0):
-                raise ValueError("Series positions must be finite and non-negative")
-            if not math.isfinite(point_value):
-                raise ValueError("Series values must be finite")
-            positions.append(position)
-
-        if len(positions) != len(set(positions)):
-            raise ValueError("Series positions must be unique")
-
+        """
+        Check the points with the rule of the engine (`check_series` of
+        `crates/commol-model/src/values.rs`): at least one point, each
+        position finite, not negative and once, each value finite.
+        """
+        commol_rs.model.check_series(value)
         return value
 
 

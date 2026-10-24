@@ -148,30 +148,10 @@ fn an_initial_amount_is_of_a_compartment_and_not_negative() {
     );
     assert_eq!(
         compiled.set_initial_condition(0, -1.0),
-        Err("Initial condition value must be non-negative, got: -1".to_string())
+        Err("Compartment 'A': initial amount is a finite number of at least 0, got -1".to_string())
     );
     compiled.set_initial_condition(0, 650.0).unwrap();
     assert_eq!(compiled.initial_state(), [650.0, 200.0, 100.0]);
-}
-
-#[test]
-fn a_series_without_points_is_zero() {
-    let mut json: serde_json::Value =
-        serde_json::from_str(&serde_json::to_string(&model("s", 0)).unwrap()).unwrap();
-    json["parameters"]
-        .as_array_mut()
-        .unwrap()
-        .push(serde_json::json!({"id": "s", "value": {"data": [], "mode": "linear"}}));
-    let model: Model = serde_json::from_value(json).unwrap();
-
-    let mut compiled = CompiledModel::try_from_model(&model).unwrap();
-    let state = compiled.initial_state().to_vec();
-    let mut rates = vec![0.0; 1];
-    compiled
-        .transition_rates(0.0, 0.5, &state, &mut rates)
-        .unwrap();
-
-    assert_eq!(rates, [0.0]);
 }
 
 #[test]
