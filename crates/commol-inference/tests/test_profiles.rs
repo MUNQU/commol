@@ -15,8 +15,8 @@ use commol_inference::profiles::{
     ProfileEnd, ProfileTracer, ProfiledQuantity, beale, bootstrap_thresholds, chi_square,
 };
 use commol_inference::resampling::{Perturbation, ReplicateRunner, Resampler};
-use commol_inference::streams::Stream;
 use commol_random::Generator;
+use commol_random::Stream;
 
 type Formula = fn(&HashMap<String, f64>, f64) -> f64;
 
@@ -152,12 +152,12 @@ fn least_squares(values: &[f64]) -> (f64, f64) {
 #[test]
 fn fixing_a_parameter_at_the_fit_keeps_the_loss() {
     let problem = line_problem(&VALUES);
-    let fit = optimize(&problem, &config()).unwrap();
+    let fit = optimize(&problem, &config(), 0).unwrap();
 
     for index in 0..2 {
         let subproblem =
             Subproblem::fix_parameter(&problem, index, fit.best_parameters[index]).unwrap();
-        let refit = optimize_subproblem(&subproblem, &config(), &fit.best_parameters, None)
+        let refit = optimize_subproblem(&subproblem, &config(), &fit.best_parameters, 0)
             .unwrap()
             .fit;
 
@@ -180,7 +180,7 @@ fn fixing_a_prediction_at_the_fit_keeps_the_parameters() {
     // refit starts away from the fit.
     let spec = ObservedDataPoint::new(15.0, "x".to_string(), 0.0);
     let subproblem = Subproblem::fix_prediction(&problem, &spec, a + 15.0 * b).unwrap();
-    let refit = optimize_subproblem(&subproblem, &config(), &[a + 1.0, b - 0.1], None).unwrap();
+    let refit = optimize_subproblem(&subproblem, &config(), &[a + 1.0, b - 0.1], 0).unwrap();
 
     assert!(refit.fit.converged, "{}", refit.fit.termination_reason);
     assert!(
@@ -304,7 +304,7 @@ fn a_subproblem_refuses_what_it_cannot_hold() {
         ]
     );
     assert!(
-        optimize_subproblem(&held, &config(), &[0.0], None)
+        optimize_subproblem(&held, &config(), &[0.0], 0)
             .unwrap_err()
             .contains("Expected 2 start values, got 1")
     );
@@ -327,7 +327,7 @@ fn a_problem_of_one_parameter_held_is_scored_once() {
     )
     .unwrap();
     let held = Subproblem::fix_parameter(&problem, 0, 1.5).unwrap();
-    let result = optimize_subproblem(&held, &config(), &[4.0], None).unwrap();
+    let result = optimize_subproblem(&held, &config(), &[4.0], 0).unwrap();
 
     // (1 − 1.5)² + (3 − 1.5)².
     assert_eq!(result.fit.final_loss, 2.5);
@@ -345,7 +345,7 @@ fn a_swarm_fits_a_subproblem_and_repeats_from_its_seed() {
         ..ParticleSwarmConfig::default()
     });
     let fixed = Subproblem::fix_parameter(&problem, 1, b).unwrap();
-    let refit = optimize_subproblem(&fixed, &swarm, &[0.0, 0.0], Some(4)).unwrap();
+    let refit = optimize_subproblem(&fixed, &swarm, &[0.0, 0.0], 4).unwrap();
     assert!(
         (refit.fit.best_parameters[0] - a).abs() < 1e-3,
         "{:?}",
@@ -363,8 +363,8 @@ fn a_swarm_fits_a_subproblem_and_repeats_from_its_seed() {
             penalty: None,
         })
         .unwrap();
-    let first = optimize_subproblem(&held, &swarm, &[0.0, 0.0], Some(4)).unwrap();
-    let again = optimize_subproblem(&held, &swarm, &[0.0, 0.0], Some(4)).unwrap();
+    let first = optimize_subproblem(&held, &swarm, &[0.0, 0.0], 4).unwrap();
+    let again = optimize_subproblem(&held, &swarm, &[0.0, 0.0], 4).unwrap();
     // A swarm without stop rules runs every outer iteration to its limit.
     assert!(!first.fit.converged);
     // With the improvement rule, each inner run converges, and the outer run
@@ -388,7 +388,7 @@ fn a_swarm_fits_a_subproblem_and_repeats_from_its_seed() {
             penalty: None,
         })
         .unwrap();
-    let stopped = optimize_subproblem(&held_longer, &stopping, &[0.0, 0.0], Some(4)).unwrap();
+    let stopped = optimize_subproblem(&held_longer, &stopping, &[0.0, 0.0], 4).unwrap();
     assert!(stopped.fit.converged, "{:?}", stopped.fit);
     assert!(stopped.fit.iterations < 30 * 150, "{:?}", stopped.fit);
     assert!((stopped.prediction.unwrap() - (a + 15.0 * b + 1.0)).abs() < 1e-6);
@@ -404,7 +404,7 @@ fn a_swarm_fits_a_subproblem_and_repeats_from_its_seed() {
 #[test]
 fn profile_of_a_linear_model_is_a_parabola() {
     let problem = line_problem(&VALUES);
-    let fit = optimize(&problem, &config()).unwrap();
+    let fit = optimize(&problem, &config(), 0).unwrap();
     let (_, b) = least_squares(&VALUES);
     // Σ (t − 4.5)² over t = 0, …, 9.
     let stt: f64 = 82.5;
@@ -440,7 +440,7 @@ fn profile_of_a_linear_model_is_a_parabola() {
 #[test]
 fn a_profile_flags_a_refit_less_accurate_than_the_tolerance() {
     let problem = line_problem(&VALUES);
-    let fit = optimize(&problem, &config()).unwrap();
+    let fit = optimize(&problem, &config(), 0).unwrap();
     // Five iterations leave a refit far from the optimum it starts near.
     let short = OptimizationConfig::NelderMead(NelderMeadConfig {
         sd_tolerance: 1e-14,
@@ -530,7 +530,7 @@ fn abc_problem() -> CalibrationProblem<commol_difference::DifferenceEquations> {
 fn the_multiplier_of_a_prediction_profile_is_minus_its_slope() {
     let problem = abc_problem();
     let config = config();
-    let fit = optimize(&problem, &config).unwrap();
+    let fit = optimize(&problem, &config, 0).unwrap();
     let tracer = ProfileTracer::new(&problem, &config, &fit.best_parameters, 3).unwrap();
     let spec = ObservedDataPoint::new(30.0, "B".to_string(), 0.0);
     let profile = tracer
@@ -574,13 +574,13 @@ fn a_held_prediction_takes_a_warm_start() {
             penalty: Some(10.0),
         })
         .unwrap();
-    let refit = optimize_subproblem(&held, &config(), &[a, b], None).unwrap();
+    let refit = optimize_subproblem(&held, &config(), &[a, b], 0).unwrap();
 
     assert!(refit.fit.converged, "{}", refit.fit.termination_reason);
     let multiplier = refit.multiplier.unwrap();
     assert!((multiplier + 2.0 / h).abs() < 1e-4, "{multiplier}");
     // The loss rises by (c − ĉ)² / h.
-    let fit = optimize(&problem, &config()).unwrap();
+    let fit = optimize(&problem, &config(), 0).unwrap();
     assert!((refit.fit.final_loss - fit.final_loss - 1.0 / h).abs() < 1e-6);
 }
 
@@ -597,7 +597,7 @@ fn an_invalid_optimizer_fails_a_subproblem() {
         Subproblem::fix_prediction(&problem, &spec, 8.0).unwrap(),
     ];
     for subproblem in &subproblems {
-        let error = optimize_subproblem(subproblem, &config, &[1.0, 0.5], None).unwrap_err();
+        let error = optimize_subproblem(subproblem, &config, &[1.0, 0.5], 0).unwrap_err();
         assert!(
             error.contains("initial_simplex_size must be in (0, 1]"),
             "{error}"
@@ -660,7 +660,7 @@ fn a_side_that_starts_at_a_bound_ends_there() {
 #[test]
 fn the_tolerance_follows_the_optimizer() {
     let problem = line_problem(&VALUES);
-    let fit = optimize(&problem, &config()).unwrap();
+    let fit = optimize(&problem, &config(), 0).unwrap();
     let nelder_mead = config();
     let swarm = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig::default());
     let stopping = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
@@ -750,7 +750,7 @@ impl Resampler for Noisy {
 fn a_bootstrap_threshold_of_a_prediction_reads_the_rise_of_each_replicate() {
     let problem = line_problem(&VALUES);
     let config = config();
-    let fit = optimize(&problem, &config).unwrap();
+    let fit = optimize(&problem, &config, 0).unwrap();
     let (a, b) = least_squares(&VALUES);
     let center = a + 15.0 * b;
     let runner = ReplicateRunner::new(&problem, &config, &fit.best_parameters, 1, 9).unwrap();

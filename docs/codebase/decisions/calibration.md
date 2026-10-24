@@ -191,8 +191,11 @@ the improvement rule, it stops when the constraint holds.
 ## A result records its seed
 
 Every random number of a calibration and of its uncertainty methods comes from
-`Calibrator.seed`: `problem.seed`, or a seed the calibrator draws once and
-logs. A particle swarm takes it too, so the seed alone repeats a run. The
+`Calibrator.seed`: `problem.seed`, or the seed the engine draws when the
+calibrator is built (`commol_random::seed_or_drawn`), which the calibrator
+logs. A particle swarm takes the seed of its start, drawn from it
+([Optimizers](optimizers.md#a-swarm-takes-its-seed-from-its-caller)), so the
+seed alone repeats a run. The
 result records it, so a result read from a file repeats too:
 `CalibrationResult.seed`, and `settings["seed"]` of the `SampleMethod` of every
 sample a runner makes (`sample_method` in `api/inference/resampling.py`) or
@@ -201,7 +204,9 @@ sample a runner makes (`sample_method` in `api/inference/resampling.py`) or
 **Guards:** `tests/calibration/test_problem.py`
 (`test_a_result_records_the_seed_of_its_calibration`);
 `tests/calibration/test_optimizers.py`
-(`test_the_seed_of_a_result_repeats_a_particle_swarm`).
+(`test_the_seed_of_a_result_repeats_a_particle_swarm`);
+`tests/calibration/test_starts.py`
+(`test_a_verbose_swarm_repeats_its_fit_from_the_seed`).
 
 ## Parallel work runs in the pool of the setting
 

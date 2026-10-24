@@ -19,8 +19,8 @@ use crate::local::{CurvatureKind, block_meat, blocks_at, curvature_at};
 use crate::priors::Priors;
 use crate::resampling::{BayesianBootstrap, BlockScheme};
 use crate::statistics::{interval_levels, normalized_weights, quantiles};
-use crate::streams::Stream;
 use crate::target::discrepancy_in_support;
+use commol_random::Stream;
 
 /// Growth of the largest `η` of a calibration by coverage, while its
 /// intervals still cover too often.

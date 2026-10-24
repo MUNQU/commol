@@ -1,9 +1,10 @@
 //! Optimizers of a calibration problem: Nelder-Mead and particle swarm.
 //!
 //! Each optimizer minimizes the [`OptimizationObjective`] of a problem from a
-//! start point. Nothing here writes to standard output or standard error: a
-//! caller that wants progress passes an observer
-//! ([`optimize_with_observer`]).
+//! start point. A particle swarm draws every random number from a
+//! [`Generator`] of the seed its caller gives. Nothing here writes to
+//! standard output or standard error: a caller that wants progress passes an
+//! observer ([`crate::optimize_starts_with_observer`]).
 
 use argmin::core::observers::{Observe, ObserverMode};
 use argmin::core::{
@@ -18,12 +19,11 @@ use argmin::solver::particleswarm::{
     Particle, ParticleSwarm,
 };
 use commol_core::SimulationEngine;
-use commol_random::replicate_seed;
-use rand::SeedableRng;
-use rand::rngs::SmallRng;
+use commol_random::{Generator, replicate_seed};
 
 use crate::calibration_problem::CalibrationProblem;
 use crate::objective::{OptimizationObjective, Recorded};
+use crate::starts::start_seed;
 use crate::subproblem::{
     ConstraintSettings, Fixed, FixedParameter, PredictionCost, Subproblem, SubproblemResult,
 };
@@ -263,9 +263,6 @@ pub struct ParticleSwarmConfig {
     /// Which particles to apply mutation to
     pub mutation_application: MutationApplication,
 
-    /// Random seed for reproducibility (None = use system entropy)
-    pub seed: Option<u64>,
-
     /// Stop when the best cost stops improving (None = disabled)
     pub improvement_stop: Option<ImprovementStop>,
 
@@ -311,7 +308,6 @@ impl Default for ParticleSwarmConfig {
             mutation_strategy: MutationStrategy::None,
             mutation_probability: 0.0,
             mutation_application: MutationApplication::None,
-            seed: None,
             improvement_stop: None,
             radius_stop: None,
         }
@@ -332,7 +328,9 @@ pub enum OptimizationConfig {
     ParticleSwarm(ParticleSwarmConfig),
 }
 
-/// Minimize the objective of `problem` from its initial guess.
+/// Minimize the objective of `problem` from its initial guess: start 0 of
+/// the multi-start optimization seeded with `seed`
+/// ([`crate::optimize_starts`]).
 ///
 /// # Errors
 ///
@@ -341,15 +339,20 @@ pub enum OptimizationConfig {
 pub fn optimize<E: SimulationEngine + Sync>(
     problem: &CalibrationProblem<E>,
     config: &OptimizationConfig,
+    seed: u64,
 ) -> Result<CalibrationResult, String> {
-    optimize_from(problem, config, &problem.initial_parameters(), None)
+    optimize_from(
+        problem,
+        config,
+        &problem.initial_parameters(),
+        start_seed(seed, 0),
+    )
 }
 
 /// Minimize the objective of `problem` from `start`.
 ///
 /// Nelder-Mead builds its simplex around `start`. A particle swarm draws its
-/// population over the bounds; `seed`, when given, replaces the seed of its
-/// configuration.
+/// population over the bounds with the generator of `seed`.
 ///
 /// # Errors
 ///
@@ -358,7 +361,7 @@ pub fn optimize_from<E: SimulationEngine + Sync>(
     problem: &CalibrationProblem<E>,
     config: &OptimizationConfig,
     start: &[f64],
-    seed: Option<u64>,
+    seed: u64,
 ) -> Result<CalibrationResult, String> {
     let objective = OptimizationObjective::new(problem);
     run(
@@ -372,36 +375,9 @@ pub fn optimize_from<E: SimulationEngine + Sync>(
     .map(|(result, _)| result)
 }
 
-/// Minimize the objective of `problem` from its initial guess, with an
-/// observer that sees every iteration.
-///
-/// # Errors
-///
-/// As [`optimize`].
-pub fn optimize_with_observer<E, O>(
-    problem: &CalibrationProblem<E>,
-    config: &OptimizationConfig,
-    observer: O,
-) -> Result<CalibrationResult, String>
-where
-    E: SimulationEngine + Sync,
-    O: Observe<NelderMeadState> + Observe<ParticleSwarmState> + 'static,
-{
-    let objective = OptimizationObjective::new(problem);
-    let start = problem.initial_parameters();
-    run(
-        &SearchSpace::of(problem),
-        objective,
-        config,
-        &start,
-        None,
-        Some(observer),
-    )
-    .map(|(result, _)| result)
-}
-
-/// Minimize the objective of `problem` from its initial guess, and keep every
-/// evaluation of a feasible point.
+/// Minimize the objective of `problem` from its initial guess, as
+/// [`optimize`] does with `seed`, and keep every evaluation of a feasible
+/// point.
 ///
 /// # Errors
 ///
@@ -409,6 +385,7 @@ where
 pub fn optimize_with_history<E: SimulationEngine + Sync>(
     problem: &CalibrationProblem<E>,
     config: &OptimizationConfig,
+    seed: u64,
 ) -> Result<CalibrationResultWithHistory, String> {
     let recorded = Recorded::new(problem);
     let start = problem.initial_parameters();
@@ -417,7 +394,7 @@ pub fn optimize_with_history<E: SimulationEngine + Sync>(
         recorded,
         config,
         &start,
-        None,
+        start_seed(seed, 0),
         None::<NoObserver>,
     )?;
     let evaluations: Vec<CalibrationEvaluation> =
@@ -488,8 +465,8 @@ impl SearchSpace {
 /// particle swarm without a stop rule, which runs to its `max_iterations`
 /// in each outer iteration, stops at the outer limit of the settings.
 ///
-/// `seed`, when given, replaces the seed of a particle swarm; outer
-/// iteration `k` of a held prediction takes `replicate_seed(seed, k)`.
+/// A particle swarm takes `seed`; outer iteration `k` of a held prediction
+/// takes `replicate_seed(seed, k)`.
 ///
 /// # Errors
 ///
@@ -498,7 +475,7 @@ pub fn optimize_subproblem<E: SimulationEngine + Sync>(
     subproblem: &Subproblem<'_, E>,
     config: &OptimizationConfig,
     start: &[f64],
-    seed: Option<u64>,
+    seed: u64,
 ) -> Result<SubproblemResult, String> {
     let problem = subproblem.problem;
     SearchSpace::of(problem).check_start(start)?;
@@ -583,7 +560,7 @@ fn run_constrained<C>(
     cost: C,
     config: &OptimizationConfig,
     start: &[f64],
-    seed: Option<u64>,
+    seed: u64,
     settings: &ConstraintSettings,
 ) -> Result<ConstrainedRun<C>, String>
 where
@@ -620,15 +597,14 @@ where
             (best, result.state, cost)
         }
         OptimizationConfig::ParticleSwarm(ps_config) => {
-            let base = seed.or(ps_config.seed);
             let outer_iteration = std::cell::Cell::new(0u64);
             let factory = |_: &Vec<f64>| {
                 let k = outer_iteration.get();
                 outer_iteration.set(k + 1);
-                let swarm = seeded(ps_config, base.map(|base| replicate_seed(base, k)));
                 let solver =
-                    build_particle_swarm_solver(&space.bounds, &swarm).map_err(Error::msg)?;
-                Ok((solver, swarm_state(ParticleSwarmState::new(), &swarm)))
+                    build_particle_swarm_solver(&space.bounds, ps_config, replicate_seed(seed, k))
+                        .map_err(Error::msg)?;
+                Ok((solver, swarm_state(ParticleSwarmState::new(), ps_config)))
             };
             let mut result = Executor::new(cost, lagrangian(factory, settings)?)
                 .configure(|state| outer(state, space.clamp(start)))
@@ -681,14 +657,15 @@ fn lagrangian<B>(
 const NO_POINT: &str = "Optimization failed: the solver returned no point";
 const NO_COST: &str = "Optimization failed: the solver kept the cost function";
 
-/// Run the optimizer of `config` on `cost` over `space` from `start`, and
-/// return the result and the cost function.
+/// Run the optimizer of `config` on `cost` over `space` from `start`, a
+/// particle swarm with the generator of `seed`, and return the result and
+/// the cost function.
 pub(crate) fn run<C, O>(
     space: &SearchSpace,
     cost: C,
     config: &OptimizationConfig,
     start: &[f64],
-    seed: Option<u64>,
+    seed: u64,
     observer: Option<O>,
 ) -> Result<(CalibrationResult, Option<C>), String>
 where
@@ -701,18 +678,9 @@ where
             optimize_nelder_mead(space, cost, start, nm_config, observer)
         }
         OptimizationConfig::ParticleSwarm(ps_config) => {
-            optimize_particle_swarm(space, cost, &seeded(ps_config, seed), observer)
+            optimize_particle_swarm(space, cost, ps_config, seed, observer)
         }
     }
-}
-
-/// The swarm of `config`, with `seed` in place of its own when given.
-pub(crate) fn seeded(config: &ParticleSwarmConfig, seed: Option<u64>) -> ParticleSwarmConfig {
-    let mut config = config.clone();
-    if seed.is_some() {
-        config.seed = seed;
-    }
-    config
 }
 
 /// State of a Nelder-Mead run.
@@ -831,18 +799,20 @@ where
     Ok((calibration, cost))
 }
 
-/// Particle swarm on `cost`, its population drawn over the bounds.
+/// Particle swarm on `cost`, its population drawn over the bounds with the
+/// generator of `seed`.
 fn optimize_particle_swarm<C, O>(
     space: &SearchSpace,
     cost: C,
     config: &ParticleSwarmConfig,
+    seed: u64,
     observer: Option<O>,
 ) -> Result<(CalibrationResult, Option<C>), String>
 where
     C: CostFunction<Param = Vec<f64>, Output = f64> + Sync,
     O: Observe<ParticleSwarmState> + 'static,
 {
-    let solver = build_particle_swarm_solver(&space.bounds, config)?;
+    let solver = build_particle_swarm_solver(&space.bounds, config, seed)?;
     let mut executor = Executor::new(cost, solver)
         .configure(|state| swarm_state(state, config))
         .timer(true);
@@ -882,23 +852,17 @@ pub(crate) fn swarm_state(
     state
 }
 
-/// The swarm of `config` over `bounds`, its random numbers from its seed or,
-/// without one, from the system.
+/// The swarm of `config` over `bounds`, its random numbers from the
+/// generator of `seed`.
 pub(crate) fn build_particle_swarm_solver(
     bounds: &[(f64, f64)],
     config: &ParticleSwarmConfig,
-) -> Result<ParticleSwarm<Vec<f64>, f64, SmallRng>, String> {
+    seed: u64,
+) -> Result<ParticleSwarm<Vec<f64>, f64, Generator>, String> {
     let lower_bound: Vec<f64> = bounds.iter().map(|(min, _)| *min).collect();
     let upper_bound: Vec<f64> = bounds.iter().map(|(_, max)| *max).collect();
-
-    // Always use SmallRng for consistency, either seeded or from system entropy
-    let mut solver = if let Some(seed) = config.seed {
-        ParticleSwarm::new((lower_bound, upper_bound), config.particles)
-            .with_rng_generator(SmallRng::seed_from_u64(seed))
-    } else {
-        ParticleSwarm::new((lower_bound, upper_bound), config.particles)
-            .with_rng_generator(SmallRng::from_rng(&mut rand::rng()))
-    };
+    let mut solver = ParticleSwarm::new((lower_bound, upper_bound), config.particles)
+        .with_rng_generator(Generator::from_seed(seed));
 
     // Apply inertia strategy if provided
     solver = match &config.inertia_strategy {
@@ -1071,7 +1035,7 @@ mod tests {
         .unwrap()
     }
 
-    /// A swarm of 12 particles, 15 iterations, with mutation, seeded.
+    /// A swarm of 12 particles, 15 iterations, with mutation.
     fn swarm() -> OptimizationConfig {
         OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
             particles: 12,
@@ -1079,7 +1043,6 @@ mod tests {
             mutation_strategy: MutationStrategy::Gaussian(0.1),
             mutation_probability: 0.5,
             mutation_application: MutationApplication::BelowAverage,
-            seed: Some(3),
             ..ParticleSwarmConfig::default()
         })
     }
@@ -1091,7 +1054,7 @@ mod tests {
         let run = |threads: i64, levels: Levels| {
             Parallelism::new(threads, levels)
                 .unwrap()
-                .install(|| optimize_with_history(&problem, &config).unwrap())
+                .install(|| optimize_with_history(&problem, &config, 4).unwrap())
                 .unwrap()
         };
         let sequential = run(4, Levels::Outer);
@@ -1108,7 +1071,7 @@ mod tests {
             assert_eq!(bits(&parallel.result), bits(&sequential.result));
             assert_eq!(bits(&parallel.evaluations), bits(&sequential.evaluations));
         }
-        let plain = optimize(&problem, &config).unwrap();
+        let plain = optimize(&problem, &config, 4).unwrap();
         assert_eq!(bits(&plain), bits(&sequential.result));
     }
 
@@ -1118,7 +1081,6 @@ mod tests {
         let config = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
             particles: 8,
             max_iterations: 6,
-            seed: Some(5),
             ..ParticleSwarmConfig::default()
         });
         let held = crate::ObservedDataPoint::new(8.0, "C".to_string(), 0.0);
@@ -1136,7 +1098,7 @@ mod tests {
                         .unwrap();
                     [parameter, prediction].map(|subproblem| {
                         let fit =
-                            optimize_subproblem(&subproblem, &config, &[0.5, 0.5], None).unwrap();
+                            optimize_subproblem(&subproblem, &config, &[0.5, 0.5], 5).unwrap();
                         format!("{fit:?}")
                     })
                 })
@@ -1195,7 +1157,6 @@ mod tests {
         let config = ParticleSwarmConfig {
             particles: 16,
             max_iterations: 5,
-            seed: Some(1),
             ..ParticleSwarmConfig::default()
         };
         let threads = |levels| {
@@ -1206,6 +1167,7 @@ mod tests {
                         &space,
                         Threads::default(),
                         &config,
+                        1,
                         None::<NoObserver>,
                     )
                     .unwrap();
@@ -1296,7 +1258,6 @@ mod tests {
         let config = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
             particles: 32,
             max_iterations: 10,
-            seed: Some(5),
             ..ParticleSwarmConfig::default()
         });
         for levels in [Levels::All, Levels::Outer] {
@@ -1309,7 +1270,7 @@ mod tests {
                         PredictionCost::new(held),
                         &config,
                         &[0.5, 0.5],
-                        None,
+                        5,
                         &held.settings,
                     )
                     .unwrap();
@@ -1333,12 +1294,11 @@ mod tests {
         };
         let config = ParticleSwarmConfig {
             max_iterations: 200,
-            // A seed whose first particle falls where the cost is NaN.
-            seed: Some(0),
             ..ParticleSwarmConfig::default()
         };
+        // A seed whose first particle falls where the cost is NaN.
         let (fit, _) =
-            optimize_particle_swarm(&space, HalfNan, &config, None::<NoObserver>).unwrap();
+            optimize_particle_swarm(&space, HalfNan, &config, 0, None::<NoObserver>).unwrap();
         assert!((fit.best_parameters[0] - 0.7).abs() < 1e-3);
         assert!(fit.final_loss < 1e-6);
     }
@@ -1356,21 +1316,6 @@ mod tests {
     }
 
     #[test]
-    fn a_swarm_without_a_seed_draws_one_from_the_system() {
-        let space = SearchSpace {
-            bounds: vec![(0.0, 1.0)],
-            names: vec!["x".to_string()],
-        };
-        let config = ParticleSwarmConfig {
-            max_iterations: 200,
-            seed: None,
-            ..ParticleSwarmConfig::default()
-        };
-        let (fit, _) = optimize_particle_swarm(&space, Bowl, &config, None::<NoObserver>).unwrap();
-        assert!((fit.best_parameters[0] - 0.7).abs() < 1e-3);
-    }
-
-    #[test]
     fn a_swarm_gathered_around_its_best_stops_by_the_radius_rule() {
         let space = SearchSpace {
             bounds: vec![(0.0, 1.0)],
@@ -1378,11 +1323,11 @@ mod tests {
         };
         let config = ParticleSwarmConfig {
             max_iterations: 1000,
-            seed: Some(2),
             radius_stop: Some(1e-6),
             ..ParticleSwarmConfig::default()
         };
-        let (fit, _) = optimize_particle_swarm(&space, Bowl, &config, None::<NoObserver>).unwrap();
+        let (fit, _) =
+            optimize_particle_swarm(&space, Bowl, &config, 2, None::<NoObserver>).unwrap();
         assert!(fit.converged, "{fit:?}");
         assert!(fit.iterations < 1000, "{}", fit.iterations);
         assert!((fit.best_parameters[0] - 0.7).abs() < 1e-5, "{fit:?}");
@@ -1399,6 +1344,7 @@ mod tests {
                     radius_stop,
                     ..ParticleSwarmConfig::default()
                 },
+                0,
             )
             .err()
             .unwrap()

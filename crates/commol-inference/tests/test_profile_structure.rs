@@ -175,7 +175,7 @@ fn traced(
     let fit = match fit {
         Some(fit) => fit,
         None => {
-            fitted = optimize(problem, config).unwrap().best_parameters;
+            fitted = optimize(problem, config, 0).unwrap().best_parameters;
             &fitted
         }
     };
@@ -192,7 +192,7 @@ fn traced(
 fn the_noise_floor_propagates_the_accuracy_of_a_run() {
     let problem = product_problem(1.0);
     let config = config();
-    let fit = optimize(&problem, &config).unwrap().best_parameters;
+    let fit = optimize(&problem, &config, 0).unwrap().best_parameters;
     let tracer = ProfileTracer::new(&problem, &config, &fit, 0).unwrap();
 
     // The sum of squares has the term derivative −2 r at a mean m: the
@@ -253,7 +253,7 @@ fn a_parameter_with_no_effect_is_non_identifiable_at_the_default_tolerance() {
         sse(),
     );
     let config = default_config();
-    let mut fit = optimize(&problem, &config).unwrap().best_parameters;
+    let mut fit = optimize(&problem, &config, 0).unwrap().best_parameters;
     fit[2] = 0.4;
     let (_, verdict, structure, _) = traced(&problem, &config, Some(&fit), 2, 2.0);
 
@@ -279,7 +279,7 @@ fn the_ends_of_the_box_rule_out_non_identifiable() {
         sse(),
     );
     let config = config();
-    let mut fit = optimize(&problem, &config).unwrap().best_parameters;
+    let mut fit = optimize(&problem, &config, 0).unwrap().best_parameters;
     fit[2] = 0.4;
     let tracer = ProfileTracer::new(&problem, &config, &fit, 0).unwrap();
     let profile = tracer
@@ -309,7 +309,7 @@ fn a_reset_whose_engine_fails_is_infeasible() {
         sse(),
     );
     let config = config();
-    let mut fit = optimize(&problem, &config).unwrap().best_parameters;
+    let mut fit = optimize(&problem, &config, 0).unwrap().best_parameters;
     fit[2] = 0.4;
     let tracer = ProfileTracer::new(&problem, &config, &fit, 0).unwrap();
     let profile = tracer
@@ -378,7 +378,7 @@ fn a_parameter_with_no_effect_is_non_identifiable_even_when_another_drifts() {
         sse(),
     );
     let config = config();
-    let mut fit = optimize(&problem, &config).unwrap().best_parameters;
+    let mut fit = optimize(&problem, &config, 0).unwrap().best_parameters;
     fit[2] = 0.4;
     fit[3] = 0.6;
     let (profile, verdict, structure, _) = traced(&problem, &config, Some(&fit), 2, 2.0);
@@ -412,7 +412,7 @@ fn a_parameter_that_leaves_and_returns_is_named_where_it_moves_most() {
         sse(),
     );
     let config = config();
-    let mut fit = optimize(&problem, &config).unwrap().best_parameters;
+    let mut fit = optimize(&problem, &config, 0).unwrap().best_parameters;
     // b = 0.5 + sin c at the fit, with c = 0.05.
     fit[1] += 0.05_f64.sin() - fit[2].sin();
     fit[2] = 0.05;
@@ -486,7 +486,7 @@ fn a_feasible_fit_above_the_base_of_the_penalty_is_read() {
         sse(),
     );
     let config = config();
-    let fit = optimize(&problem, &config).unwrap().best_parameters;
+    let fit = optimize(&problem, &config, 0).unwrap().best_parameters;
     let tracer = ProfileTracer::new(&problem, &config, &fit, 0).unwrap();
     assert!(tracer.fit_loss() > 1e10, "{}", tracer.fit_loss());
     let (_, verdict, structure, _) = traced(&problem, &config, Some(&fit), 0, 1e12);
@@ -528,7 +528,9 @@ fn a_crossing_on_a_bound_is_identifiable() {
         vec![],
         sse(),
     );
-    let fit = optimize(&fit_problem, &config()).unwrap().best_parameters;
+    let fit = optimize(&fit_problem, &config(), 0)
+        .unwrap()
+        .best_parameters;
     let half_width = (1.0_f64 / 82.5).sqrt();
     let lower = fit[1] - 1.01 * half_width;
     let parameters = [("a", -10.0, 10.0), ("b", lower, 5.0)];
@@ -589,7 +591,7 @@ fn a_threshold_at_or_below_the_tolerance_reads_no_structure() {
         ..NelderMeadConfig::default()
     });
     let problem = product_problem(1.0);
-    let fit = optimize(&problem, &config()).unwrap().best_parameters;
+    let fit = optimize(&problem, &config(), 0).unwrap().best_parameters;
     let (_, verdict, structure, tolerance) = traced(&problem, &loose, Some(&fit), 0, 2.0);
 
     assert_eq!(tolerance, 2.0);
@@ -615,7 +617,7 @@ fn a_likelihood_far_from_zero_keeps_an_absolute_tolerance() {
         )]),
     );
     let config = config();
-    let fit = optimize(&problem, &config).unwrap().best_parameters;
+    let fit = optimize(&problem, &config, 0).unwrap().best_parameters;
     let tracer = ProfileTracer::new(&problem, &config, &fit, 0).unwrap();
     assert!(tracer.fit_loss() < -100.0, "{}", tracer.fit_loss());
     // The tolerance does not grow with |−log L|: it is the error of a run,
@@ -639,7 +641,7 @@ fn a_loss_with_no_term_derivatives_has_no_noise_floor() {
         LossConfig::MeanAbsoluteError.into(),
     );
     let config = config();
-    let fit = optimize(&problem, &config).unwrap().best_parameters;
+    let fit = optimize(&problem, &config, 0).unwrap().best_parameters;
     let tracer = ProfileTracer::new(&problem, &config, &fit, 0).unwrap();
 
     assert_eq!(tracer.noise_floor(), 0.0);
@@ -729,7 +731,7 @@ fn the_floor_of_the_root_mean_squared_error_scales_the_squares() {
         LossConfig::RootMeanSquaredError.into(),
     );
     let config = config();
-    let fit = optimize(&problem, &config).unwrap().best_parameters;
+    let fit = optimize(&problem, &config, 0).unwrap().best_parameters;
     let tracer = ProfileTracer::new(&problem, &config, &fit, 0).unwrap();
 
     let (mut squares, mut first, mut second) = (0.0, 0.0, 0.0);

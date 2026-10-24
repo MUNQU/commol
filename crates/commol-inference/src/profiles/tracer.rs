@@ -23,7 +23,7 @@ use rayon::prelude::*;
 
 use crate::error::MethodError;
 use crate::profiles::verdict::ProfileVerdict;
-use crate::streams::Stream;
+use commol_random::Stream;
 
 /// The share of the threshold a step aims to rise by.
 const RISE_FRACTION: f64 = 0.1;
@@ -307,8 +307,7 @@ where
         for neighbour in sides.iter().filter_map(|side| side.first()) {
             let mut start = neighbour.parameters.clone();
             start[index] = center;
-            let refit =
-                optimize_subproblem(&subproblem, self.config, &start, Some(self.seed)).ok()?;
+            let refit = optimize_subproblem(&subproblem, self.config, &start, self.seed).ok()?;
             let error = (refit.fit.final_loss - self.fit_loss).abs();
             largest = Some(largest.map_or(error, |kept: f64| kept.max(error)));
         }
@@ -521,7 +520,7 @@ where
                 ProfiledQuantity::Parameter(index) => {
                     let subproblem = Subproblem::fix_parameter(self.problem, *index, value)
                         .map_err(MethodError::Invalid)?;
-                    optimize_subproblem(&subproblem, self.config, &start.parameters, Some(seed))
+                    optimize_subproblem(&subproblem, self.config, &start.parameters, seed)
                         .map_err(MethodError::Failed)?
                 }
                 ProfiledQuantity::Prediction(spec) => {
@@ -534,7 +533,7 @@ where
                     let subproblem = Subproblem::fix_prediction(self.problem, spec, value)
                         .and_then(|subproblem| subproblem.with_settings(settings))
                         .map_err(MethodError::Invalid)?;
-                    optimize_subproblem(&subproblem, self.config, &start.parameters, Some(seed))
+                    optimize_subproblem(&subproblem, self.config, &start.parameters, seed)
                         .map_err(MethodError::Failed)?
                 }
             };

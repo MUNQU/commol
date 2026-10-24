@@ -9,6 +9,7 @@ from commol import (
     CalibrationProblem,
     Calibrator,
     NelderMeadConfig,
+    ParticleSwarmConfig,
     Simulation,
 )
 from commol.context.model import Model
@@ -23,15 +24,15 @@ def _calibrator(
     *,
     order: tuple[str, str] = ("k1", "k2"),
     verbose: bool = False,
+    config: NelderMeadConfig | ParticleSwarmConfig | None = None,
 ) -> Calibrator:
     bounds = {"k1": (0.0, 0.5), "k2": (0.0, 0.3)}
     problem = CalibrationProblem(
         observed_data=observed(truth_run, "B", STEPS) + observed(truth_run, "C", STEPS),
         parameters=[bounded(name, *bounds[name]) for name in order],
         loss_function="sse",
-        optimization_config=NelderMeadConfig(
-            max_iterations=2000, sd_tolerance=1e-12, verbose=verbose
-        ),
+        optimization_config=config
+        or NelderMeadConfig(max_iterations=2000, sd_tolerance=1e-12, verbose=verbose),
         seed=seed,
     )
     model: Model = build(abc_builder(parameters={"k1": None, "k2": None}))
@@ -108,6 +109,22 @@ class TestStarts:
         with pytest.raises(ValueError, match="verbose optimizer shows one start"):
             _calibrator(truth_run, verbose=True).run(starts=2)
 
+    def test_a_verbose_swarm_repeats_its_fit_from_the_seed(
+        self, truth_run: dict[str, list[float]], capfd: pytest.CaptureFixture[str]
+    ) -> None:
+        swarm = ParticleSwarmConfig(particles=6, max_iterations=4, verbose=True)
+        first = _calibrator(truth_run, seed=5, config=swarm).run()
+        again = _calibrator(truth_run, seed=5, config=swarm).run()
+        quiet = _calibrator(
+            truth_run, seed=5, config=swarm.model_copy(update={"verbose": False})
+        ).run()
+
+        assert "Particle Swarm Optimization (Verbose Mode)" in capfd.readouterr().out
+        assert first.best_parameters == again.best_parameters
+        assert first.final_loss == again.final_loss
+        # A verbose calibration is the calibration that shows nothing.
+        assert first.best_parameters == quiet.best_parameters
+
     def test_a_calibration_needs_a_start(
         self, truth_run: dict[str, list[float]]
     ) -> None:
@@ -133,14 +150,19 @@ def _outcome(start: list[float], loss: float | None) -> SimpleNamespace:
 
 
 class TestFailedStarts:
-    """The calibrator reports the starts the extension says failed."""
+    """The calibrator reports the starts the extension says failed, and the
+    start it chooses."""
 
     def _with_outcomes(
-        self, truth_run: dict[str, list[float]], outcomes: list[SimpleNamespace]
+        self,
+        truth_run: dict[str, list[float]],
+        outcomes: list[SimpleNamespace],
+        best: int = 0,
     ) -> Calibrator:
         calibrator = _calibrator(truth_run)
         calibrator._rust_problem = SimpleNamespace(  # type: ignore[assignment]
-            optimize=lambda *_: outcomes, seed=calibrator.seed
+            optimize=lambda *_: SimpleNamespace(outcomes=outcomes, best=best),
+            seed=calibrator.seed,
         )
         return calibrator
 
@@ -160,11 +182,11 @@ class TestFailedStarts:
         ]
         assert result.best_parameters == {"k1": 0.2, "k2": 0.1}
 
-    def test_the_best_start_is_the_one_of_least_loss(
+    def test_the_result_is_the_start_the_engine_chooses(
         self, truth_run: dict[str, list[float]]
     ) -> None:
         calibrator = self._with_outcomes(
-            truth_run, [_outcome([0.2, 0.1], 4.0), _outcome([0.4, 0.2], 1.0)]
+            truth_run, [_outcome([0.2, 0.1], 1.0), _outcome([0.4, 0.2], 1.0)], best=1
         )
 
         assert calibrator.run(starts=2).best_parameters == {"k1": 0.4, "k2": 0.2}
@@ -172,7 +194,12 @@ class TestFailedStarts:
     def test_every_start_failing_raises_with_each_reason(
         self, truth_run: dict[str, list[float]]
     ) -> None:
-        calibrator = self._with_outcomes(truth_run, [_outcome([0.2, 0.1], None)])
+        # An expansion below 1, which Nelder-Mead rejects at every start.
+        calibrator = _calibrator(truth_run, config=NelderMeadConfig(gamma=0.5))
 
-        with pytest.raises(RuntimeError, match="Every start failed: Start 0 failed"):
-            calibrator.run()
+        with pytest.raises(RuntimeError) as raised:
+            calibrator.run(starts=2)
+
+        message = str(raised.value)
+        assert message.startswith("Every start failed: Start 0 failed: ")
+        assert "; Start 1 failed: " in message

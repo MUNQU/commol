@@ -13,9 +13,9 @@ use rayon::prelude::*;
 use crate::psis::smooth;
 use crate::smc::TemperedTarget;
 use crate::statistics::effective_size;
-use crate::streams::Stream;
 use crate::target::Target;
 use crate::transform::Transform;
+use commol_random::Stream;
 
 /// The port of a proposal: a distribution on the unbounded scale that draws
 /// and gives its log density.

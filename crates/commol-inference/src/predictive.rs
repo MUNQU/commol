@@ -26,7 +26,7 @@ use rayon::prelude::*;
 
 use crate::sample::ParameterSample;
 use crate::statistics;
-use crate::streams::Stream;
+use commol_random::Stream;
 
 /// Below this share of extra variance, `φμ`, a negative binomial draw is a
 /// Poisson draw.

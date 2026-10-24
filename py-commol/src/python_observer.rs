@@ -6,7 +6,7 @@
 
 use argmin::core::observers::Observe;
 use argmin::core::{KV, State};
-use commol_calibration::{CalibrationProblem, OptimizationConfig};
+use commol_calibration::{CalibrationProblem, OptimizationConfig, Starts};
 use commol_core::SimulationEngine;
 use pyo3::prelude::*;
 
@@ -100,15 +100,19 @@ where
     }
 }
 
-/// Run optimization with Python observer for verbose output
+/// Run the starts of `points` seeded with `seed`, with an observer of each
+/// that writes to Python's stdout instead of Rust's
 ///
-/// This function runs `commol_calibration::optimize_with_observer` with an
-/// observer that writes to Python's stdout instead of Rust's.
-pub fn optimize_with_python_observer<E: SimulationEngine + Sync>(
+/// It runs `commol_calibration::optimize_starts_with_observer`, so a verbose
+/// calibration takes the starts and the seeds of one that is not; the
+/// caller passes one start.
+pub fn optimize_with_python_observer<E: SimulationEngine + Send + Sync>(
     problem: &CalibrationProblem<E>,
     config: &OptimizationConfig,
+    points: Vec<Vec<f64>>,
+    seed: u64,
     header_interval: u64,
-) -> Result<commol_calibration::CalibrationResult, String> {
+) -> Result<Starts, String> {
     let initial_params = problem.initial_parameters();
     let parameter_names = problem.parameter_names();
 
@@ -145,11 +149,11 @@ pub fn optimize_with_python_observer<E: SimulationEngine + Sync>(
     };
     write_optimization_header(&header);
 
-    let result = commol_calibration::optimize_with_observer(
-        problem,
-        config,
-        PythonObserver::with_header_interval(header_interval),
-    )?;
+    let starts =
+        commol_calibration::optimize_starts_with_observer(problem, config, points, seed, || {
+            PythonObserver::with_header_interval(header_interval)
+        })?;
+    let result = starts.best();
 
     // Print final calibrated parameters
     let separator = "=".repeat(HEADER_SEPARATOR_WIDTH);
@@ -165,5 +169,5 @@ pub fn optimize_with_python_observer<E: SimulationEngine + Sync>(
     }
     write_to_python_stdout(&separator);
 
-    Ok(result)
+    Ok(starts)
 }

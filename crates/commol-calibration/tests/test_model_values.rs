@@ -8,9 +8,9 @@ use argmin::core::CostFunction;
 use commol_calibration::{
     CalibrationConstraint, CalibrationParameter, CalibrationParameterType, CalibrationProblem,
     EvaluationError, ImprovementStop, LossConfig, MutationApplication, MutationStrategy,
-    NelderMeadConfig, NoObserver, ObservedDataPoint, OptimizationConfig, OptimizationObjective,
-    ParticleSwarmConfig, Violation, Workspace, check_model_values, configured_engine,
-    optimize_from, optimize_with_history, optimize_with_observer,
+    NelderMeadConfig, ObservedDataPoint, OptimizationConfig, OptimizationObjective,
+    ParticleSwarmConfig, Violation, Workspace, check_model_values, configured_engine, optimize,
+    optimize_from, optimize_with_history,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 
@@ -300,7 +300,7 @@ fn every_entry_takes_one_value_per_parameter() {
             .err()
             .unwrap()
             .to_string(),
-        optimize_from(&problem, &config, &[0.3, 0.8], None).unwrap_err(),
+        optimize_from(&problem, &config, &[0.3, 0.8], 0).unwrap_err(),
     ];
 
     assert_eq!(errors[0], expected);
@@ -318,7 +318,7 @@ fn a_history_reports_an_optimizer_it_cannot_build() {
         ..NelderMeadConfig::default()
     });
 
-    let error = optimize_with_history(&problem, &config).err().unwrap();
+    let error = optimize_with_history(&problem, &config, 0).err().unwrap();
 
     assert_eq!(error, "initial_simplex_size must be in (0, 1], got 0");
 }
@@ -456,11 +456,10 @@ fn a_swarm_with_mutation_a_target_and_an_observer_runs() {
             mutation_strategy: strategy,
             mutation_probability: 0.5,
             mutation_application: application,
-            seed: Some(3),
             ..ParticleSwarmConfig::default()
         });
 
-        let result = optimize_with_observer(&problem, &config, NoObserver).unwrap();
+        let result = optimize(&problem, &config, 3).unwrap();
 
         assert!(result.final_loss < 1e-3, "{}", result.final_loss);
     }
@@ -473,13 +472,12 @@ fn a_particle_swarm_with_a_stop_rule_converges() {
         OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
             particles: 10,
             max_iterations: 1000,
-            seed: Some(3),
             improvement_stop,
             radius_stop,
             ..ParticleSwarmConfig::default()
         })
     };
-    let without = optimize_with_observer(&problem, &swarm(None, None), NoObserver).unwrap();
+    let without = optimize(&problem, &swarm(None, None), 1).unwrap();
     assert!(!without.converged);
     assert_eq!(without.iterations, 1000);
 
@@ -490,7 +488,7 @@ fn a_particle_swarm_with_a_stop_rule_converges() {
     });
     let config = swarm(improvement, None);
 
-    let result = optimize_with_observer(&problem, &config, NoObserver).unwrap();
+    let result = optimize(&problem, &config, 1).unwrap();
 
     assert!(result.converged, "{result:?}");
     assert_eq!(result.termination_reason, "Terminated(SolverConverged)");
@@ -498,6 +496,6 @@ fn a_particle_swarm_with_a_stop_rule_converges() {
     assert!(result.final_loss < 1e-6, "{}", result.final_loss);
     // The values of this problem lie on a curve of zero loss, so the swarm
     // never gathers around one point: the radius rule does not stop it.
-    let spread = optimize_with_observer(&problem, &swarm(None, Some(1e-4)), NoObserver).unwrap();
+    let spread = optimize(&problem, &swarm(None, Some(1e-4)), 1).unwrap();
     assert!(!spread.converged);
 }

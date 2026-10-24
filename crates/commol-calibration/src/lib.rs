@@ -20,9 +20,11 @@
 //! The summary of the replicates of a stochastic engine and every method of
 //! `commol-inference` take the one quantile of [`statistics`].
 //!
-//! [`optimize`] minimizes the objective with Nelder-Mead or a particle
-//! swarm; [`optimize_starts`] runs several starts in parallel
-//! ([`start_points`]).
+//! [`optimize_starts`] minimizes the objective with Nelder-Mead or a
+//! particle swarm from several start points ([`start_points`]) in parallel,
+//! and chooses the best ([`Starts`]): a calibration and every fit of a
+//! replicate run it. [`optimize`] is its start 0, from the initial guess. A
+//! particle swarm takes the seed its caller gives.
 //!
 //! ## Example
 //!
@@ -54,7 +56,7 @@
 //! )
 //! .unwrap();
 //! let config = OptimizationConfig::NelderMead(NelderMeadConfig::default());
-//! let result = optimize(&problem, &config).unwrap();
+//! let result = optimize(&problem, &config, 7).unwrap();
 //! assert!((result.best_parameters[0] - 0.1).abs() < 1e-4);
 //! ```
 
@@ -90,10 +92,12 @@ pub use optimization::{
     AccelerationStrategy, ImprovementStop, InertiaWeightStrategy, InitializationStrategy,
     MutationApplication, MutationStrategy, NelderMeadConfig, NelderMeadState, NoObserver,
     OptimizationConfig, ParticleSwarmConfig, ParticleSwarmState, converged, optimize,
-    optimize_from, optimize_subproblem, optimize_with_history, optimize_with_observer,
+    optimize_from, optimize_subproblem, optimize_with_history,
 };
 pub use series::SeriesIndex;
-pub use starts::{StartOutcome, optimize_starts, start_points};
+pub use starts::{
+    StartOutcome, Starts, optimize_starts, optimize_starts_with_observer, start_points,
+};
 pub use subproblem::{ConstraintSettings, Subproblem, SubproblemResult, predict};
 pub use types::{
     CalibrationConstraint, CalibrationEvaluation, CalibrationParameter, CalibrationParameterType,

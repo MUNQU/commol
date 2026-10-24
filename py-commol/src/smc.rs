@@ -9,9 +9,9 @@
 use crate::parallelism::parallel;
 use commol_inference::resampling::{BlockDrawing, BlockScheme, FitUnit};
 use commol_inference::smc::{self, AbcTarget, Distance, RandomWalk, SmcRun, SmcSampler, Stop};
-use commol_inference::streams::Stream;
 use commol_inference::{Distribution, Family, Priors};
 use commol_random::Generator;
+use commol_random::Stream;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 

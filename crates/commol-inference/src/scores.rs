@@ -19,7 +19,7 @@ use crate::predictive::{
 };
 use crate::sample::ParameterSample;
 use crate::statistics;
-use crate::streams::Stream;
+use commol_random::Stream;
 
 fn column(draws: &ObservationDraws, observation: usize) -> Vec<f64> {
     draws.values.iter().map(|row| row[observation]).collect()

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use commol_calibration::{
     CalibrationParameter, CalibrationProblem, LossConfig, NelderMeadConfig, ObservedDataPoint,
-    OptimizationConfig, Workspace,
+    OptimizationConfig, Workspace, optimize_starts, start_points,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 use commol_inference::conformal::{
@@ -20,6 +20,7 @@ use commol_inference::resampling::{
 };
 use commol_inference::{NoNoise, ObservationNoise, ParameterSample, observation_draws};
 use commol_random::Generator;
+use commol_random::Stream;
 use commol_random::sample::normal;
 
 type Formula = fn(&HashMap<String, f64>, f64) -> f64;
@@ -626,6 +627,29 @@ fn a_replicate_keeps_its_best_start() {
         .unwrap();
     assert!(eight.final_loss < one.final_loss - 1.0, "{one:?} {eight:?}");
     assert!((eight.best_parameters[0] - 2.0).abs() < 1e-4, "{eight:?}");
+}
+
+#[test]
+fn a_replicate_fit_is_the_calibration_of_its_data() {
+    let values: Vec<f64> = (0..12).map(|t| (2.0 * t as f64).sin()).collect();
+    let problem = problem(sine, &[("k", 0.0, 3.0)], &values);
+    let config = config();
+    let weights = Perturbation::Weights((0..values.len()).map(|i| 0.5 + (i % 3) as f64).collect());
+    let runner = ReplicateRunner::new(&problem, &config, &[0.4], 4, 5).unwrap();
+    let replicate = runner.fit_one(2, &weights).unwrap();
+
+    // The calibration of the data of replicate 2, from the fit and the
+    // hypercube, with the seed of the fit of replicate 2.
+    let seed = Stream::ReplicateFits.replicate(5, 2);
+    let data = runner.replicate_problem(&weights).unwrap();
+    let mut points = start_points(data.parameters(), 4, seed);
+    points[0] = runner.fit().to_vec();
+    let calibration = optimize_starts(&data, &config, points, seed).unwrap();
+
+    assert_eq!(
+        format!("{replicate:?}"),
+        format!("{:?}", calibration.best())
+    );
 }
 
 #[test]

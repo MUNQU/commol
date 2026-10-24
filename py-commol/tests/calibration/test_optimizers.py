@@ -14,7 +14,7 @@ from commol.context.calibration import CalibrationResult
 from commol.context.model import Model
 from tests.support import a_to_b_builder, bounded, build, observed
 
-SEED = 42
+SEED = 7
 TRUTH = {"k1": 0.1, "k2": 0.05}
 """The parameters of the ``truth`` fixture."""
 TRUE_K = 0.37
@@ -193,15 +193,18 @@ class TestHistory:
 
 
 class TestParticleSwarmSettings:
-    """Each setting reaches the optimizer: it changes the search of one seed."""
+    """Each setting reaches the optimizer: it changes the points one seed
+    evaluates."""
 
     @staticmethod
     def _base() -> ParticleSwarmConfig:
         return ParticleSwarmConfig(particles=5, max_iterations=5)
 
     @staticmethod
-    def _search(config: ParticleSwarmConfig) -> float:
-        return _calibrate(_k_problem(config, seed=SEED)).best_parameters["k"]
+    def _search(config: ParticleSwarmConfig) -> list[float]:
+        calibrator = Calibrator(Simulation(_ab(None)), _k_problem(config, seed=SEED))
+        history = calibrator.run_with_history()
+        return [evaluation.parameters["k"] for evaluation in history.evaluations]
 
     @pytest.mark.parametrize(
         "configure",
@@ -249,9 +252,9 @@ class TestParticleSwarmSettings:
         assert self._search(configure(self._base())) != self._search(self._base())
 
     def test_a_verbose_swarm_reports_its_iterations(self, capfd) -> None:
-        self._search(self._base())
+        _calibrate(_k_problem(self._base(), seed=SEED))
         quiet = capfd.readouterr().out
-        self._search(self._base().model_copy(update={"verbose": True}))
+        _calibrate(_k_problem(self._base().model_copy(update={"verbose": True})))
 
         assert quiet == ""
         assert capfd.readouterr().out != ""

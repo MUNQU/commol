@@ -264,7 +264,6 @@ class ParticleSwarmConfigProtocol(Protocol):
         mutation: PSOMutationProtocol | None = None,
         velocity: PSOVelocityProtocol | None = None,
         initialization: str = "uniform",
-        seed: int | None = None,
         improvement_stop: tuple[int, float, float] | None = None,
         radius_stop: float | None = None,
     ) -> None: ...
@@ -311,6 +310,12 @@ class StartOutcomeProtocol(Protocol):
     @property
     def error(self) -> str | None: ...
 
+class StartsProtocol(Protocol):
+    @property
+    def outcomes(self) -> list[StartOutcomeProtocol]: ...
+    @property
+    def best(self) -> int: ...
+
 class CalibrationModule(Protocol):
     PSO_DEFAULT_INERTIA_FACTOR: float
     PSO_DEFAULT_ACCELERATION: float
@@ -333,6 +338,7 @@ class CalibrationModule(Protocol):
     CalibrationEvaluation: type[CalibrationEvaluationProtocol]
     CalibrationResultWithHistory: type[CalibrationResultWithHistoryProtocol]
     StartOutcome: type[StartOutcomeProtocol]
+    Starts: type[StartsProtocol]
     def index_at(self, positions: list[float], at: list[float]) -> list[int]: ...
     def window_start(self, at: float, window: float) -> float: ...
     def window_increments(
@@ -378,9 +384,9 @@ class CalibrationProblemProtocol(Protocol):
     def seed(self) -> int: ...
     def optimize(
         self, config: OptimizationConfigProtocol, starts: int, seed: int
-    ) -> list[StartOutcomeProtocol]: ...
+    ) -> StartsProtocol: ...
     def optimize_with_history(
-        self, config: OptimizationConfigProtocol
+        self, config: OptimizationConfigProtocol, seed: int
     ) -> CalibrationResultWithHistoryProtocol: ...
     def predict_observations(
         self, parameter_sets: list[list[float]]
