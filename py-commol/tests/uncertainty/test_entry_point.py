@@ -16,6 +16,7 @@ from commol import (
     EnbPI,
     GibbsPosterior,
     InputSpace,
+    LogNormalObservations,
     Laplace,
     NelderMeadConfig,
     NormalObservations,
@@ -25,6 +26,7 @@ from commol import (
     Priors,
     ProfileLikelihood,
     Ratio,
+    ResidualBootstrap,
     SensitivityAnalysis,
     SensitivityMethod,
     Simulation,
@@ -44,6 +46,7 @@ from tests.support import (
     build_stochastic,
     flow_calibrator,
     flow_observations,
+    line_calibrator,
     rate_calibrator,
 )
 from tests.support.methods import StartsResult, StartsSample, run_starts_sample
@@ -311,9 +314,17 @@ def _failed_local() -> object:
 
 
 def _failed_resampling() -> object:
-    # Without the first block, every weight is zero.
-    calibrator = flow_calibrator(_FLOWS, windowed=True, weights=[1.0] * 3 + [0.0] * 3)
-    return calibrator.uncertainty(BlockJackknife(block_length=3))
+    # Values far from a line: every additive replicate has a value below 0,
+    # which a log-normal model cannot read.
+    calibrator = line_calibrator(
+        [0.1, 20.0] * 4,
+        observation_models={"B": LogNormalObservations(sigma=0.5, center="median")},
+    )
+    return calibrator.uncertainty(
+        ResidualBootstrap(
+            replicates=2, block_length=1, residual_scale="additive", scheme="moving"
+        )
+    )
 
 
 def _failed_profile() -> object:
@@ -368,7 +379,7 @@ def _failed_sensitivity() -> object:
     ("run", "message"),
     [
         (_failed_local, "The Hessian of the objective at the fit failed"),
-        (_failed_resampling, "Only 1 of 2 blocks fitted"),
+        (_failed_resampling, "Every replicate failed"),
         (_failed_profile, "is not a number"),
         (_failed_smc, "is not a number"),
         (_failed_conformal, "Parameter set 0: Simulation failed"),

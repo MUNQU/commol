@@ -300,7 +300,9 @@ class TestGibbsPosterior:
         with pytest.raises(ValueError, match=hint):
             GibbsPosterior.model_validate(settings)
         for eta in (0.0, -1.0):
-            with pytest.raises(ValueError, match=hint):
+            with pytest.raises(
+                ValueError, match=rf"eta is a finite number greater than 0, got {eta:g}"
+            ):
                 _gibbs(eta=eta)
 
     def test_information_matching_needs_a_smooth_sum_loss(self) -> None:

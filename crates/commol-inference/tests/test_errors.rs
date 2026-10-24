@@ -266,14 +266,14 @@ fn a_setting_out_of_range_is_invalid_in_every_method() {
 
     let expected = [
         "replicates times parameters, got 2; use more replicates",
-        "particles must be at least 2, got 1",
-        "Sobol needs at least 2 bootstrap replicates, got 1",
+        "particles is a whole number of at least 2, got 1",
+        "replicates is a whole number of at least 2, got 1",
         "One center per quantity: 1 quantities, 2 centers",
         "a jackknife needs at least two",
-        "A replicate needs at least one start",
+        "starts is a whole number of at least 1, got 0",
         "strictly between 0 and 1",
-        "step is -1; it must be positive",
-        "A structural rank needs at least one point",
+        "step is a finite number greater than 0, got -1",
+        "points is a whole number of at least 1, got 0",
         "give a sample",
         "give a sample",
     ];

@@ -259,8 +259,9 @@ impl PyCalibrationProblem {
         loss_config: Option<PyRef<'_, PyLossConfig>>,
         initial_condition_remainder: Option<String>,
         observation_models: Option<Vec<(String, PyObservationModel)>>,
-        seed: Option<u64>,
+        seed: Option<i128>,
     ) -> PyResult<Self> {
+        let seed: Option<u64> = crate::counts::optional_count(&commol_core::SEED, seed)?;
         let engine = engine.engine();
         let discrepancy = match (&loss_config, observation_models) {
             (Some(loss), None) => DiscrepancyConfig::Loss(loss.inner),
@@ -333,9 +334,11 @@ impl PyCalibrationProblem {
         &self,
         py: Python<'_>,
         config: &PyOptimizationConfig,
-        #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
-        seed: u64,
+        starts: i64,
+        seed: i128,
     ) -> PyResult<PyStarts> {
+        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+        let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
         if config.verbose && starts > 1 {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                 "A verbose optimizer shows one start; set starts=1 or verbose=False",
@@ -368,8 +371,9 @@ impl PyCalibrationProblem {
         &self,
         py: Python<'_>,
         config: &PyOptimizationConfig,
-        seed: u64,
+        seed: i128,
     ) -> PyResult<PyCalibrationResultWithHistory> {
+        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
         parallel(py, || {
             optimize_with_history(&self.inner, &config.inner, seed)
         })?
@@ -427,8 +431,9 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         sample: &PyParameterSample,
         positions: Vec<f64>,
-        seed: u64,
+        seed: i128,
     ) -> PyResult<PyPredictive> {
+        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
         parallel(py, || {
             Predictive::new(self.inner.forward(), &sample.inner, &positions, seed)
         })?
@@ -460,14 +465,11 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         sample: &PyParameterSample,
         observations: Vec<PyObservedDataPoint>,
-        seed: u64,
-        #[pyo3(from_py_with = crate::counts::residual_noise)] residual_noise: Option<(
-            Vec<f64>,
-            usize,
-            String,
-        )>,
+        seed: i128,
+        residual_noise: Option<(Vec<f64>, i64, String)>,
         distribution_noise: bool,
     ) -> PyResult<PyObservationDraws> {
+        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
         let observations: Vec<_> = observations.into_iter().map(|o| o.inner).collect();
         let noise: Box<dyn ObservationNoise> = match residual_noise {
             None if distribution_noise => {
@@ -480,6 +482,7 @@ impl PyCalibrationProblem {
                 ));
             }
             Some((fit, length, scale)) => {
+                let length = crate::counts::count(&commol_inference::ranges::BLOCK_LENGTH, length)?;
                 let scale = ResidualScale::from_name(&scale).map_err(method_error)?;
                 let residuals = Residuals::new(&self.inner, &fit, scale).map_err(method_error)?;
                 Box::new(
@@ -515,8 +518,9 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         sample: &PyParameterSample,
         observations: Vec<PyObservedDataPoint>,
-        seed: u64,
+        seed: i128,
     ) -> PyResult<Vec<f64>> {
+        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
         let observations: Vec<_> = observations.into_iter().map(|o| o.inner).collect();
         let noise = DistributionNoise::new(&self.inner).map_err(value_error)?;
         parallel(py, || {
@@ -554,10 +558,14 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         config: &PyOptimizationConfig,
         fit: Vec<f64>,
-        #[pyo3(from_py_with = crate::counts::required::replicates)] replicates: usize,
-        #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
-        seed: u64,
+        replicates: i64,
+        starts: i64,
+        seed: i128,
     ) -> PyResult<PyBootstrapRun> {
+        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+        let replicates: usize =
+            crate::counts::count(&commol_inference::ranges::REPLICATES, replicates)?;
+        let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
         self.run_bootstrap(py, config, &fit, replicates, starts, seed, |fit| {
             self.resampler(&ResamplerSpec::Parametric, fit)
         })
@@ -584,11 +592,17 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         config: &PyOptimizationConfig,
         fit: Vec<f64>,
-        #[pyo3(from_py_with = crate::counts::required::replicates)] replicates: usize,
-        #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
-        #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
-        seed: u64,
+        replicates: i64,
+        block_length: Option<i64>,
+        starts: i64,
+        seed: i128,
     ) -> PyResult<PyBootstrapRun> {
+        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+        let replicates: usize =
+            crate::counts::count(&commol_inference::ranges::REPLICATES, replicates)?;
+        let block_length: Option<usize> =
+            crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
+        let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
         self.run_bootstrap(py, config, &fit, replicates, starts, seed, |fit| {
             self.resampler(&ResamplerSpec::Bayesian { block_length }, fit)
         })
@@ -618,13 +632,19 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         config: &PyOptimizationConfig,
         fit: Vec<f64>,
-        #[pyo3(from_py_with = crate::counts::required::replicates)] replicates: usize,
-        #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
-        #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
-        seed: u64,
+        replicates: i64,
+        block_length: Option<i64>,
+        starts: i64,
+        seed: i128,
         residual_scale: &str,
         scheme: &str,
     ) -> PyResult<PyBootstrapRun> {
+        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+        let replicates: usize =
+            crate::counts::count(&commol_inference::ranges::REPLICATES, replicates)?;
+        let block_length: Option<usize> =
+            crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
+        let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
         let spec = ResamplerSpec::residual(block_length, residual_scale, scheme)?;
         self.run_bootstrap(py, config, &fit, replicates, starts, seed, |fit| {
             self.resampler(&spec, fit)
@@ -654,12 +674,18 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         config: &PyOptimizationConfig,
         fit: Vec<f64>,
-        #[pyo3(from_py_with = crate::counts::required::replicates)] replicates: usize,
-        #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
-        #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
-        seed: u64,
+        replicates: i64,
+        block_length: Option<i64>,
+        starts: i64,
+        seed: i128,
         multipliers: &str,
     ) -> PyResult<PyBootstrapRun> {
+        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+        let replicates: usize =
+            crate::counts::count(&commol_inference::ranges::REPLICATES, replicates)?;
+        let block_length: Option<usize> =
+            crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
+        let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
         let spec = ResamplerSpec::wild(block_length, multipliers)?;
         self.run_bootstrap(py, config, &fit, replicates, starts, seed, |fit| {
             self.resampler(&spec, fit)
@@ -685,10 +711,14 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         config: &PyOptimizationConfig,
         fit: Vec<f64>,
-        #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
-        #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
-        seed: u64,
+        block_length: Option<i64>,
+        starts: i64,
+        seed: i128,
     ) -> PyResult<PyJackknifeRun> {
+        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+        let block_length: Option<usize> =
+            crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
+        let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
         let runner = ReplicateRunner::new(&self.inner, &config.inner, &fit, starts, seed)
             .map_err(method_error)?;
         let scheme = BlockScheme::at_fit(
@@ -864,12 +894,10 @@ impl PyParameterSample {
     }
 
     /// The indices of `count` draws taken with replacement by weight
-    fn resample(
-        &self,
-        #[pyo3(from_py_with = crate::counts::required::count)] count: usize,
-        seed: u64,
-    ) -> Vec<usize> {
-        self.inner.resample(count, seed)
+    fn resample(&self, count: i64, seed: i128) -> PyResult<Vec<usize>> {
+        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+        let count: usize = crate::counts::count(&commol_inference::ranges::COUNT, count)?;
+        Ok(self.inner.resample(count, seed))
     }
 }
 
@@ -1035,21 +1063,11 @@ fn weighted_quantiles(values: Vec<f64>, weights: Vec<f64>, levels: Vec<f64>) -> 
 ///     ValueError: If `confidence_level` is not strictly between 0 and 1
 #[pyfunction]
 fn interval_levels(confidence_level: f64) -> PyResult<(f64, f64)> {
-    commol_core::check_confidence_level(confidence_level).map_err(value_error)?;
+    commol_core::CONFIDENCE_LEVEL
+        .check(confidence_level)
+        .map_err(value_error)?;
     let [lower, upper] = statistics::interval_levels(confidence_level);
     Ok((lower, upper))
-}
-
-/// Check that the setting `name` is strictly between 0 and 1
-///
-/// The one check of a share.
-///
-/// Raises:
-///     ValueError: If `value` is not strictly between 0 and 1; the message
-///         names the setting
-#[pyfunction]
-fn check_open_unit(name: &str, value: f64) -> PyResult<()> {
-    commol_core::check_open_unit(name, value).map_err(value_error)
 }
 
 /// Check that every level of `levels` is a quantile level, from 0 to 1
@@ -1096,7 +1114,9 @@ fn weighted_summary(
     weights: Vec<f64>,
     confidence_level: f64,
 ) -> PyResult<PyWeightedSummary> {
-    commol_core::check_confidence_level(confidence_level).map_err(value_error)?;
+    commol_core::CONFIDENCE_LEVEL
+        .check(confidence_level)
+        .map_err(value_error)?;
     let levels = statistics::interval_levels(confidence_level);
     check_weights(&values, &weights)?;
     let summary = statistics::summary(&values, &weights, levels)
@@ -1151,7 +1171,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(quantile_error, m)?)?;
     m.add_function(wrap_pyfunction!(weighted_quantiles, m)?)?;
     m.add_function(wrap_pyfunction!(interval_levels, m)?)?;
-    m.add_function(wrap_pyfunction!(check_open_unit, m)?)?;
     m.add_function(wrap_pyfunction!(check_levels, m)?)?;
     m.add_function(wrap_pyfunction!(by_series, m)?)?;
     m.add_class::<PyWeightedSummary>()?;

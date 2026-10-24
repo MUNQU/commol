@@ -382,13 +382,24 @@ fn collinearity_gives_the_verdict_of_each_parameter() {
 
 #[test]
 fn an_index_equal_to_the_threshold_is_not_below_it() {
-    let source = Fixed::new(vec![sixty_degrees()]);
+    // One pair of columns at 60 degrees, whose index is the threshold.
+    let sine = 0.75f64.sqrt();
+    let pair = Matrix::from_row_slice(2, 2, &[1.0, 0.5, 0.0, sine]);
+    let source = Fixed::new(vec![pair]);
+    let gamma = collinearity(&source, &[vec![0.0; 2]], &[1.0], 2, 10.0)
+        .unwrap()
+        .best_by_size[0]
+        .gamma;
 
-    let result = collinearity(&source, &[vec![0.0; 3]], &[1.0], 2, 1.0).unwrap();
+    let result = collinearity(&source, &[vec![0.0; 2]], &[1.0], 2, gamma).unwrap();
 
-    assert_eq!(result.best_by_size[0].gamma, 1.0);
+    assert!(gamma > 1.0, "{gamma}");
     assert_eq!(result.best_by_size[0].share_below, 0.0);
-    assert!(result.admissible.is_empty(), "{:?}", result.admissible);
+    assert!(
+        result.admissible.iter().all(|s| s.parameters.len() == 1),
+        "{:?}",
+        result.admissible
+    );
 }
 
 #[test]
@@ -455,13 +466,6 @@ fn a_greedy_search_extends_the_best_subset_past_the_exhaustive_sizes() {
         .collect();
     assert_eq!(sizes, [2, 3, 4, 5, 6, 7]);
     assert_eq!(result.admissible[0].parameters, [0, 1, 2, 3, 4, 5, 6]);
-    // At a threshold of 1, an index of 1 is not below it at any size.
-    let at_one = collinearity(&source, &[vec![0.0; 7]], &[1.0], 7, 1.0).unwrap();
-    assert!(
-        at_one.admissible.iter().all(|s| s.parameters.len() == 1),
-        "{:?}",
-        at_one.admissible
-    );
 }
 
 #[test]
@@ -481,7 +485,7 @@ fn a_structural_rank_needs_a_point_and_collinearity_a_feasible_one() {
 
     assert_eq!(
         no_points,
-        MethodError::Invalid("A structural rank needs at least one point".to_string())
+        MethodError::Invalid("points is a whole number of at least 1, got 0".to_string())
     );
     assert!(
         matches!(&infeasible, MethodError::NoFeasiblePoint { points: 2, reasons }

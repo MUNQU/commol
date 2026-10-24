@@ -16,6 +16,7 @@ use crate::feasibility::{EvaluationError, Feasibility, Violation, constraint_pos
 use crate::forward::{ForwardModel, Workspace, schedule_of, the_engine};
 use crate::likelihood::TermDerivatives;
 use crate::observation::ObservationOperator;
+use crate::ranges::WINDOW;
 use crate::types::{
     CalibrationConstraint, CalibrationParameter, ObservedDataPoint, ReplicateSummary, Replicates,
 };
@@ -89,7 +90,8 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     ///
     /// Returns a message when a stochastic engine
     /// ([`SimulationEngine::is_stochastic`]) comes with observation models,
-    /// there is no observation or parameter, a position is one the engine
+    /// there is no observation or parameter, a window is outside its range
+    /// ([`crate::ranges::WINDOW`]), a position is one the engine
     /// rejects, an observation names an unknown output or factor, a factor
     /// has a bound at or below 0, the engine does not resolve a value of its
     /// model kind, a constraint is invalid, or the observation models do not
@@ -546,8 +548,8 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
 /// # Errors
 ///
 /// Returns a message that names the observation or constraint and gives the
-/// engine's reason, or that names an observation whose window is not a
-/// finite, positive length.
+/// engine's reason, or the message of the rule of a window
+/// ([`crate::ranges::WINDOW`]) after the observation.
 pub(crate) fn check_positions<E: SimulationEngine>(
     engine: &E,
     observed_data: &[ObservedDataPoint],
@@ -558,13 +560,9 @@ pub(crate) fn check_positions<E: SimulationEngine>(
             .check_position(obs.at)
             .map_err(|reason| format!("Observation '{}': {reason}", obs.label))?;
         if let Some(window) = obs.window {
-            if !(window.is_finite() && window > 0.0) {
-                return Err(format!(
-                    "Observation '{}' at {} has the window {window}; a window \
-                     must be finite and positive",
-                    obs.label, obs.at
-                ));
-            }
+            WINDOW
+                .check(window)
+                .map_err(|error| format!("Observation '{}' at {}: {error}", obs.label, obs.at))?;
             let start = crate::observation::window_start(obs.at, window);
             engine.check_position(start).map_err(|reason| {
                 format!(

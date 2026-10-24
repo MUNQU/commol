@@ -19,6 +19,7 @@ use crate::global_sensitivity::{
 };
 use crate::predictive::{draw_seeds, run_sets, share_among_replicates};
 use crate::quantity::{Quantities, Quantity};
+use crate::ranges;
 use crate::sample::ParameterSample;
 use commol_random::Stream;
 
@@ -133,6 +134,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
                  Latin hypercube to run"
             ))),
             (InputSpace::Independent(_), Some(count)) => {
+                ranges::DRAWS.check(count).map_err(invalid)?;
                 let points = self
                     .inputs
                     .latin_hypercube(method, count, self.design_seed())
@@ -244,12 +246,12 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         confidence_level: f64,
         quantities: &[Quantity],
     ) -> Result<(Sobol, usize), MethodError> {
-        if replicates < 2 {
-            return Err(MethodError::Invalid(format!(
-                "Sobol needs at least 2 bootstrap replicates, got {replicates}"
-            )));
-        }
-        commol_core::check_confidence_level(confidence_level).map_err(MethodError::Invalid)?;
+        ranges::TWO_REPLICATES
+            .check(replicates)
+            .map_err(MethodError::Invalid)?;
+        commol_core::CONFIDENCE_LEVEL
+            .check(confidence_level)
+            .map_err(MethodError::Invalid)?;
         let design = self
             .inputs
             .saltelli("Sobol", draws, self.design_seed())
@@ -282,6 +284,10 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         quantities: &[Quantity],
     ) -> Result<(ChaosExpansion, usize), MethodError> {
         let method = "PolynomialChaos";
+        ranges::DEGREE
+            .check(degree)
+            .and(ranges::TWO_DRAWS.check(draws))
+            .map_err(MethodError::Invalid)?;
         self.inputs
             .independent(method)
             .map_err(MethodError::Invalid)?;

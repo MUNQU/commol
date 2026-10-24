@@ -810,7 +810,7 @@ fn a_runner_takes_a_start_and_one_fit_value_per_parameter() {
 
     assert_eq!(
         starts.as_deref(),
-        Some("A replicate needs at least one start")
+        Some("starts is a whole number of at least 1, got 0")
     );
     assert_eq!(
         fit.as_deref(),

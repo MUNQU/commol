@@ -105,6 +105,22 @@ impl ObservedDataPoint {
         self.window
             .map(|window| crate::observation::window_start(self.at, window))
     }
+
+    /// Check the position, the value, the weight, the window and the trials
+    /// of the observation with their rules ([`crate::ranges`]), as the
+    /// observation of the Python API is checked when it is built.
+    ///
+    /// # Errors
+    ///
+    /// Returns the message of the first rule that a setting breaks.
+    pub fn check_ranges(&self) -> Result<(), String> {
+        use crate::ranges::{AT, TRIALS, VALUE, WEIGHT, WINDOW};
+        AT.check(self.at)?;
+        VALUE.check(self.value)?;
+        WEIGHT.check(self.weight)?;
+        self.window.map_or(Ok(()), |window| WINDOW.check(window))?;
+        self.trials.map_or(Ok(()), |trials| TRIALS.check(trials))
+    }
 }
 
 /// Parameter to be calibrated with its bounds
@@ -422,11 +438,11 @@ impl Replicates {
     ///
     /// # Errors
     ///
-    /// Returns the message of [`Self::check_count`] when `count` is 0, or
-    /// the message of [`statistics::check_levels`] when a quantile level is
-    /// outside `[0, 1]`.
+    /// Returns the message of [`crate::ranges::REPLICATES`] when `count` is
+    /// 0, or the message of [`statistics::check_levels`] when a quantile
+    /// level is outside `[0, 1]`.
     pub fn new(count: usize, seed: u64, summary: ReplicateSummary) -> Result<Self, String> {
-        Self::check_count(count)?;
+        crate::ranges::REPLICATES.check(count)?;
         if let ReplicateSummary::Quantile(level) = summary {
             statistics::check_levels(&[level])?;
         }
@@ -436,19 +452,6 @@ impl Replicates {
                 .collect(),
             summary,
         })
-    }
-
-    /// Check that a count of replicates is at least 1. It is the one check
-    /// of the setting `replicates`.
-    ///
-    /// # Errors
-    ///
-    /// Returns "replicates is at least 1, got 0" when it is 0.
-    pub fn check_count(count: usize) -> Result<(), String> {
-        if count == 0 {
-            return Err(format!("replicates is at least 1, got {count}"));
-        }
-        Ok(())
     }
 }
 
@@ -565,6 +568,22 @@ impl CalibrationConstraint {
     pub fn with_positions(mut self, at: Vec<f64>) -> Self {
         self.at = Some(at);
         self
+    }
+
+    /// Check the weight and each position of the constraint with their rules
+    /// ([`crate::ranges`]), as the constraint of the Python API is checked
+    /// when it is built.
+    ///
+    /// # Errors
+    ///
+    /// Returns the message of the first rule that a setting breaks.
+    pub fn check_ranges(&self) -> Result<(), String> {
+        use crate::ranges::{AT, WEIGHT};
+        WEIGHT.check(self.weight)?;
+        self.at
+            .iter()
+            .flatten()
+            .try_for_each(|&position| AT.check(position))
     }
 }
 

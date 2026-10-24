@@ -73,7 +73,10 @@ fn a_stochastic_engine_names_each_setting_it_needs() {
         "The StochasticSteps engine is stochastic: set seed, so the replicates and the calibration are \
          reproducible."
     );
-    assert_eq!(no_replicate, "replicates is at least 1, got 0");
+    assert_eq!(
+        no_replicate,
+        "replicates is a whole number of at least 1, got 0"
+    );
 }
 
 #[test]

@@ -10,7 +10,7 @@
 //! a calibration, is the caller's choice.
 
 use commol_calibration::{CalibrationProblem, ObservedDataPoint, SeriesIndex, weighted_crps};
-use commol_core::{SimulationEngine, check_confidence_level};
+use commol_core::{CONFIDENCE_LEVEL, SimulationEngine};
 use commol_random::Generator;
 use commol_statistics::numeric::log_sum_exp;
 use commol_statistics::statistics;
@@ -45,7 +45,7 @@ fn intervals(
     confidence_level: f64,
 ) -> Result<Vec<(f64, f64)>, String> {
     check(draws, observed)?;
-    check_confidence_level(confidence_level)?;
+    CONFIDENCE_LEVEL.check(confidence_level)?;
     let levels = statistics::interval_levels(confidence_level);
     (0..observed.len())
         .map(|i| {
@@ -113,7 +113,7 @@ pub fn weighted_interval_score(
     check(draws, observed)?;
     let mut levels = vec![0.5];
     for &c in confidence_levels {
-        check_confidence_level(c)?;
+        CONFIDENCE_LEVEL.check(c)?;
         levels.extend(statistics::interval_levels(c));
     }
     let k = confidence_levels.len() as f64;

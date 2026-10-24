@@ -234,7 +234,7 @@ fn increments_cannot_start_before_zero() {
         early.contains("windows of 7") && early.contains("the end 5"),
         "{early}"
     );
-    assert!(empty.contains("above 0, got 0"), "{empty}");
+    assert!(empty.contains("greater than 0, got 0"), "{empty}");
     assert!(infinite.contains("finite"), "{infinite}");
     assert!(no_outputs.contains("no outputs"), "{no_outputs}");
     assert!(no_positions.contains("needs positions"), "{no_positions}");

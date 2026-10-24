@@ -7,6 +7,7 @@ value is binomial: ``initial`` trials of probability ``exp(-k t)``.
 """
 
 import math
+import re
 
 import pytest
 
@@ -64,9 +65,19 @@ class TestSeeds:
         assert first.seed is None
         assert not simulation.is_stochastic
 
-    @pytest.mark.parametrize("seed", [-1, 2**64, 1.5, True])
-    def test_a_seed_is_a_whole_number_of_64_bits(self, seed: object) -> None:
-        with pytest.raises(ValueError, match="2\\*\\*64 - 1"):
+    @pytest.mark.parametrize(
+        ("seed", "message"),
+        [
+            (-1, "seed is a whole number from 0 to 18446744073709551615, got -1"),
+            (2**64, f"seed is a whole number from 0 to {2**64 - 1}, got {2**64}"),
+            (1.5, "seed is a whole number, got 1.5"),
+            (True, "seed is a whole number, got True"),
+        ],
+    )
+    def test_a_seed_is_a_whole_number_of_64_bits(
+        self, seed: object, message: str
+    ) -> None:
+        with pytest.raises(ValueError, match=re.escape(message)):
             _stochastic().run(1, seed=seed)  # ty: ignore[invalid-argument-type]
 
 
@@ -132,8 +143,15 @@ class TestReplicates:
             simulation.replicates(10)
 
     def test_at_least_one_replicate(self) -> None:
-        with pytest.raises(ValueError, match="at least 1"):
+        with pytest.raises(
+            ValueError, match="count is a whole number of at least 1, got 0"
+        ):
             _stochastic().replicates(0)
+
+    @pytest.mark.parametrize("count", [True, 1.5, "2"])
+    def test_a_count_of_replicates_is_a_whole_number(self, count: object) -> None:
+        with pytest.raises(ValueError, match="count is a whole number, got"):
+            _stochastic().replicates(count)  # ty: ignore[invalid-argument-type]
 
     def test_an_uncalibrated_parameter_stops_the_replicates(self) -> None:
         with pytest.raises(ValueError, match="Parameters requiring calibration: k"):

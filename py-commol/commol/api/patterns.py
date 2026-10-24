@@ -30,6 +30,7 @@ from commol.utils.security import (
     SecurityConfig,
     validate_expression_security,
 )
+from commol.context.ranges import RangeChecked
 
 
 class ConditionDict(TypedDict):
@@ -87,10 +88,6 @@ class CombineMode(StrEnum):
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
-
-
-FinitePosition = Annotated[float, Field(allow_inf_nan=False)]
-"""A position on the axis in a pattern bound."""
 
 
 def _number(value: float) -> str:
@@ -588,8 +585,8 @@ class AxisPattern(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class _PulseAxisPattern(AxisPattern):
-    at: Annotated[int, Field(ge=0)]
+class _PulseAxisPattern(AxisPattern, RangeChecked):
+    at: int
     value: float | str
 
     @property
@@ -602,8 +599,8 @@ class _PulseAxisPattern(AxisPattern):
         return [(self.at, float(self.value))]
 
 
-class _PulsesAxisPattern(AxisPattern):
-    steps: list[Annotated[int, Field(ge=0)]]
+class _PulsesAxisPattern(AxisPattern, RangeChecked):
+    steps: list[int]
     value: float | str | list[float | str]
 
     @field_validator("steps")
@@ -647,10 +644,10 @@ class _PulsesAxisPattern(AxisPattern):
         return [(s, float(self.value)) for s in self.steps]
 
 
-class _PeriodicAxisPattern(AxisPattern):
-    period: Annotated[int, Field(gt=0)]
+class _PeriodicAxisPattern(AxisPattern, RangeChecked):
+    period: int
     value: float | str
-    offset: Annotated[int, Field(ge=0)] = 0
+    offset: int = 0
 
     @model_validator(mode="after")
     def validate_offset_lt_period(self) -> "_PeriodicAxisPattern":
@@ -672,9 +669,9 @@ class _PeriodicAxisPattern(AxisPattern):
         )
 
 
-class _IntervalAxisPattern(AxisPattern):
-    start: FinitePosition
-    end: FinitePosition
+class _IntervalAxisPattern(AxisPattern, RangeChecked):
+    start: float
+    end: float
     value: float | str
 
     @model_validator(mode="after")
@@ -720,9 +717,9 @@ class _SinusoidAxisPattern(AxisPattern):
         )
 
 
-class _GaussianPulseAxisPattern(AxisPattern):
+class _GaussianPulseAxisPattern(AxisPattern, RangeChecked):
     center: float
-    width: Annotated[float, Field(gt=0)]
+    width: float
     peak: float | str
 
     @property
@@ -733,9 +730,9 @@ class _GaussianPulseAxisPattern(AxisPattern):
         )
 
 
-class _LinearRampAxisPattern(AxisPattern):
-    start: FinitePosition
-    end: FinitePosition
+class _LinearRampAxisPattern(AxisPattern, RangeChecked):
+    start: float
+    end: float
     start_value: float
     end_value: float
 

@@ -1,15 +1,25 @@
-"""Every count a binding takes names its setting when it is negative."""
+"""Every count and every seed a binding takes, called with no Python object in
+between, gets the message of the rule of its setting in the engine when it is
+negative; and so does a seed of each entry point of the Python API."""
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
 
-from commol import SensitivityAnalysis, Simulation
+from commol import CalibrationProblem, SensitivityAnalysis, Simulation
 from commol.api.calibrator import Calibrator
 from commol.commol_rs import _commol_rs as commol_rs
-from tests.support import abc_builder, abc_rates, build, line_calibrator
+from tests.support import (
+    a_to_b_builder,
+    abc_builder,
+    abc_rates,
+    build,
+    build_stochastic,
+    line_calibrator,
+)
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import ForwardAnalysisProtocol
@@ -58,7 +68,7 @@ CASES: dict[str, tuple[str, Callable[[Bindings], object]]] = {
         lambda _: calibration.ObservationModel.binomial(trials=-1),
     ),
     "count of LossConfig.with_replicates": (
-        "count",
+        "replicates",
         lambda _: calibration.LossConfig.sse().with_replicates(count=-1),
     ),
     "max_iterations of NelderMeadConfig": (
@@ -333,14 +343,23 @@ CASES: dict[str, tuple[str, Callable[[Bindings], object]]] = {
 }
 
 
+RULE = re.compile(
+    r"(?P<setting>\w+) is a whole number (of at least \d+|from 0 to \d+), got -1"
+)
+"""The message of the rule of a count, for -1."""
+
+
 @pytest.mark.parametrize("case", CASES)
-def test_a_negative_count_names_its_setting(bindings: Bindings, case: str) -> None:
+def test_a_negative_count_gets_the_message_of_its_rule(
+    bindings: Bindings, case: str
+) -> None:
     setting, call = CASES[case]
 
     with pytest.raises(ValueError) as error:
         call(bindings)
 
-    assert str(error.value) == f"{setting} is a whole number from 0, got -1"
+    message = RULE.fullmatch(str(error.value))
+    assert message is not None and message["setting"] == setting, str(error.value)
 
 
 def test_a_count_above_its_type_names_its_largest_value(bindings: Bindings) -> None:
@@ -355,3 +374,125 @@ def test_a_count_above_its_type_names_its_largest_value(bindings: Bindings) -> N
 def test_a_count_that_is_not_a_whole_number_is_a_type_error() -> None:
     with pytest.raises(TypeError):
         calibration.NelderMeadConfig(max_iterations=1.5)  # ty: ignore[invalid-argument-type]
+
+
+SEED_RULE = "seed is a whole number from 0 to 18446744073709551615, got {}"
+"""The message of the rule of a seed."""
+
+
+SEEDS: dict[str, Callable[[Bindings], object]] = {
+    "Engine.set_seed": lambda b: b.calibrator.simulation.engine.set_seed(-1),
+    "Engine.run_replicates": lambda b: b.calibrator.simulation.engine.run_replicates(
+        -1, 2, 5
+    ),
+    "CalibrationProblem.optimize": lambda b: _problem(b).optimize(_config(b), 1, -1),
+    "CalibrationProblem.optimize_with_history": lambda b: _problem(
+        b
+    ).optimize_with_history(_config(b), -1),
+    "CalibrationProblem.predictive": lambda b: _problem(b).predictive(
+        _sample(), [], -1
+    ),
+    "CalibrationProblem.observation_draws": lambda b: _problem(b).observation_draws(
+        _sample(), [], -1
+    ),
+    "CalibrationProblem.log_score": lambda b: _problem(b).log_score(_sample(), [], -1),
+    "parametric_bootstrap": lambda b: _problem(b).parametric_bootstrap(
+        _config(b), FIT, 2, 1, -1
+    ),
+    "bayesian_bootstrap": lambda b: _problem(b).bayesian_bootstrap(
+        _config(b), FIT, 2, None, 1, -1
+    ),
+    "residual_bootstrap": lambda b: _problem(b).residual_bootstrap(
+        _config(b), FIT, 2, None, 1, -1, "additive", "iid"
+    ),
+    "wild_bootstrap": lambda b: _problem(b).wild_bootstrap(
+        _config(b), FIT, 2, None, 1, -1, "x"
+    ),
+    "jackknife": lambda b: _problem(b).jackknife(_config(b), FIT, None, 1, -1),
+    "ParameterSample.resample": lambda _: _sample().resample(1, -1),
+    "Distribution.sample": lambda _: inference.Distribution(
+        "uniform", [], 0.0, 1.0
+    ).sample(1, -1),
+    "ForwardAnalysis": lambda b: inference.ForwardAnalysis(
+        b.calibrator.simulation.engine, [], seed=-1
+    ),
+    "trace_profiles": lambda b: inference.trace_profiles(
+        _problem(b), _config(b), FIT, [0], [], "beale", 0.9, 1, -1
+    ),
+    "structural_rank": lambda b: inference.structural_rank(_problem(b), 3, False, -1),
+    "gibbs_posterior": lambda b: inference.gibbs_posterior(
+        _problem(b), None, 1.0, 10, 0.5, 0.5, 0.5, -1
+    ),
+    "bayesian_posterior": lambda b: inference.bayesian_posterior(
+        _problem(b), None, 10, 0.5, 0.5, 0.5, -1
+    ),
+    "laplace": lambda b: inference.laplace(_problem(b), FIT, "x", 1, -1),
+    "sandwich": lambda b: inference.sandwich(_problem(b), FIT, "x", None, 1, -1),
+    "laplace_mixture": lambda b: inference.laplace_mixture(
+        _problem(b), None, None, [], 1, "x", -1
+    ),
+    "bootstrap_coverage_eta": lambda b: inference.bootstrap_coverage_eta(
+        _problem(b), None, FIT, 2, None, 0.9, 10, 0.5, 0.5, 0.5, -1
+    ),
+    "abc_smc": lambda b: inference.abc_smc(
+        _problem(b), None, None, 10, 0.5, 0.5, 0.5, -1
+    ),
+    "abc_rejection": lambda b: inference.abc_rejection(
+        _problem(b), None, None, 10, 0.5, -1
+    ),
+    "rolling_conformal": lambda b: inference.rolling_conformal(
+        _problem(b), _config(b), FIT, [], [], "x", "x", 0.9, 1, -1
+    ),
+    "jackknife_plus": lambda b: inference.jackknife_plus(
+        _problem(b), _config(b), FIT, None, [], "x", "x", 0.9, 1, -1
+    ),
+    "enbpi": lambda b: inference.enbpi(
+        _problem(b), _config(b), FIT, 2, None, [], "x", "x", 0.9, 1, -1
+    ),
+}
+"""Each binding that takes a seed, called with the seed -1."""
+
+
+@pytest.mark.parametrize("case", SEEDS)
+def test_a_negative_seed_of_a_binding_gets_the_message_of_its_rule(
+    bindings: Bindings, case: str
+) -> None:
+    with pytest.raises(ValueError) as error:
+        SEEDS[case](bindings)
+
+    assert str(error.value) == SEED_RULE.format(-1)
+
+
+def _stochastic() -> Simulation:
+    return Simulation(
+        build_stochastic(a_to_b_builder(amounts={"A": 10, "B": 0}), "StochasticSteps")
+    )
+
+
+ENTRY_POINTS: dict[str, Callable[[int], object]] = {
+    "Simulation.run": lambda seed: _stochastic().run(1, seed=seed),
+    "Simulation.run_at": lambda seed: _stochastic().run_at([1.0], seed=seed),
+    "Simulation.replicates": lambda seed: _stochastic().replicates(2, seed=seed),
+    "SensitivityAnalysis": lambda seed: SensitivityAnalysis(
+        Simulation(build(abc_builder())), abc_rates(), seed=seed
+    ),
+    "CalibrationProblem": lambda seed: CalibrationProblem.model_validate(
+        {
+            **line_calibrator([7.4, 8.6]).problem.model_dump(
+                exclude={"seed", "optimization_config"}
+            ),
+            "optimization_config": line_calibrator([7.4]).problem.optimization_config,
+            "seed": seed,
+        }
+    ),
+}
+"""Each entry point of the Python API that takes a seed."""
+
+
+@pytest.mark.parametrize("seed", [-1, 2**64])
+@pytest.mark.parametrize("entry", ENTRY_POINTS)
+def test_a_seed_outside_its_range_gets_the_message_of_the_engine(
+    entry: str, seed: int
+) -> None:
+    with pytest.raises(ValueError, match=re.escape(SEED_RULE.format(seed))):
+        ENTRY_POINTS[entry](seed)

@@ -5,7 +5,7 @@ use commol_calibration::{
     CalibrationParameter, CalibrationProblem, LossConfig, NelderMeadConfig, ObservedDataPoint,
     OptimizationConfig,
 };
-use commol_core::{Model, check_confidence_level, check_open_unit};
+use commol_core::{CONFIDENCE_LEVEL, Model, Real};
 use commol_difference::DifferenceEquations;
 use commol_inference::conformal::{AdaptiveLevel, ConformalSettings, NonconformityScore, Pooling};
 use commol_inference::identifiability::{Reference, sample_identifiability};
@@ -68,7 +68,7 @@ fn every_confidence_level_has_one_check() {
     };
 
     let errors = [
-        check_confidence_level(0.0).unwrap_err(),
+        CONFIDENCE_LEVEL.check(0.0).unwrap_err(),
         sample().interval(0.0).unwrap_err(),
         coverage(&draws, &[1.5], 0.0).unwrap_err(),
         ConformalSettings::new(NonconformityScore::Absolute, Pooling::All, 0.0)
@@ -136,7 +136,7 @@ fn every_share_has_one_check() {
                 .unwrap_err()
                 .to_string(),
         ),
-        ("share", check_open_unit("share", 1.0).unwrap_err()),
+        ("share", Real::share("share").check(1.0).unwrap_err()),
     ];
 
     for (name, error) in errors {

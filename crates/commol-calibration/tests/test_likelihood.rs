@@ -401,7 +401,7 @@ fn models_and_their_arguments_are_checked() {
         (
             line_parameters(),
             normal(Argument::Value(0.0)),
-            "has sd=0; it must be finite and above 0",
+            "The observation model of 'x': sd is a finite number greater than 0, got 0",
         ),
         (
             line_parameters(),
@@ -416,7 +416,7 @@ fn models_and_their_arguments_are_checked() {
         (
             with_noise(CalibrationParameterType::Noise),
             normal(k()),
-            "its bounds must be finite and above 0; they are [0, 1]",
+            "its bounds must be a finite number greater than 0; they are [0, 1]",
         ),
         (
             with_noise(CalibrationParameterType::Noise),
@@ -433,7 +433,7 @@ fn models_and_their_arguments_are_checked() {
             models(ObservationModel::NegativeBinomial {
                 overdispersion: Argument::Value(-1.0),
             }),
-            "it must be finite and at least 0",
+            "overdispersion is a finite number of at least 0, got -1",
         ),
     ];
     for (parameters, config, message) in cases {

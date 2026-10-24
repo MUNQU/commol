@@ -16,8 +16,9 @@
 //! - [`EngineType`]: The list of engines a model can name, and the positions
 //!   each one reports at
 //! - [`same_position`]: When two positions on the axis are one
-//! - [`check_open_unit`]: The one check of a share, strictly between 0 and 1
-//! - [`check_confidence_level`]: The one check of a confidence level
+//! - [`range`]: The range rule of each setting ([`Count`], [`Real`]), declared
+//!   once as data, and the check of an object against the rules of its
+//!   settings ([`Ranges`])
 //! - [`types`]: All data structures for defining a model: its process and
 //!   its structure
 
@@ -26,7 +27,7 @@
 pub mod math_expression;
 pub mod parallelism;
 pub mod position;
-pub mod share;
+pub mod range;
 pub mod simulation_engine;
 /// Data types of a model definition.
 pub mod types;
@@ -42,12 +43,12 @@ pub use parallelism::{Levels, Parallelism, inner_levels_in_parallel};
 
 pub use position::{POSITION_TOLERANCE, same_position};
 
-pub use share::{check_confidence_level, check_open_unit};
+pub use range::{Bound, CONFIDENCE_LEVEL, Count, Ranges, Real, Rule, Setting, check_object};
 
 // Re-export simulation engine trait
 pub use simulation_engine::{
-    ModelValue, SimulationEngine, SimulationError, Trajectory, ValuePlan, check_positions,
-    run_replicates,
+    ModelValue, NUM_STEPS, REPLICATE_COUNT, SEED, SimulationEngine, SimulationError, Trajectory,
+    ValuePlan, check_positions, run_replicates,
 };
 
 // Re-export all public types from the types module for convenient access

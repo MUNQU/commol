@@ -171,9 +171,11 @@ fn rolling_conformal(
     score: &str,
     by: &str,
     confidence_level: f64,
-    #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
-    seed: u64,
+    starts: i64,
+    seed: i128,
 ) -> PyResult<PyConformalRun> {
+    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+    let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
     let settings = settings(score, by, confidence_level)?;
     let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
         .map_err(method_error)?;
@@ -219,14 +221,18 @@ fn jackknife_plus(
     problem: &PyCalibrationProblem,
     config: &PyOptimizationConfig,
     fit: Vec<f64>,
-    #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
+    block_length: Option<i64>,
     positions: Vec<f64>,
     score: &str,
     by: &str,
     confidence_level: f64,
-    #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
-    seed: u64,
+    starts: i64,
+    seed: i128,
 ) -> PyResult<PyConformalRun> {
+    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+    let block_length: Option<usize> =
+        crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
+    let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
     let settings = settings(score, by, confidence_level)?;
     let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
         .map_err(method_error)?;
@@ -270,15 +276,21 @@ fn enbpi(
     problem: &PyCalibrationProblem,
     config: &PyOptimizationConfig,
     fit: Vec<f64>,
-    #[pyo3(from_py_with = crate::counts::required::replicates)] replicates: usize,
-    #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
+    replicates: i64,
+    block_length: Option<i64>,
     positions: Vec<f64>,
     score: &str,
     by: &str,
     confidence_level: f64,
-    #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
-    seed: u64,
+    starts: i64,
+    seed: i128,
 ) -> PyResult<PyConformalRun> {
+    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+    let replicates: usize =
+        crate::counts::count(&commol_inference::ranges::TWO_REPLICATES, replicates)?;
+    let block_length: Option<usize> =
+        crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
+    let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
     let settings = settings(score, by, confidence_level)?;
     let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
         .map_err(method_error)?;

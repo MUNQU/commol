@@ -108,8 +108,9 @@ fn index_of_normalized(normalized: &Matrix) -> f64 {
 /// # Errors
 ///
 /// [`MethodError::Invalid`] when there is no point, the weights do
-/// not match the points, or `max_subset_size` is below 2 or above the number
-/// of parameters; [`MethodError::NoFeasiblePoint`] when every point
+/// not match the points, `threshold` is outside its range
+/// ([`crate::ranges::THRESHOLD`]), or `max_subset_size` is outside its range
+/// ([`crate::ranges::MAX_SUBSET_SIZE`]) or above the number of parameters; [`MethodError::NoFeasiblePoint`] when every point
 /// is infeasible; [`MethodError::Sensitivity`] when the
 /// sensitivities fail for another reason.
 pub fn collinearity<S: SensitivitySource>(
@@ -120,6 +121,9 @@ pub fn collinearity<S: SensitivitySource>(
     threshold: f64,
 ) -> Result<Collinearity, MethodError> {
     let count = source.parameters().len();
+    crate::ranges::THRESHOLD
+        .check(threshold)
+        .map_err(MethodError::Invalid)?;
     if points.is_empty() || points.len() != weights.len() {
         return Err(MethodError::Invalid(format!(
             "Collinearity needs one weight per point, got {} points and {} weights",
@@ -127,12 +131,10 @@ pub fn collinearity<S: SensitivitySource>(
             weights.len()
         )));
     }
-    if max_subset_size < 2 || max_subset_size > count {
-        return Err(MethodError::Invalid(format!(
-            "max_subset_size must be from 2 to the number of parameters ({count}), got \
-             {max_subset_size}"
-        )));
-    }
+    crate::ranges::MAX_SUBSET_SIZE
+        .at_most(count)
+        .check(max_subset_size)
+        .map_err(MethodError::Invalid)?;
     let mut columns: Vec<Matrix> = Vec::new();
     let mut used_weights = Vec::new();
     let mut sensitivity_draws: Vec<Vec<f64>> = vec![Vec::new(); count];

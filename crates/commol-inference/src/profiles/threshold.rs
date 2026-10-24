@@ -8,7 +8,7 @@
 //! | [`bootstrap_thresholds`] | Any loss | That the bootstrap mimics the data |
 
 use commol_calibration::{CalibrationProblem, LossConfig, Subproblem, optimize_subproblem};
-use commol_core::{SimulationEngine, check_confidence_level};
+use commol_core::{CONFIDENCE_LEVEL, SimulationEngine};
 use commol_random::replicate_seed;
 use commol_statistics::statistics;
 use rayon::prelude::*;
@@ -26,12 +26,14 @@ use commol_random::Stream;
 ///
 /// [`MethodError::Invalid`] when the problem has a loss instead of
 /// observation models, or `confidence_level` is not strictly between 0 and
-/// 1 ([`check_confidence_level`]).
+/// 1 ([`CONFIDENCE_LEVEL`]).
 pub fn chi_square<E: SimulationEngine>(
     problem: &CalibrationProblem<E>,
     confidence_level: f64,
 ) -> Result<f64, MethodError> {
-    check_confidence_level(confidence_level).map_err(MethodError::Invalid)?;
+    CONFIDENCE_LEVEL
+        .check(confidence_level)
+        .map_err(MethodError::Invalid)?;
     if problem.discrepancy().likelihood().is_none() {
         return Err(MethodError::Invalid(
             "The chi-square threshold reads −log L and needs observation models; the problem \
@@ -59,7 +61,9 @@ pub fn beale<E: SimulationEngine>(
     fit_loss: f64,
     confidence_level: f64,
 ) -> Result<f64, MethodError> {
-    check_confidence_level(confidence_level).map_err(MethodError::Invalid)?;
+    CONFIDENCE_LEVEL
+        .check(confidence_level)
+        .map_err(MethodError::Invalid)?;
     if problem.discrepancy().loss() != Some(LossConfig::SumSquaredError) {
         return Err(MethodError::Invalid(
             "Beale's threshold reads a sum of squares; the problem needs the loss 'sse'"
@@ -130,7 +134,10 @@ pub fn bootstrap_thresholds<E>(
 where
     E: SimulationEngine + Send + Sync,
 {
-    check_confidence_level(confidence_level).map_err(MethodError::Invalid)?;
+    crate::ranges::REPLICATES
+        .check(replicates)
+        .and(CONFIDENCE_LEVEL.check(confidence_level))
+        .map_err(MethodError::Invalid)?;
     if quantities.len() != centers.len() {
         return Err(MethodError::Invalid(format!(
             "One center per quantity: {} quantities, {} centers",

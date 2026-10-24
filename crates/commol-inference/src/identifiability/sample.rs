@@ -6,7 +6,6 @@
 //! the threshold, or when its marginal has several modes; otherwise it is
 //! determined.
 
-use commol_core::check_open_unit;
 use commol_statistics::statistics::{effective_size, quantiles};
 
 use super::PracticalVerdict;
@@ -77,7 +76,8 @@ pub fn sample_identifiability(
     reference: Reference<'_>,
     correlation_threshold: f64,
 ) -> Result<SampleIdentifiability, MethodError> {
-    check_open_unit("correlation_threshold", correlation_threshold)
+    crate::ranges::CORRELATION_THRESHOLD
+        .check(correlation_threshold)
         .map_err(MethodError::Invalid)?;
     let variances: Vec<f64> = match reference {
         Reference::Bounds => sample

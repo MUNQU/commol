@@ -150,7 +150,9 @@ class TestAnalysis:
 
     def test_a_stochastic_engine_runs_at_least_one_replicate(self) -> None:
         simulation = Simulation(build_stochastic(abc_builder(), "StochasticSteps"))
-        with pytest.raises(ValueError, match=r"replicates is at least 1, got 0"):
+        with pytest.raises(
+            ValueError, match=r"replicates is a whole number of at least 1, got 0"
+        ):
             SensitivityAnalysis(simulation, abc_rates(), replicates=0, seed=1)
 
     def test_a_negative_count_names_the_setting(self, simulation: Simulation) -> None:
@@ -159,7 +161,7 @@ class TestAnalysis:
         with pytest.raises(TypeError):
             SensitivityAnalysis(simulation, abc_rates(), replicates=1.5, seed=1)  # ty: ignore[invalid-argument-type]
 
-        assert str(error.value) == "replicates is a whole number from 0, got -1"
+        assert str(error.value) == "replicates is a whole number of at least 1, got -1"
 
     def test_a_seed_is_a_whole_number_of_64_bits(self, simulation: Simulation) -> None:
         with pytest.raises(ValueError):
@@ -414,7 +416,7 @@ class TestPolynomialChaos:
     def test_a_truncation_out_of_range_is_rejected(
         self, truncation: dict[str, float]
     ) -> None:
-        with pytest.raises(ValueError, match=r"Input should be"):
+        with pytest.raises(ValueError, match=r"(q_norm|max_interaction) is a"):
             PolynomialChaos.model_validate(
                 {
                     "degree": 2,
@@ -444,7 +446,9 @@ class TestPolynomialChaos:
         )
 
         assert result.predict([[0.3, 0.5]]) == [[1.0]]
-        with pytest.raises(ValueError, match=r"must be in \(0, 1\], got 2"):
+        with pytest.raises(
+            ValueError, match=r"q_norm is a number greater than 0 and at most 1, got 2"
+        ):
             result.model_copy(update={"q_norm": 2.0}).predict([[0.3, 0.5]])
         with pytest.raises(ValueError, match=r"has 6 terms; a row of coefficients"):
             result.model_copy(update={"max_interaction": None}).predict([[0.3, 0.5]])

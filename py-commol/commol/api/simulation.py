@@ -24,13 +24,11 @@ from commol.context.structure import ModelStructure
 
 logger = logging.getLogger(__name__)
 
-SEED_LIMIT = 2**64
-"""Seeds are whole numbers from 0 to ``2**64 - 1``."""
-
 
 def check_seed(seed: int) -> int:
     """
-    Check that a seed is a whole number from 0 to ``2**64 - 1``.
+    Check that a seed is a whole number: an int, not a bool. The engine checks
+    its range, from 0 to ``2**64 - 1``.
 
     Parameters
     ----------
@@ -45,14 +43,10 @@ def check_seed(seed: int) -> int:
     Raises
     ------
     ValueError
-        If the seed is not such a number.
+        If the seed is not a whole number.
     """
-    if (
-        isinstance(seed, bool)
-        or not isinstance(seed, int)
-        or not 0 <= seed < SEED_LIMIT
-    ):
-        raise ValueError(f"A seed is a whole number from 0 to 2**64 - 1, got {seed!r}.")
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise ValueError(f"seed is a whole number, got {seed!r}")
     return seed
 
 
@@ -292,15 +286,16 @@ class Simulation:
         ------
         ValueError
             If the engine is deterministic (every replicate would be equal),
-            ``count`` is below 1, or the seed is not valid.
+            ``count`` is not a whole number or is below 1, or the seed is not
+            valid.
         """
         if not self.is_stochastic:
             raise ValueError(
                 f"The {self.model_definition.engine.type} engine is deterministic: "
                 "every replicate would be equal. Replicates need a stochastic engine."
             )
-        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
-            raise ValueError(f"The number of replicates is at least 1, got {count!r}.")
+        if isinstance(count, bool) or not isinstance(count, int):
+            raise ValueError(f"count is a whole number, got {count!r}")
         return ReplicateRuns(self, count, None if seed is None else check_seed(seed))
 
     @property
@@ -536,7 +531,14 @@ class ReplicateRuns:
         seed : int | None
             The seed the replicate seeds derive from; None draws one at each
             run.
+
+        Raises
+        ------
+        ValueError
+            With the message of the engine, if ``count`` is below 1 or the
+            seed is outside its range.
         """
+        commol_rs.core.check_ranges("ReplicateRuns", {"count": count, "seed": seed})
         self.simulation = simulation
         self.count = count
         self.seed = seed

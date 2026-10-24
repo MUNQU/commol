@@ -68,7 +68,7 @@ impl<E: SimulationEngine> ForwardModel<E> {
     ///
     /// Returns a message when there is no parameter, a parameter is a factor
     /// or a noise parameter (both belong to observations), `replicates` is 0
-    /// ([`Replicates::check_count`]), the engine is stochastic and
+    /// ([`crate::ranges::REPLICATES`]), the engine is stochastic and
     /// `replicates` or `seed` is not set, or the engine does not resolve a
     /// value of its model kind or the remainder.
     pub fn unobserved(
@@ -96,7 +96,7 @@ impl<E: SimulationEngine> ForwardModel<E> {
             ));
         }
         if let Some(count) = replicates {
-            Replicates::check_count(count)?;
+            crate::ranges::REPLICATES.check(count)?;
         }
         let replicates = if base_engine.is_stochastic() {
             let engine = the_engine(&base_engine);

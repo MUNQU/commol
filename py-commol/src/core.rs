@@ -136,6 +136,7 @@ impl PyMathExpression {
 
 /// Register all core types with the Python module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    crate::ranges::register(m)?;
     m.add_class::<PyModel>()?;
     m.add_class::<PyProcess>()?;
     m.add_class::<PyAggregate>()?;

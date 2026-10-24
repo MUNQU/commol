@@ -39,11 +39,10 @@ pub fn starts_identifiability(
             "One end, loss and convergence flag per start".to_string(),
         ));
     }
-    if !(parameter_tolerance >= 0.0 && loss_tolerance >= 0.0) {
-        return Err(MethodError::Invalid(format!(
-            "The tolerances must not be negative, got {parameter_tolerance} and {loss_tolerance}"
-        )));
-    }
+    crate::ranges::PARAMETER_TOLERANCE
+        .check(parameter_tolerance)
+        .and(crate::ranges::LOSS_TOLERANCE.check(loss_tolerance))
+        .map_err(MethodError::Invalid)?;
     let finished: Vec<usize> = (0..ends.len()).filter(|&i| converged[i]).collect();
     if finished.len() < 2 {
         return Err(MethodError::Invalid(format!(

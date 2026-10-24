@@ -15,10 +15,10 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import ObservedDataPoint
-from commol.context.inference.levels import ConfidenceLevel
 from commol.context.inference.method import UncertaintyMethod
 from commol.context.inference.resampling import BlockLength
 from commol.context.inference.sample import ParameterSample
+from commol.context.ranges import RangeChecked
 
 type ConformalScore = Literal["absolute", "normalized", "spread"]
 """How a predicted value ``ŷ`` and an observed value ``y`` become a score:
@@ -132,7 +132,7 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
 
     score: ConformalScore = Field(description="The nonconformity score.")
     by: Pooling = Field(description="Which scores each quantile reads.")
-    confidence_level: ConfidenceLevel = Field(description="The level of the intervals.")
+    confidence_level: float = Field(description="The level of the intervals.")
 
     @model_validator(mode="before")
     @classmethod
@@ -156,7 +156,7 @@ def _no_spread_without_sample(method: "SplitConformal | AdaptiveConformal") -> N
         )
 
 
-class SplitConformal(ConformalMethod):
+class SplitConformal(ConformalMethod, RangeChecked):
     """
     Split conformal prediction.
 
@@ -188,7 +188,7 @@ class SplitConformal(ConformalMethod):
     sample: ParameterSample | None = Field(
         default=None, description="The sample whose predictive predicts."
     )
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+    starts: int = Field(default=1, description="Starts of the fit.")
 
     @model_validator(mode="after")
     def check_spread(self) -> Self:
@@ -197,7 +197,7 @@ class SplitConformal(ConformalMethod):
         return self
 
 
-class RollingConformal(ConformalMethod):
+class RollingConformal(ConformalMethod, RangeChecked):
     """
     Rolling-origin conformal prediction: intervals ahead of the data, one
     quantile per horizon.
@@ -221,7 +221,7 @@ class RollingConformal(ConformalMethod):
 
     origins: list[float] = Field(min_length=1, description="The origins.")
     positions: list[float] = Field(min_length=1, description="Where the intervals are.")
-    starts: int = Field(default=1, ge=1, description="Starts of each fit.")
+    starts: int = Field(default=1, description="Starts of each fit.")
 
     @model_validator(mode="after")
     def check_spread(self) -> Self:
@@ -234,7 +234,7 @@ class RollingConformal(ConformalMethod):
         return self
 
 
-class JackknifePlus(ConformalMethod):
+class JackknifePlus(ConformalMethod, RangeChecked):
     """
     Jackknife+ (Barber et al. 2021) with blocks: one refit per block left
     out, and intervals from the left-out residuals and predictions.
@@ -256,10 +256,10 @@ class JackknifePlus(ConformalMethod):
 
     block_length: BlockLength = Field(description="Positions per block.")
     positions: list[float] = Field(min_length=1, description="Where the intervals are.")
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    starts: int = Field(default=1, description="Starts per fit.")
 
 
-class EnbPI(ConformalMethod):
+class EnbPI(ConformalMethod, RangeChecked):
     """
     Ensemble batch prediction intervals (Xu and Xie 2021).
 
@@ -282,13 +282,13 @@ class EnbPI(ConformalMethod):
         Starts of the fit and of each replicate (default 1).
     """
 
-    replicates: int = Field(ge=2, description="Number of replicates.")
+    replicates: int = Field(description="Number of replicates.")
     block_length: BlockLength = Field(description="Positions per block.")
     positions: list[float] = Field(min_length=1, description="Where the intervals are.")
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    starts: int = Field(default=1, description="Starts per fit.")
 
 
-class AdaptiveConformal(ConformalMethod):
+class AdaptiveConformal(ConformalMethod, RangeChecked):
     """
     Adaptive conformal inference (Gibbs and Candès 2021).
 
@@ -312,14 +312,14 @@ class AdaptiveConformal(ConformalMethod):
         Starts of the fit (default 1).
     """
 
-    step: float = Field(gt=0.0, description="The step of the working level.")
+    step: float = Field(description="The step of the working level.")
     stream: list[ObservedDataPoint] = Field(
         min_length=1, description="The observations that arrive."
     )
     sample: ParameterSample | None = Field(
         default=None, description="The sample whose predictive predicts."
     )
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+    starts: int = Field(default=1, description="Starts of the fit.")
 
     @model_validator(mode="after")
     def check_spread(self) -> Self:

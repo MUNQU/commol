@@ -94,11 +94,9 @@ pub fn structural_rank<S: SensitivitySource>(
     points: usize,
     seed: u64,
 ) -> Result<StructuralAnalysis, MethodError> {
-    if points == 0 {
-        return Err(MethodError::Invalid(
-            "A structural rank needs at least one point".to_string(),
-        ));
-    }
+    crate::ranges::POINTS
+        .check(points)
+        .map_err(MethodError::Invalid)?;
     let parameters = source.parameters();
     let mut ranks = Vec::with_capacity(points);
     let mut null_spaces = Vec::with_capacity(points);

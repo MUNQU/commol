@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The engine holds the range rule of every setting: a count, a share, a
+  length, a scale, a tolerance, a bound of an optimizer, an observation, an
+  observation model, an axis pattern, a distribution, a quantity of interest
+  and the setting of an uncertainty, identifiability or sensitivity method.
+  A value outside its range still raises `ValueError` when the object is
+  built, and the same values are valid; the message is the engine's, and
+  names the setting and its range: `replicates is a whole number of at least
+  1, got 0`, `sd is a finite number greater than 0, got 0`. A count gives
+  one message for every value outside its range, a negative one included,
+  also when a binding is called with no Python object in between, and for
+  `Simulation.replicates` (`count is a whole number of at least 1, got 0`)
+  and `Calibrator.run` (`starts is a whole number of at least 1, got 0`).
+  A seed outside its range gives `seed is a whole number from 0 to
+  18446744073709551615, got -1` in every function that takes one:
+  `Simulation.run`, `Simulation.run_at`, `Simulation.replicates`,
+  `CalibrationProblem`, `SensitivityAnalysis` and each binding.
 - A calibration, a sensitivity analysis or any other method that sets a
   model parameter raises `ValueError` when it is built if the parameter is
   a formula or a series parameter. The engine computes such a parameter at

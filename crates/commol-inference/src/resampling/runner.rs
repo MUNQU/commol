@@ -148,11 +148,9 @@ where
         starts: usize,
         seed: u64,
     ) -> Result<Self, MethodError> {
-        if starts == 0 {
-            return Err(MethodError::Invalid(
-                "A replicate needs at least one start".to_string(),
-            ));
-        }
+        commol_calibration::ranges::STARTS
+            .check(starts)
+            .map_err(MethodError::Invalid)?;
         if fit.len() != problem.num_parameters() {
             return Err(MethodError::Invalid(format!(
                 "The fit has {} values for {} parameters",
@@ -291,7 +289,8 @@ pub struct BootstrapRun {
 /// # Errors
 ///
 /// [`MethodError::Failed`] of [`FitUnit::require`] when every replicate
-/// fails; [`MethodError::Invalid`] when the problem names a parameter twice,
+/// fails; [`MethodError::Invalid`] when `replicates` is outside its range
+/// ([`crate::ranges::REPLICATES`]) or the problem names a parameter twice,
 /// so its fits are no sample.
 pub fn bootstrap<E>(
     runner: &ReplicateRunner<'_, E>,
@@ -301,6 +300,9 @@ pub fn bootstrap<E>(
 where
     E: SimulationEngine + Send + Sync,
 {
+    crate::ranges::REPLICATES
+        .check(replicates)
+        .map_err(MethodError::Invalid)?;
     let perturbations = runner.perturbations(resampler, replicates);
     let negative_values = perturbations
         .iter()

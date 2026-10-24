@@ -19,7 +19,7 @@ use commol_calibration::likelihood::log_location;
 use commol_calibration::{
     CalibrationProblem, EvaluationError, ForwardModel, Likelihood, Noise, ObservedDataPoint,
 };
-use commol_core::{SimulationEngine, check_confidence_level};
+use commol_core::{CONFIDENCE_LEVEL, SimulationEngine};
 use commol_random::sample::{binomial, gamma, normal, poisson};
 use commol_random::{Generator, replicate_seed};
 use commol_statistics::statistics;
@@ -348,7 +348,7 @@ impl Band {
         confidence_level: f64,
         value: impl Fn(usize, usize, usize) -> f64,
     ) -> Result<Self, String> {
-        check_confidence_level(confidence_level)?;
+        CONFIDENCE_LEVEL.check(confidence_level)?;
         let levels = statistics::interval_levels(confidence_level);
         let table = vec![vec![0.0; outputs]; positions];
         let mut band = Self {

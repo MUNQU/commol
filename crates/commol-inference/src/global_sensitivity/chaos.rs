@@ -24,6 +24,7 @@ use nalgebra::DMatrix;
 
 use super::check_numbers;
 use crate::error::MethodError;
+use crate::ranges::{MAX_INTERACTION, Q_NORM};
 
 /// The terms a basis of `degree` keeps: those whose degrees `α` have
 /// `Σ α_i^q ≤ degree^q` and hold at most `max_interaction` inputs.
@@ -48,17 +49,9 @@ impl Truncation {
     /// [`MethodError::Invalid`] when `q_norm` is not in `(0, 1]` or
     /// `max_interaction` is 0.
     pub fn new(q_norm: f64, max_interaction: Option<usize>) -> Result<Self, MethodError> {
-        if !(q_norm > 0.0 && q_norm <= 1.0) {
-            return Err(MethodError::Invalid(format!(
-                "The q-norm of a polynomial chaos basis must be in (0, 1], got {q_norm}"
-            )));
-        }
-        if max_interaction == Some(0) {
-            return Err(MethodError::Invalid(
-                "The largest interaction order of a polynomial chaos basis must be at least 1, \
-                 got 0"
-                    .to_string(),
-            ));
+        Q_NORM.check(q_norm).map_err(MethodError::Invalid)?;
+        if let Some(order) = max_interaction {
+            MAX_INTERACTION.check(order).map_err(MethodError::Invalid)?;
         }
         Ok(Self {
             q_norm,
@@ -618,14 +611,14 @@ mod tests {
                 Truncation::new(q, None)
                     .unwrap_err()
                     .to_string()
-                    .contains("must be in (0, 1]")
+                    .contains("q_norm is a number greater than 0 and at most 1")
             );
         }
         assert!(
             Truncation::new(0.5, Some(0))
                 .unwrap_err()
                 .to_string()
-                .contains("at least 1")
+                .contains("max_interaction is a whole number of at least 1, got 0")
         );
         let truncation = Truncation::new(0.5, Some(3)).unwrap();
         assert_eq!(truncation.q_norm(), 0.5);

@@ -18,6 +18,8 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
+use crate::Count;
+
 /// Which levels run in parallel when a method nests them, such as the
 /// starts of a calibration (the outer level) and the particles of the swarm
 /// of each start (an inner level).
@@ -87,18 +89,20 @@ impl Default for Parallelism {
 }
 
 impl Parallelism {
+    /// The rule of the number of threads: a whole number of at least 1.
+    pub const THREADS: Count = Count::at_least("threads", 1);
+
     /// `threads` threads, with `levels` in parallel.
     ///
     /// # Errors
     ///
-    /// Returns a message that names `threads` when it is below 1.
+    /// Returns the message of [`Parallelism::THREADS`] when `threads` is
+    /// below 1.
     pub fn new(threads: i64, levels: Levels) -> Result<Self, String> {
-        match usize::try_from(threads) {
-            Ok(threads) if threads >= 1 => Ok(Self { threads, levels }),
-            _ => Err(format!(
-                "The number of threads must be at least 1, got {threads}"
-            )),
-        }
+        Ok(Self {
+            threads: Self::THREADS.read(threads)?,
+            levels,
+        })
     }
 
     /// The number of threads.
@@ -154,11 +158,11 @@ mod tests {
     fn a_number_of_threads_below_one_is_rejected_with_its_value() {
         assert_eq!(
             Parallelism::new(0, Levels::All),
-            Err("The number of threads must be at least 1, got 0".to_string())
+            Err("threads is a whole number of at least 1, got 0".to_string())
         );
         assert_eq!(
             Parallelism::new(-3, Levels::Outer),
-            Err("The number of threads must be at least 1, got -3".to_string())
+            Err("threads is a whole number of at least 1, got -3".to_string())
         );
         let parallelism = Parallelism::new(3, Levels::Outer).unwrap();
         assert_eq!(

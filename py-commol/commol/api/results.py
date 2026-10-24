@@ -523,9 +523,7 @@ class SimulationReplicates(list[SimulationResults]):
         ValueError
             If a level is outside ``[0, 1]`` or there are no replicates.
         """
-        for level in levels:
-            if not 0.0 <= level <= 1.0:
-                raise ValueError(f"A quantile level is between 0 and 1, got {level}.")
+        commol_rs.inference.check_levels(list(levels))
         if not self:
             raise ValueError("There are no replicates.")
         from commol.api.inference.intervals import weighted_quantiles

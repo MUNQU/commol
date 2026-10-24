@@ -1,6 +1,6 @@
 //! The weighted parameter sample every method with draws returns.
 
-use commol_core::check_confidence_level;
+use commol_core::CONFIDENCE_LEVEL;
 use commol_random::Generator;
 use commol_statistics::statistics;
 
@@ -214,7 +214,7 @@ impl ParameterSample {
     /// Returns a message when `confidence_level` is not strictly between 0
     /// and 1.
     pub fn interval(&self, confidence_level: f64) -> Result<[Vec<f64>; 2], String> {
-        check_confidence_level(confidence_level)?;
+        CONFIDENCE_LEVEL.check(confidence_level)?;
         let levels = statistics::interval_levels(confidence_level);
         let mut rows = self.quantiles(&levels)?.into_iter();
         Ok([

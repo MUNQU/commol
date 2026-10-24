@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Annotated, ClassVar, Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context.ranges import RangeChecked
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import DistributionProtocol
@@ -160,7 +161,7 @@ class LogUniform(DistributionBase):
     kind: Literal["log_uniform"] = "log_uniform"
 
 
-class Beta(DistributionBase):
+class Beta(DistributionBase, RangeChecked):
     """
     The beta distribution of shapes `a` and `b`, scaled to the bounds; they
     must be finite.
@@ -175,15 +176,15 @@ class Beta(DistributionBase):
 
     rust_kind: ClassVar[str] = "beta"
     kind: Literal["beta"] = "beta"
-    a: float = Field(gt=0.0, allow_inf_nan=False, description="The first shape.")
-    b: float = Field(gt=0.0, allow_inf_nan=False, description="The second shape.")
+    a: float = Field(description="The first shape.")
+    b: float = Field(description="The second shape.")
 
     def rust_parameters(self) -> list[float]:
         """The shapes `a` and `b`."""
         return [self.a, self.b]
 
 
-class Normal(DistributionBase):
+class Normal(DistributionBase, RangeChecked):
     """
     The normal distribution, truncated to the bounds.
 
@@ -197,17 +198,15 @@ class Normal(DistributionBase):
 
     rust_kind: ClassVar[str] = "normal"
     kind: Literal["normal"] = "normal"
-    mean: float = Field(allow_inf_nan=False, description="The mean.")
-    sd: float = Field(
-        gt=0.0, allow_inf_nan=False, description="The standard deviation."
-    )
+    mean: float = Field(description="The mean.")
+    sd: float = Field(description="The standard deviation.")
 
     def rust_parameters(self) -> list[float]:
         """The mean and the standard deviation."""
         return [self.mean, self.sd]
 
 
-class LogNormal(DistributionBase):
+class LogNormal(DistributionBase, RangeChecked):
     """
     The log-normal distribution, truncated to the bounds and to ``(0, ∞)``:
     ``log x`` is normal. The upper bound must be above 0.
@@ -222,17 +221,15 @@ class LogNormal(DistributionBase):
 
     rust_kind: ClassVar[str] = "log_normal"
     kind: Literal["log_normal"] = "log_normal"
-    mu: float = Field(allow_inf_nan=False, description="The mean of log x.")
-    sigma: float = Field(
-        gt=0.0, allow_inf_nan=False, description="The standard deviation of log x."
-    )
+    mu: float = Field(description="The mean of log x.")
+    sigma: float = Field(description="The standard deviation of log x.")
 
     def rust_parameters(self) -> list[float]:
         """`mu` and `sigma`."""
         return [self.mu, self.sigma]
 
 
-class Gamma(DistributionBase):
+class Gamma(DistributionBase, RangeChecked):
     """
     The gamma distribution of shape `shape` and rate `rate` (mean
     ``shape / rate``), truncated to the bounds and to ``(0, ∞)``. The upper
@@ -248,8 +245,8 @@ class Gamma(DistributionBase):
 
     rust_kind: ClassVar[str] = "gamma"
     kind: Literal["gamma"] = "gamma"
-    shape: float = Field(gt=0.0, allow_inf_nan=False, description="The shape.")
-    rate: float = Field(gt=0.0, allow_inf_nan=False, description="The rate.")
+    shape: float = Field(description="The shape.")
+    rate: float = Field(description="The rate.")
 
     def rust_parameters(self) -> list[float]:
         """The shape and the rate."""

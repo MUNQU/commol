@@ -320,7 +320,10 @@ fn a_history_reports_an_optimizer_it_cannot_build() {
 
     let error = optimize_with_history(&problem, &config, 0).err().unwrap();
 
-    assert_eq!(error, "initial_simplex_size must be in (0, 1], got 0");
+    assert_eq!(
+        error,
+        "initial_simplex_size is a number greater than 0 and at most 1, got 0"
+    );
 }
 
 #[test]

@@ -4,7 +4,19 @@
 use rayon::prelude::*;
 use std::fmt::{self, Debug, Display};
 
+use crate::Count;
 use crate::types::ModelValueType;
+
+/// The rule of the steps of a run: a whole number from 0 to the largest
+/// `u32`, the type of [`SimulationEngine::run`].
+pub const NUM_STEPS: Count = Count::between("num_steps", 0, u32::MAX as i128);
+
+/// The rule of the number of replicates of a stochastic run
+/// ([`run_replicates`]): at least 1.
+pub const REPLICATE_COUNT: Count = Count::at_least("count", 1);
+
+/// The rule of a seed: a whole number of 64 bits, from 0 to 2^64 - 1.
+pub const SEED: Count = Count::between("seed", 0, u64::MAX as i128);
 
 /// Outputs of a run and the positions on the axis they were reported at.
 #[derive(Debug, Clone, PartialEq)]

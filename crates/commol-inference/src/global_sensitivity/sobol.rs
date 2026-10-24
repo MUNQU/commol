@@ -15,7 +15,7 @@
 //! no indices, and then the interval is NaN: raise `base` rather than drop
 //! it, since dropping such replicates would bias the interval.
 
-use commol_core::check_confidence_level;
+use commol_core::CONFIDENCE_LEVEL;
 use commol_random::Generator;
 use commol_random::sample::index;
 use commol_statistics::statistics::{interval_levels, quantiles};
@@ -83,12 +83,8 @@ fn estimate(
             outputs.len()
         ));
     }
-    if replicates < 2 {
-        return Err(format!(
-            "Sobol needs at least 2 bootstrap replicates, got {replicates}"
-        ));
-    }
-    check_confidence_level(confidence_level)?;
+    crate::ranges::TWO_REPLICATES.check(replicates)?;
+    CONFIDENCE_LEVEL.check(confidence_level)?;
     let levels = interval_levels(confidence_level);
     let (base, inputs) = (design.base, design.inputs);
     let quantities = outputs.first().map_or(0, Vec::len);

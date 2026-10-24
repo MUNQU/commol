@@ -172,7 +172,8 @@ pub fn position_indices(observations: &[ObservedDataPoint], positions: &[f64]) -
 }
 
 pub(crate) fn check_length(length: usize, positions: usize) -> Result<(), String> {
-    if length == 0 || length > positions {
+    crate::ranges::BLOCK_LENGTH.check(length)?;
+    if length > positions {
         return Err(format!(
             "block_length is {length}; it must be between 1 and the number of distinct \
              positions of the observations, {positions}, or \"auto\""
@@ -347,13 +348,16 @@ mod tests {
     #[test]
     fn a_length_outside_the_positions_is_rejected() {
         let observations = observed(&[0.0, 1.0, 2.0], "x");
-        for length in [0, 4] {
-            let error = BlockScheme::new(&observations, length)
-                .unwrap_err()
-                .to_string();
-            assert!(error.contains("block_length"), "{error}");
-            assert!(error.contains("3"), "{error}");
-        }
+        let zero = BlockScheme::new(&observations, 0).unwrap_err().to_string();
+        let long = BlockScheme::new(&observations, 4).unwrap_err().to_string();
+        assert!(
+            zero.contains("block_length is a whole number of at least 1, got 0"),
+            "{zero}"
+        );
+        assert!(
+            long.contains("block_length") && long.contains("3"),
+            "{long}"
+        );
     }
 
     #[test]

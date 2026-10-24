@@ -20,6 +20,7 @@ use commol_statistics::numeric::{
     ln_beta, ln_gamma, log_normal_log_density, normal_log_density, x_log_y,
 };
 
+use crate::ranges;
 use crate::special::{
     beta_i, gamma_p, gamma_q, normal_cdf, normal_density, normal_quantile, normal_quantile_sf,
     normal_sf,
@@ -123,33 +124,17 @@ impl Family {
     }
 
     fn check_parameters(&self) -> Result<(), String> {
-        let positive = |name: &str, value: f64| {
-            if value.is_finite() && value > 0.0 {
-                Ok(())
-            } else {
-                Err(format!(
-                    "{} needs a finite {name} above 0, got {value}",
-                    self.kind()
-                ))
-            }
+        let checks = match *self {
+            Self::Uniform | Self::LogUniform => vec![],
+            Self::Beta { a, b } => vec![(ranges::A, a), (ranges::B, b)],
+            Self::Normal { mean, sd } => vec![(ranges::MEAN, mean), (ranges::SD, sd)],
+            Self::LogNormal { mu, sigma } => vec![(ranges::MU, mu), (ranges::SIGMA, sigma)],
+            Self::Gamma { shape, rate } => vec![(ranges::SHAPE, shape), (ranges::RATE, rate)],
         };
-        let finite = |name: &str, value: f64| {
-            if value.is_finite() {
-                Ok(())
-            } else {
-                Err(format!(
-                    "{} needs a finite {name}, got {value}",
-                    self.kind()
-                ))
-            }
-        };
-        match *self {
-            Self::Uniform | Self::LogUniform => Ok(()),
-            Self::Beta { a, b } => positive("a", a).and(positive("b", b)),
-            Self::Normal { mean, sd } => finite("mean", mean).and(positive("sd", sd)),
-            Self::LogNormal { mu, sigma } => finite("mu", mu).and(positive("sigma", sigma)),
-            Self::Gamma { shape, rate } => positive("shape", shape).and(positive("rate", rate)),
-        }
+        checks
+            .into_iter()
+            .try_for_each(|(rule, value)| rule.check(value))
+            .map_err(|error| format!("{}: {error}", self.kind()))
     }
 }
 
@@ -664,7 +649,7 @@ mod tests {
             1.0,
         )
         .unwrap_err();
-        assert!(error.contains("finite mean"), "{error}");
+        assert_eq!(error, "Normal: mean is a finite number, got inf");
     }
 
     #[test]

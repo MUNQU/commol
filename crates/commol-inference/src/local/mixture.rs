@@ -96,7 +96,8 @@ pub struct MixtureRun {
 ///
 /// # Errors
 ///
-/// [`MethodError::Invalid`] when no end gives a component, or the curvature
+/// [`MethodError::Invalid`] when `draws` is outside its range
+/// ([`crate::ranges::MIXTURE_DRAWS`]), no end gives a component, or the curvature
 /// does not apply (a stochastic engine, the mean absolute error);
 /// [`MethodError::Failed`] when a run, the derivatives or the importance
 /// sampler fail.
@@ -114,6 +115,9 @@ where
     E: SimulationEngine + Send + Sync,
     T: Target + Sync,
 {
+    crate::ranges::MIXTURE_DRAWS
+        .check(draws)
+        .map_err(MethodError::Invalid)?;
     let names = problem.parameter_names();
     let transform = Transform::new(&problem.parameter_bounds());
     let mut workspace = Workspace::default();

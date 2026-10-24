@@ -14,10 +14,10 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from commol.context.calibration import CalibrationResult
 from commol.context.inference.distributions import WithPriors
-from commol.context.inference.levels import ConfidenceLevel, Share
 from commol.context.inference.method import UncertaintyMethod
 from commol.context.inference.resampling import BlockLength
 from commol.context.inference.sample import ParameterSample
+from commol.context.ranges import RangeChecked
 
 ETA_CHOICES = (
     "a number above 0, InformationMatchingEta(block_length=...) or "
@@ -25,7 +25,7 @@ ETA_CHOICES = (
 )
 
 
-class InformationMatchingEta(BaseModel):
+class InformationMatchingEta(RangeChecked):
     """
     Calibrate `η` by information matching: `η = tr(J I⁻¹ J) / tr(J)` at the
     fit, with ``J`` the Gauss–Newton curvature of the objective and ``I`` the
@@ -53,10 +53,10 @@ class InformationMatchingEta(BaseModel):
 
     kind: Literal["information_matching"] = "information_matching"
     block_length: BlockLength = Field(description="Positions per block.")
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+    starts: int = Field(default=1, description="Starts of the fit.")
 
 
-class BootstrapCoverageEta(BaseModel):
+class BootstrapCoverageEta(RangeChecked):
     """
     Calibrate `η` by bootstrap coverage: the `η` at which the central
     intervals of `confidence_level` of the Gibbs posteriors of
@@ -81,14 +81,14 @@ class BootstrapCoverageEta(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: Literal["bootstrap_coverage"] = "bootstrap_coverage"
-    replicates: int = Field(ge=1, description="Number of bootstrap data sets.")
+    replicates: int = Field(description="Number of bootstrap data sets.")
     block_length: BlockLength = Field(description="Positions per block.")
-    confidence_level: ConfidenceLevel = Field(description="The level of the intervals.")
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+    confidence_level: float = Field(description="The level of the intervals.")
+    starts: int = Field(default=1, description="Starts of the fit.")
 
 
 type Eta = (
-    Annotated[float, Field(gt=0.0, allow_inf_nan=False)]
+    float
     | Annotated[
         InformationMatchingEta | BootstrapCoverageEta, Field(discriminator="kind")
     ]
@@ -235,7 +235,7 @@ def _require(data: JsonValue, name: str, hint: str) -> None:
         raise ValueError(f"{name} is required: {hint}.")
 
 
-class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult]):
+class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult], RangeChecked):
     """
     The Gibbs posterior ``π(θ) ∝ prior(θ) · exp(−η · loss(θ))`` of the
     problem's loss, with its weights and normalization, sampled by sequential
@@ -269,26 +269,20 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult]):
     """
 
     eta: Eta = Field(description="The scale of the loss, or its calibration.")
-    particles: int = Field(ge=2, description="Number of particles.")
-    target_cess: Share = Field(description="Share kept per step.")
-    resample_threshold: float = Field(
-        gt=0.0, le=1.0, description="Resample below this share."
-    )
-    stay_probability: Share = Field(description="Probability a particle does not move.")
+    particles: int = Field(description="Number of particles.")
+    target_cess: float = Field(description="Share kept per step.")
+    resample_threshold: float = Field(description="Resample below this share.")
+    stay_probability: float = Field(description="Probability a particle does not move.")
 
     @model_validator(mode="before")
     @classmethod
     def require_eta(cls, data: JsonValue) -> JsonValue:
         """Name the choices of `eta` when it is missing."""
         _require(data, "eta", f"give {ETA_CHOICES}")
-        if isinstance(data, Mapping):
-            eta = data["eta"]
-            if isinstance(eta, int | float) and not eta > 0:
-                raise ValueError(f"eta must be {ETA_CHOICES}; got {eta}.")
         return data
 
 
-class BayesianPosterior(WithPriors, UncertaintyMethod[SMCResult]):
+class BayesianPosterior(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
     """
     The posterior ``π(θ) ∝ prior(θ) · L(θ)`` of the problem's observation
     models, sampled by sequential Monte Carlo from the priors (temperature
@@ -318,15 +312,13 @@ class BayesianPosterior(WithPriors, UncertaintyMethod[SMCResult]):
         ``⌈log c / log(1 − a)⌉`` times.
     """
 
-    particles: int = Field(ge=2, description="Number of particles.")
-    target_cess: Share = Field(description="Share kept per step.")
-    resample_threshold: float = Field(
-        gt=0.0, le=1.0, description="Resample below this share."
-    )
-    stay_probability: Share = Field(description="Probability a particle does not move.")
+    particles: int = Field(description="Number of particles.")
+    target_cess: float = Field(description="Share kept per step.")
+    resample_threshold: float = Field(description="Resample below this share.")
+    stay_probability: float = Field(description="Probability a particle does not move.")
 
 
-class ABCSMC(WithPriors, UncertaintyMethod[SMCResult]):
+class ABCSMC(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
     """
     Approximate Bayesian computation by sequential Monte Carlo (Del Moral,
     Doucet and Jasra 2012): the tolerance ``ε`` falls step by step, and a
@@ -360,15 +352,15 @@ class ABCSMC(WithPriors, UncertaintyMethod[SMCResult]):
     """
 
     distance: ABCDistance = Field(description="The distance.")
-    particles: int = Field(ge=2, description="Number of particles.")
-    target_cess: Share = Field(description="Share kept per step.")
-    min_acceptance: Share = Field(
+    particles: int = Field(description="Number of particles.")
+    target_cess: float = Field(description="Share kept per step.")
+    min_acceptance: float = Field(
         description="Acceptance rate below which the run stops."
     )
-    stay_probability: Share = Field(description="Probability a particle does not move.")
+    stay_probability: float = Field(description="Probability a particle does not move.")
 
 
-class ABCRejection(WithPriors, UncertaintyMethod[SMCResult]):
+class ABCRejection(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
     """
     ABC rejection: `draws` draws of the priors, of which the closest share
     `quantile` is kept, with equal weights. It is one step of `ABCSMC` with
@@ -389,5 +381,5 @@ class ABCRejection(WithPriors, UncertaintyMethod[SMCResult]):
     """
 
     distance: ABCDistance = Field(description="The distance.")
-    draws: int = Field(ge=2, description="Number of draws.")
-    quantile: Share = Field(description="The share of draws kept.")
+    draws: int = Field(description="Number of draws.")
+    quantile: float = Field(description="The share of draws kept.")

@@ -131,9 +131,9 @@ fn a_window_is_finite_and_positive() {
         let error = problem(differential(), vec![observation], vec![])
             .err()
             .expect("the window is rejected");
-        assert!(
-            error.contains("a window must be finite and positive"),
-            "{error}"
+        assert_eq!(
+            error,
+            format!("Observation 'A' at 4: window is a finite number greater than 0, got {window}")
         );
     }
 }

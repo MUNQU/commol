@@ -88,24 +88,18 @@ impl PyDistribution {
     /// Raises:
     ///     ValueError: If `p` is not in [0, 1]
     fn quantile(&self, p: f64) -> PyResult<f64> {
-        if !(0.0..=1.0).contains(&p) {
-            return Err(value_error(format!(
-                "A quantile level is between 0 and 1, got {p}"
-            )));
-        }
+        commol_statistics::statistics::check_levels(&[p]).map_err(value_error)?;
         Ok(self.inner.quantile(p))
     }
 
     /// `count` draws from the stream of draws of a distribution of `seed`
-    fn sample(
-        &self,
-        #[pyo3(from_py_with = crate::counts::required::count)] count: usize,
-        seed: u64,
-    ) -> Vec<f64> {
+    fn sample(&self, count: i64, seed: i128) -> PyResult<Vec<f64>> {
+        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+        let count: usize = crate::counts::count(&commol_inference::ranges::COUNT, count)?;
         let mut generator = Generator::from_seed(Stream::DistributionDraws.seed(seed));
-        (0..count)
+        Ok((0..count)
             .map(|_| self.inner.sample(&mut generator))
-            .collect()
+            .collect())
     }
 }
 
@@ -230,12 +224,14 @@ fn gibbs_posterior(
     problem: &PyCalibrationProblem,
     priors: Option<Vec<PriorArgs>>,
     eta: f64,
-    #[pyo3(from_py_with = crate::counts::required::particles)] particles: usize,
+    particles: i64,
     resample_threshold: f64,
     target_cess: f64,
     stay_probability: f64,
-    seed: u64,
+    seed: i128,
 ) -> PyResult<PySmcRun> {
+    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+    let particles: usize = crate::counts::count(&commol_inference::ranges::PARTICLES, particles)?;
     let priors = problem_priors(problem, priors)?;
     let mut sampler = sampler(particles, resample_threshold, target_cess, stay_probability)?;
     let run = parallel(py, || {
@@ -267,12 +263,14 @@ fn bayesian_posterior(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
     priors: Option<Vec<PriorArgs>>,
-    #[pyo3(from_py_with = crate::counts::required::particles)] particles: usize,
+    particles: i64,
     resample_threshold: f64,
     target_cess: f64,
     stay_probability: f64,
-    seed: u64,
+    seed: i128,
 ) -> PyResult<PySmcRun> {
+    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+    let particles: usize = crate::counts::count(&commol_inference::ranges::PARTICLES, particles)?;
     let priors = problem_priors(problem, priors)?;
     let mut sampler = sampler(particles, resample_threshold, target_cess, stay_probability)?;
     let run = parallel(py, || {
@@ -300,8 +298,10 @@ fn bayesian_posterior(
 fn information_matching_eta(
     problem: &PyCalibrationProblem,
     fit: Vec<f64>,
-    #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
+    block_length: Option<i64>,
 ) -> PyResult<f64> {
+    let block_length: Option<usize> =
+        crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
     smc::information_matching_eta(&problem.inner, &fit, block_length).map_err(method_error)
 }
 
@@ -334,15 +334,21 @@ fn bootstrap_coverage_eta(
     problem: &PyCalibrationProblem,
     priors: Option<Vec<PriorArgs>>,
     fit: Vec<f64>,
-    #[pyo3(from_py_with = crate::counts::required::replicates)] replicates: usize,
-    #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
+    replicates: i64,
+    block_length: Option<i64>,
     confidence_level: f64,
-    #[pyo3(from_py_with = crate::counts::required::particles)] particles: usize,
+    particles: i64,
     resample_threshold: f64,
     target_cess: f64,
     stay_probability: f64,
-    seed: u64,
+    seed: i128,
 ) -> PyResult<PyEtaCoverage> {
+    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+    let replicates: usize =
+        crate::counts::count(&commol_inference::ranges::REPLICATES, replicates)?;
+    let block_length: Option<usize> =
+        crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
+    let particles: usize = crate::counts::count(&commol_inference::ranges::PARTICLES, particles)?;
     let priors = problem_priors(problem, priors)?;
     let mut sampler = sampler(particles, resample_threshold, target_cess, stay_probability)?;
     let blocks = BlockScheme::at_fit(
@@ -401,12 +407,14 @@ fn abc_smc(
     problem: &PyCalibrationProblem,
     priors: Option<Vec<PriorArgs>>,
     metric: Option<&str>,
-    #[pyo3(from_py_with = crate::counts::required::particles)] particles: usize,
+    particles: i64,
     target_cess: f64,
     min_acceptance: f64,
     stay_probability: f64,
-    seed: u64,
+    seed: i128,
 ) -> PyResult<(PySmcRun, bool)> {
+    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+    let particles: usize = crate::counts::count(&commol_inference::ranges::PARTICLES, particles)?;
     let priors = problem_priors(problem, priors)?;
     let distance = Distance::from_metric(metric).map_err(method_error)?;
     // With weights of 0 or 1, a particle of weight 0 cannot move: every
@@ -444,10 +452,12 @@ fn abc_rejection(
     problem: &PyCalibrationProblem,
     priors: Option<Vec<PriorArgs>>,
     metric: Option<&str>,
-    #[pyo3(from_py_with = crate::counts::required::draws)] draws: usize,
+    draws: i64,
     quantile: f64,
-    seed: u64,
+    seed: i128,
 ) -> PyResult<(PySmcRun, bool)> {
+    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+    let draws: usize = crate::counts::count(&commol_inference::ranges::TWO_DRAWS, draws)?;
     let priors = problem_priors(problem, priors)?;
     let distance = Distance::from_metric(metric).map_err(method_error)?;
     let target = AbcTarget::new(&problem.inner, &priors, distance).map_err(method_error)?;

@@ -202,13 +202,13 @@ class TestPositions:
     @pytest.mark.parametrize(
         ("at", "message"),
         [
-            ([], "must not be empty if specified"),
-            ([10, -1], "must all be finite and non-negative"),
-            ([float("inf")], "must all be finite and non-negative"),
+            ([], "'cap' must not be empty if specified"),
+            ([10, -1], "at is a finite number of at least 0, got -1"),
+            ([float("inf")], "at is a finite number of at least 0, got inf"),
         ],
     )
     def test_a_constraint_is_checked_at_positions_of_the_axis(
         self, at: list[float], message: str
     ) -> None:
-        with pytest.raises(ValidationError, match=f"'cap' {message}"):
+        with pytest.raises(ValidationError, match=message):
             CalibrationConstraint(id="cap", expression="500.0 - B", at=at)
