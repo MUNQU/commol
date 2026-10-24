@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-10-24
+
+This release makes the engine the one source of every rule: the range of
+each setting, the values of a model, the windows, the checks of a model and
+a calibration, and the language of formulas, which commol now reads with a
+parser of its own. A value that was valid stays valid, and an invalid one
+still raises `ValueError` when its object is built, but the messages are
+the engine's. Read the changes before you upgrade: seeded results change
+value, as every draw comes from one seed scheme in which neighbouring seeds
+share no replicate; a chain of powers groups from the right, so
+`2 ** 3 ** 2` is 512; `BootstrapCoverageEta` gives a slightly different η;
+a stratification fraction outside 0 to 1 is rejected; and two results are
+equal when their values, a NaN included, and their positions, seed and
+model are equal, so a run is no longer equal to a plain `dict`. See
+[Building models](../guide/building-models.md) and
+[Uncertainty](../guide/uncertainty/index.md).
+
 ### Changed
 
 - The engine holds the range rule of every setting: a count, a share, a
@@ -1847,6 +1864,7 @@ the details of these versions.
 ## Version History
 
 - **Unreleased** - Current development version
+- **0.10.2** - The engine as the one source of rules: settings, model values, windows and formulas; one seed scheme; results equal by value
 - **0.10.1** - Fixes of the audit: stochastic changes from the position, one account in the documentation, read-only CI and pinned tools
 - **0.10.0** - One way for equivalent things: setting names, seeds and starts, result shapes, error types, the quantile and logging
 - **0.9.0** - Control over the work and the record: threads and levels, swarm stop rules, truncated chaos bases, ratios, seeds and build info
