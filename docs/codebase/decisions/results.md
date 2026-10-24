@@ -97,7 +97,7 @@ no crate of commol. `ci_percentiles`, `BootstrapResult.interval_error`,
 with a range gets its rule, a row for its object in `RANGES` and the check in
 the engine function that takes it.
 
-**Guards:** `tests/suite/test_rules.py` (`test_a_setting_has_one_name`,
+**Guards:** `tests/suite/test_engine_rules.py` (`test_a_setting_has_one_name`,
 `test_no_model_declares_a_range_of_a_setting`), `tests/uncertainty/test_ranges.py`,
 `tests/uncertainty/test_counts.py`, `tests/uncertainty/test_intervals.py`,
 `crates/commol-calibration/tests/test_ranges.rs`,

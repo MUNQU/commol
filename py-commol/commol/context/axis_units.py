@@ -8,7 +8,6 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validat
 
 from commol.commol_rs import _commol_rs as commol_rs
 
-from commol.context import _windows as windows
 from commol.context._model.units import DEFAULT_STEP_UNIT, check_step_unit
 from commol.utils.equations import define_units, ureg
 
@@ -119,7 +118,8 @@ class AxisUnits(BaseModel):
     rate means (`rate_meaning`) and give the rate it reads. `window_start`,
     `window_end`, `window_index` and `window_ends` give the grid of windows of
     one width, a span in a unit: window ``w`` covers the positions
-    ``(w * width, (w + 1) * width]``.
+    ``(w * width, (w + 1) * width]``, as the engine computes it
+    (`crates/commol-calibration/src/observation.rs`).
 
     An axis of time with an `origin` is on the calendar: `position_of` and
     `moment_of` convert between calendar moments and positions, and
@@ -476,7 +476,9 @@ class AxisUnits(BaseModel):
             If the width is not a positive whole number of steps, `unit` has
             another dimension than the step unit, or `index` is negative.
         """
-        return windows.window_start(index, self._window_steps(span, unit))
+        return commol_rs.calibration.window_bounds(
+            index, self._window_steps(span, unit)
+        )[0]
 
     def window_end(self, index: int, span: float, unit: str) -> float:
         """
@@ -502,7 +504,9 @@ class AxisUnits(BaseModel):
             If the width is not a positive whole number of steps, `unit` has
             another dimension than the step unit, or `index` is negative.
         """
-        return windows.window_end(index, self._window_steps(span, unit))
+        return commol_rs.calibration.window_bounds(
+            index, self._window_steps(span, unit)
+        )[1]
 
     def window_index(self, at: float, span: float, unit: str) -> int:
         """
@@ -533,7 +537,7 @@ class AxisUnits(BaseModel):
             If the width is not a positive whole number of steps, `unit` has
             another dimension than the step unit, or `at` is negative.
         """
-        return windows.window_index(at, self._window_steps(span, unit))
+        return commol_rs.calibration.window_index(at, self._window_steps(span, unit))
 
     def window_ends(self, span: float, unit: str, end: float) -> list[float]:
         """
@@ -561,7 +565,7 @@ class AxisUnits(BaseModel):
             If the width is not a positive whole number of steps, or `unit`
             has another dimension than the step unit.
         """
-        return windows.window_ends(self._window_steps(span, unit), end)
+        return commol_rs.calibration.window_ends(self._window_steps(span, unit), end)
 
     @property
     def rate_meaning(self) -> str:

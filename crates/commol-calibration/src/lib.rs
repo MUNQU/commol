@@ -89,7 +89,8 @@ pub use likelihood::{
 };
 pub use objective::{OptimizationObjective, Score};
 pub use observation::{
-    ObservationOperator, WindowError, index_at, window_increments, window_start,
+    ObservationOperator, WindowError, check_window_end, index_at, window_bounds, window_ends,
+    window_increments, window_index, window_start, windows_in,
 };
 pub use optimization::{
     AccelerationStrategy, ImprovementStop, InertiaWeightStrategy, InitializationStrategy,

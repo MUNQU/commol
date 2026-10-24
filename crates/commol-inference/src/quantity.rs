@@ -37,7 +37,7 @@
 use std::ops::Range;
 
 use commol_calibration::ranges::{AT, WINDOW};
-use commol_calibration::{ObservationOperator, ObservedDataPoint, index_at, window_start};
+use commol_calibration::{ObservationOperator, ObservedDataPoint, check_window_end, index_at};
 use commol_core::Real;
 use serde::{Deserialize, Serialize};
 
@@ -321,22 +321,17 @@ impl Points<'_> {
         for &at in positions {
             rule.check(at)
                 .map_err(|error| format!("Quantity {index}: {error}"))?;
-            if let Some(window) = window
-                && window_start(at, window) < 0.0
-            {
-                return Err(format!(
-                    "Quantity {index}: increments over windows of {window} start at 0 at the \
-                     earliest, so each end is at least {window}; got the end {at}"
-                ));
-            }
+            let start = window
+                .map(|window| check_window_end(at, window))
+                .transpose()
+                .map_err(|error| format!("Quantity {index}: {error}"))?;
             self.points.push(ObservedDataPoint::of_sum(
                 at,
                 format!("quantity {index}"),
                 series.outputs().to_vec(),
                 0.0,
             ));
-            self.starts
-                .push(window.map(|window| window_start(at, window)));
+            self.starts.push(start);
         }
         Ok(first..self.points.len())
     }

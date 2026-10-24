@@ -1,11 +1,10 @@
 """Check the rules of the Python test suite that a program can judge: every
 test checks a result, a fixture name has one meaning, a module stays short and
 its package has a row in the layout, every expected failure names the issue
-that fixes it, no test takes over its time budget unless the test conventions
-give its reason, and every public setting of commol has the one name of its
-meaning. The rules are in ``docs/codebase/tests.md`` and
-``docs/codebase/conventions.md``; the rules of the Rust tests are in
-``test_rust_rules.py``."""
+that fixes it, and no test takes over its time budget unless the test
+conventions give its reason. The rules are in ``docs/codebase/tests.md``; the
+rules of the Rust tests are in ``test_rust_rules.py``, and the rules of what
+the engine holds in ``test_engine_rules.py``."""
 
 import ast
 import re
@@ -21,7 +20,6 @@ import pytest
 
 
 from tests.suite.durations import DURATIONS
-from tests.suite.settings import declared_ranges, public_settings
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TESTS_DIR = REPO_ROOT / "py-commol" / "tests"
@@ -468,110 +466,3 @@ def test_no_coverage_profile_is_tracked() -> None:
 
     assert not tracked, f"Remove the coverage profiles from git: {tracked}"
     assert ignored == profiles
-
-
-# Names
-
-OLD_NAMES = {"num_particles", "base_draws"}
-"""Names of a count that every other method writes as a plain plural noun."""
-
-QUANTILE_LEVELS = {"Quantile", "Quantile.__init__"}
-"""The settings whose ``level`` is the level of a quantile, not of an interval."""
-
-
-def test_a_setting_has_one_name() -> None:
-    """A count is a plain plural noun and the level of an interval is
-    ``confidence_level``, in every public setting of commol."""
-    wrong = sorted(
-        f"{owner}: {name}"
-        for owner, name in public_settings()
-        if name in OLD_NAMES or (name == "level" and owner not in QUANTILE_LEVELS)
-    )
-    assert not wrong, (
-        "Name a count with a plural noun (particles, draws, replicates) and the "
-        "level of an interval confidence_level:\n" + "\n".join(wrong)
-    )
-
-
-POLICY = "A range rule of a setting lives in the engine, and Python does not repeat it."
-"""The policy line of the range rules in ``coverage.md``; ``conventions.md``
-gives the rule with this test as its check."""
-
-OLD_POLICY = "A check that the Python layer makes first is not repeated"
-"""The policy that a range rule replaces: the binding skips a check of Python."""
-
-
-def test_no_model_declares_a_range_of_a_setting() -> None:
-    """No pydantic model of commol declares a range constraint (``ge``, ``gt``,
-    ``le``, ``lt``, a constrained number type or ``allow_inf_nan=False``): the
-    engine holds the range rule of each setting, and the documentation says
-    so."""
-    declared = sorted(declared_ranges())
-    pages = {
-        relative(page): page.read_text(encoding="utf-8")
-        for page in (REPO_ROOT / "docs").rglob("*.md")
-    }
-    policy = {
-        "docs/codebase/coverage.md": POLICY,
-        "docs/codebase/conventions.md": "test_no_model_declares_a_range_of_a_setting",
-    }
-    without = [
-        name
-        for name, line in policy.items()
-        if line not in " ".join(pages[name].split())
-    ]
-    old = [name for name, text in pages.items() if OLD_POLICY in " ".join(text.split())]
-
-    assert not declared, (
-        "Move the range rule to the engine (crates/*/src/ranges.rs):\n"
-        + "\n".join(declared)
-    )
-    assert not without, f"Write the policy of the range rules in {without}"
-    assert not old, f"Remove the old policy of the binding checks from {old}"
-
-
-# The stub of the extension
-
-STUB = REPO_ROOT / "py-commol" / "commol" / "commol_rs" / "_commol_rs.pyi"
-UNDECLARED = {"test_kind": "the queries of the test model kind, only in a test build"}
-"""The members of the extension that the stub leaves out, and why."""
-
-
-def declared(node: ast.Module | ast.ClassDef) -> dict[str, str]:
-    """The names the stub declares in ``node``, each with its annotation."""
-    return {
-        item.target.id: ast.unparse(item.annotation)
-        for item in node.body
-        if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name)
-    } | {
-        item.name: ""
-        for item in node.body
-        if isinstance(item, ast.FunctionDef) and item.name != "__init__"
-    }
-
-
-def test_the_stub_declares_what_the_extension_has() -> None:
-    """Each module and class of ``_commol_rs.pyi`` declares the members of
-    the built extension and nothing else."""
-    from commol.commol_rs import _commol_rs as extension
-
-    tree = ast.parse(STUB.read_text(encoding="utf-8"))
-    classes = {node.name: node for node in tree.body if isinstance(node, ast.ClassDef)}
-    pending = [("_commol_rs", tree, extension)]
-    wrong = []
-    while pending:
-        name, node, built = pending.pop()
-        names = {key: value for key, value in declared(node).items() if key[:2] != "__"}
-        members = {key for key in vars(built) if key[:2] != "__"} - set(UNDECLARED)
-        if set(names) != members:
-            wrong.append(
-                f"{name}: only in the stub {sorted(set(names) - members)}, "
-                f"only in the extension {sorted(members - set(names))}"
-            )
-        for member, annotation in names.items():
-            protocol = annotation.removeprefix("type[").removesuffix("]")
-            if protocol in classes and member in members:
-                pending.append((member, classes[protocol], getattr(built, member)))
-    assert not wrong, "Make the stub declare what the extension has:\n" + "\n".join(
-        wrong
-    )

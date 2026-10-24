@@ -9,7 +9,6 @@ neighbors of a unit are (`Complete`, `Groups`). The engine
 validates the structure and asks the engine.
 """
 
-import math
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Literal, Self
 
@@ -504,7 +503,9 @@ class Aggregate(ModelStructure, InitialConditions):
             )
 
     def _check_stratification_fractions(self, process: Process) -> None:
-        """Check the stratification fractions against the stratifications."""
+        """Check that the fractions name each stratification and its
+        categories; the rule of their values is the engine's, checked when the
+        structure is built."""
         strat_map = {strat.id: strat for strat in process.stratifications}
         actual_strat = set(self.stratification_fractions)
         expected_strat = set(strat_map)
@@ -527,13 +528,6 @@ class Aggregate(ModelStructure, InitialConditions):
                     f"match defined categories in instance '{strat_instance.id}'. "
                     f"Missing categories: {sorted(expected - actual)}, "
                     f"Extra categories: {sorted(actual - expected)}."
-                )
-
-            total = sum(fractions.values())
-            if not math.isclose(total, 1.0, abs_tol=1e-6):
-                raise ValueError(
-                    f"Stratification fractions for '{strat_id}' must sum to 1.0, "
-                    f"but got {total:.7}."
                 )
 
 

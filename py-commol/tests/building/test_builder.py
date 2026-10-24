@@ -93,7 +93,7 @@ class TestProcessChecks:
         ids=["bin", "stratification", "transition"],
     )
     def test_an_id_names_one_item_of_its_kind(self, add, message: str) -> None:
-        builder = a_to_b_builder(stratifications={"g": ["g1", "g2"]})
+        builder = a_to_b_builder(stratifications={"g": {"g1": 0.5, "g2": 0.5}})
         add(builder)
 
         with pytest.raises(ValidationError, match=message):
@@ -111,7 +111,9 @@ class TestProcessChecks:
     def test_a_transition_moves_between_bins_or_categories_of_one_stratification(
         self, source: list[str], target: list[str], message: str
     ) -> None:
-        builder = a_to_b_builder(stratifications={"g": ["g1", "g2"], "h": ["h1", "h2"]})
+        builder = a_to_b_builder(
+            stratifications={"g": {"g1": 0.5, "g2": 0.5}, "h": {"h1": 0.5, "h2": 0.5}}
+        )
         builder.add_transition(id="t2", source=source, target=target, rate="k")
 
         with pytest.raises(ValidationError, match=message):

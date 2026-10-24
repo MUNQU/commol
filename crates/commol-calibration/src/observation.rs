@@ -4,11 +4,19 @@
 //! This is the only code that turns a run into observed quantities. The
 //! optimizer, every inference method, the predictive and the scores read
 //! observations through it.
+//!
+//! It is also the only code of the arithmetic of windows: the start of the
+//! window of an observation ([`window_start`], [`check_window_end`]), the
+//! increments of a series over windows ([`window_increments`]), and the grid
+//! of windows that results, figures and reports read: window `w` of length
+//! `window` covers `(w · window, (w + 1) · window]` ([`window_bounds`],
+//! [`window_index`], [`window_ends`], [`windows_in`]).
 
 use std::collections::HashMap;
 
 use commol_core::{POSITION_TOLERANCE, same_position};
 
+use crate::ranges::{AT, GRID_END, WINDOW, WINDOW_INDEX};
 use crate::types::{CalibrationParameter, CalibrationParameterType, ObservedDataPoint};
 
 /// The index of `at` in `positions`, ascending: the entry equal to it, or
@@ -47,8 +55,103 @@ pub fn window_start(at: f64, window: f64) -> f64 {
     }
 }
 
+/// Check the window of length `window` that ends at `at`: a length of
+/// [`WINDOW`] and a start ([`window_start`]) at 0 or after it, so an end is
+/// at least its window. Returns the start.
+///
+/// # Errors
+///
+/// Returns the message of [`WINDOW`], or a message that names the window and
+/// its end when the window starts before 0.
+pub fn check_window_end(at: f64, window: f64) -> Result<f64, String> {
+    WINDOW.check(window)?;
+    let start = window_start(at, window);
+    if start < 0.0 {
+        Err(format!(
+            "the window {window} that ends at {at} starts before 0; an end is at least \
+             its window"
+        ))
+    } else {
+        Ok(start)
+    }
+}
+
+/// The number of windows of length `window` in `span`: `span / window`, or
+/// the nearest whole number when the two are the same within the tolerance
+/// of the axis ([`same_position`], a count of windows being a position in
+/// units of the window), so `0.3 / 0.1` is 3 windows.
+///
+/// # Errors
+///
+/// Returns the message of [`WINDOW`] when `window` is not a finite, positive
+/// length.
+pub fn windows_in(span: f64, window: f64) -> Result<f64, String> {
+    WINDOW.check(window)?;
+    let count = span / window;
+    let whole = count.round();
+    Ok(if same_position(count, whole) {
+        whole
+    } else {
+        count
+    })
+}
+
+/// The positions that bound window `index` of the grid of length `window`:
+/// it opens at `index · window` and closes at `(index + 1) · window`, where
+/// the next window opens.
+///
+/// # Errors
+///
+/// Returns the message of [`WINDOW`], or of [`WINDOW_INDEX`] for a negative
+/// index.
+pub fn window_bounds(index: i64, window: f64) -> Result<(f64, f64), String> {
+    WINDOW.check(window)?;
+    WINDOW_INDEX.check(index)?;
+    // An index of the grid is far below 2^53, where each is a number.
+    let index = index as f64;
+    Ok((index * window, (index + 1.0) * window))
+}
+
+/// The window of the grid of length `window` that holds the position `at`:
+/// `max(ceil(at / window) − 1, 0)`, with the number of windows of
+/// [`windows_in`]. Position 0 is in window 0, and the end of each window is
+/// in that window.
+///
+/// # Errors
+///
+/// Returns the message of [`WINDOW`], or of [`AT`] when `at` is not a
+/// position on the axis.
+pub fn window_index(at: f64, window: f64) -> Result<usize, String> {
+    let count = windows_in(at, window)?;
+    AT.check(at)?;
+    // A finite count of at least 0 below 2^64 windows.
+    Ok((count.ceil() as usize).saturating_sub(1))
+}
+
+/// The end of each complete window of the grid of length `window` up to
+/// `end`: `window`, `2 · window`, … with the number of windows of
+/// [`windows_in`]. A trailing partial window is left out, and an `end` below
+/// one window gives none.
+///
+/// # Errors
+///
+/// Returns the message of [`WINDOW`], or of [`GRID_END`] when `end` is not
+/// finite.
+pub fn window_ends(window: f64, end: f64) -> Result<Vec<f64>, String> {
+    let count = windows_in(end, window)?;
+    GRID_END.check(end)?;
+    // A finite count, read as 0 below 0.
+    let count = count.floor().max(0.0) as usize;
+    (0..count)
+        .map(|index| {
+            let index = i64::try_from(index).expect("a count of windows fits an i64");
+            window_bounds(index, window).map(|(_, end)| end)
+        })
+        .collect()
+}
+
 /// Why a window has no increment ([`window_increments`]).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum WindowError {
     /// The window that ends at `end` starts before 0 ([`window_start`]) and
     /// before every position.
@@ -60,6 +163,8 @@ pub enum WindowError {
     },
     /// No position is this position, the end or the start of a window.
     Missing(f64),
+    /// The length of the window is outside the rule [`WINDOW`]: its message.
+    Length(String),
 }
 
 impl std::fmt::Display for WindowError {
@@ -70,6 +175,7 @@ impl std::fmt::Display for WindowError {
                 "Position {end} has no complete window of {window} before it"
             ),
             Self::Missing(at) => write!(f, "No position is {at}"),
+            Self::Length(message) => f.write_str(message),
         }
     }
 }
@@ -83,6 +189,7 @@ impl std::error::Error for WindowError {}
 ///
 /// # Errors
 ///
+/// [`WindowError::Length`] when `window` is outside the rule [`WINDOW`],
 /// [`WindowError::Incomplete`] for the first window that starts before 0 at
 /// no position, and [`WindowError::Missing`] for the first end or start that
 /// is no position.
@@ -97,6 +204,7 @@ pub fn window_increments(
     ends: &[f64],
 ) -> Result<Vec<f64>, WindowError> {
     assert_eq!(series.len(), positions.len(), "one value per position");
+    WINDOW.check(window).map_err(WindowError::Length)?;
     ends.iter()
         .map(|&end| {
             let start = window_start(end, window);
@@ -438,5 +546,92 @@ mod tests {
         let parameters = vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)];
         let error = ObservationOperator::new(&observed, &parameters, &names(), &[1.0]).unwrap_err();
         assert!(error.contains("not a Factor parameter"), "{error}");
+    }
+
+    #[test]
+    fn the_ends_of_the_grid_are_its_complete_windows() {
+        assert_eq!(window_ends(5.0, 20.0), Ok(vec![5.0, 10.0, 15.0, 20.0]));
+        assert_eq!(window_ends(5.0, 23.0), Ok(vec![5.0, 10.0, 15.0, 20.0]));
+        for end in [3.0, 0.0, -5.0] {
+            assert_eq!(window_ends(5.0, end), Ok(vec![]), "{end}");
+        }
+        // 0.3 / 0.1 is 2.9999999999999996, which is 3 windows.
+        let ends = window_ends(0.1, 0.3).unwrap();
+        assert_eq!(ends.len(), 3);
+        assert!(same_position(ends[2], 0.3));
+        assert_eq!(
+            window_ends(5.0, f64::INFINITY),
+            Err("end is a finite number, got inf".to_string())
+        );
+    }
+
+    #[test]
+    fn the_index_of_a_position_inverts_the_end_of_its_window() {
+        for window in [168.0, 2.5] {
+            for index in 0..33 {
+                let (start, end) = window_bounds(index, window).unwrap();
+                assert_eq!(end - start, window);
+                assert_eq!(window_bounds(index + 1, window).unwrap().0, end);
+                let index = usize::try_from(index).unwrap();
+                assert_eq!(window_index(end, window), Ok(index));
+                assert_eq!(window_index(start + window / 2.0, window), Ok(index));
+            }
+        }
+        // Window 1 of length 7 covers (7, 14].
+        let indices: Vec<usize> = [0.0, 0.5, 7.0, 7.5, 14.0, 14.5]
+            .into_iter()
+            .map(|at| window_index(at, 7.0).unwrap())
+            .collect();
+        assert_eq!(indices, [0, 0, 0, 1, 1, 2]);
+        // 0.1 + 0.2 is 0.30000000000000004, the end of window 2 of 0.1.
+        assert_eq!(window_index(0.1 + 0.2, 0.1), Ok(2));
+    }
+
+    #[test]
+    fn the_grid_has_the_rule_of_a_window_its_index_and_its_positions() {
+        for window in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            let message = WINDOW.check(window).unwrap_err();
+            assert_eq!(window_bounds(0, window), Err(message.clone()));
+            assert_eq!(window_index(1.0, window), Err(message.clone()));
+            assert_eq!(window_ends(window, 10.0), Err(message.clone()));
+            assert_eq!(windows_in(1.0, window), Err(message.clone()));
+            assert_eq!(check_window_end(10.0, window), Err(message.clone()));
+            assert_eq!(
+                window_increments(&[0.0], &[0.0], window, &[]),
+                Err(WindowError::Length(message.clone()))
+            );
+            assert_eq!(WindowError::Length(message.clone()).to_string(), message);
+        }
+        assert_eq!(
+            window_bounds(-1, 7.0),
+            Err("index is a whole number of at least 0, got -1".to_string())
+        );
+        assert_eq!(
+            window_index(-1.0, 7.0),
+            Err("at is a finite number of at least 0, got -1".to_string())
+        );
+    }
+
+    #[test]
+    fn a_window_ends_at_least_one_window_after_0() {
+        assert_eq!(check_window_end(7.0, 7.0), Ok(0.0));
+        assert_eq!(check_window_end(1000.0, 1000.0 + 1e-7), Ok(0.0));
+        assert_eq!(check_window_end(10.0, 4.0), Ok(6.0));
+        assert_eq!(
+            check_window_end(3.0, 4.0),
+            Err(
+                "the window 4 that ends at 3 starts before 0; an end is at least its \
+                 window"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn a_count_of_windows_is_whole_within_the_tolerance_of_the_axis() {
+        assert_eq!(windows_in(0.3, 0.1), Ok(3.0));
+        assert_eq!(windows_in(7.5, 2.5), Ok(3.0));
+        assert_eq!(windows_in(1.0, 4.0), Ok(0.25));
+        assert_eq!(windows_in(-14.0, 7.0), Ok(-2.0));
     }
 }

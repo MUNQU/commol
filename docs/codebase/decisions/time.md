@@ -18,13 +18,13 @@ be whole is the engine's check, not the converter's.
 
 The axis owns the window grid: `AxisUnits.window_start`, `window_end`,
 `window_index` and `window_ends` take the width as a span and a unit, as
-`steps` does, and check that it is a positive whole number of steps. They call
-the grid in steps of `context/_windows.py`, private, the one grid that
-`windowed_totals` and `_observed_report` read; those two take a `window` of any
-positive length, because the window of an observation of a differential model
-need not be whole. No public function takes a width in steps: a width of `n`
-steps is the span `n` in the step unit. The grid is in the context layer, so
-`AxisUnits` does not import `api/`.
+`steps` does, and check that it is a positive whole number of steps. The
+engine computes the grid in steps (`window_bounds`, `window_index`,
+`window_ends`, `windows_in` of `crates/commol-calibration/src/observation.rs`)
+that `windowed_totals`, `_observed_report` and the ticks of a figure read, with
+a `window` of any positive length: the window of an observation of a
+differential model need not be whole. No public function takes a width in
+steps: a width of `n` steps is the span `n` in the step unit.
 
 The rate conversions (`rate_from_mean_span`, `rate_from_probability`) ask the
 engine: `RateMeaning::rate_from_mean_span` and `rate_from_probability`
@@ -34,12 +34,12 @@ from a mean span is `1 - e^(-1/n)`: it keeps the survival of the continuous
 process at every step, and its mean residence is `1/rate`, not `n` (10.508
 steps for `n = 10`). `r = 1/n` keeps the mean and loses the survival.
 
-**Rule:** no formula of a rate per engine in Python; ask the engine.
+**Rule:** no formula of a rate per engine nor of a window in Python; ask the engine.
 
 **Guards:** `tests/simulation/test_axis_units.py`,
 `crates/commol-core/src/types/engine.rs` (tests `a_rate_from_…`),
-`tests/simulation/test_windows.py::TestWindowGrid`,
-`tests/simulation/test_axis_units.py::TestWindowGrid`.
+`tests/simulation/test_windows.py::test_windows_come_from_the_engine`,
+`tests/suite/test_engine_rules.py::test_only_the_engine_computes_a_window`.
 
 ## An origin puts the axis on the calendar
 

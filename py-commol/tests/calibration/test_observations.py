@@ -177,7 +177,7 @@ class TestPositionsAndEngines:
             ObservedDataPoint(at=3, outputs=[], label="x", value=1.0)
 
     def test_a_window_does_not_start_before_zero(self) -> None:
-        with pytest.raises(ValidationError, match="window 4.0 that ends at 3.0 starts"):
+        with pytest.raises(ValidationError, match="window 4 that ends at 3 starts"):
             ObservedDataPoint(at=3, output="B", window=4, value=1.0)
 
     def test_a_window_that_starts_at_zero_within_its_rounding_is_calibrated(

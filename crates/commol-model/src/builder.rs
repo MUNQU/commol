@@ -466,50 +466,25 @@ fn check_positions_of_engine(model: &Model) -> Result<(), String> {
 ///
 /// # Errors
 ///
-/// Returns a message that names the transition when it sets both
-/// `impulse_at` and `impulse_every`, when a position is not finite or is
-/// negative, or when the period is not positive.
+/// Returns the message of [`crate::rules::check_impulse`] for the first
+/// impulse outside its rule.
 fn impulse_schedules(process: &Process) -> Result<HashMap<String, ImpulseSchedule>, String> {
     let mut schedules = HashMap::new();
     for transition in &process.transitions {
+        crate::rules::check_impulse(
+            &transition.id,
+            transition.impulse_at.as_deref(),
+            transition.impulse_every,
+        )?;
         let schedule = match (&transition.impulse_at, transition.impulse_every) {
-            (None, None) => continue,
-            (Some(_), Some(_)) => {
-                return Err(format!(
-                    "Transition '{}' sets both impulse_at and impulse_every; set one",
-                    transition.id
-                ));
-            }
             (Some(positions), None) => {
-                if let Some(bad) = positions.iter().find(|p| !p.is_finite() || **p < 0.0) {
-                    return Err(format!(
-                        "Transition '{}' has the impulse position {bad}; positions must \
-                         be finite and not negative",
-                        transition.id
-                    ));
-                }
                 let mut positions = positions.clone();
                 positions.sort_by(f64::total_cmp);
                 positions.dedup();
                 ImpulseSchedule::At(positions)
             }
-            (None, Some((period, offset))) => {
-                if !(period.is_finite() && period > 0.0) {
-                    return Err(format!(
-                        "Transition '{}' has the impulse period {period}; it must be \
-                         positive",
-                        transition.id
-                    ));
-                }
-                if !(offset.is_finite() && offset >= 0.0) {
-                    return Err(format!(
-                        "Transition '{}' has the impulse offset {offset}; it must be \
-                         finite and not negative",
-                        transition.id
-                    ));
-                }
-                ImpulseSchedule::Every { period, offset }
-            }
+            (None, Some((period, offset))) => ImpulseSchedule::Every { period, offset },
+            _ => continue,
         };
         schedules.insert(transition.id.clone(), schedule);
     }
@@ -637,17 +612,6 @@ pub struct InitialCompartment {
     pub amount: f64,
 }
 
-/// Check that an initial amount is finite and not negative.
-fn check_amount(what: &str, amount: f64) -> Result<(), String> {
-    if amount.is_finite() && amount >= 0.0 {
-        Ok(())
-    } else {
-        Err(format!(
-            "The initial amount of {what} must be finite and not negative, got {amount}."
-        ))
-    }
-}
-
 /// Expand a process into its compartments and their initial amounts.
 ///
 /// This is the single source of truth for the initial state of an aggregate
@@ -663,9 +627,11 @@ fn check_amount(what: &str, amount: f64) -> Result<(), String> {
 ///
 /// # Errors
 ///
-/// Returns a message when a bin amount or an override is not finite or is
-/// negative, or when an override names a compartment that is not part of the
-/// expansion.
+/// Returns the message of the rule of a bin amount, the fractions of a
+/// stratification or an override ([`crate::rules::check_bin_amount`],
+/// [`crate::rules::check_fractions`],
+/// [`crate::rules::check_compartment_amount`]), or a message when an
+/// override names a compartment that is not part of the expansion.
 pub fn initial_state(
     process: &Process,
     aggregate: &Aggregate,
@@ -674,10 +640,18 @@ pub fn initial_state(
     let bin_amounts = &initial_conditions.bin_amounts;
     for (bin, amount) in bin_amounts {
         if let Some(amount) = amount {
-            check_amount(&format!("bin '{bin}'"), *amount)?;
+            crate::rules::check_bin_amount(bin, *amount)?;
         }
     }
     let stratification_fractions = &initial_conditions.stratification_fractions;
+    for (stratification, fractions) in stratification_fractions {
+        crate::rules::check_fractions(
+            stratification,
+            fractions
+                .iter()
+                .map(|(category, &fraction)| (category.as_str(), fraction)),
+        )?;
+    }
 
     let mut state: Vec<InitialCompartment> = expand_compartments(process)
         .into_iter()
@@ -727,7 +701,7 @@ pub fn initial_state(
                  compartments: {available:?}"
             ));
         }
-        check_amount(&format!("compartment '{compartment}'"), amount)?;
+        crate::rules::check_compartment_amount(compartment, amount)?;
     }
 
     for (compartment, amount) in overrides {
@@ -1927,24 +1901,6 @@ mod tests {
     }
 
     #[test]
-    fn an_override_that_is_not_finite_or_is_negative_is_a_build_error() {
-        for amount in [-0.5, f64::NAN, f64::INFINITY] {
-            let model = make_model(
-                vec![group_stratification()],
-                vec![group_fractions(0.6, 0.4)],
-                vec![("A_g1", amount)],
-            );
-            let (compartments, _) = generate_compartments(&model);
-            let error = initial_amounts(&model, &compartments).unwrap_err();
-
-            assert!(
-                error.contains("compartment 'A_g1' must be finite and not negative"),
-                "{error}"
-            );
-        }
-    }
-
-    #[test]
     fn an_override_above_the_amount_of_its_bin_builds() {
         let model = make_model(
             vec![group_stratification()],
@@ -2308,20 +2264,6 @@ mod tests {
 
         assert_eq!(compiled.initial_state(), [0.0, 0.0]);
         assert_eq!(compiled.total(), 0.0);
-    }
-
-    #[test]
-    fn a_bin_amount_that_is_not_finite_or_is_negative_is_a_build_error() {
-        for amount in [-1.0, f64::NAN, f64::INFINITY] {
-            let mut model = make_model(vec![], vec![], vec![]);
-            set_bin_amount(&mut model, "B", amount);
-            let error = model_initial_state(&model).unwrap_err();
-
-            assert!(
-                error.contains("bin 'B' must be finite and not negative"),
-                "{error}"
-            );
-        }
     }
 
     #[test]

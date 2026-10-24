@@ -81,15 +81,23 @@ class TestUpdateStratificationFractions:
     def test_fully_specified_values_must_sum_to_one(self) -> None:
         model = _stratified_model()
 
-        with pytest.raises(ValueError, match="must sum to 1.0"):
+        with pytest.raises(
+            ValueError,
+            match="Stratification 'tier': the fractions of its categories sum to 1",
+        ):
             model.structure.update_stratification_fractions(
                 {"low": 0.2, "mid": 0.2, "high": 0.2}
             )
 
+        assert _fractions_of(model, "tier") == {"low": 0.5, "mid": 0.3, "high": 0.2}
+
     def test_values_exceeding_one_are_rejected(self) -> None:
         model = _stratified_model()
 
-        with pytest.raises(ValueError, match="negative fraction"):
+        with pytest.raises(
+            ValueError,
+            match="the fractions of its categories sum to 1 within 1e-6, got 1.29",
+        ):
             model.structure.update_stratification_fractions({"low": 0.7, "mid": 0.6})
 
     def test_unknown_category_is_rejected_and_lists_available(self) -> None:
@@ -101,15 +109,21 @@ class TestUpdateStratificationFractions:
         assert "group1" in str(excinfo.value)
 
     @pytest.mark.parametrize("value", [-0.1, 1.1])
-    def test_out_of_range_fraction_is_rejected(self, value: float) -> None:
+    def test_out_of_range_fraction_gets_the_message_of_the_engine(
+        self, value: float
+    ) -> None:
         model = _stratified_model()
 
         with pytest.raises(ValueError) as error:
-            model.structure.update_stratification_fractions({"group1": value})
+            model.structure.update_stratification_fractions(
+                {"group1": value, "low": 0.1, "mid": 0.4}
+            )
 
         assert str(error.value) == (
-            f"Fraction for category 'group1' must be between 0.0 and 1.0, got {value}."
+            f"Stratification 'group', category 'group1': fraction is a number "
+            f"from 0 to 1, got {value}"
         )
+        assert _fractions_of(model, "tier") == {"low": 0.5, "mid": 0.3, "high": 0.2}
 
     def test_a_complete_update_may_miss_one_by_its_tolerance(self) -> None:
         model = _stratified_model()
@@ -229,14 +243,13 @@ class TestNames:
                 {"g": {"g1": 1.0, "g3": 0.0}},
                 r"Missing categories: \['g2'\], Extra categories: \['g3'\]",
             ),
-            ({"g": {"g1": 0.5, "g2": 0.4}}, "'g' must sum to 1.0, but got 0.9"),
         ],
-        ids=["stratification", "category", "sum"],
+        ids=["stratification", "category"],
     )
-    def test_the_fractions_of_a_stratification_name_its_categories_and_sum_to_1(
+    def test_the_fractions_of_a_stratification_name_its_categories(
         self, fractions: dict[str, dict[str, float]], message: str
     ) -> None:
-        builder = a_to_b_builder(stratifications={"g": ["g1", "g2"]})
+        builder = a_to_b_builder(stratifications={"g": {"g1": 0.5, "g2": 0.5}})
         builder.set_structure(
             Aggregate(
                 bin_amounts={"A": 10, "B": 0},

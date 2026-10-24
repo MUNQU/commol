@@ -20,7 +20,7 @@ check some of these rules. The rest depend on the author and the reviewer.
 | Doc examples | Abstract names; every block runs | `pytest -m docs` (CI) and review |
 | Field words | No application field in the user pages or the source of `commol` | `tests/docs/test_pages.py` (`pytest -m docs`, CI) |
 | Tests | One package per guide page; shared factories; every test checks a result, once, within its time budget: [Tests](tests.md) | `tests/suite/` (CI) and review; pytest 10 deprecations fail the run (`filterwarnings`) |
-| Ranges of settings | The engine holds each range rule; a Python model declares only the type | `tests/suite/test_rules.py` (CI) |
+| Rules of values | The engine holds the range rule of each setting, the rule of each value of a model and every window; a Python model declares only the type | `tests/suite/test_engine_rules.py` (CI) |
 | Commits | `type(scope): description` | Review |
 
 ## Python
@@ -48,7 +48,7 @@ check some of these rules. The rest depend on the author and the reviewer.
 - A setting keeps the name its meaning has elsewhere: `confidence_level` for
   the level of an interval, a plural noun for a count. See
   [Design decisions](decisions/results.md#a-setting-has-one-name-and-one-check);
-  `tests/suite/test_rules.py::test_a_setting_has_one_name` checks it.
+  `tests/suite/test_engine_rules.py::test_a_setting_has_one_name` checks it.
 - The engine holds the range of every setting; a Python model declares only
   its type (no `ge`, `gt`, `le`, `lt`, constrained number type or
   `allow_inf_nan=False`), and a model of an object with ranges lists
@@ -57,8 +57,15 @@ check some of these rules. The rest depend on the author and the reviewer.
   `crates/commol-core/src/range.rs`, `crates/commol-calibration/src/ranges.rs`
   and `crates/commol-inference/src/ranges.rs`. See
   [Design decisions](decisions/results.md#a-setting-has-one-name-and-one-check);
-  `tests/suite/test_rules.py::test_no_model_declares_a_range_of_a_setting`
+  `tests/suite/test_engine_rules.py::test_no_model_declares_a_range_of_a_setting`
   checks it.
+- The engine holds the rule of each value of a model, an initial amount, the
+  fractions of a stratification, an impulse or a point of a series
+  (`crates/commol-model/src/rules.rs`), and the
+  validator of its Python object calls it; see
+  [Design decisions](decisions/python-models.md#a-value-of-a-model-has-its-rule-in-the-engine).
+  The engine computes every window, and Python has no window arithmetic
+  (`tests/suite/test_engine_rules.py::test_only_the_engine_computes_a_window`).
 - Context data structures are Pydantic v2 models.
 - `ModelBuilder` methods return `Self`, so calls chain.
 - Log with the standard `logging` module. Library code never writes to the

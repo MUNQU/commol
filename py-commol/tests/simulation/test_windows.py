@@ -1,10 +1,13 @@
 """Tests for reducing cumulative series to per-window increments, and for
 reading series at positions."""
 
+import math
+
 import pytest
 
 import commol
 from commol import (
+    AxisUnits,
     CalibrationProblem,
     Calibrator,
     NelderMeadConfig,
@@ -12,8 +15,9 @@ from commol import (
     Simulation,
     windowed_totals,
 )
+from commol.api.plotting.panels import compared_panels
 from commol.api.results import sample
-from commol.context._windows import window_end, window_ends, window_index, window_start
+from commol.commol_rs import _commol_rs as commol_rs
 from tests.support import a_to_b_builder, bounded, build
 
 SEED = 42
@@ -26,83 +30,40 @@ def _model(k1: float | None = 0.05) -> Simulation:
     return Simulation(build(builder))
 
 
-class TestWindowEnds:
-    def test_lists_every_complete_window(self) -> None:
-        assert window_ends(5, 20) == [5, 10, 15, 20]
+def test_windows_come_from_the_engine() -> None:
+    """Results, reports and figures read the windows that the engine computes
+    (`crates/commol-calibration/src/observation.rs`), and a window that is
+    not a finite, positive length gets the message of the engine."""
+    engine = commol_rs.calibration
+    results = _model().run(23)
+    events = results["events"]
+    ends = engine.window_ends(WINDOW, 23)
 
-    def test_trailing_partial_window_is_dropped(self) -> None:
-        assert window_ends(5, 23) == [5, 10, 15, 20]
+    report = results.report([23], WINDOW, len(ends), accumulators=["events"])
+    windowed = report["accumulators"]["events"]["windowed"]["total"]
+    [panel] = compared_panels({"run": results}, 0.9, series=["events"], window=WINDOW)
 
-    def test_run_shorter_than_one_window_gives_nothing(self) -> None:
-        assert window_ends(5, 3) == []
-        assert window_ends(5, 0) == []
-        assert window_ends(5, -5) == []
-
-    def test_a_window_need_not_be_a_whole_number(self) -> None:
-        assert window_ends(0.1, 0.3) == pytest.approx([0.1, 0.2, 0.3])
-
-    @pytest.mark.parametrize("window", [0, -1])
-    def test_non_positive_window_is_rejected(self, window: int) -> None:
-        with pytest.raises(ValueError, match="positive length"):
-            window_ends(window, 20)
-
-
-class TestWindowGrid:
-    """The window grid is one mapping, usable in both directions."""
-
-    PERIOD = 168
-    INDICES = range(33)
-
-    def test_window_index_inverts_window_end(self) -> None:
-        for index in self.INDICES:
-            assert window_index(window_end(index, self.PERIOD), self.PERIOD) == index
-            assert window_index(window_end(index, 2.5), 2.5) == index
-
-    def test_every_step_maps_to_its_containing_window(self) -> None:
-        for index in self.INDICES:
-            start = int(window_start(index, self.PERIOD))
-            end = int(window_end(index, self.PERIOD))
-            for step in range(start + 1, end + 1):
-                assert window_index(step, self.PERIOD) == index
-
-    def test_a_position_between_steps_belongs_to_the_window_that_holds_it(
-        self,
-    ) -> None:
-        # Window 1 of length 7 covers (7, 14].
-        assert [window_index(at, 7) for at in [0.5, 7, 7.5, 14, 14.5]] == [
-            0,
-            0,
-            1,
-            1,
-            2,
-        ]
-
-    def test_a_computed_end_belongs_to_its_window(self) -> None:
-        # 0.1 + 0.2 is 0.30000000000000004, the end of window 2 of 0.1.
-        assert window_index(0.1 + 0.2, 0.1) == 2
-
-    def test_position_zero_belongs_to_the_first_window(self) -> None:
-        assert window_index(0, self.PERIOD) == 0
-
-    def test_windows_span_the_period_and_meet_end_to_start(self) -> None:
-        for index in self.INDICES:
-            start = window_start(index, self.PERIOD)
-            end = window_end(index, self.PERIOD)
-            assert end - start == self.PERIOD
-            assert end == window_start(index + 1, self.PERIOD)
-
-    def test_negative_index_is_rejected(self) -> None:
-        with pytest.raises(ValueError, match="index must not be negative"):
-            window_start(-1, self.PERIOD)
-
-    def test_negative_position_is_rejected(self) -> None:
-        with pytest.raises(ValueError, match="at must not be negative"):
-            window_index(-1, self.PERIOD)
-
-    @pytest.mark.parametrize("window", [0, -1])
-    def test_non_positive_window_is_rejected(self, window: int) -> None:
-        with pytest.raises(ValueError, match="positive length"):
-            window_end(0, window)
+    assert ends == [5, 10, 15, 20]
+    assert AxisUnits().window_ends(WINDOW, "step", 23) == ends
+    assert [engine.window_bounds(i, WINDOW)[1] for i in range(4)] == ends
+    assert windowed_totals(events, results.positions, WINDOW) == (
+        windowed_totals(events, results.positions, WINDOW, ends)
+    )
+    assert windowed == windowed_totals(events, results.positions, WINDOW, ends)
+    assert panel.lines[0].positions == ends
+    readers = [
+        lambda window: windowed_totals(events, results.positions, window),
+        lambda window: windowed_totals(events, results.positions, window, [5]),
+        lambda window: results.report([23], window, 1, accumulators=["events"]),
+        lambda window: compared_panels({"run": results}, 0.9, window=window),
+    ]
+    for window in [0, -1, math.nan, math.inf]:
+        with pytest.raises(ValueError) as message:
+            engine.check_window(window)
+        for read in readers:
+            with pytest.raises(ValueError) as error:
+                read(window)
+            assert str(error.value) == str(message.value)
 
 
 class TestWindowedTotals:
@@ -155,11 +116,6 @@ class TestWindowedTotals:
         with pytest.raises(ValueError, match="no value at 9"):
             windowed_totals([0.0, 1.0, 2.0], range(3), 1, [9])
 
-    @pytest.mark.parametrize("window", [0, -1])
-    def test_non_positive_window_is_rejected(self, window: int) -> None:
-        with pytest.raises(ValueError, match="positive length"):
-            windowed_totals([0.0, 1.0], range(2), window)
-
     def test_simulation_windows_the_total_of_its_accumulators(self) -> None:
         simulation = _model()
         results = simulation.run(NUM_STEPS)
@@ -184,7 +140,7 @@ class TestAgreementWithTheCalibrationLoss:
 
     def _observations(self, simulation: Simulation) -> list[ObservedDataPoint]:
         results = simulation.run(NUM_STEPS)
-        steps = window_ends(WINDOW, NUM_STEPS)
+        steps = AxisUnits().window_ends(WINDOW, "step", NUM_STEPS)
         values = simulation.windowed_totals(results, ["events"], WINDOW, steps)
         return [
             ObservedDataPoint(
@@ -218,7 +174,7 @@ class TestAgreementWithTheCalibrationLoss:
         truth = 0.05
         simulation = _model(truth)
         results = simulation.run(NUM_STEPS)
-        steps = window_ends(WINDOW, NUM_STEPS)
+        steps = AxisUnits().window_ends(WINDOW, "step", NUM_STEPS)
         wrong = windowed_totals(results["events"], results.positions, WINDOW - 1, steps)
 
         observations = [

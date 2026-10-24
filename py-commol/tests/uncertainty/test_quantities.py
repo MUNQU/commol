@@ -97,9 +97,9 @@ class TestSeries:
         assert values == [4.0, 14.0, 1.0, 4.0, 2.0, 6.0]
 
     def test_increments_cannot_start_before_zero(self) -> None:
-        with pytest.raises(ValueError, match=r"windows of 7 .* the end 5"):
+        with pytest.raises(ValueError, match=r"window 7 that ends at 5 starts before"):
             ValueAt(series=Increments("acc", 7), at=5)
-        with pytest.raises(ValueError, match=r"windows of 7 .* the end 0"):
+        with pytest.raises(ValueError, match=r"window 7 that ends at 0 starts before"):
             Peak(series=Increments("acc", 7), positions=[0, 7])
         with pytest.raises(ValueError, match=r"greater than 0"):
             Increments("acc", 0)

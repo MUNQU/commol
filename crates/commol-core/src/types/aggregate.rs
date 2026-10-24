@@ -25,8 +25,8 @@ pub struct InitialConditions {
     /// calibration.
     pub bin_amounts: IndexMap<String, Option<f64>>,
     /// Fraction of each category of the group a stratification splits, by
-    /// stratification id and category; the fractions of one stratification
-    /// sum to 1.0.
+    /// stratification id and category: each from 0 to 1, and a sum of 1
+    /// (`commol_model::rules::check_fractions`).
     #[serde(default)]
     pub stratification_fractions: IndexMap<String, IndexMap<String, f64>>,
     /// Amount of single expanded compartments, by compartment name, applied

@@ -27,6 +27,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   18446744073709551615, got -1` in every function that takes one:
   `Simulation.run`, `Simulation.run_at`, `Simulation.replicates`,
   `CalibrationProblem`, `SensitivityAnalysis` and each binding.
+- The engine holds the rule of every value of a model and of every window.
+  An initial amount, an impulse and the points of a series fail when their
+  object (`Aggregate`, `Transition`, `SeriesValue`) is built or an amount is
+  updated, as before, and the same values are valid; the message is the one
+  the model compiler gives, which names the bin, the compartment or the
+  transition: `Bin 'B': initial amount is a finite number of at least 0, got
+  -1`, `Transition 't': impulse period is a finite number greater than 0, got
+  0`, `a series has one point per position, got two at 2`. The windows of
+  `windowed_totals`, of reports, of figures and of `AxisUnits.window_start`,
+  `window_end`, `window_index` and `window_ends` come from the engine, with
+  its messages (`window is a finite number greater than 0, got 0`, `index is
+  a whole number of at least 0, got -1`), and an observation or a quantity
+  whose window starts before 0 gives `the window 4 that ends at 3 starts
+  before 0; an end is at least its window`. A `tick_every` of a figure that
+  is not a finite number greater than 0 raises `ValueError`.
 - A calibration, a sensitivity analysis or any other method that sets a
   model parameter raises `ValueError` when it is built if the parameter is
   a formula or a series parameter. The engine computes such a parameter at
@@ -118,6 +133,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A fraction of a stratification outside 0 to 1 raises `ValueError` when its
+  `Aggregate` is built, with the message of the engine: `Stratification 'g',
+  category 'g1': fraction is a number from 0 to 1, got 1.5`. Before, only the
+  sum was checked, so fractions such as `{"g1": 1.5, "g2": -0.5}` built a
+  model whose compartment started at a negative amount. The sum of the
+  fractions of a stratification, 1 within 1e-6, is checked at the same time
+  (`Stratification 'g': the fractions of its categories sum to 1 within 1e-6,
+  got 0.9`), where it was checked by `build`, and
+  `update_stratification_fractions` and the model compiler give the same
+  messages.
 - Two results of commol with the same values are equal, also when they hold
   a NaN: a NaN equals a NaN, whatever the objects that hold it. Before, `==`
   compared the identity of the items of a list first, so two runs with one

@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from commol import Aggregate, AxisUnits, Simulation
-from commol.context import _windows as windows
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.utils.equations import UnitConsistencyError
 
 from tests.support import (
@@ -96,8 +96,9 @@ class TestWindowGrid:
         week = 168
 
         assert hours.window_end(2, 1, "week") == 504
-        assert hours.window_end(2, 1, "week") == windows.window_end(2, week)
-        assert hours.window_start(2, 1, "week") == windows.window_start(2, week)
+        assert (hours.window_start(2, 1, "week"), hours.window_end(2, 1, "week")) == (
+            commol_rs.calibration.window_bounds(2, week)
+        )
         assert hours.window_start(2, 7, "day") == 336
         assert [hours.window_index(at, 1, "week") for at in [0, 168, 168.5, 504]] == [
             0,
@@ -106,7 +107,9 @@ class TestWindowGrid:
             2,
         ]
         assert hours.window_ends(1, "week", 600) == [168, 336, 504]
-        assert hours.window_ends(1, "week", 600) == windows.window_ends(week, 600)
+        assert hours.window_ends(1, "week", 600) == (
+            commol_rs.calibration.window_ends(week, 600)
+        )
 
     def test_a_width_in_steps_is_the_span_in_the_step_unit(self) -> None:
         assert AxisUnits().window_ends(5, "step", 20) == [5, 10, 15, 20]
@@ -138,10 +141,13 @@ class TestWindowGrid:
     def test_a_negative_index_or_position_is_rejected(self) -> None:
         days = AxisUnits(step_unit="day")
 
-        with pytest.raises(ValueError, match="index must not be negative"):
+        with pytest.raises(ValueError) as index:
             days.window_start(-1, 7, "day")
-        with pytest.raises(ValueError, match="at must not be negative"):
+        with pytest.raises(ValueError) as at:
             days.window_index(-1, 7, "day")
+
+        assert str(index.value) == "index is a whole number of at least 0, got -1"
+        assert str(at.value) == "at is a finite number of at least 0, got -1"
 
 
 DAILY_DIFFERENCE = AxisUnits(step_unit="day", engine="DifferenceEquations")

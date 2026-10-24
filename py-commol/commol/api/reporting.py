@@ -16,7 +16,7 @@ import numpy as np
 from commol.api.inference.intervals import member_statistics
 from commol.api.results import SimulationResults, outputs_for, sample, total_series
 from commol.api.windows import windowed_totals
-from commol.context._windows import window_end, window_index
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import (
     CalibrationProblem,
     CalibrationResult,
@@ -245,7 +245,8 @@ def _observed_report(
     Each series becomes one array of `num_windows` entries, padded with null
     where there is no observation, so it lines up index for index with the
     windowed accumulator series. An observation goes to the window that holds
-    its position (`AxisUnits.window_index`). ``weights``, ``outputs``
+    its position (`window_index` of the engine, as `AxisUnits.window_index`
+    gives it). ``weights``, ``outputs``
     and ``factor_id`` appear only on series that use them; a series whose
     weights are all 1.0 omits them.
     """
@@ -258,7 +259,7 @@ def _observed_report(
                 "weights": [None] * num_windows,
             },
         )
-        index = window_index(point.at, window)
+        index = commol_rs.calibration.window_index(point.at, window)
         if not 0 <= index < num_windows:
             continue
         entry["values"][index] = point.value
@@ -314,7 +315,10 @@ def _accumulators_report(
     within each run. ``cumulative`` follows `at` like the compartment series
     do. Both are given as a total and per output.
     """
-    ends = [window_end(index, window) for index in range(num_windows)]
+    ends = [
+        commol_rs.calibration.window_bounds(index, window)[1]
+        for index in range(num_windows)
+    ]
 
     def windowed(series: Sequence[float], positions: Sequence[float]) -> list[float]:
         last = positions[-1] if positions else 0.0

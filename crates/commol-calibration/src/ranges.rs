@@ -15,8 +15,13 @@ pub const AT: Real = Real::non_negative("at");
 pub const VALUE: Real = Real::non_negative_or_infinite("value");
 /// The weight of an observation or a constraint.
 pub const WEIGHT: Real = Real::positive_or_infinite("weight");
-/// The window of an observation of a cumulative output.
+/// The window of an observation of a cumulative output, and the length of
+/// a window of the grid of windows.
 pub const WINDOW: Real = Real::positive("window");
+/// The index of a window of the grid of windows.
+pub const WINDOW_INDEX: Count = Count::at_least("index", 0);
+/// The last position the ends of the grid of windows cover.
+pub const GRID_END: Real = Real::finite("end");
 /// The trials of a binomial observation.
 pub const TRIALS: Count = Count::at_least("trials", 0);
 

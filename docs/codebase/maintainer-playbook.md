@@ -75,8 +75,8 @@ Use this page before you make or review a change. It turns the
 
 ### Initial conditions
 
-- [ ] Change the Pydantic validation in `context/initial_conditions.py` and the
-      engine rule in `builder.rs` (`initial_state`).
+- [ ] Change the rule of an amount or a fraction in `rules.rs`
+      (`commol-model`), which `context/initial_conditions.py` and `initial_state` call.
 - [ ] Check that `Aggregate.initial_state(process)` reports the new state.
 - [ ] If calibration can set it, update
       `commol-model/src/initial_conditions.rs` (`InitialConditionPlan`) and the write-back
@@ -120,7 +120,7 @@ changing it ([Design decisions](decisions/uncertainty.md#methods-plug-into-one-e
 - [ ] The runner, bound in `py-commol/src/` (`inference.rs` or the module
       of its family), which runs the method through `parallel`
       (`py-commol/src/parallelism.rs`), and its stub in `_commol_rs.pyi`
-      (`tests/suite/test_rules.py::test_the_stub_declares_what_the_extension_has`); a
+      (`tests/suite/test_engine_rules.py::test_the_stub_declares_what_the_extension_has`); a
       row in the table of `docs/guide/parallelism.md` and a case of `METHODS`
       in `tests/parallelism/test_threads.py`.
 - [ ] The configuration, a subclass of `UncertaintyMethod[YourResult]`, and
