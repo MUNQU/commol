@@ -158,7 +158,8 @@ class TestBuild:
             ).run(5)
             for settings in (None, ODESolver())
         )
-        assert unset == default
+        # The models state their settings apart, so the runs compare their values.
+        assert dict(unset) == dict(default)
 
     @pytest.mark.parametrize(
         ("settings", "message"),

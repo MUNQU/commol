@@ -7,12 +7,13 @@ member statistics. Both know the `Model` they ran, report themselves
 """
 
 from collections.abc import Iterable, Mapping, Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 import numpy as np
 
 from commol.api.plotting.accessors import ReplicatesPlot, ResultsPlot
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context.result_model import ComparedByValue
 
 if TYPE_CHECKING:
     from commol.api.reporting import SimulationReport
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
     from commol.context.model import Model
 
 
-class SimulationResults(dict[str, list[float]]):
+class SimulationResults(ComparedByValue, dict[str, list[float]]):
     """
     Values of every output at each position on the axis.
 
@@ -30,6 +31,11 @@ class SimulationResults(dict[str, list[float]]):
     ``results["A"]``, ``json.dumps(results)`` and
     ``pandas.DataFrame(results)`` work as for any mapping. The positions the
     values were read at are in :attr:`positions`.
+
+    Two results are equal when their values (a NaN equal to a NaN), their
+    positions, their seed and their model are (`ComparedByValue`); a plain
+    ``dict`` is not a result, so it is not equal to one. Results can change,
+    so they have no hash.
 
     Attributes
     ----------
@@ -245,6 +251,11 @@ class SimulationResults(dict[str, list[float]]):
             prediction_intervals,
         )
 
+    @override
+    def compared_values(self) -> object:
+        """The values, the positions, the seed and the model."""
+        return dict(self), self.positions, self.seed, self.model
+
     def __repr__(self) -> str:
         """The positions, the seed and the values."""
         seed = "" if self.seed is None else f"seed={self.seed!r}, "
@@ -401,7 +412,7 @@ def sample(
     return [series[row] for row in rows]
 
 
-class SimulationReplicates(list[SimulationResults]):
+class SimulationReplicates(ComparedByValue, list[SimulationResults]):
     """
     Replicates of a run of a stochastic engine, one `SimulationResults` each.
 
@@ -409,6 +420,10 @@ class SimulationReplicates(list[SimulationResults]):
     ``replicates[i].seed`` repeats replicate ``i``. The statistics reduce the
     replicates position by position, and `member_statistics` reduces them as
     ``ci_percentiles`` requires.
+
+    Two replicates are equal when their runs, their seed, their positions and
+    their model are (`ComparedByValue`); a plain ``list`` of the same runs is
+    not equal to them. They have no hash.
 
     Attributes
     ----------
@@ -692,6 +707,11 @@ class SimulationReplicates(list[SimulationResults]):
             accumulators,
             prediction_intervals,
         )
+
+    @override
+    def compared_values(self) -> object:
+        """The runs, the seed, the positions and the model."""
+        return list(self), self.seed, self.positions, self.model
 
     def __repr__(self) -> str:
         """The number of replicates, their seed and their positions."""

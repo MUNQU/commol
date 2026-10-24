@@ -408,7 +408,7 @@ class TestABC:
         second = _binomial(300, seed=9).uncertainty(_abc(particles=100))
         other = _binomial(300, seed=10).uncertainty(_abc(particles=100))
 
-        assert first.model_dump() == second.model_dump()
+        assert first == second
         assert first.sample.values != other.sample.values
         assert first.sample.method.settings["seed"] == 9
 

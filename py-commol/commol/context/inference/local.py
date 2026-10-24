@@ -9,7 +9,7 @@ bounds.
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
 from commol.context.calibration import CalibrationResult
 from commol.context.inference.distributions import WithPriors
@@ -17,6 +17,7 @@ from commol.context.inference.method import UncertaintyMethod
 from commol.context.inference.resampling import BlockLength
 from commol.context.inference.sample import ParameterSample
 from commol.context.ranges import RangeChecked
+from commol.context.result_model import ResultModel
 
 type CurvatureName = Literal["gauss_newton", "hessian"]
 """The curvature a local approximation reads. ``"gauss_newton"``: the
@@ -27,7 +28,7 @@ with steps from the accuracy of the engine, ``4p² + 1`` runs; for a fit with
 large residuals or a wrong model, where the two differ."""
 
 
-class DeltaBand(BaseModel):
+class DeltaBand(ResultModel):
     """
     The band of every output by the delta method (``Calibrator.delta_band``):
     the prediction at the fit
@@ -54,7 +55,7 @@ class DeltaBand(BaseModel):
     upper: dict[str, list[float]] = Field(description="Upper end")
 
 
-class LocalResult(BaseModel):
+class LocalResult(ResultModel):
     """
     What every local approximation returns: a distribution on the unbounded
     scale of the parameters, centred on the fit.
@@ -265,7 +266,7 @@ type MixtureTarget = Annotated[
 """The posterior a `LaplaceMixture` samples."""
 
 
-class MixtureComponent(BaseModel):
+class MixtureComponent(ResultModel):
     """
     One component of a Laplace mixture: the Laplace approximation at one
     optimum of the starts.
@@ -291,7 +292,7 @@ class MixtureComponent(BaseModel):
     log_evidence: float
 
 
-class ImportanceResult(BaseModel):
+class ImportanceResult(ResultModel):
     """
     The result of a Laplace mixture: draws of the mixture weighted by the
     target over the mixture, smoothed by Pareto-smoothed importance

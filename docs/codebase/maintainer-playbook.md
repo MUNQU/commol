@@ -124,8 +124,8 @@ changing it ([Design decisions](decisions/uncertainty.md#methods-plug-into-one-e
       row in the table of `docs/guide/parallelism.md` and a case of `METHODS`
       in `tests/parallelism/test_threads.py`.
 - [ ] The configuration, a subclass of `UncertaintyMethod[YourResult]`, and
-      the result, in `context/inference/`; a result with draws holds a
-      `ParameterSample`.
+      the result, a subclass of `ResultModel`, in `context/inference/`; a
+      result with draws holds a `ParameterSample`.
 - [ ] A method that fits several times fits its perturbations with
       `ReplicateRunner::fit_all` and checks them with `ReplicateFits::require`;
       its result has `failed` (the entries of `FitUnit::failed`, logged as

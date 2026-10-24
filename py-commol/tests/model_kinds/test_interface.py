@@ -232,7 +232,9 @@ class TestVariants:
 
         results = Simulation(build_variant(self._variant(), engine=engine)).run(3)
 
-        assert results == expected
+        # The models differ, so the runs compare their positions and values.
+        assert results.positions == expected.positions
+        assert dict(results) == dict(expected)
 
     def test_the_engine_runs_the_checks_of_the_variant(self) -> None:
         builder = abc_builder(stratifications={"group": {"g1": 0.5, "g2": 0.5}})

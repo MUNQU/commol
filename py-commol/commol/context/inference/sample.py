@@ -4,7 +4,6 @@ from collections.abc import Iterator
 from typing import TYPE_CHECKING, Self
 
 from pydantic import (
-    BaseModel,
     ConfigDict,
     Field,
     JsonValue,
@@ -15,12 +14,13 @@ from pydantic import (
 )
 
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context.result_model import ResultModel
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import ParameterSampleProtocol
 
 
-class SampleMethod(BaseModel):
+class SampleMethod(ResultModel):
     """
     What made a sample: the name of the method and its settings.
 
@@ -40,7 +40,7 @@ class SampleMethod(BaseModel):
     )
 
 
-class ParameterSummary(BaseModel):
+class ParameterSummary(ResultModel):
     """
     Weighted statistics of one parameter of a sample.
 
@@ -73,7 +73,7 @@ class ParameterSummary(BaseModel):
     max: float
 
 
-class ParameterSample(BaseModel):
+class ParameterSample(ResultModel):
     """
     Draws of the parameters of a calibration problem, each with a weight.
 
@@ -145,14 +145,6 @@ class ParameterSample(BaseModel):
             self.names, self.bounds, self.values, self.log_weights, self.groups
         )
         return self
-
-    def __eq__(self, other: object) -> bool:
-        """Two samples are equal when their fields are."""
-        if not isinstance(other, ParameterSample):
-            return NotImplemented
-        return self.model_dump() == other.model_dump()
-
-    __hash__ = None  # type: ignore[assignment]
 
     @classmethod
     def equally_weighted(

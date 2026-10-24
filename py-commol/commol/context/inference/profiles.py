@@ -11,7 +11,7 @@ Every interval is pointwise: it holds one quantity, not several at once.
 
 from typing import TYPE_CHECKING, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from commol.context.calibration import CalibrationResult, ObservedDataPoint
 from commol.context.inference.identifiability import (
@@ -30,6 +30,7 @@ from commol.context.inference.resampling import (
     WildBootstrap,
 )
 from commol.context.ranges import RangeChecked
+from commol.context.result_model import ResultModel
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
@@ -47,11 +48,11 @@ type ProfileBootstrap = (
 """A bootstrap that calibrates a threshold."""
 
 
-class _Frozen(BaseModel):
+class _FrozenResult(ResultModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class Threshold(_Frozen, RangeChecked):
+class Threshold(RangeChecked):
     """
     How far the statistic of a profile may rise above the fit inside an
     interval of `confidence_level`.
@@ -67,6 +68,8 @@ class Threshold(_Frozen, RangeChecked):
     bootstrap : BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap | None
         The bootstrap of ``"bootstrap_calibrated"``; None otherwise.
     """  # noqa: E501
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: Literal["chi_square", "beale", "bootstrap_calibrated"]
     confidence_level: float
@@ -176,7 +179,7 @@ class Threshold(_Frozen, RangeChecked):
         )
 
 
-class PredictionSpec(_Frozen, RangeChecked):
+class PredictionSpec(RangeChecked):
     """
     A prediction to profile: an output, or a sum of outputs, at a position,
     read as an observation is.
@@ -197,6 +200,8 @@ class PredictionSpec(_Frozen, RangeChecked):
     factor_id : str | None
         A factor parameter that multiplies the prediction.
     """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     at: float = Field()
     output: str | None = Field(default=None, min_length=1)
@@ -315,7 +320,7 @@ class PredictionProfile(UncertaintyMethod["ProfileResult"], RangeChecked):
         return self
 
 
-class Profile(_Frozen):
+class Profile(_FrozenResult):
     """
     The profile of one parameter or prediction.
 
@@ -384,7 +389,7 @@ UndeterminedName = Literal[
 _RESET = "The verdict holds with the other parameters at their fitted values."
 
 
-class ProfileStructure(_Frozen):
+class ProfileStructure(_FrozenResult):
     """
     What resetting the other parameters says about a profile.
 
@@ -481,7 +486,7 @@ class ProfileStructure(_Frozen):
         return f"{text}. {_RESET}"
 
 
-class ProfileInterval(_Frozen):
+class ProfileInterval(_FrozenResult):
     """
     The pointwise interval of a quantity: where its profile crosses the
     threshold.
@@ -496,7 +501,7 @@ class ProfileInterval(_Frozen):
     upper: float | None
 
 
-class ProfileResult(_Frozen):
+class ProfileResult(_FrozenResult):
     """
     The result of a profile likelihood.
 

@@ -11,13 +11,14 @@ data from the observation models.
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import CalibrationResult
 from commol.context.inference.method import UncertaintyMethod
 from commol.context.inference.sample import ParameterSample
 from commol.context.ranges import RangeChecked
+from commol.context.result_model import ResultModel
 
 type BlockLength = int | Literal["auto"]
 """Positions per block: an integer of at least 1, or ``"auto"``, the rule of
@@ -25,7 +26,7 @@ Politis and White (2004) with the correction of Patton, Politis and White
 (2009) on the residuals of the fit, the largest over the series."""
 
 
-class ResamplingDiagnostics(BaseModel):
+class ResamplingDiagnostics(ResultModel):
     """
     The blocks of a resampling method, and the synthetic values below zero.
 
@@ -51,7 +52,7 @@ class ResamplingDiagnostics(BaseModel):
     negative_values: int = Field(description="Synthetic values below zero.")
 
 
-class BoundError(BaseModel):
+class BoundError(ResultModel):
     """
     The Monte Carlo error of the bounds of an interval: for each bound, an
     order-statistic interval that holds the bound of infinitely many
@@ -71,7 +72,7 @@ class BoundError(BaseModel):
     upper: tuple[float, float]
 
 
-class BootstrapResult(BaseModel):
+class BootstrapResult(ResultModel):
     """
     The result of a bootstrap.
 
@@ -250,7 +251,7 @@ class WildBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
     starts: int = Field(default=1, description="Starts per fit.")
 
 
-class JackknifeResult(BaseModel):
+class JackknifeResult(ResultModel):
     """
     The result of a block jackknife.
 

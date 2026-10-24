@@ -10,15 +10,16 @@ of the model (`NoNoise`) compared with data covers less than its level.
 
 from collections.abc import Sequence
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
 from commol.api.inference.predictive import ObservationDraws, Predictive
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import ObservedDataPoint
 from commol.context.inference.noise import DistributionNoise, ObservationNoise
+from commol.context.result_model import ResultModel
 
 
-class Score(BaseModel):
+class Score(ResultModel):
     """
     One score of a predictive at a set of observations.
 
