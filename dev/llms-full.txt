@@ -5348,7 +5348,7 @@ None of them has a default: each sets the cost and the accuracy of the run.
 
 Both calibrations read the fit `Calibrator.run(starts)`, the best of [several starts](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts).
 
-Information matching is cheap and local; it needs a sum of smooth terms, so `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic engine raise a `ValueError` that points to the other choices. `J` and `I` are the curvature and the meat of the [sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich): `I` sums the scores over blocks, so it holds when the noise depends on its neighbours inside a block, and `block_length` has no default: `block_length=1` gives the independent version, every observation its own block. Bootstrap coverage runs one tempered sampler per replicate to a large `η`, reads the posterior of every smaller `η` by reweighting, so its search runs no model, and finds for each replicate and parameter the `η` where the interval stops holding the fit. `η` interpolates those thresholds at the level, so the expected coverage is the level; it needs at least `1/(1 − c) − 1` replicates times parameters.
+Information matching is cheap and local; it needs a sum of smooth terms, so `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic engine raise a `ValueError` that points to the other choices. `J` and `I` are the curvature and the meat of the [sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich): `I` sums the scores over blocks, so it holds when the noise depends on its neighbours inside a block, and `block_length` has no default: `block_length=1` gives the independent version, every observation its own block. Bootstrap coverage runs one tempered sampler per replicate to a large `η`, reads the posterior of every smaller `η` by reweighting, so its search runs no model, and finds for each replicate and parameter the `η` where the interval stops holding the fit. `η` is the one quantile of commol of the log thresholds at `1 − c` (with equal weights, as [`weighted_quantiles`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-one-quantile) reads them), which interpolates between two of them; it needs at least `1/(2(1 − c))` replicates times parameters, so that the level is not below the smallest threshold.
 
 With a stochastic engine the loss reads the problem's `replicates` with common random numbers, as the optimizers do, so it is a function of the parameters.
 
@@ -5515,7 +5515,7 @@ The Fisher information of each observation model (`Noise::information` in `crate
 
 The Hessian steps are `δ^{1/4} · dθ/du` for a parameter with a bound and `δ^{1/4} · max(|θ|, 1)` for one without, where `δ` is the accuracy of the engine (machine precision, or the `rtol` of the ODE engine): the step that balances the truncation error of the differences with the error of the runs, and keeps every run inside the bounds. Each entry of either curvature has an estimated error. An entry whose error is above 1 % of `√(H_jj · H_kk)` is listed in `notes` and logged as a warning. The error is read as a share of a correlation: an off-diagonal entry near 0 is compared with the diagonal of its row and column, not with its own size. A note changes no result.
 
-Every distribution lives on the **unbounded scale** of the parameters, the scale on which the [sampler](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#how-the-sampler-works) of sequential Monte Carlo proposes its moves. The curvature there is `H_u = D · H · D` with `D = dθ/du` at the fit, and `covariance` is on that scale. Every draw maps back inside the bounds, so a fit near a bound gives a skewed sample, not draws outside it. A fit **on** a bound of its parameter (within `1e-8` of the width of its bounds) raises a `ValueError`: its variance on the unbounded scale is infinite there, and a [profile likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md) describes it.
+Every distribution lives on the **unbounded scale** of the parameters, the scale on which the [sampler](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#how-the-sampler-works) of sequential Monte Carlo proposes its moves. The curvature there is `H_u = D · H · D` with `D = dθ/du` at the fit, and `covariance` is on that scale. Every draw maps back inside the bounds, so a fit near a bound gives a skewed sample, not draws outside it. A fit **on** a bound of its parameter (within `1e-8` of the width of its bounds, or of `max(1, |bound|)` when the parameter has one finite bound) raises a `ValueError`: its variance on the unbounded scale is infinite there, and a [profile likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md) describes it.
 
 ## Laplace approximation and the delta method
 
@@ -5815,7 +5815,7 @@ Every side of every quantity runs in parallel. A held parameter leaves the value
 
 `tolerance` is `ε = max(τ, ν)`. `τ` is the `sd_tolerance` of Nelder-Mead, an absolute amount: argmin stops when the costs of its simplex spread by less. For a particle swarm with the improvement stop rule, `τ` is the improvement the rule allows at the fit, `tol_abs + tol_rel · |objective at the fit|`: the swarm stops when its best value improves by less. A swarm without that rule has no tolerance on the objective, and `τ` is `1e-6 · max(1, |objective at the fit|)`. `ν`, the noise floor, is the error of one evaluation of the objective at the fit, from the accuracy of a run: `Σ |∂ℓᵢ/∂mᵢ| · eᵢ`, with `eᵢ = rtol · |mᵢ| + k · atol` the error of a run on an observation that sums `k` outputs, its prediction `mᵢ`, and the accuracy of the engine (machine epsilon for a difference model, the `rtol` and `atol` of the ODE solver). A solver holds its tolerances at each step, so `ν` is an estimate, not a bound. A threshold at or below `ε` gives no verdict: the profile cannot tell a rise from numerical error, and `notes` says so.
 
-The box of the parameters is the space inside their bounds. A free parameter of a refit is on a bound when it is within `1e-8` of the width of its bounds. When it is on a bound that it is not on at the fit, the refit has left the box: the bound makes its rise, not the data. The flatness reads only the points inside the box, and a note names the parameter and the value where the ridge leaves it. When the crossing point of a side has such a parameter, and the parameter is not on that bound over the whole side, the side crosses because of the box. It counts as open, and its interval end stays, with a note. A parameter on its bound at every point from the fit to the crossing does not count: the verdict then holds within the box.
+The box of the parameters is the space inside their bounds. A free parameter of a refit is on a bound when it is within `1e-8` of the width of its bounds, or of the larger of 1 and the size of its one finite bound, the rule of the [local approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/index.md). When it is on a bound that it is not on at the fit, the refit has left the box: the bound makes its rise, not the data. The flatness reads only the points inside the box, and a note names the parameter and the value where the ridge leaves it. When the crossing point of a side has such a parameter, and the parameter is not on that bound over the whole side, the side crosses because of the box. It counts as open, and its interval end stays, with a note. A parameter on its bound at every point from the fit to the crossing does not count: the verdict then holds within the box.
 
 A profile is flat for one of two reasons: other parameters compensate the parameter along it, or nothing the data read depends on it. Raue et al. (2009) read such relations from the paths of the profiles. To tell them apart with no optimizer, each *reset* puts the parameter at one value of its profile inside the box, or at one end of its box, and every other parameter at its fitted value. Each reset evaluates the objective once and compares it with the objective at the fit, `f̂`. The evaluation floor `2(ν₁ + ν₂) + 2γₙ Σ|ℓᵢ|` (`ProfileResult.evaluation_floor`) is how far two evaluations can differ: `ν₁` is `ν`, `ν₂ = Σ ½ |ℓᵢ''| · eᵢ²` uses the expected curvature of each term (an estimate for a model that is not normal), and `γₙ · Σ |ℓᵢ|` bounds the rounding of the sum of the `n` terms, with the constants of `−log L`.
 
@@ -25930,8 +25930,7 @@ class PropagationResult(BaseModel):
         Kish's effective size of the weights of the runs, ``(Σw)²/Σw²``: the
         number of equally weighted runs that carry as much information.
         """
-        weights = np.asarray(self.weights, dtype=float)
-        return float(weights.sum() ** 2 / (weights**2).sum())
+        return commol_rs.inference.effective_size(self.weights)
 
     def where(self, mask: ArrayLike) -> "PropagationResult":
         """
@@ -26000,13 +25999,14 @@ class PropagationResult(BaseModel):
             quantity is NaN in a run: `where` keeps the runs a condition
             chooses.
         """
-        levels = [0.5, *commol_rs.inference.interval_levels(confidence_level)]
+        # The level is checked before the values, also when there are none.
+        commol_rs.inference.interval_levels(confidence_level)
         summaries = []
         for index, label in enumerate(self.labels):
             column = [row[index] for row in self.values]
             try:
-                median, lower, upper = commol_rs.inference.weighted_quantiles(
-                    column, self.weights, levels
+                summary = commol_rs.inference.weighted_summary(
+                    column, self.weights, confidence_level
                 )
             except ValueError as error:
                 raise ValueError(
@@ -26017,10 +26017,10 @@ class PropagationResult(BaseModel):
                 QuantitySummary(
                     label=label,
                     confidence_level=confidence_level,
-                    mean=commol_rs.inference.weighted_mean(column, self.weights),
-                    median=median,
-                    lower=lower,
-                    upper=upper,
+                    mean=summary.mean,
+                    median=summary.median,
+                    lower=summary.lower,
+                    upper=summary.upper,
                 )
             )
         return summaries
@@ -26166,13 +26166,14 @@ def summary(self, confidence_level: float) -> list[QuantitySummary]:
         quantity is NaN in a run: `where` keeps the runs a condition
         chooses.
     """
-    levels = [0.5, *commol_rs.inference.interval_levels(confidence_level)]
+    # The level is checked before the values, also when there are none.
+    commol_rs.inference.interval_levels(confidence_level)
     summaries = []
     for index, label in enumerate(self.labels):
         column = [row[index] for row in self.values]
         try:
-            median, lower, upper = commol_rs.inference.weighted_quantiles(
-                column, self.weights, levels
+            summary = commol_rs.inference.weighted_summary(
+                column, self.weights, confidence_level
             )
         except ValueError as error:
             raise ValueError(
@@ -26183,10 +26184,10 @@ def summary(self, confidence_level: float) -> list[QuantitySummary]:
             QuantitySummary(
                 label=label,
                 confidence_level=confidence_level,
-                mean=commol_rs.inference.weighted_mean(column, self.weights),
-                median=median,
-                lower=lower,
-                upper=upper,
+                mean=summary.mean,
+                median=summary.median,
+                lower=summary.lower,
+                upper=summary.upper,
             )
         )
     return summaries
@@ -38782,7 +38783,8 @@ def member_statistics(
         If ``confidence_level`` is out of range, ``per_member`` is empty, or
         the weights do not match the members.
     """
-    lower_point, upper_point = ci_percentiles(confidence_level)
+    # The level is checked before the values, also when there are none.
+    commol_rs.inference.interval_levels(confidence_level)
     values = np.asarray(per_member, dtype=float)
     if values.size == 0:
         raise ValueError("per_member must hold at least one ensemble member.")
@@ -38794,14 +38796,11 @@ def member_statistics(
             f"One weight per member: {values.shape[0]} members, "
             f"{len(member_weights)} weights."
         )
-    levels = [0.0, lower_point / 100.0, 0.5, upper_point / 100.0, 1.0]
     columns = values.reshape(values.shape[0], -1).T
-    table = [
-        weighted_quantiles(column.tolist(), levels, member_weights)
-        for column in columns
-    ]
-    means = [
-        commol_rs.inference.weighted_mean(column.tolist(), member_weights)
+    summaries = [
+        commol_rs.inference.weighted_summary(
+            column.tolist(), member_weights, confidence_level
+        )
         for column in columns
     ]
 
@@ -38809,12 +38808,12 @@ def member_statistics(
         return per_column[0] if values.ndim == 1 else per_column
 
     return {
-        "mean": shaped(means),
-        "median": shaped([row[2] for row in table]),
-        "ci_lower": shaped([row[1] for row in table]),
-        "ci_upper": shaped([row[3] for row in table]),
-        "min": shaped([row[0] for row in table]),
-        "max": shaped([row[4] for row in table]),
+        "mean": shaped([summary.mean for summary in summaries]),
+        "median": shaped([summary.median for summary in summaries]),
+        "ci_lower": shaped([summary.lower for summary in summaries]),
+        "ci_upper": shaped([summary.upper for summary in summaries]),
+        "min": shaped([summary.minimum for summary in summaries]),
+        "max": shaped([summary.maximum for summary in summaries]),
     }
 ```
 
@@ -40910,9 +40909,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Ruff checks that every signature of the package has annotations and that none is `typing.Any`; the raw input of a validator is a `JsonValue`. A keyword that `Quantile`, `Groups`, `Level` or `Increments` does not take raises `TypeError` that names it, such as `Quantile(0.5, unknown=1)`, in place of the `ValidationError` `Extra inputs are not permitted`. A `ParameterSample` whose `names`, `bounds` or `values` are not valid gets the pydantic message of that field before the engine checks the log weights.
 - A calibration and every fit of a replicate of a bootstrap, the jackknife, a profile threshold or a conformal method run their starts with one rule: the engine chooses the best start, the first of lowest loss, and the seed gives the Latin hypercube and the seed of each start from two streams of its own. So a calibration with a seed, its structural rank and its fits of replicates give other values than in 0.10.1; a run stays reproducible from its seed on one version. When every start fails, the message lists the reason of each start, also in the message of a replicate that fails.
 - A particle swarm draws its numbers with the generator of commol from the seed of its start, which a calibration always gives: a verbose calibration with a swarm is the calibration without `verbose`, and `Calibrator.run_with_history` is start 0 of `Calibrator.run`.
+- The summaries of `PropagationResult`, of the scenarios and of `member_statistics`, the effective size of a propagation and the densities of observation models and priors keep their values: one Rust function computes each, and Python calls the summary as `commol_rs.inference.weighted_summary`. The error of a `Laplace` fit on its bound points to `ProfileLikelihood` and cites no issue.
+- `BootstrapCoverageEta` takes `η` with the one quantile of commol, the one of `weighted_quantiles`, on the logs of the thresholds, so `η` changes once. It needs at least `1/(2(1 − c))` replicates times parameters, where it needed `1/(1 − c) − 1`.
 
 ### Fixed
 
+- A profile reads a parameter with one finite bound, such as `[0, +∞)`, on its bound within `1e-8` of `max(1, |bound|)`, the rule of `Laplace`. Before, every value of such a parameter was on its bound, so a profile never saw the ridge leave the box through it, and the structure of a flat profile gave `undetermined="on_bound"` with that parameter in place of a reading.
 - A window whose start rounds to just below 0, such as a window of `1000 + 1e-7` that ends at 1000, starts at 0 in an observation, a calibration and a quantity, as `windowed_totals` reads it. Before, a calibration rejected it while the same window that ends at 2000 was accepted. One rule of the engine gives the start of a window.
 - Two neighbouring seeds share no replicate: before, replicate `i + 1` of `simulation.replicates(n, seed=42)` was replicate `i` of `seed=43`, and so were the starts and the swarms of a calibration with neighbouring seeds. Two methods that take one seed no longer draw from one sequence either: every random method draws from a stream of its own of the seed, and with one seed, replicate `i + 1` of a bootstrap no longer has the generator of particle `i` of an SMC sampler, nor the draws of `Laplace` the design of a sensitivity analysis. Every method draws with the samplers of the one generator of commol. So with one seed, the draws of the random methods and the replicates of a stochastic engine differ from 0.10.1; a run stays reproducible from its seed on one version.
 - One check of the engine defines the language of formulas, the one [Mathematical expressions](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) documents, for rates, formula parameters, calibration constraints and the unit check. A formula outside it fails when it is added, with a message that names the formula and its first part outside the language. Before, `k1 * (step > 30)` was accepted as a formula parameter, and `step > 1` as a rate became a parameter named `step > 1` that failed only when the model ran. A formula that calls a function the guide does not list, such as `erf`, `fma` or `trunc`, fails as a rate always did; a formula parameter accepted it before.

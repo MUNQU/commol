@@ -3665,9 +3665,11 @@ the independent version, every observation its own block. Bootstrap
 coverage runs one tempered sampler per replicate to a large <code>η</code>, reads the
 posterior of every smaller <code>η</code> by reweighting, so its search runs no model,
 and finds for each replicate and parameter the <code>η</code> where the interval stops
-holding the fit. <code>η</code> interpolates those thresholds at the level, so the
-expected coverage is the level; it needs at least <code>1/(1 − c) − 1</code> replicates
-times parameters.</p>
+holding the fit. <code>η</code> is the one quantile of commol of the log thresholds at
+<code>1 − c</code> (with equal weights, as
+<a href="../#the-one-quantile"><code>weighted_quantiles</code></a> reads them), which interpolates between two
+of them; it needs at least <code>1/(2(1 − c))</code> replicates times parameters, so
+that the level is not below the smallest threshold.</p>
 <p>With a stochastic engine the loss reads the problem's <code>replicates</code> with
 common random numbers, as the optimizers do, so it is a function of the
 parameters.</p>

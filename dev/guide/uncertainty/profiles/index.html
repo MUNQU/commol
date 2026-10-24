@@ -3713,7 +3713,9 @@ of the ODE solver). A solver holds its tolerances at each step, so <code>ν</cod
 estimate, not a bound. A threshold at or below <code>ε</code> gives no verdict: the
 profile cannot tell a rise from numerical error, and <code>notes</code> says so.</p>
 <p>The box of the parameters is the space inside their bounds. A free parameter
-of a refit is on a bound when it is within <code>1e-8</code> of the width of its bounds.
+of a refit is on a bound when it is within <code>1e-8</code> of the width of its bounds,
+or of the larger of 1 and the size of its one finite bound, the rule of the
+<a href="../local/">local approximations</a>.
 When it is on a bound that it is not on at the fit, the refit has left the
 box: the bound makes its rise, not the data. The flatness reads only the
 points inside the box, and a note names the parameter and the value where

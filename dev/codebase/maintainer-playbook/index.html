@@ -3677,14 +3677,18 @@ changing it (<a href="../decisions/uncertainty/#methods-plug-into-one-entry-poin
       samplers of <code>commol-random</code>, from a <code>commol_random::Generator</code> seeded
       from a stream of the problem's seed: a new <code>Stream</code> of
       <code>crates/commol-random/src/streams.rs</code>, with a number of its own, and
-      <code>Stream::replicate</code> for each draw or replicate; never the seed itself.</li>
+      <code>Stream::replicate</code> for each draw or replicate; never the seed itself.
+      It takes its numerical helpers and log densities from
+      <code>commol_statistics::numeric</code> and its quantiles and weighted statistics
+      from <code>commol_statistics::statistics</code>, and writes no copy of them.</li>
 <li>[ ] A method that samples a posterior is a <code>TemperedTarget</code> on
       <code>SmcSampler</code> (<code>crates/commol-inference/src/smc/</code>), not a sampler of its
       own, and its configuration takes required <code>priors</code> (<code>WithPriors</code>)
       (<a href="../decisions/uncertainty/#one-smc-core-many-targets">Design decisions</a>).</li>
 <li>[ ] The runner, bound in <code>py-commol/src/</code> (<code>inference.rs</code> or the module
       of its family), which runs the method through <code>parallel</code>
-      (<code>py-commol/src/parallelism.rs</code>), and its stub in <code>_commol_rs.pyi</code>; a
+      (<code>py-commol/src/parallelism.rs</code>), and its stub in <code>_commol_rs.pyi</code>
+      (<code>tests/suite/test_rules.py::test_the_stub_declares_what_the_extension_has</code>); a
       row in the table of <code>docs/guide/parallelism.md</code> and a case of <code>METHODS</code>
       in <code>tests/parallelism/test_threads.py</code>.</li>
 <li>[ ] The configuration, a subclass of <code>UncertaintyMethod[YourResult]</code>, and

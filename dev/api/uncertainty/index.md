@@ -7506,7 +7506,8 @@ def member_statistics(
         If ``confidence_level`` is out of range, ``per_member`` is empty, or
         the weights do not match the members.
     """
-    lower_point, upper_point = ci_percentiles(confidence_level)
+    # The level is checked before the values, also when there are none.
+    commol_rs.inference.interval_levels(confidence_level)
     values = np.asarray(per_member, dtype=float)
     if values.size == 0:
         raise ValueError("per_member must hold at least one ensemble member.")
@@ -7518,14 +7519,11 @@ def member_statistics(
             f"One weight per member: {values.shape[0]} members, "
             f"{len(member_weights)} weights."
         )
-    levels = [0.0, lower_point / 100.0, 0.5, upper_point / 100.0, 1.0]
     columns = values.reshape(values.shape[0], -1).T
-    table = [
-        weighted_quantiles(column.tolist(), levels, member_weights)
-        for column in columns
-    ]
-    means = [
-        commol_rs.inference.weighted_mean(column.tolist(), member_weights)
+    summaries = [
+        commol_rs.inference.weighted_summary(
+            column.tolist(), member_weights, confidence_level
+        )
         for column in columns
     ]
 
@@ -7533,12 +7531,12 @@ def member_statistics(
         return per_column[0] if values.ndim == 1 else per_column
 
     return {
-        "mean": shaped(means),
-        "median": shaped([row[2] for row in table]),
-        "ci_lower": shaped([row[1] for row in table]),
-        "ci_upper": shaped([row[3] for row in table]),
-        "min": shaped([row[0] for row in table]),
-        "max": shaped([row[4] for row in table]),
+        "mean": shaped([summary.mean for summary in summaries]),
+        "median": shaped([summary.median for summary in summaries]),
+        "ci_lower": shaped([summary.lower for summary in summaries]),
+        "ci_upper": shaped([summary.upper for summary in summaries]),
+        "min": shaped([summary.minimum for summary in summaries]),
+        "max": shaped([summary.maximum for summary in summaries]),
     }
 ```
 

@@ -1317,8 +1317,7 @@ class PropagationResult(BaseModel):
         Kish's effective size of the weights of the runs, ``(Σw)²/Σw²``: the
         number of equally weighted runs that carry as much information.
         """
-        weights = np.asarray(self.weights, dtype=float)
-        return float(weights.sum() ** 2 / (weights**2).sum())
+        return commol_rs.inference.effective_size(self.weights)
 
     def where(self, mask: ArrayLike) -> "PropagationResult":
         """
@@ -1387,13 +1386,14 @@ class PropagationResult(BaseModel):
             quantity is NaN in a run: `where` keeps the runs a condition
             chooses.
         """
-        levels = [0.5, *commol_rs.inference.interval_levels(confidence_level)]
+        # The level is checked before the values, also when there are none.
+        commol_rs.inference.interval_levels(confidence_level)
         summaries = []
         for index, label in enumerate(self.labels):
             column = [row[index] for row in self.values]
             try:
-                median, lower, upper = commol_rs.inference.weighted_quantiles(
-                    column, self.weights, levels
+                summary = commol_rs.inference.weighted_summary(
+                    column, self.weights, confidence_level
                 )
             except ValueError as error:
                 raise ValueError(
@@ -1404,10 +1404,10 @@ class PropagationResult(BaseModel):
                 QuantitySummary(
                     label=label,
                     confidence_level=confidence_level,
-                    mean=commol_rs.inference.weighted_mean(column, self.weights),
-                    median=median,
-                    lower=lower,
-                    upper=upper,
+                    mean=summary.mean,
+                    median=summary.median,
+                    lower=summary.lower,
+                    upper=summary.upper,
                 )
             )
         return summaries
@@ -1553,13 +1553,14 @@ def summary(self, confidence_level: float) -> list[QuantitySummary]:
         quantity is NaN in a run: `where` keeps the runs a condition
         chooses.
     """
-    levels = [0.5, *commol_rs.inference.interval_levels(confidence_level)]
+    # The level is checked before the values, also when there are none.
+    commol_rs.inference.interval_levels(confidence_level)
     summaries = []
     for index, label in enumerate(self.labels):
         column = [row[index] for row in self.values]
         try:
-            median, lower, upper = commol_rs.inference.weighted_quantiles(
-                column, self.weights, levels
+            summary = commol_rs.inference.weighted_summary(
+                column, self.weights, confidence_level
             )
         except ValueError as error:
             raise ValueError(
@@ -1570,10 +1571,10 @@ def summary(self, confidence_level: float) -> list[QuantitySummary]:
             QuantitySummary(
                 label=label,
                 confidence_level=confidence_level,
-                mean=commol_rs.inference.weighted_mean(column, self.weights),
-                median=median,
-                lower=lower,
-                upper=upper,
+                mean=summary.mean,
+                median=summary.median,
+                lower=summary.lower,
+                upper=summary.upper,
             )
         )
     return summaries

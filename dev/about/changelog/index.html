@@ -4662,14 +4662,34 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   seed of its start, which a calibration always gives: a verbose calibration
   with a swarm is the calibration without <code>verbose</code>, and
   <code>Calibrator.run_with_history</code> is start 0 of <code>Calibrator.run</code>.</li>
+<li>The summaries of <code>PropagationResult</code>, of the scenarios and of
+  <code>member_statistics</code>, the effective size of a propagation and the densities
+  of observation models and priors keep their values: one Rust function
+  computes each, and Python calls the summary as
+  <code>commol_rs.inference.weighted_summary</code>. The error of a <code>Laplace</code> fit on its
+  bound points to <code>ProfileLikelihood</code> and cites no issue.</li>
+<li><code>BootstrapCoverageEta</code> takes <code>η</code> with the one quantile of commol, the one
+  of <code>weighted_quantiles</code>, on the logs of the thresholds, so <code>η</code> changes
+  once. It needs at least <code>1/(2(1 − c))</code> replicates times parameters, where
+  it needed <code>1/(1 − c) − 1</code>.</li>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
-<li>A window whose start rounds to just below 0, such as a window of
+<li>
+<p>A profile reads a parameter with one finite bound, such as <code>[0, +∞)</code>, on
+  its bound within <code>1e-8</code> of <code>max(1, |bound|)</code>, the rule of <code>Laplace</code>.
+  Before, every value of such a parameter was on its bound, so a profile
+  never saw the ridge leave the box through it, and the structure of a flat
+  profile gave <code>undetermined="on_bound"</code> with that parameter in place of a
+  reading.</p>
+</li>
+<li>
+<p>A window whose start rounds to just below 0, such as a window of
   <code>1000 + 1e-7</code> that ends at 1000, starts at 0 in an observation, a
   calibration and a quantity, as <code>windowed_totals</code> reads it. Before, a
   calibration rejected it while the same window that ends at 2000 was
-  accepted. One rule of the engine gives the start of a window.</li>
+  accepted. One rule of the engine gives the start of a window.</p>
+</li>
 <li>Two neighbouring seeds share no replicate: before, replicate <code>i + 1</code> of
   <code>simulation.replicates(n, seed=42)</code> was replicate <code>i</code> of <code>seed=43</code>, and so
   were the starts and the swarms of a calibration with neighbouring seeds.

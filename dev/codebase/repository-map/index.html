@@ -3384,13 +3384,23 @@
 </tr>
 <tr>
 <td><code>crates/commol-core/src/share.rs</code></td>
-<td>The one check of a setting strictly between 0 and 1 (<code>check_open_unit</code>), for the settings of an engine and of the inference methods.</td>
+<td>The one check of a setting strictly between 0 and 1 (<code>check_open_unit</code>), for the settings of an engine and of the inference methods, and the one check of a confidence level (<code>check_confidence_level</code>), which each caller runs at its boundary.</td>
 <td>A check of such a setting anywhere else.</td>
 </tr>
 <tr>
 <td><code>crates/commol-random/</code></td>
 <td>What every stochastic engine and inference method shares and no model: the generator (<code>Generator</code>, <code>Xoshiro256PlusPlus</code> seeded by SplitMix64, with its uniforms and the generator trait of <code>rand_core</code>, which the particle swarm draws with), <code>replicate_seed</code>, <code>seed_or_drawn</code> (the one place a seed that its caller does not set is drawn), <code>Stream</code> (<code>streams.rs</code>), the one registry of the seed streams of every method that draws from a seed, the starts of a calibration and the inference methods: each stream with its own number, its method and its purpose (<code>Stream::ALL</code>), and the one scheme of a draw, seed, then <code>Stream::seed</code>, then <code>Stream::replicate</code> for each draw or replicate, the samplers (<code>sample</code>: exponential, Poisson, binomial, multinomial, normal, gamma, an index below <code>n</code>), <code>SumTree</code>, the rates of a set of events, which the stochastic engine of the test kind uses (<code>StochasticEvents</code> scans its propensities), and <code>latin_hypercube</code> on the unit cube.</td>
 <td>Anything of a model or an engine; a sampler in another crate; a stream number written in a method.</td>
+</tr>
+<tr>
+<td><code>crates/commol-statistics/src/statistics.rs</code></td>
+<td>The one quantile (weighted, midpoints of the cumulative weights; Hazen with equal weights), used by the summary of the replicates of a calibration and by every interval, sample and band of <code>commol-inference</code> and by the bindings, which import it from this crate; weighted mean and covariance, the weighted summary of a column (<code>summary</code>: mean, median, central interval, minimum and maximum, the reduction of every band and of every summary of runs), Kish's effective size; the two quantiles of a central interval (<code>interval_levels</code>, a pure function: the caller checks the level with <code>commol_core::check_confidence_level</code>) and the check of quantile levels (<code>check_levels</code>). It depends on no crate of commol.</td>
+<td>Quantiles or summaries anywhere else.</td>
+</tr>
+<tr>
+<td><code>crates/commol-statistics/src/numeric.rs</code></td>
+<td>The numerical helpers that the calibration and the inference methods share, one copy of each: <code>log_sum_exp</code>, <code>x_log_y</code>, <code>x_log1p_y</code>, <code>ln_gamma</code>, <code>ln_beta</code>, <code>digamma</code>, <code>trigamma</code>, and the log densities of the normal, the log-normal and the Student t in one or several dimensions.</td>
+<td>A second copy of a helper or a density; anything of a model.</td>
 </tr>
 <tr>
 <td><code>crates/commol-model/src/builder.rs</code></td>
@@ -3538,11 +3548,6 @@
 <td>Stepping along a profile; thresholds.</td>
 </tr>
 <tr>
-<td><code>crates/commol-calibration/src/statistics.rs</code></td>
-<td>The one quantile (weighted, midpoints of the cumulative weights; Hazen with equal weights), used by the summary of the replicates of a calibration and by every interval, sample and band of <code>commol-inference</code>, which re-exports the module as <code>commol_inference::statistics</code>; weighted mean and covariance, Kish's effective size; the one check of a confidence level (<code>interval_levels</code>, on <code>commol_core::check_open_unit</code>) and of quantile levels (<code>check_levels</code>).</td>
-<td>Quantiles or checks of such a setting anywhere else.</td>
-</tr>
-<tr>
 <td><code>crates/commol-inference/src/error.rs</code></td>
 <td><code>MethodError</code>, the one error of every method, and its <code>ErrorKind</code> (<code>Invalid</code> or <code>Failed</code>), which sets the Python exception.</td>
 <td>An error type of one method.</td>
@@ -3554,7 +3559,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/predictive.rs</code></td>
-<td><code>Predictive</code> (the run of every draw, its bands), <code>observation_draws</code> through <code>ForwardModel::with_observations</code>, the <code>ObservationNoise</code> port (one draw's whole vector), <code>NoNoise</code>, and <code>DistributionNoise</code> with the draw of each observation model; <code>Band</code>, the one layout of a band (<code>[position][output]</code>, also of the delta method) and its one reducer (<code>Band::of</code>); <code>share_among_replicates</code>, the one share of the weight of a draw among its replicates.</td>
+<td><code>Predictive</code> (the run of every draw, its bands), <code>observation_draws</code> through <code>ForwardModel::with_observations</code>, the <code>ObservationNoise</code> port (one draw's whole vector), <code>NoNoise</code>, and <code>DistributionNoise</code> with the draw of each observation model; <code>Band</code>, the one layout of a band (<code>[position][output]</code>, also of the delta method) and its one reducer (<code>Band::of</code>, on <code>statistics::summary</code>); <code>share_among_replicates</code>, the one share of the weight of a draw among its replicates.</td>
 <td>Noise models of one method; a second band reducer or layout.</td>
 </tr>
 <tr>
@@ -3604,7 +3609,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/distribution.rs</code>, <code>special.rs</code></td>
-<td><code>Family</code> and <code>Distribution</code>, one family truncated to the bounds of a parameter (density, distribution function, quantile, closed-form moments, draws by inversion); the special functions on <code>libm</code>. The quantile sets the bracket of the root and takes the root finder from the argmin fork (<code>NewtonRoot</code>).</td>
+<td><code>Family</code> and <code>Distribution</code>, one family truncated to the bounds of a parameter (density, distribution function, quantile, closed-form moments, draws by inversion); the normal distribution function and its inverse, the regularized incomplete gamma and beta functions and the quantiles of the Student t and the F (<code>special.rs</code>, on <code>libm</code>). The quantile sets the bracket of the root and takes the root finder from the argmin fork (<code>NewtonRoot</code>).</td>
 <td>Distributions from a dependency, whose draws change with it; a root finder of its own.</td>
 </tr>
 <tr>
@@ -3614,8 +3619,8 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/transform.rs</code></td>
-<td><code>Transform</code>: the unbounded scale a move proposes on (logit, log or identity by the bounds) and its log Jacobian.</td>
-<td>Kernels.</td>
+<td><code>Transform</code>: the unbounded scale a move proposes on (logit, log or identity by the bounds) and its log Jacobian; <code>on_bound</code> and <code>ON_BOUND</code>, the one rule of a value on a bound, which the curvature, the Laplace mixture and the profiles read.</td>
+<td>Kernels; a second rule of a bound.</td>
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/local/</code></td>
@@ -3711,7 +3716,7 @@
 </tr>
 <tr>
 <td><code>py-commol/src/inference.rs</code></td>
-<td><code>commol_rs.inference</code>: <code>CalibrationProblem</code> (built once from a <code>Calibrator</code>, with a loss or observation models: starts, history, predictions, the predictive, the log score, the pointwise log-likelihood), <code>ParameterSample</code>, <code>Predictive</code>, <code>ObservationDraws</code>, <code>BootstrapRun</code>, <code>JackknifeRun</code>, <code>weighted_quantiles</code>, <code>weighted_mean</code>, <code>by_series</code>, <code>quantile_error</code>; the runners of methods (the bootstraps, <code>parametric_bootstrap</code>, <code>jackknife</code>).</td>
+<td><code>commol_rs.inference</code>: <code>CalibrationProblem</code> (built once from a <code>Calibrator</code>, with a loss or observation models: starts, history, predictions, the predictive, the log score, the pointwise log-likelihood), <code>ParameterSample</code>, <code>Predictive</code>, <code>ObservationDraws</code>, <code>BootstrapRun</code>, <code>JackknifeRun</code>, <code>weighted_quantiles</code>, <code>weighted_summary</code> (<code>WeightedSummary</code>), <code>effective_size</code>, <code>by_series</code>, <code>quantile_error</code>; the runners of methods (the bootstraps, <code>parametric_bootstrap</code>, <code>jackknife</code>).</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
@@ -4133,7 +4138,7 @@
 </tr>
 <tr>
 <td>Change the parameter sample, the predictive, the scenarios, the scores or the quantile</td>
-<td><code>crates/commol-inference/src/sample.rs</code>, <code>predictive.rs</code>, <code>scores.rs</code>; <code>crates/commol-calibration/src/statistics.rs</code> (the one quantile, also of the replicates of a calibration)</td>
+<td><code>crates/commol-inference/src/sample.rs</code>, <code>predictive.rs</code>, <code>scores.rs</code>; <code>crates/commol-statistics/src/statistics.rs</code> (the one quantile, also of the replicates of a calibration)</td>
 <td><code>py-commol/commol/context/inference/sample.py</code>, <code>api/inference/</code> (<code>scenarios.py</code>), <code>docs/guide/uncertainty/index.md</code></td>
 </tr>
 <tr>

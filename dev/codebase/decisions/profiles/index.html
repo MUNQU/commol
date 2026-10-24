@@ -3380,8 +3380,9 @@ observation that sums <code>k</code> outputs, the term derivatives of
 <code>CalibrationProblem::term_derivatives</code> and the <code>output_accuracy</code> and
 <code>output_absolute_accuracy</code> of the engine (<code>ProfileTracer::noise_floor</code>);
 solvers hold their tolerances per step, so <code>ν</code> is an estimate, not a bound. A
-point whose refit has a free parameter on a bound, within <code>ON_BOUND = 1e-8</code>
-of the width of its bounds (the tolerance of #133), that it is not on at the
+point whose refit has a free parameter on a bound (<code>on_bound</code> of
+<code>transform.rs</code>, the rule of the curvature: <code>1e-8</code> of the width of two finite
+bounds, of <code>max(1, |bound|)</code> with one) that it is not on at the
 fit has left the box of the parameters (<code>ProfilePoint::on_bound</code>): the bound,
 not the data, makes its rise. <code>structurally_non_identifiable</code>: each side is
 flat within <code>ε</code> over its points inside the box, has one past the fit, and

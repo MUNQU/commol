@@ -3586,9 +3586,10 @@ with special functions on <code>libm</code>, so a seed gives the same draws on e
 platform. Each sampling method takes <code>priors</code> with no default, and <code>η</code> of a
 Gibbs posterior has no default either: a number or a calibration.
 Information matching reads the curvature and the meat of the sandwich;
-bootstrap coverage interpolates the per-replicate thresholds of <code>η</code> at the
-positions <code>i / (M + 1)</code>, because the largest <code>η</code> that covers at the level is
-an order statistic whose expected coverage is below it.</p>
+bootstrap coverage takes the one quantile of commol of the log thresholds
+of <code>η</code> at <code>1 − c</code> (<code>interpolated_eta</code> in <code>smc/gibbs.rs</code>), which interpolates
+between two order statistics, because the largest <code>η</code> that covers at the
+level is an order statistic whose expected coverage is below it.</p>
 <table>
 <thead>
 <tr>

@@ -3370,7 +3370,7 @@ its runs. Figures have <a href="../figures/">a page of their own</a>.</p>
 <h2 id="one-confidence-interval-convention">One confidence-interval convention<a class="headerlink" href="#one-confidence-interval-convention" title="Permanent link">&para;</a></h2>
 <p>Every interval is a weighted quantile: the inverse of the weighted empirical
 distribution, interpolated between the midpoints of the cumulative weights
-(<code>statistics::quantiles</code> in <code>crates/commol-calibration/src/statistics.rs</code>). With
+(<code>statistics::quantiles</code> in <code>crates/commol-statistics/src/statistics.rs</code>). With
 equal weights it equals NumPy's <code>method="hazen"</code>; a weight of zero removes a
 value. <code>ci_percentiles</code> (<code>api/inference/intervals.py</code>) turns a confidence level
 into the two percentile points of <code>statistics::interval_levels</code>. <code>member_statistics</code> reduces each member to the
@@ -3382,9 +3382,11 @@ a predictive and the summary of the replicates of a calibration
 quantile. So a calibration with <code>Quantile(0.25)</code> compares the observations
 with the value that <code>SimulationReplicates.quantiles([0.25])</code> gives for the
 same runs.</p>
-<p>The module lives in <code>commol-calibration</code>, the lowest crate that takes a
-quantile, and <code>commol-inference</code> re-exports it (<code>pub use
-commol_calibration::statistics</code>), so there is one copy.</p>
+<p>The module lives in <code>commol-statistics</code>, a crate with no model and no
+optimizer that calibration, inference and the bindings depend on and import
+directly (<code>commol_statistics::statistics</code>), so there is one copy and one path. Every band and every summary of runs reduces a column with
+its <code>summary</code> (the mean, the median, the central interval, the minimum and the
+maximum), which Python calls as <code>weighted_summary</code>.</p>
 <table>
 <thead>
 <tr>
@@ -3403,7 +3405,11 @@ commol_calibration::statistics</code>), so there is one copy.</p>
 </tr>
 <tr>
 <td>The module in <code>commol-core</code></td>
-<td>No crate below calibration takes a quantile, and <code>commol-core</code> holds the model types and the engine contract.</td>
+<td><code>commol-core</code> holds the model types, the engine contract and the threads.</td>
+</tr>
+<tr>
+<td>The module in <code>commol-calibration</code></td>
+<td>A quantile is not calibration, and a crate that needs it would depend on the problem and its optimizers.</td>
 </tr>
 <tr>
 <td>A copy of Hazen's rule in <code>commol-calibration</code></td>
@@ -3414,7 +3420,7 @@ commol_calibration::statistics</code>), so there is one copy.</p>
 <p><strong>Rule:</strong> every new interval goes through <code>weighted_quantiles</code> or
 <code>member_statistics</code>, and every quantile in Rust through
 <code>statistics::quantiles</code>.</p>
-<p><strong>Guards:</strong> <code>crates/commol-calibration/src/statistics.rs</code> tests,
+<p><strong>Guards:</strong> <code>crates/commol-statistics/src/statistics.rs</code> tests,
 <code>crates/commol-calibration/tests/test_replicate_summary.rs</code>,
 <code>tests/uncertainty/test_intervals.py</code>,
 <code>tests/stochastic/test_calibration.py::test_a_quantile_summary_agrees_with_the_quantiles_of_the_replicates</code>,
@@ -3447,7 +3453,7 @@ interval.</p>
 <tbody>
 <tr>
 <td>A confidence level</td>
-<td><code>statistics::interval_levels</code></td>
+<td><code>check_confidence_level</code> (<code>crates/commol-core/src/share.rs</code>)</td>
 <td><code>confidence_level is strictly between 0 and 1, got 1.5; use 0.95 for a 95% interval</code></td>
 </tr>
 <tr>
@@ -3462,7 +3468,12 @@ interval.</p>
 </tr>
 </tbody>
 </table>
-<p>Python calls the first through the binding <code>commol_rs.inference.interval_levels</code>:
+<p>A caller checks a confidence level at its boundary, then computes the two
+quantiles of its interval with <code>statistics::interval_levels</code>, a pure function
+of <code>commol-statistics</code> that checks nothing: the rule of a setting stays in the
+layer of the settings, and the crate of statistics depends on no crate of
+commol. Python calls the check through the binding
+<code>commol_rs.inference.interval_levels</code>, which checks, then computes:
 <code>ci_percentiles</code>, <code>BootstrapResult.interval_error</code>, <code>PropagationResult.summary</code>,
 the scenario summaries, and every <code>confidence_level</code> field, whose type is
 <code>ConfidenceLevel</code> (<code>context/inference/levels.py</code>). A field of a share has the
@@ -3487,10 +3498,19 @@ reaches the check through the engine (<code>check_settings</code>).</p>
 <td>An alias for an old name</td>
 <td>Two names for one setting, which is what the rule removes.</td>
 </tr>
+<tr>
+<td><code>statistics::interval_levels</code> checks the level and returns a <code>Result</code></td>
+<td><code>commol-statistics</code> depends on <code>commol-core</code> only to word a message, and a computation and a rule of a setting stay mixed.</td>
+</tr>
+<tr>
+<td><code>check_open_unit</code> and the check of a confidence level in <code>commol-statistics</code></td>
+<td>The settings of an engine depend on the crate of statistics, and the rules of the settings split across two crates.</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Rule:</strong> a new setting takes the name its meaning already has, and a new
-setting strictly between 0 and 1 is checked by one of the two functions.</p>
+setting strictly between 0 and 1 is checked by one of the two functions of
+<code>share.rs</code>.</p>
 <p><strong>Guards:</strong> <code>tests/suite/test_rules.py::test_a_setting_has_one_name</code>,
 <code>tests/uncertainty/test_intervals.py::test_every_confidence_level_has_one_check</code>,
 <code>crates/commol-inference/tests/test_levels.rs</code>.</p>
