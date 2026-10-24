@@ -3,7 +3,7 @@
 use commol_random::Generator;
 
 use crate::statistics;
-use crate::streams::Stream;
+use commol_random::Stream;
 
 /// Draws of the parameters of a calibration problem, each with a weight.
 ///

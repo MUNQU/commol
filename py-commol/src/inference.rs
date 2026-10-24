@@ -8,8 +8,8 @@
 
 use crate::parallelism::parallel;
 use commol_calibration::{
-    CalibrationProblem, DiscrepancyConfig, EvaluationError, StartOutcome, Violation, Workspace,
-    optimize_starts, optimize_with_history,
+    CalibrationProblem, DiscrepancyConfig, EvaluationError, Violation, Workspace, optimize_starts,
+    optimize_with_history, start_points,
 };
 use commol_inference::resampling::{
     BayesianBootstrap, BlockDrawing, BlockScheme, FitUnit, Multipliers, ParametricResampler,
@@ -25,7 +25,7 @@ use rayon::prelude::*;
 
 use crate::calibration::{
     PyCalibrationConstraint, PyCalibrationParameter, PyCalibrationResultWithHistory, PyLossConfig,
-    PyObservationModel, PyObservedDataPoint, PyOptimizationConfig, PyStartOutcome,
+    PyObservationModel, PyObservedDataPoint, PyOptimizationConfig, PyStarts,
 };
 use crate::engine::{Engine, InfeasibleStateError, PyEngine};
 
@@ -310,10 +310,11 @@ impl PyCalibrationProblem {
         self.seed
     }
 
-    /// Optimize from `starts` start points in parallel
+    /// Optimize from `starts` start points in parallel, and choose the best
     ///
     /// Start 0 is the initial guess; the others are rows of a Latin
-    /// hypercube over the bounds drawn from `seed`.
+    /// hypercube over the bounds. `seed` gives the hypercube and the seed of
+    /// each start of a particle swarm.
     ///
     /// Args:
     ///     config: The optimizer
@@ -321,47 +322,44 @@ impl PyCalibrationProblem {
     ///     seed: Seed of the starts
     ///
     /// Returns:
-    ///     One StartOutcome per start, in order
+    ///     The outcome of each start, in order, and the index of the best
     ///
     /// Raises:
     ///     ValueError: If a verbose optimizer has more than one start
+    ///     RuntimeError: If every start fails; the message gives the reason
+    ///         of each
     fn optimize(
         &self,
         py: Python<'_>,
         config: &PyOptimizationConfig,
         #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
         seed: u64,
-    ) -> PyResult<Vec<PyStartOutcome>> {
-        let outcomes = if config.verbose {
-            if starts > 1 {
-                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "A verbose optimizer shows one start; set starts=1 or verbose=False",
-                ));
-            }
-            let result = parallel(py, || {
+    ) -> PyResult<PyStarts> {
+        if config.verbose && starts > 1 {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "A verbose optimizer shows one start; set starts=1 or verbose=False",
+            ));
+        }
+        let points = start_points(self.inner.parameters(), starts, seed);
+        parallel(py, || {
+            if config.verbose {
                 crate::python_observer::optimize_with_python_observer(
                     &self.inner,
                     &config.inner,
+                    points,
+                    seed,
                     config.header_interval,
                 )
-            })?;
-            vec![StartOutcome {
-                start: self.inner.initial_parameters(),
-                result,
-            }]
-        } else {
-            parallel(py, || {
-                optimize_starts(&self.inner, &config.inner, starts, seed)
-            })?
-        };
-        Ok(outcomes
-            .into_iter()
-            .map(|inner| PyStartOutcome { inner })
-            .collect())
+            } else {
+                optimize_starts(&self.inner, &config.inner, points, seed)
+            }
+        })?
+        .map(|inner| PyStarts { inner })
+        .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)
     }
 
-    /// Optimize from the initial guess and keep every evaluation of a
-    /// feasible point
+    /// Optimize from the initial guess, as start 0 of `optimize` with
+    /// `seed`, and keep every evaluation of a feasible point
     ///
     /// Raises:
     ///     RuntimeError: If the optimization fails
@@ -369,10 +367,13 @@ impl PyCalibrationProblem {
         &self,
         py: Python<'_>,
         config: &PyOptimizationConfig,
+        seed: u64,
     ) -> PyResult<PyCalibrationResultWithHistory> {
-        parallel(py, || optimize_with_history(&self.inner, &config.inner))?
-            .map(|inner| PyCalibrationResultWithHistory { inner })
-            .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)
+        parallel(py, || {
+            optimize_with_history(&self.inner, &config.inner, seed)
+        })?
+        .map(|inner| PyCalibrationResultWithHistory { inner })
+        .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)
     }
 
     /// The predicted observations of each parameter set, in parallel

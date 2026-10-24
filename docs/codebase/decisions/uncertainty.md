@@ -50,7 +50,7 @@ by the configuration's type and knows no method. A static type checker infers
 
 Every random number of a method comes from the generator and the samplers
 of `commol-random`, seeded from the seed of its source ([Results](results.md#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts))
-by one scheme: seed, then a `Stream` of `crates/commol-inference/src/streams.rs`, then the index of a draw.
+by one scheme: seed, then a `Stream` of `crates/commol-random/src/streams.rs`, then the index of a draw.
 Coverage studies (`tests/support/coverage.py`, marker `coverage_study`) check that a method's
 intervals cover the truth at their level; they run for a pull request that
 changes what they run and before a release
@@ -104,9 +104,11 @@ A resampling method makes each replicate with
 (`crates/commol-calibration/src/calibration_problem.rs`): a copy of the problem
 whose discrepancy is built as `new` builds it, so with normalization on its
 factors come from the replicate's own values, as the fit's do. The engine, the
-observation operator and the feasibility stay. A replicate starts from the fit
-and, with more starts, from a Latin hypercube, and keeps its best end
-(`ReplicateRunner`, `resampling/runner.rs`). Blocks hold every series in a
+observation operator and the feasibility stay. A replicate is the calibration
+of its data: it starts from the fit and, with more starts, from a Latin
+hypercube, and keeps the best start of `optimize_starts`, the function a
+calibration calls (`ReplicateRunner::fit_one`, `resampling/runner.rs`;
+[Optimizers](optimizers.md#one-function-runs-the-starts-and-chooses-the-best)). Blocks hold every series in a
 window of positions (`BlockScheme`), and `block_length` has no default.
 
 | Alternative | Why not |

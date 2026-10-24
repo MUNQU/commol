@@ -8,8 +8,8 @@ use nalgebra::DVector;
 use super::curvature::Curvature;
 use crate::error::MethodError;
 use crate::sensitivity::Matrix;
-use crate::streams::Stream;
 use crate::transform::Transform;
+use commol_random::Stream;
 
 /// A normal distribution on the unbounded scale, or a multivariate Student t
 /// with `degrees_of_freedom`, whose draws map back to the parameters.

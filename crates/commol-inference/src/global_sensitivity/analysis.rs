@@ -20,7 +20,7 @@ use crate::global_sensitivity::{
 use crate::predictive::{draw_seeds, run_sets, share_among_replicates};
 use crate::quantity::{Quantities, Quantity};
 use crate::sample::ParameterSample;
-use crate::streams::Stream;
+use commol_random::Stream;
 
 /// The draws of a propagation and what each run gives.
 #[derive(Debug, Clone, PartialEq)]

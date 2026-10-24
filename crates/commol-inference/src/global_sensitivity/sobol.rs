@@ -48,7 +48,7 @@ pub struct Sobol {
 /// The Sobol indices of `design` from the quantities of its points,
 /// `[point][quantity]`, with `replicates` bootstrap replicates for intervals at
 /// `confidence_level`; `seed` seeds the bootstrap alone, so a caller gives
-/// it a stream of its own ([`crate::streams::Stream::SobolBootstrap`]). The quantities
+/// it a stream of its own ([`commol_random::Stream::SobolBootstrap`]). The quantities
 /// run in parallel.
 ///
 /// # Errors

@@ -2,7 +2,8 @@
 
 [Back to Design decisions](../design-decisions.md)
 
-How Nelder-Mead and the particle swarm of a calibration search, score and stop.
+How Nelder-Mead and the particle swarm of a calibration search, score and stop,
+and how the starts of a calibration run and draw their seeds.
 
 ## Nelder-Mead searches inside the bounds
 
@@ -81,3 +82,63 @@ profile under a swarm ([Profiles](profiles.md)).
 `a_stop_rule_out_of_its_range_names_itself`);
 `crates/commol-inference/tests/test_profiles.rs::a_swarm_fits_a_subproblem_and_repeats_from_its_seed`;
 `tests/calibration/test_optimizers.py::TestConverged::test_a_swarm_that_stagnates_stops_and_converges`.
+
+## One function runs the starts and chooses the best
+
+`optimize_starts` (`crates/commol-calibration/src/starts.rs`) takes the start
+points and one seed, runs the starts in parallel and returns every outcome
+and the index of the best (`Starts`): the start of lowest loss among those
+that did not fail, the first on a tie, a NaN loss counting as `+∞`. When every
+start fails, its error lists the reason of each start. A calibration
+(`PyCalibrationProblem::optimize`, which `Calibrator.run` calls) and every fit
+of a replicate (`ReplicateRunner::fit_one`) call it, so their starts, seeds
+and best start follow one rule; Python chooses no start. The seed gives two
+streams of the registry of `commol-random` (`Stream`): `Stream::StartPoints`
+draws the Latin hypercube of `start_points`, and start `i` takes
+`Stream::StartSeeds.replicate(seed, i)`, so the starts draw from no stream of
+another method with the same seed. A replicate
+passes the seed `Stream::ReplicateFits.replicate(seed, b)`, apart from the
+stream of its data, and its fit as start 0. `optimize` and
+`optimize_with_history` are start 0, from the initial guess, and a verbose
+calibration runs `optimize_starts_with_observer` with its one start.
+
+| Alternative | Why not |
+|---|---|
+| The hypercube from the seed itself | A replicate draws its data from the seed of its replicate, so the hypercube could reuse that stream; each caller would need to know which seeds it must not pass. |
+| Stream numbers of its own in `commol-calibration` | They can take a number of the registry: with one seed, the hypercube of the starts was the design of a sensitivity analysis. The registry lives in `commol-random`, below every crate that draws. |
+| Start 0 on another seed than the others | Start 0 of a calibration and of a replicate would follow two rules. |
+| The best start chosen in Python | A replicate chooses in Rust, so the two choices could differ on a tie or a NaN. |
+| Only the reason of the first failed start | The other starts can fail for other reasons, which the message would hide. |
+
+**Guards:** `crates/commol-calibration/tests/test_starts.rs`
+(`the_best_start_is_the_first_of_lowest_loss`,
+`every_failed_start_gives_its_reason`,
+`the_calibration_from_the_guess_is_the_first_start`);
+`crates/commol-calibration/src/starts.rs` `tests`
+(`the_hypercube_comes_from_the_stream_of_the_start_points`,
+`start_i_takes_seed_i_of_the_stream_of_the_start_seeds`,
+`a_loss_that_is_not_a_number_is_the_worst`);
+`crates/commol-inference/tests/test_resampling.rs::a_replicate_fit_is_the_calibration_of_its_data`;
+`crates/commol-inference/tests/test_streams.rs::a_calibration_and_a_sensitivity_analysis_with_one_seed_draw_from_two_streams`;
+`tests/calibration/test_starts.py::TestFailedStarts::test_every_start_failing_raises_with_each_reason`.
+
+## A swarm takes its seed from its caller
+
+A particle swarm takes its seed as an argument of every optimizer
+(`optimize_from`, `optimize_subproblem`, `optimize_starts`), which every
+caller gives; `ParticleSwarmConfig` has no seed. The swarm draws with
+`commol_random::Generator`, which implements the generator trait of
+`rand_core` that the swarm of the argmin fork takes (`with_rng_generator`),
+so its numbers come from the one generator of commol and repeat from the
+seed.
+
+| Alternative | Why not |
+|---|---|
+| A seed in `ParticleSwarmConfig` and an argument that replaces it | Two seeds of one run; the configuration seed served only a test. |
+| A seed from the system when none is given | A run that no seed repeats; every caller has a seed. |
+| `rand::SmallRng` | Its sequence is not the one of the other draws of commol, and `rand` may change it in a version. |
+
+**Guards:** `crates/commol-calibration/tests/test_starts.rs::a_swarm_repeats_its_fit_from_its_seed`;
+`crates/commol-random/src/generator.rs` `tests`
+(`the_trait_of_rand_core_draws_the_numbers_of_the_generator`);
+`tests/calibration/test_starts.py::TestStarts::test_a_verbose_swarm_repeats_its_fit_from_the_seed`.

@@ -35,8 +35,8 @@ use super::TemperedTarget;
 use super::kernel::Kernel;
 use crate::error::MethodError;
 use crate::statistics::{effective_size, normalized_weights};
-use crate::streams::Stream;
 use commol_core::check_open_unit;
+use commol_random::Stream;
 
 /// One step of a run.
 #[derive(Debug, Clone, PartialEq)]

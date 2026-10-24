@@ -415,7 +415,8 @@ class TestFailures:
         with pytest.raises(
             RuntimeError,
             match=r"Every origin failed: 0 of 1 origins fitted, and the method needs "
-            r"1; the first reasons: origin 0: Optimization failed: Simulation failed",
+            r"1; the first reasons: origin 0: Every start failed: Start 0 failed: "
+            r"Optimization failed: Simulation failed",
         ):
             calibrator.uncertainty(
                 RollingConformal(

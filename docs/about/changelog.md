@@ -77,6 +77,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the `ValidationError` `Extra inputs are not permitted`. A `ParameterSample`
   whose `names`, `bounds` or `values` are not valid gets the pydantic message
   of that field before the engine checks the log weights.
+- A calibration and every fit of a replicate of a bootstrap, the jackknife,
+  a profile threshold or a conformal method run their starts with one rule:
+  the engine chooses the best start, the first of lowest loss, and the seed
+  gives the Latin hypercube and the seed of each start from two streams of
+  its own. So a calibration with a seed, its structural rank and its fits of
+  replicates give other values than in 0.10.1; a run stays reproducible
+  from its seed on one version. When every start fails, the message lists
+  the reason of each start, also in the message of a replicate that fails.
+- A particle swarm draws its numbers with the generator of commol from the
+  seed of its start, which a calibration always gives: a verbose calibration
+  with a swarm is the calibration without `verbose`, and
+  `Calibrator.run_with_history` is start 0 of `Calibrator.run`.
 
 ### Fixed
 

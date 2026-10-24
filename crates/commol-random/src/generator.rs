@@ -1,6 +1,8 @@
 //! The generator every stochastic engine draws from.
 
-use rand_core::{Rng, SeedableRng};
+use std::convert::Infallible;
+
+use rand_core::{Rng, SeedableRng, TryRng};
 use rand_xoshiro::Xoshiro256PlusPlus;
 
 /// The golden-ratio increment of SplitMix64.
@@ -18,7 +20,7 @@ pub fn splitmix64(state: &mut u64) -> u64 {
 
 /// The SplitMix64 of `seed`: a seed with its bits mixed, so that
 /// neighbouring seeds give unrelated numbers.
-fn mixed(seed: u64) -> u64 {
+pub(crate) fn mixed(seed: u64) -> u64 {
     let mut state = seed;
     splitmix64(&mut state)
 }
@@ -35,22 +37,14 @@ pub fn replicate_seed(seed: u64, index: u64) -> u64 {
     splitmix64(&mut state)
 }
 
-/// The seed of stream `stream` of a run seeded with `seed`: one seed per
-/// purpose of a method (its design, its replicates, its bootstrap), so that
-/// no two purposes draw from one sequence.
-///
-/// It mixes `stream` into the mixed seed with a multiplier, then takes the
-/// SplitMix64 of the result; the replicates of one stream come from
-/// [`replicate_seed`] of its seed.
-pub fn stream_seed(seed: u64, stream: u64) -> u64 {
-    let mut state = mixed(seed) ^ stream.wrapping_mul(0xD1B5_4A32_D192_ED03);
-    splitmix64(&mut state)
-}
-
 /// A `Xoshiro256PlusPlus` generator (Blackman and Vigna 2021).
 ///
 /// Its four words of state are the first four SplitMix64 numbers of the
-/// seed, so one seed gives one sequence on every platform and version.
+/// seed, so one seed gives one sequence on every platform and version. It
+/// implements the generator trait of `rand_core` ([`TryRng`], so also
+/// `rand_core::Rng`), with the numbers of its `Xoshiro256PlusPlus`, for a
+/// dependency that takes any generator of `rand`, such as the particle swarm
+/// of the argmin fork.
 #[derive(Clone, Debug)]
 pub struct Generator {
     rng: Xoshiro256PlusPlus,
@@ -105,23 +99,38 @@ impl Generator {
     }
 }
 
+impl TryRng for Generator {
+    type Error = Infallible;
+
+    fn try_next_u32(&mut self) -> Result<u32, Infallible> {
+        Ok(self.rng.next_u32())
+    }
+
+    fn try_next_u64(&mut self) -> Result<u64, Infallible> {
+        Ok(self.rng.next_u64())
+    }
+
+    fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Infallible> {
+        self.rng.fill_bytes(dst);
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn each_stream_has_its_own_seed() {
-        let seeds: Vec<u64> = (1..=4).map(|stream| stream_seed(7, stream)).collect();
-        for (i, a) in seeds.iter().enumerate() {
-            for b in &seeds[i + 1..] {
-                assert_ne!(a, b);
-            }
-            for index in 0..100 {
-                assert_ne!(*a, replicate_seed(7, index));
-            }
-        }
-        assert_eq!(stream_seed(7, 2), stream_seed(7, 2));
-        assert_ne!(stream_seed(7, 2), stream_seed(8, 2));
+    fn the_trait_of_rand_core_draws_the_numbers_of_the_generator() {
+        let mut inherent = Generator::from_seed(9);
+        let mut through_trait = Generator::from_seed(9);
+        let first = inherent.next_u64();
+        assert_eq!(Rng::next_u64(&mut through_trait), first);
+        let second = inherent.next_u64();
+        assert_eq!(Rng::next_u32(&mut through_trait), (second >> 32) as u32);
+        let mut bytes = [0u8; 8];
+        Rng::fill_bytes(&mut through_trait, &mut bytes);
+        assert_eq!(bytes, inherent.next_u64().to_le_bytes());
     }
 
     #[test]

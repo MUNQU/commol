@@ -1,9 +1,9 @@
-//! The registry of seed streams: one number per stream, and methods that
-//! take one seed and draw from two streams.
+//! Methods that take one seed draw from two streams of the registry of
+//! `commol-random`.
 
 use commol_calibration::{
     CalibrationParameter, CalibrationProblem, LossConfig, NelderMeadConfig, ObservedDataPoint,
-    OptimizationConfig, Workspace,
+    OptimizationConfig, Workspace, start_points,
 };
 use commol_core::Model;
 use commol_difference::DifferenceEquations;
@@ -14,11 +14,11 @@ use commol_inference::importance::TemperedPosterior;
 use commol_inference::local::Gaussian;
 use commol_inference::resampling::{Perturbation, ReplicateRunner, Resampler};
 use commol_inference::smc::{RandomWalk, SmcSampler, TemperedTarget};
-use commol_inference::streams::Stream;
 use commol_inference::target::Target;
 use commol_inference::transform::Transform;
-use commol_random::Generator;
+use commol_random::Stream;
 use commol_random::sample::normal;
+use commol_random::{Generator, latin_hypercube};
 use nalgebra::DMatrix;
 
 const SEED: u64 = 11;
@@ -36,21 +36,6 @@ fn decay() -> Model {
         "structure":{"kind":"aggregate","bin_amounts":{"A":1000.0,"B":0.0}}}"#,
     )
     .expect("valid model JSON")
-}
-
-#[test]
-fn every_stream_has_its_own_number() {
-    let numbers: Vec<u64> = Stream::ALL.iter().map(|stream| stream.number()).collect();
-    for (i, number) in numbers.iter().enumerate() {
-        assert!(!numbers[..i].contains(number), "stream {number} twice");
-    }
-    let seeds: Vec<u64> = Stream::ALL.iter().map(|stream| stream.seed(SEED)).collect();
-    for (i, seed) in seeds.iter().enumerate() {
-        assert!(!seeds[..i].contains(seed), "{:?}", Stream::ALL[i]);
-    }
-    for stream in Stream::ALL {
-        assert!(!stream.method().is_empty() && !stream.purpose().is_empty());
-    }
 }
 
 #[test]
@@ -89,6 +74,39 @@ fn two_methods_with_one_seed_draw_from_two_streams() {
     assert_eq!(design_unit, design_stream.clone().uniform());
 
     assert_ne!(laplace_stream.clone().uniform(), design_unit);
+}
+
+#[test]
+fn a_calibration_and_a_sensitivity_analysis_with_one_seed_draw_from_two_streams() {
+    // The Latin hypercube of one row of the starts of a calibration over
+    // [0, 1], and the design of one point of a sensitivity analysis of a
+    // uniform input on [0, 1], with one seed.
+    let k = vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)];
+    let start = start_points(&k, 2, SEED)[1][0];
+    let inputs = Priors::uniform_on_bounds(&["k".to_string()], &[(0.0, 1.0)]).unwrap();
+    let engine = DifferenceEquations::try_from_model(&decay()).unwrap();
+    let analysis = ForwardAnalysis::new(
+        engine,
+        k,
+        None,
+        None,
+        InputSpace::Independent(inputs),
+        Some(SEED),
+    )
+    .unwrap();
+    let design = analysis.draws("PRCC", Some(1)).unwrap().values()[0][0];
+
+    let starts_stream = Generator::from_seed(Stream::StartPoints.seed(SEED));
+    assert_eq!(
+        start,
+        latin_hypercube(&mut starts_stream.clone(), 1, 1)[0][0]
+    );
+    let design_stream = Generator::from_seed(Stream::SensitivityDesign.seed(SEED));
+    assert_eq!(
+        design,
+        latin_hypercube(&mut design_stream.clone(), 1, 1)[0][0]
+    );
+    assert_ne!(start, design);
 }
 
 /// A resampler whose replicate is the first uniform of its generator.

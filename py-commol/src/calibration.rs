@@ -574,11 +574,10 @@ impl PyParticleSwarmConfig {
     ///     mutation: Optional mutation configuration (PSOMutation)
     ///     velocity: Optional velocity configuration (PSOVelocity)
     ///     initialization: Initialization strategy (default: "uniform")
-    ///     seed: Random seed for reproducibility (default: None, uses system entropy)
     ///     improvement_stop: Optional improvement stop rule, `(window, tol_abs, tol_rel)`
     ///     radius_stop: Optional tolerance of the radius stop rule
     #[new]
-    #[pyo3(signature = (particles=20, max_iterations=1000, verbose=false, inertia=None, acceleration=None, mutation=None, velocity=None, initialization="uniform", seed=None, improvement_stop=None, radius_stop=None))]
+    #[pyo3(signature = (particles=20, max_iterations=1000, verbose=false, inertia=None, acceleration=None, mutation=None, velocity=None, initialization="uniform", improvement_stop=None, radius_stop=None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         #[pyo3(from_py_with = crate::counts::required::particles)] particles: usize,
@@ -589,7 +588,6 @@ impl PyParticleSwarmConfig {
         mutation: Option<PyRef<PyPSOMutation>>,
         velocity: Option<PyRef<PyPSOVelocity>>,
         initialization: &str,
-        seed: Option<u64>,
         #[pyo3(from_py_with = crate::counts::improvement_stop)] improvement_stop: Option<(
             u64,
             f64,
@@ -652,7 +650,6 @@ impl PyParticleSwarmConfig {
             mutation_strategy,
             mutation_probability,
             mutation_application,
-            seed,
             improvement_stop: improvement_stop.map(|(window, tol_abs, tol_rel)| {
                 commol_calibration::ImprovementStop {
                     window,
@@ -842,6 +839,36 @@ impl PyStartOutcome {
     #[getter]
     fn error(&self) -> Option<String> {
         self.inner.result.as_ref().err().cloned()
+    }
+}
+
+/// The starts of a multi-start optimization and the best of them: the
+/// start of lowest loss among those that did not fail, the first on a tie
+#[pyclass(name = "Starts")]
+pub struct PyStarts {
+    pub inner: commol_calibration::Starts,
+}
+
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
+#[pymethods]
+impl PyStarts {
+    /// The outcome of each start, in order
+    #[getter]
+    fn outcomes(&self) -> Vec<PyStartOutcome> {
+        self.inner
+            .outcomes()
+            .iter()
+            .map(|outcome| PyStartOutcome {
+                inner: outcome.clone(),
+            })
+            .collect()
+    }
+
+    /// The index of the best start
+    #[getter]
+    fn best(&self) -> usize {
+        self.inner.best_index()
     }
 }
 
@@ -1050,6 +1077,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCalibrationResultWithHistory>()?;
     m.add_class::<PyCalibrationResult>()?;
     m.add_class::<PyStartOutcome>()?;
+    m.add_class::<PyStarts>()?;
     m.add_function(wrap_pyfunction!(calibrated_initial_state, m)?)?;
     m.add_function(wrap_pyfunction!(check_model_values, m)?)?;
     m.add_function(wrap_pyfunction!(initial_condition_coverage, m)?)?;

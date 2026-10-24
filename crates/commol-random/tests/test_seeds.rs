@@ -1,7 +1,7 @@
 //! The seeds of replicates and streams: two seeds give unrelated seeds for
 //! every pair of indices.
 
-use commol_random::{replicate_seed, seed_or_drawn, stream_seed};
+use commol_random::{Stream, replicate_seed, seed_or_drawn};
 
 fn all_differ(mut seeds: Vec<u64>) -> bool {
     let count = seeds.len();
@@ -13,7 +13,7 @@ fn all_differ(mut seeds: Vec<u64>) -> bool {
 #[test]
 fn neighbouring_seeds_share_no_replicate_seed() {
     let replicates = |seed: u64| (0..20).map(move |index| replicate_seed(seed, index));
-    let streams = |seed: u64| (1..20).map(move |stream| stream_seed(seed, stream));
+    let streams = |seed: u64| Stream::ALL.iter().map(move |stream| stream.seed(seed));
     assert!(all_differ((40..60).flat_map(replicates).collect()));
     assert!(all_differ(
         (40..60)
@@ -28,7 +28,10 @@ fn neighbouring_seeds_share_no_replicate_seed() {
 #[test]
 fn the_first_seeds_are_fixed() {
     let replicates: Vec<u64> = (0..3).map(|index| replicate_seed(1, index)).collect();
-    let streams: Vec<u64> = (1..4).map(|stream| stream_seed(1, stream)).collect();
+    let streams: Vec<u64> = Stream::ALL[..3]
+        .iter()
+        .map(|stream| stream.seed(1))
+        .collect();
     assert_eq!(
         replicates,
         [

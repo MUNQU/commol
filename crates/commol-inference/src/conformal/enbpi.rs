@@ -20,7 +20,7 @@ use crate::conformal::quantile::group_quantiles;
 use crate::conformal::score::{ConformalSettings, NonconformityScore, scales};
 use crate::error::MethodError;
 use crate::resampling::{BlockScheme, FitUnit, Perturbation, ReplicateRunner};
-use crate::streams::Stream;
+use commol_random::Stream;
 
 /// Blocks drawn with replacement: one multinomial count per block, of as
 /// many draws as there are blocks, multiplies the weight of every

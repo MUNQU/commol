@@ -17,7 +17,7 @@ use crate::profiles::tracer::ProfiledQuantity;
 use crate::resampling::{FitUnit, ReplicateRunner, Resampler};
 use crate::special::{f_one_quantile, normal_quantile};
 use crate::statistics;
-use crate::streams::Stream;
+use commol_random::Stream;
 
 /// `½ χ²₁(confidence_level)`: the threshold of `−log L` for a pointwise
 /// interval of `confidence_level` (Wilks).
@@ -164,7 +164,7 @@ where
                                 &held,
                                 runner.config(),
                                 &start,
-                                Some(replicate_seed(seed, q as u64)),
+                                replicate_seed(seed, q as u64),
                             )?;
                             Ok((refit.fit.final_loss - fit.final_loss).max(0.0))
                         })

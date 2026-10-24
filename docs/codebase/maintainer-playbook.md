@@ -108,7 +108,7 @@ changing it ([Design decisions](decisions/uncertainty.md#methods-plug-into-one-e
       (`discrepancy_in_support`), and draws every random number with the
       samplers of `commol-random`, from a `commol_random::Generator` seeded
       from a stream of the problem's seed: a new `Stream` of
-      `crates/commol-inference/src/streams.rs`, with a number of its own, and
+      `crates/commol-random/src/streams.rs`, with a number of its own, and
       `Stream::replicate` for each draw or replicate; never the seed itself.
 - [ ] A method that samples a posterior is a `TemperedTarget` on
       `SmcSampler` (`crates/commol-inference/src/smc/`), not a sampler of its
@@ -153,7 +153,7 @@ builds the design from `InputSpace` (`design.rs`), runs it with
 `BatchRunner` and calls the estimator; the binding and the Python runner only
 convert. A method of independent inputs refuses a sample through
 `InputSpace::independent`, and a random number comes from a stream of the
-seed of the analysis (`Stream`, `streams.rs`).
+seed of the analysis (`Stream`, `crates/commol-random/src/streams.rs`).
 
 ### Model type (engine)
 

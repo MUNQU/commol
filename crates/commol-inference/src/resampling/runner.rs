@@ -3,16 +3,16 @@
 //! shares.
 
 use commol_calibration::{
-    CalibrationProblem, CalibrationResult, OptimizationConfig, optimize_from, start_points,
+    CalibrationProblem, CalibrationResult, OptimizationConfig, optimize_starts, start_points,
 };
 use commol_core::SimulationEngine;
-use commol_random::{Generator, replicate_seed};
+use commol_random::Generator;
 use rayon::prelude::*;
 
 use crate::error::MethodError;
 use crate::resampling::resamplers::{Perturbation, Resampler};
 use crate::sample::ParameterSample;
-use crate::streams::Stream;
+use commol_random::Stream;
 
 /// What a method fits once per perturbation: a replicate of the data, a
 /// block left out, or an origin. Its messages name it.
@@ -115,10 +115,11 @@ impl ReplicateFits {
 /// Fits replicates of a problem from its fit.
 ///
 /// Replicate `b` draws its data from `Stream::ReplicateData.replicate(seed, b)`
-/// and its starts from `Stream::ReplicateFits.replicate(seed, b)`
-/// ([`Stream`]). It starts from the fit and, with more than one
-/// start, from rows of a Latin hypercube over the bounds
-/// ([`commol_calibration::start_points`]), and keeps the end of lowest loss.
+/// ([`Stream`]), and is the calibration of its data seeded with
+/// `Stream::ReplicateFits.replicate(seed, b)`: it starts from the fit and,
+/// with more than one start, from rows of a Latin hypercube over the bounds
+/// ([`commol_calibration::start_points`]), and keeps the best start
+/// ([`commol_calibration::optimize_starts`]).
 pub struct ReplicateRunner<'a, E: SimulationEngine> {
     problem: &'a CalibrationProblem<E>,
     config: &'a OptimizationConfig,
@@ -212,7 +213,7 @@ where
     /// # Errors
     ///
     /// As [`Self::replicate_problem`], and [`MethodError::Failed`] with the
-    /// reason of the first start when every start fails.
+    /// reason of each start when every start fails.
     pub fn fit_one(
         &self,
         index: usize,
@@ -220,27 +221,11 @@ where
     ) -> Result<CalibrationResult, MethodError> {
         let problem = self.replicate_problem(perturbation)?;
         let seed = Stream::ReplicateFits.replicate(self.seed, index as u64);
-        let mut starts = start_points(problem.parameters(), self.starts, replicate_seed(seed, 1));
-        starts[0] = self.fit.clone();
-        let mut best: Option<CalibrationResult> = None;
-        let mut first_error = None;
-        for (start_index, start) in starts.iter().enumerate() {
-            let start_seed = replicate_seed(seed, 2 + start_index as u64);
-            match optimize_from(&problem, self.config, start, Some(start_seed)) {
-                Ok(result) => {
-                    if best
-                        .as_ref()
-                        .is_none_or(|kept| result.final_loss < kept.final_loss)
-                    {
-                        best = Some(result);
-                    }
-                }
-                Err(error) => {
-                    first_error.get_or_insert(error);
-                }
-            }
-        }
-        best.ok_or_else(|| MethodError::Failed(first_error.unwrap_or_default()))
+        let mut points = start_points(problem.parameters(), self.starts, seed);
+        points[0] = self.fit.clone();
+        optimize_starts(&problem, self.config, points, seed)
+            .map(|starts| starts.into_best())
+            .map_err(MethodError::Failed)
     }
 
     /// The perturbations of `replicates` replicates of `resampler`:

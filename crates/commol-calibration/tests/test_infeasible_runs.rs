@@ -75,7 +75,7 @@ fn a_calibration_whose_bounds_include_infeasible_rates_finds_the_rate_of_the_dat
         ..NelderMeadConfig::default()
     });
 
-    let result = optimize(&problem("k", 0.5), &config).unwrap();
+    let result = optimize(&problem("k", 0.5), &config, 0).unwrap();
 
     assert!(
         (result.best_parameters[0] - 0.2).abs() < 1e-4,
