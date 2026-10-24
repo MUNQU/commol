@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from commol.context.calibration import CalibrationResult
+from commol.context.ranges import RangeChecked
 
 
 class NoNoise(BaseModel):
@@ -20,7 +21,7 @@ class NoNoise(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class ResidualNoise(BaseModel):
+class ResidualNoise(RangeChecked):
     """
     Observation noise made of the residuals of a fit, with no noise model.
 
@@ -48,7 +49,7 @@ class ResidualNoise(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     fit: CalibrationResult = Field(description="The fit whose residuals are added.")
-    block_length: int = Field(ge=1, description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     residual_scale: Literal["additive", "multiplicative"] = Field(
         description="The scale of the residuals."
     )

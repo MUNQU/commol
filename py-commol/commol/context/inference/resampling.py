@@ -9,7 +9,7 @@ parametric bootstrap needs no noise model; the parametric bootstrap draws the
 data from the observation models.
 """
 
-from typing import Annotated, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -17,8 +17,9 @@ from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import CalibrationResult
 from commol.context.inference.method import UncertaintyMethod
 from commol.context.inference.sample import ParameterSample
+from commol.context.ranges import RangeChecked
 
-type BlockLength = Annotated[int, Field(ge=1)] | Literal["auto"]
+type BlockLength = int | Literal["auto"]
 """Positions per block: an integer of at least 1, or ``"auto"``, the rule of
 Politis and White (2004) with the correction of Patton, Politis and White
 (2009) on the residuals of the fit, the largest over the series."""
@@ -131,7 +132,7 @@ class BootstrapResult(BaseModel):
         return errors
 
 
-class BayesianBootstrap(UncertaintyMethod[BootstrapResult]):
+class BayesianBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
     """
     The Bayesian (weighted) bootstrap by blocks.
 
@@ -153,12 +154,12 @@ class BayesianBootstrap(UncertaintyMethod[BootstrapResult]):
         rows of a Latin hypercube over the bounds.
     """
 
-    replicates: int = Field(ge=1, description="Number of replicates.")
+    replicates: int = Field(description="Number of replicates.")
     block_length: BlockLength = Field(description="Positions per block.")
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    starts: int = Field(default=1, description="Starts per fit.")
 
 
-class ParametricBootstrap(UncertaintyMethod[BootstrapResult]):
+class ParametricBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
     """
     The parametric bootstrap of the problem's observation models.
 
@@ -177,11 +178,11 @@ class ParametricBootstrap(UncertaintyMethod[BootstrapResult]):
         rows of a Latin hypercube over the bounds.
     """
 
-    replicates: int = Field(ge=1, description="Number of replicates.")
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    replicates: int = Field(description="Number of replicates.")
+    starts: int = Field(default=1, description="Starts per fit.")
 
 
-class ResidualBootstrap(UncertaintyMethod[BootstrapResult]):
+class ResidualBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
     """
     The residual block bootstrap.
 
@@ -207,7 +208,7 @@ class ResidualBootstrap(UncertaintyMethod[BootstrapResult]):
         Starts of the fit and of each replicate (default 1).
     """
 
-    replicates: int = Field(ge=1, description="Number of replicates.")
+    replicates: int = Field(description="Number of replicates.")
     block_length: BlockLength = Field(description="Positions per block.")
     residual_scale: Literal["additive", "multiplicative"] = Field(
         description="The scale of the residuals."
@@ -215,10 +216,10 @@ class ResidualBootstrap(UncertaintyMethod[BootstrapResult]):
     scheme: Literal["moving", "stationary"] = Field(
         description="How blocks of residuals are drawn."
     )
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    starts: int = Field(default=1, description="Starts per fit.")
 
 
-class WildBootstrap(UncertaintyMethod[BootstrapResult]):
+class WildBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
     """
     The wild block bootstrap.
 
@@ -241,12 +242,12 @@ class WildBootstrap(UncertaintyMethod[BootstrapResult]):
         Starts of the fit and of each replicate (default 1).
     """
 
-    replicates: int = Field(ge=1, description="Number of replicates.")
+    replicates: int = Field(description="Number of replicates.")
     block_length: BlockLength = Field(description="Positions per block.")
     multipliers: Literal["rademacher", "mammen"] = Field(
         description="The distribution of the multipliers."
     )
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    starts: int = Field(default=1, description="Starts per fit.")
 
 
 class JackknifeResult(BaseModel):
@@ -302,7 +303,7 @@ class JackknifeResult(BaseModel):
     diagnostics: ResamplingDiagnostics
 
 
-class BlockJackknife(UncertaintyMethod[JackknifeResult]):
+class BlockJackknife(UncertaintyMethod[JackknifeResult], RangeChecked):
     """
     The block jackknife (Künsch 1989): one fit per block left out.
 
@@ -319,4 +320,4 @@ class BlockJackknife(UncertaintyMethod[JackknifeResult]):
     """
 
     block_length: BlockLength = Field(description="Positions per block.")
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    starts: int = Field(default=1, description="Starts per fit.")

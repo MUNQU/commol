@@ -388,7 +388,7 @@ engine rejects settings of another engine with an error that names both
 The defaults are the engine's (`commol_rs.engine.ODE_DEFAULT_RTOL` and
 `ODE_DEFAULT_ATOL`), and the engine checks the settings when they are built:
 `ODESolver(rtol=0.0)` raises `ValidationError` with the message of the
-engine, `The solver tolerance rtol must be a positive number, got 0`.
+engine, `rtol is a finite number greater than 0, got 0`.
 
 `bdf` builds its Jacobian from a finite-difference Jacobian-vector product. It
 uses a dense matrix below `SPARSE_THRESHOLD` state components and a sparse one

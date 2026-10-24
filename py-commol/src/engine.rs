@@ -329,7 +329,7 @@ impl SimulationEngine for Engine {
 #[derive(FromPyObject)]
 pub enum ReplicateGrid {
     /// The default grid of this many steps.
-    Steps(u32),
+    Steps(i64),
     /// Sorted, unique positions.
     Positions(Vec<f64>),
 }
@@ -378,10 +378,8 @@ impl PyEngine {
     ///     InfeasibleStateError: If the state leaves the values the model
     ///         allows, such as an amount below zero
     ///     RuntimeError: If the simulation fails for another reason
-    fn run(
-        &mut self,
-        #[pyo3(from_py_with = crate::counts::required::num_steps)] num_steps: u32,
-    ) -> PyResult<(Vec<f64>, Vec<Vec<f64>>)> {
+    fn run(&mut self, num_steps: i64) -> PyResult<(Vec<f64>, Vec<Vec<f64>>)> {
+        let num_steps: u32 = crate::counts::count(&commol_core::NUM_STEPS, num_steps)?;
         let trajectory =
             SimulationEngine::run(&mut self.inner, num_steps).map_err(simulation_error)?;
         Ok((trajectory.positions, trajectory.rows))
@@ -414,15 +412,19 @@ impl PyEngine {
     fn run_replicates(
         &self,
         py: Python<'_>,
-        seed: Option<u64>,
-        #[pyo3(from_py_with = crate::counts::required::count)] count: u64,
+        seed: Option<i128>,
+        count: i64,
         grid: ReplicateGrid,
     ) -> PyResult<(u64, Vec<f64>, Vec<u64>, Vec<Vec<Vec<f64>>>)> {
+        let seed: Option<u64> = crate::counts::optional_count(&commol_core::SEED, seed)?;
+        let count: u64 = crate::counts::count(&commol_core::REPLICATE_COUNT, count)?;
         let seed = commol_random::seed_or_drawn(seed);
         let mut start = self.inner.clone();
         start.reset();
         let positions = match grid {
-            ReplicateGrid::Steps(num_steps) => start.grid(num_steps),
+            ReplicateGrid::Steps(num_steps) => {
+                start.grid(crate::counts::count(&commol_core::NUM_STEPS, num_steps)?)
+            }
             ReplicateGrid::Positions(positions) => positions,
         };
         commol_core::check_positions(&positions, 0.0, |position| start.check_position(position))
@@ -516,11 +518,16 @@ impl PyEngine {
     ///
     /// Returns:
     ///     The seed the engine runs with
+    ///
+    /// Raises:
+    ///     ValueError: With the message of the rule of a seed, when the seed
+    ///         is outside its range
     #[pyo3(signature = (seed=None))]
-    fn set_seed(&mut self, seed: Option<u64>) -> u64 {
-        let seed = commol_random::seed_or_drawn(seed);
+    fn set_seed(&mut self, seed: Option<i128>) -> PyResult<u64> {
+        let seed =
+            commol_random::seed_or_drawn(crate::counts::optional_count(&commol_core::SEED, seed)?);
         self.inner.set_seed(seed);
-        seed
+        Ok(seed)
     }
 
     /// Current position on the axis

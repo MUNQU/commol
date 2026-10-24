@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from commol.context.model import Model
 
 from commol.api.inference.predictive import by_output
-from commol.api.simulation import Simulation, check_seed
+from commol.api.simulation import Simulation
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context._model import engine_state
 from commol.context.calibration import (
@@ -118,7 +118,7 @@ class Calibrator:
                     if models is None
                     else engine_state.rust_observation_models(models)
                 ),
-                seed=None if problem.seed is None else check_seed(problem.seed),
+                seed=problem.seed,
             )
         )
         if problem.seed is None:
@@ -426,8 +426,6 @@ class Calibrator:
             f"Starting calibration with {algorithm_name} algorithm, "
             f"{measure} and {starts} start(s)."
         )
-        if starts < 1:
-            raise ValueError(f"A calibration needs at least one start, got {starts}.")
         run = self._rust_problem.optimize(
             self._build_optimization_config(), starts, self.seed
         )

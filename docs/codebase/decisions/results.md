@@ -64,43 +64,44 @@ argument of `Simulation.replicates`, `ParameterSample.resample` and
 quantile keeps the name `level` (`Quantile(level)`): it is not the level of an
 interval.
 
-One Rust function checks each kind of setting, with one message:
-
-| Check | Function | Message |
-|---|---|---|
-| A confidence level | `check_confidence_level` (`crates/commol-core/src/share.rs`) | `confidence_level is strictly between 0 and 1, got 1.5; use 0.95 for a 95% interval` |
-| Any other setting strictly between 0 and 1 (`target_cess`, `stay_probability`, `min_acceptance`, the `quantile` of ABC, `correlation_threshold`, the `epsilon` of an adaptive leap) | `check_open_unit(name, value)` (`crates/commol-core/src/share.rs`) | `<name> is strictly between 0 and 1, got <value>` |
-| A quantile level, `Quantile(level)` included | `statistics::check_levels` | `A quantile level is between 0 and 1, got 1.5` |
+The engine declares the range rule of each setting once, as data:
+`Count::at_least("replicates", 1)` for a whole number, `Real::new(name, low,
+high)` for a number with an open or a closed bound (`Real::share`,
+`Real::positive`, …), in `crates/commol-core/src/range.rs`,
+`crates/commol-calibration/src/ranges.rs` and
+`crates/commol-inference/src/ranges.rs`. A rule has one message for every
+value outside its range, a negative count included (`replicates is a whole
+number of at least 1, got -1`); `statistics::check_levels` checks a quantile
+level. Three paths read a rule: the Python model of an object, whose base
+`RangeChecked` (`py-commol/commol/context/ranges.py`) calls the one check of
+the engine for its object when it is built (`commol_rs.core.check_ranges`
+on the tables `RANGES`, each setting in its own type, so a parameter name
+`"NaN"` is no number); the engine function that takes the setting; and a
+binding, which reads a count (`i64`) with its rule (`py-commol/src/counts.rs`).
 
 A caller checks a confidence level at its boundary, then computes the two
 quantiles of its interval with `statistics::interval_levels`, a pure function
-of `commol-statistics` that checks nothing: the rule of a setting stays in the
-layer of the settings, and the crate of statistics depends on no crate of
-commol. Python calls the check through the binding
-`commol_rs.inference.interval_levels`, which checks, then computes:
-`ci_percentiles`, `BootstrapResult.interval_error`, `PropagationResult.summary`,
-the scenario summaries, and every `confidence_level` field, whose type is
-`ConfidenceLevel` (`context/inference/levels.py`). A field of a share has the
-type `Share` of the same module, which calls `commol_rs.inference.check_open_unit`
-with the name of the field, and `Quantile.level` calls
-`commol_rs.inference.check_levels`, so the error comes when the setting is
-built, with the message of Rust. The `epsilon` of `StochasticEventsSettings`
-reaches the check through the engine (`check_settings`).
+of `commol-statistics` that checks nothing: the crate of statistics depends on
+no crate of commol. `ci_percentiles`, `BootstrapResult.interval_error`,
+`PropagationResult.summary` and the scenario summaries call the binding
+`commol_rs.inference.interval_levels`, which checks, then computes.
 
 | Alternative | Why not |
 |---|---|
-| A check in each method, with `Field(gt=0.0, lt=1.0)` | The same mistake gives a different message in each method, and the rule is written many times. |
+| A pydantic constraint (`Field(gt=0.0, lt=1.0)`) in each model | The rule exists twice, the same mistake gives a different message in each method, and the message of the engine shows only where Python has none. |
+| A message of its own in `counts.rs` | `-1` and `0` get two wordings of one rule. |
 | An alias for an old name | Two names for one setting, which is what the rule removes. |
-| `statistics::interval_levels` checks the level and returns a `Result` | `commol-statistics` depends on `commol-core` only to word a message, and a computation and a rule of a setting stay mixed. |
-| `check_open_unit` and the check of a confidence level in `commol-statistics` | The settings of an engine depend on the crate of statistics, and the rules of the settings split across two crates. |
+| The rules of the settings in `commol-statistics` | The settings of an engine depend on the crate of statistics, and a computation and a rule of a setting stay mixed. |
 
-**Rule:** a new setting takes the name its meaning already has, and a new
-setting strictly between 0 and 1 is checked by one of the two functions of
-`share.rs`.
+**Rule:** a new setting takes the name its meaning already has; a setting
+with a range gets its rule, a row for its object in `RANGES` and the check in
+the engine function that takes it.
 
-**Guards:** `tests/suite/test_rules.py::test_a_setting_has_one_name`,
-`tests/uncertainty/test_intervals.py::test_every_confidence_level_has_one_check`,
-`crates/commol-inference/tests/test_levels.rs`.
+**Guards:** `tests/suite/test_rules.py` (`test_a_setting_has_one_name`,
+`test_no_model_declares_a_range_of_a_setting`), `tests/uncertainty/test_ranges.py`,
+`tests/uncertainty/test_counts.py`, `tests/uncertainty/test_intervals.py`,
+`crates/commol-calibration/tests/test_ranges.rs`,
+`crates/commol-inference/tests/test_ranges.rs`, `test_levels.rs`.
 
 ## A method takes its seed from its source and fits from its starts
 

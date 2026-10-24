@@ -169,7 +169,7 @@ class TestBuild:
             ),
             (
                 lambda: ODESolver(rtol=0.0),
-                "The solver tolerance rtol must be a positive number, got 0",
+                "rtol is a finite number greater than 0, got 0",
             ),
         ],
         ids=["epsilon", "rtol"],

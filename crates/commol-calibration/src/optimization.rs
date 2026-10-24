@@ -23,6 +23,7 @@ use commol_random::{Generator, replicate_seed};
 
 use crate::calibration_problem::CalibrationProblem;
 use crate::objective::{OptimizationObjective, Recorded};
+use crate::ranges;
 use crate::starts::start_seed;
 use crate::subproblem::{
     ConstraintSettings, Fixed, FixedParameter, PredictionCost, Subproblem, SubproblemResult,
@@ -60,6 +61,29 @@ pub struct NelderMeadConfig {
     /// Shrinking parameter (sigma)
     /// Must be in (0, 1], defaults to 0.5
     pub sigma: Option<f64>,
+}
+
+impl NelderMeadConfig {
+    /// Check each setting with its rule ([`crate::ranges`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns the message of the rule of the first setting outside its
+    /// range.
+    pub fn check_ranges(&self) -> Result<(), String> {
+        ranges::MAX_ITERATIONS.check(self.max_iterations)?;
+        ranges::SD_TOLERANCE.check(self.sd_tolerance)?;
+        ranges::INITIAL_SIMPLEX_SIZE.check(self.initial_simplex_size)?;
+        [
+            (ranges::ALPHA, self.alpha),
+            (ranges::GAMMA, self.gamma),
+            (ranges::RHO, self.rho),
+            (ranges::SIGMA, self.sigma),
+        ]
+        .into_iter()
+        .filter_map(|(rule, value)| value.map(|value| (rule, value)))
+        .try_for_each(|(rule, value)| rule.check(value))
+    }
 }
 
 impl Default for NelderMeadConfig {
@@ -291,6 +315,69 @@ impl ImprovementStop {
     /// `tol_abs + tol_rel · |cost|`.
     pub fn tolerance(&self, cost: f64) -> f64 {
         self.tol_abs + self.tol_rel * cost.abs()
+    }
+}
+
+impl ParticleSwarmConfig {
+    /// Check each setting with its rule ([`crate::ranges`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns the message of the rule of the first setting outside its
+    /// range.
+    pub fn check_ranges(&self) -> Result<(), String> {
+        ranges::PARTICLES.check(self.particles)?;
+        ranges::MAX_ITERATIONS.check(self.max_iterations)?;
+        let mut reals = Vec::new();
+        match self.inertia_strategy {
+            Some(InertiaWeightStrategy::Constant(factor)) => reals.push((ranges::FACTOR, factor)),
+            Some(InertiaWeightStrategy::Chaotic { w_min, w_max }) => {
+                reals.extend([(ranges::W_MIN, w_min), (ranges::W_MAX, w_max)]);
+            }
+            None => {}
+        }
+        match self.acceleration_strategy {
+            Some(AccelerationStrategy::Constant { cognitive, social }) => {
+                reals.extend([(ranges::COGNITIVE, cognitive), (ranges::SOCIAL, social)]);
+            }
+            Some(AccelerationStrategy::TimeVarying {
+                c1_initial,
+                c1_final,
+                c2_initial,
+                c2_final,
+            }) => reals.extend([
+                (ranges::C1_INITIAL, c1_initial),
+                (ranges::C1_FINAL, c1_final),
+                (ranges::C2_INITIAL, c2_initial),
+                (ranges::C2_FINAL, c2_final),
+            ]),
+            None => {}
+        }
+        if let MutationStrategy::Gaussian(scale) | MutationStrategy::Cauchy(scale) =
+            self.mutation_strategy
+        {
+            reals.push((ranges::SCALE, scale));
+        }
+        reals.push((ranges::PROBABILITY, self.mutation_probability));
+        reals.extend(
+            [
+                (ranges::CLAMP_FACTOR, self.velocity_clamp_factor),
+                (ranges::MUTATION_THRESHOLD, self.velocity_mutation_threshold),
+                (ranges::TOL, self.radius_stop),
+            ]
+            .into_iter()
+            .filter_map(|(rule, value)| value.map(|value| (rule, value))),
+        );
+        if let Some(stop) = self.improvement_stop {
+            ranges::STOP_WINDOW.check(stop.window)?;
+            reals.extend([
+                (ranges::TOL_ABS, stop.tol_abs),
+                (ranges::TOL_REL, stop.tol_rel),
+            ]);
+        }
+        reals
+            .into_iter()
+            .try_for_each(|(rule, value)| rule.check(value))
     }
 }
 
@@ -712,12 +799,7 @@ fn build_nelder_mead_solver(
     initial_params: &[f64],
     config: &NelderMeadConfig,
 ) -> Result<NelderMead<Vec<f64>, f64>, String> {
-    if !(config.initial_simplex_size > 0.0 && config.initial_simplex_size <= 1.0) {
-        return Err(format!(
-            "initial_simplex_size must be in (0, 1], got {}",
-            config.initial_simplex_size
-        ));
-    }
+    config.check_ranges()?;
     let vertices = transform.initial_simplex(initial_params, config.initial_simplex_size);
 
     // Build solver with configuration
@@ -859,6 +941,7 @@ pub(crate) fn build_particle_swarm_solver(
     config: &ParticleSwarmConfig,
     seed: u64,
 ) -> Result<ParticleSwarm<Vec<f64>, f64, Generator>, String> {
+    config.check_ranges()?;
     let lower_bound: Vec<f64> = bounds.iter().map(|(min, _)| *min).collect();
     let upper_bound: Vec<f64> = bounds.iter().map(|(_, max)| *max).collect();
     let mut solver = ParticleSwarm::new((lower_bound, upper_bound), config.particles)
@@ -1358,18 +1441,15 @@ mod tests {
         };
         assert_eq!(
             build(improvement(0, 0.0, 0.0), None),
-            "Failed to set improvement_stop: Invalid parameter: \"`ParticleSwarm`: improvement \
-             stop `window` must be > 0.\""
+            "window is a whole number of at least 1, got 0"
         );
         assert_eq!(
             build(improvement(5, -1.0, 0.0), None),
-            "Failed to set improvement_stop: Invalid parameter: \"`ParticleSwarm`: improvement \
-             stop `tol_abs` must be >= 0.\""
+            "tol_abs is a number of at least 0, got -1"
         );
         assert_eq!(
             build(None, Some(f64::NAN)),
-            "Failed to set radius_stop: Invalid parameter: \"`ParticleSwarm`: radius stop `tol` \
-             must be >= 0.\""
+            "tol is a number of at least 0, got NaN"
         );
     }
 
@@ -1434,7 +1514,12 @@ mod tests {
         assert!(solver(1.0).is_ok());
         for size in [0.0, 1.5] {
             let error = solver(size).err().expect("an invalid size");
-            assert!(error.contains("must be in (0, 1]"), "{error}");
+            assert_eq!(
+                error,
+                format!(
+                    "initial_simplex_size is a number greater than 0 and at most 1, got {size}"
+                )
+            );
         }
     }
 

@@ -73,9 +73,11 @@ fn laplace(
     problem: &PyCalibrationProblem,
     fit: Vec<f64>,
     curvature: &str,
-    #[pyo3(from_py_with = crate::counts::required::draws)] draws: usize,
-    seed: u64,
+    draws: i64,
+    seed: i128,
 ) -> PyResult<PyLocalRun> {
+    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+    let draws: usize = crate::counts::count(&commol_inference::ranges::DRAWS, draws)?;
     let kind = curvature_kind(curvature)?;
     let (curvature, gaussian) = parallel(py, || {
         local::laplace_approximation(&problem.inner, &fit, kind)
@@ -117,10 +119,14 @@ fn sandwich(
     problem: &PyCalibrationProblem,
     fit: Vec<f64>,
     curvature: &str,
-    #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
-    #[pyo3(from_py_with = crate::counts::required::draws)] draws: usize,
-    seed: u64,
+    block_length: Option<i64>,
+    draws: i64,
+    seed: i128,
 ) -> PyResult<SandwichTables> {
+    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+    let block_length: Option<usize> =
+        crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
+    let draws: usize = crate::counts::count(&commol_inference::ranges::DRAWS, draws)?;
     let kind = curvature_kind(curvature)?;
     let run = parallel(py, || {
         local::sandwich_approximation(&problem.inner, &fit, kind, block_length)
@@ -263,10 +269,12 @@ fn laplace_mixture(
     priors: Option<Vec<PriorArgs>>,
     eta: Option<f64>,
     ends: Vec<Vec<f64>>,
-    #[pyo3(from_py_with = crate::counts::required::draws)] draws: usize,
+    draws: i64,
     curvature: &str,
-    seed: u64,
+    seed: i128,
 ) -> PyResult<PyMixtureRun> {
+    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+    let draws: usize = crate::counts::count(&commol_inference::ranges::MIXTURE_DRAWS, draws)?;
     let kind = curvature_kind(curvature)?;
     let priors = problem_priors(problem, priors)?;
     let inner = &problem.inner;

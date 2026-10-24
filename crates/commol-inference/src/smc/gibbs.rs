@@ -7,7 +7,7 @@
 //! common random numbers, so the loss is a function of the parameters.
 
 use commol_calibration::{CalibrationProblem, LossConfig, Workspace};
-use commol_core::{SimulationEngine, check_confidence_level};
+use commol_core::{CONFIDENCE_LEVEL, SimulationEngine};
 use commol_random::Generator;
 use commol_statistics::statistics::{interval_levels, normalized_weights, quantiles};
 use nalgebra::DMatrix;
@@ -43,17 +43,16 @@ impl<'a, E: SimulationEngine> GibbsTarget<'a, E> {
     ///
     /// # Errors
     ///
-    /// [`MethodError::Invalid`] when `eta` is not finite and above 0.
+    /// [`MethodError::Invalid`] when `eta` is outside its range
+    /// ([`crate::ranges::ETA`]).
     pub fn new(
         problem: &'a CalibrationProblem<E>,
         priors: &'a Priors,
         eta: f64,
     ) -> Result<Self, MethodError> {
-        if !(eta.is_finite() && eta > 0.0) {
-            return Err(MethodError::Invalid(format!(
-                "eta must be a finite number above 0, got {eta}"
-            )));
-        }
+        crate::ranges::ETA
+            .check(eta)
+            .map_err(MethodError::Invalid)?;
         Ok(Self {
             problem,
             priors,
@@ -396,7 +395,10 @@ where
     E: SimulationEngine + Send + Sync,
     K: Kernel,
 {
-    check_confidence_level(confidence_level).map_err(MethodError::Invalid)?;
+    crate::ranges::REPLICATES
+        .check(replicates)
+        .and(CONFIDENCE_LEVEL.check(confidence_level))
+        .map_err(MethodError::Invalid)?;
     let levels = interval_levels(confidence_level);
     check_threshold_count(replicates * fit.len(), confidence_level)?;
     let mut workspace = Workspace::default();

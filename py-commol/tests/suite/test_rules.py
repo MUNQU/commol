@@ -8,23 +8,20 @@ meaning. The rules are in ``docs/codebase/tests.md`` and
 ``test_rust_rules.py``."""
 
 import ast
-import inspect
 import re
 import subprocess
 import sys
 import tomllib
-import typing
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import coverage
 import pytest
-from pydantic import BaseModel
 
-import commol
 
 from tests.suite.durations import DURATIONS
+from tests.suite.settings import declared_ranges, public_settings
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TESTS_DIR = REPO_ROOT / "py-commol" / "tests"
@@ -482,49 +479,6 @@ QUANTILE_LEVELS = {"Quantile", "Quantile.__init__"}
 """The settings whose ``level`` is the level of a quantile, not of an interval."""
 
 
-def model_classes(annotation: object) -> Iterator[type[BaseModel]]:
-    """The pydantic models of commol that ``annotation`` names, nested or not."""
-    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
-        if annotation.__module__.startswith("commol."):
-            yield annotation
-        return
-    for argument in typing.get_args(getattr(annotation, "__value__", annotation)):
-        yield from model_classes(argument)
-
-
-def arguments(owner: str, function: object) -> Iterator[tuple[str, str]]:
-    """Each argument of ``function``, a method of a class or a function, as
-    ``(owner, name)``."""
-    if isinstance(function, classmethod | staticmethod):
-        function = function.__func__
-    if inspect.isfunction(function):
-        for argument in inspect.signature(function).parameters:
-            yield owner, argument
-
-
-def public_settings() -> Iterator[tuple[str, str]]:
-    """Each field of a public pydantic model, and of the models its fields
-    hold, and each argument of a public function or method, as ``(owner,
-    name)``."""
-    seen: set[type] = set()
-    pending: list[object] = [getattr(commol, name) for name in commol.__all__]
-    while pending:
-        item = pending.pop()
-        if not isinstance(item, type):
-            yield from arguments(getattr(item, "__qualname__", ""), item)
-            continue
-        if item in seen:
-            continue
-        seen.add(item)
-        if issubclass(item, BaseModel):
-            for name, field in item.model_fields.items():
-                yield item.__name__, name
-                pending.extend(model_classes(field.annotation))
-        for attribute, member in vars(item).items():
-            if not attribute.startswith("_") or attribute == "__init__":
-                yield from arguments(f"{item.__name__}.{attribute}", member)
-
-
 def test_a_setting_has_one_name() -> None:
     """A count is a plain plural noun and the level of an interval is
     ``confidence_level``, in every public setting of commol."""
@@ -537,6 +491,43 @@ def test_a_setting_has_one_name() -> None:
         "Name a count with a plural noun (particles, draws, replicates) and the "
         "level of an interval confidence_level:\n" + "\n".join(wrong)
     )
+
+
+POLICY = "A range rule of a setting lives in the engine, and Python does not repeat it."
+"""The policy line of the range rules in ``coverage.md``; ``conventions.md``
+gives the rule with this test as its check."""
+
+OLD_POLICY = "A check that the Python layer makes first is not repeated"
+"""The policy that a range rule replaces: the binding skips a check of Python."""
+
+
+def test_no_model_declares_a_range_of_a_setting() -> None:
+    """No pydantic model of commol declares a range constraint (``ge``, ``gt``,
+    ``le``, ``lt``, a constrained number type or ``allow_inf_nan=False``): the
+    engine holds the range rule of each setting, and the documentation says
+    so."""
+    declared = sorted(declared_ranges())
+    pages = {
+        relative(page): page.read_text(encoding="utf-8")
+        for page in (REPO_ROOT / "docs").rglob("*.md")
+    }
+    policy = {
+        "docs/codebase/coverage.md": POLICY,
+        "docs/codebase/conventions.md": "test_no_model_declares_a_range_of_a_setting",
+    }
+    without = [
+        name
+        for name, line in policy.items()
+        if line not in " ".join(pages[name].split())
+    ]
+    old = [name for name, text in pages.items() if OLD_POLICY in " ".join(text.split())]
+
+    assert not declared, (
+        "Move the range rule to the engine (crates/*/src/ranges.rs):\n"
+        + "\n".join(declared)
+    )
+    assert not without, f"Write the policy of the range rules in {without}"
+    assert not old, f"Remove the old policy of the binding checks from {old}"
 
 
 # The stub of the extension

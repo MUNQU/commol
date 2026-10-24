@@ -600,7 +600,7 @@ fn an_invalid_optimizer_fails_a_subproblem() {
     for subproblem in &subproblems {
         let error = optimize_subproblem(subproblem, &config, &[1.0, 0.5], 0).unwrap_err();
         assert!(
-            error.contains("initial_simplex_size must be in (0, 1]"),
+            error.contains("initial_simplex_size is a number greater than 0 and at most 1"),
             "{error}"
         );
     }

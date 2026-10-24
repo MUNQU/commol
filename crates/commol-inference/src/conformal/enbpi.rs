@@ -69,9 +69,11 @@ impl BlockMultinomial {
 ///
 /// # Errors
 ///
-/// Returns an error when a block is left out by no replicate that fitted,
-/// every replicate fails ([`FitUnit::require`]), a point cannot be
-/// predicted, or the score has no scale at a point.
+/// [`MethodError::Invalid`] when `replicates` is outside its range
+/// ([`crate::ranges::TWO_REPLICATES`]). Returns an error when a block is
+/// left out by no replicate that fitted, every replicate fails
+/// ([`FitUnit::require`]), a point cannot be predicted, or the score has no
+/// scale at a point.
 pub fn enbpi<E>(
     runner: &ReplicateRunner<'_, E>,
     scheme: &BlockScheme,
@@ -82,6 +84,9 @@ pub fn enbpi<E>(
 where
     E: SimulationEngine + Send + Sync,
 {
+    crate::ranges::TWO_REPLICATES
+        .check(replicates)
+        .map_err(MethodError::Invalid)?;
     let problem = runner.problem();
     let observed = problem.observed_data();
     let resampler = BlockMultinomial::new(observed, scheme);

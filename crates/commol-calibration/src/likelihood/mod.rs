@@ -16,7 +16,10 @@ use std::collections::HashMap;
 
 pub use density::{Center, Noise, log_location};
 
+use commol_core::Real;
+
 use crate::feasibility::Violation;
+use crate::ranges::{DF, LOG_NORMAL_SIGMA, OVERDISPERSION, SD, STUDENT_T_SCALE};
 use crate::types::{CalibrationParameter, CalibrationParameterType, ObservedDataPoint};
 
 /// A noise argument of an observation model: a number, or the id of a noise
@@ -66,42 +69,6 @@ pub enum ObservationModel {
         /// The trials of the series, or `None`.
         trials: Option<u64>,
     },
-}
-
-/// The lowest value a noise argument allows, and whether that value is
-/// allowed itself.
-#[derive(Debug, Clone, Copy)]
-struct Domain {
-    lowest: f64,
-    inclusive: bool,
-}
-
-const POSITIVE: Domain = Domain {
-    lowest: 0.0,
-    inclusive: false,
-};
-const NOT_NEGATIVE: Domain = Domain {
-    lowest: 0.0,
-    inclusive: true,
-};
-
-impl Domain {
-    fn holds(self, value: f64) -> bool {
-        value.is_finite()
-            && if self.inclusive {
-                value >= self.lowest
-            } else {
-                value > self.lowest
-            }
-    }
-
-    fn describe(self) -> &'static str {
-        if self.inclusive {
-            "finite and at least 0"
-        } else {
-            "finite and above 0"
-        }
-    }
 }
 
 /// A noise argument resolved against the parameters.
@@ -195,7 +162,7 @@ impl Likelihood {
     ///
     /// Returns a message when a series has no model or a model names no
     /// series, an argument is not valid or names a parameter that is not a
-    /// noise parameter or whose bounds leave its domain, a noise parameter
+    /// noise parameter or whose bounds leave its range, a noise parameter
     /// is named by no model, a binomial series has trials on its model and
     /// on an observation or on neither, an observation of another series has
     /// trials, or an observed value is outside the support of its model.
@@ -223,27 +190,23 @@ impl Likelihood {
                     "The observation model of '{label}' names a series that no observation has"
                 ));
             }
-            let mut slot = |argument: &Argument, name: &str, domain: Domain| {
-                resolve(
-                    label, argument, name, domain, parameters, &index_of, &mut named,
-                )
+            let mut slot = |argument: &Argument, rule: Real| {
+                resolve(label, argument, rule, parameters, &index_of, &mut named)
             };
             let resolved = match model {
-                ObservationModel::Normal { sd } => Resolved::Normal {
-                    sd: slot(sd, "sd", POSITIVE)?,
-                },
+                ObservationModel::Normal { sd } => Resolved::Normal { sd: slot(sd, SD)? },
                 ObservationModel::LogNormal { sigma, center } => Resolved::LogNormal {
-                    sigma: slot(sigma, "sigma", POSITIVE)?,
+                    sigma: slot(sigma, LOG_NORMAL_SIGMA)?,
                     center: *center,
                 },
                 ObservationModel::StudentT { df, scale } => Resolved::StudentT {
-                    df: slot(df, "df", POSITIVE)?,
-                    scale: slot(scale, "scale", POSITIVE)?,
+                    df: slot(df, DF)?,
+                    scale: slot(scale, STUDENT_T_SCALE)?,
                 },
                 ObservationModel::Poisson => Resolved::Poisson,
                 ObservationModel::NegativeBinomial { overdispersion } => {
                     Resolved::NegativeBinomial {
-                        overdispersion: slot(overdispersion, "overdispersion", NOT_NEGATIVE)?,
+                        overdispersion: slot(overdispersion, OVERDISPERSION)?,
                     }
                 }
                 ObservationModel::Binomial { trials } => Resolved::Binomial { trials: *trials },
@@ -555,22 +518,22 @@ pub(crate) fn unnamed_noise(id: &str) -> String {
     )
 }
 
-/// Resolve `argument`, the `name` argument of the model of `label`.
+/// Resolve `argument`, the argument of the model of `label` that `rule`
+/// names.
 fn resolve(
     label: &str,
     argument: &Argument,
-    name: &str,
-    domain: Domain,
+    rule: Real,
     parameters: &[CalibrationParameter],
     index_of: &HashMap<&str, usize>,
     named: &mut [bool],
 ) -> Result<Slot, String> {
+    let name = rule.name();
     match argument {
-        Argument::Value(value) if domain.holds(*value) => Ok(Slot::Value(*value)),
-        Argument::Value(value) => Err(format!(
-            "The observation model of '{label}' has {name}={value}; it must be {}",
-            domain.describe()
-        )),
+        Argument::Value(value) => rule
+            .check(*value)
+            .map(|()| Slot::Value(*value))
+            .map_err(|error| format!("The observation model of '{label}': {error}")),
         Argument::Parameter(id) => {
             let &index = index_of.get(id.as_str()).ok_or_else(|| {
                 format!(
@@ -586,11 +549,15 @@ fn resolve(
                     parameter.parameter_type
                 ));
             }
-            if !(domain.holds(parameter.min_bound) && domain.holds(parameter.max_bound)) {
+            if rule
+                .check(parameter.min_bound)
+                .and(rule.check(parameter.max_bound))
+                .is_err()
+            {
                 return Err(format!(
                     "Noise parameter '{id}' is {name} of the observation model of '{label}', \
                      so its bounds must be {}; they are [{}, {}]",
-                    domain.describe(),
+                    rule.range(),
                     parameter.min_bound,
                     parameter.max_bound
                 ));

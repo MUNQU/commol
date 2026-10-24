@@ -102,7 +102,10 @@ fn an_unobserved_model_needs_parameters_and_replicates() {
         .unwrap();
 
     assert!(no_parameters.contains("No parameters"), "{no_parameters}");
-    assert_eq!(no_replicates, "replicates is at least 1, got 0");
+    assert_eq!(
+        no_replicates,
+        "replicates is a whole number of at least 1, got 0"
+    );
 }
 
 #[test]

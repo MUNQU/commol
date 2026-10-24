@@ -98,9 +98,12 @@ impl PyForwardAnalysis {
         distributions: Option<Vec<PriorArgs>>,
         sample: Option<PyRef<'_, PyParameterSample>>,
         initial_condition_remainder: Option<String>,
-        #[pyo3(from_py_with = crate::counts::optional::replicates)] replicates: Option<usize>,
-        seed: Option<u64>,
+        replicates: Option<i64>,
+        seed: Option<i128>,
     ) -> PyResult<Self> {
+        let seed: Option<u64> = crate::counts::optional_count(&commol_core::SEED, seed)?;
+        let replicates: Option<usize> =
+            crate::counts::optional_count(&commol_calibration::ranges::REPLICATES, replicates)?;
         let inputs = input_space(&parameters, distributions, sample.as_deref())?;
         let inner = ForwardAnalysis::new(
             engine.engine(),
@@ -130,9 +133,11 @@ impl PyForwardAnalysis {
     fn propagate(
         &self,
         py: Python<'_>,
-        #[pyo3(from_py_with = crate::counts::optional::draws)] draws: Option<usize>,
+        draws: Option<i64>,
         quantities: &str,
     ) -> PyResult<PropagationValues> {
+        let draws: Option<usize> =
+            crate::counts::optional_count(&commol_inference::ranges::DRAWS, draws)?;
         let quantities = read_quantities(quantities)?;
         let result =
             parallel(py, || self.inner.propagate(draws, &quantities))?.map_err(method_error)?;
@@ -148,12 +153,9 @@ impl PyForwardAnalysis {
     ///         fit the model or is NaN at a draw, or the ranks of the inputs
     ///         are collinear
     ///     InfeasibleStateError: If a point leaves the values its model allows
-    fn prcc(
-        &self,
-        py: Python<'_>,
-        #[pyo3(from_py_with = crate::counts::optional::draws)] draws: Option<usize>,
-        quantities: &str,
-    ) -> PyResult<PrccValues> {
+    fn prcc(&self, py: Python<'_>, draws: Option<i64>, quantities: &str) -> PyResult<PrccValues> {
+        let draws: Option<usize> =
+            crate::counts::optional_count(&commol_inference::ranges::DRAWS, draws)?;
         let quantities = read_quantities(quantities)?;
         let (sample, result) =
             parallel(py, || self.inner.prcc(draws, &quantities))?.map_err(method_error)?;
@@ -176,10 +178,13 @@ impl PyForwardAnalysis {
     fn morris(
         &self,
         py: Python<'_>,
-        #[pyo3(from_py_with = crate::counts::required::trajectories)] trajectories: usize,
-        #[pyo3(from_py_with = crate::counts::required::levels)] levels: usize,
+        trajectories: i64,
+        levels: i64,
         quantities: &str,
     ) -> PyResult<MorrisValues> {
+        let trajectories: usize =
+            crate::counts::count(&commol_inference::ranges::TRAJECTORIES, trajectories)?;
+        let levels: usize = crate::counts::count(&commol_inference::ranges::LEVELS, levels)?;
         let quantities = read_quantities(quantities)?;
         let (result, runs) = parallel(py, || self.inner.morris(trajectories, levels, &quantities))?
             .map_err(method_error)?;
@@ -196,11 +201,14 @@ impl PyForwardAnalysis {
     fn sobol(
         &self,
         py: Python<'_>,
-        #[pyo3(from_py_with = crate::counts::required::draws)] draws: usize,
-        #[pyo3(from_py_with = crate::counts::required::replicates)] replicates: usize,
+        draws: i64,
+        replicates: i64,
         confidence_level: f64,
         quantities: &str,
     ) -> PyResult<SobolValues> {
+        let draws: usize = crate::counts::count(&commol_inference::ranges::TWO_DRAWS, draws)?;
+        let replicates: usize =
+            crate::counts::count(&commol_inference::ranges::TWO_REPLICATES, replicates)?;
         let quantities = read_quantities(quantities)?;
         let (result, runs) = parallel(py, || {
             self.inner
@@ -233,14 +241,18 @@ impl PyForwardAnalysis {
     fn chaos(
         &self,
         py: Python<'_>,
-        #[pyo3(from_py_with = crate::counts::required::degree)] degree: usize,
+        degree: i64,
         q_norm: f64,
-        #[pyo3(from_py_with = crate::counts::optional::max_interaction)] max_interaction: Option<
-            usize,
-        >,
-        #[pyo3(from_py_with = crate::counts::required::draws)] draws: usize,
+        max_interaction: Option<i64>,
+        draws: i64,
         quantities: &str,
     ) -> PyResult<PyChaosRun> {
+        let max_interaction: Option<usize> = crate::counts::optional_count(
+            &commol_inference::ranges::MAX_INTERACTION,
+            max_interaction,
+        )?;
+        let degree: usize = crate::counts::count(&commol_inference::ranges::DEGREE, degree)?;
+        let draws: usize = crate::counts::count(&commol_inference::ranges::TWO_DRAWS, draws)?;
         let truncation = Truncation::new(q_norm, max_interaction).map_err(method_error)?;
         let quantities = read_quantities(quantities)?;
         let (expansion, runs) = parallel(py, || {
@@ -382,12 +394,15 @@ pub struct PyChaosRun {
 fn chaos_evaluate(
     parameters: Vec<PyCalibrationParameter>,
     distributions: Vec<PriorArgs>,
-    #[pyo3(from_py_with = crate::counts::required::degree)] degree: usize,
+    degree: i64,
     q_norm: f64,
-    #[pyo3(from_py_with = crate::counts::optional::max_interaction)] max_interaction: Option<usize>,
+    max_interaction: Option<i64>,
     coefficients: Vec<Vec<f64>>,
     points: Vec<Vec<f64>>,
 ) -> PyResult<Vec<Vec<f64>>> {
+    let degree: usize = crate::counts::count(&commol_inference::ranges::DEGREE, degree)?;
+    let max_interaction: Option<usize> =
+        crate::counts::optional_count(&commol_inference::ranges::MAX_INTERACTION, max_interaction)?;
     let inputs = input_space(&parameters, Some(distributions), None)?;
     let truncation = Truncation::new(q_norm, max_interaction).map_err(method_error)?;
     let expansion = ChaosExpansion::new(parameters.len(), degree, truncation, coefficients)

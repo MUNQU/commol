@@ -418,7 +418,7 @@ fn weighted_first_block() -> CalibrationProblem<Constant> {
 
 #[test]
 fn enbpi_fails_when_every_replicate_fails() {
-    // The replicate of seed 1 draws no copy of the first block.
+    // Neither replicate of seed 1 draws a copy of the first block.
     let problem = weighted_first_block();
     let config = config();
     let runner = ReplicateRunner::new(&problem, &config, &[10.0], 1, 1).unwrap();
@@ -427,14 +427,14 @@ fn enbpi_fails_when_every_replicate_fails() {
     let message = failed(enbpi(
         &runner,
         &scheme,
-        1,
+        2,
         &[10.0],
         settings(NonconformityScore::Absolute),
     ));
 
     assert!(
         message.starts_with(
-            "Every replicate failed: 0 of 1 replicates fitted, and the method needs 1; the \
+            "Every replicate failed: 0 of 2 replicates fitted, and the method needs 1; the \
              first reasons: replicate 0: "
         ),
         "{message}"

@@ -1,6 +1,5 @@
 """Calibration problems, observations, unknowns, constraints, optimizers and results."""
 
-import math
 from collections.abc import Mapping
 from typing import Annotated, Literal, Self, overload, override
 
@@ -27,6 +26,7 @@ from commol.context.constants import (
 )
 from commol.context.observation_models import ObservationModel
 from commol.utils.security import validate_expression_security
+from commol.context.ranges import RangeChecked
 
 
 # Re-export for documentation
@@ -40,7 +40,7 @@ PSO_DEFAULT_ACCELERATION: float = commol_rs.calibration.PSO_DEFAULT_ACCELERATION
 engine's default."""
 
 
-class ObservedDataPoint(BaseModel):
+class ObservedDataPoint(RangeChecked):
     """
     Represents a single observed data point for calibration.
 
@@ -84,9 +84,7 @@ class ObservedDataPoint(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    at: float = Field(
-        default=..., ge=0, allow_inf_nan=False, description="Position on the axis"
-    )
+    at: float = Field(default=..., description="Position on the axis")
     output: str | None = Field(
         default=None, min_length=1, description="The output being observed"
     )
@@ -98,10 +96,9 @@ class ObservedDataPoint(BaseModel):
         default="",
         description="Name of the observed series; defaults to `output`",
     )
-    value: float = Field(default=..., ge=0.0, description="Observed value")
+    value: float = Field(default=..., description="Observed value")
     weight: float = Field(
         default=1.0,
-        gt=0.0,
         description="Weight for this observation in the loss function",
     )
     factor_id: str | None = Field(
@@ -110,8 +107,6 @@ class ObservedDataPoint(BaseModel):
     )
     window: float | None = Field(
         default=None,
-        gt=0,
-        allow_inf_nan=False,
         description=(
             "Optional window length for cumulative-output observations. "
             "When set, prediction is value(at) - value(at - window)."
@@ -119,7 +114,6 @@ class ObservedDataPoint(BaseModel):
     )
     trials: int | None = Field(
         default=None,
-        ge=0,
         description="Trials of a binomial observation model that reads them here",
     )
 
@@ -228,7 +222,7 @@ class CalibrationParameter(BaseModel):
         return self
 
 
-class CalibrationConstraint(BaseModel):
+class CalibrationConstraint(RangeChecked):
     """
     A constraint on calibration parameters defined as a mathematical expression.
 
@@ -306,7 +300,6 @@ class CalibrationConstraint(BaseModel):
     )
     weight: float = Field(
         default=1.0,
-        gt=0.0,
         description="Penalty weight multiplier for violations",
     )
     at: list[float] | None = Field(
@@ -331,20 +324,15 @@ class CalibrationConstraint(BaseModel):
 
     @model_validator(mode="after")
     def validate_positions(self) -> Self:
-        """Validate that the positions are finite and non-negative."""
-        if self.at is not None:
-            if len(self.at) == 0:
-                raise ValueError(
-                    f"at for constraint '{self.id}' must not be empty if specified"
-                )
-            if any(position < 0 or not math.isfinite(position) for position in self.at):
-                raise ValueError(
-                    f"at for constraint '{self.id}' must all be finite and non-negative"
-                )
+        """Validate that the positions, when given, are not empty."""
+        if self.at is not None and len(self.at) == 0:
+            raise ValueError(
+                f"at for constraint '{self.id}' must not be empty if specified"
+            )
         return self
 
 
-class NelderMeadConfig(BaseModel):
+class NelderMeadConfig(RangeChecked):
     """
     Configuration for the Nelder-Mead optimization algorithm.
 
@@ -380,37 +368,31 @@ class NelderMeadConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     max_iterations: int = Field(
-        default=1000, gt=0, description="Maximum number of iterations"
+        default=1000, description="Maximum number of iterations"
     )
     sd_tolerance: float = Field(
-        default=1e-6, gt=0.0, description="Convergence tolerance for standard deviation"
+        default=1e-6, description="Convergence tolerance for standard deviation"
     )
     initial_simplex_size: float = Field(
         default=0.1,
-        gt=0.0,
-        le=1.0,
         description=(
             "Size of the initial simplex, as a fraction of each parameter's bound width"
         ),
     )
     alpha: float | None = Field(
         default=None,
-        gt=0.0,
         description="Reflection coefficient (default: None, uses argmin's default)",
     )
     gamma: float | None = Field(
         default=None,
-        gt=0.0,
         description="Expansion coefficient (default: None, uses argmin's default)",
     )
     rho: float | None = Field(
         default=None,
-        gt=0.0,
         description="Contraction coefficient (default: None, uses argmin's default)",
     )
     sigma: float | None = Field(
         default=None,
-        gt=0.0,
         description="Shrink coefficient (default: None, uses argmin's default)",
     )
     verbose: bool = Field(
@@ -419,7 +401,6 @@ class NelderMeadConfig(BaseModel):
     )
     header_interval: int = Field(
         default=100,
-        gt=0,
         description=(
             "Number of iterations between table header repeats in verbose output "
             "(default: 100)"
@@ -439,7 +420,7 @@ class PSOInertiaStrategy(BaseModel):
     pass
 
 
-class PSOConstantInertia(PSOInertiaStrategy):
+class PSOConstantInertia(PSOInertiaStrategy, RangeChecked):
     """
     Constant inertia weight for PSO.
 
@@ -449,12 +430,10 @@ class PSOConstantInertia(PSOInertiaStrategy):
         Constant inertia weight factor (must be positive).
     """
 
-    factor: float = Field(
-        default=..., gt=0.0, description="Constant inertia weight factor"
-    )
+    factor: float = Field(default=..., description="Constant inertia weight factor")
 
 
-class PSOChaoticInertia(PSOInertiaStrategy):
+class PSOChaoticInertia(PSOInertiaStrategy, RangeChecked):
     """
     Chaotic inertia weight for PSO using logistic map.
 
@@ -475,8 +454,8 @@ class PSOChaoticInertia(PSOInertiaStrategy):
     Chaos, Solitons & Fractals, 25(5), 1261-1271.
     """
 
-    w_min: float = Field(default=..., gt=0.0, description="Minimum inertia weight")
-    w_max: float = Field(default=..., gt=0.0, description="Maximum inertia weight")
+    w_min: float = Field(default=..., description="Minimum inertia weight")
+    w_max: float = Field(default=..., description="Maximum inertia weight")
 
     @model_validator(mode="after")
     def validate_bounds(self) -> Self:
@@ -500,7 +479,7 @@ class PSOAccelerationStrategy(BaseModel):
     pass
 
 
-class PSOConstantAcceleration(PSOAccelerationStrategy):
+class PSOConstantAcceleration(PSOAccelerationStrategy, RangeChecked):
     """
     Constant acceleration coefficients for PSO (canonical PSO).
 
@@ -512,13 +491,11 @@ class PSOConstantAcceleration(PSOAccelerationStrategy):
         Social coefficient (c2) - attraction to swarm best.
     """
 
-    cognitive: float = Field(
-        default=..., gt=0.0, description="Cognitive coefficient (c1)"
-    )
-    social: float = Field(default=..., gt=0.0, description="Social coefficient (c2)")
+    cognitive: float = Field(default=..., description="Cognitive coefficient (c1)")
+    social: float = Field(default=..., description="Social coefficient (c2)")
 
 
-class PSOTimeVaryingAcceleration(PSOAccelerationStrategy):
+class PSOTimeVaryingAcceleration(PSOAccelerationStrategy, RangeChecked):
     """
     Time-Varying Acceleration Coefficients (TVAC) for PSO.
 
@@ -545,15 +522,13 @@ class PSOTimeVaryingAcceleration(PSOAccelerationStrategy):
     Evolutionary Computation, 8(3), 240-255.
     """
 
-    c1_initial: float = Field(
-        default=..., gt=0.0, description="Initial cognitive factor"
-    )
-    c1_final: float = Field(default=..., gt=0.0, description="Final cognitive factor")
-    c2_initial: float = Field(default=..., gt=0.0, description="Initial social factor")
-    c2_final: float = Field(default=..., gt=0.0, description="Final social factor")
+    c1_initial: float = Field(default=..., description="Initial cognitive factor")
+    c1_final: float = Field(default=..., description="Final cognitive factor")
+    c2_initial: float = Field(default=..., description="Initial social factor")
+    c2_final: float = Field(default=..., description="Final social factor")
 
 
-class PSOMutationConfig(BaseModel):
+class PSOMutationConfig(RangeChecked):
     """
     Configuration for PSO particle mutation to help escape local optima.
 
@@ -588,12 +563,10 @@ class PSOMutationConfig(BaseModel):
         description='Mutation strategy: "gaussian" or "cauchy"',
     )
     scale: float = Field(
-        default=..., gt=0.0, description="Standard deviation or scale parameter"
+        default=..., description="Standard deviation or scale parameter"
     )
     probability: float = Field(
         default=...,
-        ge=0.0,
-        le=1.0,
         description="Mutation probability per iteration (0.0-1.0)",
     )
     application: PSOMutationApplication = Field(
@@ -602,7 +575,7 @@ class PSOMutationConfig(BaseModel):
     )
 
 
-class PSOVelocityConfig(BaseModel):
+class PSOVelocityConfig(RangeChecked):
     """
     Configuration for PSO particle velocity control.
 
@@ -630,18 +603,15 @@ class PSOVelocityConfig(BaseModel):
 
     clamp_factor: float | None = Field(
         default=None,
-        gt=0.0,
-        le=1.0,
         description="Velocity clamping factor (0.0-1.0), typically 0.1-0.2",
     )
     mutation_threshold: float | None = Field(
         default=None,
-        ge=0.0,
         description="Velocity mutation threshold, typically 0.001-0.01",
     )
 
 
-class PSOImprovementStop(BaseModel):
+class PSOImprovementStop(RangeChecked):
     """
     The improvement stop rule of a particle swarm.
 
@@ -660,16 +630,16 @@ class PSOImprovementStop(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    window: int = Field(default=..., gt=0, description="Iterations of the window")
+    window: int = Field(default=..., description="Iterations of the window")
     tol_abs: float = Field(
-        default=..., ge=0.0, description="Absolute tolerance on the improvement"
+        default=..., description="Absolute tolerance on the improvement"
     )
     tol_rel: float = Field(
-        default=..., ge=0.0, description="Relative tolerance on the improvement"
+        default=..., description="Relative tolerance on the improvement"
     )
 
 
-class PSORadiusStop(BaseModel):
+class PSORadiusStop(RangeChecked):
     """
     The radius stop rule of a particle swarm.
 
@@ -692,12 +662,10 @@ class PSORadiusStop(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    tol: float = Field(
-        default=..., ge=0.0, description="Tolerance on the radius of the swarm"
-    )
+    tol: float = Field(default=..., description="Tolerance on the radius of the swarm")
 
 
-class ParticleSwarmConfig(BaseModel):
+class ParticleSwarmConfig(RangeChecked):
     """
     Configuration for the Particle Swarm Optimization algorithm.
 
@@ -731,11 +699,9 @@ class ParticleSwarmConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # Core parameters
-    particles: int = Field(
-        default=20, gt=0, description="Number of particles in the swarm"
-    )
+    particles: int = Field(default=20, description="Number of particles in the swarm")
     max_iterations: int = Field(
-        default=1000, gt=0, description="Maximum number of iterations"
+        default=1000, description="Maximum number of iterations"
     )
     verbose: bool = Field(
         default=False,
@@ -1087,7 +1053,7 @@ class StartSummary(BaseModel):
     converged: bool = Field(description="Whether the optimizer converged")
 
 
-class CalibrationResult(BaseModel):
+class CalibrationResult(RangeChecked):
     """
     Result of a calibration: the best of its starts.
 
@@ -1122,9 +1088,7 @@ class CalibrationResult(BaseModel):
         default=..., description="Calibrated parameter values"
     )
     final_loss: float = Field(default=..., description="Final loss value")
-    iterations: int = Field(
-        default=..., ge=0, description="Number of iterations performed"
-    )
+    iterations: int = Field(default=..., description="Number of iterations performed")
     converged: bool = Field(default=..., description="Whether optimization converged")
     termination_reason: str = Field(
         default=..., description="Reason for optimization termination"
@@ -1136,7 +1100,7 @@ class CalibrationResult(BaseModel):
         default_factory=list, description="Each start that failed"
     )
     seed: int = Field(
-        default=..., ge=0, description="Seed of the calibration's random numbers"
+        default=..., description="Seed of the calibration's random numbers"
     )
 
     @override
@@ -1258,7 +1222,7 @@ type ReplicateSummary = Literal["mean", "median", "crps"] | Quantile
 `Quantile` of the replicates, or their whole distribution (``"crps"``)."""
 
 
-class CalibrationProblem(BaseModel):
+class CalibrationProblem(RangeChecked):
     """
     Defines a complete calibration problem.
 
@@ -1362,7 +1326,6 @@ class CalibrationProblem(BaseModel):
     )
     replicates: int | None = Field(
         default=None,
-        ge=1,
         description="Replicates per evaluation of a stochastic engine.",
     )
     replicate_summary: ReplicateSummary | None = Field(
@@ -1371,7 +1334,6 @@ class CalibrationProblem(BaseModel):
     )
     seed: int | None = Field(
         default=None,
-        ge=0,
         description=(
             "Seed of every random number of a calibration: the replicates of a "
             "stochastic engine, the starts, a particle swarm and the methods"

@@ -343,7 +343,7 @@ fn abc_rejection_needs_two_draws() {
     let error = abc_rejection(&target, 1, 0.5, 1).unwrap_err();
     assert_eq!(
         error,
-        MethodError::Invalid("draws must be at least 2, got 1".to_string())
+        MethodError::Invalid("draws is a whole number of at least 2, got 1".to_string())
     );
 }
 
@@ -657,7 +657,10 @@ fn a_gibbs_target_needs_a_finite_eta_above_zero() {
             .err()
             .unwrap()
             .to_string();
-        assert!(error.contains("finite number above 0"), "{error}");
+        assert!(
+            error.contains("eta is a finite number greater than 0"),
+            "{error}"
+        );
     }
 }
 

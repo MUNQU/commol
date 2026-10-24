@@ -82,8 +82,10 @@ that may carry a marker:
 
 A `?` or an arm that no input reaches and that is none of these kinds is
 removed: the binding, the engine or the check before it already rules the
-input out. A check that the Python layer makes first is not repeated in the
-binding.
+input out. A range rule of a setting lives in the engine, and Python does not
+repeat it. The Python model of an object calls the check of the engine when it
+is built, and a binding reads the same rule when it is called with no Python
+object in between (`py-commol/src/counts.rs`), so both lines run in a test.
 
 ## Mutation testing
 

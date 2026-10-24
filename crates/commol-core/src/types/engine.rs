@@ -9,6 +9,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::Real;
+
 /// The kind of model an engine runs: the kind of its structure.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ModelKind {
@@ -697,20 +699,19 @@ impl OdeSolver {
         Self::DEFAULT_ATOL
     }
 
-    /// Check that both tolerances are positive numbers.
+    /// The rule of the relative tolerance: a finite number greater than 0.
+    pub const RTOL: Real = Real::positive("rtol");
+    /// The rule of the absolute tolerance: a finite number greater than 0.
+    pub const ATOL: Real = Real::positive("atol");
+
+    /// Check that both tolerances are in their ranges.
     ///
     /// # Errors
     ///
-    /// Returns a message that names the first tolerance that is not.
+    /// Returns the message of the rule of the first tolerance that is not.
     pub fn validate(&self) -> Result<(), String> {
-        for (name, value) in [("rtol", self.rtol), ("atol", self.atol)] {
-            if !(value.is_finite() && value > 0.0) {
-                return Err(format!(
-                    "The solver tolerance {name} must be a positive number, got {value}"
-                ));
-            }
-        }
-        Ok(())
+        Self::RTOL.check(self.rtol)?;
+        Self::ATOL.check(self.atol)
     }
 }
 
@@ -801,32 +802,31 @@ impl StochasticEventsSettings {
         Self::DEFAULT_TOLERANCE
     }
 
+    /// The rule of the length of a leap: a finite number greater than 0.
+    pub const TAU: Real = Real::positive("tau");
+    /// The rule of `epsilon`: a share, strictly between 0 and 1.
+    pub const EPSILON: Real = Real::share("epsilon");
+    /// The rule of the tolerance: a finite number greater than 0.
+    pub const TOLERANCE: Real = Real::positive("tolerance");
+
     /// Check the settings.
     ///
     /// # Errors
     ///
-    /// Returns a message when `tau` is not a positive number or is given
-    /// for the direct method, when `epsilon` is not in `(0, 1)`, or when the
-    /// tolerance is not a positive number.
+    /// Returns the message of the rule of `tau`, `epsilon` or `tolerance`
+    /// when one is outside its range, or a message when `tau` is given for
+    /// the direct method.
     pub fn validate(&self) -> Result<(), String> {
         if let Some(tau) = self.tau {
-            if !(tau.is_finite() && tau > 0.0) {
-                return Err(format!("tau must be a positive number, got {tau}"));
-            }
+            Self::TAU.check(tau)?;
             if self.method != EventMethod::TauLeaping {
                 return Err(
                     "tau is the length of a leap: it needs the method \"tau_leaping\"".to_string(),
                 );
             }
         }
-        crate::check_open_unit("epsilon", self.epsilon)?;
-        if !(self.tolerance.is_finite() && self.tolerance > 0.0) {
-            return Err(format!(
-                "The tolerance must be a positive number, got {}",
-                self.tolerance
-            ));
-        }
-        Ok(())
+        Self::EPSILON.check(self.epsilon)?;
+        Self::TOLERANCE.check(self.tolerance)
     }
 }
 

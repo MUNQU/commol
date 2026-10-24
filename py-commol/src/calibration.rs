@@ -56,6 +56,9 @@ impl PyObservedDataPoint {
     ///     window: Optional window length for a cumulative output
     ///     trials: Optional trials of a binomial observation model that
     ///         reads them from each observation
+    ///
+    /// Raises:
+    ///     ValueError: If a setting is outside its range
     #[new]
     #[pyo3(signature = (at, label, outputs, value, weight=None, factor_id=None, window=None, trials=None))]
     #[allow(clippy::too_many_arguments)]
@@ -67,14 +70,19 @@ impl PyObservedDataPoint {
         weight: Option<f64>,
         factor_id: Option<String>,
         window: Option<f64>,
-        #[pyo3(from_py_with = crate::counts::optional::trials)] trials: Option<u64>,
-    ) -> Self {
+        trials: Option<i64>,
+    ) -> PyResult<Self> {
+        let trials: Option<u64> =
+            crate::counts::optional_count(&commol_calibration::ranges::TRIALS, trials)?;
         let mut inner = commol_calibration::ObservedDataPoint::of_sum(at, label, outputs, value);
         inner.weight = weight.unwrap_or(1.0);
         inner.factor_id = factor_id;
         inner.window = window;
         inner.trials = trials;
-        Self { inner }
+        inner
+            .check_ranges()
+            .map_err(pyo3::exceptions::PyValueError::new_err)?;
+        Ok(Self { inner })
     }
 }
 
@@ -161,12 +169,12 @@ impl PyObservationModel {
     /// read the trials of each observation
     #[staticmethod]
     #[pyo3(signature = (trials=None))]
-    fn binomial(
-        #[pyo3(from_py_with = crate::counts::optional::trials)] trials: Option<u64>,
-    ) -> Self {
-        Self {
+    fn binomial(trials: Option<i64>) -> PyResult<Self> {
+        let trials: Option<u64> =
+            crate::counts::optional_count(&commol_calibration::ranges::TRIALS, trials)?;
+        Ok(Self {
             inner: commol_calibration::ObservationModel::Binomial { trials },
-        }
+        })
     }
 }
 
@@ -234,17 +242,23 @@ impl PyCalibrationConstraint {
     ///     weight: Penalty weight multiplier (default: 1.0)
     ///     at: Optional positions on the axis at which to evaluate the
     ///         constraint; it can then read output values
+    ///
+    /// Raises:
+    ///     ValueError: If the weight or a position is outside its range
     #[new]
     #[pyo3(signature = (id, expression, weight=1.0, at=None))]
-    fn new(id: String, expression: String, weight: f64, at: Option<Vec<f64>>) -> Self {
+    fn new(id: String, expression: String, weight: f64, at: Option<Vec<f64>>) -> PyResult<Self> {
         let mut constraint =
             commol_calibration::CalibrationConstraint::new(id, expression).with_weight(weight);
 
         if let Some(positions) = at {
             constraint = constraint.with_positions(positions);
         }
+        constraint
+            .check_ranges()
+            .map_err(pyo3::exceptions::PyValueError::new_err)?;
 
-        Self { inner: constraint }
+        Ok(Self { inner: constraint })
     }
 }
 
@@ -331,10 +345,12 @@ impl PyLossConfig {
     #[pyo3(signature = (count=None, summary=None, quantile=None))]
     fn with_replicates(
         &self,
-        #[pyo3(from_py_with = crate::counts::optional::count)] count: Option<usize>,
+        count: Option<i64>,
         summary: Option<&str>,
         quantile: Option<f64>,
     ) -> PyResult<Self> {
+        let count: Option<usize> =
+            crate::counts::optional_count(&commol_calibration::ranges::REPLICATES, count)?;
         let summary = summary
             .map(|name| commol_calibration::ReplicateSummary::from_name(name, quantile))
             .transpose()
@@ -380,7 +396,7 @@ impl PyNelderMeadConfig {
     #[pyo3(signature = (max_iterations=1000, sd_tolerance=1e-6, initial_simplex_size=0.1, alpha=None, gamma=None, rho=None, sigma=None, verbose=false, header_interval=100))]
     #[allow(clippy::too_many_arguments)]
     fn new(
-        #[pyo3(from_py_with = crate::counts::required::max_iterations)] max_iterations: u64,
+        max_iterations: i64,
         sd_tolerance: f64,
         initial_simplex_size: f64,
         alpha: Option<f64>,
@@ -388,9 +404,15 @@ impl PyNelderMeadConfig {
         rho: Option<f64>,
         sigma: Option<f64>,
         verbose: bool,
-        #[pyo3(from_py_with = crate::counts::required::header_interval)] header_interval: u64,
-    ) -> Self {
-        Self {
+        header_interval: i64,
+    ) -> PyResult<Self> {
+        let max_iterations: u64 =
+            crate::counts::count(&commol_calibration::ranges::MAX_ITERATIONS, max_iterations)?;
+        let header_interval: u64 = crate::counts::count(
+            &commol_calibration::ranges::HEADER_INTERVAL,
+            header_interval,
+        )?;
+        Ok(Self {
             inner: commol_calibration::NelderMeadConfig {
                 max_iterations,
                 sd_tolerance,
@@ -402,7 +424,7 @@ impl PyNelderMeadConfig {
             },
             verbose,
             header_interval,
-        }
+        })
     }
 }
 
@@ -580,21 +602,21 @@ impl PyParticleSwarmConfig {
     #[pyo3(signature = (particles=20, max_iterations=1000, verbose=false, inertia=None, acceleration=None, mutation=None, velocity=None, initialization="uniform", improvement_stop=None, radius_stop=None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
-        #[pyo3(from_py_with = crate::counts::required::particles)] particles: usize,
-        #[pyo3(from_py_with = crate::counts::required::max_iterations)] max_iterations: u64,
+        particles: i64,
+        max_iterations: i64,
         verbose: bool,
         inertia: Option<PyInertia>,
         acceleration: Option<PyAcceleration>,
         mutation: Option<PyRef<PyPSOMutation>>,
         velocity: Option<PyRef<PyPSOVelocity>>,
         initialization: &str,
-        #[pyo3(from_py_with = crate::counts::improvement_stop)] improvement_stop: Option<(
-            u64,
-            f64,
-            f64,
-        )>,
+        improvement_stop: Option<(i64, f64, f64)>,
         radius_stop: Option<f64>,
     ) -> PyResult<Self> {
+        let particles: usize =
+            crate::counts::count(&commol_calibration::ranges::PARTICLES, particles)?;
+        let max_iterations: u64 =
+            crate::counts::count(&commol_calibration::ranges::MAX_ITERATIONS, max_iterations)?;
         let value_error = PyErr::new::<pyo3::exceptions::PyValueError, _>;
         let (mutation_strategy, mutation_probability, mutation_application) = match mutation {
             Some(mutation) => (
@@ -650,13 +672,18 @@ impl PyParticleSwarmConfig {
             mutation_strategy,
             mutation_probability,
             mutation_application,
-            improvement_stop: improvement_stop.map(|(window, tol_abs, tol_rel)| {
-                commol_calibration::ImprovementStop {
-                    window,
-                    tol_abs,
-                    tol_rel,
-                }
-            }),
+            improvement_stop: improvement_stop
+                .map(|(window, tol_abs, tol_rel)| {
+                    Ok::<_, PyErr>(commol_calibration::ImprovementStop {
+                        window: crate::counts::count(
+                            &commol_calibration::ranges::STOP_WINDOW,
+                            window,
+                        )?,
+                        tol_abs,
+                        tol_rel,
+                    })
+                })
+                .transpose()?,
             radius_stop,
         };
         Ok(Self {

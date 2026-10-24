@@ -398,7 +398,7 @@ const ISHIGAMI_TOTAL: [f64; 3] = [0.5576, 0.4424, 0.2437];
 fn a_saltelli_design_needs_two_base_draws() {
     let error = ishigami_inputs().saltelli("Sobol", 1, 21).unwrap_err();
 
-    assert_eq!(error, "Sobol needs at least 2 draws, got 1");
+    assert_eq!(error, "draws is a whole number of at least 2, got 1");
 }
 
 #[test]
@@ -630,7 +630,7 @@ fn an_analysis_of_no_replicates_is_refused() {
         .unwrap()
         .to_string();
 
-    assert_eq!(error, "replicates is at least 1, got 0");
+    assert_eq!(error, "replicates is a whole number of at least 1, got 0");
 }
 
 #[test]

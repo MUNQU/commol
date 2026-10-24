@@ -273,10 +273,47 @@ _SMALL = [0.3, 3.2, 0.2, 6.1, 4.0, 9.5, 6.2, 12.0, 9.0, 15.5]
 _BELOW_ZERO = ResidualBootstrap(
     replicates=20, block_length=1, residual_scale="additive", scheme="moving"
 )
-# Nine flows of which only the first three have weight: a fit without them
-# has nothing to fit.
-_FIRST_BLOCK = [1.0] * 3 + [0.0] * 6
+# A fit of a block or an origin fails only with a model that fails, which
+# fails the fit of every observation too: the extension adds one failed fit.
 _NO_WEIGHT = "Every weight is zero"
+
+
+class _OneMoreFailed:
+    """The run of the extension `run`, with one more failed fit, `entry`."""
+
+    def __init__(self, run: object, entry: str) -> None:
+        self._run = run
+        self.failed = [*getattr(run, "failed"), entry]
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._run, name)
+
+
+class _ProblemWithAFailedFit:
+    """The problem of the extension `problem`, whose `name` reports one more
+    failed fit, `entry`."""
+
+    def __init__(self, problem: object, name: str, entry: str) -> None:
+        self._problem = problem
+        self._name = name
+        self._entry = entry
+
+    def __getattr__(self, name: str) -> object:
+        found = getattr(self._problem, name)
+        if name != self._name:
+            return found
+        return lambda *arguments: _OneMoreFailed(found(*arguments), self._entry)
+
+
+def _fails_one_fit(monkeypatch: pytest.MonkeyPatch, name: str, entry: str) -> None:
+    """Make the function `name` of ``commol_rs.inference`` report one more
+    failed fit, `entry`."""
+    found = getattr(commol_rs.inference, name)
+    monkeypatch.setattr(
+        commol_rs.inference,
+        name,
+        lambda *arguments: _OneMoreFailed(found(*arguments), entry),
+    )
 
 
 type _Result = (
@@ -296,7 +333,10 @@ def _bootstrap(_: pytest.MonkeyPatch) -> _Result:
 
 
 def _jackknife(_: pytest.MonkeyPatch) -> _Result:
-    calibrator = flow_calibrator(_noisy(9, 2), windowed=True, weights=_FIRST_BLOCK)
+    calibrator = flow_calibrator(_noisy(9, 2), windowed=True)
+    calibrator._rust_problem = _ProblemWithAFailedFit(
+        calibrator.rust_problem, "jackknife", f"Block 1 failed: {_NO_WEIGHT}"
+    )
     return calibrator.uncertainty(BlockJackknife(block_length=3))
 
 
@@ -310,8 +350,9 @@ def _profile(_: pytest.MonkeyPatch) -> _Result:
     )
 
 
-def _jackknife_plus(_: pytest.MonkeyPatch) -> _Result:
-    calibrator = flow_calibrator(_noisy(9, 2), windowed=True, weights=_FIRST_BLOCK)
+def _jackknife_plus(monkeypatch: pytest.MonkeyPatch) -> _Result:
+    _fails_one_fit(monkeypatch, "jackknife_plus", f"Block 1 failed: {_NO_WEIGHT}")
+    calibrator = flow_calibrator(_noisy(9, 2), windowed=True)
     return calibrator.uncertainty(
         JackknifePlus(
             block_length=3,
@@ -323,11 +364,9 @@ def _jackknife_plus(_: pytest.MonkeyPatch) -> _Result:
     )
 
 
-def _rolling(_: pytest.MonkeyPatch) -> _Result:
-    # The origin at 2 has only observations of weight 0 to fit.
-    calibrator = flow_calibrator(
-        _noisy(9, 2), windowed=True, weights=[0.0] * 2 + [1.0] * 7
-    )
+def _rolling(monkeypatch: pytest.MonkeyPatch) -> _Result:
+    _fails_one_fit(monkeypatch, "rolling_conformal", f"Origin 1 failed: {_NO_WEIGHT}")
+    calibrator = flow_calibrator(_noisy(9, 2), windowed=True)
     return calibrator.uncertainty(
         RollingConformal(
             origins=[2.0, 5.0],

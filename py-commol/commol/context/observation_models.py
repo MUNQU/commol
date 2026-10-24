@@ -12,8 +12,9 @@ engine.
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+from commol.context.ranges import RangeChecked
 
-type NoiseArgument = Annotated[float, Field(allow_inf_nan=False)] | str
+type NoiseArgument = float | str
 """A noise argument: a number, or the id of a noise parameter."""
 
 
@@ -21,7 +22,7 @@ class _ObservationModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class NormalObservations(_ObservationModel):
+class NormalObservations(_ObservationModel, RangeChecked):
     """
     Normal noise: ``y ~ N(μ, sd²)``, with ``μ`` the prediction.
 
@@ -38,7 +39,7 @@ class NormalObservations(_ObservationModel):
     sd: NoiseArgument = Field(description="The standard deviation.")
 
 
-class LogNormalObservations(_ObservationModel):
+class LogNormalObservations(_ObservationModel, RangeChecked):
     """
     Log-normal noise: ``log y`` is normal with standard deviation ``sigma``.
 
@@ -62,7 +63,7 @@ class LogNormalObservations(_ObservationModel):
     center: Literal["mean", "median"] = Field(description="What the prediction is.")
 
 
-class StudentTObservations(_ObservationModel):
+class StudentTObservations(_ObservationModel, RangeChecked):
     """
     Student-t noise of center ``μ``, the prediction: normal noise with heavier
     tails, so an outlier pulls the fit less.
@@ -91,7 +92,7 @@ class PoissonObservations(_ObservationModel):
     kind: Literal["poisson"] = "poisson"
 
 
-class NegativeBinomialObservations(_ObservationModel):
+class NegativeBinomialObservations(_ObservationModel, RangeChecked):
     """
     Negative binomial counts of mean ``μ``, the prediction, and variance
     ``μ + φμ²``: counts that scatter more than a Poisson.
@@ -110,7 +111,7 @@ class NegativeBinomialObservations(_ObservationModel):
     overdispersion: NoiseArgument = Field(description="The overdispersion φ.")
 
 
-class BinomialObservations(_ObservationModel):
+class BinomialObservations(_ObservationModel, RangeChecked):
     """
     Binomial counts of ``n`` trials and mean ``μ``, the prediction: the
     probability is ``μ / n``, so the prediction is an expected count, not a
@@ -130,7 +131,7 @@ class BinomialObservations(_ObservationModel):
     """
 
     kind: Literal["binomial"] = "binomial"
-    trials: int | None = Field(default=None, ge=0, description="The trials.")
+    trials: int | None = Field(default=None, description="The trials.")
 
 
 type ObservationModel = Annotated[

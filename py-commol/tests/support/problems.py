@@ -115,7 +115,6 @@ def flow_calibrator(
     bounds: tuple[float, float] = (0.0, 50.0),
     observation_models: Mapping[str, ObservationModel] | None = None,
     noise: Sequence[CalibrationParameter] = (),
-    weights: Sequence[float] | None = None,
 ) -> Calibrator:
     """
     Fit a constant flow ``c`` from A to B (``a_to_b_builder`` with the rate
@@ -129,8 +128,7 @@ def flow_calibrator(
 
     The fit minimizes the sum of squares, or, with `observation_models` (of
     the series ``"B"``), maximizes their likelihood, with the `noise`
-    parameters calibrated after ``c``. `weights`, one per value, replace the
-    weight 1 of each observation.
+    parameters calibrated after ``c``.
     """
     model = build(
         a_to_b_builder(
@@ -138,11 +136,6 @@ def flow_calibrator(
         )
     )
     observations = flow_observations(values, windowed=windowed)
-    if weights is not None:
-        observations = [
-            point.model_copy(update={"weight": weight})
-            for point, weight in zip(observations, weights, strict=True)
-        ]
     problem = CalibrationProblem(
         observed_data=observations,
         parameters=[bounded("c", *bounds, initial_guess=sum(bounds) / 2), *noise],

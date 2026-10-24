@@ -19,10 +19,10 @@ from commol.context._model import engine_state
 from commol.context.calibration import CalibrationParameter
 from commol.context.constants import CalibrationParameterType
 from commol.context.inference.distributions import Distribution, Uniform
-from commol.context.inference.levels import ConfidenceLevel
 from commol.context.inference.method import SensitivityMethod
 from commol.context.inference.quantities import Quantity
 from commol.context.inference.sample import ParameterSample
+from commol.context.ranges import RangeChecked
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
@@ -408,7 +408,7 @@ class PropagationResult(BaseModel):
         return summaries
 
 
-class Propagation(SensitivityMethod[PropagationResult]):
+class Propagation(SensitivityMethod[PropagationResult], RangeChecked):
     """
     Monte Carlo propagation: run the draws of the inputs and reduce each run
     to the quantities.
@@ -428,7 +428,7 @@ class Propagation(SensitivityMethod[PropagationResult]):
     """
 
     draws: int | None = Field(
-        default=None, ge=1, description="Points of the Latin hypercube."
+        default=None, description="Points of the Latin hypercube."
     )
     quantities: list[Quantity] = Field(
         default_factory=list, description="What each run is reduced to."
@@ -521,7 +521,7 @@ class PRCCResult(BaseModel):
         )
 
 
-class PRCC(SensitivityMethod[PRCCResult]):
+class PRCC(SensitivityMethod[PRCCResult], RangeChecked):
     """
     Latin hypercube sampling with partial rank correlation coefficients
     (Marino et al. 2008): how steadily each quantity rises or falls with each
@@ -542,7 +542,7 @@ class PRCC(SensitivityMethod[PRCCResult]):
     """
 
     draws: int | None = Field(
-        default=None, ge=1, description="Points of the Latin hypercube."
+        default=None, description="Points of the Latin hypercube."
     )
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
@@ -625,7 +625,7 @@ class MorrisResult(BaseModel):
         return _morris(self, output_file=output_file, config=config, axes=axes)
 
 
-class Morris(SensitivityMethod[MorrisResult]):
+class Morris(SensitivityMethod[MorrisResult], RangeChecked):
     """
     Morris screening (Morris 1991), with the ``μ*`` of Campolongo, Cariboni
     and Saltelli (2007): which inputs matter, in few runs.
@@ -646,8 +646,8 @@ class Morris(SensitivityMethod[MorrisResult]):
         What each run is reduced to.
     """
 
-    trajectories: int = Field(ge=1, description="The number of trajectories.")
-    levels: int = Field(ge=2, description="The number of levels; even.")
+    trajectories: int = Field(description="The number of trajectories.")
+    levels: int = Field(description="The number of levels; even.")
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
@@ -735,7 +735,7 @@ class SobolResult(BaseModel):
         return _sobol(self, output_file=output_file, config=config, axes=axes)
 
 
-class Sobol(SensitivityMethod[SobolResult]):
+class Sobol(SensitivityMethod[SobolResult], RangeChecked):
     """
     Sobol indices on the design of Saltelli (2010): first-order indices by
     the estimator of Saltelli (2010) and total indices by the estimator of
@@ -759,9 +759,9 @@ class Sobol(SensitivityMethod[SobolResult]):
         What each run is reduced to.
     """
 
-    draws: int = Field(ge=2, description="Rows of each base matrix.")
-    replicates: int = Field(ge=2, description="Bootstrap replicates.")
-    confidence_level: ConfidenceLevel = Field(description="Level of the intervals.")
+    draws: int = Field(description="Rows of each base matrix.")
+    replicates: int = Field(description="Bootstrap replicates.")
+    confidence_level: float = Field(description="Level of the intervals.")
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
@@ -897,7 +897,7 @@ class ChaosResult(BaseModel):
         )
 
 
-class PolynomialChaos(SensitivityMethod[ChaosResult]):
+class PolynomialChaos(SensitivityMethod[ChaosResult], RangeChecked):
     """
     A polynomial chaos expansion (Sudret 2008): a polynomial surrogate of
     each quantity, and the Sobol indices of its coefficients, in far fewer
@@ -934,14 +934,12 @@ class PolynomialChaos(SensitivityMethod[ChaosResult]):
         What each run is reduced to.
     """
 
-    degree: int = Field(ge=1, description="The degree of the basis.")
-    q_norm: float = Field(
-        default=1.0, gt=0.0, le=1.0, description="The q of the q-norm of the basis."
-    )
+    degree: int = Field(description="The degree of the basis.")
+    q_norm: float = Field(default=1.0, description="The q of the q-norm of the basis.")
     max_interaction: int | None = Field(
-        default=None, ge=1, description="The largest number of inputs of a term."
+        default=None, description="The largest number of inputs of a term."
     )
-    draws: int = Field(ge=2, description="Points of the Latin hypercube.")
+    draws: int = Field(description="Points of the Latin hypercube.")
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )

@@ -71,10 +71,12 @@ pub struct PyStructuralAnalysis {
 fn structural_rank(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
-    #[pyo3(from_py_with = crate::counts::required::points)] points: usize,
+    points: i64,
     dense: bool,
-    seed: u64,
+    seed: i128,
 ) -> PyResult<PyStructuralAnalysis> {
+    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+    let points: usize = crate::counts::count(&commol_inference::ranges::POINTS, points)?;
     let source = source(problem, dense)?;
     let analysis = parallel(py, || {
         identifiability::structural_rank(&source, points, seed)
@@ -184,9 +186,11 @@ fn collinearity(
     problem: &PyCalibrationProblem,
     points: Vec<Vec<f64>>,
     weights: Vec<f64>,
-    #[pyo3(from_py_with = crate::counts::required::max_subset_size)] max_subset_size: usize,
+    max_subset_size: i64,
     threshold: f64,
 ) -> PyResult<PyCollinearityAnalysis> {
+    let max_subset_size: usize =
+        crate::counts::count(&commol_inference::ranges::MAX_SUBSET_SIZE, max_subset_size)?;
     let source = source(problem, false)?;
     let analysis = parallel(py, || {
         identifiability::collinearity(&source, &points, &weights, max_subset_size, threshold)

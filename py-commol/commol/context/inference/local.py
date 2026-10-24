@@ -16,6 +16,7 @@ from commol.context.inference.distributions import WithPriors
 from commol.context.inference.method import UncertaintyMethod
 from commol.context.inference.resampling import BlockLength
 from commol.context.inference.sample import ParameterSample
+from commol.context.ranges import RangeChecked
 
 type CurvatureName = Literal["gauss_newton", "hessian"]
 """The curvature a local approximation reads. ``"gauss_newton"``: the
@@ -112,7 +113,7 @@ class LaplaceResult(LocalResult):
     """
 
 
-class Laplace(UncertaintyMethod[LaplaceResult]):
+class Laplace(UncertaintyMethod[LaplaceResult], RangeChecked):
     """
     The Laplace approximation of the problem's observation models: the normal
     ``N(θ̂, H⁻¹)`` on the unbounded scale of the parameters, centred on the
@@ -134,11 +135,11 @@ class Laplace(UncertaintyMethod[LaplaceResult]):
         hypercube over the bounds.
     """
 
-    draws: int = Field(ge=1, description="Number of draws.")
+    draws: int = Field(description="Number of draws.")
     curvature: CurvatureName = Field(
         default="gauss_newton", description="The curvature."
     )
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+    starts: int = Field(default=1, description="Starts of the fit.")
 
 
 class SandwichResult(LocalResult):
@@ -185,7 +186,7 @@ class SandwichResult(LocalResult):
         return float(self.blocks - 1)
 
 
-class Sandwich(UncertaintyMethod[SandwichResult]):
+class Sandwich(UncertaintyMethod[SandwichResult], RangeChecked):
     """
     The sandwich covariance ``H⁻¹ B H⁻¹`` at the fit, with the meat ``B``
     summed over blocks of positions (the clustered estimator CR1):
@@ -217,11 +218,11 @@ class Sandwich(UncertaintyMethod[SandwichResult]):
     """
 
     block_length: BlockLength = Field(description="Positions per block.")
-    draws: int = Field(ge=1, description="Number of draws.")
+    draws: int = Field(description="Number of draws.")
     curvature: CurvatureName = Field(
         default="gauss_newton", description="The curvature."
     )
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+    starts: int = Field(default=1, description="Starts of the fit.")
 
 
 class LikelihoodTarget(WithPriors):
@@ -239,7 +240,7 @@ class LikelihoodTarget(WithPriors):
     kind: Literal["likelihood"] = "likelihood"
 
 
-class GibbsTarget(WithPriors):
+class GibbsTarget(WithPriors, RangeChecked):
     """
     The Gibbs posterior of the problem's loss,
     ``π(θ) ∝ prior(θ) · exp(−η · loss(θ))``, as the target of a
@@ -255,7 +256,7 @@ class GibbsTarget(WithPriors):
     """
 
     kind: Literal["gibbs"] = "gibbs"
-    eta: float = Field(gt=0.0, allow_inf_nan=False, description="Scale of the loss.")
+    eta: float = Field(description="Scale of the loss.")
 
 
 type MixtureTarget = Annotated[
@@ -328,7 +329,7 @@ class ImportanceResult(BaseModel):
     notes: list[str]
 
 
-class LaplaceMixture(UncertaintyMethod[ImportanceResult]):
+class LaplaceMixture(UncertaintyMethod[ImportanceResult], RangeChecked):
     """
     The Laplace mixture: a Laplace approximation at each distinct optimum of
     a multi-start fit, weighted by its Laplace evidence, as the proposal of
@@ -355,8 +356,8 @@ class LaplaceMixture(UncertaintyMethod[ImportanceResult]):
         The curvature of each component (default ``"gauss_newton"``).
     """
 
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
-    draws: int = Field(ge=25, description="Number of draws.")
+    starts: int = Field(default=1, description="Starts of the fit.")
+    draws: int = Field(description="Number of draws.")
     target: MixtureTarget = Field(description="The posterior to sample.")
     curvature: CurvatureName = Field(
         default="gauss_newton", description="The curvature."

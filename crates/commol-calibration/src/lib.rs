@@ -20,6 +20,9 @@
 //! The summary of the replicates of a stochastic engine and every method of
 //! `commol-inference` take the one quantile of `commol_statistics::statistics`.
 //!
+//! [`ranges`] declares the range rule of each setting of a calibration, of
+//! its observations and of its optimizers.
+//!
 //! [`optimize_starts`] minimizes the objective with Nelder-Mead or a
 //! particle swarm from several start points ([`start_points`]) in parallel,
 //! and chooses the best ([`Starts`]): a calibration and every fit of a
@@ -70,6 +73,7 @@ pub mod likelihood;
 pub mod objective;
 pub mod observation;
 pub mod optimization;
+pub mod ranges;
 pub mod series;
 pub mod starts;
 pub mod subproblem;

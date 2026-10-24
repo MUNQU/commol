@@ -303,29 +303,28 @@ class TestCollinearity:
         with pytest.raises(ValidationError, match="threshold"):
             Collinearity(at=_best(), max_subset_size=2)  # ty: ignore[missing-argument]
 
-    @pytest.mark.parametrize("size", [1, 9])
-    def test_max_subset_size_gets_the_message_of_the_engine(
-        self, product: Calibrator, size: int
+    @pytest.mark.parametrize("size", [1, -1])
+    def test_max_subset_size_below_2_gets_the_message_of_the_engine(
+        self, size: int
     ) -> None:
         with pytest.raises(ValueError) as error:
-            product.identifiability(
-                Collinearity(at=_best(), max_subset_size=size, threshold=20)
-            )
+            Collinearity(at=_best(), max_subset_size=size, threshold=20)
 
-        assert str(error.value) == (
-            "max_subset_size must be from 2 to the number of parameters (3), "
-            f"got {size}"
+        assert f"max_subset_size is a whole number of at least 2, got {size}" in str(
+            error.value
         )
 
-    def test_a_negative_max_subset_size_names_the_setting(
+    def test_max_subset_size_above_the_parameters_gets_the_message_of_the_engine(
         self, product: Calibrator
     ) -> None:
         with pytest.raises(ValueError) as error:
             product.identifiability(
-                Collinearity(at=_best(), max_subset_size=-1, threshold=20)
+                Collinearity(at=_best(), max_subset_size=9, threshold=20)
             )
 
-        assert str(error.value) == "max_subset_size is a whole number from 0, got -1"
+        assert (
+            str(error.value) == "max_subset_size is a whole number from 2 to 3, got 9"
+        )
 
 
 def _best() -> CalibrationResult:

@@ -126,7 +126,7 @@ pub fn quantiles(values: &[f64], weights: &[f64], levels: &[f64]) -> Result<Vec<
 /// The two quantiles of a central interval of `confidence_level`:
 /// `(1 − c)/2` and `(1 + c)/2`.
 ///
-/// The caller checks the level first (`commol_core::check_confidence_level`):
+/// The caller checks the level first (`commol_core::CONFIDENCE_LEVEL`):
 /// `confidence_level` is strictly between 0 and 1.
 pub fn interval_levels(confidence_level: f64) -> [f64; 2] {
     debug_assert!(

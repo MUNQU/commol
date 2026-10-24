@@ -9,7 +9,7 @@
 //! median, as the normal and the Student t are symmetric.
 
 use commol_calibration::{CalibrationProblem, ObservedDataPoint};
-use commol_core::{SimulationEngine, check_confidence_level};
+use commol_core::{CONFIDENCE_LEVEL, SimulationEngine};
 use commol_statistics::statistics::interval_levels;
 
 use crate::error::MethodError;
@@ -48,7 +48,9 @@ pub fn delta_band<E>(
 where
     E: SimulationEngine + Send + Sync,
 {
-    check_confidence_level(confidence_level).map_err(MethodError::Invalid)?;
+    CONFIDENCE_LEVEL
+        .check(confidence_level)
+        .map_err(MethodError::Invalid)?;
     let upper_level = interval_levels(confidence_level)[1];
     let quantile = match degrees_of_freedom {
         Some(df) => student_t_quantile(upper_level, df),

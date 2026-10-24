@@ -35,7 +35,10 @@ use rayon::prelude::*;
 use super::TemperedTarget;
 use super::kernel::Kernel;
 use crate::error::MethodError;
-use commol_core::check_open_unit;
+use crate::ranges::{
+    MIN_ACCEPTANCE, PARTICLES, QUANTILE, RESAMPLE_THRESHOLD, STAY_PROBABILITY, TARGET_CESS,
+    TWO_DRAWS,
+};
 use commol_random::Stream;
 
 /// One step of a run.
@@ -171,18 +174,12 @@ impl<K: Kernel> SmcSampler<K> {
         target_cess: f64,
         stay_probability: f64,
     ) -> Result<Self, MethodError> {
-        if particles < 2 {
-            return Err(MethodError::Invalid(format!(
-                "particles must be at least 2, got {particles}"
-            )));
-        }
-        if !(resample_threshold > 0.0 && resample_threshold <= 1.0) {
-            return Err(MethodError::Invalid(format!(
-                "resample_threshold must be in (0, 1], got {resample_threshold}"
-            )));
-        }
-        check_open_unit("target_cess", target_cess).map_err(MethodError::Invalid)?;
-        check_open_unit("stay_probability", stay_probability).map_err(MethodError::Invalid)?;
+        PARTICLES
+            .check(particles)
+            .and(RESAMPLE_THRESHOLD.check(resample_threshold))
+            .and(TARGET_CESS.check(target_cess))
+            .and(STAY_PROBABILITY.check(stay_probability))
+            .map_err(MethodError::Invalid)?;
         Ok(Self {
             particles,
             kernel,
@@ -201,7 +198,9 @@ impl<K: Kernel> SmcSampler<K> {
     /// [`MethodError::Invalid`] when `min_acceptance` is not strictly between
     /// 0 and 1.
     pub fn with_min_acceptance(mut self, min_acceptance: f64) -> Result<Self, MethodError> {
-        check_open_unit("min_acceptance", min_acceptance).map_err(MethodError::Invalid)?;
+        MIN_ACCEPTANCE
+            .check(min_acceptance)
+            .map_err(MethodError::Invalid)?;
         self.min_acceptance = Some(min_acceptance);
         Ok(self)
     }
@@ -563,9 +562,12 @@ pub fn abc_rejection<T: TemperedTarget>(
     quantile: f64,
     seed: u64,
 ) -> Result<SmcRun, MethodError> {
-    check_open_unit("quantile", quantile).map_err(MethodError::Invalid)?;
+    TWO_DRAWS
+        .check(draws)
+        .and(QUANTILE.check(quantile))
+        .map_err(MethodError::Invalid)?;
     let sampler = SmcSampler::new(draws, super::RandomWalk::new(), 1.0, quantile, 0.5)
-        .map_err(|error| MethodError::Invalid(error.to_string().replace("particles", "draws")))?;
+        .expect("the draws and the quantile are in the ranges of a sampler");
     let mut state = sampler.start(target, seed)?;
     let level = next_level(
         target,

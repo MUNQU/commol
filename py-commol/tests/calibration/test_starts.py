@@ -128,7 +128,9 @@ class TestStarts:
     def test_a_calibration_needs_a_start(
         self, truth_run: dict[str, list[float]]
     ) -> None:
-        with pytest.raises(ValueError, match="at least one start"):
+        with pytest.raises(
+            ValueError, match="starts is a whole number of at least 1, got 0"
+        ):
             _calibrator(truth_run).run(starts=0)
 
 

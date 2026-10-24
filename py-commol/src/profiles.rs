@@ -43,13 +43,18 @@ impl PyBootstrapSettings {
     #[pyo3(signature = (method, replicates, starts, block_length=None, residual_scale=None, scheme=None, multipliers=None))]
     fn new(
         method: &str,
-        #[pyo3(from_py_with = crate::counts::required::replicates)] replicates: usize,
-        #[pyo3(from_py_with = crate::counts::required::starts)] starts: usize,
-        #[pyo3(from_py_with = crate::counts::optional::block_length)] block_length: Option<usize>,
+        replicates: i64,
+        starts: i64,
+        block_length: Option<i64>,
         residual_scale: Option<&str>,
         scheme: Option<&str>,
         multipliers: Option<&str>,
     ) -> PyResult<Self> {
+        let replicates: usize =
+            crate::counts::count(&commol_inference::ranges::REPLICATES, replicates)?;
+        let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
+        let block_length: Option<usize> =
+            crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
         fn needed<'s>(method: &str, setting: Option<&'s str>, name: &str) -> PyResult<&'s str> {
             setting.ok_or_else(|| value_error(format!("A {method} bootstrap needs {name}")))
         }
@@ -277,10 +282,12 @@ fn trace_profiles(
     predictions: Vec<PyObservedDataPoint>,
     threshold: &str,
     confidence_level: f64,
-    #[pyo3(from_py_with = crate::counts::required::max_steps)] max_steps: usize,
-    seed: u64,
+    max_steps: i64,
+    seed: i128,
     bootstrap: Option<PyRef<'_, PyBootstrapSettings>>,
 ) -> PyResult<PyProfileRun> {
+    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+    let max_steps: usize = crate::counts::count(&commol_inference::ranges::MAX_STEPS, max_steps)?;
     let problem_ref = &problem.inner;
     let tracer =
         ProfileTracer::new(problem_ref, &config.inner, &fit, seed).map_err(method_error)?;

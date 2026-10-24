@@ -22,7 +22,6 @@ from commol.context.inference.identifiability import (
     ProfileVerdictName,
     StructuralVerdict,
 )
-from commol.context.inference.levels import ConfidenceLevel
 from commol.context.inference.method import UncertaintyMethod
 from commol.context.inference.resampling import (
     BayesianBootstrap,
@@ -30,6 +29,7 @@ from commol.context.inference.resampling import (
     ResidualBootstrap,
     WildBootstrap,
 )
+from commol.context.ranges import RangeChecked
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
@@ -51,7 +51,7 @@ class _Frozen(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class Threshold(_Frozen):
+class Threshold(_Frozen, RangeChecked):
     """
     How far the statistic of a profile may rise above the fit inside an
     interval of `confidence_level`.
@@ -69,7 +69,7 @@ class Threshold(_Frozen):
     """  # noqa: E501
 
     kind: Literal["chi_square", "beale", "bootstrap_calibrated"]
-    confidence_level: ConfidenceLevel
+    confidence_level: float
     bootstrap: ProfileBootstrap | None = None
 
     @model_validator(mode="after")
@@ -176,7 +176,7 @@ class Threshold(_Frozen):
         )
 
 
-class PredictionSpec(_Frozen):
+class PredictionSpec(_Frozen, RangeChecked):
     """
     A prediction to profile: an output, or a sum of outputs, at a position,
     read as an observation is.
@@ -198,11 +198,13 @@ class PredictionSpec(_Frozen):
         A factor parameter that multiplies the prediction.
     """
 
-    at: float = Field(ge=0, allow_inf_nan=False)
+    at: float = Field()
     output: str | None = Field(default=None, min_length=1)
     outputs: list[str] | None = None
     label: str = ""
-    window: float | None = Field(default=None, gt=0)
+    window: float | None = Field(
+        default=None,
+    )
     factor_id: str | None = None
 
     def as_observation(self) -> ObservedDataPoint:
@@ -230,7 +232,7 @@ class PredictionSpec(_Frozen):
         )
 
 
-class ProfileLikelihood(UncertaintyMethod["ProfileResult"]):
+class ProfileLikelihood(UncertaintyMethod["ProfileResult"], RangeChecked):
     """
     The profile likelihood of parameters (Raue et al. 2009).
 
@@ -256,8 +258,12 @@ class ProfileLikelihood(UncertaintyMethod["ProfileResult"]):
 
     parameters: list[str] = Field(min_length=1)
     threshold: Threshold
-    max_steps: int = Field(default=100, ge=1)
-    starts: int = Field(default=1, ge=1)
+    max_steps: int = Field(
+        default=100,
+    )
+    starts: int = Field(
+        default=1,
+    )
 
     @model_validator(mode="after")
     def check_unique(self) -> Self:
@@ -267,7 +273,7 @@ class ProfileLikelihood(UncertaintyMethod["ProfileResult"]):
         return self
 
 
-class PredictionProfile(UncertaintyMethod["ProfileResult"]):
+class PredictionProfile(UncertaintyMethod["ProfileResult"], RangeChecked):
     """
     The profile likelihood of predictions (Kreutz et al. 2012).
 
@@ -291,8 +297,12 @@ class PredictionProfile(UncertaintyMethod["ProfileResult"]):
 
     specs: list[PredictionSpec] = Field(min_length=1)
     threshold: Threshold
-    max_steps: int = Field(default=100, ge=1)
-    starts: int = Field(default=1, ge=1)
+    max_steps: int = Field(
+        default=100,
+    )
+    starts: int = Field(
+        default=1,
+    )
 
     @model_validator(mode="after")
     def check_labels(self) -> Self:

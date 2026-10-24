@@ -352,10 +352,10 @@ class TestParticleSwarmConfig:
     def test_a_stop_rule_out_of_its_range_names_its_setting(
         self, configure, field: str
     ) -> None:
-        with pytest.raises(ValidationError) as error:
+        with pytest.raises(
+            ValidationError, match=rf"Value error, {field} is a (whole )?number"
+        ):
             configure(ParticleSwarmConfig())
-
-        assert error.value.errors()[0]["loc"] == (field,)
 
     @pytest.mark.parametrize(
         ("configure", "message"),

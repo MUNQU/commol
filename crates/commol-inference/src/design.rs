@@ -9,6 +9,7 @@ use commol_random::sample::index;
 use commol_random::{Generator, latin_hypercube};
 
 use crate::priors::Priors;
+use crate::ranges;
 use crate::sample::ParameterSample;
 
 /// What a method varies.
@@ -131,14 +132,13 @@ impl InputSpace {
         seed: u64,
     ) -> Result<MorrisDesign, String> {
         let priors = self.independent(method)?;
-        if levels < 2 || !levels.is_multiple_of(2) {
+        ranges::LEVELS.check(levels)?;
+        if !levels.is_multiple_of(2) {
             return Err(format!(
-                "Morris takes an even number of levels, at least 2, got {levels}"
+                "Morris takes an even number of levels, got {levels}"
             ));
         }
-        if trajectories == 0 {
-            return Err("Morris needs at least one trajectory".to_string());
-        }
+        ranges::TRAJECTORIES.check(trajectories)?;
         let inputs = priors.distributions().len();
         let half = levels / 2;
         let mut generator = Generator::from_seed(seed);
@@ -194,9 +194,7 @@ impl InputSpace {
     /// As [`Self::independent`], or when `base` is below 2.
     pub fn saltelli(&self, method: &str, base: usize, seed: u64) -> Result<SaltelliDesign, String> {
         let priors = self.independent(method)?;
-        if base < 2 {
-            return Err(format!("{method} needs at least 2 draws, got {base}"));
-        }
+        ranges::TWO_DRAWS.check(base)?;
         let inputs = priors.distributions().len();
         let mut generator = Generator::from_seed(seed);
         let mut matrix = || -> Vec<Vec<f64>> {
@@ -371,13 +369,13 @@ mod tests {
             space
                 .morris("Morris", 2, 0, 1)
                 .unwrap_err()
-                .contains("even")
+                .contains("levels is a whole number of at least 2, got 0")
         );
         assert!(
             space
                 .morris("Morris", 0, 4, 1)
                 .unwrap_err()
-                .contains("trajectory")
+                .contains("trajectories is a whole number of at least 1, got 0")
         );
     }
 

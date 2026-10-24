@@ -39,9 +39,7 @@ from pydantic import (
 )
 
 from commol.commol_rs import _commol_rs as commol_rs
-
-Position = Annotated[float, Field(ge=0.0, allow_inf_nan=False)]
-"""A position on the axis of the model."""
+from commol.context.ranges import RangeChecked
 
 
 def _position_text(at: float) -> str:
@@ -101,7 +99,7 @@ class Level(_Outputs):
         """A level reads any position."""
 
 
-class Increments(_Outputs):
+class Increments(_Outputs, RangeChecked):
     """
     The increments of some outputs: at each end, the gain of their sum over
     ``(end - window, end]``, as an observation with the window `window`
@@ -121,7 +119,7 @@ class Increments(_Outputs):
     """
 
     kind: Literal["increments"] = "increments"
-    window: float = Field(gt=0.0, allow_inf_nan=False, description="The width.")
+    window: float = Field(description="The width.")
 
     def __init__(
         self,
@@ -227,7 +225,7 @@ class _OneScalar(QuantityBase):
         return [self.label or self.default_label()]
 
 
-class ValueAt(_OfSeries, _OneScalar):
+class ValueAt(_OfSeries, _OneScalar, RangeChecked):
     """
     The value of a series at a position: the level of the outputs, or their
     gain over the window that ends there.
@@ -244,7 +242,7 @@ class ValueAt(_OfSeries, _OneScalar):
     """
 
     kind: Literal["value_at"] = "value_at"
-    at: Position = Field(description="The position.")
+    at: float = Field(description="The position.")
 
     @model_validator(mode="after")
     def window_after_zero(self) -> Self:
@@ -257,7 +255,7 @@ class ValueAt(_OfSeries, _OneScalar):
         return f"{self.series.text} at {_position_text(self.at)}"
 
 
-class Gain(_Outputs, _OneScalar):
+class Gain(_Outputs, _OneScalar, RangeChecked):
     """
     The value at `end` minus the value at `start`: what entered a cumulative
     output over ``(start, end]``, as an observation with the window
@@ -277,8 +275,8 @@ class Gain(_Outputs, _OneScalar):
     """
 
     kind: Literal["gain"] = "gain"
-    start: Position = Field(description="The start of the window.")
-    end: Position = Field(description="The end of the window.")
+    start: float = Field(description="The start of the window.")
+    end: float = Field(description="The end of the window.")
 
     @model_validator(mode="after")
     def end_after_start(self) -> Self:
@@ -299,7 +297,7 @@ class Gain(_Outputs, _OneScalar):
 class _AtPositions(_OfSeries):
     """A quantity that reads a series at several positions."""
 
-    positions: list[Position] = Field(
+    positions: list[float] = Field(
         min_length=1, description="The positions, ascending."
     )
 
@@ -318,7 +316,7 @@ class _AtPositions(_OfSeries):
         return self
 
 
-class Peak(_AtPositions, _OneScalar):
+class Peak(_AtPositions, _OneScalar, RangeChecked):
     """
     The largest value of a series at the positions.
 
@@ -345,7 +343,7 @@ class Peak(_AtPositions, _OneScalar):
         return f"peak of {self.series.text}"
 
 
-class PeakPosition(_AtPositions, _OneScalar):
+class PeakPosition(_AtPositions, _OneScalar, RangeChecked):
     """
     The first of the positions where the value of a series is largest; NaN
     when the value at a position is NaN.
@@ -368,7 +366,7 @@ class PeakPosition(_AtPositions, _OneScalar):
         return f"position of the peak of {self.series.text}"
 
 
-class Trajectory(_AtPositions):
+class Trajectory(_AtPositions, RangeChecked):
     """
     The value of a series at each position: one scalar per position, for an
     analysis over the axis.

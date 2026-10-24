@@ -36,8 +36,12 @@
 
 use std::ops::Range;
 
+use commol_calibration::ranges::{AT, WINDOW};
 use commol_calibration::{ObservationOperator, ObservedDataPoint, index_at, window_start};
+use commol_core::Real;
 use serde::{Deserialize, Serialize};
+
+use crate::ranges::{END, POSITIONS, START};
 
 /// What a quantity reads at each position of a run.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -292,9 +296,14 @@ struct Points<'a> {
 }
 
 impl Points<'_> {
-    /// The observations of `series` at `positions`, as a range of the
-    /// observations of the design.
-    fn read(&mut self, series: &Series, positions: &[f64]) -> Result<Range<usize>, String> {
+    /// The observations of `series` at `positions`, each in the range of
+    /// `rule`, as a range of the observations of the design.
+    fn read(
+        &mut self,
+        series: &Series,
+        positions: &[f64],
+        rule: Real,
+    ) -> Result<Range<usize>, String> {
         let index = self.index;
         if series.outputs().is_empty() {
             return Err(format!("Quantity {index} has no outputs"));
@@ -302,18 +311,16 @@ impl Points<'_> {
         let window = match series {
             Series::Level { .. } => None,
             Series::Increments { window, .. } => {
-                if !(window.is_finite() && *window > 0.0) {
-                    return Err(format!(
-                        "Quantity {index}: the window of increments is finite and above 0, got \
-                         {window}"
-                    ));
-                }
+                WINDOW
+                    .check(*window)
+                    .map_err(|error| format!("Quantity {index}: {error}"))?;
                 Some(*window)
             }
         };
         let first = self.points.len();
         for &at in positions {
-            check_position(index, at)?;
+            rule.check(at)
+                .map_err(|error| format!("Quantity {index}: {error}"))?;
             if let Some(window) = window
                 && window_start(at, window) < 0.0
             {
@@ -339,14 +346,16 @@ impl Points<'_> {
         let index = self.index;
         Ok(match quantity {
             Quantity::ValueAt { series, at } => {
-                Reduction::Scalar(Scalar::One(self.read(series, &[*at])?.start))
+                Reduction::Scalar(Scalar::One(self.read(series, &[*at], AT)?.start))
             }
             Quantity::Gain {
                 outputs,
                 start,
                 end,
             } => {
-                check_position(index, *start)?;
+                START
+                    .check(*start)
+                    .map_err(|error| format!("Quantity {index}: {error}"))?;
                 if end <= start {
                     return Err(format!(
                         "Quantity {index}: a gain ends after it starts, got start {start} and \
@@ -356,7 +365,7 @@ impl Points<'_> {
                 let series = Series::Level {
                     outputs: outputs.clone(),
                 };
-                let row = self.read(&series, &[*end])?.start;
+                let row = self.read(&series, &[*end], END)?.start;
                 self.starts[row] = Some(*start);
                 Reduction::Scalar(Scalar::One(row))
             }
@@ -368,7 +377,7 @@ impl Points<'_> {
                         "Quantity {index}: a peak or a trajectory needs positions"
                     ));
                 }
-                let range = self.read(series, positions)?;
+                let range = self.read(series, positions, POSITIONS)?;
                 match quantity {
                     Quantity::Peak { .. } => Reduction::Scalar(Scalar::Max(range)),
                     Quantity::PeakPosition { .. } => {
@@ -414,9 +423,9 @@ impl Quantities {
     /// # Errors
     ///
     /// Returns a message when there is no quantity, a quantity has no
-    /// outputs or names an unknown one, a position is not finite, a gain
-    /// does not end after it starts, the window of increments is not finite
-    /// and above 0 or longer than an end, or a peak or a trajectory has no
+    /// outputs or names an unknown one, a position or the window of
+    /// increments is outside its range ([`crate::ranges`]), a gain does not
+    /// end after it starts, the window of increments is longer than an end, or a peak or a trajectory has no
     /// positions.
     pub fn new(quantities: &[Quantity], output_names: &[String]) -> Result<Self, String> {
         if quantities.is_empty() {
@@ -663,12 +672,4 @@ fn first_largest(values: &[f64]) -> Option<(usize, f64)> {
         }
     }
     Some(best)
-}
-
-fn check_position(index: usize, at: f64) -> Result<(), String> {
-    if at.is_finite() {
-        Ok(())
-    } else {
-        Err(format!("Quantity {index}: a position is finite, got {at}"))
-    }
 }
