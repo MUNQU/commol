@@ -2811,6 +2811,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/figures/" class="md-nav__link">
         
   
@@ -3349,7 +3377,8 @@ Rust.</p>
 method and gives one series per output. Calibration runs an engine many times
 and compares the series with the observations. Inference reads the
 calibration problem to measure uncertainty. The arrows show this flow, from
-top to bottom. The dashed box is the base that every box uses.</p>
+top to bottom. The dashed boxes are shared: the base that every box uses, and
+the statistics that calibration and inference use.</p>
 <pre class="mermaid"><code>flowchart TB
     J[/model as JSON/]
     M["Model compiler&lt;br/&gt;compartments, initial state,&lt;br/&gt;flows, rates"]
@@ -3360,14 +3389,16 @@ top to bottom. The dashed box is the base that every box uses.</p>
     C["Calibration&lt;br/&gt;the problem in layers, optimizers"]
     I["Inference&lt;br/&gt;parameter sample, predictive, scores,&lt;br/&gt;resampling, conformal, sensitivities, identifiability,&lt;br/&gt;priors, sequential Monte Carlo, global sensitivity"]
     F["Base: commol-core, commol-random&lt;br/&gt;used by every box"]
+    G["Statistics: commol-statistics&lt;br/&gt;used by calibration and inference"]
     J --&gt; M
     M --&gt; E1 &amp; E2 &amp; E3
     E1 &amp; E2 &amp; E3 --&gt; O
     O --&gt; C
     C --&gt; I
     I ~~~ F
+    I ~~~ G
     classDef base stroke-dasharray: 5 5
-    class F base</code></pre>
+    class F,G base</code></pre>
 <table>
 <thead>
 <tr>
@@ -3400,7 +3431,12 @@ top to bottom. The dashed box is the base that every box uses.</p>
 <tr>
 <td>Calibration</td>
 <td><code>commol-calibration</code></td>
-<td>The calibration problem in layers (forward model, observation operator, feasibility, discrepancy: a loss or the likelihood of observation models, optimization objective), and the optimizers that find the values that make an engine match observations, from one or several starts, or with one parameter or prediction held fixed (<code>Subproblem</code>); the one quantile of commol (<code>statistics</code>), which the summary of the replicates and every method of inference take.</td>
+<td>The calibration problem in layers (forward model, observation operator, feasibility, discrepancy: a loss or the likelihood of observation models, optimization objective), and the optimizers that find the values that make an engine match observations, from one or several starts, or with one parameter or prediction held fixed (<code>Subproblem</code>).</td>
+</tr>
+<tr>
+<td>Statistics</td>
+<td><code>commol-statistics</code></td>
+<td>One copy of each numerical helper (<code>log Σ exp</code>, <code>x ln y</code>, the special functions of the gamma family), of the log densities of the normal, the log-normal and the Student t, and of the weighted statistics: the one quantile of commol, the weighted summary of a column, the covariance and the effective size. It depends on no crate of commol.</td>
 </tr>
 <tr>
 <td>Inference</td>
@@ -3411,7 +3447,9 @@ top to bottom. The dashed box is the base that every box uses.</p>
 </table>
 <p>Every box uses <code>commol-core</code> (shared types, rate formulas, the
 <code>SimulationEngine</code> trait). The stochastic engines and calibration also use
-<code>commol-random</code> (random numbers), and so does inference. Calibration works
+<code>commol-random</code> (random numbers), and so does inference. Calibration and
+inference also use <code>commol-statistics</code>, whose quantile the summary of the
+replicates and every method of inference take. Calibration works
 through the <code>SimulationEngine</code> trait, so it does not depend on a specific
 engine; inference reaches an engine only through the forward model of a
 calibration problem.</p>

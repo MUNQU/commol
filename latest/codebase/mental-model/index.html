@@ -2844,6 +2844,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/figures/" class="md-nav__link">
         
   
@@ -3398,8 +3426,9 @@ Rust engine builds and runs it.</p>
 </span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>crates/commol-differential/  the ODE engine: diffsol integrates derivatives
 </span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>crates/commol-stochastic/    the stochastic engines of whole units
 </span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>crates/commol-random/        the generator, replicate seeds, samplers
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>crates/commol-calibration/   the problem in layers, optimizers (argmin fork), starts
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>crates/commol-inference/     parameter sample, predictive, scores, quantiles
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>crates/commol-statistics/    numerical helpers, log densities, the one quantile
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>crates/commol-calibration/   the problem in layers, optimizers (argmin fork), starts
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>crates/commol-inference/     parameter sample, predictive, scores
 </span></code></pre></div>
 <h2 id="what-commol-is">What Commol is<a class="headerlink" href="#what-commol-is" title="Permanent link">&para;</a></h2>
 <table>
@@ -3439,12 +3468,16 @@ Rust engine builds and runs it.</p>
 <td><code>crates/commol-stochastic/</code></td>
 </tr>
 <tr>
-<td>Reproducible random numbers for stochastic engines: the generator, replicate seeds, samplers and a sum tree of rates</td>
+<td>Reproducible random numbers for stochastic engines and inference methods: the generator, replicate seeds, samplers, and a sum tree of rates that the stochastic engine of the test kind uses</td>
 <td><code>crates/commol-random/</code></td>
 </tr>
 <tr>
 <td>A JIT compiler for rate expressions</td>
 <td><code>crates/commol-core/src/math_expression/jit/</code> (Cranelift)</td>
+</tr>
+<tr>
+<td>One copy of each numerical helper, log density and weighted statistic that calibration and inference share: <code>log Σ exp</code>, the special functions, the normal, log-normal and Student t densities, the one quantile, the weighted summary</td>
+<td><code>crates/commol-statistics/</code></td>
 </tr>
 <tr>
 <td>A calibration problem in layers: the forward model, the observation operator, feasibility, the discrepancy and the optimization objective; optimizers from one or several starts</td>

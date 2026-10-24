@@ -2607,6 +2607,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#one-function-runs-the-starts-and-chooses-the-best" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One function runs the starts and chooses the best
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-swarm-takes-its-seed-from-its-caller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A swarm takes its seed from its caller
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2771,6 +2793,34 @@
     
   
     Results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
   
 
     
@@ -3233,6 +3283,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#one-function-runs-the-starts-and-chooses-the-best" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One function runs the starts and chooses the best
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-swarm-takes-its-seed-from-its-caller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A swarm takes its seed from its caller
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3255,7 +3327,8 @@
 
 <h1 id="optimizers">Optimizers<a class="headerlink" href="#optimizers" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
-<p>How Nelder-Mead and the particle swarm of a calibration search, score and stop.</p>
+<p>How Nelder-Mead and the particle swarm of a calibration search, score and stop,
+and how the starts of a calibration run and draw their seeds.</p>
 <h2 id="nelder-mead-searches-inside-the-bounds">Nelder-Mead searches inside the bounds<a class="headerlink" href="#nelder-mead-searches-inside-the-bounds" title="Permanent link">&para;</a></h2>
 <p>The objective clamps values to their bounds, so the loss is flat outside them,
 and a simplex that crosses a bound collapses there. Nelder-Mead therefore
@@ -3356,6 +3429,98 @@ profile under a swarm (<a href="../profiles/">Profiles</a>).</p>
 <code>a_stop_rule_out_of_its_range_names_itself</code>);
 <code>crates/commol-inference/tests/test_profiles.rs::a_swarm_fits_a_subproblem_and_repeats_from_its_seed</code>;
 <code>tests/calibration/test_optimizers.py::TestConverged::test_a_swarm_that_stagnates_stops_and_converges</code>.</p>
+<h2 id="one-function-runs-the-starts-and-chooses-the-best">One function runs the starts and chooses the best<a class="headerlink" href="#one-function-runs-the-starts-and-chooses-the-best" title="Permanent link">&para;</a></h2>
+<p><code>optimize_starts</code> (<code>crates/commol-calibration/src/starts.rs</code>) takes the start
+points and one seed, runs the starts in parallel and returns every outcome
+and the index of the best (<code>Starts</code>): the start of lowest loss among those
+that did not fail, the first on a tie, a NaN loss counting as <code>+∞</code>. When every
+start fails, its error lists the reason of each start. A calibration
+(<code>PyCalibrationProblem::optimize</code>, which <code>Calibrator.run</code> calls) and every fit
+of a replicate (<code>ReplicateRunner::fit_one</code>) call it, so their starts, seeds
+and best start follow one rule; Python chooses no start. The seed gives two
+streams of the registry of <code>commol-random</code> (<code>Stream</code>): <code>Stream::StartPoints</code>
+draws the Latin hypercube of <code>start_points</code>, and start <code>i</code> takes
+<code>Stream::StartSeeds.replicate(seed, i)</code>, so the starts draw from no stream of
+another method with the same seed. A replicate
+passes the seed <code>Stream::ReplicateFits.replicate(seed, b)</code>, apart from the
+stream of its data, and its fit as start 0. <code>optimize</code> and
+<code>optimize_with_history</code> are start 0, from the initial guess, and a verbose
+calibration runs <code>optimize_starts_with_observer</code> with its one start.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The hypercube from the seed itself</td>
+<td>A replicate draws its data from the seed of its replicate, so the hypercube could reuse that stream; each caller would need to know which seeds it must not pass.</td>
+</tr>
+<tr>
+<td>Stream numbers of its own in <code>commol-calibration</code></td>
+<td>They can take a number of the registry: with one seed, the hypercube of the starts was the design of a sensitivity analysis. The registry lives in <code>commol-random</code>, below every crate that draws.</td>
+</tr>
+<tr>
+<td>Start 0 on another seed than the others</td>
+<td>Start 0 of a calibration and of a replicate would follow two rules.</td>
+</tr>
+<tr>
+<td>The best start chosen in Python</td>
+<td>A replicate chooses in Rust, so the two choices could differ on a tie or a NaN.</td>
+</tr>
+<tr>
+<td>Only the reason of the first failed start</td>
+<td>The other starts can fail for other reasons, which the message would hide.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_starts.rs</code>
+(<code>the_best_start_is_the_first_of_lowest_loss</code>,
+<code>every_failed_start_gives_its_reason</code>,
+<code>the_calibration_from_the_guess_is_the_first_start</code>);
+<code>crates/commol-calibration/src/starts.rs</code> <code>tests</code>
+(<code>the_hypercube_comes_from_the_stream_of_the_start_points</code>,
+<code>start_i_takes_seed_i_of_the_stream_of_the_start_seeds</code>,
+<code>a_loss_that_is_not_a_number_is_the_worst</code>);
+<code>crates/commol-inference/tests/test_resampling.rs::a_replicate_fit_is_the_calibration_of_its_data</code>;
+<code>crates/commol-inference/tests/test_streams.rs::a_calibration_and_a_sensitivity_analysis_with_one_seed_draw_from_two_streams</code>;
+<code>tests/calibration/test_starts.py::TestFailedStarts::test_every_start_failing_raises_with_each_reason</code>.</p>
+<h2 id="a-swarm-takes-its-seed-from-its-caller">A swarm takes its seed from its caller<a class="headerlink" href="#a-swarm-takes-its-seed-from-its-caller" title="Permanent link">&para;</a></h2>
+<p>A particle swarm takes its seed as an argument of every optimizer
+(<code>optimize_from</code>, <code>optimize_subproblem</code>, <code>optimize_starts</code>), which every
+caller gives; <code>ParticleSwarmConfig</code> has no seed. The swarm draws with
+<code>commol_random::Generator</code>, which implements the generator trait of
+<code>rand_core</code> that the swarm of the argmin fork takes (<code>with_rng_generator</code>),
+so its numbers come from the one generator of commol and repeat from the
+seed.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A seed in <code>ParticleSwarmConfig</code> and an argument that replaces it</td>
+<td>Two seeds of one run; the configuration seed served only a test.</td>
+</tr>
+<tr>
+<td>A seed from the system when none is given</td>
+<td>A run that no seed repeats; every caller has a seed.</td>
+</tr>
+<tr>
+<td><code>rand::SmallRng</code></td>
+<td>Its sequence is not the one of the other draws of commol, and <code>rand</code> may change it in a version.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_starts.rs::a_swarm_repeats_its_fit_from_its_seed</code>;
+<code>crates/commol-random/src/generator.rs</code> <code>tests</code>
+(<code>the_trait_of_rand_core_draws_the_numbers_of_the_generator</code>);
+<code>tests/calibration/test_starts.py::TestStarts::test_a_verbose_swarm_repeats_its_fit_from_the_seed</code>.</p>
 
 
 

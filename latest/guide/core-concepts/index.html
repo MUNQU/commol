@@ -2935,6 +2935,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/figures/" class="md-nav__link">
         
   
@@ -3975,7 +4003,7 @@ the expansion of the process before they are stored.</p>
 </tr>
 <tr>
 <td><code>update_stratification_fractions</code></td>
-<td>Within each stratification you may omit one category; it receives what remains of 1.0. Omitting two raises.</td>
+<td>Within each stratification you may omit one category; it receives what remains of 1, or 0 when the given fractions pass 1. Omitting two raises. Each fraction is from 0 to 1 and the fractions sum to 1 within 1e-6, with the rule of the engine; a rejected call changes no fraction.</td>
 </tr>
 </tbody>
 </table>

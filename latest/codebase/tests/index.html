@@ -2709,6 +2709,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/figures/" class="md-nav__link">
         
   
@@ -3442,7 +3470,7 @@ kind that is not aggregate through every generic layer.</p>
 </tr>
 <tr>
 <td><code>units/</code></td>
-<td>Unit checks of an equation (<code>test_unit_checks.py</code>) and of a model (<code>test_model_units.py</code>); the step unit, the unit of the axis and a position in a rate (<code>test_time_units.py</code>); the dates of an axis with an origin (<code>test_calendar_axis.py</code>)</td>
+<td>Unit checks of an equation (<code>test_unit_checks.py</code>), of the operators and the functions of the language (<code>test_expression_units.py</code>) and of a model (<code>test_model_units.py</code>); the step unit, the unit of the axis and a position in a rate (<code>test_time_units.py</code>); the dates of an axis with an origin (<code>test_calendar_axis.py</code>)</td>
 <td><a href="../../guide/units-and-equations/">Units</a></td>
 </tr>
 <tr>
@@ -3457,7 +3485,7 @@ kind that is not aggregate through every generic layer.</p>
 </tr>
 <tr>
 <td><code>uncertainty/</code></td>
-<td>The parameter sample, the one quantile, the predictive, the scores, the entry points <code>Calibrator.uncertainty</code> and <code>SensitivityAnalysis.run</code>, and the coverage harness (<code>test_coverage.py</code>, marker <code>coverage_study</code>)</td>
+<td>The parameter sample, the one quantile, the predictive, the scores, the entry points <code>Calibrator.uncertainty</code> and <code>SensitivityAnalysis.run</code>, the range rule of every setting (<code>test_ranges.py</code>) and of every count and every seed a binding or an entry point takes (<code>test_counts.py</code>), and the coverage harness (<code>test_coverage.py</code>, marker <code>coverage_study</code>)</td>
 <td><a href="../../guide/uncertainty/">Uncertainty</a></td>
 </tr>
 <tr>
@@ -3492,7 +3520,7 @@ kind that is not aggregate through every generic layer.</p>
 </tr>
 <tr>
 <td><code>suite/</code></td>
-<td>The rules of this page that a program can check, for the Python tests (<code>test_rules.py</code>) and for the Rust tests (<code>test_rust_rules.py</code>), the plugin that records how long each test takes (<code>durations.py</code>), the checks of the package as a whole: its version (<code>test_version.py</code>) and its logging, in a fresh interpreter (<code>test_logging.py</code>), the checks of CI: its rights, its pinned tools, the workspace of the crates and the commands the documentation shows (<code>test_workflows.py</code>), and the checks of the scripts of <code>.github/scripts/</code>: the next issues and what can run in parallel (<code>test_planning.py</code>), the precedence levels (<code>test_levels.py</code>), the links of the releases (<code>test_releases.py</code>), the REST calls (<code>test_github.py</code>), the affected issues (<code>test_affected.py</code>), the release notes (<code>test_release_notes.py</code>) and the Rust lines no test runs (<code>test_rust_uncovered.py</code>). No test calls GitHub: each one patches the REST calls (<code>support/planning.py</code>)</td>
+<td>The rules of this page that a program can check, for the Python tests (<code>test_rules.py</code>) and for the Rust tests (<code>test_rust_rules.py</code>), the rules of what the engine holds: the names and ranges of the settings, the windows and the stub of the extension (<code>test_engine_rules.py</code>), the plugin that records how long each test takes (<code>durations.py</code>), the settings of commol that the rules read: their names and the range constraints of the pydantic models (<code>settings.py</code>), the checks of the package as a whole: its version (<code>test_version.py</code>) and its logging, in a fresh interpreter (<code>test_logging.py</code>), the checks of CI: its rights, its pinned tools, the workspace of the crates and the commands the documentation shows (<code>test_workflows.py</code>), and the checks of the scripts of <code>.github/scripts/</code>: the next issues and what can run in parallel (<code>test_planning.py</code>), the precedence levels (<code>test_levels.py</code>), the links of the releases (<code>test_releases.py</code>), the REST calls (<code>test_github.py</code>), the affected issues (<code>test_affected.py</code>), the release notes (<code>test_release_notes.py</code>) and the Rust lines no test runs (<code>test_rust_uncovered.py</code>). No test calls GitHub: each one patches the REST calls (<code>support/planning.py</code>)</td>
 <td>—</td>
 </tr>
 <tr>
@@ -3703,6 +3731,10 @@ a test, or one case of a parametrized test with its parameter in brackets.</p>
 <tr>
 <td><code>tests/description/test_rendering.py::TestLatex::test_the_latex_document_compiles</code></td>
 <td>It compiles the LaTeX description with <code>latexmk</code>; the first TeX run of the job loads its formats. No other test checks that the document compiles.</td>
+</tr>
+<tr>
+<td><code>tests/plotting/test_panels.py::test_the_panels_of_a_run_need_no_matplotlib</code></td>
+<td>It starts a new Python process that imports commol and computes the panels of a run; only a new process shows that the panels import no matplotlib, because the other tests of the session import it first.</td>
 </tr>
 <tr>
 <td><code>tests/docs/test_examples.py::test_page_examples_run[docs/guide/simulations.md]</code></td>

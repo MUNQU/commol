@@ -2709,6 +2709,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/figures/" class="md-nav__link">
         
   
@@ -3628,15 +3656,24 @@
 </ul>
 <h3 id="expressions-functions-variables">Expressions (functions, variables)<a class="headerlink" href="#expressions-functions-variables" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] Change <code>crates/commol-core/src/math_expression/</code>, including the JIT
-      (<code>jit/</code>) and its tests.</li>
-<li>[ ] Add a new function to <code>SAFE_FUNCTIONS</code> in <code>utils/security.py</code>.</li>
+<li>[ ] Change the language in <code>crates/commol-core/src/math_expression/</code>: a
+      function is one entry of <code>FUNCTIONS</code> (<code>language.rs</code>), which the check,
+      the JIT and Python (<code>commol_rs.core.FUNCTIONS</code>) read; an operator is a
+      token and a level of the parser (<code>jit/parser.rs</code>), a case of <code>check</code>
+      (<code>language.rs</code>) and of the JIT (<code>jit/codegen.rs</code>).</li>
+<li>[ ] Keep every walk of a tree (<code>Expr</code>) recursive only into the operands of
+      a node: a chain of one level is one node, and <code>MAX_NESTING</code> bounds the
+      depth. A new walk at the limit runs in
+      <code>crates/commol-core/tests/expressions.rs::every_level_of_operators_at_the_limit_reads_on_a_worker_thread</code>.</li>
+<li>[ ] Give a new function its value in
+      <code>crates/commol-core/tests/expressions.rs::every_function_of_the_guide_has_its_value</code>
+      and its unit rule in <code>_FUNCTION_UNITS</code> (<code>utils/equations.py</code>).</li>
 <li>[ ] Update <a href="../../guide/mathematical-expressions/">Mathematical expressions</a>.</li>
 </ul>
 <h3 id="initial-conditions">Initial conditions<a class="headerlink" href="#initial-conditions" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] Change the Pydantic validation in <code>context/initial_conditions.py</code> and the
-      engine rule in <code>builder.rs</code> (<code>initial_state</code>).</li>
+<li>[ ] Change the rule of an amount or a fraction in <code>rules.rs</code>
+      (<code>commol-model</code>), which <code>context/initial_conditions.py</code> and <code>initial_state</code> call.</li>
 <li>[ ] Check that <code>Aggregate.initial_state(process)</code> reports the new state.</li>
 <li>[ ] If calibration can set it, update
       <code>commol-model/src/initial_conditions.rs</code> (<code>InitialConditionPlan</code>) and the write-back
@@ -3664,20 +3701,27 @@ changing it (<a href="../decisions/uncertainty/#methods-plug-into-one-entry-poin
 <li>[ ] The algorithm in <code>crates/commol-inference/</code>. It runs the engine only
       through <code>ForwardModel</code>, reads observations only through
       <code>ObservationOperator</code>, sees a <code>Violation</code> as outside the support
-      (<code>discrepancy_in_support</code>), and draws every random number from a
-      <code>commol_random::Generator</code> seeded from the problem's seed.</li>
+      (<code>discrepancy_in_support</code>), and draws every random number with the
+      samplers of <code>commol-random</code>, from a <code>commol_random::Generator</code> seeded
+      from a stream of the problem's seed: a new <code>Stream</code> of
+      <code>crates/commol-random/src/streams.rs</code>, with a number of its own, and
+      <code>Stream::replicate</code> for each draw or replicate; never the seed itself.
+      It takes its numerical helpers and log densities from
+      <code>commol_statistics::numeric</code> and its quantiles and weighted statistics
+      from <code>commol_statistics::statistics</code>, and writes no copy of them.</li>
 <li>[ ] A method that samples a posterior is a <code>TemperedTarget</code> on
       <code>SmcSampler</code> (<code>crates/commol-inference/src/smc/</code>), not a sampler of its
       own, and its configuration takes required <code>priors</code> (<code>WithPriors</code>)
       (<a href="../decisions/uncertainty/#one-smc-core-many-targets">Design decisions</a>).</li>
 <li>[ ] The runner, bound in <code>py-commol/src/</code> (<code>inference.rs</code> or the module
       of its family), which runs the method through <code>parallel</code>
-      (<code>py-commol/src/parallelism.rs</code>), and its stub in <code>_commol_rs.pyi</code>; a
+      (<code>py-commol/src/parallelism.rs</code>), and its stub in <code>_commol_rs.pyi</code>
+      (<code>tests/suite/test_engine_rules.py::test_the_stub_declares_what_the_extension_has</code>); a
       row in the table of <code>docs/guide/parallelism.md</code> and a case of <code>METHODS</code>
       in <code>tests/parallelism/test_threads.py</code>.</li>
 <li>[ ] The configuration, a subclass of <code>UncertaintyMethod[YourResult]</code>, and
-      the result, in <code>context/inference/</code>; a result with draws holds a
-      <code>ParameterSample</code>.</li>
+      the result, a subclass of <code>ResultModel</code>, in <code>context/inference/</code>; a
+      result with draws holds a <code>ParameterSample</code>.</li>
 <li>[ ] A method that fits several times fits its perturbations with
       <code>ReplicateRunner::fit_all</code> and checks them with <code>ReplicateFits::require</code>;
       its result has <code>failed</code> (the entries of <code>FitUnit::failed</code>, logged as
@@ -3708,7 +3752,7 @@ builds the design from <code>InputSpace</code> (<code>design.rs</code>), runs it
 <code>BatchRunner</code> and calls the estimator; the binding and the Python runner only
 convert. A method of independent inputs refuses a sample through
 <code>InputSpace::independent</code>, and a random number comes from a stream of the
-seed of the analysis (<code>stream_seed</code>).</p>
+seed of the analysis (<code>Stream</code>, <code>crates/commol-random/src/streams.rs</code>).</p>
 <h3 id="model-type-engine">Model type (engine)<a class="headerlink" href="#model-type-engine" title="Permanent link">&para;</a></h3>
 <p>To add an engine to the list:</p>
 <ul>
@@ -3717,11 +3761,17 @@ seed of the analysis (<code>stream_seed</code>).</p>
       file: its name, the model kinds it runs (<code>kinds</code>), whether it is
       stochastic (<code>is_stochastic</code>), its settings (<code>EngineSettings</code>, parsed
       and validated with <code>deny_unknown_fields</code>), the form of its dynamics
-      (<code>dynamics_form</code>) and the meaning of a rate (see
+      (<code>dynamics_form</code>) and the meaning of a rate, which sets the positions it
+      reports at (<code>check_position</code>; see
       <a href="../decisions/engines/#one-list-of-engines">One list of engines</a>).</li>
 <li>[ ] Write the engine in its own crate and implement <code>SimulationEngine</code>
       (for an engine of the aggregate kind, also <code>CompartmentalEngine</code> from
-      <code>commol-model</code>); <code>try_from_model</code> rejects a model of another engine. A
+      <code>commol-model</code>: it gives its compiled model, <code>delegate_to_compiled_model!</code>
+      writes the methods that read it, and <code>record_steps</code> runs an engine that
+      reports only at integer steps); <code>check_position</code> is the rule of
+      <code>EngineType</code>, <code>engine_type</code> returns its entry (so <code>is_stochastic</code> and
+      the messages of a calibration read it), and <code>try_from_model</code> rejects a
+      model of another engine. A
       stochastic engine draws every random number from one
       <code>commol_random::Generator</code>, implements <code>set_seed</code>, and restores the
       generator in <code>reset</code>, so a run repeats from its seed.</li>
@@ -3789,6 +3839,10 @@ seed of the analysis (<code>stream_seed</code>).</p>
 <h3 id="pyo3-bindings">PyO3 bindings<a class="headerlink" href="#pyo3-bindings" title="Permanent link">&para;</a></h3>
 <ul>
 <li>[ ] Keep logic out of <code>py-commol/src/</code>: convert types and call the crate.</li>
+<li>[ ] Take a count as <code>i64</code> (a seed as <code>i128</code>) and read it with its rule,
+      <code>crate::counts::count(&amp;RULE, value)</code> (<code>commol_core::SEED</code> for a seed),
+      so a negative one raises the message of the rule; add the case to
+      <code>tests/uncertainty/test_counts.py</code>.</li>
 <li>[ ] Update <code>_commol_rs.pyi</code>.</li>
 <li>[ ] Rebuild the extension with the test model kind
       (<a href="../../development/workflow/#quick-commands">Quick commands</a>) before you run

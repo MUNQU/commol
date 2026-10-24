@@ -893,6 +893,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#rejected-expressions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rejected expressions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#security" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2854,6 +2865,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/figures/" class="md-nav__link">
         
   
@@ -3336,6 +3375,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#rejected-expressions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rejected expressions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#security" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3381,8 +3431,9 @@
 <p><a href="../building-models/">Back to Building Models</a></p>
 <p>Rates and formula parameters are written as expressions, such as
 <code>"k1 * A * B / total"</code>. This page lists everything an expression can contain:
-operators, variables, functions, and the security limits. The engine compiles
-each expression to machine code (Cranelift) once, and reuses it at every step.</p>
+operators, variables, functions, and the security limits. The engine checks
+each expression against this language, compiles it to machine code
+(Cranelift) once, and reuses it at every step.</p>
 <h2 id="quick-path">Quick path<a class="headerlink" href="#quick-path" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">Aggregate</span><span class="p">,</span> <span class="n">ModelBuilder</span><span class="p">,</span> <span class="n">Simulation</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
@@ -3492,8 +3543,12 @@ each expression to machine code (Cranelift) once, and reuses it at every step.</
 </tr>
 </tbody>
 </table>
-<p>Precedence, from high to low: parentheses, power, multiplication, division and remainder,
-addition and subtraction. So <code>"2 ** 3 * 4"</code> is 32 and <code>"2 + 3 * 4"</code> is 14.</p>
+<p>Precedence, from high to low: parentheses, power, the sign <code>-</code>,
+multiplication, division and remainder, addition and subtraction. So
+<code>"2 ** 3 * 4"</code> is 32, <code>"2 + 3 * 4"</code> is 14 and <code>"-2 ** 2"</code> is -4. Operators of
+one level apply from the left: <code>"8 - 4 - 2"</code> is 2 and <code>"8 / 4 * 2"</code> is 4. A
+chain of powers applies from the right, as in Python: <code>"2 ** 3 ** 2"</code> is
+<code>"2 ** (3 ** 2)"</code>, 512.</p>
 <p>A comparison gives a boolean, not a number, so it cannot be multiplied:
 <code>"k1 * (step &gt; 30)"</code> is rejected. Write <code>"if(step &gt; 30, k1, 0)"</code>. Rates do not
 accept <code>&amp;&amp;</code> or <code>||</code>; nest <code>if</code> calls instead:</p>
@@ -3664,7 +3719,7 @@ stratifications were declared. <code>commol_rs.model.subgroup_total_names</code>
 </tr>
 <tr>
 <td>Comparison</td>
-<td><code>min(a, b)</code>, <code>max(a, b)</code>, <code>abs</code></td>
+<td><code>min(a, b, ...)</code>, <code>max(a, b, ...)</code> (two arguments or more), <code>abs</code></td>
 </tr>
 <tr>
 <td>Rounding</td>
@@ -3676,6 +3731,7 @@ stratifications were declared. <code>commol_rs.model.subgroup_total_names</code>
 </tr>
 </tbody>
 </table>
+<p>No other function is in the language: <code>erf(x)</code> or <code>trunc(x)</code> is rejected.</p>
 <p>For rates that change along the axis, <a href="../axis-patterns/"><code>AxisPattern</code></a> builds
 tested expressions for pulses, windows, ramps and sinusoids.</p>
 <h2 id="common-patterns">Common patterns<a class="headerlink" href="#common-patterns" title="Permanent link">&para;</a></h2>
@@ -3695,16 +3751,36 @@ tested expressions for pulses, windows, ramps and sinusoids.</p>
 <p>To keep a rate readable, move part of it into a formula parameter:
 <code>add_parameter(id="k1_periodic", value="k1 * (1 + 0.3 * sin(2 * pi * step / 365))")</code>
 and then <code>rate="k1_periodic * A * B / total"</code>.</p>
+<h2 id="rejected-expressions">Rejected expressions<a class="headerlink" href="#rejected-expressions" title="Permanent link">&para;</a></h2>
+<p>The engine checks each expression when it is added: a transition rate, a
+stratified rate, a formula parameter, a calibration constraint or an axis
+pattern. An expression outside the language of this page fails with a
+<code>ValueError</code> that names the expression and its first part outside the
+language: an unknown function, a call with the wrong number of arguments,
+<code>&amp;&amp;</code> or <code>||</code>, or a comparison or <code>!</code> outside the condition of an <code>if</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">try</span><span class="p">:</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Rejected&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="s2">&quot;k1 * (step &gt; 30)&quot;</span><span class="p">)</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">error</span><span class="p">)</span>  <span class="c1"># ... Parameter &#39;k2&#39;: Formula &#39;k1 * (step &gt; 30)&#39;: the comparison &#39;&gt;&#39; ...</span>
+</span></code></pre></div>
+<p>When the model is built, the engine checks the variables each rate and each
+formula parameter reads. A variable that no parameter, bin, compartment,
+subgroup total or engine variable defines fails the build, with a message
+that names the transition or the parameter, the expression, the undefined
+variables, and the parameters and bins of the model:
+<code>Undefined variables in transition 'bc' rate 'k9 * B': k9. Available
+parameters: k1, k2. Available bins: A, B, C.</code> A category id, such as <code>g1</code>,
+is not a variable: write <code>total_g1</code> for its compartments.</p>
 <h2 id="security">Security<a class="headerlink" href="#security" title="Permanent link">&para;</a></h2>
-<p>Every rate and constraint expression is checked before it reaches the engine
+<p>Every expression is also checked before it reaches the engine
 (<code>commol.utils.security.validate_expression_security</code>). An expression that is not
 plain mathematics is rejected when the transition is added:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">try</span><span class="p">:</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Unsafe&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;__import__(&#39;os&#39;)&quot;</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="p">)</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;rejected&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">try</span><span class="p">:</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Unsafe&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;__import__(&#39;os&#39;)&quot;</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="p">)</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;rejected&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -3735,11 +3811,16 @@ plain mathematics is rejected when the transition is added:</p>
 <td>1e12</td>
 </tr>
 <tr>
-<td>Complexity score</td>
+<td>Complexity score: the nodes of the tree of the expression (numbers, variables, operators and calls)</td>
 <td>1000</td>
 </tr>
 </tbody>
 </table>
+<p>The engine has one limit of its own, which no configuration changes: a formula
+nests at most 100 levels deep. Each pair of parentheses, each call, each sign
+and each power is one level; a sum or a product of any number of terms is
+one. A deeper formula fails with
+<code>it nests deeper than 100 levels of parentheses, calls, signs and powers</code>.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

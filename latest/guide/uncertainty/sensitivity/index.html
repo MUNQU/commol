@@ -2959,6 +2959,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/figures/" class="md-nav__link">
         
   
@@ -3722,7 +3750,8 @@ mean of <code>replicates</code> replicates, and they come close to those of the 
 value as <code>replicates</code> grows. A propagation, and the <code>Predictive</code> of its draws,
 keep every replicate, each with a seed of its own. A deterministic engine
 does not use <code>replicates</code>, so the same analysis runs on either engine; with no
-seed, one is drawn and logged.</p>
+seed, the engine draws one, which <code>analysis.seed</code> gives and the analysis logs.
+A negative <code>replicates</code> raises <code>ValueError</code> that names the setting.</p>
 <h2 id="quantities-of-interest">Quantities of interest<a class="headerlink" href="#quantities-of-interest" title="Permanent link">&para;</a></h2>
 <p>A quantity reads a series of each run and reduces it to a scalar, in Rust,
 through the observation operator of the calibration

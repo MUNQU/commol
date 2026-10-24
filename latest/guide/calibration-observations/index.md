@@ -165,12 +165,12 @@ windowed = [
 print(calibrate_k1(windowed))  # 0.4
 ```
 
-| Rule           | Detail                                                                                     |
-| -------------- | ------------------------------------------------------------------------------------------ |
-| `window <= at` | Otherwise the observation is rejected when it is created.                                  |
-| Any output     | Usually an accumulator, but any compartment works.                                         |
-| Mixed windows  | Observations may use different windows, and positions need not be multiples of the window. |
-| Combinations   | Works with `factor_id` and `outputs`.                                                      |
+| Rule                            | Detail                                                                                                                                                                                                                    |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The window starts at 0 or later | `at − window`, read as 0 within the rounding of the window; otherwise the observation is rejected when it is created, with the rule of the engine (`check_window_end` in `crates/commol-calibration/src/observation.rs`). |
+| Any output                      | Usually an accumulator, but any compartment works.                                                                                                                                                                        |
+| Mixed windows                   | Observations may use different windows, and positions need not be multiples of the window.                                                                                                                                |
+| Combinations                    | Works with `factor_id` and `outputs`.                                                                                                                                                                                     |
 
 `windowed_totals` (module function) and `Simulation.windowed_totals` apply the same reduction outside calibration, so a report shows exactly what the loss compared. See [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals). An observation without `window` reads its output at `at`; `sample` and `Simulation.sample` read a run there in the same way ([Values at positions](https://munqu.github.io/commol/latest/guide/simulations/#values-at-positions)).
 
@@ -217,7 +217,7 @@ Observe expanded outputs by name, such as `B_g1`, or sum them with `outputs`. `S
 - [ ] Every `output` (and every entry of `outputs`) is an output name; a sum has a `label`.
 - [ ] Weights say how much each observation counts, in every loss.
 - [ ] Every `factor_id` has a `CalibrationParameter` with `parameter_type="factor"`.
-- [ ] Windowed observations use a cumulative output and `window <= at`.
+- [ ] Windowed observations use a cumulative output and a window that starts at 0 or later.
 
 ## Next steps
 

@@ -23,7 +23,7 @@ class ResultsPlot:
     panel of that series instead.
     """
 
-    def __init__(self, results: "SimulationResults"):
+    def __init__(self, results: "SimulationResults") -> None:
         """
         The figures of `results`.
 
@@ -108,11 +108,13 @@ class ResultsPlot:
         Raises
         ------
         ValueError
-            If an entry of ``series`` is neither an output nor a bin or
-            accumulator id, or a bin or accumulator id of results with no
-            model; the results have no value at the position of an
+            If an entry of ``series`` is a bin or accumulator id of results
+            with no model; the results have no value at the position of an
             observation read on its own or at the start of its window; or
             ``axes`` has no panel of a series.
+        KeyError
+            If an entry of ``series`` is neither an output nor a bin or
+            accumulator id of the model.
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
@@ -175,8 +177,10 @@ class ResultsPlot:
         Raises
         ------
         ValueError
+            If ``axes`` has no panel of a series.
+        KeyError
             If an entry of ``series`` is neither an output nor a bin or
-            accumulator id, or ``axes`` has no panel of a series.
+            accumulator id of the model.
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
@@ -285,7 +289,7 @@ class ResultsPlot:
 #### __init__
 
 ```python
-__init__(results: SimulationResults)
+__init__(results: SimulationResults) -> None
 ```
 
 The figures of `results`.
@@ -299,7 +303,7 @@ Parameters:
 Source code in `commol/api/plotting/accessors.py`
 
 ```python
-def __init__(self, results: "SimulationResults"):
+def __init__(self, results: "SimulationResults") -> None:
     """
     The figures of `results`.
 
@@ -344,10 +348,11 @@ Returns:
 
 Raises:
 
-| Type          | Description                                                                                                                                                                                                                                                               |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError`  | If an entry of series is neither an output nor a bin or accumulator id, or a bin or accumulator id of results with no model; the results have no value at the position of an observation read on its own or at the start of its window; or axes has no panel of a series. |
-| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                                                                                                                                                                                              |
+| Type          | Description                                                                                                                                                                                                             |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError`  | If an entry of series is a bin or accumulator id of results with no model; the results have no value at the position of an observation read on its own or at the start of its window; or axes has no panel of a series. |
+| `KeyError`    | If an entry of series is neither an output nor a bin or accumulator id of the model.                                                                                                                                    |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                                                                                                                                            |
 
 Source code in `commol/api/plotting/accessors.py`
 
@@ -426,11 +431,13 @@ def series(
     Raises
     ------
     ValueError
-        If an entry of ``series`` is neither an output nor a bin or
-        accumulator id, or a bin or accumulator id of results with no
-        model; the results have no value at the position of an
+        If an entry of ``series`` is a bin or accumulator id of results
+        with no model; the results have no value at the position of an
         observation read on its own or at the start of its window; or
         ``axes`` has no panel of a series.
+    KeyError
+        If an entry of ``series`` is neither an output nor a bin or
+        accumulator id of the model.
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
@@ -481,10 +488,11 @@ Returns:
 
 Raises:
 
-| Type          | Description                                                                                               |
-| ------------- | --------------------------------------------------------------------------------------------------------- |
-| `ValueError`  | If an entry of series is neither an output nor a bin or accumulator id, or axes has no panel of a series. |
-| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                              |
+| Type          | Description                                                                          |
+| ------------- | ------------------------------------------------------------------------------------ |
+| `ValueError`  | If axes has no panel of a series.                                                    |
+| `KeyError`    | If an entry of series is neither an output nor a bin or accumulator id of the model. |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                         |
 
 Source code in `commol/api/plotting/accessors.py`
 
@@ -530,8 +538,10 @@ def cumulative(
     Raises
     ------
     ValueError
+        If ``axes`` has no panel of a series.
+    KeyError
         If an entry of ``series`` is neither an output nor a bin or
-        accumulator id, or ``axes`` has no panel of a series.
+        accumulator id of the model.
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
@@ -696,7 +706,7 @@ class ReplicatesPlot:
     `series` adds the band of the replicates.
     """
 
-    def __init__(self, replicates: "SimulationReplicates"):
+    def __init__(self, replicates: "SimulationReplicates") -> None:
         """
         The figures of `replicates`.
 
@@ -772,6 +782,8 @@ class ReplicatesPlot:
         ValueError
             As `ResultsPlot.series`; or if there are no replicates or the
             confidence level is out of range.
+        KeyError
+            As `ResultsPlot.series`.
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
@@ -834,6 +846,8 @@ class ReplicatesPlot:
         ------
         ValueError
             As `ResultsPlot.cumulative`; or if there are no replicates.
+        KeyError
+            As `ResultsPlot.cumulative`.
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
@@ -939,7 +953,7 @@ class ReplicatesPlot:
 #### __init__
 
 ```python
-__init__(replicates: SimulationReplicates)
+__init__(replicates: SimulationReplicates) -> None
 ```
 
 The figures of `replicates`.
@@ -953,7 +967,7 @@ Parameters:
 Source code in `commol/api/plotting/accessors.py`
 
 ```python
-def __init__(self, replicates: "SimulationReplicates"):
+def __init__(self, replicates: "SimulationReplicates") -> None:
     """
     The figures of `replicates`.
 
@@ -1004,6 +1018,7 @@ Raises:
 | Type          | Description                                                                                   |
 | ------------- | --------------------------------------------------------------------------------------------- |
 | `ValueError`  | As ResultsPlot.series; or if there are no replicates or the confidence level is out of range. |
+| `KeyError`    | As ResultsPlot.series.                                                                        |
 | `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                  |
 
 Source code in `commol/api/plotting/accessors.py`
@@ -1074,6 +1089,8 @@ def series(
     ValueError
         As `ResultsPlot.series`; or if there are no replicates or the
         confidence level is out of range.
+    KeyError
+        As `ResultsPlot.series`.
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
@@ -1128,6 +1145,7 @@ Raises:
 | Type          | Description                                                  |
 | ------------- | ------------------------------------------------------------ |
 | `ValueError`  | As ResultsPlot.cumulative; or if there are no replicates.    |
+| `KeyError`    | As ResultsPlot.cumulative.                                   |
 | `ImportError` | If matplotlib is not installed (pip install 'commol[plot]'). |
 
 Source code in `commol/api/plotting/accessors.py`
@@ -1173,6 +1191,8 @@ def cumulative(
     ------
     ValueError
         As `ResultsPlot.cumulative`; or if there are no replicates.
+    KeyError
+        As `ResultsPlot.cumulative`.
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
@@ -1334,7 +1354,7 @@ class PredictivePlot:
     other run; the model of the source names the series.
     """
 
-    def __init__(self, predictive: "Predictive"):
+    def __init__(self, predictive: "Predictive") -> None:
         """
         The figures of `predictive`.
 
@@ -1407,10 +1427,12 @@ class PredictivePlot:
         Raises
         ------
         ValueError
+            If an observation names an unknown output or factor, the
+            confidence level is out of range, or ``axes`` has no panel of a
+            series.
+        KeyError
             If an entry of ``series`` is neither an output nor a bin or
-            accumulator id, an observation names an unknown output or factor,
-            the confidence level is out of range, or ``axes`` has no panel of
-            a series.
+            accumulator id of the model.
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
@@ -1473,9 +1495,11 @@ class PredictivePlot:
         Raises
         ------
         ValueError
+            If the confidence level is out of range, or ``axes`` has no panel
+            of a series.
+        KeyError
             If an entry of ``series`` is neither an output nor a bin or
-            accumulator id, the confidence level is out of range, or ``axes``
-            has no panel of a series.
+            accumulator id of the model.
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
@@ -1579,7 +1603,7 @@ class PredictivePlot:
 #### __init__
 
 ```python
-__init__(predictive: Predictive)
+__init__(predictive: Predictive) -> None
 ```
 
 The figures of `predictive`.
@@ -1593,7 +1617,7 @@ Parameters:
 Source code in `commol/api/plotting/accessors.py`
 
 ```python
-def __init__(self, predictive: "Predictive"):
+def __init__(self, predictive: "Predictive") -> None:
     """
     The figures of `predictive`.
 
@@ -1640,10 +1664,11 @@ Returns:
 
 Raises:
 
-| Type          | Description                                                                                                                                                                                       |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError`  | If an entry of series is neither an output nor a bin or accumulator id, an observation names an unknown output or factor, the confidence level is out of range, or axes has no panel of a series. |
-| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                                                                                                                      |
+| Type          | Description                                                                                                                  |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError`  | If an observation names an unknown output or factor, the confidence level is out of range, or axes has no panel of a series. |
+| `KeyError`    | If an entry of series is neither an output nor a bin or accumulator id of the model.                                         |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                                                 |
 
 Source code in `commol/api/plotting/accessors.py`
 
@@ -1710,10 +1735,12 @@ def series(
     Raises
     ------
     ValueError
+        If an observation names an unknown output or factor, the
+        confidence level is out of range, or ``axes`` has no panel of a
+        series.
+    KeyError
         If an entry of ``series`` is neither an output nor a bin or
-        accumulator id, an observation names an unknown output or factor,
-        the confidence level is out of range, or ``axes`` has no panel of
-        a series.
+        accumulator id of the model.
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
@@ -1764,10 +1791,11 @@ Returns:
 
 Raises:
 
-| Type          | Description                                                                                                                                     |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError`  | If an entry of series is neither an output nor a bin or accumulator id, the confidence level is out of range, or axes has no panel of a series. |
-| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                                                                    |
+| Type          | Description                                                                          |
+| ------------- | ------------------------------------------------------------------------------------ |
+| `ValueError`  | If the confidence level is out of range, or axes has no panel of a series.           |
+| `KeyError`    | If an entry of series is neither an output nor a bin or accumulator id of the model. |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                         |
 
 Source code in `commol/api/plotting/accessors.py`
 
@@ -1813,9 +1841,11 @@ def cumulative(
     Raises
     ------
     ValueError
+        If the confidence level is out of range, or ``axes`` has no panel
+        of a series.
+    KeyError
         If an entry of ``series`` is neither an output nor a bin or
-        accumulator id, the confidence level is out of range, or ``axes``
-        has no panel of a series.
+        accumulator id of the model.
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
@@ -1993,10 +2023,11 @@ Returns:
 
 Raises:
 
-| Type          | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError`  | If there are no results; a result does not have the outputs of the first (the message names its key and the outputs that differ); an entry of series is neither an output nor a bin or accumulator id; window is not positive; the confidence level is out of range; axes has no panel of a series; panels is neither "series" nor "observations"; or, with panels="observations", series or window is given, there are no observations, or a result has no value at the position of an observation or at the start of its window. |
-| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Type          | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError`  | If there are no results; a result does not have the outputs of the first (the message names its key and the outputs that differ); window is not positive; the confidence level is out of range; axes has no panel of a series; panels is neither "series" nor "observations"; or, with panels="observations", series or window is given, there are no observations, or a result has no value at the position of an observation or at the start of its window. |
+| `KeyError`    | If an entry of series is neither an output nor a bin or accumulator id of the model.                                                                                                                                                                                                                                                                                                                                                                          |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 Examples:
 
@@ -2094,14 +2125,16 @@ def plot_compared(
     ------
     ValueError
         If there are no results; a result does not have the outputs of the
-        first (the message names its key and the outputs that differ); an
-        entry of ``series`` is neither an output nor a bin or accumulator
-        id; `window` is not positive; the confidence level is out of range;
+        first (the message names its key and the outputs that differ);
+        `window` is not positive; the confidence level is out of range;
         ``axes`` has no panel of a series; `panels` is neither ``"series"``
         nor ``"observations"``; or, with ``panels="observations"``, `series`
         or `window` is given, there are no observations, or a result has no
         value at the position of an observation or at the start of its
         window.
+    KeyError
+        If an entry of ``series`` is neither an output nor a bin or
+        accumulator id of the model.
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
 

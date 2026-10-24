@@ -2903,6 +2903,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/figures/" class="md-nav__link">
         
   
@@ -3810,8 +3838,8 @@ against the interval, run more replicates.</p>
 and keeps the end of lowest loss, so a
 second basin of the loss shows up instead of adding optimizer noise to the
 data's uncertainty. Replicate <code>b</code> draws its data and its starts from
-<code>replicate_seed(seed, b)</code> of the problem's seed: two runs with one seed give one
-result. A replicate changes only the observed values or the weights
+streams of the problem's seed, one for the data and one for the fits, at
+index <code>b</code>: two runs with one seed give one result. A replicate changes only the observed values or the weights
 (<code>CalibrationProblem::with_data</code>); with <code>normalize_observations</code> its
 normalization comes from its own values, as the fit's does.</p>
 <h2 id="prediction-intervals">Prediction intervals<a class="headerlink" href="#prediction-intervals" title="Permanent link">&para;</a></h2>

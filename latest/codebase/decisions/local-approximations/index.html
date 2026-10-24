@@ -2824,6 +2824,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../figures/" class="md-nav__link">
         
   
@@ -3331,9 +3359,11 @@ live.</p>
 identity with none), centred on the fit mapped to that scale, with no
 curvature of the log Jacobian. Every draw maps back with <code>from_unbounded</code>,
 so it lies inside the bounds; every density on that scale, as the importance
-weights of the mixture, adds <code>log_jacobian</code>. A fit on a bound, within <code>1e-8</code>
-of the width of its bounds (<code>on_bound</code>), is refused with a message that
-names the parameter: its variance on that scale is infinite. The tolerance
+weights of the mixture, adds <code>log_jacobian</code>. A fit on a bound is refused with
+a message that names the parameter and points to a profile likelihood: its
+variance on that scale is infinite. The one rule of a value on a bound,
+<code>on_bound</code> in <code>transform.rs</code>, which the profiles also read, is <code>1e-8</code> of the
+width of two finite bounds, or of <code>max(1, |bound|)</code> with one. The tolerance
 comes from the optimizer: Nelder-Mead searches on a sine (<code>SineTransform</code>) of the unbounded
 coordinate, which approaches a bound quadratically in <code>u</code> and ends about
 <code>1e-15</code> of the width from it; <code>1e-8</code> of the width is a step <code>δu ≈ 2e-4</code>, far

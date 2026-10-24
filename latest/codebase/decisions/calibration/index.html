@@ -2580,6 +2580,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-engine-says-which-parameters-a-caller-sets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The engine says which parameters a caller sets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#one-observation-operator" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2826,6 +2837,34 @@
     
   
     Results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
   
 
     
@@ -3289,6 +3328,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-engine-says-which-parameters-a-caller-sets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The engine says which parameters a caller sets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#one-observation-operator" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3426,6 +3476,22 @@ when it differs (<code>Simulation._sync_engine</code>), and <code>run</code> res
 <code>Calibrator</code> takes <code>simulation.engine</code> when it is created, so the check is in
 the property, not only in <code>run</code>.</p>
 <p><strong>Guard:</strong> <code>tests/simulation/test_runs.py</code>.</p>
+<h2 id="the-engine-says-which-parameters-a-caller-sets">The engine says which parameters a caller sets<a class="headerlink" href="#the-engine-says-which-parameters-a-caller-sets" title="Permanent link">&para;</a></h2>
+<p><code>SimulationEngine::set_parameter</code> returns an error for an id the engine does
+not let a caller set. An engine of the aggregate kind sets a constant or a
+parameter to calibrate, and rejects any other id
+(<code>CompiledModel::set_parameter</code> in <code>crates/commol-model/src/system.rs</code>): one
+the model does not have, or a formula or a series parameter, which the model
+writes again at each evaluation, so a value set on it is lost. A calibration
+or any method on <code>ForwardModel</code> sets each parameter on a copy of the engine
+when it is built (<code>ValueWriter::new</code> in <code>crates/commol-calibration/src/values.rs</code>),
+so the engine's message reaches the user before any run, and Python checks no
+parameter id (<code>check_values</code> in <code>api/calibrator.py</code>). <code>ValueWriter::new</code> also
+checks that a factor has positive bounds, the observed outputs and positions
+are checked by <code>CalibrationProblem::new</code> alone, and Python passes each
+message with no prefix.</p>
+<p><strong>Guards:</strong> <code>crates/commol-model/tests/parameters.rs</code>,
+<code>tests/calibration/test_problem.py::TestProblemAgainstTheModel</code>.</p>
 <h2 id="one-observation-operator">One observation operator<a class="headerlink" href="#one-observation-operator" title="Permanent link">&para;</a></h2>
 <p><code>ObservationOperator</code> (<code>crates/commol-calibration/src/observation.rs</code>) is the
 only code that turns a run into observed quantities: the row of each
@@ -3446,17 +3512,29 @@ come from Rust. <code>Calibrator</code> builds the Rust problem once
 (<code>commol_rs.inference.CalibrationProblem</code>) and every call reads it. The
 helpers that present results already computed, such as <code>windowed_totals</code>
 (<code>api/windows.py</code>) for a run or its replicates, are not predictions; they
-must agree with the operator, which
-<code>tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss</code> checks.</p>
+read the rules of the operator through bindings (<code>index_at</code> and
+<code>window_increments</code> of <code>observation.rs</code>), which
+<code>tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss</code> and
+<code>tests/simulation/test_windows.py::test_windowed_totals_equal_the_prediction_of_a_windowed_observation</code>
+check.</p>
 <p>An observation is given by <code>at</code> and <code>window</code>, so its window starts at
-<code>at − window</code>. A quantity given by its start, <code>Gain(start, end)</code>, passes the
+<code>at − window</code> (<code>observation::window_start</code>), read as 0 when
+<code>|at − window|</code> is at most <code>1e-9</code> times the larger of <code>|at|</code>, <code>window</code> and 1:
+the rounding of the subtraction grows with its operands, and <code>same_position</code>
+near 0 loses that scale, so a window of <code>1000 + 1e-7</code> has one verdict whether
+it ends at 1000 or at 2000. <code>check_positions</code>, <code>schedule_of</code>, the windows of a
+quantity, <code>window_increments</code> and the checks of Python (<code>ObservedDataPoint</code>,
+<code>Increments</code>, through the binding) read this one rule. A quantity given by its start, <code>Gain(start, end)</code>, passes the
 start itself (<code>ObservationOperator::with_starts</code>): <code>end − (end − start)</code> can
 round away from <code>start</code>, as <code>0.4 − (0.4 − 0.1)</code> is <code>0.09999999999999998</code>.
 The operator finds the row of each position and of each start with the
 tolerance of the axis (<code>observation::index_at</code>: equal within <code>1e-9</code> of the
-larger of their magnitudes and 1, as <code>index_at</code> of <code>api/results.py</code>), so a start
-computed as <code>at − window</code> reads the row of the position it rounds away from.</p>
+larger of their magnitudes and 1), so a start computed as <code>at − window</code>
+(<code>window_start</code>) reads the row of the position it rounds away from. Results
+read a position with the same <code>index_at</code>.</p>
 <p><strong>Guards:</strong> <code>observation::tests</code>,
+<code>crates/commol-calibration/tests/test_positions.rs::a_window_that_starts_at_zero_within_the_rounding_of_its_end_is_accepted</code>,
+<code>tests/calibration/test_observations.py::TestPositionsAndEngines::test_a_window_that_starts_at_zero_within_its_rounding_is_calibrated</code>,
 <code>crates/commol-inference/tests/test_predictive.rs::observation_draws_are_the_predictions_the_loss_compares</code>,
 <code>tests/uncertainty/test_predictive.py::TestObservations</code>,
 <code>crates/commol-inference/tests/test_global_sensitivity.rs::a_gain_reads_its_start_exactly</code>,
@@ -3556,8 +3634,11 @@ the improvement rule, it stops when the constraint holds.</p>
 <code>a_swarm_fits_a_subproblem_and_repeats_from_its_seed</code>).</p>
 <h2 id="a-result-records-its-seed">A result records its seed<a class="headerlink" href="#a-result-records-its-seed" title="Permanent link">&para;</a></h2>
 <p>Every random number of a calibration and of its uncertainty methods comes from
-<code>Calibrator.seed</code>: <code>problem.seed</code>, or a seed the calibrator draws once and
-logs. A particle swarm takes it too, so the seed alone repeats a run. The
+<code>Calibrator.seed</code>: <code>problem.seed</code>, or the seed the engine draws when the
+calibrator is built (<code>commol_random::seed_or_drawn</code>), which the calibrator
+logs. A particle swarm takes the seed of its start, drawn from it
+(<a href="../optimizers/#a-swarm-takes-its-seed-from-its-caller">Optimizers</a>), so the
+seed alone repeats a run. The
 result records it, so a result read from a file repeats too:
 <code>CalibrationResult.seed</code>, and <code>settings["seed"]</code> of the <code>SampleMethod</code> of every
 sample a runner makes (<code>sample_method</code> in <code>api/inference/resampling.py</code>) or
@@ -3565,7 +3646,9 @@ sample a runner makes (<code>sample_method</code> in <code>api/inference/resampl
 <p><strong>Guards:</strong> <code>tests/calibration/test_problem.py</code>
 (<code>test_a_result_records_the_seed_of_its_calibration</code>);
 <code>tests/calibration/test_optimizers.py</code>
-(<code>test_the_seed_of_a_result_repeats_a_particle_swarm</code>).</p>
+(<code>test_the_seed_of_a_result_repeats_a_particle_swarm</code>);
+<code>tests/calibration/test_starts.py</code>
+(<code>test_a_verbose_swarm_repeats_its_fit_from_the_seed</code>).</p>
 <h2 id="parallel-work-runs-in-the-pool-of-the-setting">Parallel work runs in the pool of the setting<a class="headerlink" href="#parallel-work-runs-in-the-pool-of-the-setting" title="Permanent link">&para;</a></h2>
 <p>Every binding that runs parallel work calls <code>parallel</code> (<code>py-commol/src/parallelism.rs</code>),
 which releases the GIL and runs the job in <code>Parallelism::install</code>

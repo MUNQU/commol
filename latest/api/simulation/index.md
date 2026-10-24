@@ -22,7 +22,7 @@ class Simulation:
     from, for example after ``Model.update_parameters``.
     """
 
-    def __init__(self, model: Model):
+    def __init__(self, model: Model) -> None:
         """
         Initializes the simulation engine from a Pydantic Model definition.
 
@@ -108,12 +108,13 @@ class Simulation:
         ).is_stochastic
 
     def _seed_run(self, seed: int | None) -> int | None:
-        """Seed the engine of a stochastic model; None for a deterministic one."""
+        """
+        Seed the engine of a stochastic model, which draws a seed for None;
+        the seed it runs with, or None for a deterministic engine.
+        """
         if not self.is_stochastic:
             return None
-        seed = draw_seed() if seed is None else check_seed(seed)
-        self._engine.set_seed(seed)
-        return seed
+        return self._engine.set_seed(None if seed is None else check_seed(seed))
 
     def run(self, num_steps: int, *, seed: int | None = None) -> SimulationResults:
         """
@@ -227,8 +228,9 @@ class Simulation:
         The returned object has ``run`` and ``run_at``, as `Simulation`, and
         they return `SimulationReplicates`: ``count`` runs, each with its own seed,
         run in parallel in the engine. Replicate ``i`` takes the seed derived
-        from ``seed`` and ``i`` (the SplitMix64 of ``seed + i``), so it gives
-        the same run however many replicates run.
+        from ``seed`` and ``i`` (the SplitMix64 of the SplitMix64 of ``seed``
+        plus ``i``), so two seeds share no replicate, and a replicate gives the
+        same run however many replicates run.
 
         Parameters
         ----------
@@ -247,18 +249,17 @@ class Simulation:
         ------
         ValueError
             If the engine is deterministic (every replicate would be equal),
-            ``count`` is below 1, or the seed is not valid.
+            ``count`` is not a whole number or is below 1, or the seed is not
+            valid.
         """
         if not self.is_stochastic:
             raise ValueError(
                 f"The {self.model_definition.engine.type} engine is deterministic: "
                 "every replicate would be equal. Replicates need a stochastic engine."
             )
-        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
-            raise ValueError(f"The number of replicates is at least 1, got {count!r}.")
-        return ReplicateRuns(
-            self, count, draw_seed() if seed is None else check_seed(seed)
-        )
+        if isinstance(count, bool) or not isinstance(count, int):
+            raise ValueError(f"count is a whole number, got {count!r}")
+        return ReplicateRuns(self, count, None if seed is None else check_seed(seed))
 
     @property
     def engine(self) -> "EngineProtocol":
@@ -301,14 +302,7 @@ class Simulation:
         KeyError
             If `id` is not a source of the model.
         """
-        model = self.model_definition
-        outputs = model.structure.outputs_by_source(model)
-        if id not in outputs:
-            raise KeyError(
-                f"'{id}' is not a bin or accumulator of model "
-                f"'{self.model_definition.name}'. Available: {sorted(outputs)}"
-            )
-        return outputs[id]
+        return outputs_for(self.model_definition, id)
 
     def group_outputs(self, ids: Iterable[str]) -> dict[str, list[str]]:
         """
@@ -388,16 +382,7 @@ class Simulation:
             If an id is not a bin, accumulator or output of the model, or an
             expected output is missing from `results`.
         """
-        names = self._series_names(ids)
-        missing = [name for name in names if name not in results]
-        if missing:
-            raise KeyError(f"Missing output series in results: {sorted(missing)}")
-        if not names:
-            return []
-        return [
-            sum(values)
-            for values in zip(*(results[name] for name in names), strict=True)
-        ]
+        return total_series(results, self._series_names(ids))
 
     def windowed_totals(
         self,
@@ -514,7 +499,7 @@ Names of the columns returned by simulation runs.
 #### __init__
 
 ```python
-__init__(model: Model)
+__init__(model: Model) -> None
 ```
 
 Initializes the simulation engine from a Pydantic Model definition.
@@ -534,7 +519,7 @@ Raises:
 Source code in `commol/api/simulation.py`
 
 ```python
-def __init__(self, model: Model):
+def __init__(self, model: Model) -> None:
     """
     Initializes the simulation engine from a Pydantic Model definition.
 
@@ -744,7 +729,7 @@ replicates(count: int, *, seed: int | None = None) -> ReplicateRuns
 
 Replicates of the runs of a stochastic engine.
 
-The returned object has `run` and `run_at`, as `Simulation`, and they return `SimulationReplicates`: `count` runs, each with its own seed, run in parallel in the engine. Replicate `i` takes the seed derived from `seed` and `i` (the SplitMix64 of `seed + i`), so it gives the same run however many replicates run.
+The returned object has `run` and `run_at`, as `Simulation`, and they return `SimulationReplicates`: `count` runs, each with its own seed, run in parallel in the engine. Replicate `i` takes the seed derived from `seed` and `i` (the SplitMix64 of the SplitMix64 of `seed` plus `i`), so two seeds share no replicate, and a replicate gives the same run however many replicates run.
 
 Parameters:
 
@@ -761,9 +746,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                  |
-| ------------ | ------------------------------------------------------------------------------------------------------------ |
-| `ValueError` | If the engine is deterministic (every replicate would be equal), count is below 1, or the seed is not valid. |
+| Type         | Description                                                                                                                           |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If the engine is deterministic (every replicate would be equal), count is not a whole number or is below 1, or the seed is not valid. |
 
 Source code in `commol/api/simulation.py`
 
@@ -775,8 +760,9 @@ def replicates(self, count: int, *, seed: int | None = None) -> "ReplicateRuns":
     The returned object has ``run`` and ``run_at``, as `Simulation`, and
     they return `SimulationReplicates`: ``count`` runs, each with its own seed,
     run in parallel in the engine. Replicate ``i`` takes the seed derived
-    from ``seed`` and ``i`` (the SplitMix64 of ``seed + i``), so it gives
-    the same run however many replicates run.
+    from ``seed`` and ``i`` (the SplitMix64 of the SplitMix64 of ``seed``
+    plus ``i``), so two seeds share no replicate, and a replicate gives the
+    same run however many replicates run.
 
     Parameters
     ----------
@@ -795,18 +781,17 @@ def replicates(self, count: int, *, seed: int | None = None) -> "ReplicateRuns":
     ------
     ValueError
         If the engine is deterministic (every replicate would be equal),
-        ``count`` is below 1, or the seed is not valid.
+        ``count`` is not a whole number or is below 1, or the seed is not
+        valid.
     """
     if not self.is_stochastic:
         raise ValueError(
             f"The {self.model_definition.engine.type} engine is deterministic: "
             "every replicate would be equal. Replicates need a stochastic engine."
         )
-    if isinstance(count, bool) or not isinstance(count, int) or count < 1:
-        raise ValueError(f"The number of replicates is at least 1, got {count!r}.")
-    return ReplicateRuns(
-        self, count, draw_seed() if seed is None else check_seed(seed)
-    )
+    if isinstance(count, bool) or not isinstance(count, int):
+        raise ValueError(f"count is a whole number, got {count!r}")
+    return ReplicateRuns(self, count, None if seed is None else check_seed(seed))
 ```
 
 #### outputs_for
@@ -863,14 +848,7 @@ def outputs_for(self, id: str) -> list[str]:
     KeyError
         If `id` is not a source of the model.
     """
-    model = self.model_definition
-    outputs = model.structure.outputs_by_source(model)
-    if id not in outputs:
-        raise KeyError(
-            f"'{id}' is not a bin or accumulator of model "
-            f"'{self.model_definition.name}'. Available: {sorted(outputs)}"
-        )
-    return outputs[id]
+    return outputs_for(self.model_definition, id)
 ```
 
 #### group_outputs
@@ -982,16 +960,7 @@ def total_series(
         If an id is not a bin, accumulator or output of the model, or an
         expected output is missing from `results`.
     """
-    names = self._series_names(ids)
-    missing = [name for name in names if name not in results]
-    if missing:
-        raise KeyError(f"Missing output series in results: {sorted(missing)}")
-    if not names:
-        return []
-    return [
-        sum(values)
-        for values in zip(*(results[name] for name in names), strict=True)
-    ]
+    return total_series(results, self._series_names(ids))
 ```
 
 #### windowed_totals
@@ -1146,11 +1115,13 @@ def sample(
 
 ## SimulationResults
 
-Bases: `dict[str, list[float]]`
+Bases: `ComparedByValue`, `dict[str, list[float]]`
 
 Values of every output at each position on the axis.
 
 A `dict` from output name to one value per position, so `results["A"]`, `json.dumps(results)` and `pandas.DataFrame(results)` work as for any mapping. The positions the values were read at are in :attr:`positions`.
+
+Two results are equal when their values (a NaN equal to a NaN), their positions, their seed and their model are (`ComparedByValue`); a plain `dict` is not a result, so it is not equal to one. Results can change, so they have no hash.
 
 Attributes:
 
@@ -1163,7 +1134,7 @@ Attributes:
 Source code in `commol/api/results.py`
 
 ```python
-class SimulationResults(dict[str, list[float]]):
+class SimulationResults(ComparedByValue, dict[str, list[float]]):
     """
     Values of every output at each position on the axis.
 
@@ -1171,6 +1142,11 @@ class SimulationResults(dict[str, list[float]]):
     ``results["A"]``, ``json.dumps(results)`` and
     ``pandas.DataFrame(results)`` work as for any mapping. The positions the
     values were read at are in :attr:`positions`.
+
+    Two results are equal when their values (a NaN equal to a NaN), their
+    positions, their seed and their model are (`ComparedByValue`); a plain
+    ``dict`` is not a result, so it is not equal to one. Results can change,
+    so they have no hash.
 
     Attributes
     ----------
@@ -1197,7 +1173,7 @@ class SimulationResults(dict[str, list[float]]):
         values: Mapping[str, Sequence[float]] | None = None,
         seed: int | None = None,
         model: "Model | None" = None,
-    ):
+    ) -> None:
         """
         Results at the given positions.
 
@@ -1285,7 +1261,8 @@ class SimulationResults(dict[str, list[float]]):
 
         The run must hold every position the quantities read: the results of
         ``Simulation.run_at(quantity_schedule(quantities))`` hold them all.
-        Each position is found within ``1e-9``, as `index_at` finds it, and
+        Each position is found within ``1e-9``, as an observation finds its
+        row (`index_at` of `crates/commol-calibration/src/observation.rs`), and
         Rust reduces the rows with the code of `Propagation`, so the values
         equal those of a `Propagation` of a sample of one draw with the
         parameters of this run.
@@ -1385,6 +1362,11 @@ class SimulationResults(dict[str, list[float]]):
             prediction_intervals,
         )
 
+    @override
+    def compared_values(self) -> object:
+        """The values, the positions, the seed and the model."""
+        return dict(self), self.positions, self.seed, self.model
+
     def __repr__(self) -> str:
         """The positions, the seed and the values."""
         seed = "" if self.seed is None else f"seed={self.seed!r}, "
@@ -1411,7 +1393,7 @@ They name each series from `model`; results with no model draw only their output
 #### __init__
 
 ```python
-__init__(positions: Iterable[float], values: Mapping[str, Sequence[float]] | None = None, seed: int | None = None, model: Model | None = None)
+__init__(positions: Iterable[float], values: Mapping[str, Sequence[float]] | None = None, seed: int | None = None, model: Model | None = None) -> None
 ```
 
 Results at the given positions.
@@ -1440,7 +1422,7 @@ def __init__(
     values: Mapping[str, Sequence[float]] | None = None,
     seed: int | None = None,
     model: "Model | None" = None,
-):
+) -> None:
     """
     Results at the given positions.
 
@@ -1576,7 +1558,7 @@ quantities(quantities: Sequence[QuantityBase]) -> dict[str, float]
 
 The quantities of interest of this run, as a `Propagation` reduces each of its runs.
 
-The run must hold every position the quantities read: the results of `Simulation.run_at(quantity_schedule(quantities))` hold them all. Each position is found within `1e-9`, as `index_at` finds it, and Rust reduces the rows with the code of `Propagation`, so the values equal those of a `Propagation` of a sample of one draw with the parameters of this run.
+The run must hold every position the quantities read: the results of `Simulation.run_at(quantity_schedule(quantities))` hold them all. Each position is found within `1e-9`, as an observation finds its row (`index_at` of `crates/commol-calibration/src/observation.rs`), and Rust reduces the rows with the code of `Propagation`, so the values equal those of a `Propagation` of a sample of one draw with the parameters of this run.
 
 On the ODE engine, `Simulation.run` reports a position that is not a breakpoint by interpolation, so a value read from it can differ from that of a run that ends there by about the relative tolerance of the solver, and `PeakPosition` can change on a near-tie.
 
@@ -1608,7 +1590,8 @@ def quantities(self, quantities: "Sequence[QuantityBase]") -> dict[str, float]:
 
     The run must hold every position the quantities read: the results of
     ``Simulation.run_at(quantity_schedule(quantities))`` hold them all.
-    Each position is found within ``1e-9``, as `index_at` finds it, and
+    Each position is found within ``1e-9``, as an observation finds its
+    row (`index_at` of `crates/commol-calibration/src/observation.rs`), and
     Rust reduces the rows with the code of `Propagation`, so the values
     equal those of a `Propagation` of a sample of one draw with the
     parameters of this run.
@@ -1737,6 +1720,23 @@ def report(
     )
 ```
 
+#### compared_values
+
+```python
+compared_values() -> object
+```
+
+The values, the positions, the seed and the model.
+
+Source code in `commol/api/results.py`
+
+```python
+@override
+def compared_values(self) -> object:
+    """The values, the positions, the seed and the model."""
+    return dict(self), self.positions, self.seed, self.model
+```
+
 #### __repr__
 
 ```python
@@ -1767,7 +1767,7 @@ Attributes:
 | ------------ | ------------ | ---------------------------------------------- |
 | `simulation` | `Simulation` | The simulation whose model the replicates run. |
 | `count`      | `int`        | How many replicates.                           |
-| `seed`       | `int`        | The seed the replicate seeds derive from.      |
+| `seed`       | \`int        | None\`                                         |
 
 Source code in `commol/api/simulation.py`
 
@@ -1782,11 +1782,12 @@ class ReplicateRuns:
         The simulation whose model the replicates run.
     count : int
         How many replicates.
-    seed : int
-        The seed the replicate seeds derive from.
+    seed : int | None
+        The seed the replicate seeds derive from; None draws one at each run,
+        which the replicates keep (`SimulationReplicates.seed`).
     """
 
-    def __init__(self, simulation: Simulation, count: int, seed: int):
+    def __init__(self, simulation: Simulation, count: int, seed: int | None) -> None:
         """
         The replicates of a simulation.
 
@@ -1796,9 +1797,17 @@ class ReplicateRuns:
             The simulation whose model the replicates run.
         count : int
             How many replicates.
-        seed : int
-            The seed the replicate seeds derive from.
+        seed : int | None
+            The seed the replicate seeds derive from; None draws one at each
+            run.
+
+        Raises
+        ------
+        ValueError
+            With the message of the engine, if ``count`` is below 1 or the
+            seed is outside its range.
         """
+        commol_rs.core.check_ranges("ReplicateRuns", {"count": count, "seed": seed})
         self.simulation = simulation
         self.count = count
         self.seed = seed
@@ -1808,7 +1817,9 @@ class ReplicateRuns:
         simulation = self.simulation
         simulation._validate_all_parameters_calibrated(simulation.model_definition)
         engine = simulation.engine
-        positions, seeds, runs = engine.run_replicates(self.seed, self.count, grid)
+        seed, positions, seeds, runs = engine.run_replicates(
+            self.seed, self.count, grid
+        )
         outputs = simulation.simulation_outputs
         model = simulation.model_definition
         return SimulationReplicates(
@@ -1818,7 +1829,7 @@ class ReplicateRuns:
                 )
                 for replicate_seed, rows in zip(seeds, runs, strict=True)
             ),
-            seed=self.seed,
+            seed=seed,
             positions=positions,
             model=model,
         )
@@ -1877,23 +1888,29 @@ class ReplicateRuns:
 #### __init__
 
 ```python
-__init__(simulation: Simulation, count: int, seed: int)
+__init__(simulation: Simulation, count: int, seed: int | None) -> None
 ```
 
 The replicates of a simulation.
 
 Parameters:
 
-| Name         | Type         | Description                                    | Default    |
-| ------------ | ------------ | ---------------------------------------------- | ---------- |
-| `simulation` | `Simulation` | The simulation whose model the replicates run. | *required* |
-| `count`      | `int`        | How many replicates.                           | *required* |
-| `seed`       | `int`        | The seed the replicate seeds derive from.      | *required* |
+| Name         | Type         | Description                                    | Default                                                               |
+| ------------ | ------------ | ---------------------------------------------- | --------------------------------------------------------------------- |
+| `simulation` | `Simulation` | The simulation whose model the replicates run. | *required*                                                            |
+| `count`      | `int`        | How many replicates.                           | *required*                                                            |
+| `seed`       | \`int        | None\`                                         | The seed the replicate seeds derive from; None draws one at each run. |
+
+Raises:
+
+| Type         | Description                                                                           |
+| ------------ | ------------------------------------------------------------------------------------- |
+| `ValueError` | With the message of the engine, if count is below 1 or the seed is outside its range. |
 
 Source code in `commol/api/simulation.py`
 
 ```python
-def __init__(self, simulation: Simulation, count: int, seed: int):
+def __init__(self, simulation: Simulation, count: int, seed: int | None) -> None:
     """
     The replicates of a simulation.
 
@@ -1903,9 +1920,17 @@ def __init__(self, simulation: Simulation, count: int, seed: int):
         The simulation whose model the replicates run.
     count : int
         How many replicates.
-    seed : int
-        The seed the replicate seeds derive from.
+    seed : int | None
+        The seed the replicate seeds derive from; None draws one at each
+        run.
+
+    Raises
+    ------
+    ValueError
+        With the message of the engine, if ``count`` is below 1 or the
+        seed is outside its range.
     """
+    commol_rs.core.check_ranges("ReplicateRuns", {"count": count, "seed": seed})
     self.simulation = simulation
     self.count = count
     self.seed = seed
@@ -2023,11 +2048,13 @@ def run_at(self, at: Sequence[float]) -> SimulationReplicates:
 
 ## SimulationReplicates
 
-Bases: `list[SimulationResults]`
+Bases: `ComparedByValue`, `list[SimulationResults]`
 
 Replicates of a run of a stochastic engine, one `SimulationResults` each.
 
 A `list` of runs at the same positions, each with its own seed: `replicates[i].seed` repeats replicate `i`. The statistics reduce the replicates position by position, and `member_statistics` reduces them as `ci_percentiles` requires.
+
+Two replicates are equal when their runs, their seed, their positions and their model are (`ComparedByValue`); a plain `list` of the same runs is not equal to them. They have no hash.
 
 Attributes:
 
@@ -2040,7 +2067,7 @@ Attributes:
 Source code in `commol/api/results.py`
 
 ```python
-class SimulationReplicates(list[SimulationResults]):
+class SimulationReplicates(ComparedByValue, list[SimulationResults]):
     """
     Replicates of a run of a stochastic engine, one `SimulationResults` each.
 
@@ -2048,6 +2075,10 @@ class SimulationReplicates(list[SimulationResults]):
     ``replicates[i].seed`` repeats replicate ``i``. The statistics reduce the
     replicates position by position, and `member_statistics` reduces them as
     ``ci_percentiles`` requires.
+
+    Two replicates are equal when their runs, their seed, their positions and
+    their model are (`ComparedByValue`); a plain ``list`` of the same runs is
+    not equal to them. They have no hash.
 
     Attributes
     ----------
@@ -2070,7 +2101,7 @@ class SimulationReplicates(list[SimulationResults]):
         seed: int,
         positions: Sequence[float],
         model: "Model | None" = None,
-    ):
+    ) -> None:
         """
         Replicates of one run.
 
@@ -2162,9 +2193,7 @@ class SimulationReplicates(list[SimulationResults]):
         ValueError
             If a level is outside ``[0, 1]`` or there are no replicates.
         """
-        for level in levels:
-            if not 0.0 <= level <= 1.0:
-                raise ValueError(f"A quantile level is between 0 and 1, got {level}.")
+        commol_rs.inference.check_levels(list(levels))
         if not self:
             raise ValueError("There are no replicates.")
         from commol.api.inference.intervals import weighted_quantiles
@@ -2334,6 +2363,11 @@ class SimulationReplicates(list[SimulationResults]):
             prediction_intervals,
         )
 
+    @override
+    def compared_values(self) -> object:
+        """The runs, the seed, the positions and the model."""
+        return list(self), self.seed, self.positions, self.model
+
     def __repr__(self) -> str:
         """The number of replicates, their seed and their positions."""
         return (
@@ -2365,7 +2399,7 @@ The figures of the replicates: `plot.series()`, their mean and band, and `plot.c
 #### __init__
 
 ```python
-__init__(runs: Iterable[SimulationResults], seed: int, positions: Sequence[float], model: Model | None = None)
+__init__(runs: Iterable[SimulationResults], seed: int, positions: Sequence[float], model: Model | None = None) -> None
 ```
 
 Replicates of one run.
@@ -2394,7 +2428,7 @@ def __init__(
     seed: int,
     positions: Sequence[float],
     model: "Model | None" = None,
-):
+) -> None:
     """
     Replicates of one run.
 
@@ -2526,9 +2560,7 @@ def quantiles(self, levels: Sequence[float]) -> dict[float, SimulationResults]:
     ValueError
         If a level is outside ``[0, 1]`` or there are no replicates.
     """
-    for level in levels:
-        if not 0.0 <= level <= 1.0:
-            raise ValueError(f"A quantile level is between 0 and 1, got {level}.")
+    commol_rs.inference.check_levels(list(levels))
     if not self:
         raise ValueError("There are no replicates.")
     from commol.api.inference.intervals import weighted_quantiles
@@ -2804,6 +2836,23 @@ def report(
     )
 ```
 
+#### compared_values
+
+```python
+compared_values() -> object
+```
+
+The runs, the seed, the positions and the model.
+
+Source code in `commol/api/results.py`
+
+```python
+@override
+def compared_values(self) -> object:
+    """The runs, the seed, the positions and the model."""
+    return list(self), self.seed, self.positions, self.model
+```
+
 #### __repr__
 
 ```python
@@ -2860,8 +2909,36 @@ class ODESolver(BaseModel):
     method: Literal["tsit45", "bdf"] = Field(
         default="tsit45", description="Integration method."
     )
-    rtol: float = Field(default=1e-6, gt=0.0, description="Relative tolerance.")
-    atol: float = Field(default=1e-6, gt=0.0, description="Absolute tolerance.")
+    rtol: float = Field(
+        default=commol_rs.engine.ODE_DEFAULT_RTOL, description="Relative tolerance."
+    )
+    atol: float = Field(
+        default=commol_rs.engine.ODE_DEFAULT_ATOL, description="Absolute tolerance."
+    )
+
+    @model_validator(mode="after")
+    def check_with_the_engine(self) -> Self:
+        """Ask the engine's list whether it takes the settings."""
+        return _checked(self)
+```
+
+### Methods:
+
+#### check_with_the_engine
+
+```python
+check_with_the_engine() -> Self
+```
+
+Ask the engine's list whether it takes the settings.
+
+Source code in `commol/context/engine.py`
+
+```python
+@model_validator(mode="after")
+def check_with_the_engine(self) -> Self:
+    """Ask the engine's list whether it takes the settings."""
+    return _checked(self)
 ```
 
 ## StochasticEventsSettings
@@ -2912,17 +2989,43 @@ class StochasticEventsSettings(BaseModel):
         default="direct", description="Simulation method."
     )
     tau: float | None = Field(
-        default=None, gt=0.0, description="Length of a leap of tau-leaping."
+        default=None, description="Length of a leap of tau-leaping."
     )
     epsilon: float = Field(
-        default=0.03, gt=0.0, lt=1.0, description="Bound of an adaptive leap."
+        default=commol_rs.engine.STOCHASTIC_EVENTS_DEFAULT_EPSILON,
+        description="Bound of an adaptive leap.",
     )
     tolerance: float = Field(
-        default=1e-8, gt=0.0, description="Relative tolerance of an event time."
+        default=commol_rs.engine.STOCHASTIC_EVENTS_DEFAULT_TOLERANCE,
+        description="Relative tolerance of an event time.",
     )
     rounding: Rounding | None = Field(
         default=None, description="How to make the initial amounts whole."
     )
+
+    @model_validator(mode="after")
+    def check_with_the_engine(self) -> Self:
+        """Ask the engine's list whether it takes the settings."""
+        return _checked(self)
+```
+
+### Methods:
+
+#### check_with_the_engine
+
+```python
+check_with_the_engine() -> Self
+```
+
+Ask the engine's list whether it takes the settings.
+
+Source code in `commol/context/engine.py`
+
+```python
+@model_validator(mode="after")
+def check_with_the_engine(self) -> Self:
+    """Ask the engine's list whether it takes the settings."""
+    return _checked(self)
 ```
 
 ## StochasticStepsSettings
@@ -2956,6 +3059,30 @@ class StochasticStepsSettings(BaseModel):
     rounding: Rounding | None = Field(
         default=None, description="How to make the initial amounts whole."
     )
+
+    @model_validator(mode="after")
+    def check_with_the_engine(self) -> Self:
+        """Ask the engine's list whether it takes the settings."""
+        return _checked(self)
+```
+
+### Methods:
+
+#### check_with_the_engine
+
+```python
+check_with_the_engine() -> Self
+```
+
+Ask the engine's list whether it takes the settings.
+
+Source code in `commol/context/engine.py`
+
+```python
+@model_validator(mode="after")
+def check_with_the_engine(self) -> Self:
+    """Ask the engine's list whether it takes the settings."""
+    return _checked(self)
 ```
 
 ## InfeasibleStateError
@@ -2978,16 +3105,16 @@ windowed_totals(series: Sequence[float], positions: Sequence[float], window: flo
 
 Amount a cumulative series gained over each window.
 
-Each value is the series at the end of the window minus the series at its start, `at - window`: the same quantity a calibration compares an observation against when that observation sets `window`.
+Each value is the series at the end of the window minus the series at its start, `at - window`, each found with the tolerance of the axis: the rule of a windowed observation (`window_increments` of `crates/commol-calibration/src/observation.rs`), so the value is the prediction a calibration compares an observation against when that observation sets `window`.
 
 Parameters:
 
-| Name        | Type              | Description                                                              | Default                                                                                                                                                                                   |
-| ----------- | ----------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `series`    | `Sequence[float]` | A cumulative series, one value per position.                             | *required*                                                                                                                                                                                |
-| `positions` | `Sequence[float]` | Positions of the series, ascending, such as SimulationResults.positions. | *required*                                                                                                                                                                                |
-| `window`    | `float`           | Length of one window on the axis.                                        | *required*                                                                                                                                                                                |
-| `at`        | \`Iterable[float] | None\`                                                                   | Positions at which windows close. Defaults to every complete window of the series (:func:window_ends). Pass the observation positions to reproduce exactly the values a calibration used. |
+| Name        | Type              | Description                                                              | Default                                                                                                                                                                                                                              |
+| ----------- | ----------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `series`    | `Sequence[float]` | A cumulative series, one value per position.                             | *required*                                                                                                                                                                                                                           |
+| `positions` | `Sequence[float]` | Positions of the series, ascending, such as SimulationResults.positions. | *required*                                                                                                                                                                                                                           |
+| `window`    | `float`           | Length of one window on the axis.                                        | *required*                                                                                                                                                                                                                           |
+| `at`        | \`Iterable[float] | None\`                                                                   | Positions at which windows close. Defaults to every complete window of the series (window_ends of the engine, as AxisUnits.window_ends gives it). Pass the observation positions to reproduce exactly the values a calibration used. |
 
 Returns:
 
@@ -2997,9 +3124,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                             |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If window is not positive, a window starts before position 0, or the series has no value at the end or the start of a requested window. |
+| Type         | Description                                                                                                                                                                                                                 |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If series and positions differ in length, window is not a finite, positive length (the message of the engine), a window starts before position 0, or the series has no value at the end or the start of a requested window. |
 
 Source code in `commol/api/windows.py`
 
@@ -3014,8 +3141,11 @@ def windowed_totals(
     Amount a cumulative series gained over each window.
 
     Each value is the series at the end of the window minus the series at its
-    start, ``at - window``: the same quantity a calibration compares an
-    observation against when that observation sets ``window``.
+    start, ``at - window``, each found with the tolerance of the axis: the
+    rule of a windowed observation (`window_increments` of
+    `crates/commol-calibration/src/observation.rs`), so the value is the
+    prediction a calibration compares an observation against when that
+    observation sets ``window``.
 
     Parameters
     ----------
@@ -3028,8 +3158,9 @@ def windowed_totals(
         Length of one window on the axis.
     at : Iterable[float] | None, optional
         Positions at which windows close. Defaults to every complete window of
-        the series (:func:`window_ends`). Pass the observation positions to
-        reproduce exactly the values a calibration used.
+        the series (`window_ends` of the engine, as `AxisUnits.window_ends`
+        gives it). Pass the observation positions to reproduce exactly the
+        values a calibration used.
 
     Returns
     -------
@@ -3039,28 +3170,26 @@ def windowed_totals(
     Raises
     ------
     ValueError
-        If `window` is not positive, a window starts before position 0, or the
-        series has no value at the end or the start of a requested window.
+        If `series` and `positions` differ in length, `window` is not a
+        finite, positive length (the message of the engine), a window starts
+        before position 0, or the series has no value at the end or the start
+        of a requested window.
     """
-    check_window(window)
+    if len(series) != len(positions):
+        raise ValueError(
+            f"The series has {len(series)} values for {len(positions)} positions."
+        )
     ends = (
-        window_ends(window, positions[-1] if positions else 0.0)
+        commol_rs.calibration.window_ends(window, positions[-1] if positions else 0.0)
         if at is None
         else list(at)
     )
-
-    totals = []
-    for end in ends:
-        start = end - window
-        if start < -POSITION_TOLERANCE * max(abs(end), 1.0):
-            raise ValueError(
-                f"Position {end} has no complete window of {window} before it."
-            )
-        totals.append(
-            series[index_at(positions, end)]
-            - series[index_at(positions, max(start, 0.0))]
-        )
-    return totals
+    return commol_rs.calibration.window_increments(
+        [float(value) for value in series],
+        [float(position) for position in positions],
+        float(window),
+        [float(end) for end in ends],
+    )
 ```
 
 ## sample
@@ -3071,7 +3200,9 @@ sample(series: Sequence[float], positions: Sequence[float], at: Iterable[float])
 
 Read a series at the given positions.
 
-Compartment counts are instantaneous, so they are read at the position rather than averaged over the interval leading to it.
+Compartment counts are instantaneous, so they are read at the position rather than averaged over the interval leading to it. Each position is found with the tolerance of the axis, as an observation finds its row (`index_at` of `crates/commol-calibration/src/observation.rs`), so \`0.1
+
+- 0.2`reads the value at`0.3\`.
 
 Parameters:
 
@@ -3103,7 +3234,10 @@ def sample(
     Read a series at the given positions.
 
     Compartment counts are instantaneous, so they are read at the position
-    rather than averaged over the interval leading to it.
+    rather than averaged over the interval leading to it. Each position is
+    found with the tolerance of the axis, as an observation finds its row
+    (`index_at` of `crates/commol-calibration/src/observation.rs`), so ``0.1
+    + 0.2`` reads the value at ``0.3``.
 
     Parameters
     ----------
@@ -3124,5 +3258,9 @@ def sample(
     ValueError
         If a position in `at` is not one of `positions`.
     """
-    return [series[index_at(positions, position)] for position in at]
+    rows = commol_rs.calibration.index_at(
+        [float(position) for position in positions],
+        [float(position) for position in at],
+    )
+    return [series[row] for row in rows]
 ```

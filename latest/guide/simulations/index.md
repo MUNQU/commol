@@ -98,15 +98,21 @@ print(len(rows[0]))           # 4: A, B, C and cum_ab
 print([round(value) for value in rows[0]])  # [900, 100, 0, 0]
 ```
 
+Two results are equal (`==`) when their values, `positions`, `seed` and `model` are equal, a NaN equal to a NaN. A plain `dict` is not a result, so it is not equal to one even with the same values: compare `dict(results)` to read the values only. `SimulationReplicates` compare their runs, their seed, their positions and their model in the same way. Results can change, so they have no hash ([Comparing results](https://munqu.github.io/commol/latest/guide/uncertainty/#comparing-results)).
+
+```python
+print(results == dict(results), dict(results) == dict(results))  # False True
+```
+
 ## Randomness, seeds and replicates
 
 A stochastic engine draws random numbers, so its runs depend on a seed; a deterministic engine, such as `DifferenceEquations` and `DifferentialEquations`, gives the same run for every seed (`EngineType.is_stochastic` in `crates/commol-core/src/types/engine.rs`).
 
-| Call                                   | Deterministic engine                                                      | Stochastic engine                                                                                 |
-| -------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `run(n, seed=s)`, `run_at(at, seed=s)` | Ignores the seed; `results.seed` is `None`                                | One run from seed `s`; `results.seed` is `s`                                                      |
-| `run(n)` without a seed                | `results.seed` is `None`                                                  | Draws a seed from the operating system and keeps it in `results.seed`, so the run can be repeated |
-| `replicates(count, seed=s).run(…)`     | Raises `ValueError` that names the engine: every replicate would be equal | `count` runs, in parallel in the engine, each with its own seed                                   |
+| Call                                   | Deterministic engine                                                      | Stochastic engine                                                                                                                       |
+| -------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `run(n, seed=s)`, `run_at(at, seed=s)` | Ignores the seed; `results.seed` is `None`                                | One run from seed `s`; `results.seed` is `s`                                                                                            |
+| `run(n)` without a seed                | `results.seed` is `None`                                                  | The engine draws a seed and keeps it in `results.seed`, so the run can be repeated                                                      |
+| `replicates(count, seed=s).run(…)`     | Raises `ValueError` that names the engine: every replicate would be equal | `count` runs, in parallel in the engine, each with its own seed; without `seed`, the engine draws one and keeps it in `replicates.seed` |
 
 ```python
 print(simulation.is_stochastic)                # False: a difference engine
@@ -117,7 +123,7 @@ except ValueError as error:
     print(error)  # The DifferenceEquations engine is deterministic: ...
 ```
 
-Replicate `i` takes the seed derived from `seed` and `i`, the SplitMix64 of `seed + i` (`replicate_seed` in `crates/commol-random/src/generator.rs`), so a replicate gives the same run however many replicates run, and `simulation.run(…, seed=replicates[i].seed)` repeats it. `SimulationReplicates` (`py-commol/commol/api/results.py`) is a list of `SimulationResults`:
+Replicate `i` takes the seed derived from `seed` and `i`, the SplitMix64 of the SplitMix64 of `seed` plus `i` (`replicate_seed` in `crates/commol-random/src/generator.rs`), so two seeds share no replicate, a replicate gives the same run however many replicates run, and `simulation.run(…, seed=replicates[i].seed)` repeats it. `SimulationReplicates` (`py-commol/commol/api/results.py`) is a list of `SimulationResults`:
 
 | Member                                                         | Returns                                                                                                                                                                                                                                             |
 | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -243,7 +249,7 @@ print(len(per_week))  # 7: the complete windows of a 50-step run
 | Argument | Meaning                                                                                                                                                                                                                                             |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ids`    | Accumulator ids, each for all its outputs, and output names, each for itself, such as some strata of an accumulator. Their outputs are summed first. An id that is neither raises `KeyError`, with the bins, accumulators and outputs of the model. |
-| `window` | The window length on the axis. Must be positive.                                                                                                                                                                                                    |
+| `window` | The window length on the axis: a finite number greater than 0.                                                                                                                                                                                      |
 | `at`     | The positions where windows close. By default, every complete window of the results. Pass observation positions to get the values a calibration compares against.                                                                                   |
 
 The axis of a model gives the window grid of a width in a unit (`Model.axis_units()`; [Units of the axis](https://munqu.github.io/commol/latest/guide/core-concepts/#units-of-the-axis)), and `windowed_totals` of `py-commol/commol/api/windows.py` gives the same reduction for any series:
@@ -254,10 +260,10 @@ from commol import AxisUnits, windowed_totals
 daily = AxisUnits(step_unit="day")
 print(daily.window_ends(1, "week", 30))  # [7.0, 14.0, 21.0, 28.0]
 print(daily.window_end(0, 1, "week"), daily.window_index(7, 1, "week"))  # 7.0 0
-print(windowed_totals([0, 1, 3, 6, 10, 15, 21, 28], range(8), 3))  # [6, 15]
+print(windowed_totals([0, 1, 3, 6, 10, 15, 21, 28], range(8), 3))  # [6.0, 15.0]
 ```
 
-A window of the grid is a whole number of steps. The `window` of `windowed_totals` need not be: see [Reporting at any position](#reporting-at-any-position).
+A window of the grid is a whole number of steps. The `window` of `windowed_totals` need not be: see [Reporting at any position](#reporting-at-any-position). The engine computes every window that results, reports and figures read, and checks its length (`window_ends` and the other functions of `crates/commol-calibration/src/observation.rs`), so a calibration and a report read the same windows.
 
 ## Values at positions
 
@@ -322,6 +328,8 @@ print(round(ode.run(num_steps=10)["moved"][10], 1))  # 632.1: the integral of th
 | `method` | `"tsit45"` | `"tsit45"`: explicit Runge–Kutta 5(4), for non-stiff models. `"bdf"`: backward differentiation formulas, for stiff models (rates of very different speeds). |
 | `rtol`   | `1e-6`     | Relative tolerance of each state component.                                                                                                                 |
 | `atol`   | `1e-6`     | Absolute tolerance of each state component, in the unit of the bins.                                                                                        |
+
+The defaults are the engine's (`commol_rs.engine.ODE_DEFAULT_RTOL` and `ODE_DEFAULT_ATOL`), and the engine checks the settings when they are built: `ODESolver(rtol=0.0)` raises `ValidationError` with the message of the engine, `rtol is a finite number greater than 0, got 0`.
 
 `bdf` builds its Jacobian from a finite-difference Jacobian-vector product. It uses a dense matrix below `SPARSE_THRESHOLD` state components and a sparse one from there (`crates/commol-differential/src/solve.rs`).
 

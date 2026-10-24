@@ -2,7 +2,7 @@
 
 [Back to Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)
 
-Rates and formula parameters are written as expressions, such as `"k1 * A * B / total"`. This page lists everything an expression can contain: operators, variables, functions, and the security limits. The engine compiles each expression to machine code (Cranelift) once, and reuses it at every step.
+Rates and formula parameters are written as expressions, such as `"k1 * A * B / total"`. This page lists everything an expression can contain: operators, variables, functions, and the security limits. The engine checks each expression against this language, compiles it to machine code (Cranelift) once, and reuses it at every step.
 
 ## Quick path
 
@@ -49,7 +49,7 @@ The variables a rate names decide whether it is absolute or proportional; see [A
 | `>`, `<`, `>=`, `<=`, `==`, `!=` | Comparison, only inside `if`    | `"if(step > 30, k1, 0)"`    |        |
 | `!`                              | Not, only inside `if`           | `"if(!(step > 30), k1, 0)"` |        |
 
-Precedence, from high to low: parentheses, power, multiplication, division and remainder, addition and subtraction. So `"2 ** 3 * 4"` is 32 and `"2 + 3 * 4"` is 14.
+Precedence, from high to low: parentheses, power, the sign `-`, multiplication, division and remainder, addition and subtraction. So `"2 ** 3 * 4"` is 32, `"2 + 3 * 4"` is 14 and `"-2 ** 2"` is -4. Operators of one level apply from the left: `"8 - 4 - 2"` is 2 and `"8 / 4 * 2"` is 4. A chain of powers applies from the right, as in Python: `"2 ** 3 ** 2"` is `"2 ** (3 ** 2)"`, 512.
 
 A comparison gives a boolean, not a number, so it cannot be multiplied: `"k1 * (step > 30)"` is rejected. Write `"if(step > 30, k1, 0)"`. Rates do not accept `&&` or `||`; nest `if` calls instead:
 
@@ -134,9 +134,11 @@ print(value_of("A_t1 + 0"))     # 300.0  = 600 x 0.5
 | Hyperbolic                | `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh`                                              |
 | Exponential and logarithm | `exp`, `log` (natural), `ln` (natural), `log10`, `log2`                                        |
 | Power and root            | `sqrt`, `cbrt`, `pow(x, y)`, `hypot(x, y)`                                                     |
-| Comparison                | `min(a, b)`, `max(a, b)`, `abs`                                                                |
+| Comparison                | `min(a, b, ...)`, `max(a, b, ...)` (two arguments or more), `abs`                              |
 | Rounding                  | `floor`, `ceil`, `round` (halves round away from zero: `round(2.5)` is 3, `round(-2.5)` is -3) |
 | Conditional               | `if(condition, value_if_true, value_if_false)`                                                 |
+
+No other function is in the language: `erf(x)` or `trunc(x)` is rejected.
 
 For rates that change along the axis, [`AxisPattern`](https://munqu.github.io/commol/latest/guide/axis-patterns/index.md) builds tested expressions for pulses, windows, ramps and sinusoids.
 
@@ -159,9 +161,22 @@ patterns = {
 
 To keep a rate readable, move part of it into a formula parameter: `add_parameter(id="k1_periodic", value="k1 * (1 + 0.3 * sin(2 * pi * step / 365))")` and then `rate="k1_periodic * A * B / total"`.
 
+## Rejected expressions
+
+The engine checks each expression when it is added: a transition rate, a stratified rate, a formula parameter, a calibration constraint or an axis pattern. An expression outside the language of this page fails with a `ValueError` that names the expression and its first part outside the language: an unknown function, a call with the wrong number of arguments, `&&` or `||`, or a comparison or `!` outside the condition of an `if`.
+
+```python
+try:
+    ModelBuilder(name="Rejected").add_parameter(id="k2", value="k1 * (step > 30)")
+except ValueError as error:
+    print(error)  # ... Parameter 'k2': Formula 'k1 * (step > 30)': the comparison '>' ...
+```
+
+When the model is built, the engine checks the variables each rate and each formula parameter reads. A variable that no parameter, bin, compartment, subgroup total or engine variable defines fails the build, with a message that names the transition or the parameter, the expression, the undefined variables, and the parameters and bins of the model: `Undefined variables in transition 'bc' rate 'k9 * B': k9. Available parameters: k1, k2. Available bins: A, B, C.` A category id, such as `g1`, is not a variable: write `total_g1` for its compartments.
+
 ## Security
 
-Every rate and constraint expression is checked before it reaches the engine (`commol.utils.security.validate_expression_security`). An expression that is not plain mathematics is rejected when the transition is added:
+Every expression is also checked before it reaches the engine (`commol.utils.security.validate_expression_security`). An expression that is not plain mathematics is rejected when the transition is added:
 
 ```python
 try:
@@ -172,14 +187,16 @@ except ValueError as error:
     print("rejected")
 ```
 
-| Limit (`SecurityConfig`) | Value            |
-| ------------------------ | ---------------- |
-| Expression length        | 10000 characters |
-| Nesting depth            | 10 levels        |
-| Function calls           | 500              |
-| Variable name length     | 50 characters    |
-| Numeric literal          | 1e12             |
-| Complexity score         | 1000             |
+| Limit (`SecurityConfig`)                                                                            | Value            |
+| --------------------------------------------------------------------------------------------------- | ---------------- |
+| Expression length                                                                                   | 10000 characters |
+| Nesting depth                                                                                       | 10 levels        |
+| Function calls                                                                                      | 500              |
+| Variable name length                                                                                | 50 characters    |
+| Numeric literal                                                                                     | 1e12             |
+| Complexity score: the nodes of the tree of the expression (numbers, variables, operators and calls) | 1000             |
+
+The engine has one limit of its own, which no configuration changes: a formula nests at most 100 levels deep. Each pair of parentheses, each call, each sign and each power is one level; a sum or a product of any number of terms is one. A deeper formula fails with `it nests deeper than 100 levels of parentheses, calls, signs and powers`.
 
 ## Next steps
 

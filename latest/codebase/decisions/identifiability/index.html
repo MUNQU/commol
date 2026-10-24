@@ -2780,6 +2780,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../figures/" class="md-nav__link">
         
   
@@ -3285,7 +3313,13 @@ the observations gives the structural verdict; a dense design keeps its
 verdicts in its section. Merging reports keeps a verdict the reports agree
 on, and makes one they disagree on <code>conflicting</code>, with every reason.
 Thresholds and tolerances of the methods are required arguments: they are
-modelling judgments.</p>
+modelling judgments. Rust decides each verdict and gives its causes
+(<code>StructuralAnalysis::verdicts</code>; <code>Collinearity::verdicts</code>: insensitive, the
+parameters it is collinear with; <code>SampleIdentifiability::verdicts</code>: the
+parameters it is correlated with, its number of modes;
+<code>StartsIdentifiability::flagged</code>). The runners of
+<code>api/inference/identifiability.py</code> write the reasons from the causes and
+decide nothing.</p>
 <table>
 <thead>
 <tr>
@@ -3304,7 +3338,9 @@ modelling judgments.</p>
 </tr>
 </tbody>
 </table>
-<p><strong>Guards:</strong> <code>tests/uncertainty/test_identifiability_report.py</code> (<code>TestReport</code>).</p>
+<p><strong>Guards:</strong> <code>tests/uncertainty/test_identifiability_report.py</code> (<code>TestReport</code>),
+<code>crates/commol-inference/tests/test_identifiability.rs::collinearity_gives_the_verdict_of_each_parameter</code>,
+<code>crates/commol-inference/tests/test_identifiability.rs::a_sample_gives_the_verdict_of_each_parameter</code>.</p>
 
 
 

@@ -2865,6 +2865,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/figures/" class="md-nav__link">
         
   
@@ -3562,7 +3590,8 @@ Carlo proposes its moves. The curvature there is
 <code>H_u = D · H · D</code> with <code>D = dθ/du</code> at the fit, and <code>covariance</code> is on that
 scale. Every draw maps back inside the bounds, so a fit near a bound gives a
 skewed sample, not draws outside it. A fit <strong>on</strong> a bound of its parameter
-(within <code>1e-8</code> of the width of its bounds) raises a <code>ValueError</code>: its
+(within <code>1e-8</code> of the width of its bounds, or of <code>max(1, |bound|)</code> when the
+parameter has one finite bound) raises a <code>ValueError</code>: its
 variance on the unbounded scale is infinite there, and a
 <a href="../profiles/">profile likelihood</a> describes it.</p>
 <h2 id="laplace-approximation-and-the-delta-method">Laplace approximation and the delta method<a class="headerlink" href="#laplace-approximation-and-the-delta-method" title="Permanent link">&para;</a></h2>

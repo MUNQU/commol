@@ -2802,6 +2802,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../figures/" class="md-nav__link">
         
   
@@ -3331,8 +3359,8 @@ points of the side, or of the line through the last two.</p>
 <code>−log L</code> and refuses a loss; <code>beale</code> gives
 <code>S(θ̂) · F(1, n − p; confidence_level) / (n − p)</code> and needs
 the loss <code>"sse"</code>; <code>bootstrap_calibrated</code> calibrates the statistic itself
-(prepivoting, Beran 1988): replicate <code>b</code> of the bootstrap, rebuilt from
-<code>replicate_seed(seed, b)</code> as <code>ReplicateRunner::perturbations</code> builds it, is fitted and
+(prepivoting, Beran 1988): replicate <code>b</code> of the bootstrap, built as
+<code>ReplicateRunner::perturbations</code> builds it, is fitted and
 then fitted again with the quantity held at its value at the original fit, and
 the threshold is the quantile <code>confidence_level</code> of the rises
 (<code>bootstrap_thresholds</code>, <code>threshold.rs</code>).</p>
@@ -3380,8 +3408,9 @@ observation that sums <code>k</code> outputs, the term derivatives of
 <code>CalibrationProblem::term_derivatives</code> and the <code>output_accuracy</code> and
 <code>output_absolute_accuracy</code> of the engine (<code>ProfileTracer::noise_floor</code>);
 solvers hold their tolerances per step, so <code>ν</code> is an estimate, not a bound. A
-point whose refit has a free parameter on a bound, within <code>ON_BOUND = 1e-8</code>
-of the width of its bounds (the tolerance of #133), that it is not on at the
+point whose refit has a free parameter on a bound (<code>on_bound</code> of
+<code>transform.rs</code>, the rule of the curvature: <code>1e-8</code> of the width of two finite
+bounds, of <code>max(1, |bound|)</code> with one) that it is not on at the
 fit has left the box of the parameters (<code>ProfilePoint::on_bound</code>): the bound,
 not the data, makes its rise. <code>structurally_non_identifiable</code>: each side is
 flat within <code>ε</code> over its points inside the box, has one past the fit, and
@@ -3462,9 +3491,12 @@ named, noise parameters included, are then reset together on each side, and
 a rise above the floor (two evaluations) makes the list "may be incomplete".
 <code>combinations</code> keeps the algebraic combinations of the structural rank. Every
 verdict holds with the other parameters at their fitted values. The error of
-a refit at the fit, <code>|δ|</code> (<code>ProfileTracer::refit_error</code>), is a diagnostic
-only, with a note when it is above <code>ε</code>: the flatness keeps <code>ε</code>, and a too
-small <code>ε</code> falls back to the practical verdict.</p>
+a refit at the fit, <code>|δ|</code> (<code>ProfileTracer::refit_error</code>, kept in
+<code>Profile::refit_error</code>), is a diagnostic only, with a note when it is above
+<code>ε</code>: the flatness keeps <code>ε</code>, and a too small <code>ε</code> falls back to the practical
+verdict. The profile flags both notes (<code>Profile::inaccurate_refit</code>, and
+<code>Profile::below_fit</code> for a refit below the fit by more than <code>ε</code>); Python
+writes their text.</p>
 <p>Conflicts with <code>StructuralRank</code> remain, and the merge shows them as
 <code>conflicting</code>: the rank reads the generic rank over a Latin hypercube across
 the box, a profile one ridge through the fit; the rank cuts the projection on
@@ -3503,6 +3535,8 @@ with no effect at the fit of the others but an effect elsewhere reads
 </tbody>
 </table>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_profile_structure.rs</code>,
+<code>crates/commol-inference/tests/test_profiles.rs::a_profile_flags_a_refit_less_accurate_than_the_tolerance</code>,
+<code>crates/commol-inference/tests/test_profiles.rs::a_profile_flags_a_refit_below_the_fit</code>,
 <code>tests/uncertainty/test_profile_verdicts.py</code> (<code>TestStructure</code>, <code>TestReport</code>).</p>
 
 

@@ -61,7 +61,7 @@ problem = CalibrationProblem(
     ],
     loss_function="sse",
     optimization_config=NelderMeadConfig(max_iterations=2000),
-    seed=42,
+    seed=1,
 )
 calibrator = Calibrator(Simulation(basic_model(None, None, None)), problem)
 

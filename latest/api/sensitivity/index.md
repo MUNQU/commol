@@ -33,7 +33,7 @@ class SensitivityAnalysis:
         *,
         replicates: int | None = None,
         seed: int | None = None,
-    ):
+    ) -> None:
         """
         Build the analysis of `inputs` on `simulation`.
 
@@ -52,36 +52,20 @@ class SensitivityAnalysis:
             the same analysis runs on every engine.
         seed : int | None, optional
             The seed of the designs and the replicates. Required with a
-            stochastic engine; otherwise None draws one from the operating
-            system, which the analysis logs.
+            stochastic engine; otherwise None has the engine draw one, which
+            `seed` reports and the analysis logs.
 
         Raises
         ------
         ValueError
             If an input is not a value of the model, the replicates or the
-            seed do not fit the engine, `replicates` is below 1, or the seed
-            is not a whole number from 0 to ``2**64 - 1``.
+            seed do not fit the engine, `replicates` is below 1 (a negative
+            number included), or the seed is not a whole number from 0 to
+            ``2**64 - 1``.
         """
-        engine_type = simulation.model_definition.engine.type
-        stochastic = commol_rs.engine.EngineType(engine_type).is_stochastic
-        if replicates is not None and replicates < 1:
-            raise ValueError(f"replicates is at least 1, got {replicates}")
-        if stochastic and replicates is None:
-            raise ValueError(
-                f"The {engine_type} engine is stochastic: set replicates, how many "
-                "replicates each point of a design runs."
-            )
-        if stochastic and seed is None:
-            raise ValueError(
-                f"The {engine_type} engine is stochastic: set seed, so the "
-                "replicates and the analysis are reproducible."
-            )
         self.simulation: Simulation = simulation
         self.inputs: InputSpace = inputs
         self.replicates: int | None = replicates
-        if seed is not None:
-            check_seed(seed)
-        self._seed: int | None = seed
         check_values(
             simulation.model_definition,
             simulation.engine,
@@ -94,9 +78,14 @@ class SensitivityAnalysis:
             distributions=inputs.rust_distributions(),
             sample=None if inputs.sample is None else inputs.sample.rust_sample,
             initial_condition_remainder=inputs.initial_condition_remainder,
-            replicates=replicates if stochastic else None,
-            seed=self.seed,
+            replicates=replicates,
+            seed=None if seed is None else check_seed(seed),
         )
+        if seed is None:
+            logger.info(
+                "No seed set; drew the seed %d, which repeats this analysis.",
+                self._rust.seed,
+            )
 
     @property
     def rust_analysis(self) -> "ForwardAnalysisProtocol":
@@ -233,18 +222,10 @@ class SensitivityAnalysis:
         Returns
         -------
         int
-            The seed given, or a seed drawn from the operating system once
-            per analysis and logged.
+            The seed given, or the seed the engine drew when the analysis
+            was built, which it logs.
         """
-        if self._seed is not None:
-            return self._seed
-        if not hasattr(self, "_drawn_seed"):
-            self._drawn_seed = draw_seed()
-            logger.info(
-                "No seed set; drew the seed %d, which repeats this analysis.",
-                self._drawn_seed,
-            )
-        return self._drawn_seed
+        return self._rust.seed
 
     def run(self, method: SensitivityMethod[ResultT]) -> ResultT:
         """
@@ -306,14 +287,14 @@ Returns:
 
 | Type  | Description                                                                             |
 | ----- | --------------------------------------------------------------------------------------- |
-| `int` | The seed given, or a seed drawn from the operating system once per analysis and logged. |
+| `int` | The seed given, or the seed the engine drew when the analysis was built, which it logs. |
 
 ### Methods:
 
 #### __init__
 
 ```python
-__init__(simulation: Simulation, inputs: InputSpace, *, replicates: int | None = None, seed: int | None = None)
+__init__(simulation: Simulation, inputs: InputSpace, *, replicates: int | None = None, seed: int | None = None) -> None
 ```
 
 Build the analysis of `inputs` on `simulation`.
@@ -325,13 +306,13 @@ Parameters:
 | `simulation` | `Simulation` | The model to analyse. | *required*                                                                                                                                                                                                                                                                                                                                                                    |
 | `inputs`     | `InputSpace` | What varies.          | *required*                                                                                                                                                                                                                                                                                                                                                                    |
 | `replicates` | \`int        | None\`                | For a stochastic engine, required, at least 1: how many replicates each point runs. A point of the design of PRCC, Morris, Sobol or polynomial chaos holds the mean of its replicates, on the same seeds at every point; a propagation keeps every replicate, each with a seed of its own. A deterministic engine does not use it, so the same analysis runs on every engine. |
-| `seed`       | \`int        | None\`                | The seed of the designs and the replicates. Required with a stochastic engine; otherwise None draws one from the operating system, which the analysis logs.                                                                                                                                                                                                                   |
+| `seed`       | \`int        | None\`                | The seed of the designs and the replicates. Required with a stochastic engine; otherwise None has the engine draw one, which seed reports and the analysis logs.                                                                                                                                                                                                              |
 
 Raises:
 
-| Type         | Description                                                                                                                                                                |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If an input is not a value of the model, the replicates or the seed do not fit the engine, replicates is below 1, or the seed is not a whole number from 0 to 2\*\*64 - 1. |
+| Type         | Description                                                                                                                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If an input is not a value of the model, the replicates or the seed do not fit the engine, replicates is below 1 (a negative number included), or the seed is not a whole number from 0 to 2\*\*64 - 1. |
 
 Source code in `commol/api/sensitivity.py`
 
@@ -343,7 +324,7 @@ def __init__(
     *,
     replicates: int | None = None,
     seed: int | None = None,
-):
+) -> None:
     """
     Build the analysis of `inputs` on `simulation`.
 
@@ -362,36 +343,20 @@ def __init__(
         the same analysis runs on every engine.
     seed : int | None, optional
         The seed of the designs and the replicates. Required with a
-        stochastic engine; otherwise None draws one from the operating
-        system, which the analysis logs.
+        stochastic engine; otherwise None has the engine draw one, which
+        `seed` reports and the analysis logs.
 
     Raises
     ------
     ValueError
         If an input is not a value of the model, the replicates or the
-        seed do not fit the engine, `replicates` is below 1, or the seed
-        is not a whole number from 0 to ``2**64 - 1``.
+        seed do not fit the engine, `replicates` is below 1 (a negative
+        number included), or the seed is not a whole number from 0 to
+        ``2**64 - 1``.
     """
-    engine_type = simulation.model_definition.engine.type
-    stochastic = commol_rs.engine.EngineType(engine_type).is_stochastic
-    if replicates is not None and replicates < 1:
-        raise ValueError(f"replicates is at least 1, got {replicates}")
-    if stochastic and replicates is None:
-        raise ValueError(
-            f"The {engine_type} engine is stochastic: set replicates, how many "
-            "replicates each point of a design runs."
-        )
-    if stochastic and seed is None:
-        raise ValueError(
-            f"The {engine_type} engine is stochastic: set seed, so the "
-            "replicates and the analysis are reproducible."
-        )
     self.simulation: Simulation = simulation
     self.inputs: InputSpace = inputs
     self.replicates: int | None = replicates
-    if seed is not None:
-        check_seed(seed)
-    self._seed: int | None = seed
     check_values(
         simulation.model_definition,
         simulation.engine,
@@ -404,9 +369,14 @@ def __init__(
         distributions=inputs.rust_distributions(),
         sample=None if inputs.sample is None else inputs.sample.rust_sample,
         initial_condition_remainder=inputs.initial_condition_remainder,
-        replicates=replicates if stochastic else None,
-        seed=self.seed,
+        replicates=replicates,
+        seed=None if seed is None else check_seed(seed),
     )
+    if seed is None:
+        logger.info(
+            "No seed set; drew the seed %d, which repeats this analysis.",
+            self._rust.seed,
+        )
 ```
 
 #### rust_predictive
@@ -1234,7 +1204,7 @@ class SensitivityMethod(InferenceMethod[ResultT], Generic[ResultT]):
 
 ## Propagation
 
-Bases: `SensitivityMethod[PropagationResult]`
+Bases: `SensitivityMethod[PropagationResult]`, `RangeChecked`
 
 Monte Carlo propagation: run the draws of the inputs and reduce each run to the quantities.
 
@@ -1250,7 +1220,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class Propagation(SensitivityMethod[PropagationResult]):
+class Propagation(SensitivityMethod[PropagationResult], RangeChecked):
     """
     Monte Carlo propagation: run the draws of the inputs and reduce each run
     to the quantities.
@@ -1270,7 +1240,7 @@ class Propagation(SensitivityMethod[PropagationResult]):
     """
 
     draws: int | None = Field(
-        default=None, ge=1, description="Points of the Latin hypercube."
+        default=None, description="Points of the Latin hypercube."
     )
     quantities: list[Quantity] = Field(
         default_factory=list, description="What each run is reduced to."
@@ -1279,7 +1249,7 @@ class Propagation(SensitivityMethod[PropagationResult]):
 
 ## PropagationResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The draws of the inputs and what each run gives.
 
@@ -1301,7 +1271,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class PropagationResult(BaseModel):
+class PropagationResult(ResultModel):
     """
     The draws of the inputs and what each run gives.
 
@@ -1347,8 +1317,7 @@ class PropagationResult(BaseModel):
         Kish's effective size of the weights of the runs, ``(Σw)²/Σw²``: the
         number of equally weighted runs that carry as much information.
         """
-        weights = np.asarray(self.weights, dtype=float)
-        return float(weights.sum() ** 2 / (weights**2).sum())
+        return commol_rs.inference.effective_size(self.weights)
 
     def where(self, mask: ArrayLike) -> "PropagationResult":
         """
@@ -1417,13 +1386,14 @@ class PropagationResult(BaseModel):
             quantity is NaN in a run: `where` keeps the runs a condition
             chooses.
         """
-        levels = [0.5, *commol_rs.inference.interval_levels(confidence_level)]
+        # The level is checked before the values, also when there are none.
+        commol_rs.inference.interval_levels(confidence_level)
         summaries = []
         for index, label in enumerate(self.labels):
             column = [row[index] for row in self.values]
             try:
-                median, lower, upper = commol_rs.inference.weighted_quantiles(
-                    column, self.weights, levels
+                summary = commol_rs.inference.weighted_summary(
+                    column, self.weights, confidence_level
                 )
             except ValueError as error:
                 raise ValueError(
@@ -1434,10 +1404,10 @@ class PropagationResult(BaseModel):
                 QuantitySummary(
                     label=label,
                     confidence_level=confidence_level,
-                    mean=commol_rs.inference.weighted_mean(column, self.weights),
-                    median=median,
-                    lower=lower,
-                    upper=upper,
+                    mean=summary.mean,
+                    median=summary.median,
+                    lower=summary.lower,
+                    upper=summary.upper,
                 )
             )
         return summaries
@@ -1583,13 +1553,14 @@ def summary(self, confidence_level: float) -> list[QuantitySummary]:
         quantity is NaN in a run: `where` keeps the runs a condition
         chooses.
     """
-    levels = [0.5, *commol_rs.inference.interval_levels(confidence_level)]
+    # The level is checked before the values, also when there are none.
+    commol_rs.inference.interval_levels(confidence_level)
     summaries = []
     for index, label in enumerate(self.labels):
         column = [row[index] for row in self.values]
         try:
-            median, lower, upper = commol_rs.inference.weighted_quantiles(
-                column, self.weights, levels
+            summary = commol_rs.inference.weighted_summary(
+                column, self.weights, confidence_level
             )
         except ValueError as error:
             raise ValueError(
@@ -1600,10 +1571,10 @@ def summary(self, confidence_level: float) -> list[QuantitySummary]:
             QuantitySummary(
                 label=label,
                 confidence_level=confidence_level,
-                mean=commol_rs.inference.weighted_mean(column, self.weights),
-                median=median,
-                lower=lower,
-                upper=upper,
+                mean=summary.mean,
+                median=summary.median,
+                lower=summary.lower,
+                upper=summary.upper,
             )
         )
     return summaries
@@ -1611,7 +1582,7 @@ def summary(self, confidence_level: float) -> list[QuantitySummary]:
 
 ## QuantitySummary
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The weighted distribution of one quantity across the runs of a propagation.
 
@@ -1629,7 +1600,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class QuantitySummary(BaseModel):
+class QuantitySummary(ResultModel):
     """
     The weighted distribution of one quantity across the runs of a
     propagation.
@@ -1662,7 +1633,7 @@ class QuantitySummary(BaseModel):
 
 ## PRCC
 
-Bases: `SensitivityMethod[PRCCResult]`
+Bases: `SensitivityMethod[PRCCResult]`, `RangeChecked`
 
 Latin hypercube sampling with partial rank correlation coefficients (Marino et al. 2008): how steadily each quantity rises or falls with each input.
 
@@ -1678,7 +1649,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class PRCC(SensitivityMethod[PRCCResult]):
+class PRCC(SensitivityMethod[PRCCResult], RangeChecked):
     """
     Latin hypercube sampling with partial rank correlation coefficients
     (Marino et al. 2008): how steadily each quantity rises or falls with each
@@ -1699,7 +1670,7 @@ class PRCC(SensitivityMethod[PRCCResult]):
     """
 
     draws: int | None = Field(
-        default=None, ge=1, description="Points of the Latin hypercube."
+        default=None, description="Points of the Latin hypercube."
     )
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
@@ -1708,7 +1679,7 @@ class PRCC(SensitivityMethod[PRCCResult]):
 
 ## PRCCResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The partial rank correlation of each input with each quantity.
 
@@ -1730,7 +1701,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class PRCCResult(BaseModel):
+class PRCCResult(ResultModel):
     """
     The partial rank correlation of each input with each quantity.
 
@@ -1899,7 +1870,7 @@ def plot(
 
 ## Morris
 
-Bases: `SensitivityMethod[MorrisResult]`
+Bases: `SensitivityMethod[MorrisResult]`, `RangeChecked`
 
 Morris screening (Morris 1991), with the `μ*` of Campolongo, Cariboni and Saltelli (2007): which inputs matter, in few runs.
 
@@ -1916,7 +1887,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class Morris(SensitivityMethod[MorrisResult]):
+class Morris(SensitivityMethod[MorrisResult], RangeChecked):
     """
     Morris screening (Morris 1991), with the ``μ*`` of Campolongo, Cariboni
     and Saltelli (2007): which inputs matter, in few runs.
@@ -1937,8 +1908,8 @@ class Morris(SensitivityMethod[MorrisResult]):
         What each run is reduced to.
     """
 
-    trajectories: int = Field(ge=1, description="The number of trajectories.")
-    levels: int = Field(ge=2, description="The number of levels; even.")
+    trajectories: int = Field(description="The number of trajectories.")
+    levels: int = Field(description="The number of levels; even.")
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
@@ -1946,7 +1917,7 @@ class Morris(SensitivityMethod[MorrisResult]):
 
 ## MorrisResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The Morris indices of each input for each quantity.
 
@@ -1966,7 +1937,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class MorrisResult(BaseModel):
+class MorrisResult(ResultModel):
     """
     The Morris indices of each input for each quantity.
 
@@ -2120,7 +2091,7 @@ def plot(
 
 ## Sobol
 
-Bases: `SensitivityMethod[SobolResult]`
+Bases: `SensitivityMethod[SobolResult]`, `RangeChecked`
 
 Sobol indices on the design of Saltelli (2010): first-order indices by the estimator of Saltelli (2010) and total indices by the estimator of Jansen (1999), with intervals from a bootstrap of the rows.
 
@@ -2138,7 +2109,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class Sobol(SensitivityMethod[SobolResult]):
+class Sobol(SensitivityMethod[SobolResult], RangeChecked):
     """
     Sobol indices on the design of Saltelli (2010): first-order indices by
     the estimator of Saltelli (2010) and total indices by the estimator of
@@ -2162,9 +2133,9 @@ class Sobol(SensitivityMethod[SobolResult]):
         What each run is reduced to.
     """
 
-    draws: int = Field(ge=2, description="Rows of each base matrix.")
-    replicates: int = Field(ge=2, description="Bootstrap replicates.")
-    confidence_level: ConfidenceLevel = Field(description="Level of the intervals.")
+    draws: int = Field(description="Rows of each base matrix.")
+    replicates: int = Field(description="Bootstrap replicates.")
+    confidence_level: float = Field(description="Level of the intervals.")
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
@@ -2172,7 +2143,7 @@ class Sobol(SensitivityMethod[SobolResult]):
 
 ## SobolResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The Sobol indices of each input for each quantity, with their bootstrap intervals.
 
@@ -2193,7 +2164,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class SobolResult(BaseModel):
+class SobolResult(ResultModel):
     """
     The Sobol indices of each input for each quantity, with their bootstrap
     intervals.
@@ -2348,7 +2319,7 @@ def plot(
 
 ## PolynomialChaos
 
-Bases: `SensitivityMethod[ChaosResult]`
+Bases: `SensitivityMethod[ChaosResult]`, `RangeChecked`
 
 A polynomial chaos expansion (Sudret 2008): a polynomial surrogate of each quantity, and the Sobol indices of its coefficients, in far fewer runs than `Sobol` when the quantity is smooth.
 
@@ -2369,7 +2340,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class PolynomialChaos(SensitivityMethod[ChaosResult]):
+class PolynomialChaos(SensitivityMethod[ChaosResult], RangeChecked):
     """
     A polynomial chaos expansion (Sudret 2008): a polynomial surrogate of
     each quantity, and the Sobol indices of its coefficients, in far fewer
@@ -2406,14 +2377,12 @@ class PolynomialChaos(SensitivityMethod[ChaosResult]):
         What each run is reduced to.
     """
 
-    degree: int = Field(ge=1, description="The degree of the basis.")
-    q_norm: float = Field(
-        default=1.0, gt=0.0, le=1.0, description="The q of the q-norm of the basis."
-    )
+    degree: int = Field(description="The degree of the basis.")
+    q_norm: float = Field(default=1.0, description="The q of the q-norm of the basis.")
     max_interaction: int | None = Field(
-        default=None, ge=1, description="The largest number of inputs of a term."
+        default=None, description="The largest number of inputs of a term."
     )
-    draws: int = Field(ge=2, description="Points of the Latin hypercube.")
+    draws: int = Field(description="Points of the Latin hypercube.")
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
@@ -2421,7 +2390,7 @@ class PolynomialChaos(SensitivityMethod[ChaosResult]):
 
 ## ChaosResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 A polynomial chaos expansion of each quantity, its accuracy and the Sobol indices of its coefficients.
 
@@ -2447,7 +2416,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class ChaosResult(BaseModel):
+class ChaosResult(ResultModel):
     """
     A polynomial chaos expansion of each quantity, its accuracy and the
     Sobol indices of its coefficients.
@@ -2741,8 +2710,10 @@ class Level(_Outputs):
 
     kind: Literal["level"] = "level"
 
-    def __init__(self, outputs: str | list[str], **data: Any) -> None:
-        super().__init__(outputs=outputs, **data)
+    def __init__(
+        self, outputs: str | list[str], *, kind: Literal["level"] = "level"
+    ) -> None:
+        BaseModel.__init__(self, outputs=outputs, kind=kind)
 
     @property
     def text(self) -> str:
@@ -2782,11 +2753,11 @@ def check_ends(self, positions: Sequence[float]) -> None:
 
 ## Increments
 
-Bases: `_Outputs`
+Bases: `_Outputs`, `RangeChecked`
 
 The increments of some outputs: at each end, the gain of their sum over `(end - window, end]`, as an observation with the window `window` reads it.
 
-The positions of a quantity of increments are window ends, each at least `window`, so no window starts before 0.
+The positions of a quantity of increments are window ends, each at least `window` within the rounding of the window (`window_start` of `crates/commol-calibration/src/observation.rs`), so no window starts before 0.
 
 Attributes:
 
@@ -2798,14 +2769,16 @@ Attributes:
 Source code in `commol/context/inference/quantities.py`
 
 ```python
-class Increments(_Outputs):
+class Increments(_Outputs, RangeChecked):
     """
     The increments of some outputs: at each end, the gain of their sum over
     ``(end - window, end]``, as an observation with the window `window`
     reads it.
 
     The positions of a quantity of increments are window ends, each at
-    least `window`, so no window starts before 0.
+    least `window` within the rounding of the window (`window_start` of
+    `crates/commol-calibration/src/observation.rs`), so no window starts
+    before 0.
 
     Attributes
     ----------
@@ -2816,10 +2789,16 @@ class Increments(_Outputs):
     """
 
     kind: Literal["increments"] = "increments"
-    window: float = Field(gt=0.0, allow_inf_nan=False, description="The width.")
+    window: float = Field(description="The width.")
 
-    def __init__(self, outputs: str | list[str], window: float, **data: Any) -> None:
-        super().__init__(outputs=outputs, **{**data, "window": window})
+    def __init__(
+        self,
+        outputs: str | list[str],
+        window: float,
+        *,
+        kind: Literal["increments"] = "increments",
+    ) -> None:
+        BaseModel.__init__(self, outputs=outputs, window=window, kind=kind)
 
     @property
     def text(self) -> str:
@@ -2828,20 +2807,16 @@ class Increments(_Outputs):
 
     def check_ends(self, positions: Sequence[float]) -> None:
         """
-        Each end is at least the window, so no window starts before 0.
+        No window starts before 0, with the rule of the engine
+        (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
 
         Raises
         ------
         ValueError
-            If an end is less than the window.
+            With the message of the engine, if a window starts before 0.
         """
-        early = [at for at in positions if at < self.window]
-        if early:
-            raise ValueError(
-                f"Increments over windows of {_position_text(self.window)} start "
-                f"at 0 at the earliest, so each end is at least the window; got "
-                f"the end {_position_text(early[0])}"
-            )
+        for at in positions:
+            commol_rs.calibration.check_window_end(at, self.window)
 ```
 
 ### Attributes
@@ -2862,38 +2837,34 @@ The series as a label reads it: the gain over windows of a width.
 check_ends(positions: Sequence[float]) -> None
 ```
 
-Each end is at least the window, so no window starts before 0.
+No window starts before 0, with the rule of the engine (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
 
 Raises:
 
-| Type         | Description                        |
-| ------------ | ---------------------------------- |
-| `ValueError` | If an end is less than the window. |
+| Type         | Description                                                  |
+| ------------ | ------------------------------------------------------------ |
+| `ValueError` | With the message of the engine, if a window starts before 0. |
 
 Source code in `commol/context/inference/quantities.py`
 
 ```python
 def check_ends(self, positions: Sequence[float]) -> None:
     """
-    Each end is at least the window, so no window starts before 0.
+    No window starts before 0, with the rule of the engine
+    (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
 
     Raises
     ------
     ValueError
-        If an end is less than the window.
+        With the message of the engine, if a window starts before 0.
     """
-    early = [at for at in positions if at < self.window]
-    if early:
-        raise ValueError(
-            f"Increments over windows of {_position_text(self.window)} start "
-            f"at 0 at the earliest, so each end is at least the window; got "
-            f"the end {_position_text(early[0])}"
-        )
+    for at in positions:
+        commol_rs.calibration.check_window_end(at, self.window)
 ```
 
 ## ValueAt
 
-Bases: `_OfSeries`, `_OneScalar`
+Bases: `_OfSeries`, `_OneScalar`, `RangeChecked`
 
 The value of a series at a position: the level of the outputs, or their gain over the window that ends there.
 
@@ -2908,7 +2879,7 @@ Attributes:
 Source code in `commol/context/inference/quantities.py`
 
 ```python
-class ValueAt(_OfSeries, _OneScalar):
+class ValueAt(_OfSeries, _OneScalar, RangeChecked):
     """
     The value of a series at a position: the level of the outputs, or their
     gain over the window that ends there.
@@ -2925,7 +2896,7 @@ class ValueAt(_OfSeries, _OneScalar):
     """
 
     kind: Literal["value_at"] = "value_at"
-    at: Position = Field(description="The position.")
+    at: float = Field(description="The position.")
 
     @model_validator(mode="after")
     def window_after_zero(self) -> Self:
@@ -2976,7 +2947,7 @@ def default_label(self) -> str:
 
 ## Gain
 
-Bases: `_Outputs`, `_OneScalar`
+Bases: `_Outputs`, `_OneScalar`, `RangeChecked`
 
 The value at `end` minus the value at `start`: what entered a cumulative output over `(start, end]`, as an observation with the window `end - start` that starts at exactly `start` reads it.
 
@@ -2992,7 +2963,7 @@ Attributes:
 Source code in `commol/context/inference/quantities.py`
 
 ```python
-class Gain(_Outputs, _OneScalar):
+class Gain(_Outputs, _OneScalar, RangeChecked):
     """
     The value at `end` minus the value at `start`: what entered a cumulative
     output over ``(start, end]``, as an observation with the window
@@ -3012,8 +2983,8 @@ class Gain(_Outputs, _OneScalar):
     """
 
     kind: Literal["gain"] = "gain"
-    start: Position = Field(description="The start of the window.")
-    end: Position = Field(description="The end of the window.")
+    start: float = Field(description="The start of the window.")
+    end: float = Field(description="The end of the window.")
 
     @model_validator(mode="after")
     def end_after_start(self) -> Self:
@@ -3074,7 +3045,7 @@ def default_label(self) -> str:
 
 ## Peak
 
-Bases: `_AtPositions`, `_OneScalar`
+Bases: `_AtPositions`, `_OneScalar`, `RangeChecked`
 
 The largest value of a series at the positions.
 
@@ -3091,7 +3062,7 @@ Attributes:
 Source code in `commol/context/inference/quantities.py`
 
 ```python
-class Peak(_AtPositions, _OneScalar):
+class Peak(_AtPositions, _OneScalar, RangeChecked):
     """
     The largest value of a series at the positions.
 
@@ -3138,7 +3109,7 @@ def default_label(self) -> str:
 
 ## PeakPosition
 
-Bases: `_AtPositions`, `_OneScalar`
+Bases: `_AtPositions`, `_OneScalar`, `RangeChecked`
 
 The first of the positions where the value of a series is largest; NaN when the value at a position is NaN.
 
@@ -3153,7 +3124,7 @@ Attributes:
 Source code in `commol/context/inference/quantities.py`
 
 ```python
-class PeakPosition(_AtPositions, _OneScalar):
+class PeakPosition(_AtPositions, _OneScalar, RangeChecked):
     """
     The first of the positions where the value of a series is largest; NaN
     when the value at a position is NaN.
@@ -3196,7 +3167,7 @@ def default_label(self) -> str:
 
 ## Trajectory
 
-Bases: `_AtPositions`
+Bases: `_AtPositions`, `RangeChecked`
 
 The value of a series at each position: one scalar per position, for an analysis over the axis.
 
@@ -3211,7 +3182,7 @@ Attributes:
 Source code in `commol/context/inference/quantities.py`
 
 ```python
-class Trajectory(_AtPositions):
+class Trajectory(_AtPositions, RangeChecked):
     """
     The value of a series at each position: one scalar per position, for an
     analysis over the axis.

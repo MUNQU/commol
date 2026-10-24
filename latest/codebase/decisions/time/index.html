@@ -2846,6 +2846,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../figures/" class="md-nav__link">
         
   
@@ -3378,13 +3406,13 @@ and snaps a result within <code>1e-9</code> of an integer to it; whether a posit
 be whole is the engine's check, not the converter's.</p>
 <p>The axis owns the window grid: <code>AxisUnits.window_start</code>, <code>window_end</code>,
 <code>window_index</code> and <code>window_ends</code> take the width as a span and a unit, as
-<code>steps</code> does, and check that it is a positive whole number of steps. They call
-the grid in steps of <code>context/_windows.py</code>, private, the one grid that
-<code>windowed_totals</code> and <code>_observed_report</code> read; those two take a <code>window</code> of any
-positive length, because the window of an observation of a differential model
-need not be whole. No public function takes a width in steps: a width of <code>n</code>
-steps is the span <code>n</code> in the step unit. The grid is in the context layer, so
-<code>AxisUnits</code> does not import <code>api/</code>.</p>
+<code>steps</code> does, and check that it is a positive whole number of steps. The
+engine computes the grid in steps (<code>window_bounds</code>, <code>window_index</code>,
+<code>window_ends</code>, <code>windows_in</code> of <code>crates/commol-calibration/src/observation.rs</code>)
+that <code>windowed_totals</code>, <code>_observed_report</code> and the ticks of a figure read, with
+a <code>window</code> of any positive length: the window of an observation of a
+differential model need not be whole. No public function takes a width in
+steps: a width of <code>n</code> steps is the span <code>n</code> in the step unit.</p>
 <p>The rate conversions (<code>rate_from_mean_span</code>, <code>rate_from_probability</code>) ask the
 engine: <code>RateMeaning::rate_from_mean_span</code> and <code>rate_from_probability</code>
 (<code>crates/commol-core/src/types/engine.rs</code>) hold the formula of each meaning, so
@@ -3392,11 +3420,11 @@ a new engine picks a meaning and Python does not change. The per-step rate
 from a mean span is <code>1 - e^(-1/n)</code>: it keeps the survival of the continuous
 process at every step, and its mean residence is <code>1/rate</code>, not <code>n</code> (10.508
 steps for <code>n = 10</code>). <code>r = 1/n</code> keeps the mean and loses the survival.</p>
-<p><strong>Rule:</strong> no formula of a rate per engine in Python; ask the engine.</p>
+<p><strong>Rule:</strong> no formula of a rate per engine nor of a window in Python; ask the engine.</p>
 <p><strong>Guards:</strong> <code>tests/simulation/test_axis_units.py</code>,
 <code>crates/commol-core/src/types/engine.rs</code> (tests <code>a_rate_from_…</code>),
-<code>tests/simulation/test_windows.py::TestWindowGrid</code>,
-<code>tests/simulation/test_axis_units.py::TestWindowGrid</code>.</p>
+<code>tests/simulation/test_windows.py::test_windows_come_from_the_engine</code>,
+<code>tests/suite/test_engine_rules.py::test_only_the_engine_computes_a_window</code>.</p>
 <h2 id="an-origin-puts-the-axis-on-the-calendar">An origin puts the axis on the calendar<a class="headerlink" href="#an-origin-puts-the-axis-on-the-calendar" title="Permanent link">&para;</a></h2>
 <p><code>AxisUnits.origin</code> (<code>context/axis_units.py</code>) is the calendar moment of
 position 0. It belongs to the axis, so <code>ModelBuilder</code> declares it next to
@@ -3475,8 +3503,7 @@ that do not change during a run (<code>time_thresholds</code> in
 <code>crates/commol-model/src/builder.rs</code>), and the engine evaluates them with the
 current parameters and ends a piece there. Without that, an adaptive solver
 whose rate is 0 before a short window grows its step and steps over the window.
-A comparison with the state is a state event, which the engine does not
-detect.</p>
+A comparison with the state is a state event, which the engine does not detect.</p>
 <p>On a piece <code>[start, end)</code> the right-hand side sees <code>t</code> no larger than the
 float just below <code>end</code> (<code>RightHandSide::last_t</code>). A Runge–Kutta step evaluates
 the right-hand side at the end of its interval; without the limit, a value that
@@ -3511,8 +3538,8 @@ impulse step and restarts from the new state, so <code>diffsol</code> needs no e
 <h2 id="windowed-observations">Windowed observations<a class="headerlink" href="#windowed-observations" title="Permanent link">&para;</a></h2>
 <p>An observation at <code>at</code> with <code>window = W</code> is compared with
 <code>output(at) - output(at - W)</code>, anchored at its own position. The Rust loss and
-<code>windowed_totals</code> (<code>api/windows.py</code>) must give the same number, and the
-predictive reads windows through the observation operator
+<code>windowed_totals</code> (<code>api/windows.py</code>) give the same number from one rule
+(<code>window_increments</code>), and the predictive reads windows through the observation operator
 (<a href="../calibration/#one-observation-operator">One observation operator</a>). Window <code>w</code>
 covers <code>(w · W, (w + 1) · W]</code>; <code>window_index</code> places a position with
 <code>max(ceil(at / W) − 1, 0)</code>, and the <code>observed</code> block of a report (<code>_observed_report</code> in <code>api/reporting.py</code>) calls it.
@@ -3532,36 +3559,44 @@ public Python name (<code>at</code>); a length is <code>window</code> or <code>p
 keeps <code>num_steps</code>. The <code>SimulationEngine</code> trait
 (<code>crates/commol-core/src/simulation_engine.rs</code>) runs only at positions
 (<code>run_at_positions_into_buffer</code>); <code>run(n)</code> runs on the grid the engine builds,
-<code>grid(n)</code>, and returns it. Each engine says which positions its model type
-accepts (<code>check_position</code>): the difference engine and the chain binomial
-(<code>StochasticSteps</code>) non-negative integers, the differential engine and the
-events engine (<code>StochasticEvents</code>) any finite, non-negative position. The engine checks every
+<code>grid(n)</code>, and returns it. One rule says which positions each engine accepts
+(<code>EngineType::check_position</code> in <code>crates/commol-core/src/types/engine.rs</code>),
+and each engine's <code>check_position</code> and the builder read it: an engine whose
+rate is per step (<code>DifferenceEquations</code>, <code>StochasticSteps</code>,
+<code>EngineType::reports_at_integer_steps</code>) non-negative integers, the others
+(<code>DifferentialEquations</code>, <code>StochasticEvents</code>) any finite, non-negative
+position. Its message starts with "The <engine> engine". The engine checks every
 position where it receives it, and its message names the object that holds a
 rejected one: the observation or constraint (<code>check_positions</code> in
 <code>crates/commol-calibration/src/calibration_problem.rs</code>), the impulse transition
 or series parameter when the model is built or its parameters change
 (<code>check_model</code> in <code>crates/commol-model/src/builder.rs</code>, for an engine that
-steps only at integers), or the positions of a predictive before any draw
-runs (<code>Predictive::new</code> in <code>crates/commol-inference/src/predictive.rs</code>).</p>
+steps only at integers), or the positions and observations of a predictive before any
+draw runs (<code>Predictive::new</code>; <code>observation_draws</code> through <code>ForwardModel::with_observations</code>).</p>
 <p><strong>Rule:</strong> Python passes positions on and shows the engine's message. It never
 checks whether a model type accepts a position.</p>
 <p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_positions.rs</code>,
+<code>crates/commol-core/tests/positions.rs::only_the_engines_of_rates_per_step_report_at_integer_steps_alone</code>,
+<code>tests/simulation/test_runs.py::test_each_engine_names_itself_when_it_rejects_a_position</code>,
 <code>crates/commol-difference/src/simulation.rs::integer_positions_are_accepted_and_others_rejected</code>,
 <code>crates/commol-differential/src/tests.rs::a_difference_engine_names_a_series_point_between_steps</code>,
 <code>crates/commol-model/tests/schedules.rs::an_engine_that_steps_at_integers_rejects_a_position_between_steps_at_the_check</code>,
 <code>tests/building/test_parameters.py::test_a_point_the_engine_cannot_run_is_rejected_at_build_and_update</code>,
 <code>tests/calibration/test_observations.py::TestPositionsAndEngines</code>,
-<code>crates/commol-inference/tests/test_predictive.rs::positions_the_engine_cannot_run_are_rejected_before_any_draw</code>.</p>
+<code>crates/commol-inference/tests/test_predictive.rs::positions_the_engine_cannot_run_are_rejected_before_any_draw</code>,
+<code>crates/commol-inference/tests/test_predictive.rs::observation_draws_reject_a_position_the_engine_rejects</code>.</p>
 <h2 id="results-carry-their-positions">Results carry their positions<a class="headerlink" href="#results-carry-their-positions" title="Permanent link">&para;</a></h2>
 <p><code>Simulation.run</code> and <code>run_at</code> return <code>SimulationResults</code>
 (<code>api/results.py</code>): a <code>dict</code> from output name to values, with the positions in
 <code>positions</code> and the rows in <code>rows()</code>. A <code>dict</code> keeps <code>results["A"]</code>,
 <code>json.dumps</code> and <code>pandas.DataFrame(results)</code> working; a reserved key could clash
 with an output name. Windows, reports and plots read a value at a position
-(<code>index_at</code>, which matches within a relative <code>1e-9</code>), never at a list index, so
-a model type that reports between integers fits them. A predictive holds the
-positions it was asked for (<code>Predictive.positions</code>).</p>
-<p><strong>Guards:</strong> <code>tests/simulation/test_runs.py::TestResults</code>,
+with the Rust <code>index_at</code> of an observation (<code>observation.rs</code>, a relative <code>1e-9</code>), never at a list index, so
+a model type that reports between integers fits them. The engines take the
+same tolerance (<code>same_position</code> in <code>crates/commol-core/src/position.rs</code>). A
+predictive holds the positions it was asked for (<code>Predictive.positions</code>).</p>
+<p><strong>Guards:</strong> <code>tests/simulation/test_runs.py::TestResults</code>, <code>tests/simulation/test_runs.py::test_a_result_reads_a_position_with_the_tolerance_of_the_engine</code>,
+<code>crates/commol-core/tests/positions.rs::same_position_is_relative_to_the_larger_magnitude</code>,
 <code>tests/reporting/test_simulation_report.py::TestNonIntegerPositions</code>,
 <code>tests/plotting/test_figures.py::TestDifferentialModel</code>.</p>
 

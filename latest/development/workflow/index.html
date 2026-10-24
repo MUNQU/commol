@@ -2707,6 +2707,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/figures/" class="md-nav__link">
         
   
@@ -4247,7 +4275,7 @@ Updating the file there also triggers a version-update check right away.</p>
 <tr>
 <td>Build (<code>build.yaml</code>)</td>
 <td>Pull requests, the merge queue, every Monday on <code>main</code> and on demand</td>
-<td>Tests, the documentation checks included, without coverage: the job on Ubuntu installs LaTeX and times every test against its budget (<a href="../../codebase/tests/#time-budget">Time budget</a>). A pull request that changes what the coverage studies run also runs them (<code>coverage.yaml</code>): the crates <code>commol-core</code>, <code>commol-model</code>, <code>commol-difference</code>, <code>commol-stochastic</code>, <code>commol-calibration</code>, <code>commol-random</code> and <code>commol-inference</code>, the bindings (<code>py-commol/src/</code>), the Python package, <code>tests/support/</code>, the studies, the locks, the manifests and the toolchain. The merge queue does not run them again. A pull request runs one job, Ubuntu with Python 3.12, for a fast answer; the merge queue, the weekly and the manual runs test Ubuntu, Windows and macOS with Python 3.12, 3.13 and 3.14. A failure that only one operating system shows appears in the queue, which then removes the pull request. A change of only documentation or planning files (<code>docs/</code>, Markdown at the root, <code>mkdocs.yaml</code>, <code>.github/ISSUE_TEMPLATE/</code>, <code>.github/scripts/</code>) skips the tests. The wheels of every architecture are built by the release (<code>release.yaml</code>).</td>
+<td>Tests, the documentation checks included, without coverage: the job on Ubuntu installs LaTeX and times every test against its budget (<a href="../../codebase/tests/#time-budget">Time budget</a>). A pull request that changes what the coverage studies run also runs them (<code>coverage.yaml</code>): the crates <code>commol-core</code>, <code>commol-model</code>, <code>commol-difference</code>, <code>commol-stochastic</code>, <code>commol-calibration</code>, <code>commol-random</code>, <code>commol-statistics</code> and <code>commol-inference</code>, the bindings (<code>py-commol/src/</code>), the Python package, <code>tests/support/</code>, the studies, the locks, the manifests and the toolchain. The merge queue does not run them again. A pull request runs one job, Ubuntu with Python 3.12, for a fast answer; the merge queue, the weekly and the manual runs test Ubuntu, Windows and macOS with Python 3.12, 3.13 and 3.14. A failure that only one operating system shows appears in the queue, which then removes the pull request. A change of only documentation or planning files (<code>docs/</code>, Markdown at the root, <code>mkdocs.yaml</code>, <code>.github/ISSUE_TEMPLATE/</code>, <code>.github/scripts/</code>) skips the tests. The wheels of every architecture are built by the release (<code>release.yaml</code>).</td>
 <td><code>Build Passed</code></td>
 </tr>
 <tr>
@@ -4327,7 +4355,7 @@ template show.</p>
 </tr>
 <tr>
 <td>Rust tests (from the root)</td>
-<td><code>cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-inference -p commol-random -p commol-stochastic -p commol &amp;&amp; cargo test -p commol --features test-kind</code></td>
+<td><code>cargo test -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-inference -p commol-random -p commol-statistics -p commol-stochastic -p commol &amp;&amp; cargo test -p commol --features test-kind</code></td>
 </tr>
 <tr>
 <td>Test coverage, as CI measures it</td>
@@ -4343,7 +4371,7 @@ template show.</p>
 </tr>
 <tr>
 <td>Rust docs (from the root)</td>
-<td><code>RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-inference -p commol-random -p commol-stochastic</code></td>
+<td><code>RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p commol-core -p commol-model -p commol-difference -p commol-differential -p commol-calibration -p commol-inference -p commol-random -p commol-statistics -p commol-stochastic</code></td>
 </tr>
 </tbody>
 </table>

@@ -2859,6 +2859,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/figures/" class="md-nav__link">
         
   
@@ -3639,8 +3667,8 @@ model's prediction becomes the gain over the window:</p>
 </thead>
 <tbody>
 <tr>
-<td><code>window &lt;= at</code></td>
-<td>Otherwise the observation is rejected when it is created.</td>
+<td>The window starts at 0 or later</td>
+<td><code>at − window</code>, read as 0 within the rounding of the window; otherwise the observation is rejected when it is created, with the rule of the engine (<code>check_window_end</code> in <code>crates/commol-calibration/src/observation.rs</code>).</td>
 </tr>
 <tr>
 <td>Any output</td>
@@ -3710,7 +3738,7 @@ observation, or the constraint, that holds it (<code>check_positions</code> in
 <li>[ ] Every <code>output</code> (and every entry of <code>outputs</code>) is an output name; a sum has a <code>label</code>.</li>
 <li>[ ] Weights say how much each observation counts, in every loss.</li>
 <li>[ ] Every <code>factor_id</code> has a <code>CalibrationParameter</code> with <code>parameter_type="factor"</code>.</li>
-<li>[ ] Windowed observations use a cumulative output and <code>window &lt;= at</code>.</li>
+<li>[ ] Windowed observations use a cumulative output and a window that starts at 0 or later.</li>
 </ul>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <table>

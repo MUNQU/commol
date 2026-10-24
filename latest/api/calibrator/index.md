@@ -26,7 +26,7 @@ class Calibrator:
         self,
         simulation: Simulation,
         problem: CalibrationProblem,
-    ):
+    ) -> None:
         """
         Initializes the calibration from a Simulation and CalibrationProblem.
 
@@ -59,7 +59,6 @@ class Calibrator:
 
         loss_config = self._build_loss_config()
         self._validate_calibration_parameters()
-        self._validate_observed_data()
         self._warn_constraint_positions_beyond_observations()
         models = problem.observation_models
         self._rust_problem: "CalibrationProblemProtocol" = (
@@ -75,8 +74,14 @@ class Calibrator:
                     if models is None
                     else engine_state.rust_observation_models(models)
                 ),
+                seed=problem.seed,
             )
         )
+        if problem.seed is None:
+            logger.info(
+                "No seed set; drew the seed %d, which repeats this calibration.",
+                self._rust_problem.seed,
+            )
 
     @property
     def rust_problem(self) -> "CalibrationProblemProtocol":
@@ -235,9 +240,9 @@ class Calibrator:
         return DeltaBand(
             confidence_level=confidence_level,
             positions=points,
-            center=dict(zip(outputs, center, strict=True)),
-            lower=dict(zip(outputs, lower, strict=True)),
-            upper=dict(zip(outputs, upper, strict=True)),
+            center=by_output(outputs, center),
+            lower=by_output(outputs, lower),
+            upper=by_output(outputs, upper),
         )
 
     def rust_observation_draws(
@@ -323,18 +328,10 @@ class Calibrator:
         Returns
         -------
         int
-            ``problem.seed``, or a seed drawn from the operating system once
-            per calibrator and logged.
+            ``problem.seed``, or the seed the engine drew when the
+            calibrator was built, which it logs.
         """
-        if self.problem.seed is not None:
-            return check_seed(self.problem.seed)
-        if not hasattr(self, "_drawn_seed"):
-            self._drawn_seed = draw_seed()
-            logger.info(
-                "No seed set; drew the seed %d, which repeats this calibration.",
-                self._drawn_seed,
-            )
-        return self._drawn_seed
+        return self._rust_problem.seed
 
     def run(self, starts: int = 1) -> CalibrationResult:
         """
@@ -342,10 +339,12 @@ class Calibrator:
 
         Start 0 is the initial guess of each parameter. Each further start is a
         row of a Latin hypercube over the bounds, drawn from `seed`, so the
-        starts cover the parameter space. They run in parallel, on the
-        threads of `commol.threads`; the result is the best of them, and lists
-        every start. Distinct ends with equal losses are a sign that the data
-        do not identify the parameters.
+        starts cover the parameter space; a particle swarm takes a seed of
+        its own at each start, also from `seed`. They run in parallel, on the
+        threads of `commol.threads`; the result is the best of them, the
+        first start of lowest loss, and lists every start. Distinct ends with
+        equal losses are a sign that the data do not identify the
+        parameters.
 
         Parameters
         ----------
@@ -383,42 +382,35 @@ class Calibrator:
             f"Starting calibration with {algorithm_name} algorithm, "
             f"{measure} and {starts} start(s)."
         )
-        if starts < 1:
-            raise ValueError(f"A calibration needs at least one start, got {starts}.")
-        seed = self.seed if starts > 1 else 0
-        outcomes = self._rust_problem.optimize(
-            self._build_optimization_config(), starts, seed
+        run = self._rust_problem.optimize(
+            self._build_optimization_config(), starts, self.seed
         )
         names = self.parameter_names
-        summaries: list[tuple[StartSummary, "CalibrationResultProtocol"]] = []
+        summaries: list[StartSummary] = []
         failed: list[str] = []
-        for index, outcome in enumerate(outcomes):
+        for index, outcome in enumerate(run.outcomes):
             if outcome.result is None:
                 reason = f"Start {index} failed: {outcome.error}"
                 logger.warning(reason)
                 failed.append(reason)
                 continue
             summaries.append(
-                (
-                    StartSummary(
-                        start=dict(zip(names, outcome.start, strict=True)),
-                        end=dict(outcome.result.best_parameters),
-                        loss=outcome.result.final_loss,
-                        converged=outcome.result.converged,
-                    ),
-                    outcome.result,
+                StartSummary(
+                    start=dict(zip(names, outcome.start, strict=True)),
+                    end=dict(outcome.result.best_parameters),
+                    loss=outcome.result.final_loss,
+                    converged=outcome.result.converged,
                 )
             )
-        if not summaries:
-            raise RuntimeError("Every start failed: " + "; ".join(failed))
-        best = min(summaries, key=lambda summary: summary[0].loss)[1]
+        best = run.outcomes[run.best].result
+        assert best is not None, "the best start did not fail"
         result = CalibrationResult(
             best_parameters=dict(best.best_parameters),
             final_loss=best.final_loss,
             iterations=best.iterations,
             converged=best.converged,
             termination_reason=best.termination_reason,
-            starts=[summary for summary, _ in summaries],
+            starts=summaries,
             failed=failed,
             seed=self.seed,
         )
@@ -448,7 +440,7 @@ class Calibrator:
         """
         logger.info("Starting calibration with history tracking")
         history = self._rust_problem.optimize_with_history(
-            self._build_optimization_config()
+            self._build_optimization_config(), self.seed
         )
         names = self.parameter_names
         rust_result = history.result
@@ -552,15 +544,11 @@ class Calibrator:
         return run_method(self, method, IdentifiabilityMethod)
 
     def _build_loss_config(self) -> "LossConfigProtocol | None":
-        """The Rust loss, with the replicates of a stochastic engine; None with
+        """The Rust loss, with the settings of the replicates; None with
         observation models."""
         if self.problem.loss_function is None:
             return None
-        return engine_state.rust_loss_config(
-            self.problem,
-            self.problem.loss_function,
-            self.simulation.model_definition.engine.type,
-        )
+        return engine_state.rust_loss_config(self.problem, self.problem.loss_function)
 
     def _build_optimization_config(self) -> "OptimizationConfigProtocol":
         """Convert Python OptimizationConfig to Rust OptimizationConfig."""
@@ -620,7 +608,6 @@ class Calibrator:
             mutation=rust_mutation,
             velocity=rust_velocity,
             initialization=opt_config.initialization,
-            seed=self.seed,
             improvement_stop=(
                 None
                 if improvement is None
@@ -632,7 +619,7 @@ class Calibrator:
 
     def _build_rust_inertia(
         self, inertia: PSOConstantInertia | PSOChaoticInertia | None
-    ):
+    ) -> "PSOInertiaConstantProtocol | PSOInertiaChaoticProtocol | None":
         """Convert Python inertia config to Rust type."""
         if inertia is None:
             return None
@@ -644,7 +631,7 @@ class Calibrator:
 
     def _build_rust_acceleration(
         self, acceleration: PSOConstantAcceleration | PSOTimeVaryingAcceleration | None
-    ):
+    ) -> "PSOAccelerationConstantProtocol | PSOAccelerationTimeVaryingProtocol | None":
         """Convert Python acceleration config to Rust type."""
         if acceleration is None:
             return None
@@ -689,34 +676,6 @@ class Calibrator:
             self._engine,
             self.problem.parameters,
             self.problem.initial_condition_remainder,
-        )
-
-    def _validate_observed_data(self) -> None:
-        """Validate that observed data compartments exist and have valid steps.
-
-        Raises
-        ------
-        ValueError
-            If observed data contains invalid compartments or negative positions.
-        """
-        simulation_output_names = set(self._engine.output_names)
-
-        for obs in self.problem.observed_data:
-            observed_outputs = obs.observed_outputs
-            missing_outputs = [
-                output
-                for output in observed_outputs
-                if output not in simulation_output_names
-            ]
-            if missing_outputs:
-                raise ValueError(
-                    f"Observed data output(s) {missing_outputs} for observation "
-                    f"'{obs.label}' not found in model simulation outputs. "
-                    f"Available outputs: {sorted(simulation_output_names)}"
-                )
-
-        engine_state.check_positions(
-            self._engine, self.problem.observed_data, self.problem.constraints
         )
 
     def _warn_constraint_positions_beyond_observations(self) -> None:
@@ -774,7 +733,7 @@ Returns:
 
 | Type  | Description                                                                             |
 | ----- | --------------------------------------------------------------------------------------- |
-| `int` | problem.seed, or a seed drawn from the operating system once per calibrator and logged. |
+| `int` | problem.seed, or the seed the engine drew when the calibrator was built, which it logs. |
 
 #### num_parameters
 
@@ -805,7 +764,7 @@ Names of parameters being calibrated.
 #### __init__
 
 ```python
-__init__(simulation: Simulation, problem: CalibrationProblem)
+__init__(simulation: Simulation, problem: CalibrationProblem) -> None
 ```
 
 Initializes the calibration from a Simulation and CalibrationProblem.
@@ -830,7 +789,7 @@ def __init__(
     self,
     simulation: Simulation,
     problem: CalibrationProblem,
-):
+) -> None:
     """
     Initializes the calibration from a Simulation and CalibrationProblem.
 
@@ -863,7 +822,6 @@ def __init__(
 
     loss_config = self._build_loss_config()
     self._validate_calibration_parameters()
-    self._validate_observed_data()
     self._warn_constraint_positions_beyond_observations()
     models = problem.observation_models
     self._rust_problem: "CalibrationProblemProtocol" = (
@@ -879,8 +837,14 @@ def __init__(
                 if models is None
                 else engine_state.rust_observation_models(models)
             ),
+            seed=problem.seed,
         )
     )
+    if problem.seed is None:
+        logger.info(
+            "No seed set; drew the seed %d, which repeats this calibration.",
+            self._rust_problem.seed,
+        )
 ```
 
 #### rust_predictive
@@ -1151,9 +1115,9 @@ def delta_band(
     return DeltaBand(
         confidence_level=confidence_level,
         positions=points,
-        center=dict(zip(outputs, center, strict=True)),
-        lower=dict(zip(outputs, lower, strict=True)),
-        upper=dict(zip(outputs, upper, strict=True)),
+        center=by_output(outputs, center),
+        lower=by_output(outputs, lower),
+        upper=by_output(outputs, upper),
     )
 ```
 
@@ -1279,7 +1243,7 @@ run(starts: int = 1) -> CalibrationResult
 
 Runs the calibration optimization from one or more starts.
 
-Start 0 is the initial guess of each parameter. Each further start is a row of a Latin hypercube over the bounds, drawn from `seed`, so the starts cover the parameter space. They run in parallel, on the threads of `commol.threads`; the result is the best of them, and lists every start. Distinct ends with equal losses are a sign that the data do not identify the parameters.
+Start 0 is the initial guess of each parameter. Each further start is a row of a Latin hypercube over the bounds, drawn from `seed`, so the starts cover the parameter space; a particle swarm takes a seed of its own at each start, also from `seed`. They run in parallel, on the threads of `commol.threads`; the result is the best of them, the first start of lowest loss, and lists every start. Distinct ends with equal losses are a sign that the data do not identify the parameters.
 
 Parameters:
 
@@ -1309,10 +1273,12 @@ def run(self, starts: int = 1) -> CalibrationResult:
 
     Start 0 is the initial guess of each parameter. Each further start is a
     row of a Latin hypercube over the bounds, drawn from `seed`, so the
-    starts cover the parameter space. They run in parallel, on the
-    threads of `commol.threads`; the result is the best of them, and lists
-    every start. Distinct ends with equal losses are a sign that the data
-    do not identify the parameters.
+    starts cover the parameter space; a particle swarm takes a seed of
+    its own at each start, also from `seed`. They run in parallel, on the
+    threads of `commol.threads`; the result is the best of them, the
+    first start of lowest loss, and lists every start. Distinct ends with
+    equal losses are a sign that the data do not identify the
+    parameters.
 
     Parameters
     ----------
@@ -1350,42 +1316,35 @@ def run(self, starts: int = 1) -> CalibrationResult:
         f"Starting calibration with {algorithm_name} algorithm, "
         f"{measure} and {starts} start(s)."
     )
-    if starts < 1:
-        raise ValueError(f"A calibration needs at least one start, got {starts}.")
-    seed = self.seed if starts > 1 else 0
-    outcomes = self._rust_problem.optimize(
-        self._build_optimization_config(), starts, seed
+    run = self._rust_problem.optimize(
+        self._build_optimization_config(), starts, self.seed
     )
     names = self.parameter_names
-    summaries: list[tuple[StartSummary, "CalibrationResultProtocol"]] = []
+    summaries: list[StartSummary] = []
     failed: list[str] = []
-    for index, outcome in enumerate(outcomes):
+    for index, outcome in enumerate(run.outcomes):
         if outcome.result is None:
             reason = f"Start {index} failed: {outcome.error}"
             logger.warning(reason)
             failed.append(reason)
             continue
         summaries.append(
-            (
-                StartSummary(
-                    start=dict(zip(names, outcome.start, strict=True)),
-                    end=dict(outcome.result.best_parameters),
-                    loss=outcome.result.final_loss,
-                    converged=outcome.result.converged,
-                ),
-                outcome.result,
+            StartSummary(
+                start=dict(zip(names, outcome.start, strict=True)),
+                end=dict(outcome.result.best_parameters),
+                loss=outcome.result.final_loss,
+                converged=outcome.result.converged,
             )
         )
-    if not summaries:
-        raise RuntimeError("Every start failed: " + "; ".join(failed))
-    best = min(summaries, key=lambda summary: summary[0].loss)[1]
+    best = run.outcomes[run.best].result
+    assert best is not None, "the best start did not fail"
     result = CalibrationResult(
         best_parameters=dict(best.best_parameters),
         final_loss=best.final_loss,
         iterations=best.iterations,
         converged=best.converged,
         termination_reason=best.termination_reason,
-        starts=[summary for summary, _ in summaries],
+        starts=summaries,
         failed=failed,
         seed=self.seed,
     )
@@ -1439,7 +1398,7 @@ def run_with_history(self) -> CalibrationHistory:
     """
     logger.info("Starting calibration with history tracking")
     history = self._rust_problem.optimize_with_history(
-        self._build_optimization_config()
+        self._build_optimization_config(), self.seed
     )
     names = self.parameter_names
     rust_result = history.result
@@ -1614,7 +1573,7 @@ def identifiability(self, method: IdentifiabilityMethod[ResultT]) -> ResultT:
 
 ## CalibrationProblem
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Defines a complete calibration problem.
 
@@ -1639,7 +1598,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class CalibrationProblem(BaseModel):
+class CalibrationProblem(RangeChecked):
     """
     Defines a complete calibration problem.
 
@@ -1696,7 +1655,8 @@ class CalibrationProblem(BaseModel):
         modelling choice.
     seed : int | None
         Seed of every random number of a calibration (default: None, a seed
-        drawn from the operating system, which `Calibrator.run` logs):
+        the engine draws when the calibrator is built, which `Calibrator.seed`
+        gives and the calibrator logs):
         the replicates of a stochastic engine, the starts of
         ``Calibrator.run(starts=n)``, a particle swarm, and the uncertainty
         methods. Required with a stochastic engine.
@@ -1742,7 +1702,6 @@ class CalibrationProblem(BaseModel):
     )
     replicates: int | None = Field(
         default=None,
-        ge=1,
         description="Replicates per evaluation of a stochastic engine.",
     )
     replicate_summary: ReplicateSummary | None = Field(
@@ -1751,7 +1710,6 @@ class CalibrationProblem(BaseModel):
     )
     seed: int | None = Field(
         default=None,
-        ge=0,
         description=(
             "Seed of every random number of a calibration: the replicates of a "
             "stochastic engine, the starts, a particle swarm and the methods"
@@ -1889,9 +1847,9 @@ class Quantile(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    level: float = Field(..., ge=0.0, le=1.0, description="Level of the quantile.")
+    level: QuantileLevel = Field(..., description="Level of the quantile.")
 
-    def __init__(self, level: float, **data: object) -> None:
+    def __init__(self, level: float) -> None:
         """
         A quantile of the replicates.
 
@@ -1899,10 +1857,8 @@ class Quantile(BaseModel):
         ----------
         level : float
             The level, between 0 and 1.
-        **data : object
-            The other fields, as JSON holds them.
         """
-        super().__init__(level=level, **data)
+        super().__init__(level=level)
 ```
 
 ### Methods:
@@ -1910,22 +1866,21 @@ class Quantile(BaseModel):
 #### __init__
 
 ```python
-__init__(level: float, **data: object) -> None
+__init__(level: float) -> None
 ```
 
 A quantile of the replicates.
 
 Parameters:
 
-| Name     | Type     | Description                           | Default    |
-| -------- | -------- | ------------------------------------- | ---------- |
-| `level`  | `float`  | The level, between 0 and 1.           | *required* |
-| `**data` | `object` | The other fields, as JSON holds them. | `{}`       |
+| Name    | Type    | Description                 | Default    |
+| ------- | ------- | --------------------------- | ---------- |
+| `level` | `float` | The level, between 0 and 1. | *required* |
 
 Source code in `commol/context/calibration.py`
 
 ```python
-def __init__(self, level: float, **data: object) -> None:
+def __init__(self, level: float) -> None:
     """
     A quantile of the replicates.
 
@@ -1933,15 +1888,13 @@ def __init__(self, level: float, **data: object) -> None:
     ----------
     level : float
         The level, between 0 and 1.
-    **data : object
-        The other fields, as JSON holds them.
     """
-    super().__init__(level=level, **data)
+    super().__init__(level=level)
 ```
 
 ## ObservedDataPoint
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Represents a single observed data point for calibration.
 
@@ -1964,7 +1917,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class ObservedDataPoint(BaseModel):
+class ObservedDataPoint(RangeChecked):
     """
     Represents a single observed data point for calibration.
 
@@ -2008,9 +1961,7 @@ class ObservedDataPoint(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    at: float = Field(
-        default=..., ge=0, allow_inf_nan=False, description="Position on the axis"
-    )
+    at: float = Field(default=..., description="Position on the axis")
     output: str | None = Field(
         default=None, min_length=1, description="The output being observed"
     )
@@ -2022,10 +1973,9 @@ class ObservedDataPoint(BaseModel):
         default="",
         description="Name of the observed series; defaults to `output`",
     )
-    value: float = Field(default=..., ge=0.0, description="Observed value")
+    value: float = Field(default=..., description="Observed value")
     weight: float = Field(
         default=1.0,
-        gt=0.0,
         description="Weight for this observation in the loss function",
     )
     factor_id: str | None = Field(
@@ -2034,8 +1984,6 @@ class ObservedDataPoint(BaseModel):
     )
     window: float | None = Field(
         default=None,
-        gt=0,
-        allow_inf_nan=False,
         description=(
             "Optional window length for cumulative-output observations. "
             "When set, prediction is value(at) - value(at - window)."
@@ -2043,7 +1991,6 @@ class ObservedDataPoint(BaseModel):
     )
     trials: int | None = Field(
         default=None,
-        ge=0,
         description="Trials of a binomial observation model that reads them here",
     )
 
@@ -2066,9 +2013,13 @@ class ObservedDataPoint(BaseModel):
 
     @model_validator(mode="after")
     def validate_window(self) -> Self:
-        """A window must not start before position 0."""
-        if self.window is not None and self.window > self.at:
-            raise ValueError(f"window ({self.window}) must be <= at ({self.at})")
+        """
+        A window must not start before position 0, with the rule of the
+        engine (`check_window_end` of
+        `crates/commol-calibration/src/observation.rs`).
+        """
+        if self.window is not None:
+            commol_rs.calibration.check_window_end(self.at, self.window)
         return self
 
     @property
@@ -2124,16 +2075,20 @@ def validate_observed_outputs(self) -> Self:
 validate_window() -> Self
 ```
 
-A window must not start before position 0.
+A window must not start before position 0, with the rule of the engine (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
 
 Source code in `commol/context/calibration.py`
 
 ```python
 @model_validator(mode="after")
 def validate_window(self) -> Self:
-    """A window must not start before position 0."""
-    if self.window is not None and self.window > self.at:
-        raise ValueError(f"window ({self.window}) must be <= at ({self.at})")
+    """
+    A window must not start before position 0, with the rule of the
+    engine (`check_window_end` of
+    `crates/commol-calibration/src/observation.rs`).
+    """
+    if self.window is not None:
+        commol_rs.calibration.check_window_end(self.at, self.window)
     return self
 ```
 
@@ -2151,7 +2106,7 @@ One observation model of a series.
 
 ## NormalObservations
 
-Bases: `_ObservationModel`
+Bases: `_ObservationModel`, `RangeChecked`
 
 Normal noise: `y ~ N(μ, sd²)`, with `μ` the prediction.
 
@@ -2166,7 +2121,7 @@ Attributes:
 Source code in `commol/context/observation_models.py`
 
 ```python
-class NormalObservations(_ObservationModel):
+class NormalObservations(_ObservationModel, RangeChecked):
     """
     Normal noise: ``y ~ N(μ, sd²)``, with ``μ`` the prediction.
 
@@ -2185,7 +2140,7 @@ class NormalObservations(_ObservationModel):
 
 ## LogNormalObservations
 
-Bases: `_ObservationModel`
+Bases: `_ObservationModel`, `RangeChecked`
 
 Log-normal noise: `log y` is normal with standard deviation `sigma`.
 
@@ -2201,7 +2156,7 @@ Attributes:
 Source code in `commol/context/observation_models.py`
 
 ```python
-class LogNormalObservations(_ObservationModel):
+class LogNormalObservations(_ObservationModel, RangeChecked):
     """
     Log-normal noise: ``log y`` is normal with standard deviation ``sigma``.
 
@@ -2227,7 +2182,7 @@ class LogNormalObservations(_ObservationModel):
 
 ## StudentTObservations
 
-Bases: `_ObservationModel`
+Bases: `_ObservationModel`, `RangeChecked`
 
 Student-t noise of center `μ`, the prediction: normal noise with heavier tails, so an outlier pulls the fit less.
 
@@ -2241,7 +2196,7 @@ Attributes:
 Source code in `commol/context/observation_models.py`
 
 ```python
-class StudentTObservations(_ObservationModel):
+class StudentTObservations(_ObservationModel, RangeChecked):
     """
     Student-t noise of center ``μ``, the prediction: normal noise with heavier
     tails, so an outlier pulls the fit less.
@@ -2283,7 +2238,7 @@ class PoissonObservations(_ObservationModel):
 
 ## NegativeBinomialObservations
 
-Bases: `_ObservationModel`
+Bases: `_ObservationModel`, `RangeChecked`
 
 Negative binomial counts of mean `μ`, the prediction, and variance `μ + φμ²`: counts that scatter more than a Poisson.
 
@@ -2298,7 +2253,7 @@ Attributes:
 Source code in `commol/context/observation_models.py`
 
 ```python
-class NegativeBinomialObservations(_ObservationModel):
+class NegativeBinomialObservations(_ObservationModel, RangeChecked):
     """
     Negative binomial counts of mean ``μ``, the prediction, and variance
     ``μ + φμ²``: counts that scatter more than a Poisson.
@@ -2319,7 +2274,7 @@ class NegativeBinomialObservations(_ObservationModel):
 
 ## BinomialObservations
 
-Bases: `_ObservationModel`
+Bases: `_ObservationModel`, `RangeChecked`
 
 Binomial counts of `n` trials and mean `μ`, the prediction: the probability is `μ / n`, so the prediction is an expected count, not a proportion.
 
@@ -2334,7 +2289,7 @@ Attributes:
 Source code in `commol/context/observation_models.py`
 
 ```python
-class BinomialObservations(_ObservationModel):
+class BinomialObservations(_ObservationModel, RangeChecked):
     """
     Binomial counts of ``n`` trials and mean ``μ``, the prediction: the
     probability is ``μ / n``, so the prediction is an expected count, not a
@@ -2354,7 +2309,7 @@ class BinomialObservations(_ObservationModel):
     """
 
     kind: Literal["binomial"] = "binomial"
-    trials: int | None = Field(default=None, ge=0, description="The trials.")
+    trials: int | None = Field(default=None, description="The trials.")
 ```
 
 ## Unknowns, optimizers and results
@@ -2482,7 +2437,7 @@ def validate_bounds(self) -> Self:
 
 ## CalibrationConstraint
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 A constraint on calibration parameters defined as a mathematical expression.
 
@@ -2540,7 +2495,7 @@ Examples:
 Source code in `commol/context/calibration.py`
 
 ```python
-class CalibrationConstraint(BaseModel):
+class CalibrationConstraint(RangeChecked):
     """
     A constraint on calibration parameters defined as a mathematical expression.
 
@@ -2618,7 +2573,6 @@ class CalibrationConstraint(BaseModel):
     )
     weight: float = Field(
         default=1.0,
-        gt=0.0,
         description="Penalty weight multiplier for violations",
     )
     at: list[float] | None = Field(
@@ -2643,16 +2597,11 @@ class CalibrationConstraint(BaseModel):
 
     @model_validator(mode="after")
     def validate_positions(self) -> Self:
-        """Validate that the positions are finite and non-negative."""
-        if self.at is not None:
-            if len(self.at) == 0:
-                raise ValueError(
-                    f"at for constraint '{self.id}' must not be empty if specified"
-                )
-            if any(position < 0 or not math.isfinite(position) for position in self.at):
-                raise ValueError(
-                    f"at for constraint '{self.id}' must all be finite and non-negative"
-                )
+        """Validate that the positions, when given, are not empty."""
+        if self.at is not None and len(self.at) == 0:
+            raise ValueError(
+                f"at for constraint '{self.id}' must not be empty if specified"
+            )
         return self
 ```
 
@@ -2688,29 +2637,24 @@ def validate_expression(cls, value: str) -> str:
 validate_positions() -> Self
 ```
 
-Validate that the positions are finite and non-negative.
+Validate that the positions, when given, are not empty.
 
 Source code in `commol/context/calibration.py`
 
 ```python
 @model_validator(mode="after")
 def validate_positions(self) -> Self:
-    """Validate that the positions are finite and non-negative."""
-    if self.at is not None:
-        if len(self.at) == 0:
-            raise ValueError(
-                f"at for constraint '{self.id}' must not be empty if specified"
-            )
-        if any(position < 0 or not math.isfinite(position) for position in self.at):
-            raise ValueError(
-                f"at for constraint '{self.id}' must all be finite and non-negative"
-            )
+    """Validate that the positions, when given, are not empty."""
+    if self.at is not None and len(self.at) == 0:
+        raise ValueError(
+            f"at for constraint '{self.id}' must not be empty if specified"
+        )
     return self
 ```
 
 ## NelderMeadConfig
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Configuration for the Nelder-Mead optimization algorithm.
 
@@ -2733,7 +2677,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class NelderMeadConfig(BaseModel):
+class NelderMeadConfig(RangeChecked):
     """
     Configuration for the Nelder-Mead optimization algorithm.
 
@@ -2769,37 +2713,31 @@ class NelderMeadConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     max_iterations: int = Field(
-        default=1000, gt=0, description="Maximum number of iterations"
+        default=1000, description="Maximum number of iterations"
     )
     sd_tolerance: float = Field(
-        default=1e-6, gt=0.0, description="Convergence tolerance for standard deviation"
+        default=1e-6, description="Convergence tolerance for standard deviation"
     )
     initial_simplex_size: float = Field(
         default=0.1,
-        gt=0.0,
-        le=1.0,
         description=(
             "Size of the initial simplex, as a fraction of each parameter's bound width"
         ),
     )
     alpha: float | None = Field(
         default=None,
-        gt=0.0,
         description="Reflection coefficient (default: None, uses argmin's default)",
     )
     gamma: float | None = Field(
         default=None,
-        gt=0.0,
         description="Expansion coefficient (default: None, uses argmin's default)",
     )
     rho: float | None = Field(
         default=None,
-        gt=0.0,
         description="Contraction coefficient (default: None, uses argmin's default)",
     )
     sigma: float | None = Field(
         default=None,
-        gt=0.0,
         description="Shrink coefficient (default: None, uses argmin's default)",
     )
     verbose: bool = Field(
@@ -2808,7 +2746,6 @@ class NelderMeadConfig(BaseModel):
     )
     header_interval: int = Field(
         default=100,
-        gt=0,
         description=(
             "Number of iterations between table header repeats in verbose output "
             "(default: 100)"
@@ -2818,7 +2755,7 @@ class NelderMeadConfig(BaseModel):
 
 ## ParticleSwarmConfig
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Configuration for the Particle Swarm Optimization algorithm.
 
@@ -2845,7 +2782,7 @@ Methods:
 Source code in `commol/context/calibration.py`
 
 ```python
-class ParticleSwarmConfig(BaseModel):
+class ParticleSwarmConfig(RangeChecked):
     """
     Configuration for the Particle Swarm Optimization algorithm.
 
@@ -2879,11 +2816,9 @@ class ParticleSwarmConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # Core parameters
-    particles: int = Field(
-        default=20, gt=0, description="Number of particles in the swarm"
-    )
+    particles: int = Field(default=20, description="Number of particles in the swarm")
     max_iterations: int = Field(
-        default=1000, gt=0, description="Maximum number of iterations"
+        default=1000, description="Maximum number of iterations"
     )
     verbose: bool = Field(
         default=False,
@@ -2918,7 +2853,9 @@ class ParticleSwarmConfig(BaseModel):
         return v
 
     @overload
-    def inertia(self, type: str, *, factor: float = 0.721) -> Self: ...
+    def inertia(
+        self, type: str, *, factor: float = PSO_DEFAULT_INERTIA_FACTOR
+    ) -> Self: ...
 
     @overload
     def inertia(self, type: str, *, w_min: float, w_max: float) -> Self: ...
@@ -2936,9 +2873,10 @@ class ParticleSwarmConfig(BaseModel):
 
         Other Parameters
         ----------------
-        factor : float, default=0.721
-            Fixed inertia weight (canonical PSO: 1/(2*ln(2)) ≈ 0.721).
-            Only used when type="constant".
+        factor : float, default=PSO_DEFAULT_INERTIA_FACTOR
+            Fixed inertia weight; the default is the weight of canonical PSO,
+            1/(2 ln 2) ≈ 0.72135, which a swarm with no inertia strategy
+            uses. Only used when type="constant".
         w_min : float
             Minimum inertia weight. Only used when type="chaotic".
         w_max : float
@@ -2954,7 +2892,9 @@ class ParticleSwarmConfig(BaseModel):
                 f"Invalid inertia type: {type}. Must be one of {list(PSOInertiaType)}"
             )
         if type == PSOInertiaType.CONSTANT:
-            self._inertia = PSOConstantInertia(factor=kwargs.get("factor", 0.721))
+            self._inertia = PSOConstantInertia(
+                factor=kwargs.get("factor", PSO_DEFAULT_INERTIA_FACTOR)
+            )
         else:
             self._inertia = PSOChaoticInertia(
                 w_min=kwargs["w_min"], w_max=kwargs["w_max"]
@@ -2966,8 +2906,8 @@ class ParticleSwarmConfig(BaseModel):
         self,
         type: str,
         *,
-        cognitive: float = 1.193,
-        social: float = 1.193,
+        cognitive: float = PSO_DEFAULT_ACCELERATION,
+        social: float = PSO_DEFAULT_ACCELERATION,
     ) -> Self: ...
 
     @overload
@@ -2994,12 +2934,14 @@ class ParticleSwarmConfig(BaseModel):
 
         Other Parameters
         ----------------
-        cognitive : float, default=1.193
-            Cognitive coefficient (c1) - attraction to personal best.
-            Only used when type="constant".
-        social : float, default=1.193
-            Social coefficient (c2) - attraction to swarm best.
-            Only used when type="constant".
+        cognitive : float, default=PSO_DEFAULT_ACCELERATION
+            Cognitive coefficient (c1) - attraction to personal best; the
+            default is the coefficient of canonical PSO, 0.5 + ln 2 ≈ 1.19315,
+            which a swarm with no acceleration strategy uses. Only used when
+            type="constant".
+        social : float, default=PSO_DEFAULT_ACCELERATION
+            Social coefficient (c2) - attraction to swarm best, with the
+            same default. Only used when type="constant".
         c1_initial : float
             Initial cognitive factor (typically high, e.g., 2.5).
             Only used when type="time_varying".
@@ -3025,8 +2967,8 @@ class ParticleSwarmConfig(BaseModel):
             )
         if type == PSOAccelerationType.CONSTANT:
             self._acceleration = PSOConstantAcceleration(
-                cognitive=kwargs.get("cognitive", 1.193),
-                social=kwargs.get("social", 1.193),
+                cognitive=kwargs.get("cognitive", PSO_DEFAULT_ACCELERATION),
+                social=kwargs.get("social", PSO_DEFAULT_ACCELERATION),
             )
         else:
             self._acceleration = PSOTimeVaryingAcceleration(
@@ -3256,7 +3198,7 @@ Get the radius stop rule (for internal use).
 #### inertia
 
 ```python
-inertia(type: str, *, factor: float = 0.721) -> Self
+inertia(type: str, *, factor: float = PSO_DEFAULT_INERTIA_FACTOR) -> Self
 ```
 
 ```python
@@ -3278,11 +3220,11 @@ Parameters:
 
 Other Parameters:
 
-| Name     | Type    | Description                                                                                 |
-| -------- | ------- | ------------------------------------------------------------------------------------------- |
-| `factor` | `float` | Fixed inertia weight (canonical PSO: 1/(2\*ln(2)) ≈ 0.721). Only used when type="constant". |
-| `w_min`  | `float` | Minimum inertia weight. Only used when type="chaotic".                                      |
-| `w_max`  | `float` | Maximum inertia weight (must be > w_min). Only used when type="chaotic".                    |
+| Name     | Type    | Description                                                                                                                                                          |
+| -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `factor` | `float` | Fixed inertia weight; the default is the weight of canonical PSO, 1/(2 ln 2) ≈ 0.72135, which a swarm with no inertia strategy uses. Only used when type="constant". |
+| `w_min`  | `float` | Minimum inertia weight. Only used when type="chaotic".                                                                                                               |
+| `w_max`  | `float` | Maximum inertia weight (must be > w_min). Only used when type="chaotic".                                                                                             |
 
 Returns:
 
@@ -3306,9 +3248,10 @@ def inertia(self, type: str, **kwargs: float) -> Self:
 
     Other Parameters
     ----------------
-    factor : float, default=0.721
-        Fixed inertia weight (canonical PSO: 1/(2*ln(2)) ≈ 0.721).
-        Only used when type="constant".
+    factor : float, default=PSO_DEFAULT_INERTIA_FACTOR
+        Fixed inertia weight; the default is the weight of canonical PSO,
+        1/(2 ln 2) ≈ 0.72135, which a swarm with no inertia strategy
+        uses. Only used when type="constant".
     w_min : float
         Minimum inertia weight. Only used when type="chaotic".
     w_max : float
@@ -3324,7 +3267,9 @@ def inertia(self, type: str, **kwargs: float) -> Self:
             f"Invalid inertia type: {type}. Must be one of {list(PSOInertiaType)}"
         )
     if type == PSOInertiaType.CONSTANT:
-        self._inertia = PSOConstantInertia(factor=kwargs.get("factor", 0.721))
+        self._inertia = PSOConstantInertia(
+            factor=kwargs.get("factor", PSO_DEFAULT_INERTIA_FACTOR)
+        )
     else:
         self._inertia = PSOChaoticInertia(
             w_min=kwargs["w_min"], w_max=kwargs["w_max"]
@@ -3335,7 +3280,7 @@ def inertia(self, type: str, **kwargs: float) -> Self:
 #### acceleration
 
 ```python
-acceleration(type: str, *, cognitive: float = 1.193, social: float = 1.193) -> Self
+acceleration(type: str, *, cognitive: float = PSO_DEFAULT_ACCELERATION, social: float = PSO_DEFAULT_ACCELERATION) -> Self
 ```
 
 ```python
@@ -3357,14 +3302,14 @@ Parameters:
 
 Other Parameters:
 
-| Name         | Type    | Description                                                                               |
-| ------------ | ------- | ----------------------------------------------------------------------------------------- |
-| `cognitive`  | `float` | Cognitive coefficient (c1) - attraction to personal best. Only used when type="constant". |
-| `social`     | `float` | Social coefficient (c2) - attraction to swarm best. Only used when type="constant".       |
-| `c1_initial` | `float` | Initial cognitive factor (typically high, e.g., 2.5). Only used when type="time_varying". |
-| `c1_final`   | `float` | Final cognitive factor (typically low, e.g., 0.5). Only used when type="time_varying".    |
-| `c2_initial` | `float` | Initial social factor (typically low, e.g., 0.5). Only used when type="time_varying".     |
-| `c2_final`   | `float` | Final social factor (typically high, e.g., 2.5). Only used when type="time_varying".      |
+| Name         | Type    | Description                                                                                                                                                                                                        |
+| ------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `cognitive`  | `float` | Cognitive coefficient (c1) - attraction to personal best; the default is the coefficient of canonical PSO, 0.5 + ln 2 ≈ 1.19315, which a swarm with no acceleration strategy uses. Only used when type="constant". |
+| `social`     | `float` | Social coefficient (c2) - attraction to swarm best, with the same default. Only used when type="constant".                                                                                                         |
+| `c1_initial` | `float` | Initial cognitive factor (typically high, e.g., 2.5). Only used when type="time_varying".                                                                                                                          |
+| `c1_final`   | `float` | Final cognitive factor (typically low, e.g., 0.5). Only used when type="time_varying".                                                                                                                             |
+| `c2_initial` | `float` | Initial social factor (typically low, e.g., 0.5). Only used when type="time_varying".                                                                                                                              |
+| `c2_final`   | `float` | Final social factor (typically high, e.g., 2.5). Only used when type="time_varying".                                                                                                                               |
 
 Returns:
 
@@ -3388,12 +3333,14 @@ def acceleration(self, type: str, **kwargs: float) -> Self:
 
     Other Parameters
     ----------------
-    cognitive : float, default=1.193
-        Cognitive coefficient (c1) - attraction to personal best.
-        Only used when type="constant".
-    social : float, default=1.193
-        Social coefficient (c2) - attraction to swarm best.
-        Only used when type="constant".
+    cognitive : float, default=PSO_DEFAULT_ACCELERATION
+        Cognitive coefficient (c1) - attraction to personal best; the
+        default is the coefficient of canonical PSO, 0.5 + ln 2 ≈ 1.19315,
+        which a swarm with no acceleration strategy uses. Only used when
+        type="constant".
+    social : float, default=PSO_DEFAULT_ACCELERATION
+        Social coefficient (c2) - attraction to swarm best, with the
+        same default. Only used when type="constant".
     c1_initial : float
         Initial cognitive factor (typically high, e.g., 2.5).
         Only used when type="time_varying".
@@ -3419,8 +3366,8 @@ def acceleration(self, type: str, **kwargs: float) -> Self:
         )
     if type == PSOAccelerationType.CONSTANT:
         self._acceleration = PSOConstantAcceleration(
-            cognitive=kwargs.get("cognitive", 1.193),
-            social=kwargs.get("social", 1.193),
+            cognitive=kwargs.get("cognitive", PSO_DEFAULT_ACCELERATION),
+            social=kwargs.get("social", PSO_DEFAULT_ACCELERATION),
         )
     else:
         self._acceleration = PSOTimeVaryingAcceleration(
@@ -3671,7 +3618,7 @@ def radius_stop(self, tol: float) -> Self:
 
 ## CalibrationResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`, `RangeChecked`
 
 Result of a calibration: the best of its starts.
 
@@ -3691,7 +3638,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class CalibrationResult(BaseModel):
+class CalibrationResult(ResultModel, RangeChecked):
     """
     Result of a calibration: the best of its starts.
 
@@ -3726,9 +3673,7 @@ class CalibrationResult(BaseModel):
         default=..., description="Calibrated parameter values"
     )
     final_loss: float = Field(default=..., description="Final loss value")
-    iterations: int = Field(
-        default=..., ge=0, description="Number of iterations performed"
-    )
+    iterations: int = Field(default=..., description="Number of iterations performed")
     converged: bool = Field(default=..., description="Whether optimization converged")
     termination_reason: str = Field(
         default=..., description="Reason for optimization termination"
@@ -3740,7 +3685,7 @@ class CalibrationResult(BaseModel):
         default_factory=list, description="Each start that failed"
     )
     seed: int = Field(
-        default=..., ge=0, description="Seed of the calibration's random numbers"
+        default=..., description="Seed of the calibration's random numbers"
     )
 
     @override
@@ -3792,7 +3737,7 @@ def __str__(self) -> str:
 
 ## StartSummary
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 One start of a multi-start optimization.
 
@@ -3810,7 +3755,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class StartSummary(BaseModel):
+class StartSummary(ResultModel):
     """
     One start of a multi-start optimization.
 
@@ -3839,7 +3784,7 @@ class StartSummary(BaseModel):
 
 ## CalibrationHistory
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 A calibration and every evaluation of a feasible point it made.
 
@@ -3853,7 +3798,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class CalibrationHistory(BaseModel):
+class CalibrationHistory(ResultModel):
     """
     A calibration and every evaluation of a feasible point it made.
 
@@ -3875,7 +3820,7 @@ class CalibrationHistory(BaseModel):
 
 ## CalibrationEvaluation
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 One evaluation of a feasible point during an optimization.
 
@@ -3889,7 +3834,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class CalibrationEvaluation(BaseModel):
+class CalibrationEvaluation(ResultModel):
     """
     One evaluation of a feasible point during an optimization.
 

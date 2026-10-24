@@ -18,7 +18,7 @@
         <link rel="prev" href="../profiles/">
       
       
-        <link rel="next" href="../figures/">
+        <link rel="next" href="../python-models/">
       
       
         
@@ -2819,21 +2819,38 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#public-models-forbid-unknown-fields" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Public models forbid unknown fields
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3332,17 +3349,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#public-models-forbid-unknown-fields" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Public models forbid unknown fields
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -3370,7 +3376,7 @@ its runs. Figures have <a href="../figures/">a page of their own</a>.</p>
 <h2 id="one-confidence-interval-convention">One confidence-interval convention<a class="headerlink" href="#one-confidence-interval-convention" title="Permanent link">&para;</a></h2>
 <p>Every interval is a weighted quantile: the inverse of the weighted empirical
 distribution, interpolated between the midpoints of the cumulative weights
-(<code>statistics::quantiles</code> in <code>crates/commol-calibration/src/statistics.rs</code>). With
+(<code>statistics::quantiles</code> in <code>crates/commol-statistics/src/statistics.rs</code>). With
 equal weights it equals NumPy's <code>method="hazen"</code>; a weight of zero removes a
 value. <code>ci_percentiles</code> (<code>api/inference/intervals.py</code>) turns a confidence level
 into the two percentile points of <code>statistics::interval_levels</code>. <code>member_statistics</code> reduces each member to the
@@ -3382,9 +3388,11 @@ a predictive and the summary of the replicates of a calibration
 quantile. So a calibration with <code>Quantile(0.25)</code> compares the observations
 with the value that <code>SimulationReplicates.quantiles([0.25])</code> gives for the
 same runs.</p>
-<p>The module lives in <code>commol-calibration</code>, the lowest crate that takes a
-quantile, and <code>commol-inference</code> re-exports it (<code>pub use
-commol_calibration::statistics</code>), so there is one copy.</p>
+<p>The module lives in <code>commol-statistics</code>, a crate with no model and no
+optimizer that calibration, inference and the bindings depend on and import
+directly (<code>commol_statistics::statistics</code>), so there is one copy and one path. Every band and every summary of runs reduces a column with
+its <code>summary</code> (the mean, the median, the central interval, the minimum and the
+maximum), which Python calls as <code>weighted_summary</code>.</p>
 <table>
 <thead>
 <tr>
@@ -3403,7 +3411,11 @@ commol_calibration::statistics</code>), so there is one copy.</p>
 </tr>
 <tr>
 <td>The module in <code>commol-core</code></td>
-<td>No crate below calibration takes a quantile, and <code>commol-core</code> holds the model types and the engine contract.</td>
+<td><code>commol-core</code> holds the model types, the engine contract and the threads.</td>
+</tr>
+<tr>
+<td>The module in <code>commol-calibration</code></td>
+<td>A quantile is not calibration, and a crate that needs it would depend on the problem and its optimizers.</td>
 </tr>
 <tr>
 <td>A copy of Hazen's rule in <code>commol-calibration</code></td>
@@ -3414,7 +3426,7 @@ commol_calibration::statistics</code>), so there is one copy.</p>
 <p><strong>Rule:</strong> every new interval goes through <code>weighted_quantiles</code> or
 <code>member_statistics</code>, and every quantile in Rust through
 <code>statistics::quantiles</code>.</p>
-<p><strong>Guards:</strong> <code>crates/commol-calibration/src/statistics.rs</code> tests,
+<p><strong>Guards:</strong> <code>crates/commol-statistics/src/statistics.rs</code> tests,
 <code>crates/commol-calibration/tests/test_replicate_summary.rs</code>,
 <code>tests/uncertainty/test_intervals.py</code>,
 <code>tests/stochastic/test_calibration.py::test_a_quantile_summary_agrees_with_the_quantiles_of_the_replicates</code>,
@@ -3435,32 +3447,26 @@ argument of <code>Simulation.replicates</code>, <code>ParameterSample.resample</
 <code>Ratio.replicate_rule</code>, so <code>replicates</code> is always a count. The level of a
 quantile keeps the name <code>level</code> (<code>Quantile(level)</code>): it is not the level of an
 interval.</p>
-<p>One Rust function checks each kind of setting, with one message:</p>
-<table>
-<thead>
-<tr>
-<th>Check</th>
-<th>Function</th>
-<th>Message</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>A confidence level</td>
-<td><code>statistics::interval_levels</code></td>
-<td><code>confidence_level is strictly between 0 and 1, got 1.5; use 0.95 for a 95% interval</code></td>
-</tr>
-<tr>
-<td>Any other setting strictly between 0 and 1 (<code>target_cess</code>, <code>stay_probability</code>, <code>min_acceptance</code>, the <code>quantile</code> of ABC, <code>correlation_threshold</code>)</td>
-<td><code>statistics::check_open_unit(name, value)</code></td>
-<td><code>&lt;name&gt; is strictly between 0 and 1, got &lt;value&gt;</code></td>
-</tr>
-</tbody>
-</table>
-<p>Python calls the first through the binding <code>commol_rs.inference.interval_levels</code>:
-<code>ci_percentiles</code>, <code>BootstrapResult.interval_error</code>, <code>PropagationResult.summary</code>,
-the scenario summaries, and every <code>confidence_level</code> field, whose type is
-<code>ConfidenceLevel</code> (<code>context/inference/levels.py</code>).</p>
+<p>The engine declares the range rule of each setting once, as data:
+<code>Count::at_least("replicates", 1)</code> for a whole number, <code>Real::new(name, low,
+high)</code> for a number with an open or a closed bound (<code>Real::share</code>,
+<code>Real::positive</code>, …), in <code>crates/commol-core/src/range.rs</code>,
+<code>crates/commol-calibration/src/ranges.rs</code> and
+<code>crates/commol-inference/src/ranges.rs</code>. A rule has one message for every
+value outside its range, a negative count included (<code>replicates is a whole
+number of at least 1, got -1</code>); <code>statistics::check_levels</code> checks a quantile
+level. Three paths read a rule: the Python model of an object, whose base
+<code>RangeChecked</code> (<code>py-commol/commol/context/ranges.py</code>) calls the one check of
+the engine for its object when it is built (<code>commol_rs.core.check_ranges</code>
+on the tables <code>RANGES</code>, each setting in its own type, so a parameter name
+<code>"NaN"</code> is no number); the engine function that takes the setting; and a
+binding, which reads a count (<code>i64</code>) with its rule (<code>py-commol/src/counts.rs</code>).</p>
+<p>A caller checks a confidence level at its boundary, then computes the two
+quantiles of its interval with <code>statistics::interval_levels</code>, a pure function
+of <code>commol-statistics</code> that checks nothing: the crate of statistics depends on
+no crate of commol. <code>ci_percentiles</code>, <code>BootstrapResult.interval_error</code>,
+<code>PropagationResult.summary</code> and the scenario summaries call the binding
+<code>commol_rs.inference.interval_levels</code>, which checks, then computes.</p>
 <table>
 <thead>
 <tr>
@@ -3470,32 +3476,56 @@ the scenario summaries, and every <code>confidence_level</code> field, whose typ
 </thead>
 <tbody>
 <tr>
-<td>A check in each method, with <code>Field(gt=0.0, lt=1.0)</code></td>
-<td>The same mistake gives a different message in each method, and the rule is written many times.</td>
+<td>A pydantic constraint (<code>Field(gt=0.0, lt=1.0)</code>) in each model</td>
+<td>The rule exists twice, the same mistake gives a different message in each method, and the message of the engine shows only where Python has none.</td>
+</tr>
+<tr>
+<td>A message of its own in <code>counts.rs</code></td>
+<td><code>-1</code> and <code>0</code> get two wordings of one rule.</td>
 </tr>
 <tr>
 <td>An alias for an old name</td>
 <td>Two names for one setting, which is what the rule removes.</td>
 </tr>
+<tr>
+<td>The rules of the settings in <code>commol-statistics</code></td>
+<td>The settings of an engine depend on the crate of statistics, and a computation and a rule of a setting stay mixed.</td>
+</tr>
 </tbody>
 </table>
-<p><strong>Rule:</strong> a new setting takes the name its meaning already has, and a new
-setting strictly between 0 and 1 is checked by one of the two functions.</p>
-<p><strong>Guards:</strong> <code>tests/suite/test_rules.py::test_a_setting_has_one_name</code>,
-<code>tests/uncertainty/test_intervals.py::test_every_confidence_level_has_one_check</code>,
-<code>crates/commol-inference/tests/test_levels.rs</code>.</p>
+<p><strong>Rule:</strong> a new setting takes the name its meaning already has; a setting
+with a range gets its rule, a row for its object in <code>RANGES</code> and the check in
+the engine function that takes it.</p>
+<p><strong>Guards:</strong> <code>tests/suite/test_engine_rules.py</code> (<code>test_a_setting_has_one_name</code>,
+<code>test_no_model_declares_a_range_of_a_setting</code>), <code>tests/uncertainty/test_ranges.py</code>,
+<code>tests/uncertainty/test_counts.py</code>, <code>tests/uncertainty/test_intervals.py</code>,
+<code>crates/commol-calibration/tests/test_ranges.rs</code>,
+<code>crates/commol-inference/tests/test_ranges.rs</code>, <code>test_levels.rs</code>.</p>
 <h2 id="a-method-takes-its-seed-from-its-source-and-fits-from-its-starts">A method takes its seed from its source and fits from its starts<a class="headerlink" href="#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts" title="Permanent link">&para;</a></h2>
 <p>Every uncertainty, identifiability and sensitivity method draws its random
 numbers from the seed of its source: <code>Calibrator.seed</code> (<code>problem.seed</code>) or
-<code>SensitivityAnalysis.seed</code>, split into streams (<code>commol_random::stream_seed</code>,
-<code>replicate_seed</code>). No method has a seed of its own, so one seed repeats a
-calibration and every method on it. A score reads the seed its draws keep,
+<code>SensitivityAnalysis.seed</code>, split into streams (<code>Stream</code> in
+<code>crates/commol-random/src/streams.rs</code>, each with its own number) and the
+replicates of a stream (<code>Stream::replicate</code>); no method draws from the seed
+itself. The starts of a calibration draw from two streams of the same
+registry (<code>Stream::StartPoints</code>, <code>Stream::StartSeeds</code>). No method has a seed of its own, so one seed repeats a calibration
+and every method on it. A score reads the seed its draws keep,
 <code>ObservationDraws.seed</code> (<code>crates/commol-inference/src/predictive.rs</code>):
 <code>scores::pit</code> randomizes ties from a stream of it. Every method that fits the
 data takes <code>starts</code>, at least 1 with the default 1, and fits with
 <code>Calibrator.run(starts)</code>: the bootstraps, the jackknife, the conformal
 methods, the profiles, <code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>,
 <code>InformationMatchingEta</code> and <code>BootstrapCoverageEta</code>.</p>
+<p>A seed that its user does not set is drawn in one place,
+<code>commol_random::seed_or_drawn</code> (<code>crates/commol-random/src/drawn.rs</code>, from the
+entropy of the operating system). The bindings of a run, its replicates, a
+calibration problem and a sensitivity analysis take <code>seed: Option&lt;u64&gt;</code>, and
+each result gives the seed it ran with (<code>results.seed</code>,
+<code>SimulationReplicates.seed</code>, <code>Calibrator.seed</code>, <code>SensitivityAnalysis.seed</code>),
+so a run can be repeated. A method that needs the seed of its user, such as a
+sensitivity analysis on a stochastic engine, refuses <code>None</code> with the message
+of the engine (<code>ForwardModel::unobserved</code>); no type tells the engine where a
+seed comes from.</p>
 <table>
 <thead>
 <tr>
@@ -3504,6 +3534,14 @@ methods, the profiles, <code>Laplace</code>, <code>Sandwich</code>, <code>Laplac
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>Python draws the seed and passes it to the engine</td>
+<td>Two places draw, and the engine cannot tell a seed its user set from one drawn for them, so it needs a second argument or type to refuse a drawn seed.</td>
+</tr>
+<tr>
+<td>A seed type that says where it comes from (<code>Set</code> or <code>Drawn</code>)</td>
+<td>The engine reads only whether a seed is set; <code>Option&lt;u64&gt;</code> says that.</td>
+</tr>
 <tr>
 <td>A <code>seed</code> of a method that overrides the seed of the source</td>
 <td>Two seeds choose the random numbers of one run, and <code>problem.seed</code> no longer repeats it.</td>
@@ -3517,6 +3555,9 @@ methods, the profiles, <code>Laplace</code>, <code>Sandwich</code>, <code>Laplac
 <p><strong>Rule:</strong> a new method takes no seed and reads the seed of its source; a new
 method that fits the data takes <code>starts</code> with the default 1.</p>
 <p><strong>Guards:</strong> <code>tests/uncertainty/test_identifiability.py::TestStructuralRank::test_structural_rank_takes_the_seed_of_the_calibrator</code>,
+<code>crates/commol-random/tests/test_seeds.rs::a_seed_that_is_set_is_kept_and_one_that_is_not_is_drawn</code>,
+<code>tests/model_kinds/test_stochastic.py</code> (<code>test_a_run_without_a_seed_keeps_the_seed_it_drew</code>, <code>test_replicates_without_a_seed_keep_the_seed_they_drew</code>),
+<code>tests/uncertainty/test_sensitivity.py::TestAnalysis::test_with_no_seed_one_is_drawn_and_logged</code>,
 <code>tests/uncertainty/test_scores.py::TestPit::test_the_pit_takes_the_seed_of_the_source</code>,
 <code>crates/commol-inference/tests/test_predictive.rs::the_pit_of_ties_follows_the_seed_of_the_draws</code>,
 <code>tests/uncertainty/test_local.py::TestStarts</code>,
@@ -3664,11 +3705,6 @@ arrays on one line. It is internal on purpose: an output format in the public
 API becomes a compatibility promise.</p>
 <p><strong>Guards:</strong> <code>tests/building/test_save_and_load.py::test_an_uncalibrated_parameter_round_trips</code>,
 <code>tests/building/test_save_and_load.py::test_an_uncalibrated_bin_amount_round_trips</code>.</p>
-<h2 id="public-models-forbid-unknown-fields">Public models forbid unknown fields<a class="headerlink" href="#public-models-forbid-unknown-fields" title="Permanent link">&para;</a></h2>
-<p>Every public Pydantic class sets <code>model_config = ConfigDict(extra="forbid")</code>.
-An unknown field, such as a misspelt or an old name (<code>window_steps</code>), raises a
-<code>ValidationError</code> that names it, instead of being dropped with no error.</p>
-<p><strong>Guard:</strong> <code>tests/building/test_unknown_fields.py</code>.</p>
 
 
 

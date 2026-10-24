@@ -27,7 +27,7 @@ class IdentifiabilityMethod(InferenceMethod[ResultT], Generic[ResultT]):
 
 ## StructuralRank
 
-Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
+Bases: `IdentifiabilityMethod[IdentifiabilityReport]`, `RangeChecked`
 
 Structural identifiability, local and numerical: the rank of the scaled sensitivities at random points inside the bounds.
 
@@ -43,7 +43,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport]):
+class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
     """
     Structural identifiability, local and numerical: the rank of the scaled
     sensitivities at random points inside the bounds.
@@ -64,13 +64,13 @@ class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport]):
         last observation (can denser data of these series?).
     """
 
-    points: int = Field(ge=1)
-    design: Literal["observations", "dense"]
+    points: int = Field()
+    design: StructuralDesign
 ```
 
 ## Collinearity
 
-Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
+Bases: `IdentifiabilityMethod[IdentifiabilityReport]`, `RangeChecked`
 
 Collinearity analysis after Brun et al. (2001): the sensitivity measure of each parameter and the collinearity index of each subset.
 
@@ -87,7 +87,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class Collinearity(IdentifiabilityMethod[IdentifiabilityReport]):
+class Collinearity(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
     """
     Collinearity analysis after Brun et al. (2001): the sensitivity measure
     of each parameter and the collinearity index of each subset.
@@ -111,13 +111,13 @@ class Collinearity(IdentifiabilityMethod[IdentifiabilityReport]):
     """
 
     at: CalibrationResult | ParameterSample
-    max_subset_size: int = Field(ge=2)
-    threshold: float = Field(gt=1.0)
+    max_subset_size: int
+    threshold: float = Field()
 ```
 
 ## SampleIdentifiability
 
-Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
+Bases: `IdentifiabilityMethod[IdentifiabilityReport]`, `RangeChecked`
 
 Practical identifiability from any parameter sample: how much it contracts each parameter, which parameters move together, and which marginals have several modes.
 
@@ -133,7 +133,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
+class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
     """
     Practical identifiability from any parameter sample: how much it contracts
     each parameter, which parameters move together, and which marginals have
@@ -156,13 +156,13 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
     """
 
     sample: ParameterSample
-    reference: Literal["bounds", "prior"]
-    correlation_threshold: float = Field(gt=0.0, lt=1.0)
+    reference: SampleReference
+    correlation_threshold: float
     priors: Priors | None = None
 
     @model_validator(mode="before")
     @classmethod
-    def read_priors(cls, data: object) -> object:
+    def read_priors(cls, data: JsonValue) -> JsonValue:
         """Read a mapping of parameter to distribution as `Priors`."""
         if isinstance(data, Mapping) and data.get("priors") is not None:
             return {**data, "priors": coerce_priors(data["priors"])}
@@ -188,7 +188,7 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
 #### read_priors
 
 ```python
-read_priors(data: object) -> object
+read_priors(data: JsonValue) -> JsonValue
 ```
 
 Read a mapping of parameter to distribution as `Priors`.
@@ -198,7 +198,7 @@ Source code in `commol/context/inference/identifiability.py`
 ```python
 @model_validator(mode="before")
 @classmethod
-def read_priors(cls, data: object) -> object:
+def read_priors(cls, data: JsonValue) -> JsonValue:
     """Read a mapping of parameter to distribution as `Priors`."""
     if isinstance(data, Mapping) and data.get("priors") is not None:
         return {**data, "priors": coerce_priors(data["priors"])}
@@ -233,7 +233,7 @@ def check_priors(self) -> Self:
 
 ## StartsIdentifiability
 
-Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
+Bases: `IdentifiabilityMethod[IdentifiabilityReport]`, `RangeChecked`
 
 Practical identifiability from the starts of a calibration (`Calibrator.run(starts=n)`): converged starts of equal loss that end apart flag the parameters that differ.
 
@@ -248,7 +248,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class StartsIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
+class StartsIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
     """
     Practical identifiability from the starts of a calibration
     (``Calibrator.run(starts=n)``): converged starts of equal loss that end
@@ -265,13 +265,13 @@ class StartsIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
     """
 
     result: CalibrationResult
-    parameter_tolerance: float = Field(ge=0.0)
-    loss_tolerance: float = Field(ge=0.0)
+    parameter_tolerance: float = Field()
+    loss_tolerance: float = Field()
 ```
 
 ## IdentifiabilityReport
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 Which parameters the model and the data determine: one structural and one practical verdict per parameter, and the evidence of each method.
 
@@ -288,7 +288,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class IdentifiabilityReport(_Frozen):
+class IdentifiabilityReport(_FrozenResult):
     """
     Which parameters the model and the data determine: one structural and one
     practical verdict per parameter, and the evidence of each method.
@@ -552,7 +552,7 @@ def merge(self, *others: "IdentifiabilityReport") -> "IdentifiabilityReport":
 
 ## ParameterVerdicts
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The two verdicts of one parameter; `None` when no evidence gives one.
 
@@ -566,7 +566,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class ParameterVerdicts(_Frozen):
+class ParameterVerdicts(_FrozenResult):
     """
     The two verdicts of one parameter; ``None`` when no evidence gives one.
 
@@ -584,7 +584,7 @@ class ParameterVerdicts(_Frozen):
 
 ## StructuralVerdict
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The structural verdict of one parameter.
 
@@ -599,7 +599,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class StructuralVerdict(_Frozen):
+class StructuralVerdict(_FrozenResult):
     """
     The structural verdict of one parameter.
 
@@ -627,7 +627,7 @@ class StructuralVerdict(_Frozen):
 
 ## PracticalVerdict
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The practical verdict of one parameter.
 
@@ -641,7 +641,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class PracticalVerdict(_Frozen):
+class PracticalVerdict(_FrozenResult):
     """
     The practical verdict of one parameter.
 
@@ -660,7 +660,7 @@ class PracticalVerdict(_Frozen):
 
 ## StructuralSection
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The evidence of `StructuralRank`.
 
@@ -679,7 +679,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class StructuralSection(_Frozen):
+class StructuralSection(_FrozenResult):
     """
     The evidence of `StructuralRank`.
 
@@ -703,7 +703,7 @@ class StructuralSection(_Frozen):
         The identifiable combinations.
     """
 
-    design: Literal["observations", "dense"]
+    design: StructuralDesign
     points: list[PointRank]
     skipped: list[str]
     generic_rank: int
@@ -714,7 +714,7 @@ class StructuralSection(_Frozen):
 
 ## PointRank
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The rank of the scaled sensitivities at one point.
 
@@ -730,7 +730,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class PointRank(_Frozen):
+class PointRank(_FrozenResult):
     """
     The rank of the scaled sensitivities at one point.
 
@@ -755,7 +755,7 @@ class PointRank(_Frozen):
 
 ## Combination
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 A combination of parameters the data determine: the product of each parameter raised to its exponent.
 
@@ -769,7 +769,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class Combination(_Frozen):
+class Combination(_FrozenResult):
     """
     A combination of parameters the data determine: the product of each
     parameter raised to its exponent.
@@ -789,7 +789,7 @@ class Combination(_Frozen):
 
 ## CollinearitySection
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The evidence of `Collinearity`.
 
@@ -808,7 +808,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class CollinearitySection(_Frozen):
+class CollinearitySection(_FrozenResult):
     """
     The evidence of `Collinearity`.
 
@@ -842,7 +842,7 @@ class CollinearitySection(_Frozen):
 
 ## SubsetIndex
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 A subset of parameters and its collinearity index.
 
@@ -857,7 +857,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class SubsetIndex(_Frozen):
+class SubsetIndex(_FrozenResult):
     """
     A subset of parameters and its collinearity index.
 
@@ -879,7 +879,7 @@ class SubsetIndex(_Frozen):
 
 ## SampleSection
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The evidence of `SampleIdentifiability`.
 
@@ -897,7 +897,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class SampleSection(_Frozen):
+class SampleSection(_FrozenResult):
     """
     The evidence of `SampleIdentifiability`.
 
@@ -920,7 +920,7 @@ class SampleSection(_Frozen):
         The modes of the marginal of each parameter.
     """
 
-    reference: Literal["bounds", "prior"]
+    reference: SampleReference
     correlation_threshold: float
     contraction: dict[str, float]
     correlation: dict[str, dict[str, float]]
@@ -930,7 +930,7 @@ class SampleSection(_Frozen):
 
 ## CorrelatedPair
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 Two parameters whose absolute correlation is above the threshold.
 
@@ -944,7 +944,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class CorrelatedPair(_Frozen):
+class CorrelatedPair(_FrozenResult):
     """
     Two parameters whose absolute correlation is above the threshold.
 
@@ -963,7 +963,7 @@ class CorrelatedPair(_Frozen):
 
 ## StartsSection
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The evidence of `StartsIdentifiability`.
 
@@ -980,7 +980,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class StartsSection(_Frozen):
+class StartsSection(_FrozenResult):
     """
     The evidence of `StartsIdentifiability`.
 
@@ -1008,7 +1008,7 @@ class StartsSection(_Frozen):
 
 ## ProfileSection
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The evidence of a `ProfileLikelihood`.
 
@@ -1025,7 +1025,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class ProfileSection(_Frozen):
+class ProfileSection(_FrozenResult):
     """
     The evidence of a `ProfileLikelihood`.
 
@@ -1045,7 +1045,7 @@ class ProfileSection(_Frozen):
         cross the threshold.
     """
 
-    threshold: Literal["chi_square", "beale", "bootstrap_calibrated"]
+    threshold: ProfileThresholdName
     confidence_level: float
     tolerance: float
     verdicts: dict[str, ProfileVerdictName | None]
