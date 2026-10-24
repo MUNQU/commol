@@ -2709,6 +2709,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/figures/" class="md-nav__link">
         
   
@@ -3692,8 +3720,8 @@ changing it (<a href="../decisions/uncertainty/#methods-plug-into-one-entry-poin
       row in the table of <code>docs/guide/parallelism.md</code> and a case of <code>METHODS</code>
       in <code>tests/parallelism/test_threads.py</code>.</li>
 <li>[ ] The configuration, a subclass of <code>UncertaintyMethod[YourResult]</code>, and
-      the result, in <code>context/inference/</code>; a result with draws holds a
-      <code>ParameterSample</code>.</li>
+      the result, a subclass of <code>ResultModel</code>, in <code>context/inference/</code>; a
+      result with draws holds a <code>ParameterSample</code>.</li>
 <li>[ ] A method that fits several times fits its perturbations with
       <code>ReplicateRunner::fit_all</code> and checks them with <code>ReplicateFits::require</code>;
       its result has <code>failed</code> (the entries of <code>FitUnit::failed</code>, logged as

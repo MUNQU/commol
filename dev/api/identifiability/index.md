@@ -271,7 +271,7 @@ class StartsIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeC
 
 ## IdentifiabilityReport
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 Which parameters the model and the data determine: one structural and one practical verdict per parameter, and the evidence of each method.
 
@@ -288,7 +288,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class IdentifiabilityReport(_Frozen):
+class IdentifiabilityReport(_FrozenResult):
     """
     Which parameters the model and the data determine: one structural and one
     practical verdict per parameter, and the evidence of each method.
@@ -552,7 +552,7 @@ def merge(self, *others: "IdentifiabilityReport") -> "IdentifiabilityReport":
 
 ## ParameterVerdicts
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The two verdicts of one parameter; `None` when no evidence gives one.
 
@@ -566,7 +566,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class ParameterVerdicts(_Frozen):
+class ParameterVerdicts(_FrozenResult):
     """
     The two verdicts of one parameter; ``None`` when no evidence gives one.
 
@@ -584,7 +584,7 @@ class ParameterVerdicts(_Frozen):
 
 ## StructuralVerdict
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The structural verdict of one parameter.
 
@@ -599,7 +599,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class StructuralVerdict(_Frozen):
+class StructuralVerdict(_FrozenResult):
     """
     The structural verdict of one parameter.
 
@@ -627,7 +627,7 @@ class StructuralVerdict(_Frozen):
 
 ## PracticalVerdict
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The practical verdict of one parameter.
 
@@ -641,7 +641,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class PracticalVerdict(_Frozen):
+class PracticalVerdict(_FrozenResult):
     """
     The practical verdict of one parameter.
 
@@ -660,7 +660,7 @@ class PracticalVerdict(_Frozen):
 
 ## StructuralSection
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The evidence of `StructuralRank`.
 
@@ -679,7 +679,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class StructuralSection(_Frozen):
+class StructuralSection(_FrozenResult):
     """
     The evidence of `StructuralRank`.
 
@@ -714,7 +714,7 @@ class StructuralSection(_Frozen):
 
 ## PointRank
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The rank of the scaled sensitivities at one point.
 
@@ -730,7 +730,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class PointRank(_Frozen):
+class PointRank(_FrozenResult):
     """
     The rank of the scaled sensitivities at one point.
 
@@ -755,7 +755,7 @@ class PointRank(_Frozen):
 
 ## Combination
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 A combination of parameters the data determine: the product of each parameter raised to its exponent.
 
@@ -769,7 +769,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class Combination(_Frozen):
+class Combination(_FrozenResult):
     """
     A combination of parameters the data determine: the product of each
     parameter raised to its exponent.
@@ -789,7 +789,7 @@ class Combination(_Frozen):
 
 ## CollinearitySection
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The evidence of `Collinearity`.
 
@@ -808,7 +808,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class CollinearitySection(_Frozen):
+class CollinearitySection(_FrozenResult):
     """
     The evidence of `Collinearity`.
 
@@ -842,7 +842,7 @@ class CollinearitySection(_Frozen):
 
 ## SubsetIndex
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 A subset of parameters and its collinearity index.
 
@@ -857,7 +857,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class SubsetIndex(_Frozen):
+class SubsetIndex(_FrozenResult):
     """
     A subset of parameters and its collinearity index.
 
@@ -879,7 +879,7 @@ class SubsetIndex(_Frozen):
 
 ## SampleSection
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The evidence of `SampleIdentifiability`.
 
@@ -897,7 +897,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class SampleSection(_Frozen):
+class SampleSection(_FrozenResult):
     """
     The evidence of `SampleIdentifiability`.
 
@@ -930,7 +930,7 @@ class SampleSection(_Frozen):
 
 ## CorrelatedPair
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 Two parameters whose absolute correlation is above the threshold.
 
@@ -944,7 +944,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class CorrelatedPair(_Frozen):
+class CorrelatedPair(_FrozenResult):
     """
     Two parameters whose absolute correlation is above the threshold.
 
@@ -963,7 +963,7 @@ class CorrelatedPair(_Frozen):
 
 ## StartsSection
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The evidence of `StartsIdentifiability`.
 
@@ -980,7 +980,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class StartsSection(_Frozen):
+class StartsSection(_FrozenResult):
     """
     The evidence of `StartsIdentifiability`.
 
@@ -1008,7 +1008,7 @@ class StartsSection(_Frozen):
 
 ## ProfileSection
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The evidence of a `ProfileLikelihood`.
 
@@ -1025,7 +1025,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class ProfileSection(_Frozen):
+class ProfileSection(_FrozenResult):
     """
     The evidence of a `ProfileLikelihood`.
 

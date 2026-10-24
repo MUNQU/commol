@@ -18,7 +18,7 @@
         <link rel="prev" href="../profiles/">
       
       
-        <link rel="next" href="../figures/">
+        <link rel="next" href="../python-models/">
       
       
         
@@ -2819,21 +2819,38 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#public-models-forbid-unknown-fields" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Public models forbid unknown fields
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3332,17 +3349,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#public-models-forbid-unknown-fields" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Public models forbid unknown fields
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -3699,11 +3705,6 @@ arrays on one line. It is internal on purpose: an output format in the public
 API becomes a compatibility promise.</p>
 <p><strong>Guards:</strong> <code>tests/building/test_save_and_load.py::test_an_uncalibrated_parameter_round_trips</code>,
 <code>tests/building/test_save_and_load.py::test_an_uncalibrated_bin_amount_round_trips</code>.</p>
-<h2 id="public-models-forbid-unknown-fields">Public models forbid unknown fields<a class="headerlink" href="#public-models-forbid-unknown-fields" title="Permanent link">&para;</a></h2>
-<p>Every public Pydantic class sets <code>model_config = ConfigDict(extra="forbid")</code>.
-An unknown field, such as a misspelt or an old name (<code>window_steps</code>), raises a
-<code>ValidationError</code> that names it, instead of being dropped with no error.</p>
-<p><strong>Guard:</strong> <code>tests/building/test_unknown_fields.py</code>.</p>
 
 
 

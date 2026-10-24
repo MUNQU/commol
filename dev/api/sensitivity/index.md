@@ -1249,7 +1249,7 @@ class Propagation(SensitivityMethod[PropagationResult], RangeChecked):
 
 ## PropagationResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The draws of the inputs and what each run gives.
 
@@ -1271,7 +1271,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class PropagationResult(BaseModel):
+class PropagationResult(ResultModel):
     """
     The draws of the inputs and what each run gives.
 
@@ -1582,7 +1582,7 @@ def summary(self, confidence_level: float) -> list[QuantitySummary]:
 
 ## QuantitySummary
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The weighted distribution of one quantity across the runs of a propagation.
 
@@ -1600,7 +1600,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class QuantitySummary(BaseModel):
+class QuantitySummary(ResultModel):
     """
     The weighted distribution of one quantity across the runs of a
     propagation.
@@ -1679,7 +1679,7 @@ class PRCC(SensitivityMethod[PRCCResult], RangeChecked):
 
 ## PRCCResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The partial rank correlation of each input with each quantity.
 
@@ -1701,7 +1701,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class PRCCResult(BaseModel):
+class PRCCResult(ResultModel):
     """
     The partial rank correlation of each input with each quantity.
 
@@ -1917,7 +1917,7 @@ class Morris(SensitivityMethod[MorrisResult], RangeChecked):
 
 ## MorrisResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The Morris indices of each input for each quantity.
 
@@ -1937,7 +1937,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class MorrisResult(BaseModel):
+class MorrisResult(ResultModel):
     """
     The Morris indices of each input for each quantity.
 
@@ -2143,7 +2143,7 @@ class Sobol(SensitivityMethod[SobolResult], RangeChecked):
 
 ## SobolResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The Sobol indices of each input for each quantity, with their bootstrap intervals.
 
@@ -2164,7 +2164,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class SobolResult(BaseModel):
+class SobolResult(ResultModel):
     """
     The Sobol indices of each input for each quantity, with their bootstrap
     intervals.
@@ -2390,7 +2390,7 @@ class PolynomialChaos(SensitivityMethod[ChaosResult], RangeChecked):
 
 ## ChaosResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 A polynomial chaos expansion of each quantity, its accuracy and the Sobol indices of its coefficients.
 
@@ -2416,7 +2416,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class ChaosResult(BaseModel):
+class ChaosResult(ResultModel):
     """
     A polynomial chaos expansion of each quantity, its accuracy and the
     Sobol indices of its coefficients.

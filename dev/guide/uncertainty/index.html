@@ -1371,6 +1371,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#comparing-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparing results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#checklist" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2898,6 +2909,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/figures/" class="md-nav__link">
         
   
@@ -3417,6 +3456,17 @@
     <span class="md-ellipsis">
       
         The entry point
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comparing-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparing results
       
     </span>
   </a>
@@ -4140,6 +4190,30 @@ of the registry (<a href="sensitivity/">Sensitivity Analysis</a>).</p>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">result</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">uncertainty</span><span class="p">(</span><span class="n">BayesianBootstrap</span><span class="p">(</span><span class="n">replicates</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">block_length</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
 </span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="nb">print</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">result</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">sample</span><span class="p">))</span>  <span class="c1"># BootstrapResult 20</span>
+</span></code></pre></div>
+<h2 id="comparing-results">Comparing results<a class="headerlink" href="#comparing-results" title="Permanent link">&para;</a></h2>
+<p>Two results of commol are equal (<code>==</code>) when they are of one class and their
+fields hold the same values, whatever the objects that hold them: a NaN equals
+a NaN, <code>0.0</code> equals <code>-0.0</code>, and the order of the keys of a dict does not count.
+This holds for the result of a run and of replicates (<code>SimulationResults</code>
+and <code>SimulationReplicates</code>, which also compare their positions, seed and
+model), of a calibration, of every method, of a sample, a band, a scenario
+summary and a score; a plain <code>dict</code> or <code>list</code> is not a result. So two runs
+with one seed give equal results, also when they hold a NaN, such as the PRCC
+of an input that the other inputs explain entirely. A frozen result, every
+one but the results of runs and replicates, <code>CalibrationResult</code> and
+<code>CalibrationHistory</code>, has a hash that agrees: equal results have equal
+hashes, so they can be keys of a <code>dict</code> or members of a <code>set</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">ParameterSummary</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">again</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">uncertainty</span><span class="p">(</span><span class="n">BayesianBootstrap</span><span class="p">(</span><span class="n">replicates</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">block_length</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">again</span> <span class="o">==</span> <span class="n">result</span><span class="p">,</span> <span class="nb">hash</span><span class="p">(</span><span class="n">again</span><span class="p">)</span> <span class="o">==</span> <span class="nb">hash</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>  <span class="c1"># True True</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">first</span> <span class="o">=</span> <span class="n">ParameterSummary</span><span class="p">(</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="n">mean</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">median</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">std</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="s2">&quot;nan&quot;</span><span class="p">),</span> <span class="n">lower</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mf">1.0</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="p">)</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="n">second</span> <span class="o">=</span> <span class="n">first</span><span class="o">.</span><span class="n">model_copy</span><span class="p">(</span><span class="n">update</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;std&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;nan&quot;</span><span class="p">)})</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="nb">print</span><span class="p">(</span><span class="n">first</span> <span class="o">==</span> <span class="n">second</span><span class="p">,</span> <span class="nb">len</span><span class="p">({</span><span class="n">first</span><span class="p">,</span> <span class="n">second</span><span class="p">}))</span>  <span class="c1"># True 1</span>
 </span></code></pre></div>
 <h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
 <ul>

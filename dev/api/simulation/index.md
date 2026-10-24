@@ -1115,11 +1115,13 @@ def sample(
 
 ## SimulationResults
 
-Bases: `dict[str, list[float]]`
+Bases: `ComparedByValue`, `dict[str, list[float]]`
 
 Values of every output at each position on the axis.
 
 A `dict` from output name to one value per position, so `results["A"]`, `json.dumps(results)` and `pandas.DataFrame(results)` work as for any mapping. The positions the values were read at are in :attr:`positions`.
+
+Two results are equal when their values (a NaN equal to a NaN), their positions, their seed and their model are (`ComparedByValue`); a plain `dict` is not a result, so it is not equal to one. Results can change, so they have no hash.
 
 Attributes:
 
@@ -1132,7 +1134,7 @@ Attributes:
 Source code in `commol/api/results.py`
 
 ```python
-class SimulationResults(dict[str, list[float]]):
+class SimulationResults(ComparedByValue, dict[str, list[float]]):
     """
     Values of every output at each position on the axis.
 
@@ -1140,6 +1142,11 @@ class SimulationResults(dict[str, list[float]]):
     ``results["A"]``, ``json.dumps(results)`` and
     ``pandas.DataFrame(results)`` work as for any mapping. The positions the
     values were read at are in :attr:`positions`.
+
+    Two results are equal when their values (a NaN equal to a NaN), their
+    positions, their seed and their model are (`ComparedByValue`); a plain
+    ``dict`` is not a result, so it is not equal to one. Results can change,
+    so they have no hash.
 
     Attributes
     ----------
@@ -1354,6 +1361,11 @@ class SimulationResults(dict[str, list[float]]):
             accumulators,
             prediction_intervals,
         )
+
+    @override
+    def compared_values(self) -> object:
+        """The values, the positions, the seed and the model."""
+        return dict(self), self.positions, self.seed, self.model
 
     def __repr__(self) -> str:
         """The positions, the seed and the values."""
@@ -1708,6 +1720,23 @@ def report(
     )
 ```
 
+#### compared_values
+
+```python
+compared_values() -> object
+```
+
+The values, the positions, the seed and the model.
+
+Source code in `commol/api/results.py`
+
+```python
+@override
+def compared_values(self) -> object:
+    """The values, the positions, the seed and the model."""
+    return dict(self), self.positions, self.seed, self.model
+```
+
 #### __repr__
 
 ```python
@@ -2019,11 +2048,13 @@ def run_at(self, at: Sequence[float]) -> SimulationReplicates:
 
 ## SimulationReplicates
 
-Bases: `list[SimulationResults]`
+Bases: `ComparedByValue`, `list[SimulationResults]`
 
 Replicates of a run of a stochastic engine, one `SimulationResults` each.
 
 A `list` of runs at the same positions, each with its own seed: `replicates[i].seed` repeats replicate `i`. The statistics reduce the replicates position by position, and `member_statistics` reduces them as `ci_percentiles` requires.
+
+Two replicates are equal when their runs, their seed, their positions and their model are (`ComparedByValue`); a plain `list` of the same runs is not equal to them. They have no hash.
 
 Attributes:
 
@@ -2036,7 +2067,7 @@ Attributes:
 Source code in `commol/api/results.py`
 
 ```python
-class SimulationReplicates(list[SimulationResults]):
+class SimulationReplicates(ComparedByValue, list[SimulationResults]):
     """
     Replicates of a run of a stochastic engine, one `SimulationResults` each.
 
@@ -2044,6 +2075,10 @@ class SimulationReplicates(list[SimulationResults]):
     ``replicates[i].seed`` repeats replicate ``i``. The statistics reduce the
     replicates position by position, and `member_statistics` reduces them as
     ``ci_percentiles`` requires.
+
+    Two replicates are equal when their runs, their seed, their positions and
+    their model are (`ComparedByValue`); a plain ``list`` of the same runs is
+    not equal to them. They have no hash.
 
     Attributes
     ----------
@@ -2327,6 +2362,11 @@ class SimulationReplicates(list[SimulationResults]):
             accumulators,
             prediction_intervals,
         )
+
+    @override
+    def compared_values(self) -> object:
+        """The runs, the seed, the positions and the model."""
+        return list(self), self.seed, self.positions, self.model
 
     def __repr__(self) -> str:
         """The number of replicates, their seed and their positions."""
@@ -2794,6 +2834,23 @@ def report(
         accumulators,
         prediction_intervals,
     )
+```
+
+#### compared_values
+
+```python
+compared_values() -> object
+```
+
+The runs, the seed, the positions and the model.
+
+Source code in `commol/api/results.py`
+
+```python
+@override
+def compared_values(self) -> object:
+    """The runs, the seed, the positions and the model."""
+    return list(self), self.seed, self.positions, self.model
 ```
 
 #### __repr__

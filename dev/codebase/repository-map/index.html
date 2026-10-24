@@ -2833,6 +2833,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/figures/" class="md-nav__link">
         
   
@@ -3880,6 +3908,11 @@
 <td><code>context/ranges.py</code></td>
 <td><code>RangeChecked</code>, the base of every model of an object with range rules: its validator calls the check of the engine for the object (<code>commol_rs.core.check_ranges</code>) when the model is built.</td>
 <td>A range constraint of pydantic; a rule of a setting.</td>
+</tr>
+<tr>
+<td><code>context/result_model.py</code></td>
+<td><code>ComparedByValue</code>, the one equality of every result: <code>==</code> over the values a result compares (<code>canonical</code>), a NaN equal to a NaN, and never equal to a plain <code>dict</code> or <code>list</code>; <code>ResultModel</code>, its base of every result model (of a calibration, a method, a sample, a predictive band, a scenario summary, a score, and their parts), which compares the public fields and gives a frozen result a hash that agrees. <code>SimulationResults</code> and <code>SimulationReplicates</code> subclass <code>ComparedByValue</code>.</td>
+<td>An <code>__eq__</code> or a <code>__hash__</code> of one result; the base of a setting.</td>
 </tr>
 <tr>
 <td><code>context/constants.py</code></td>

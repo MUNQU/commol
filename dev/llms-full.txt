@@ -2536,6 +2536,12 @@ print(len(rows[0]))           # 4: A, B, C and cum_ab
 print([round(value) for value in rows[0]])  # [900, 100, 0, 0]
 ```
 
+Two results are equal (`==`) when their values, `positions`, `seed` and `model` are equal, a NaN equal to a NaN. A plain `dict` is not a result, so it is not equal to one even with the same values: compare `dict(results)` to read the values only. `SimulationReplicates` compare their runs, their seed, their positions and their model in the same way. Results can change, so they have no hash ([Comparing results](https://munqu.github.io/commol/latest/guide/uncertainty/#comparing-results)).
+
+```python
+print(results == dict(results), dict(results) == dict(results))  # False True
+```
+
 ## Randomness, seeds and replicates
 
 A stochastic engine draws random numbers, so its runs depend on a seed; a deterministic engine, such as `DifferenceEquations` and `DifferentialEquations`, gives the same run for every seed (`EngineType.is_stochastic` in `crates/commol-core/src/types/engine.rs`).
@@ -4527,6 +4533,23 @@ from commol import BayesianBootstrap
 
 result = calibrator.uncertainty(BayesianBootstrap(replicates=20, block_length=1))
 print(type(result).__name__, len(result.sample))  # BootstrapResult 20
+```
+
+## Comparing results
+
+Two results of commol are equal (`==`) when they are of one class and their fields hold the same values, whatever the objects that hold them: a NaN equals a NaN, `0.0` equals `-0.0`, and the order of the keys of a dict does not count. This holds for the result of a run and of replicates (`SimulationResults` and `SimulationReplicates`, which also compare their positions, seed and model), of a calibration, of every method, of a sample, a band, a scenario summary and a score; a plain `dict` or `list` is not a result. So two runs with one seed give equal results, also when they hold a NaN, such as the PRCC of an input that the other inputs explain entirely. A frozen result, every one but the results of runs and replicates, `CalibrationResult` and `CalibrationHistory`, has a hash that agrees: equal results have equal hashes, so they can be keys of a `dict` or members of a `set`.
+
+```python
+from commol import ParameterSummary
+
+again = calibrator.uncertainty(BayesianBootstrap(replicates=20, block_length=1))
+print(again == result, hash(again) == hash(result))  # True True
+
+first = ParameterSummary(
+    mean=0.5, median=0.5, std=float("nan"), lower=0.0, upper=1.0, min=0.0, max=1.0
+)
+second = first.model_copy(update={"std": float("nan")})
+print(first == second, len({first, second}))  # True 1
 ```
 
 ## Checklist
@@ -13113,7 +13136,7 @@ def radius_stop(self, tol: float) -> Self:
 
 ## CalibrationResult
 
-Bases: `RangeChecked`
+Bases: `ResultModel`, `RangeChecked`
 
 Result of a calibration: the best of its starts.
 
@@ -13133,7 +13156,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class CalibrationResult(RangeChecked):
+class CalibrationResult(ResultModel, RangeChecked):
     """
     Result of a calibration: the best of its starts.
 
@@ -13232,7 +13255,7 @@ def __str__(self) -> str:
 
 ## StartSummary
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 One start of a multi-start optimization.
 
@@ -13250,7 +13273,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class StartSummary(BaseModel):
+class StartSummary(ResultModel):
     """
     One start of a multi-start optimization.
 
@@ -13279,7 +13302,7 @@ class StartSummary(BaseModel):
 
 ## CalibrationHistory
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 A calibration and every evaluation of a feasible point it made.
 
@@ -13293,7 +13316,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class CalibrationHistory(BaseModel):
+class CalibrationHistory(ResultModel):
     """
     A calibration and every evaluation of a feasible point it made.
 
@@ -13315,7 +13338,7 @@ class CalibrationHistory(BaseModel):
 
 ## CalibrationEvaluation
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 One evaluation of a feasible point during an optimization.
 
@@ -13329,7 +13352,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class CalibrationEvaluation(BaseModel):
+class CalibrationEvaluation(ResultModel):
     """
     One evaluation of a feasible point during an optimization.
 
@@ -13653,7 +13676,7 @@ class StartsIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeC
 
 ## IdentifiabilityReport
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 Which parameters the model and the data determine: one structural and one practical verdict per parameter, and the evidence of each method.
 
@@ -13670,7 +13693,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class IdentifiabilityReport(_Frozen):
+class IdentifiabilityReport(_FrozenResult):
     """
     Which parameters the model and the data determine: one structural and one
     practical verdict per parameter, and the evidence of each method.
@@ -13934,7 +13957,7 @@ def merge(self, *others: "IdentifiabilityReport") -> "IdentifiabilityReport":
 
 ## ParameterVerdicts
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The two verdicts of one parameter; `None` when no evidence gives one.
 
@@ -13948,7 +13971,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class ParameterVerdicts(_Frozen):
+class ParameterVerdicts(_FrozenResult):
     """
     The two verdicts of one parameter; ``None`` when no evidence gives one.
 
@@ -13966,7 +13989,7 @@ class ParameterVerdicts(_Frozen):
 
 ## StructuralVerdict
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The structural verdict of one parameter.
 
@@ -13981,7 +14004,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class StructuralVerdict(_Frozen):
+class StructuralVerdict(_FrozenResult):
     """
     The structural verdict of one parameter.
 
@@ -14009,7 +14032,7 @@ class StructuralVerdict(_Frozen):
 
 ## PracticalVerdict
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The practical verdict of one parameter.
 
@@ -14023,7 +14046,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class PracticalVerdict(_Frozen):
+class PracticalVerdict(_FrozenResult):
     """
     The practical verdict of one parameter.
 
@@ -14042,7 +14065,7 @@ class PracticalVerdict(_Frozen):
 
 ## StructuralSection
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The evidence of `StructuralRank`.
 
@@ -14061,7 +14084,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class StructuralSection(_Frozen):
+class StructuralSection(_FrozenResult):
     """
     The evidence of `StructuralRank`.
 
@@ -14096,7 +14119,7 @@ class StructuralSection(_Frozen):
 
 ## PointRank
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The rank of the scaled sensitivities at one point.
 
@@ -14112,7 +14135,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class PointRank(_Frozen):
+class PointRank(_FrozenResult):
     """
     The rank of the scaled sensitivities at one point.
 
@@ -14137,7 +14160,7 @@ class PointRank(_Frozen):
 
 ## Combination
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 A combination of parameters the data determine: the product of each parameter raised to its exponent.
 
@@ -14151,7 +14174,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class Combination(_Frozen):
+class Combination(_FrozenResult):
     """
     A combination of parameters the data determine: the product of each
     parameter raised to its exponent.
@@ -14171,7 +14194,7 @@ class Combination(_Frozen):
 
 ## CollinearitySection
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The evidence of `Collinearity`.
 
@@ -14190,7 +14213,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class CollinearitySection(_Frozen):
+class CollinearitySection(_FrozenResult):
     """
     The evidence of `Collinearity`.
 
@@ -14224,7 +14247,7 @@ class CollinearitySection(_Frozen):
 
 ## SubsetIndex
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 A subset of parameters and its collinearity index.
 
@@ -14239,7 +14262,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class SubsetIndex(_Frozen):
+class SubsetIndex(_FrozenResult):
     """
     A subset of parameters and its collinearity index.
 
@@ -14261,7 +14284,7 @@ class SubsetIndex(_Frozen):
 
 ## SampleSection
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The evidence of `SampleIdentifiability`.
 
@@ -14279,7 +14302,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class SampleSection(_Frozen):
+class SampleSection(_FrozenResult):
     """
     The evidence of `SampleIdentifiability`.
 
@@ -14312,7 +14335,7 @@ class SampleSection(_Frozen):
 
 ## CorrelatedPair
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 Two parameters whose absolute correlation is above the threshold.
 
@@ -14326,7 +14349,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class CorrelatedPair(_Frozen):
+class CorrelatedPair(_FrozenResult):
     """
     Two parameters whose absolute correlation is above the threshold.
 
@@ -14345,7 +14368,7 @@ class CorrelatedPair(_Frozen):
 
 ## StartsSection
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The evidence of `StartsIdentifiability`.
 
@@ -14362,7 +14385,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class StartsSection(_Frozen):
+class StartsSection(_FrozenResult):
     """
     The evidence of `StartsIdentifiability`.
 
@@ -14390,7 +14413,7 @@ class StartsSection(_Frozen):
 
 ## ProfileSection
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The evidence of a `ProfileLikelihood`.
 
@@ -14407,7 +14430,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class ProfileSection(_Frozen):
+class ProfileSection(_FrozenResult):
     """
     The evidence of a `ProfileLikelihood`.
 
@@ -25828,7 +25851,7 @@ class Propagation(SensitivityMethod[PropagationResult], RangeChecked):
 
 ## PropagationResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The draws of the inputs and what each run gives.
 
@@ -25850,7 +25873,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class PropagationResult(BaseModel):
+class PropagationResult(ResultModel):
     """
     The draws of the inputs and what each run gives.
 
@@ -26161,7 +26184,7 @@ def summary(self, confidence_level: float) -> list[QuantitySummary]:
 
 ## QuantitySummary
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The weighted distribution of one quantity across the runs of a propagation.
 
@@ -26179,7 +26202,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class QuantitySummary(BaseModel):
+class QuantitySummary(ResultModel):
     """
     The weighted distribution of one quantity across the runs of a
     propagation.
@@ -26258,7 +26281,7 @@ class PRCC(SensitivityMethod[PRCCResult], RangeChecked):
 
 ## PRCCResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The partial rank correlation of each input with each quantity.
 
@@ -26280,7 +26303,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class PRCCResult(BaseModel):
+class PRCCResult(ResultModel):
     """
     The partial rank correlation of each input with each quantity.
 
@@ -26496,7 +26519,7 @@ class Morris(SensitivityMethod[MorrisResult], RangeChecked):
 
 ## MorrisResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The Morris indices of each input for each quantity.
 
@@ -26516,7 +26539,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class MorrisResult(BaseModel):
+class MorrisResult(ResultModel):
     """
     The Morris indices of each input for each quantity.
 
@@ -26722,7 +26745,7 @@ class Sobol(SensitivityMethod[SobolResult], RangeChecked):
 
 ## SobolResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The Sobol indices of each input for each quantity, with their bootstrap intervals.
 
@@ -26743,7 +26766,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class SobolResult(BaseModel):
+class SobolResult(ResultModel):
     """
     The Sobol indices of each input for each quantity, with their bootstrap
     intervals.
@@ -26969,7 +26992,7 @@ class PolynomialChaos(SensitivityMethod[ChaosResult], RangeChecked):
 
 ## ChaosResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 A polynomial chaos expansion of each quantity, its accuracy and the Sobol indices of its coefficients.
 
@@ -26995,7 +27018,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class ChaosResult(BaseModel):
+class ChaosResult(ResultModel):
     """
     A polynomial chaos expansion of each quantity, its accuracy and the
     Sobol indices of its coefficients.
@@ -29165,11 +29188,13 @@ def sample(
 
 ## SimulationResults
 
-Bases: `dict[str, list[float]]`
+Bases: `ComparedByValue`, `dict[str, list[float]]`
 
 Values of every output at each position on the axis.
 
 A `dict` from output name to one value per position, so `results["A"]`, `json.dumps(results)` and `pandas.DataFrame(results)` work as for any mapping. The positions the values were read at are in :attr:`positions`.
+
+Two results are equal when their values (a NaN equal to a NaN), their positions, their seed and their model are (`ComparedByValue`); a plain `dict` is not a result, so it is not equal to one. Results can change, so they have no hash.
 
 Attributes:
 
@@ -29182,7 +29207,7 @@ Attributes:
 Source code in `commol/api/results.py`
 
 ```python
-class SimulationResults(dict[str, list[float]]):
+class SimulationResults(ComparedByValue, dict[str, list[float]]):
     """
     Values of every output at each position on the axis.
 
@@ -29190,6 +29215,11 @@ class SimulationResults(dict[str, list[float]]):
     ``results["A"]``, ``json.dumps(results)`` and
     ``pandas.DataFrame(results)`` work as for any mapping. The positions the
     values were read at are in :attr:`positions`.
+
+    Two results are equal when their values (a NaN equal to a NaN), their
+    positions, their seed and their model are (`ComparedByValue`); a plain
+    ``dict`` is not a result, so it is not equal to one. Results can change,
+    so they have no hash.
 
     Attributes
     ----------
@@ -29404,6 +29434,11 @@ class SimulationResults(dict[str, list[float]]):
             accumulators,
             prediction_intervals,
         )
+
+    @override
+    def compared_values(self) -> object:
+        """The values, the positions, the seed and the model."""
+        return dict(self), self.positions, self.seed, self.model
 
     def __repr__(self) -> str:
         """The positions, the seed and the values."""
@@ -29758,6 +29793,23 @@ def report(
     )
 ```
 
+#### compared_values
+
+```python
+compared_values() -> object
+```
+
+The values, the positions, the seed and the model.
+
+Source code in `commol/api/results.py`
+
+```python
+@override
+def compared_values(self) -> object:
+    """The values, the positions, the seed and the model."""
+    return dict(self), self.positions, self.seed, self.model
+```
+
 #### __repr__
 
 ```python
@@ -30069,11 +30121,13 @@ def run_at(self, at: Sequence[float]) -> SimulationReplicates:
 
 ## SimulationReplicates
 
-Bases: `list[SimulationResults]`
+Bases: `ComparedByValue`, `list[SimulationResults]`
 
 Replicates of a run of a stochastic engine, one `SimulationResults` each.
 
 A `list` of runs at the same positions, each with its own seed: `replicates[i].seed` repeats replicate `i`. The statistics reduce the replicates position by position, and `member_statistics` reduces them as `ci_percentiles` requires.
+
+Two replicates are equal when their runs, their seed, their positions and their model are (`ComparedByValue`); a plain `list` of the same runs is not equal to them. They have no hash.
 
 Attributes:
 
@@ -30086,7 +30140,7 @@ Attributes:
 Source code in `commol/api/results.py`
 
 ```python
-class SimulationReplicates(list[SimulationResults]):
+class SimulationReplicates(ComparedByValue, list[SimulationResults]):
     """
     Replicates of a run of a stochastic engine, one `SimulationResults` each.
 
@@ -30094,6 +30148,10 @@ class SimulationReplicates(list[SimulationResults]):
     ``replicates[i].seed`` repeats replicate ``i``. The statistics reduce the
     replicates position by position, and `member_statistics` reduces them as
     ``ci_percentiles`` requires.
+
+    Two replicates are equal when their runs, their seed, their positions and
+    their model are (`ComparedByValue`); a plain ``list`` of the same runs is
+    not equal to them. They have no hash.
 
     Attributes
     ----------
@@ -30377,6 +30435,11 @@ class SimulationReplicates(list[SimulationResults]):
             accumulators,
             prediction_intervals,
         )
+
+    @override
+    def compared_values(self) -> object:
+        """The runs, the seed, the positions and the model."""
+        return list(self), self.seed, self.positions, self.model
 
     def __repr__(self) -> str:
         """The number of replicates, their seed and their positions."""
@@ -30846,6 +30909,23 @@ def report(
     )
 ```
 
+#### compared_values
+
+```python
+compared_values() -> object
+```
+
+The runs, the seed, the positions and the model.
+
+Source code in `commol/api/results.py`
+
+```python
+@override
+def compared_values(self) -> object:
+    """The runs, the seed, the positions and the model."""
+    return list(self), self.seed, self.positions, self.model
+```
+
 #### __repr__
 
 ```python
@@ -31312,7 +31392,7 @@ class UncertaintyMethod(InferenceMethod[ResultT], Generic[ResultT]):
 
 ## ParameterSample
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 Draws of the parameters of a calibration problem, each with a weight.
 
@@ -31340,7 +31420,7 @@ Raises:
 Source code in `commol/context/inference/sample.py`
 
 ```python
-class ParameterSample(BaseModel):
+class ParameterSample(ResultModel):
     """
     Draws of the parameters of a calibration problem, each with a weight.
 
@@ -31412,14 +31492,6 @@ class ParameterSample(BaseModel):
             self.names, self.bounds, self.values, self.log_weights, self.groups
         )
         return self
-
-    def __eq__(self, other: object) -> bool:
-        """Two samples are equal when their fields are."""
-        if not isinstance(other, ParameterSample):
-            return NotImplemented
-        return self.model_dump() == other.model_dump()
-
-    __hash__ = None  # type: ignore[assignment]
 
     @classmethod
     def equally_weighted(
@@ -31725,24 +31797,6 @@ def build_rust_sample(self) -> Self:
         self.names, self.bounds, self.values, self.log_weights, self.groups
     )
     return self
-```
-
-#### __eq__
-
-```python
-__eq__(other: object) -> bool
-```
-
-Two samples are equal when their fields are.
-
-Source code in `commol/context/inference/sample.py`
-
-```python
-def __eq__(self, other: object) -> bool:
-    """Two samples are equal when their fields are."""
-    if not isinstance(other, ParameterSample):
-        return NotImplemented
-    return self.model_dump() == other.model_dump()
 ```
 
 #### equally_weighted
@@ -32188,7 +32242,7 @@ def summary(self, confidence_level: float) -> dict[str, ParameterSummary]:
 
 ## SampleMethod
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 What made a sample: the name of the method and its settings.
 
@@ -32202,7 +32256,7 @@ Attributes:
 Source code in `commol/context/inference/sample.py`
 
 ```python
-class SampleMethod(BaseModel):
+class SampleMethod(ResultModel):
     """
     What made a sample: the name of the method and its settings.
 
@@ -32224,7 +32278,7 @@ class SampleMethod(BaseModel):
 
 ## ParameterSummary
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 Weighted statistics of one parameter of a sample.
 
@@ -32243,7 +32297,7 @@ Attributes:
 Source code in `commol/context/inference/sample.py`
 
 ```python
-class ParameterSummary(BaseModel):
+class ParameterSummary(ResultModel):
     """
     Weighted statistics of one parameter of a sample.
 
@@ -33132,7 +33186,7 @@ def at_observations(
 
 ## PredictiveBand
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The band of every output of a predictive.
 
@@ -33147,7 +33201,7 @@ Attributes:
 Source code in `commol/api/inference/predictive.py`
 
 ```python
-class PredictiveBand(BaseModel):
+class PredictiveBand(ResultModel):
     """
     The band of every output of a predictive.
 
@@ -33174,7 +33228,7 @@ class PredictiveBand(BaseModel):
 
 ## SeriesBand
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The band of one series: four values at each of its positions.
 
@@ -33192,7 +33246,7 @@ Attributes:
 Source code in `commol/api/inference/predictive.py`
 
 ```python
-class SeriesBand(BaseModel):
+class SeriesBand(ResultModel):
     """
     The band of one series: four values at each of its positions.
 
@@ -33996,7 +34050,7 @@ def compare(
 
 ## ScenarioSummary
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The weighted distribution of one quantity across the runs of a scenario, or of its difference between two scenarios.
 
@@ -34014,7 +34068,7 @@ Attributes:
 Source code in `commol/api/inference/scenarios.py`
 
 ```python
-class ScenarioSummary(BaseModel):
+class ScenarioSummary(ResultModel):
     """
     The weighted distribution of one quantity across the runs of a scenario,
     or of its difference between two scenarios.
@@ -34387,7 +34441,7 @@ class ParametricBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
 ## BootstrapResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The result of a bootstrap.
 
@@ -34404,7 +34458,7 @@ Attributes:
 Source code in `commol/context/inference/resampling.py`
 
 ```python
-class BootstrapResult(BaseModel):
+class BootstrapResult(ResultModel):
     """
     The result of a bootstrap.
 
@@ -34533,7 +34587,7 @@ def interval_error(self, confidence_level: float) -> dict[str, BoundError]:
 
 ## JackknifeResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The result of a block jackknife.
 
@@ -34557,7 +34611,7 @@ Attributes:
 Source code in `commol/context/inference/resampling.py`
 
 ```python
-class JackknifeResult(BaseModel):
+class JackknifeResult(ResultModel):
     """
     The result of a block jackknife.
 
@@ -34612,7 +34666,7 @@ class JackknifeResult(BaseModel):
 
 ## ResamplingDiagnostics
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The blocks of a resampling method, and the synthetic values below zero.
 
@@ -34627,7 +34681,7 @@ Attributes:
 Source code in `commol/context/inference/resampling.py`
 
 ```python
-class ResamplingDiagnostics(BaseModel):
+class ResamplingDiagnostics(ResultModel):
     """
     The blocks of a resampling method, and the synthetic values below zero.
 
@@ -34655,7 +34709,7 @@ class ResamplingDiagnostics(BaseModel):
 
 ## BoundError
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The Monte Carlo error of the bounds of an interval: for each bound, an order-statistic interval that holds the bound of infinitely many replicates with about 95 % probability.
 
@@ -34669,7 +34723,7 @@ Attributes:
 Source code in `commol/context/inference/resampling.py`
 
 ```python
-class BoundError(BaseModel):
+class BoundError(ResultModel):
     """
     The Monte Carlo error of the bounds of an interval: for each bound, an
     order-statistic interval that holds the bound of infinitely many
@@ -34863,7 +34917,7 @@ def check_labels(self) -> Self:
 
 ## PredictionSpec
 
-Bases: `_Frozen`, `RangeChecked`
+Bases: `RangeChecked`
 
 A prediction to profile: an output, or a sum of outputs, at a position, read as an observation is.
 
@@ -34881,7 +34935,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class PredictionSpec(_Frozen, RangeChecked):
+class PredictionSpec(RangeChecked):
     """
     A prediction to profile: an output, or a sum of outputs, at a position,
     read as an observation is.
@@ -34902,6 +34956,8 @@ class PredictionSpec(_Frozen, RangeChecked):
     factor_id : str | None
         A factor parameter that multiplies the prediction.
     """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     at: float = Field()
     output: str | None = Field(default=None, min_length=1)
@@ -34989,7 +35045,7 @@ def as_observation(self) -> ObservedDataPoint:
 
 ## Threshold
 
-Bases: `_Frozen`, `RangeChecked`
+Bases: `RangeChecked`
 
 How far the statistic of a profile may rise above the fit inside an interval of `confidence_level`.
 
@@ -35006,7 +35062,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class Threshold(_Frozen, RangeChecked):
+class Threshold(RangeChecked):
     """
     How far the statistic of a profile may rise above the fit inside an
     interval of `confidence_level`.
@@ -35022,6 +35078,8 @@ class Threshold(_Frozen, RangeChecked):
     bootstrap : BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap | None
         The bootstrap of ``"bootstrap_calibrated"``; None otherwise.
     """  # noqa: E501
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: Literal["chi_square", "beale", "bootstrap_calibrated"]
     confidence_level: float
@@ -35347,7 +35405,7 @@ def bootstrap_calibrated(
 
 ## ProfileResult
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The result of a profile likelihood.
 
@@ -35371,7 +35429,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class ProfileResult(_Frozen):
+class ProfileResult(_FrozenResult):
     """
     The result of a profile likelihood.
 
@@ -35746,7 +35804,7 @@ def identifiability(self) -> IdentifiabilityReport:
 
 ## Profile
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The profile of one parameter or prediction.
 
@@ -35770,7 +35828,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class Profile(_Frozen):
+class Profile(_FrozenResult):
     """
     The profile of one parameter or prediction.
 
@@ -35827,7 +35885,7 @@ class Profile(_Frozen):
 
 ## ProfileInterval
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The pointwise interval of a quantity: where its profile crosses the threshold.
 
@@ -35840,7 +35898,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class ProfileInterval(_Frozen):
+class ProfileInterval(_FrozenResult):
     """
     The pointwise interval of a quantity: where its profile crosses the
     threshold.
@@ -35857,7 +35915,7 @@ class ProfileInterval(_Frozen):
 
 ## ProfileStructure
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 What resetting the other parameters says about a profile.
 
@@ -35877,7 +35935,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class ProfileStructure(_Frozen):
+class ProfileStructure(_FrozenResult):
     """
     What resetting the other parameters says about a profile.
 
@@ -36848,7 +36906,7 @@ class SeriesDistance(BaseModel):
 
 ## SMCResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The result of a sequential Monte Carlo method.
 
@@ -36865,7 +36923,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class SMCResult(BaseModel):
+class SMCResult(ResultModel):
     """
     The result of a sequential Monte Carlo method.
 
@@ -36945,7 +37003,7 @@ class GibbsResult(SMCResult):
 
 ## SMCDiagnostics
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 What happened at each step of a sequential Monte Carlo run.
 
@@ -36964,7 +37022,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class SMCDiagnostics(BaseModel):
+class SMCDiagnostics(ResultModel):
     """
     What happened at each step of a sequential Monte Carlo run.
 
@@ -37235,7 +37293,7 @@ class GibbsTarget(WithPriors, RangeChecked):
 
 ## LocalResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 What every local approximation returns: a distribution on the unbounded scale of the parameters, centred on the fit.
 
@@ -37251,7 +37309,7 @@ Attributes:
 Source code in `commol/context/inference/local.py`
 
 ```python
-class LocalResult(BaseModel):
+class LocalResult(ResultModel):
     """
     What every local approximation returns: a distribution on the unbounded
     scale of the parameters, centred on the fit.
@@ -37457,7 +37515,7 @@ def degrees_of_freedom(self) -> float | None:
 
 ## DeltaBand
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The band of every output by the delta method (`Calibrator.delta_band`): the prediction at the fit plus and minus a quantile times the standard deviation of the linearized model, `J Σ Jᵀ`, with no run of the draws.
 
@@ -37472,7 +37530,7 @@ Attributes:
 Source code in `commol/context/inference/local.py`
 
 ```python
-class DeltaBand(BaseModel):
+class DeltaBand(ResultModel):
     """
     The band of every output by the delta method (``Calibrator.delta_band``):
     the prediction at the fit
@@ -37501,7 +37559,7 @@ class DeltaBand(BaseModel):
 
 ## ImportanceResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The result of a Laplace mixture: draws of the mixture weighted by the target over the mixture, smoothed by Pareto-smoothed importance sampling.
 
@@ -37520,7 +37578,7 @@ Attributes:
 Source code in `commol/context/inference/local.py`
 
 ```python
-class ImportanceResult(BaseModel):
+class ImportanceResult(ResultModel):
     """
     The result of a Laplace mixture: draws of the mixture weighted by the
     target over the mixture, smoothed by Pareto-smoothed importance
@@ -37560,7 +37618,7 @@ class ImportanceResult(BaseModel):
 
 ## MixtureComponent
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 One component of a Laplace mixture: the Laplace approximation at one optimum of the starts.
 
@@ -37576,7 +37634,7 @@ Attributes:
 Source code in `commol/context/inference/local.py`
 
 ```python
-class MixtureComponent(BaseModel):
+class MixtureComponent(ResultModel):
     """
     One component of a Laplace mixture: the Laplace approximation at one
     optimum of the starts.
@@ -38031,7 +38089,7 @@ def check_spread(self) -> Self:
 
 ## ConformalResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The result of a conformal method.
 
@@ -38048,7 +38106,7 @@ Attributes:
 Source code in `commol/context/inference/conformal.py`
 
 ```python
-class ConformalResult(BaseModel):
+class ConformalResult(ResultModel):
     """
     The result of a conformal method.
 
@@ -38083,7 +38141,7 @@ class ConformalResult(BaseModel):
 
 ## PredictionIntervals
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 Prediction intervals for observations: where new observations of each series fall, at a confidence level.
 
@@ -38098,7 +38156,7 @@ Attributes:
 Source code in `commol/context/inference/conformal.py`
 
 ```python
-class PredictionIntervals(BaseModel):
+class PredictionIntervals(ResultModel):
     """
     Prediction intervals for observations: where new observations of each
     series fall, at a confidence level.
@@ -38124,7 +38182,7 @@ class PredictionIntervals(BaseModel):
 
 ## SeriesIntervals
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The prediction intervals of one series.
 
@@ -38140,7 +38198,7 @@ Attributes:
 Source code in `commol/context/inference/conformal.py`
 
 ```python
-class SeriesIntervals(BaseModel):
+class SeriesIntervals(ResultModel):
     """
     The prediction intervals of one series.
 
@@ -38176,7 +38234,7 @@ Every score is computed in Rust, per observation and per series: from each draw'
 
 #### Score
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 One score of a predictive at a set of observations.
 
@@ -38191,7 +38249,7 @@ Attributes:
 Source code in `commol/api/inference/scores.py`
 
 ```python
-class Score(BaseModel):
+class Score(ResultModel):
     """
     One score of a predictive at a set of observations.
 
@@ -40891,6 +40949,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- Two results of commol with the same values are equal, also when they hold a NaN: a NaN equals a NaN, whatever the objects that hold it. Before, `==` compared the identity of the items of a list first, so two runs with one seed gave results that were not equal when one held a NaN, such as a PRCC coefficient of an input that the other inputs explain entirely. A frozen result has a hash that agrees with `==`, also when it holds a list, a dict or a NaN. `ParameterSample` compares as every other result. A result no longer compares its private attributes ([Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/#comparing-results)).
+- `==` of `SimulationResults` and `SimulationReplicates` now also compares their positions, seed and model, and a NaN equals a NaN. Before, it read only the values, so two runs at other positions or with other seeds and the same values were equal, and two runs with one seed that held a NaN were not. A plain `dict` or `list` with the same values is no longer equal to a result: compare `dict(results)` to read the values only ([Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/#results)).
 - A profile reads a parameter with one finite bound, such as `[0, +∞)`, on its bound within `1e-8` of `max(1, |bound|)`, the rule of `Laplace`. Before, every value of such a parameter was on its bound, so a profile never saw the ridge leave the box through it, and the structure of a flat profile gave `undetermined="on_bound"` with that parameter in place of a reading.
 - A window whose start rounds to just below 0, such as a window of `1000 + 1e-7` that ends at 1000, starts at 0 in an observation, a calibration and a quantity, as `windowed_totals` reads it. Before, a calibration rejected it while the same window that ends at 2000 was accepted. One rule of the engine gives the start of a window.
 - Two neighbouring seeds share no replicate: before, replicate `i + 1` of `simulation.replicates(n, seed=42)` was replicate `i` of `seed=43`, and so were the starts and the swarms of a calibration with neighbouring seeds. Two methods that take one seed no longer draw from one sequence either: every random method draws from a stream of its own of the seed, and with one seed, replicate `i + 1` of a bootstrap no longer has the generator of particle `i` of an SMC sampler, nor the draws of `Laplace` the design of a sensitivity analysis. Every method draws with the samplers of the one generator of commol. So with one seed, the draws of the random methods and the replicates of a stochastic engine differ from 0.10.1; a run stays reproducible from its seed on one version.

@@ -53,7 +53,7 @@ class UncertaintyMethod(InferenceMethod[ResultT], Generic[ResultT]):
 
 ## ParameterSample
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 Draws of the parameters of a calibration problem, each with a weight.
 
@@ -81,7 +81,7 @@ Raises:
 Source code in `commol/context/inference/sample.py`
 
 ```python
-class ParameterSample(BaseModel):
+class ParameterSample(ResultModel):
     """
     Draws of the parameters of a calibration problem, each with a weight.
 
@@ -153,14 +153,6 @@ class ParameterSample(BaseModel):
             self.names, self.bounds, self.values, self.log_weights, self.groups
         )
         return self
-
-    def __eq__(self, other: object) -> bool:
-        """Two samples are equal when their fields are."""
-        if not isinstance(other, ParameterSample):
-            return NotImplemented
-        return self.model_dump() == other.model_dump()
-
-    __hash__ = None  # type: ignore[assignment]
 
     @classmethod
     def equally_weighted(
@@ -466,24 +458,6 @@ def build_rust_sample(self) -> Self:
         self.names, self.bounds, self.values, self.log_weights, self.groups
     )
     return self
-```
-
-#### __eq__
-
-```python
-__eq__(other: object) -> bool
-```
-
-Two samples are equal when their fields are.
-
-Source code in `commol/context/inference/sample.py`
-
-```python
-def __eq__(self, other: object) -> bool:
-    """Two samples are equal when their fields are."""
-    if not isinstance(other, ParameterSample):
-        return NotImplemented
-    return self.model_dump() == other.model_dump()
 ```
 
 #### equally_weighted
@@ -929,7 +903,7 @@ def summary(self, confidence_level: float) -> dict[str, ParameterSummary]:
 
 ## SampleMethod
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 What made a sample: the name of the method and its settings.
 
@@ -943,7 +917,7 @@ Attributes:
 Source code in `commol/context/inference/sample.py`
 
 ```python
-class SampleMethod(BaseModel):
+class SampleMethod(ResultModel):
     """
     What made a sample: the name of the method and its settings.
 
@@ -965,7 +939,7 @@ class SampleMethod(BaseModel):
 
 ## ParameterSummary
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 Weighted statistics of one parameter of a sample.
 
@@ -984,7 +958,7 @@ Attributes:
 Source code in `commol/context/inference/sample.py`
 
 ```python
-class ParameterSummary(BaseModel):
+class ParameterSummary(ResultModel):
     """
     Weighted statistics of one parameter of a sample.
 
@@ -1873,7 +1847,7 @@ def at_observations(
 
 ## PredictiveBand
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The band of every output of a predictive.
 
@@ -1888,7 +1862,7 @@ Attributes:
 Source code in `commol/api/inference/predictive.py`
 
 ```python
-class PredictiveBand(BaseModel):
+class PredictiveBand(ResultModel):
     """
     The band of every output of a predictive.
 
@@ -1915,7 +1889,7 @@ class PredictiveBand(BaseModel):
 
 ## SeriesBand
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The band of one series: four values at each of its positions.
 
@@ -1933,7 +1907,7 @@ Attributes:
 Source code in `commol/api/inference/predictive.py`
 
 ```python
-class SeriesBand(BaseModel):
+class SeriesBand(ResultModel):
     """
     The band of one series: four values at each of its positions.
 
@@ -2737,7 +2711,7 @@ def compare(
 
 ## ScenarioSummary
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The weighted distribution of one quantity across the runs of a scenario, or of its difference between two scenarios.
 
@@ -2755,7 +2729,7 @@ Attributes:
 Source code in `commol/api/inference/scenarios.py`
 
 ```python
-class ScenarioSummary(BaseModel):
+class ScenarioSummary(ResultModel):
     """
     The weighted distribution of one quantity across the runs of a scenario,
     or of its difference between two scenarios.
@@ -3128,7 +3102,7 @@ class ParametricBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
 ## BootstrapResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The result of a bootstrap.
 
@@ -3145,7 +3119,7 @@ Attributes:
 Source code in `commol/context/inference/resampling.py`
 
 ```python
-class BootstrapResult(BaseModel):
+class BootstrapResult(ResultModel):
     """
     The result of a bootstrap.
 
@@ -3274,7 +3248,7 @@ def interval_error(self, confidence_level: float) -> dict[str, BoundError]:
 
 ## JackknifeResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The result of a block jackknife.
 
@@ -3298,7 +3272,7 @@ Attributes:
 Source code in `commol/context/inference/resampling.py`
 
 ```python
-class JackknifeResult(BaseModel):
+class JackknifeResult(ResultModel):
     """
     The result of a block jackknife.
 
@@ -3353,7 +3327,7 @@ class JackknifeResult(BaseModel):
 
 ## ResamplingDiagnostics
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The blocks of a resampling method, and the synthetic values below zero.
 
@@ -3368,7 +3342,7 @@ Attributes:
 Source code in `commol/context/inference/resampling.py`
 
 ```python
-class ResamplingDiagnostics(BaseModel):
+class ResamplingDiagnostics(ResultModel):
     """
     The blocks of a resampling method, and the synthetic values below zero.
 
@@ -3396,7 +3370,7 @@ class ResamplingDiagnostics(BaseModel):
 
 ## BoundError
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The Monte Carlo error of the bounds of an interval: for each bound, an order-statistic interval that holds the bound of infinitely many replicates with about 95 % probability.
 
@@ -3410,7 +3384,7 @@ Attributes:
 Source code in `commol/context/inference/resampling.py`
 
 ```python
-class BoundError(BaseModel):
+class BoundError(ResultModel):
     """
     The Monte Carlo error of the bounds of an interval: for each bound, an
     order-statistic interval that holds the bound of infinitely many
@@ -3604,7 +3578,7 @@ def check_labels(self) -> Self:
 
 ## PredictionSpec
 
-Bases: `_Frozen`, `RangeChecked`
+Bases: `RangeChecked`
 
 A prediction to profile: an output, or a sum of outputs, at a position, read as an observation is.
 
@@ -3622,7 +3596,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class PredictionSpec(_Frozen, RangeChecked):
+class PredictionSpec(RangeChecked):
     """
     A prediction to profile: an output, or a sum of outputs, at a position,
     read as an observation is.
@@ -3643,6 +3617,8 @@ class PredictionSpec(_Frozen, RangeChecked):
     factor_id : str | None
         A factor parameter that multiplies the prediction.
     """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     at: float = Field()
     output: str | None = Field(default=None, min_length=1)
@@ -3730,7 +3706,7 @@ def as_observation(self) -> ObservedDataPoint:
 
 ## Threshold
 
-Bases: `_Frozen`, `RangeChecked`
+Bases: `RangeChecked`
 
 How far the statistic of a profile may rise above the fit inside an interval of `confidence_level`.
 
@@ -3747,7 +3723,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class Threshold(_Frozen, RangeChecked):
+class Threshold(RangeChecked):
     """
     How far the statistic of a profile may rise above the fit inside an
     interval of `confidence_level`.
@@ -3763,6 +3739,8 @@ class Threshold(_Frozen, RangeChecked):
     bootstrap : BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap | None
         The bootstrap of ``"bootstrap_calibrated"``; None otherwise.
     """  # noqa: E501
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: Literal["chi_square", "beale", "bootstrap_calibrated"]
     confidence_level: float
@@ -4088,7 +4066,7 @@ def bootstrap_calibrated(
 
 ## ProfileResult
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The result of a profile likelihood.
 
@@ -4112,7 +4090,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class ProfileResult(_Frozen):
+class ProfileResult(_FrozenResult):
     """
     The result of a profile likelihood.
 
@@ -4487,7 +4465,7 @@ def identifiability(self) -> IdentifiabilityReport:
 
 ## Profile
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The profile of one parameter or prediction.
 
@@ -4511,7 +4489,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class Profile(_Frozen):
+class Profile(_FrozenResult):
     """
     The profile of one parameter or prediction.
 
@@ -4568,7 +4546,7 @@ class Profile(_Frozen):
 
 ## ProfileInterval
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 The pointwise interval of a quantity: where its profile crosses the threshold.
 
@@ -4581,7 +4559,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class ProfileInterval(_Frozen):
+class ProfileInterval(_FrozenResult):
     """
     The pointwise interval of a quantity: where its profile crosses the
     threshold.
@@ -4598,7 +4576,7 @@ class ProfileInterval(_Frozen):
 
 ## ProfileStructure
 
-Bases: `_Frozen`
+Bases: `_FrozenResult`
 
 What resetting the other parameters says about a profile.
 
@@ -4618,7 +4596,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class ProfileStructure(_Frozen):
+class ProfileStructure(_FrozenResult):
     """
     What resetting the other parameters says about a profile.
 
@@ -5589,7 +5567,7 @@ class SeriesDistance(BaseModel):
 
 ## SMCResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The result of a sequential Monte Carlo method.
 
@@ -5606,7 +5584,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class SMCResult(BaseModel):
+class SMCResult(ResultModel):
     """
     The result of a sequential Monte Carlo method.
 
@@ -5686,7 +5664,7 @@ class GibbsResult(SMCResult):
 
 ## SMCDiagnostics
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 What happened at each step of a sequential Monte Carlo run.
 
@@ -5705,7 +5683,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class SMCDiagnostics(BaseModel):
+class SMCDiagnostics(ResultModel):
     """
     What happened at each step of a sequential Monte Carlo run.
 
@@ -5976,7 +5954,7 @@ class GibbsTarget(WithPriors, RangeChecked):
 
 ## LocalResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 What every local approximation returns: a distribution on the unbounded scale of the parameters, centred on the fit.
 
@@ -5992,7 +5970,7 @@ Attributes:
 Source code in `commol/context/inference/local.py`
 
 ```python
-class LocalResult(BaseModel):
+class LocalResult(ResultModel):
     """
     What every local approximation returns: a distribution on the unbounded
     scale of the parameters, centred on the fit.
@@ -6198,7 +6176,7 @@ def degrees_of_freedom(self) -> float | None:
 
 ## DeltaBand
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The band of every output by the delta method (`Calibrator.delta_band`): the prediction at the fit plus and minus a quantile times the standard deviation of the linearized model, `J Σ Jᵀ`, with no run of the draws.
 
@@ -6213,7 +6191,7 @@ Attributes:
 Source code in `commol/context/inference/local.py`
 
 ```python
-class DeltaBand(BaseModel):
+class DeltaBand(ResultModel):
     """
     The band of every output by the delta method (``Calibrator.delta_band``):
     the prediction at the fit
@@ -6242,7 +6220,7 @@ class DeltaBand(BaseModel):
 
 ## ImportanceResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The result of a Laplace mixture: draws of the mixture weighted by the target over the mixture, smoothed by Pareto-smoothed importance sampling.
 
@@ -6261,7 +6239,7 @@ Attributes:
 Source code in `commol/context/inference/local.py`
 
 ```python
-class ImportanceResult(BaseModel):
+class ImportanceResult(ResultModel):
     """
     The result of a Laplace mixture: draws of the mixture weighted by the
     target over the mixture, smoothed by Pareto-smoothed importance
@@ -6301,7 +6279,7 @@ class ImportanceResult(BaseModel):
 
 ## MixtureComponent
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 One component of a Laplace mixture: the Laplace approximation at one optimum of the starts.
 
@@ -6317,7 +6295,7 @@ Attributes:
 Source code in `commol/context/inference/local.py`
 
 ```python
-class MixtureComponent(BaseModel):
+class MixtureComponent(ResultModel):
     """
     One component of a Laplace mixture: the Laplace approximation at one
     optimum of the starts.
@@ -6772,7 +6750,7 @@ def check_spread(self) -> Self:
 
 ## ConformalResult
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The result of a conformal method.
 
@@ -6789,7 +6767,7 @@ Attributes:
 Source code in `commol/context/inference/conformal.py`
 
 ```python
-class ConformalResult(BaseModel):
+class ConformalResult(ResultModel):
     """
     The result of a conformal method.
 
@@ -6824,7 +6802,7 @@ class ConformalResult(BaseModel):
 
 ## PredictionIntervals
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 Prediction intervals for observations: where new observations of each series fall, at a confidence level.
 
@@ -6839,7 +6817,7 @@ Attributes:
 Source code in `commol/context/inference/conformal.py`
 
 ```python
-class PredictionIntervals(BaseModel):
+class PredictionIntervals(ResultModel):
     """
     Prediction intervals for observations: where new observations of each
     series fall, at a confidence level.
@@ -6865,7 +6843,7 @@ class PredictionIntervals(BaseModel):
 
 ## SeriesIntervals
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 The prediction intervals of one series.
 
@@ -6881,7 +6859,7 @@ Attributes:
 Source code in `commol/context/inference/conformal.py`
 
 ```python
-class SeriesIntervals(BaseModel):
+class SeriesIntervals(ResultModel):
     """
     The prediction intervals of one series.
 
@@ -6917,7 +6895,7 @@ Every score is computed in Rust, per observation and per series: from each draw'
 
 #### Score
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 One score of a predictive at a set of observations.
 
@@ -6932,7 +6910,7 @@ Attributes:
 Source code in `commol/api/inference/scores.py`
 
 ```python
-class Score(BaseModel):
+class Score(ResultModel):
     """
     One score of a predictive at a set of observations.
 

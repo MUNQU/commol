@@ -98,6 +98,12 @@ print(len(rows[0]))           # 4: A, B, C and cum_ab
 print([round(value) for value in rows[0]])  # [900, 100, 0, 0]
 ```
 
+Two results are equal (`==`) when their values, `positions`, `seed` and `model` are equal, a NaN equal to a NaN. A plain `dict` is not a result, so it is not equal to one even with the same values: compare `dict(results)` to read the values only. `SimulationReplicates` compare their runs, their seed, their positions and their model in the same way. Results can change, so they have no hash ([Comparing results](https://munqu.github.io/commol/latest/guide/uncertainty/#comparing-results)).
+
+```python
+print(results == dict(results), dict(results) == dict(results))  # False True
+```
+
 ## Randomness, seeds and replicates
 
 A stochastic engine draws random numbers, so its runs depend on a seed; a deterministic engine, such as `DifferenceEquations` and `DifferentialEquations`, gives the same run for every seed (`EngineType.is_stochastic` in `crates/commol-core/src/types/engine.rs`).

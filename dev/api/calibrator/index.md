@@ -3628,7 +3628,7 @@ def radius_stop(self, tol: float) -> Self:
 
 ## CalibrationResult
 
-Bases: `RangeChecked`
+Bases: `ResultModel`, `RangeChecked`
 
 Result of a calibration: the best of its starts.
 
@@ -3648,7 +3648,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class CalibrationResult(RangeChecked):
+class CalibrationResult(ResultModel, RangeChecked):
     """
     Result of a calibration: the best of its starts.
 
@@ -3747,7 +3747,7 @@ def __str__(self) -> str:
 
 ## StartSummary
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 One start of a multi-start optimization.
 
@@ -3765,7 +3765,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class StartSummary(BaseModel):
+class StartSummary(ResultModel):
     """
     One start of a multi-start optimization.
 
@@ -3794,7 +3794,7 @@ class StartSummary(BaseModel):
 
 ## CalibrationHistory
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 A calibration and every evaluation of a feasible point it made.
 
@@ -3808,7 +3808,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class CalibrationHistory(BaseModel):
+class CalibrationHistory(ResultModel):
     """
     A calibration and every evaluation of a feasible point it made.
 
@@ -3830,7 +3830,7 @@ class CalibrationHistory(BaseModel):
 
 ## CalibrationEvaluation
 
-Bases: `BaseModel`
+Bases: `ResultModel`
 
 One evaluation of a feasible point during an optimization.
 
@@ -3844,7 +3844,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class CalibrationEvaluation(BaseModel):
+class CalibrationEvaluation(ResultModel):
     """
     One evaluation of a feasible point during an optimization.
 

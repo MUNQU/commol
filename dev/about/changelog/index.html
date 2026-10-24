@@ -2695,6 +2695,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/python-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/figures/" class="md-nav__link">
         
   
@@ -4691,6 +4719,22 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>Two results of commol with the same values are equal, also when they hold
+  a NaN: a NaN equals a NaN, whatever the objects that hold it. Before, <code>==</code>
+  compared the identity of the items of a list first, so two runs with one
+  seed gave results that were not equal when one held a NaN, such as a PRCC
+  coefficient of an input that the other inputs explain entirely. A frozen
+  result has a hash that agrees with <code>==</code>, also when it holds a list, a dict
+  or a NaN. <code>ParameterSample</code> compares as every other result. A result no
+  longer compares its private attributes
+  (<a href="../../guide/uncertainty/#comparing-results">Uncertainty</a>).</li>
+<li><code>==</code> of <code>SimulationResults</code> and <code>SimulationReplicates</code> now also compares
+  their positions, seed and model, and a NaN equals a NaN. Before, it read
+  only the values, so two runs at other positions or with other seeds and
+  the same values were equal, and two runs with one seed that held a NaN
+  were not. A plain <code>dict</code> or <code>list</code> with the same values is no longer equal
+  to a result: compare <code>dict(results)</code> to read the values only
+  (<a href="../../guide/simulations/#results">Running Simulations</a>).</li>
 <li>
 <p>A profile reads a parameter with one finite bound, such as <code>[0, +∞)</code>, on
   its bound within <code>1e-8</code> of <code>max(1, |bound|)</code>, the rule of <code>Laplace</code>.
