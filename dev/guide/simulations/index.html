@@ -4162,7 +4162,7 @@ engine rejects settings of another engine with an error that names both
 <p>The defaults are the engine's (<code>commol_rs.engine.ODE_DEFAULT_RTOL</code> and
 <code>ODE_DEFAULT_ATOL</code>), and the engine checks the settings when they are built:
 <code>ODESolver(rtol=0.0)</code> raises <code>ValidationError</code> with the message of the
-engine, <code>The solver tolerance rtol must be a positive number, got 0</code>.</p>
+engine, <code>rtol is a finite number greater than 0, got 0</code>.</p>
 <p><code>bdf</code> builds its Jacobian from a finite-difference Jacobian-vector product. It
 uses a dense matrix below <code>SPARSE_THRESHOLD</code> state components and a sparse one
 from there (<code>crates/commol-differential/src/solve.rs</code>).</p>

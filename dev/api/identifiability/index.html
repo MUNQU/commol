@@ -3865,7 +3865,7 @@ type. The methods of commol return an <code>IdentifiabilityReport</code>.</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-internal" title="IdentifiabilityMethod (commol.context.inference.method.IdentifiabilityMethod)" href="#commol.context.inference.method.IdentifiabilityMethod">IdentifiabilityMethod</a>[<a class="autorefs autorefs-internal" title="IdentifiabilityReport (commol.context.inference.identifiability.IdentifiabilityReport)" href="#commol.context.inference.identifiability.IdentifiabilityReport">IdentifiabilityReport</a>]</code></p>
+              Bases: <code><a class="autorefs autorefs-internal" title="IdentifiabilityMethod (commol.context.inference.method.IdentifiabilityMethod)" href="#commol.context.inference.method.IdentifiabilityMethod">IdentifiabilityMethod</a>[<a class="autorefs autorefs-internal" title="IdentifiabilityReport (commol.context.inference.identifiability.IdentifiabilityReport)" href="#commol.context.inference.identifiability.IdentifiabilityReport">IdentifiabilityReport</a>]</code>, <code><span title="commol.context.ranges.RangeChecked">RangeChecked</span></code></p>
 
 
 
@@ -3946,7 +3946,7 @@ last observation (can denser data of these series?).</p>
 <span class="normal"><a href="#__codelineno-0-509">509</a></span>
 <span class="normal"><a href="#__codelineno-0-510">510</a></span>
 <span class="normal"><a href="#__codelineno-0-511">511</a></span>
-<span class="normal"><a href="#__codelineno-0-512">512</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-490"><a id="__codelineno-0-490" name="__codelineno-0-490"></a><span class="k">class</span><span class="w"> </span><span class="nc">StructuralRank</span><span class="p">(</span><span class="n">IdentifiabilityMethod</span><span class="p">[</span><span class="n">IdentifiabilityReport</span><span class="p">]):</span>
+<span class="normal"><a href="#__codelineno-0-512">512</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-490"><a id="__codelineno-0-490" name="__codelineno-0-490"></a><span class="k">class</span><span class="w"> </span><span class="nc">StructuralRank</span><span class="p">(</span><span class="n">IdentifiabilityMethod</span><span class="p">[</span><span class="n">IdentifiabilityReport</span><span class="p">],</span> <span class="n">RangeChecked</span><span class="p">):</span>
 </span><span id="__span-0-491"><a id="__codelineno-0-491" name="__codelineno-0-491"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="__span-0-492"><a id="__codelineno-0-492" name="__codelineno-0-492"></a><span class="sd">    Structural identifiability, local and numerical: the rank of the scaled</span>
 </span><span id="__span-0-493"><a id="__codelineno-0-493" name="__codelineno-0-493"></a><span class="sd">    sensitivities at random points inside the bounds.</span>
@@ -3967,7 +3967,7 @@ last observation (can denser data of these series?).</p>
 </span><span id="__span-0-508"><a id="__codelineno-0-508" name="__codelineno-0-508"></a><span class="sd">        last observation (can denser data of these series?).</span>
 </span><span id="__span-0-509"><a id="__codelineno-0-509" name="__codelineno-0-509"></a><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="__span-0-510"><a id="__codelineno-0-510" name="__codelineno-0-510"></a>
-</span><span id="__span-0-511"><a id="__codelineno-0-511" name="__codelineno-0-511"></a>    <span class="n">points</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-0-511"><a id="__codelineno-0-511" name="__codelineno-0-511"></a>    <span class="n">points</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">()</span>
 </span><span id="__span-0-512"><a id="__codelineno-0-512" name="__codelineno-0-512"></a>    <span class="n">design</span><span class="p">:</span> <span class="n">StructuralDesign</span>
 </span></code></pre></div></td></tr></table></div>
               </details>
@@ -4006,7 +4006,7 @@ last observation (can denser data of these series?).</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-internal" title="IdentifiabilityMethod (commol.context.inference.method.IdentifiabilityMethod)" href="#commol.context.inference.method.IdentifiabilityMethod">IdentifiabilityMethod</a>[<a class="autorefs autorefs-internal" title="IdentifiabilityReport (commol.context.inference.identifiability.IdentifiabilityReport)" href="#commol.context.inference.identifiability.IdentifiabilityReport">IdentifiabilityReport</a>]</code></p>
+              Bases: <code><a class="autorefs autorefs-internal" title="IdentifiabilityMethod (commol.context.inference.method.IdentifiabilityMethod)" href="#commol.context.inference.method.IdentifiabilityMethod">IdentifiabilityMethod</a>[<a class="autorefs autorefs-internal" title="IdentifiabilityReport (commol.context.inference.identifiability.IdentifiabilityReport)" href="#commol.context.inference.identifiability.IdentifiabilityReport">IdentifiabilityReport</a>]</code>, <code><span title="commol.context.ranges.RangeChecked">RangeChecked</span></code></p>
 
 
 
@@ -4101,7 +4101,7 @@ it is a modelling judgment.</p>
 <span class="normal"><a href="#__codelineno-0-537">537</a></span>
 <span class="normal"><a href="#__codelineno-0-538">538</a></span>
 <span class="normal"><a href="#__codelineno-0-539">539</a></span>
-<span class="normal"><a href="#__codelineno-0-540">540</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-515"><a id="__codelineno-0-515" name="__codelineno-0-515"></a><span class="k">class</span><span class="w"> </span><span class="nc">Collinearity</span><span class="p">(</span><span class="n">IdentifiabilityMethod</span><span class="p">[</span><span class="n">IdentifiabilityReport</span><span class="p">]):</span>
+<span class="normal"><a href="#__codelineno-0-540">540</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-515"><a id="__codelineno-0-515" name="__codelineno-0-515"></a><span class="k">class</span><span class="w"> </span><span class="nc">Collinearity</span><span class="p">(</span><span class="n">IdentifiabilityMethod</span><span class="p">[</span><span class="n">IdentifiabilityReport</span><span class="p">],</span> <span class="n">RangeChecked</span><span class="p">):</span>
 </span><span id="__span-0-516"><a id="__codelineno-0-516" name="__codelineno-0-516"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="__span-0-517"><a id="__codelineno-0-517" name="__codelineno-0-517"></a><span class="sd">    Collinearity analysis after Brun et al. (2001): the sensitivity measure</span>
 </span><span id="__span-0-518"><a id="__codelineno-0-518" name="__codelineno-0-518"></a><span class="sd">    of each parameter and the collinearity index of each subset.</span>
@@ -4126,7 +4126,7 @@ it is a modelling judgment.</p>
 </span><span id="__span-0-537"><a id="__codelineno-0-537" name="__codelineno-0-537"></a>
 </span><span id="__span-0-538"><a id="__codelineno-0-538" name="__codelineno-0-538"></a>    <span class="n">at</span><span class="p">:</span> <span class="n">CalibrationResult</span> <span class="o">|</span> <span class="n">ParameterSample</span>
 </span><span id="__span-0-539"><a id="__codelineno-0-539" name="__codelineno-0-539"></a>    <span class="n">max_subset_size</span><span class="p">:</span> <span class="nb">int</span>
-</span><span id="__span-0-540"><a id="__codelineno-0-540" name="__codelineno-0-540"></a>    <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">gt</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</span><span id="__span-0-540"><a id="__codelineno-0-540" name="__codelineno-0-540"></a>    <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">Field</span><span class="p">()</span>
 </span></code></pre></div></td></tr></table></div>
               </details>
 
@@ -4164,7 +4164,7 @@ it is a modelling judgment.</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-internal" title="IdentifiabilityMethod (commol.context.inference.method.IdentifiabilityMethod)" href="#commol.context.inference.method.IdentifiabilityMethod">IdentifiabilityMethod</a>[<a class="autorefs autorefs-internal" title="IdentifiabilityReport (commol.context.inference.identifiability.IdentifiabilityReport)" href="#commol.context.inference.identifiability.IdentifiabilityReport">IdentifiabilityReport</a>]</code></p>
+              Bases: <code><a class="autorefs autorefs-internal" title="IdentifiabilityMethod (commol.context.inference.method.IdentifiabilityMethod)" href="#commol.context.inference.method.IdentifiabilityMethod">IdentifiabilityMethod</a>[<a class="autorefs autorefs-internal" title="IdentifiabilityReport (commol.context.inference.identifiability.IdentifiabilityReport)" href="#commol.context.inference.identifiability.IdentifiabilityReport">IdentifiabilityReport</a>]</code>, <code><span title="commol.context.ranges.RangeChecked">RangeChecked</span></code></p>
 
 
 
@@ -4290,7 +4290,7 @@ default: it is a modelling judgment.</p>
 <span class="normal"><a href="#__codelineno-0-587">587</a></span>
 <span class="normal"><a href="#__codelineno-0-588">588</a></span>
 <span class="normal"><a href="#__codelineno-0-589">589</a></span>
-<span class="normal"><a href="#__codelineno-0-590">590</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-543"><a id="__codelineno-0-543" name="__codelineno-0-543"></a><span class="k">class</span><span class="w"> </span><span class="nc">SampleIdentifiability</span><span class="p">(</span><span class="n">IdentifiabilityMethod</span><span class="p">[</span><span class="n">IdentifiabilityReport</span><span class="p">]):</span>
+<span class="normal"><a href="#__codelineno-0-590">590</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-543"><a id="__codelineno-0-543" name="__codelineno-0-543"></a><span class="k">class</span><span class="w"> </span><span class="nc">SampleIdentifiability</span><span class="p">(</span><span class="n">IdentifiabilityMethod</span><span class="p">[</span><span class="n">IdentifiabilityReport</span><span class="p">],</span> <span class="n">RangeChecked</span><span class="p">):</span>
 </span><span id="__span-0-544"><a id="__codelineno-0-544" name="__codelineno-0-544"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="__span-0-545"><a id="__codelineno-0-545" name="__codelineno-0-545"></a><span class="sd">    Practical identifiability from any parameter sample: how much it contracts</span>
 </span><span id="__span-0-546"><a id="__codelineno-0-546" name="__codelineno-0-546"></a><span class="sd">    each parameter, which parameters move together, and which marginals have</span>
@@ -4314,7 +4314,7 @@ default: it is a modelling judgment.</p>
 </span><span id="__span-0-564"><a id="__codelineno-0-564" name="__codelineno-0-564"></a>
 </span><span id="__span-0-565"><a id="__codelineno-0-565" name="__codelineno-0-565"></a>    <span class="n">sample</span><span class="p">:</span> <span class="n">ParameterSample</span>
 </span><span id="__span-0-566"><a id="__codelineno-0-566" name="__codelineno-0-566"></a>    <span class="n">reference</span><span class="p">:</span> <span class="n">SampleReference</span>
-</span><span id="__span-0-567"><a id="__codelineno-0-567" name="__codelineno-0-567"></a>    <span class="n">correlation_threshold</span><span class="p">:</span> <span class="n">Share</span>
+</span><span id="__span-0-567"><a id="__codelineno-0-567" name="__codelineno-0-567"></a>    <span class="n">correlation_threshold</span><span class="p">:</span> <span class="nb">float</span>
 </span><span id="__span-0-568"><a id="__codelineno-0-568" name="__codelineno-0-568"></a>    <span class="n">priors</span><span class="p">:</span> <span class="n">Priors</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 </span><span id="__span-0-569"><a id="__codelineno-0-569" name="__codelineno-0-569"></a>
 </span><span id="__span-0-570"><a id="__codelineno-0-570" name="__codelineno-0-570"></a>    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">)</span>
@@ -4465,7 +4465,7 @@ default: it is a modelling judgment.</p>
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-internal" title="IdentifiabilityMethod (commol.context.inference.method.IdentifiabilityMethod)" href="#commol.context.inference.method.IdentifiabilityMethod">IdentifiabilityMethod</a>[<a class="autorefs autorefs-internal" title="IdentifiabilityReport (commol.context.inference.identifiability.IdentifiabilityReport)" href="#commol.context.inference.identifiability.IdentifiabilityReport">IdentifiabilityReport</a>]</code></p>
+              Bases: <code><a class="autorefs autorefs-internal" title="IdentifiabilityMethod (commol.context.inference.method.IdentifiabilityMethod)" href="#commol.context.inference.method.IdentifiabilityMethod">IdentifiabilityMethod</a>[<a class="autorefs autorefs-internal" title="IdentifiabilityReport (commol.context.inference.identifiability.IdentifiabilityReport)" href="#commol.context.inference.identifiability.IdentifiabilityReport">IdentifiabilityReport</a>]</code>, <code><span title="commol.context.ranges.RangeChecked">RangeChecked</span></code></p>
 
 
 
@@ -4547,7 +4547,7 @@ apart flag the parameters that differ.</p>
 <span class="normal"><a href="#__codelineno-0-608">608</a></span>
 <span class="normal"><a href="#__codelineno-0-609">609</a></span>
 <span class="normal"><a href="#__codelineno-0-610">610</a></span>
-<span class="normal"><a href="#__codelineno-0-611">611</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-593"><a id="__codelineno-0-593" name="__codelineno-0-593"></a><span class="k">class</span><span class="w"> </span><span class="nc">StartsIdentifiability</span><span class="p">(</span><span class="n">IdentifiabilityMethod</span><span class="p">[</span><span class="n">IdentifiabilityReport</span><span class="p">]):</span>
+<span class="normal"><a href="#__codelineno-0-611">611</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-593"><a id="__codelineno-0-593" name="__codelineno-0-593"></a><span class="k">class</span><span class="w"> </span><span class="nc">StartsIdentifiability</span><span class="p">(</span><span class="n">IdentifiabilityMethod</span><span class="p">[</span><span class="n">IdentifiabilityReport</span><span class="p">],</span> <span class="n">RangeChecked</span><span class="p">):</span>
 </span><span id="__span-0-594"><a id="__codelineno-0-594" name="__codelineno-0-594"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="__span-0-595"><a id="__codelineno-0-595" name="__codelineno-0-595"></a><span class="sd">    Practical identifiability from the starts of a calibration</span>
 </span><span id="__span-0-596"><a id="__codelineno-0-596" name="__codelineno-0-596"></a><span class="sd">    (``Calibrator.run(starts=n)``): converged starts of equal loss that end</span>
@@ -4564,8 +4564,8 @@ apart flag the parameters that differ.</p>
 </span><span id="__span-0-607"><a id="__codelineno-0-607" name="__codelineno-0-607"></a><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="__span-0-608"><a id="__codelineno-0-608" name="__codelineno-0-608"></a>
 </span><span id="__span-0-609"><a id="__codelineno-0-609" name="__codelineno-0-609"></a>    <span class="n">result</span><span class="p">:</span> <span class="n">CalibrationResult</span>
-</span><span id="__span-0-610"><a id="__codelineno-0-610" name="__codelineno-0-610"></a>    <span class="n">parameter_tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">ge</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
-</span><span id="__span-0-611"><a id="__codelineno-0-611" name="__codelineno-0-611"></a>    <span class="n">loss_tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">ge</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+</span><span id="__span-0-610"><a id="__codelineno-0-610" name="__codelineno-0-610"></a>    <span class="n">parameter_tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">Field</span><span class="p">()</span>
+</span><span id="__span-0-611"><a id="__codelineno-0-611" name="__codelineno-0-611"></a>    <span class="n">loss_tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">Field</span><span class="p">()</span>
 </span></code></pre></div></td></tr></table></div>
               </details>
 

@@ -4584,6 +4584,22 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>The engine holds the range rule of every setting: a count, a share, a
+  length, a scale, a tolerance, a bound of an optimizer, an observation, an
+  observation model, an axis pattern, a distribution, a quantity of interest
+  and the setting of an uncertainty, identifiability or sensitivity method.
+  A value outside its range still raises <code>ValueError</code> when the object is
+  built, and the same values are valid; the message is the engine's, and
+  names the setting and its range: <code>replicates is a whole number of at least
+  1, got 0</code>, <code>sd is a finite number greater than 0, got 0</code>. A count gives
+  one message for every value outside its range, a negative one included,
+  also when a binding is called with no Python object in between, and for
+  <code>Simulation.replicates</code> (<code>count is a whole number of at least 1, got 0</code>)
+  and <code>Calibrator.run</code> (<code>starts is a whole number of at least 1, got 0</code>).
+  A seed outside its range gives <code>seed is a whole number from 0 to
+  18446744073709551615, got -1</code> in every function that takes one:
+  <code>Simulation.run</code>, <code>Simulation.run_at</code>, <code>Simulation.replicates</code>,
+  <code>CalibrationProblem</code>, <code>SensitivityAnalysis</code> and each binding.</li>
 <li>A calibration, a sensitivity analysis or any other method that sets a
   model parameter raises <code>ValueError</code> when it is built if the parameter is
   a formula or a series parameter. The engine computes such a parameter at

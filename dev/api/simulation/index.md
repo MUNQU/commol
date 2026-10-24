@@ -249,15 +249,16 @@ class Simulation:
         ------
         ValueError
             If the engine is deterministic (every replicate would be equal),
-            ``count`` is below 1, or the seed is not valid.
+            ``count`` is not a whole number or is below 1, or the seed is not
+            valid.
         """
         if not self.is_stochastic:
             raise ValueError(
                 f"The {self.model_definition.engine.type} engine is deterministic: "
                 "every replicate would be equal. Replicates need a stochastic engine."
             )
-        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
-            raise ValueError(f"The number of replicates is at least 1, got {count!r}.")
+        if isinstance(count, bool) or not isinstance(count, int):
+            raise ValueError(f"count is a whole number, got {count!r}")
         return ReplicateRuns(self, count, None if seed is None else check_seed(seed))
 
     @property
@@ -745,9 +746,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                  |
-| ------------ | ------------------------------------------------------------------------------------------------------------ |
-| `ValueError` | If the engine is deterministic (every replicate would be equal), count is below 1, or the seed is not valid. |
+| Type         | Description                                                                                                                           |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If the engine is deterministic (every replicate would be equal), count is not a whole number or is below 1, or the seed is not valid. |
 
 Source code in `commol/api/simulation.py`
 
@@ -780,15 +781,16 @@ def replicates(self, count: int, *, seed: int | None = None) -> "ReplicateRuns":
     ------
     ValueError
         If the engine is deterministic (every replicate would be equal),
-        ``count`` is below 1, or the seed is not valid.
+        ``count`` is not a whole number or is below 1, or the seed is not
+        valid.
     """
     if not self.is_stochastic:
         raise ValueError(
             f"The {self.model_definition.engine.type} engine is deterministic: "
             "every replicate would be equal. Replicates need a stochastic engine."
         )
-    if isinstance(count, bool) or not isinstance(count, int) or count < 1:
-        raise ValueError(f"The number of replicates is at least 1, got {count!r}.")
+    if isinstance(count, bool) or not isinstance(count, int):
+        raise ValueError(f"count is a whole number, got {count!r}")
     return ReplicateRuns(self, count, None if seed is None else check_seed(seed))
 ```
 
@@ -1769,7 +1771,14 @@ class ReplicateRuns:
         seed : int | None
             The seed the replicate seeds derive from; None draws one at each
             run.
+
+        Raises
+        ------
+        ValueError
+            With the message of the engine, if ``count`` is below 1 or the
+            seed is outside its range.
         """
+        commol_rs.core.check_ranges("ReplicateRuns", {"count": count, "seed": seed})
         self.simulation = simulation
         self.count = count
         self.seed = seed
@@ -1863,6 +1872,12 @@ Parameters:
 | `count`      | `int`        | How many replicates.                           | *required*                                                            |
 | `seed`       | \`int        | None\`                                         | The seed the replicate seeds derive from; None draws one at each run. |
 
+Raises:
+
+| Type         | Description                                                                           |
+| ------------ | ------------------------------------------------------------------------------------- |
+| `ValueError` | With the message of the engine, if count is below 1 or the seed is outside its range. |
+
 Source code in `commol/api/simulation.py`
 
 ```python
@@ -1879,7 +1894,14 @@ def __init__(self, simulation: Simulation, count: int, seed: int | None) -> None
     seed : int | None
         The seed the replicate seeds derive from; None draws one at each
         run.
+
+    Raises
+    ------
+    ValueError
+        With the message of the engine, if ``count`` is below 1 or the
+        seed is outside its range.
     """
+    commol_rs.core.check_ranges("ReplicateRuns", {"count": count, "seed": seed})
     self.simulation = simulation
     self.count = count
     self.seed = seed
@@ -2136,9 +2158,7 @@ class SimulationReplicates(list[SimulationResults]):
         ValueError
             If a level is outside ``[0, 1]`` or there are no replicates.
         """
-        for level in levels:
-            if not 0.0 <= level <= 1.0:
-                raise ValueError(f"A quantile level is between 0 and 1, got {level}.")
+        commol_rs.inference.check_levels(list(levels))
         if not self:
             raise ValueError("There are no replicates.")
         from commol.api.inference.intervals import weighted_quantiles
@@ -2500,9 +2520,7 @@ def quantiles(self, levels: Sequence[float]) -> dict[float, SimulationResults]:
     ValueError
         If a level is outside ``[0, 1]`` or there are no replicates.
     """
-    for level in levels:
-        if not 0.0 <= level <= 1.0:
-            raise ValueError(f"A quantile level is between 0 and 1, got {level}.")
+    commol_rs.inference.check_levels(list(levels))
     if not self:
         raise ValueError("There are no replicates.")
     from commol.api.inference.intervals import weighted_quantiles

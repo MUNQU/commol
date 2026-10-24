@@ -3811,10 +3811,10 @@ seed of the analysis (<code>Stream</code>, <code>crates/commol-random/src/stream
 <h3 id="pyo3-bindings">PyO3 bindings<a class="headerlink" href="#pyo3-bindings" title="Permanent link">&para;</a></h3>
 <ul>
 <li>[ ] Keep logic out of <code>py-commol/src/</code>: convert types and call the crate.</li>
-<li>[ ] Read each count a user sets with the reader of its name,
-      <code>#[pyo3(from_py_with = crate::counts::required::&lt;name&gt;)]</code> (or
-      <code>optional::&lt;name&gt;</code>), so a negative count raises <code>ValueError</code> that names
-      the setting; add the case to <code>tests/uncertainty/test_counts.py</code>.</li>
+<li>[ ] Take a count as <code>i64</code> (a seed as <code>i128</code>) and read it with its rule,
+      <code>crate::counts::count(&amp;RULE, value)</code> (<code>commol_core::SEED</code> for a seed),
+      so a negative one raises the message of the rule; add the case to
+      <code>tests/uncertainty/test_counts.py</code>.</li>
 <li>[ ] Update <code>_commol_rs.pyi</code>.</li>
 <li>[ ] Rebuild the extension with the test model kind
       (<a href="../../development/workflow/#quick-commands">Quick commands</a>) before you run

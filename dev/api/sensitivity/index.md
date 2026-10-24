@@ -1204,7 +1204,7 @@ class SensitivityMethod(InferenceMethod[ResultT], Generic[ResultT]):
 
 ## Propagation
 
-Bases: `SensitivityMethod[PropagationResult]`
+Bases: `SensitivityMethod[PropagationResult]`, `RangeChecked`
 
 Monte Carlo propagation: run the draws of the inputs and reduce each run to the quantities.
 
@@ -1220,7 +1220,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class Propagation(SensitivityMethod[PropagationResult]):
+class Propagation(SensitivityMethod[PropagationResult], RangeChecked):
     """
     Monte Carlo propagation: run the draws of the inputs and reduce each run
     to the quantities.
@@ -1240,7 +1240,7 @@ class Propagation(SensitivityMethod[PropagationResult]):
     """
 
     draws: int | None = Field(
-        default=None, ge=1, description="Points of the Latin hypercube."
+        default=None, description="Points of the Latin hypercube."
     )
     quantities: list[Quantity] = Field(
         default_factory=list, description="What each run is reduced to."
@@ -1633,7 +1633,7 @@ class QuantitySummary(BaseModel):
 
 ## PRCC
 
-Bases: `SensitivityMethod[PRCCResult]`
+Bases: `SensitivityMethod[PRCCResult]`, `RangeChecked`
 
 Latin hypercube sampling with partial rank correlation coefficients (Marino et al. 2008): how steadily each quantity rises or falls with each input.
 
@@ -1649,7 +1649,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class PRCC(SensitivityMethod[PRCCResult]):
+class PRCC(SensitivityMethod[PRCCResult], RangeChecked):
     """
     Latin hypercube sampling with partial rank correlation coefficients
     (Marino et al. 2008): how steadily each quantity rises or falls with each
@@ -1670,7 +1670,7 @@ class PRCC(SensitivityMethod[PRCCResult]):
     """
 
     draws: int | None = Field(
-        default=None, ge=1, description="Points of the Latin hypercube."
+        default=None, description="Points of the Latin hypercube."
     )
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
@@ -1870,7 +1870,7 @@ def plot(
 
 ## Morris
 
-Bases: `SensitivityMethod[MorrisResult]`
+Bases: `SensitivityMethod[MorrisResult]`, `RangeChecked`
 
 Morris screening (Morris 1991), with the `μ*` of Campolongo, Cariboni and Saltelli (2007): which inputs matter, in few runs.
 
@@ -1887,7 +1887,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class Morris(SensitivityMethod[MorrisResult]):
+class Morris(SensitivityMethod[MorrisResult], RangeChecked):
     """
     Morris screening (Morris 1991), with the ``μ*`` of Campolongo, Cariboni
     and Saltelli (2007): which inputs matter, in few runs.
@@ -1908,8 +1908,8 @@ class Morris(SensitivityMethod[MorrisResult]):
         What each run is reduced to.
     """
 
-    trajectories: int = Field(ge=1, description="The number of trajectories.")
-    levels: int = Field(ge=2, description="The number of levels; even.")
+    trajectories: int = Field(description="The number of trajectories.")
+    levels: int = Field(description="The number of levels; even.")
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
@@ -2091,7 +2091,7 @@ def plot(
 
 ## Sobol
 
-Bases: `SensitivityMethod[SobolResult]`
+Bases: `SensitivityMethod[SobolResult]`, `RangeChecked`
 
 Sobol indices on the design of Saltelli (2010): first-order indices by the estimator of Saltelli (2010) and total indices by the estimator of Jansen (1999), with intervals from a bootstrap of the rows.
 
@@ -2109,7 +2109,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class Sobol(SensitivityMethod[SobolResult]):
+class Sobol(SensitivityMethod[SobolResult], RangeChecked):
     """
     Sobol indices on the design of Saltelli (2010): first-order indices by
     the estimator of Saltelli (2010) and total indices by the estimator of
@@ -2133,9 +2133,9 @@ class Sobol(SensitivityMethod[SobolResult]):
         What each run is reduced to.
     """
 
-    draws: int = Field(ge=2, description="Rows of each base matrix.")
-    replicates: int = Field(ge=2, description="Bootstrap replicates.")
-    confidence_level: ConfidenceLevel = Field(description="Level of the intervals.")
+    draws: int = Field(description="Rows of each base matrix.")
+    replicates: int = Field(description="Bootstrap replicates.")
+    confidence_level: float = Field(description="Level of the intervals.")
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
@@ -2319,7 +2319,7 @@ def plot(
 
 ## PolynomialChaos
 
-Bases: `SensitivityMethod[ChaosResult]`
+Bases: `SensitivityMethod[ChaosResult]`, `RangeChecked`
 
 A polynomial chaos expansion (Sudret 2008): a polynomial surrogate of each quantity, and the Sobol indices of its coefficients, in far fewer runs than `Sobol` when the quantity is smooth.
 
@@ -2340,7 +2340,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class PolynomialChaos(SensitivityMethod[ChaosResult]):
+class PolynomialChaos(SensitivityMethod[ChaosResult], RangeChecked):
     """
     A polynomial chaos expansion (Sudret 2008): a polynomial surrogate of
     each quantity, and the Sobol indices of its coefficients, in far fewer
@@ -2377,14 +2377,12 @@ class PolynomialChaos(SensitivityMethod[ChaosResult]):
         What each run is reduced to.
     """
 
-    degree: int = Field(ge=1, description="The degree of the basis.")
-    q_norm: float = Field(
-        default=1.0, gt=0.0, le=1.0, description="The q of the q-norm of the basis."
-    )
+    degree: int = Field(description="The degree of the basis.")
+    q_norm: float = Field(default=1.0, description="The q of the q-norm of the basis.")
     max_interaction: int | None = Field(
-        default=None, ge=1, description="The largest number of inputs of a term."
+        default=None, description="The largest number of inputs of a term."
     )
-    draws: int = Field(ge=2, description="Points of the Latin hypercube.")
+    draws: int = Field(description="Points of the Latin hypercube.")
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
@@ -2755,7 +2753,7 @@ def check_ends(self, positions: Sequence[float]) -> None:
 
 ## Increments
 
-Bases: `_Outputs`
+Bases: `_Outputs`, `RangeChecked`
 
 The increments of some outputs: at each end, the gain of their sum over `(end - window, end]`, as an observation with the window `window` reads it.
 
@@ -2771,7 +2769,7 @@ Attributes:
 Source code in `commol/context/inference/quantities.py`
 
 ```python
-class Increments(_Outputs):
+class Increments(_Outputs, RangeChecked):
     """
     The increments of some outputs: at each end, the gain of their sum over
     ``(end - window, end]``, as an observation with the window `window`
@@ -2791,7 +2789,7 @@ class Increments(_Outputs):
     """
 
     kind: Literal["increments"] = "increments"
-    window: float = Field(gt=0.0, allow_inf_nan=False, description="The width.")
+    window: float = Field(description="The width.")
 
     def __init__(
         self,
@@ -2884,7 +2882,7 @@ def check_ends(self, positions: Sequence[float]) -> None:
 
 ## ValueAt
 
-Bases: `_OfSeries`, `_OneScalar`
+Bases: `_OfSeries`, `_OneScalar`, `RangeChecked`
 
 The value of a series at a position: the level of the outputs, or their gain over the window that ends there.
 
@@ -2899,7 +2897,7 @@ Attributes:
 Source code in `commol/context/inference/quantities.py`
 
 ```python
-class ValueAt(_OfSeries, _OneScalar):
+class ValueAt(_OfSeries, _OneScalar, RangeChecked):
     """
     The value of a series at a position: the level of the outputs, or their
     gain over the window that ends there.
@@ -2916,7 +2914,7 @@ class ValueAt(_OfSeries, _OneScalar):
     """
 
     kind: Literal["value_at"] = "value_at"
-    at: Position = Field(description="The position.")
+    at: float = Field(description="The position.")
 
     @model_validator(mode="after")
     def window_after_zero(self) -> Self:
@@ -2967,7 +2965,7 @@ def default_label(self) -> str:
 
 ## Gain
 
-Bases: `_Outputs`, `_OneScalar`
+Bases: `_Outputs`, `_OneScalar`, `RangeChecked`
 
 The value at `end` minus the value at `start`: what entered a cumulative output over `(start, end]`, as an observation with the window `end - start` that starts at exactly `start` reads it.
 
@@ -2983,7 +2981,7 @@ Attributes:
 Source code in `commol/context/inference/quantities.py`
 
 ```python
-class Gain(_Outputs, _OneScalar):
+class Gain(_Outputs, _OneScalar, RangeChecked):
     """
     The value at `end` minus the value at `start`: what entered a cumulative
     output over ``(start, end]``, as an observation with the window
@@ -3003,8 +3001,8 @@ class Gain(_Outputs, _OneScalar):
     """
 
     kind: Literal["gain"] = "gain"
-    start: Position = Field(description="The start of the window.")
-    end: Position = Field(description="The end of the window.")
+    start: float = Field(description="The start of the window.")
+    end: float = Field(description="The end of the window.")
 
     @model_validator(mode="after")
     def end_after_start(self) -> Self:
@@ -3065,7 +3063,7 @@ def default_label(self) -> str:
 
 ## Peak
 
-Bases: `_AtPositions`, `_OneScalar`
+Bases: `_AtPositions`, `_OneScalar`, `RangeChecked`
 
 The largest value of a series at the positions.
 
@@ -3082,7 +3080,7 @@ Attributes:
 Source code in `commol/context/inference/quantities.py`
 
 ```python
-class Peak(_AtPositions, _OneScalar):
+class Peak(_AtPositions, _OneScalar, RangeChecked):
     """
     The largest value of a series at the positions.
 
@@ -3129,7 +3127,7 @@ def default_label(self) -> str:
 
 ## PeakPosition
 
-Bases: `_AtPositions`, `_OneScalar`
+Bases: `_AtPositions`, `_OneScalar`, `RangeChecked`
 
 The first of the positions where the value of a series is largest; NaN when the value at a position is NaN.
 
@@ -3144,7 +3142,7 @@ Attributes:
 Source code in `commol/context/inference/quantities.py`
 
 ```python
-class PeakPosition(_AtPositions, _OneScalar):
+class PeakPosition(_AtPositions, _OneScalar, RangeChecked):
     """
     The first of the positions where the value of a series is largest; NaN
     when the value at a position is NaN.
@@ -3187,7 +3185,7 @@ def default_label(self) -> str:
 
 ## Trajectory
 
-Bases: `_AtPositions`
+Bases: `_AtPositions`, `RangeChecked`
 
 The value of a series at each position: one scalar per position, for an analysis over the axis.
 
@@ -3202,7 +3200,7 @@ Attributes:
 Source code in `commol/context/inference/quantities.py`
 
 ```python
-class Trajectory(_AtPositions):
+class Trajectory(_AtPositions, RangeChecked):
     """
     The value of a series at each position: one scalar per position, for an
     analysis over the axis.

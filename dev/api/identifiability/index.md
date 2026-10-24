@@ -27,7 +27,7 @@ class IdentifiabilityMethod(InferenceMethod[ResultT], Generic[ResultT]):
 
 ## StructuralRank
 
-Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
+Bases: `IdentifiabilityMethod[IdentifiabilityReport]`, `RangeChecked`
 
 Structural identifiability, local and numerical: the rank of the scaled sensitivities at random points inside the bounds.
 
@@ -43,7 +43,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport]):
+class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
     """
     Structural identifiability, local and numerical: the rank of the scaled
     sensitivities at random points inside the bounds.
@@ -64,13 +64,13 @@ class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport]):
         last observation (can denser data of these series?).
     """
 
-    points: int = Field(ge=1)
+    points: int = Field()
     design: StructuralDesign
 ```
 
 ## Collinearity
 
-Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
+Bases: `IdentifiabilityMethod[IdentifiabilityReport]`, `RangeChecked`
 
 Collinearity analysis after Brun et al. (2001): the sensitivity measure of each parameter and the collinearity index of each subset.
 
@@ -87,7 +87,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class Collinearity(IdentifiabilityMethod[IdentifiabilityReport]):
+class Collinearity(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
     """
     Collinearity analysis after Brun et al. (2001): the sensitivity measure
     of each parameter and the collinearity index of each subset.
@@ -112,12 +112,12 @@ class Collinearity(IdentifiabilityMethod[IdentifiabilityReport]):
 
     at: CalibrationResult | ParameterSample
     max_subset_size: int
-    threshold: float = Field(gt=1.0)
+    threshold: float = Field()
 ```
 
 ## SampleIdentifiability
 
-Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
+Bases: `IdentifiabilityMethod[IdentifiabilityReport]`, `RangeChecked`
 
 Practical identifiability from any parameter sample: how much it contracts each parameter, which parameters move together, and which marginals have several modes.
 
@@ -133,7 +133,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
+class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
     """
     Practical identifiability from any parameter sample: how much it contracts
     each parameter, which parameters move together, and which marginals have
@@ -157,7 +157,7 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
 
     sample: ParameterSample
     reference: SampleReference
-    correlation_threshold: Share
+    correlation_threshold: float
     priors: Priors | None = None
 
     @model_validator(mode="before")
@@ -233,7 +233,7 @@ def check_priors(self) -> Self:
 
 ## StartsIdentifiability
 
-Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
+Bases: `IdentifiabilityMethod[IdentifiabilityReport]`, `RangeChecked`
 
 Practical identifiability from the starts of a calibration (`Calibrator.run(starts=n)`): converged starts of equal loss that end apart flag the parameters that differ.
 
@@ -248,7 +248,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class StartsIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
+class StartsIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
     """
     Practical identifiability from the starts of a calibration
     (``Calibrator.run(starts=n)``): converged starts of equal loss that end
@@ -265,8 +265,8 @@ class StartsIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
     """
 
     result: CalibrationResult
-    parameter_tolerance: float = Field(ge=0.0)
-    loss_tolerance: float = Field(ge=0.0)
+    parameter_tolerance: float = Field()
+    loss_tolerance: float = Field()
 ```
 
 ## IdentifiabilityReport

@@ -3379,13 +3379,13 @@
 </tr>
 <tr>
 <td><code>crates/commol-core/src/simulation_engine.rs</code></td>
-<td>The <code>SimulationEngine</code> trait, for an engine of any kind: runs at positions (<code>check_position</code>), outputs (<code>output_names</code>, <code>state_outputs</code>, <code>output_sums</code>), parameters, reset, the seed of a stochastic engine (<code>set_seed</code>), the entry of the list of engines it runs and whether it draws random numbers (<code>engine_type</code>, <code>is_stochastic</code>), and the values of its kind (<code>plan_values</code>, <code>apply_values</code>, <code>ValuePlan</code>); <code>Trajectory</code>, <code>check_positions</code>, <code>run_replicates</code> (one run per seed, in parallel). What calibration needs from any engine.</td>
+<td>The <code>SimulationEngine</code> trait, for an engine of any kind: runs at positions (<code>check_position</code>), outputs (<code>output_names</code>, <code>state_outputs</code>, <code>output_sums</code>), parameters, reset, the seed of a stochastic engine (<code>set_seed</code>), the entry of the list of engines it runs and whether it draws random numbers (<code>engine_type</code>, <code>is_stochastic</code>), and the values of its kind (<code>plan_values</code>, <code>apply_values</code>, <code>ValuePlan</code>); <code>Trajectory</code>, <code>check_positions</code>, <code>run_replicates</code> (one run per seed, in parallel); the rules <code>NUM_STEPS</code>, <code>REPLICATE_COUNT</code> and <code>SEED</code> (a whole number from 0 to 2^64 - 1, the one rule of every seed). What calibration needs from any engine.</td>
 <td>Code for one engine or one kind.</td>
 </tr>
 <tr>
-<td><code>crates/commol-core/src/share.rs</code></td>
-<td>The one check of a setting strictly between 0 and 1 (<code>check_open_unit</code>), for the settings of an engine and of the inference methods, and the one check of a confidence level (<code>check_confidence_level</code>), which each caller runs at its boundary.</td>
-<td>A check of such a setting anywhere else.</td>
+<td><code>crates/commol-core/src/range.rs</code></td>
+<td>The range rules of the settings, as data: <code>Count</code> (a whole number, at least a minimum or in an interval, read from a signed number with one message for every value outside), <code>Real</code> with its two <code>Bound</code>s (open or closed; NaN is always outside), <code>Rule</code>, the rules of one object of the Python API (<code>Ranges</code>, whose <code>check</code> reads each setting as a <code>Setting</code> of its own type: a whole number, a number, a list or not a number) and <code>check_object</code>, which finds the object in the tables of the crates; <code>CONFIDENCE_LEVEL</code>, the one rule of a confidence level, which each caller checks at its boundary, and the table of the replicates of a simulation and of the axis patterns (<code>RANGES</code>).</td>
+<td>A rule of a setting written as a check of its own; a message of a range elsewhere.</td>
 </tr>
 <tr>
 <td><code>crates/commol-random/</code></td>
@@ -3394,7 +3394,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-statistics/src/statistics.rs</code></td>
-<td>The one quantile (weighted, midpoints of the cumulative weights; Hazen with equal weights), used by the summary of the replicates of a calibration and by every interval, sample and band of <code>commol-inference</code> and by the bindings, which import it from this crate; weighted mean and covariance, the weighted summary of a column (<code>summary</code>: mean, median, central interval, minimum and maximum, the reduction of every band and of every summary of runs), Kish's effective size; the two quantiles of a central interval (<code>interval_levels</code>, a pure function: the caller checks the level with <code>commol_core::check_confidence_level</code>) and the check of quantile levels (<code>check_levels</code>). It depends on no crate of commol.</td>
+<td>The one quantile (weighted, midpoints of the cumulative weights; Hazen with equal weights), used by the summary of the replicates of a calibration and by every interval, sample and band of <code>commol-inference</code> and by the bindings, which import it from this crate; weighted mean and covariance, the weighted summary of a column (<code>summary</code>: mean, median, central interval, minimum and maximum, the reduction of every band and of every summary of runs), Kish's effective size; the two quantiles of a central interval (<code>interval_levels</code>, a pure function: the caller checks the level with <code>commol_core::CONFIDENCE_LEVEL</code>) and the check of quantile levels (<code>check_levels</code>). It depends on no crate of commol.</td>
 <td>Quantiles or summaries anywhere else.</td>
 </tr>
 <tr>
@@ -3528,6 +3528,11 @@
 <td>Statistics.</td>
 </tr>
 <tr>
+<td><code>crates/commol-calibration/src/ranges.rs</code></td>
+<td>The range rule of each setting of a calibration (observations, constraints, observation models, optimizers, the problem) and the table <code>RANGES</code> of their objects of the Python API. The functions and constructors that take a setting check it with its rule (<code>ObservedDataPoint::check_ranges</code>, <code>NelderMeadConfig::check_ranges</code>, …).</td>
+<td>A check of a range written in a function.</td>
+</tr>
+<tr>
 <td><code>crates/commol-calibration/src/types.rs</code></td>
 <td><code>LossConfig</code> (every loss, and <code>replicate_loss</code>), <code>ReplicateSummary</code> (its median and quantile by <code>statistics::quantiles</code>), <code>crps</code> and <code>weighted_crps</code>, <code>Replicates</code>, the observation, parameter, constraint and result types.</td>
 <td>Optimizer setup.</td>
@@ -3546,6 +3551,11 @@
 <td><code>crates/commol-calibration/src/subproblem.rs</code></td>
 <td><code>Subproblem</code>: the problem with one parameter held (left out of the search) or one prediction held (an equality constraint, <code>ConstraintSettings</code>); <code>predict</code>, the value of a prediction; <code>SubproblemResult</code>.</td>
 <td>Stepping along a profile; thresholds.</td>
+</tr>
+<tr>
+<td><code>crates/commol-inference/src/ranges.rs</code></td>
+<td>The range rule of each setting of the inference methods, the distributions and the quantities of interest, and the table <code>RANGES</code> of their objects of the Python API; the method that takes a setting checks it with its rule.</td>
+<td>A check of a range written in a method.</td>
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/error.rs</code></td>
@@ -3661,8 +3671,13 @@
 </tr>
 <tr>
 <td><code>py-commol/src/counts.rs</code></td>
-<td><code>count</code>, the one reading of a count a binding takes from Python, and a reader per name (<code>required</code>, <code>optional</code>) for <code>#[pyo3(from_py_with = ...)]</code>: a negative number, or one above the type, raises <code>ValueError</code> that names the setting.</td>
-<td>The rule of a setting, which its method checks.</td>
+<td><code>count</code> and <code>optional_count</code>, the one reading of a count or a seed a binding takes from Python: the binding takes a count as <code>i64</code> and a seed as <code>i128</code> (its range ends at 2^64 - 1), so PyO3 reads only the type, and the rule of the setting in the engine converts it, with its message for a value outside the range.</td>
+<td>A message or a minimum of its own.</td>
+</tr>
+<tr>
+<td><code>py-commol/src/ranges.rs</code></td>
+<td><code>commol_rs.core.check_ranges</code>, the one check of the range rules of an object of the Python API, which joins the tables <code>RANGES</code> of <code>commol-core</code>, <code>commol-calibration</code> and <code>commol-inference</code>, and <code>range_rules</code>, each rule with a value outside its range and its message, for the tests.</td>
+<td>A rule of a setting (the crates').</td>
 </tr>
 <tr>
 <td><code>py-commol/src/model.rs</code></td>
@@ -3808,7 +3823,7 @@
 </tr>
 <tr>
 <td><code>context/inference/</code></td>
-<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code>, <code>IdentifiabilityMethod</code> and <code>SensitivityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, the identifiability methods and <code>IdentifiabilityReport</code> (<code>context/inference/identifiability.py</code>), the observation noise (<code>noise.py</code>: <code>NoNoise</code>, <code>ResidualNoise</code>, <code>DistributionNoise</code>), the distributions and <code>Priors</code> (<code>distributions.py</code>), <code>ConfidenceLevel</code>, the type of every confidence level, and <code>Share</code>, the type of every other setting strictly between 0 and 1, both checked in Rust (<code>levels.py</code>), and the settings and results of the resampling methods (<code>context/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>context/inference/smc.py</code>: <code>GibbsPosterior</code>, <code>BayesianPosterior</code>, <code>InformationMatchingEta</code>, <code>BootstrapCoverageEta</code>, <code>ABCSMC</code>, <code>ABCRejection</code>, the distances, <code>SMCResult</code>, <code>GibbsResult</code>), of the local approximations (<code>context/inference/local.py</code>: <code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>, its targets, <code>LaplaceResult</code>, <code>SandwichResult</code>, <code>DeltaBand</code>, <code>ImportanceResult</code>), of the conformal methods (<code>context/inference/conformal.py</code>), of the sensitivity methods with <code>InputSpace</code> (<code>context/inference/global_sensitivity.py</code>), the quantities of interest (<code>quantities.py</code>: a series, <code>Level</code> or <code>Increments</code>, and its reduction), and of the profiles (<code>context/inference/profiles.py</code>: <code>ProfileLikelihood</code>, <code>PredictionProfile</code>, <code>PredictionSpec</code>, <code>Threshold</code>, <code>ProfileResult</code>).</td>
+<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code>, <code>IdentifiabilityMethod</code> and <code>SensitivityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, the identifiability methods and <code>IdentifiabilityReport</code> (<code>context/inference/identifiability.py</code>), the observation noise (<code>noise.py</code>: <code>NoNoise</code>, <code>ResidualNoise</code>, <code>DistributionNoise</code>), the distributions and <code>Priors</code> (<code>distributions.py</code>), and the settings and results of the resampling methods (<code>context/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>context/inference/smc.py</code>: <code>GibbsPosterior</code>, <code>BayesianPosterior</code>, <code>InformationMatchingEta</code>, <code>BootstrapCoverageEta</code>, <code>ABCSMC</code>, <code>ABCRejection</code>, the distances, <code>SMCResult</code>, <code>GibbsResult</code>), of the local approximations (<code>context/inference/local.py</code>: <code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>, its targets, <code>LaplaceResult</code>, <code>SandwichResult</code>, <code>DeltaBand</code>, <code>ImportanceResult</code>), of the conformal methods (<code>context/inference/conformal.py</code>), of the sensitivity methods with <code>InputSpace</code> (<code>context/inference/global_sensitivity.py</code>), the quantities of interest (<code>quantities.py</code>: a series, <code>Level</code> or <code>Increments</code>, and its reduction), and of the profiles (<code>context/inference/profiles.py</code>: <code>ProfileLikelihood</code>, <code>PredictionProfile</code>, <code>PredictionSpec</code>, <code>Threshold</code>, <code>ProfileResult</code>).</td>
 <td>Runners.</td>
 </tr>
 <tr>
@@ -3860,6 +3875,11 @@
 <td><code>context/calibration.py</code></td>
 <td>The calibration problem as settings: <code>CalibrationProblem</code>, <code>ObservedDataPoint</code>, <code>CalibrationParameter</code>, <code>CalibrationConstraint</code>, <code>Quantile</code>, the optimizer settings (<code>NelderMeadConfig</code>, <code>ParticleSwarmConfig</code> and its parts, the stop rules), and the results (<code>CalibrationResult</code>, <code>StartSummary</code>, <code>CalibrationHistory</code>).</td>
 <td>Losses, penalties, optimizers (the engine's).</td>
+</tr>
+<tr>
+<td><code>context/ranges.py</code></td>
+<td><code>RangeChecked</code>, the base of every model of an object with range rules: its validator calls the check of the engine for the object (<code>commol_rs.core.check_ranges</code>) when the model is built.</td>
+<td>A range constraint of pydantic; a rule of a setting.</td>
 </tr>
 <tr>
 <td><code>context/constants.py</code></td>

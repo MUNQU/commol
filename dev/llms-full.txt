@@ -2761,7 +2761,7 @@ print(round(ode.run(num_steps=10)["moved"][10], 1))  # 632.1: the integral of th
 | `rtol`   | `1e-6`     | Relative tolerance of each state component.                                                                                                                 |
 | `atol`   | `1e-6`     | Absolute tolerance of each state component, in the unit of the bins.                                                                                        |
 
-The defaults are the engine's (`commol_rs.engine.ODE_DEFAULT_RTOL` and `ODE_DEFAULT_ATOL`), and the engine checks the settings when they are built: `ODESolver(rtol=0.0)` raises `ValidationError` with the message of the engine, `The solver tolerance rtol must be a positive number, got 0`.
+The defaults are the engine's (`commol_rs.engine.ODE_DEFAULT_RTOL` and `ODE_DEFAULT_ATOL`), and the engine checks the settings when they are built: `ODESolver(rtol=0.0)` raises `ValidationError` with the message of the engine, `rtol is a finite number greater than 0, got 0`.
 
 `bdf` builds its Jacobian from a finite-difference Jacobian-vector product. It uses a dense matrix below `SPARSE_THRESHOLD` state components and a sparse one from there (`crates/commol-differential/src/solve.rs`).
 
@@ -9559,7 +9559,7 @@ class Calibrator:
                     if models is None
                     else engine_state.rust_observation_models(models)
                 ),
-                seed=None if problem.seed is None else check_seed(problem.seed),
+                seed=problem.seed,
             )
         )
         if problem.seed is None:
@@ -9867,8 +9867,6 @@ class Calibrator:
             f"Starting calibration with {algorithm_name} algorithm, "
             f"{measure} and {starts} start(s)."
         )
-        if starts < 1:
-            raise ValueError(f"A calibration needs at least one start, got {starts}.")
         run = self._rust_problem.optimize(
             self._build_optimization_config(), starts, self.seed
         )
@@ -10324,7 +10322,7 @@ def __init__(
                 if models is None
                 else engine_state.rust_observation_models(models)
             ),
-            seed=None if problem.seed is None else check_seed(problem.seed),
+            seed=problem.seed,
         )
     )
     if problem.seed is None:
@@ -10803,8 +10801,6 @@ def run(self, starts: int = 1) -> CalibrationResult:
         f"Starting calibration with {algorithm_name} algorithm, "
         f"{measure} and {starts} start(s)."
     )
-    if starts < 1:
-        raise ValueError(f"A calibration needs at least one start, got {starts}.")
     run = self._rust_problem.optimize(
         self._build_optimization_config(), starts, self.seed
     )
@@ -11062,7 +11058,7 @@ def identifiability(self, method: IdentifiabilityMethod[ResultT]) -> ResultT:
 
 ## CalibrationProblem
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Defines a complete calibration problem.
 
@@ -11087,7 +11083,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class CalibrationProblem(BaseModel):
+class CalibrationProblem(RangeChecked):
     """
     Defines a complete calibration problem.
 
@@ -11191,7 +11187,6 @@ class CalibrationProblem(BaseModel):
     )
     replicates: int | None = Field(
         default=None,
-        ge=1,
         description="Replicates per evaluation of a stochastic engine.",
     )
     replicate_summary: ReplicateSummary | None = Field(
@@ -11200,7 +11195,6 @@ class CalibrationProblem(BaseModel):
     )
     seed: int | None = Field(
         default=None,
-        ge=0,
         description=(
             "Seed of every random number of a calibration: the replicates of a "
             "stochastic engine, the starts, a particle swarm and the methods"
@@ -11385,7 +11379,7 @@ def __init__(self, level: float) -> None:
 
 ## ObservedDataPoint
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Represents a single observed data point for calibration.
 
@@ -11408,7 +11402,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class ObservedDataPoint(BaseModel):
+class ObservedDataPoint(RangeChecked):
     """
     Represents a single observed data point for calibration.
 
@@ -11452,9 +11446,7 @@ class ObservedDataPoint(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    at: float = Field(
-        default=..., ge=0, allow_inf_nan=False, description="Position on the axis"
-    )
+    at: float = Field(default=..., description="Position on the axis")
     output: str | None = Field(
         default=None, min_length=1, description="The output being observed"
     )
@@ -11466,10 +11458,9 @@ class ObservedDataPoint(BaseModel):
         default="",
         description="Name of the observed series; defaults to `output`",
     )
-    value: float = Field(default=..., ge=0.0, description="Observed value")
+    value: float = Field(default=..., description="Observed value")
     weight: float = Field(
         default=1.0,
-        gt=0.0,
         description="Weight for this observation in the loss function",
     )
     factor_id: str | None = Field(
@@ -11478,8 +11469,6 @@ class ObservedDataPoint(BaseModel):
     )
     window: float | None = Field(
         default=None,
-        gt=0,
-        allow_inf_nan=False,
         description=(
             "Optional window length for cumulative-output observations. "
             "When set, prediction is value(at) - value(at - window)."
@@ -11487,7 +11476,6 @@ class ObservedDataPoint(BaseModel):
     )
     trials: int | None = Field(
         default=None,
-        ge=0,
         description="Trials of a binomial observation model that reads them here",
     )
 
@@ -11613,7 +11601,7 @@ One observation model of a series.
 
 ## NormalObservations
 
-Bases: `_ObservationModel`
+Bases: `_ObservationModel`, `RangeChecked`
 
 Normal noise: `y ~ N(μ, sd²)`, with `μ` the prediction.
 
@@ -11628,7 +11616,7 @@ Attributes:
 Source code in `commol/context/observation_models.py`
 
 ```python
-class NormalObservations(_ObservationModel):
+class NormalObservations(_ObservationModel, RangeChecked):
     """
     Normal noise: ``y ~ N(μ, sd²)``, with ``μ`` the prediction.
 
@@ -11647,7 +11635,7 @@ class NormalObservations(_ObservationModel):
 
 ## LogNormalObservations
 
-Bases: `_ObservationModel`
+Bases: `_ObservationModel`, `RangeChecked`
 
 Log-normal noise: `log y` is normal with standard deviation `sigma`.
 
@@ -11663,7 +11651,7 @@ Attributes:
 Source code in `commol/context/observation_models.py`
 
 ```python
-class LogNormalObservations(_ObservationModel):
+class LogNormalObservations(_ObservationModel, RangeChecked):
     """
     Log-normal noise: ``log y`` is normal with standard deviation ``sigma``.
 
@@ -11689,7 +11677,7 @@ class LogNormalObservations(_ObservationModel):
 
 ## StudentTObservations
 
-Bases: `_ObservationModel`
+Bases: `_ObservationModel`, `RangeChecked`
 
 Student-t noise of center `μ`, the prediction: normal noise with heavier tails, so an outlier pulls the fit less.
 
@@ -11703,7 +11691,7 @@ Attributes:
 Source code in `commol/context/observation_models.py`
 
 ```python
-class StudentTObservations(_ObservationModel):
+class StudentTObservations(_ObservationModel, RangeChecked):
     """
     Student-t noise of center ``μ``, the prediction: normal noise with heavier
     tails, so an outlier pulls the fit less.
@@ -11745,7 +11733,7 @@ class PoissonObservations(_ObservationModel):
 
 ## NegativeBinomialObservations
 
-Bases: `_ObservationModel`
+Bases: `_ObservationModel`, `RangeChecked`
 
 Negative binomial counts of mean `μ`, the prediction, and variance `μ + φμ²`: counts that scatter more than a Poisson.
 
@@ -11760,7 +11748,7 @@ Attributes:
 Source code in `commol/context/observation_models.py`
 
 ```python
-class NegativeBinomialObservations(_ObservationModel):
+class NegativeBinomialObservations(_ObservationModel, RangeChecked):
     """
     Negative binomial counts of mean ``μ``, the prediction, and variance
     ``μ + φμ²``: counts that scatter more than a Poisson.
@@ -11781,7 +11769,7 @@ class NegativeBinomialObservations(_ObservationModel):
 
 ## BinomialObservations
 
-Bases: `_ObservationModel`
+Bases: `_ObservationModel`, `RangeChecked`
 
 Binomial counts of `n` trials and mean `μ`, the prediction: the probability is `μ / n`, so the prediction is an expected count, not a proportion.
 
@@ -11796,7 +11784,7 @@ Attributes:
 Source code in `commol/context/observation_models.py`
 
 ```python
-class BinomialObservations(_ObservationModel):
+class BinomialObservations(_ObservationModel, RangeChecked):
     """
     Binomial counts of ``n`` trials and mean ``μ``, the prediction: the
     probability is ``μ / n``, so the prediction is an expected count, not a
@@ -11816,7 +11804,7 @@ class BinomialObservations(_ObservationModel):
     """
 
     kind: Literal["binomial"] = "binomial"
-    trials: int | None = Field(default=None, ge=0, description="The trials.")
+    trials: int | None = Field(default=None, description="The trials.")
 ```
 
 ## Unknowns, optimizers and results
@@ -11944,7 +11932,7 @@ def validate_bounds(self) -> Self:
 
 ## CalibrationConstraint
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 A constraint on calibration parameters defined as a mathematical expression.
 
@@ -12002,7 +11990,7 @@ Examples:
 Source code in `commol/context/calibration.py`
 
 ```python
-class CalibrationConstraint(BaseModel):
+class CalibrationConstraint(RangeChecked):
     """
     A constraint on calibration parameters defined as a mathematical expression.
 
@@ -12080,7 +12068,6 @@ class CalibrationConstraint(BaseModel):
     )
     weight: float = Field(
         default=1.0,
-        gt=0.0,
         description="Penalty weight multiplier for violations",
     )
     at: list[float] | None = Field(
@@ -12105,16 +12092,11 @@ class CalibrationConstraint(BaseModel):
 
     @model_validator(mode="after")
     def validate_positions(self) -> Self:
-        """Validate that the positions are finite and non-negative."""
-        if self.at is not None:
-            if len(self.at) == 0:
-                raise ValueError(
-                    f"at for constraint '{self.id}' must not be empty if specified"
-                )
-            if any(position < 0 or not math.isfinite(position) for position in self.at):
-                raise ValueError(
-                    f"at for constraint '{self.id}' must all be finite and non-negative"
-                )
+        """Validate that the positions, when given, are not empty."""
+        if self.at is not None and len(self.at) == 0:
+            raise ValueError(
+                f"at for constraint '{self.id}' must not be empty if specified"
+            )
         return self
 ```
 
@@ -12150,29 +12132,24 @@ def validate_expression(cls, value: str) -> str:
 validate_positions() -> Self
 ```
 
-Validate that the positions are finite and non-negative.
+Validate that the positions, when given, are not empty.
 
 Source code in `commol/context/calibration.py`
 
 ```python
 @model_validator(mode="after")
 def validate_positions(self) -> Self:
-    """Validate that the positions are finite and non-negative."""
-    if self.at is not None:
-        if len(self.at) == 0:
-            raise ValueError(
-                f"at for constraint '{self.id}' must not be empty if specified"
-            )
-        if any(position < 0 or not math.isfinite(position) for position in self.at):
-            raise ValueError(
-                f"at for constraint '{self.id}' must all be finite and non-negative"
-            )
+    """Validate that the positions, when given, are not empty."""
+    if self.at is not None and len(self.at) == 0:
+        raise ValueError(
+            f"at for constraint '{self.id}' must not be empty if specified"
+        )
     return self
 ```
 
 ## NelderMeadConfig
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Configuration for the Nelder-Mead optimization algorithm.
 
@@ -12195,7 +12172,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class NelderMeadConfig(BaseModel):
+class NelderMeadConfig(RangeChecked):
     """
     Configuration for the Nelder-Mead optimization algorithm.
 
@@ -12231,37 +12208,31 @@ class NelderMeadConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     max_iterations: int = Field(
-        default=1000, gt=0, description="Maximum number of iterations"
+        default=1000, description="Maximum number of iterations"
     )
     sd_tolerance: float = Field(
-        default=1e-6, gt=0.0, description="Convergence tolerance for standard deviation"
+        default=1e-6, description="Convergence tolerance for standard deviation"
     )
     initial_simplex_size: float = Field(
         default=0.1,
-        gt=0.0,
-        le=1.0,
         description=(
             "Size of the initial simplex, as a fraction of each parameter's bound width"
         ),
     )
     alpha: float | None = Field(
         default=None,
-        gt=0.0,
         description="Reflection coefficient (default: None, uses argmin's default)",
     )
     gamma: float | None = Field(
         default=None,
-        gt=0.0,
         description="Expansion coefficient (default: None, uses argmin's default)",
     )
     rho: float | None = Field(
         default=None,
-        gt=0.0,
         description="Contraction coefficient (default: None, uses argmin's default)",
     )
     sigma: float | None = Field(
         default=None,
-        gt=0.0,
         description="Shrink coefficient (default: None, uses argmin's default)",
     )
     verbose: bool = Field(
@@ -12270,7 +12241,6 @@ class NelderMeadConfig(BaseModel):
     )
     header_interval: int = Field(
         default=100,
-        gt=0,
         description=(
             "Number of iterations between table header repeats in verbose output "
             "(default: 100)"
@@ -12280,7 +12250,7 @@ class NelderMeadConfig(BaseModel):
 
 ## ParticleSwarmConfig
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Configuration for the Particle Swarm Optimization algorithm.
 
@@ -12307,7 +12277,7 @@ Methods:
 Source code in `commol/context/calibration.py`
 
 ```python
-class ParticleSwarmConfig(BaseModel):
+class ParticleSwarmConfig(RangeChecked):
     """
     Configuration for the Particle Swarm Optimization algorithm.
 
@@ -12341,11 +12311,9 @@ class ParticleSwarmConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # Core parameters
-    particles: int = Field(
-        default=20, gt=0, description="Number of particles in the swarm"
-    )
+    particles: int = Field(default=20, description="Number of particles in the swarm")
     max_iterations: int = Field(
-        default=1000, gt=0, description="Maximum number of iterations"
+        default=1000, description="Maximum number of iterations"
     )
     verbose: bool = Field(
         default=False,
@@ -13145,7 +13113,7 @@ def radius_stop(self, tol: float) -> Self:
 
 ## CalibrationResult
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Result of a calibration: the best of its starts.
 
@@ -13165,7 +13133,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class CalibrationResult(BaseModel):
+class CalibrationResult(RangeChecked):
     """
     Result of a calibration: the best of its starts.
 
@@ -13200,9 +13168,7 @@ class CalibrationResult(BaseModel):
         default=..., description="Calibrated parameter values"
     )
     final_loss: float = Field(default=..., description="Final loss value")
-    iterations: int = Field(
-        default=..., ge=0, description="Number of iterations performed"
-    )
+    iterations: int = Field(default=..., description="Number of iterations performed")
     converged: bool = Field(default=..., description="Whether optimization converged")
     termination_reason: str = Field(
         default=..., description="Reason for optimization termination"
@@ -13214,7 +13180,7 @@ class CalibrationResult(BaseModel):
         default_factory=list, description="Each start that failed"
     )
     seed: int = Field(
-        default=..., ge=0, description="Seed of the calibration's random numbers"
+        default=..., description="Seed of the calibration's random numbers"
     )
 
     @override
@@ -13443,7 +13409,7 @@ class IdentifiabilityMethod(InferenceMethod[ResultT], Generic[ResultT]):
 
 ## StructuralRank
 
-Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
+Bases: `IdentifiabilityMethod[IdentifiabilityReport]`, `RangeChecked`
 
 Structural identifiability, local and numerical: the rank of the scaled sensitivities at random points inside the bounds.
 
@@ -13459,7 +13425,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport]):
+class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
     """
     Structural identifiability, local and numerical: the rank of the scaled
     sensitivities at random points inside the bounds.
@@ -13480,13 +13446,13 @@ class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport]):
         last observation (can denser data of these series?).
     """
 
-    points: int = Field(ge=1)
+    points: int = Field()
     design: StructuralDesign
 ```
 
 ## Collinearity
 
-Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
+Bases: `IdentifiabilityMethod[IdentifiabilityReport]`, `RangeChecked`
 
 Collinearity analysis after Brun et al. (2001): the sensitivity measure of each parameter and the collinearity index of each subset.
 
@@ -13503,7 +13469,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class Collinearity(IdentifiabilityMethod[IdentifiabilityReport]):
+class Collinearity(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
     """
     Collinearity analysis after Brun et al. (2001): the sensitivity measure
     of each parameter and the collinearity index of each subset.
@@ -13528,12 +13494,12 @@ class Collinearity(IdentifiabilityMethod[IdentifiabilityReport]):
 
     at: CalibrationResult | ParameterSample
     max_subset_size: int
-    threshold: float = Field(gt=1.0)
+    threshold: float = Field()
 ```
 
 ## SampleIdentifiability
 
-Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
+Bases: `IdentifiabilityMethod[IdentifiabilityReport]`, `RangeChecked`
 
 Practical identifiability from any parameter sample: how much it contracts each parameter, which parameters move together, and which marginals have several modes.
 
@@ -13549,7 +13515,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
+class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
     """
     Practical identifiability from any parameter sample: how much it contracts
     each parameter, which parameters move together, and which marginals have
@@ -13573,7 +13539,7 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
 
     sample: ParameterSample
     reference: SampleReference
-    correlation_threshold: Share
+    correlation_threshold: float
     priors: Priors | None = None
 
     @model_validator(mode="before")
@@ -13649,7 +13615,7 @@ def check_priors(self) -> Self:
 
 ## StartsIdentifiability
 
-Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
+Bases: `IdentifiabilityMethod[IdentifiabilityReport]`, `RangeChecked`
 
 Practical identifiability from the starts of a calibration (`Calibrator.run(starts=n)`): converged starts of equal loss that end apart flag the parameters that differ.
 
@@ -13664,7 +13630,7 @@ Attributes:
 Source code in `commol/context/inference/identifiability.py`
 
 ```python
-class StartsIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
+class StartsIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
     """
     Practical identifiability from the starts of a calibration
     (``Calibrator.run(starts=n)``): converged starts of equal loss that end
@@ -13681,8 +13647,8 @@ class StartsIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
     """
 
     result: CalibrationResult
-    parameter_tolerance: float = Field(ge=0.0)
-    loss_tolerance: float = Field(ge=0.0)
+    parameter_tolerance: float = Field()
+    loss_tolerance: float = Field()
 ```
 
 ## IdentifiabilityReport
@@ -25817,7 +25783,7 @@ class SensitivityMethod(InferenceMethod[ResultT], Generic[ResultT]):
 
 ## Propagation
 
-Bases: `SensitivityMethod[PropagationResult]`
+Bases: `SensitivityMethod[PropagationResult]`, `RangeChecked`
 
 Monte Carlo propagation: run the draws of the inputs and reduce each run to the quantities.
 
@@ -25833,7 +25799,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class Propagation(SensitivityMethod[PropagationResult]):
+class Propagation(SensitivityMethod[PropagationResult], RangeChecked):
     """
     Monte Carlo propagation: run the draws of the inputs and reduce each run
     to the quantities.
@@ -25853,7 +25819,7 @@ class Propagation(SensitivityMethod[PropagationResult]):
     """
 
     draws: int | None = Field(
-        default=None, ge=1, description="Points of the Latin hypercube."
+        default=None, description="Points of the Latin hypercube."
     )
     quantities: list[Quantity] = Field(
         default_factory=list, description="What each run is reduced to."
@@ -26246,7 +26212,7 @@ class QuantitySummary(BaseModel):
 
 ## PRCC
 
-Bases: `SensitivityMethod[PRCCResult]`
+Bases: `SensitivityMethod[PRCCResult]`, `RangeChecked`
 
 Latin hypercube sampling with partial rank correlation coefficients (Marino et al. 2008): how steadily each quantity rises or falls with each input.
 
@@ -26262,7 +26228,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class PRCC(SensitivityMethod[PRCCResult]):
+class PRCC(SensitivityMethod[PRCCResult], RangeChecked):
     """
     Latin hypercube sampling with partial rank correlation coefficients
     (Marino et al. 2008): how steadily each quantity rises or falls with each
@@ -26283,7 +26249,7 @@ class PRCC(SensitivityMethod[PRCCResult]):
     """
 
     draws: int | None = Field(
-        default=None, ge=1, description="Points of the Latin hypercube."
+        default=None, description="Points of the Latin hypercube."
     )
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
@@ -26483,7 +26449,7 @@ def plot(
 
 ## Morris
 
-Bases: `SensitivityMethod[MorrisResult]`
+Bases: `SensitivityMethod[MorrisResult]`, `RangeChecked`
 
 Morris screening (Morris 1991), with the `μ*` of Campolongo, Cariboni and Saltelli (2007): which inputs matter, in few runs.
 
@@ -26500,7 +26466,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class Morris(SensitivityMethod[MorrisResult]):
+class Morris(SensitivityMethod[MorrisResult], RangeChecked):
     """
     Morris screening (Morris 1991), with the ``μ*`` of Campolongo, Cariboni
     and Saltelli (2007): which inputs matter, in few runs.
@@ -26521,8 +26487,8 @@ class Morris(SensitivityMethod[MorrisResult]):
         What each run is reduced to.
     """
 
-    trajectories: int = Field(ge=1, description="The number of trajectories.")
-    levels: int = Field(ge=2, description="The number of levels; even.")
+    trajectories: int = Field(description="The number of trajectories.")
+    levels: int = Field(description="The number of levels; even.")
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
@@ -26704,7 +26670,7 @@ def plot(
 
 ## Sobol
 
-Bases: `SensitivityMethod[SobolResult]`
+Bases: `SensitivityMethod[SobolResult]`, `RangeChecked`
 
 Sobol indices on the design of Saltelli (2010): first-order indices by the estimator of Saltelli (2010) and total indices by the estimator of Jansen (1999), with intervals from a bootstrap of the rows.
 
@@ -26722,7 +26688,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class Sobol(SensitivityMethod[SobolResult]):
+class Sobol(SensitivityMethod[SobolResult], RangeChecked):
     """
     Sobol indices on the design of Saltelli (2010): first-order indices by
     the estimator of Saltelli (2010) and total indices by the estimator of
@@ -26746,9 +26712,9 @@ class Sobol(SensitivityMethod[SobolResult]):
         What each run is reduced to.
     """
 
-    draws: int = Field(ge=2, description="Rows of each base matrix.")
-    replicates: int = Field(ge=2, description="Bootstrap replicates.")
-    confidence_level: ConfidenceLevel = Field(description="Level of the intervals.")
+    draws: int = Field(description="Rows of each base matrix.")
+    replicates: int = Field(description="Bootstrap replicates.")
+    confidence_level: float = Field(description="Level of the intervals.")
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
@@ -26932,7 +26898,7 @@ def plot(
 
 ## PolynomialChaos
 
-Bases: `SensitivityMethod[ChaosResult]`
+Bases: `SensitivityMethod[ChaosResult]`, `RangeChecked`
 
 A polynomial chaos expansion (Sudret 2008): a polynomial surrogate of each quantity, and the Sobol indices of its coefficients, in far fewer runs than `Sobol` when the quantity is smooth.
 
@@ -26953,7 +26919,7 @@ Attributes:
 Source code in `commol/context/inference/global_sensitivity.py`
 
 ```python
-class PolynomialChaos(SensitivityMethod[ChaosResult]):
+class PolynomialChaos(SensitivityMethod[ChaosResult], RangeChecked):
     """
     A polynomial chaos expansion (Sudret 2008): a polynomial surrogate of
     each quantity, and the Sobol indices of its coefficients, in far fewer
@@ -26990,14 +26956,12 @@ class PolynomialChaos(SensitivityMethod[ChaosResult]):
         What each run is reduced to.
     """
 
-    degree: int = Field(ge=1, description="The degree of the basis.")
-    q_norm: float = Field(
-        default=1.0, gt=0.0, le=1.0, description="The q of the q-norm of the basis."
-    )
+    degree: int = Field(description="The degree of the basis.")
+    q_norm: float = Field(default=1.0, description="The q of the q-norm of the basis.")
     max_interaction: int | None = Field(
-        default=None, ge=1, description="The largest number of inputs of a term."
+        default=None, description="The largest number of inputs of a term."
     )
-    draws: int = Field(ge=2, description="Points of the Latin hypercube.")
+    draws: int = Field(description="Points of the Latin hypercube.")
     quantities: list[Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
@@ -27368,7 +27332,7 @@ def check_ends(self, positions: Sequence[float]) -> None:
 
 ## Increments
 
-Bases: `_Outputs`
+Bases: `_Outputs`, `RangeChecked`
 
 The increments of some outputs: at each end, the gain of their sum over `(end - window, end]`, as an observation with the window `window` reads it.
 
@@ -27384,7 +27348,7 @@ Attributes:
 Source code in `commol/context/inference/quantities.py`
 
 ```python
-class Increments(_Outputs):
+class Increments(_Outputs, RangeChecked):
     """
     The increments of some outputs: at each end, the gain of their sum over
     ``(end - window, end]``, as an observation with the window `window`
@@ -27404,7 +27368,7 @@ class Increments(_Outputs):
     """
 
     kind: Literal["increments"] = "increments"
-    window: float = Field(gt=0.0, allow_inf_nan=False, description="The width.")
+    window: float = Field(description="The width.")
 
     def __init__(
         self,
@@ -27497,7 +27461,7 @@ def check_ends(self, positions: Sequence[float]) -> None:
 
 ## ValueAt
 
-Bases: `_OfSeries`, `_OneScalar`
+Bases: `_OfSeries`, `_OneScalar`, `RangeChecked`
 
 The value of a series at a position: the level of the outputs, or their gain over the window that ends there.
 
@@ -27512,7 +27476,7 @@ Attributes:
 Source code in `commol/context/inference/quantities.py`
 
 ```python
-class ValueAt(_OfSeries, _OneScalar):
+class ValueAt(_OfSeries, _OneScalar, RangeChecked):
     """
     The value of a series at a position: the level of the outputs, or their
     gain over the window that ends there.
@@ -27529,7 +27493,7 @@ class ValueAt(_OfSeries, _OneScalar):
     """
 
     kind: Literal["value_at"] = "value_at"
-    at: Position = Field(description="The position.")
+    at: float = Field(description="The position.")
 
     @model_validator(mode="after")
     def window_after_zero(self) -> Self:
@@ -27580,7 +27544,7 @@ def default_label(self) -> str:
 
 ## Gain
 
-Bases: `_Outputs`, `_OneScalar`
+Bases: `_Outputs`, `_OneScalar`, `RangeChecked`
 
 The value at `end` minus the value at `start`: what entered a cumulative output over `(start, end]`, as an observation with the window `end - start` that starts at exactly `start` reads it.
 
@@ -27596,7 +27560,7 @@ Attributes:
 Source code in `commol/context/inference/quantities.py`
 
 ```python
-class Gain(_Outputs, _OneScalar):
+class Gain(_Outputs, _OneScalar, RangeChecked):
     """
     The value at `end` minus the value at `start`: what entered a cumulative
     output over ``(start, end]``, as an observation with the window
@@ -27616,8 +27580,8 @@ class Gain(_Outputs, _OneScalar):
     """
 
     kind: Literal["gain"] = "gain"
-    start: Position = Field(description="The start of the window.")
-    end: Position = Field(description="The end of the window.")
+    start: float = Field(description="The start of the window.")
+    end: float = Field(description="The end of the window.")
 
     @model_validator(mode="after")
     def end_after_start(self) -> Self:
@@ -27678,7 +27642,7 @@ def default_label(self) -> str:
 
 ## Peak
 
-Bases: `_AtPositions`, `_OneScalar`
+Bases: `_AtPositions`, `_OneScalar`, `RangeChecked`
 
 The largest value of a series at the positions.
 
@@ -27695,7 +27659,7 @@ Attributes:
 Source code in `commol/context/inference/quantities.py`
 
 ```python
-class Peak(_AtPositions, _OneScalar):
+class Peak(_AtPositions, _OneScalar, RangeChecked):
     """
     The largest value of a series at the positions.
 
@@ -27742,7 +27706,7 @@ def default_label(self) -> str:
 
 ## PeakPosition
 
-Bases: `_AtPositions`, `_OneScalar`
+Bases: `_AtPositions`, `_OneScalar`, `RangeChecked`
 
 The first of the positions where the value of a series is largest; NaN when the value at a position is NaN.
 
@@ -27757,7 +27721,7 @@ Attributes:
 Source code in `commol/context/inference/quantities.py`
 
 ```python
-class PeakPosition(_AtPositions, _OneScalar):
+class PeakPosition(_AtPositions, _OneScalar, RangeChecked):
     """
     The first of the positions where the value of a series is largest; NaN
     when the value at a position is NaN.
@@ -27800,7 +27764,7 @@ def default_label(self) -> str:
 
 ## Trajectory
 
-Bases: `_AtPositions`
+Bases: `_AtPositions`, `RangeChecked`
 
 The value of a series at each position: one scalar per position, for an analysis over the axis.
 
@@ -27815,7 +27779,7 @@ Attributes:
 Source code in `commol/context/inference/quantities.py`
 
 ```python
-class Trajectory(_AtPositions):
+class Trajectory(_AtPositions, RangeChecked):
     """
     The value of a series at each position: one scalar per position, for an
     analysis over the axis.
@@ -28335,15 +28299,16 @@ class Simulation:
         ------
         ValueError
             If the engine is deterministic (every replicate would be equal),
-            ``count`` is below 1, or the seed is not valid.
+            ``count`` is not a whole number or is below 1, or the seed is not
+            valid.
         """
         if not self.is_stochastic:
             raise ValueError(
                 f"The {self.model_definition.engine.type} engine is deterministic: "
                 "every replicate would be equal. Replicates need a stochastic engine."
             )
-        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
-            raise ValueError(f"The number of replicates is at least 1, got {count!r}.")
+        if isinstance(count, bool) or not isinstance(count, int):
+            raise ValueError(f"count is a whole number, got {count!r}")
         return ReplicateRuns(self, count, None if seed is None else check_seed(seed))
 
     @property
@@ -28831,9 +28796,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                  |
-| ------------ | ------------------------------------------------------------------------------------------------------------ |
-| `ValueError` | If the engine is deterministic (every replicate would be equal), count is below 1, or the seed is not valid. |
+| Type         | Description                                                                                                                           |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If the engine is deterministic (every replicate would be equal), count is not a whole number or is below 1, or the seed is not valid. |
 
 Source code in `commol/api/simulation.py`
 
@@ -28866,15 +28831,16 @@ def replicates(self, count: int, *, seed: int | None = None) -> "ReplicateRuns":
     ------
     ValueError
         If the engine is deterministic (every replicate would be equal),
-        ``count`` is below 1, or the seed is not valid.
+        ``count`` is not a whole number or is below 1, or the seed is not
+        valid.
     """
     if not self.is_stochastic:
         raise ValueError(
             f"The {self.model_definition.engine.type} engine is deterministic: "
             "every replicate would be equal. Replicates need a stochastic engine."
         )
-    if isinstance(count, bool) or not isinstance(count, int) or count < 1:
-        raise ValueError(f"The number of replicates is at least 1, got {count!r}.")
+    if isinstance(count, bool) or not isinstance(count, int):
+        raise ValueError(f"count is a whole number, got {count!r}")
     return ReplicateRuns(self, count, None if seed is None else check_seed(seed))
 ```
 
@@ -29855,7 +29821,14 @@ class ReplicateRuns:
         seed : int | None
             The seed the replicate seeds derive from; None draws one at each
             run.
+
+        Raises
+        ------
+        ValueError
+            With the message of the engine, if ``count`` is below 1 or the
+            seed is outside its range.
         """
+        commol_rs.core.check_ranges("ReplicateRuns", {"count": count, "seed": seed})
         self.simulation = simulation
         self.count = count
         self.seed = seed
@@ -29949,6 +29922,12 @@ Parameters:
 | `count`      | `int`        | How many replicates.                           | *required*                                                            |
 | `seed`       | \`int        | None\`                                         | The seed the replicate seeds derive from; None draws one at each run. |
 
+Raises:
+
+| Type         | Description                                                                           |
+| ------------ | ------------------------------------------------------------------------------------- |
+| `ValueError` | With the message of the engine, if count is below 1 or the seed is outside its range. |
+
 Source code in `commol/api/simulation.py`
 
 ```python
@@ -29965,7 +29944,14 @@ def __init__(self, simulation: Simulation, count: int, seed: int | None) -> None
     seed : int | None
         The seed the replicate seeds derive from; None draws one at each
         run.
+
+    Raises
+    ------
+    ValueError
+        With the message of the engine, if ``count`` is below 1 or the
+        seed is outside its range.
     """
+    commol_rs.core.check_ranges("ReplicateRuns", {"count": count, "seed": seed})
     self.simulation = simulation
     self.count = count
     self.seed = seed
@@ -30222,9 +30208,7 @@ class SimulationReplicates(list[SimulationResults]):
         ValueError
             If a level is outside ``[0, 1]`` or there are no replicates.
         """
-        for level in levels:
-            if not 0.0 <= level <= 1.0:
-                raise ValueError(f"A quantile level is between 0 and 1, got {level}.")
+        commol_rs.inference.check_levels(list(levels))
         if not self:
             raise ValueError("There are no replicates.")
         from commol.api.inference.intervals import weighted_quantiles
@@ -30586,9 +30570,7 @@ def quantiles(self, levels: Sequence[float]) -> dict[float, SimulationResults]:
     ValueError
         If a level is outside ``[0, 1]`` or there are no replicates.
     """
-    for level in levels:
-        if not 0.0 <= level <= 1.0:
-            raise ValueError(f"A quantile level is between 0 and 1, got {level}.")
+    commol_rs.inference.check_levels(list(levels))
     if not self:
         raise ValueError("There are no replicates.")
     from commol.api.inference.intervals import weighted_quantiles
@@ -34088,7 +34070,7 @@ class NoNoise(BaseModel):
 
 ## ResidualNoise
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Observation noise made of the residuals of a fit, with no noise model.
 
@@ -34105,7 +34087,7 @@ Attributes:
 Source code in `commol/context/inference/noise.py`
 
 ```python
-class ResidualNoise(BaseModel):
+class ResidualNoise(RangeChecked):
     """
     Observation noise made of the residuals of a fit, with no noise model.
 
@@ -34133,7 +34115,7 @@ class ResidualNoise(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     fit: CalibrationResult = Field(description="The fit whose residuals are added.")
-    block_length: int = Field(ge=1, description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     residual_scale: Literal["additive", "multiplicative"] = Field(
         description="The scale of the residuals."
     )
@@ -34171,7 +34153,7 @@ Guide: [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resa
 
 ## BayesianBootstrap
 
-Bases: `UncertaintyMethod[BootstrapResult]`
+Bases: `UncertaintyMethod[BootstrapResult]`, `RangeChecked`
 
 The Bayesian (weighted) bootstrap by blocks.
 
@@ -34188,7 +34170,7 @@ Attributes:
 Source code in `commol/context/inference/resampling.py`
 
 ```python
-class BayesianBootstrap(UncertaintyMethod[BootstrapResult]):
+class BayesianBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
     """
     The Bayesian (weighted) bootstrap by blocks.
 
@@ -34210,14 +34192,14 @@ class BayesianBootstrap(UncertaintyMethod[BootstrapResult]):
         rows of a Latin hypercube over the bounds.
     """
 
-    replicates: int = Field(ge=1, description="Number of replicates.")
+    replicates: int = Field(description="Number of replicates.")
     block_length: BlockLength = Field(description="Positions per block.")
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    starts: int = Field(default=1, description="Starts per fit.")
 ```
 
 ## ResidualBootstrap
 
-Bases: `UncertaintyMethod[BootstrapResult]`
+Bases: `UncertaintyMethod[BootstrapResult]`, `RangeChecked`
 
 The residual block bootstrap.
 
@@ -34236,7 +34218,7 @@ Attributes:
 Source code in `commol/context/inference/resampling.py`
 
 ```python
-class ResidualBootstrap(UncertaintyMethod[BootstrapResult]):
+class ResidualBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
     """
     The residual block bootstrap.
 
@@ -34262,7 +34244,7 @@ class ResidualBootstrap(UncertaintyMethod[BootstrapResult]):
         Starts of the fit and of each replicate (default 1).
     """
 
-    replicates: int = Field(ge=1, description="Number of replicates.")
+    replicates: int = Field(description="Number of replicates.")
     block_length: BlockLength = Field(description="Positions per block.")
     residual_scale: Literal["additive", "multiplicative"] = Field(
         description="The scale of the residuals."
@@ -34270,12 +34252,12 @@ class ResidualBootstrap(UncertaintyMethod[BootstrapResult]):
     scheme: Literal["moving", "stationary"] = Field(
         description="How blocks of residuals are drawn."
     )
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    starts: int = Field(default=1, description="Starts per fit.")
 ```
 
 ## WildBootstrap
 
-Bases: `UncertaintyMethod[BootstrapResult]`
+Bases: `UncertaintyMethod[BootstrapResult]`, `RangeChecked`
 
 The wild block bootstrap.
 
@@ -34293,7 +34275,7 @@ Attributes:
 Source code in `commol/context/inference/resampling.py`
 
 ```python
-class WildBootstrap(UncertaintyMethod[BootstrapResult]):
+class WildBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
     """
     The wild block bootstrap.
 
@@ -34316,17 +34298,17 @@ class WildBootstrap(UncertaintyMethod[BootstrapResult]):
         Starts of the fit and of each replicate (default 1).
     """
 
-    replicates: int = Field(ge=1, description="Number of replicates.")
+    replicates: int = Field(description="Number of replicates.")
     block_length: BlockLength = Field(description="Positions per block.")
     multipliers: Literal["rademacher", "mammen"] = Field(
         description="The distribution of the multipliers."
     )
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    starts: int = Field(default=1, description="Starts per fit.")
 ```
 
 ## BlockJackknife
 
-Bases: `UncertaintyMethod[JackknifeResult]`
+Bases: `UncertaintyMethod[JackknifeResult]`, `RangeChecked`
 
 The block jackknife (Künsch 1989): one fit per block left out.
 
@@ -34342,7 +34324,7 @@ Attributes:
 Source code in `commol/context/inference/resampling.py`
 
 ```python
-class BlockJackknife(UncertaintyMethod[JackknifeResult]):
+class BlockJackknife(UncertaintyMethod[JackknifeResult], RangeChecked):
     """
     The block jackknife (Künsch 1989): one fit per block left out.
 
@@ -34359,12 +34341,12 @@ class BlockJackknife(UncertaintyMethod[JackknifeResult]):
     """
 
     block_length: BlockLength = Field(description="Positions per block.")
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    starts: int = Field(default=1, description="Starts per fit.")
 ```
 
 ## ParametricBootstrap
 
-Bases: `UncertaintyMethod[BootstrapResult]`
+Bases: `UncertaintyMethod[BootstrapResult]`, `RangeChecked`
 
 The parametric bootstrap of the problem's observation models.
 
@@ -34380,7 +34362,7 @@ Attributes:
 Source code in `commol/context/inference/resampling.py`
 
 ```python
-class ParametricBootstrap(UncertaintyMethod[BootstrapResult]):
+class ParametricBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
     """
     The parametric bootstrap of the problem's observation models.
 
@@ -34399,8 +34381,8 @@ class ParametricBootstrap(UncertaintyMethod[BootstrapResult]):
         rows of a Latin hypercube over the bounds.
     """
 
-    replicates: int = Field(ge=1, description="Number of replicates.")
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    replicates: int = Field(description="Number of replicates.")
+    starts: int = Field(default=1, description="Starts per fit.")
 ```
 
 ## BootstrapResult
@@ -34713,7 +34695,7 @@ Guide: [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertai
 
 ## ProfileLikelihood
 
-Bases: `UncertaintyMethod['ProfileResult']`
+Bases: `UncertaintyMethod['ProfileResult']`, `RangeChecked`
 
 The profile likelihood of parameters (Raue et al. 2009).
 
@@ -34731,7 +34713,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class ProfileLikelihood(UncertaintyMethod["ProfileResult"]):
+class ProfileLikelihood(UncertaintyMethod["ProfileResult"], RangeChecked):
     """
     The profile likelihood of parameters (Raue et al. 2009).
 
@@ -34757,8 +34739,12 @@ class ProfileLikelihood(UncertaintyMethod["ProfileResult"]):
 
     parameters: list[str] = Field(min_length=1)
     threshold: Threshold
-    max_steps: int = Field(default=100, ge=1)
-    starts: int = Field(default=1, ge=1)
+    max_steps: int = Field(
+        default=100,
+    )
+    starts: int = Field(
+        default=1,
+    )
 
     @model_validator(mode="after")
     def check_unique(self) -> Self:
@@ -34791,7 +34777,7 @@ def check_unique(self) -> Self:
 
 ## PredictionProfile
 
-Bases: `UncertaintyMethod['ProfileResult']`
+Bases: `UncertaintyMethod['ProfileResult']`, `RangeChecked`
 
 The profile likelihood of predictions (Kreutz et al. 2012).
 
@@ -34809,7 +34795,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class PredictionProfile(UncertaintyMethod["ProfileResult"]):
+class PredictionProfile(UncertaintyMethod["ProfileResult"], RangeChecked):
     """
     The profile likelihood of predictions (Kreutz et al. 2012).
 
@@ -34833,8 +34819,12 @@ class PredictionProfile(UncertaintyMethod["ProfileResult"]):
 
     specs: list[PredictionSpec] = Field(min_length=1)
     threshold: Threshold
-    max_steps: int = Field(default=100, ge=1)
-    starts: int = Field(default=1, ge=1)
+    max_steps: int = Field(
+        default=100,
+    )
+    starts: int = Field(
+        default=1,
+    )
 
     @model_validator(mode="after")
     def check_labels(self) -> Self:
@@ -34873,7 +34863,7 @@ def check_labels(self) -> Self:
 
 ## PredictionSpec
 
-Bases: `_Frozen`
+Bases: `_Frozen`, `RangeChecked`
 
 A prediction to profile: an output, or a sum of outputs, at a position, read as an observation is.
 
@@ -34891,7 +34881,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class PredictionSpec(_Frozen):
+class PredictionSpec(_Frozen, RangeChecked):
     """
     A prediction to profile: an output, or a sum of outputs, at a position,
     read as an observation is.
@@ -34913,11 +34903,13 @@ class PredictionSpec(_Frozen):
         A factor parameter that multiplies the prediction.
     """
 
-    at: float = Field(ge=0, allow_inf_nan=False)
+    at: float = Field()
     output: str | None = Field(default=None, min_length=1)
     outputs: list[str] | None = None
     label: str = ""
-    window: float | None = Field(default=None, gt=0)
+    window: float | None = Field(
+        default=None,
+    )
     factor_id: str | None = None
 
     def as_observation(self) -> ObservedDataPoint:
@@ -34997,7 +34989,7 @@ def as_observation(self) -> ObservedDataPoint:
 
 ## Threshold
 
-Bases: `_Frozen`
+Bases: `_Frozen`, `RangeChecked`
 
 How far the statistic of a profile may rise above the fit inside an interval of `confidence_level`.
 
@@ -35014,7 +35006,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class Threshold(_Frozen):
+class Threshold(_Frozen, RangeChecked):
     """
     How far the statistic of a profile may rise above the fit inside an
     interval of `confidence_level`.
@@ -35032,7 +35024,7 @@ class Threshold(_Frozen):
     """  # noqa: E501
 
     kind: Literal["chi_square", "beale", "bootstrap_calibrated"]
-    confidence_level: ConfidenceLevel
+    confidence_level: float
     bootstrap: ProfileBootstrap | None = None
 
     @model_validator(mode="after")
@@ -36218,7 +36210,7 @@ class LogUniform(DistributionBase):
 
 ## Beta
 
-Bases: `DistributionBase`
+Bases: `DistributionBase`, `RangeChecked`
 
 The beta distribution of shapes `a` and `b`, scaled to the bounds; they must be finite.
 
@@ -36232,7 +36224,7 @@ Attributes:
 Source code in `commol/context/inference/distributions.py`
 
 ```python
-class Beta(DistributionBase):
+class Beta(DistributionBase, RangeChecked):
     """
     The beta distribution of shapes `a` and `b`, scaled to the bounds; they
     must be finite.
@@ -36247,8 +36239,8 @@ class Beta(DistributionBase):
 
     rust_kind: ClassVar[str] = "beta"
     kind: Literal["beta"] = "beta"
-    a: float = Field(gt=0.0, allow_inf_nan=False, description="The first shape.")
-    b: float = Field(gt=0.0, allow_inf_nan=False, description="The second shape.")
+    a: float = Field(description="The first shape.")
+    b: float = Field(description="The second shape.")
 
     def rust_parameters(self) -> list[float]:
         """The shapes `a` and `b`."""
@@ -36275,7 +36267,7 @@ def rust_parameters(self) -> list[float]:
 
 ## Normal
 
-Bases: `DistributionBase`
+Bases: `DistributionBase`, `RangeChecked`
 
 The normal distribution, truncated to the bounds.
 
@@ -36289,7 +36281,7 @@ Attributes:
 Source code in `commol/context/inference/distributions.py`
 
 ```python
-class Normal(DistributionBase):
+class Normal(DistributionBase, RangeChecked):
     """
     The normal distribution, truncated to the bounds.
 
@@ -36303,10 +36295,8 @@ class Normal(DistributionBase):
 
     rust_kind: ClassVar[str] = "normal"
     kind: Literal["normal"] = "normal"
-    mean: float = Field(allow_inf_nan=False, description="The mean.")
-    sd: float = Field(
-        gt=0.0, allow_inf_nan=False, description="The standard deviation."
-    )
+    mean: float = Field(description="The mean.")
+    sd: float = Field(description="The standard deviation.")
 
     def rust_parameters(self) -> list[float]:
         """The mean and the standard deviation."""
@@ -36333,7 +36323,7 @@ def rust_parameters(self) -> list[float]:
 
 ## LogNormal
 
-Bases: `DistributionBase`
+Bases: `DistributionBase`, `RangeChecked`
 
 The log-normal distribution, truncated to the bounds and to `(0, ∞)`: `log x` is normal. The upper bound must be above 0.
 
@@ -36347,7 +36337,7 @@ Attributes:
 Source code in `commol/context/inference/distributions.py`
 
 ```python
-class LogNormal(DistributionBase):
+class LogNormal(DistributionBase, RangeChecked):
     """
     The log-normal distribution, truncated to the bounds and to ``(0, ∞)``:
     ``log x`` is normal. The upper bound must be above 0.
@@ -36362,10 +36352,8 @@ class LogNormal(DistributionBase):
 
     rust_kind: ClassVar[str] = "log_normal"
     kind: Literal["log_normal"] = "log_normal"
-    mu: float = Field(allow_inf_nan=False, description="The mean of log x.")
-    sigma: float = Field(
-        gt=0.0, allow_inf_nan=False, description="The standard deviation of log x."
-    )
+    mu: float = Field(description="The mean of log x.")
+    sigma: float = Field(description="The standard deviation of log x.")
 
     def rust_parameters(self) -> list[float]:
         """`mu` and `sigma`."""
@@ -36392,7 +36380,7 @@ def rust_parameters(self) -> list[float]:
 
 ## Gamma
 
-Bases: `DistributionBase`
+Bases: `DistributionBase`, `RangeChecked`
 
 The gamma distribution of shape `shape` and rate `rate` (mean `shape / rate`), truncated to the bounds and to `(0, ∞)`. The upper bound must be above 0.
 
@@ -36406,7 +36394,7 @@ Attributes:
 Source code in `commol/context/inference/distributions.py`
 
 ```python
-class Gamma(DistributionBase):
+class Gamma(DistributionBase, RangeChecked):
     """
     The gamma distribution of shape `shape` and rate `rate` (mean
     ``shape / rate``), truncated to the bounds and to ``(0, ∞)``. The upper
@@ -36422,8 +36410,8 @@ class Gamma(DistributionBase):
 
     rust_kind: ClassVar[str] = "gamma"
     kind: Literal["gamma"] = "gamma"
-    shape: float = Field(gt=0.0, allow_inf_nan=False, description="The shape.")
-    rate: float = Field(gt=0.0, allow_inf_nan=False, description="The rate.")
+    shape: float = Field(description="The shape.")
+    rate: float = Field(description="The rate.")
 
     def rust_parameters(self) -> list[float]:
         """The shape and the rate."""
@@ -36450,7 +36438,7 @@ def rust_parameters(self) -> list[float]:
 
 ## GibbsPosterior
 
-Bases: `WithPriors`, `UncertaintyMethod[GibbsResult]`
+Bases: `WithPriors`, `UncertaintyMethod[GibbsResult]`, `RangeChecked`
 
 The Gibbs posterior `π(θ) ∝ prior(θ) · exp(−η · loss(θ))` of the problem's loss, with its weights and normalization, sampled by sequential Monte Carlo from the priors (temperature 0) to the posterior (temperature 1).
 
@@ -36470,7 +36458,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult]):
+class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult], RangeChecked):
     """
     The Gibbs posterior ``π(θ) ∝ prior(θ) · exp(−η · loss(θ))`` of the
     problem's loss, with its weights and normalization, sampled by sequential
@@ -36504,22 +36492,16 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult]):
     """
 
     eta: Eta = Field(description="The scale of the loss, or its calibration.")
-    particles: int = Field(ge=2, description="Number of particles.")
-    target_cess: Share = Field(description="Share kept per step.")
-    resample_threshold: float = Field(
-        gt=0.0, le=1.0, description="Resample below this share."
-    )
-    stay_probability: Share = Field(description="Probability a particle does not move.")
+    particles: int = Field(description="Number of particles.")
+    target_cess: float = Field(description="Share kept per step.")
+    resample_threshold: float = Field(description="Resample below this share.")
+    stay_probability: float = Field(description="Probability a particle does not move.")
 
     @model_validator(mode="before")
     @classmethod
     def require_eta(cls, data: JsonValue) -> JsonValue:
         """Name the choices of `eta` when it is missing."""
         _require(data, "eta", f"give {ETA_CHOICES}")
-        if isinstance(data, Mapping):
-            eta = data["eta"]
-            if isinstance(eta, int | float) and not eta > 0:
-                raise ValueError(f"eta must be {ETA_CHOICES}; got {eta}.")
         return data
 ```
 
@@ -36541,16 +36523,12 @@ Source code in `commol/context/inference/smc.py`
 def require_eta(cls, data: JsonValue) -> JsonValue:
     """Name the choices of `eta` when it is missing."""
     _require(data, "eta", f"give {ETA_CHOICES}")
-    if isinstance(data, Mapping):
-        eta = data["eta"]
-        if isinstance(eta, int | float) and not eta > 0:
-            raise ValueError(f"eta must be {ETA_CHOICES}; got {eta}.")
     return data
 ```
 
 ## BayesianPosterior
 
-Bases: `WithPriors`, `UncertaintyMethod[SMCResult]`
+Bases: `WithPriors`, `UncertaintyMethod[SMCResult]`, `RangeChecked`
 
 The posterior `π(θ) ∝ prior(θ) · L(θ)` of the problem's observation models, sampled by sequential Monte Carlo from the priors (temperature 0) to the posterior (temperature 1), with its log evidence.
 
@@ -36569,7 +36547,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class BayesianPosterior(WithPriors, UncertaintyMethod[SMCResult]):
+class BayesianPosterior(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
     """
     The posterior ``π(θ) ∝ prior(θ) · L(θ)`` of the problem's observation
     models, sampled by sequential Monte Carlo from the priors (temperature
@@ -36599,17 +36577,15 @@ class BayesianPosterior(WithPriors, UncertaintyMethod[SMCResult]):
         ``⌈log c / log(1 − a)⌉`` times.
     """
 
-    particles: int = Field(ge=2, description="Number of particles.")
-    target_cess: Share = Field(description="Share kept per step.")
-    resample_threshold: float = Field(
-        gt=0.0, le=1.0, description="Resample below this share."
-    )
-    stay_probability: Share = Field(description="Probability a particle does not move.")
+    particles: int = Field(description="Number of particles.")
+    target_cess: float = Field(description="Share kept per step.")
+    resample_threshold: float = Field(description="Resample below this share.")
+    stay_probability: float = Field(description="Probability a particle does not move.")
 ```
 
 ## InformationMatchingEta
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Calibrate `η` by information matching: `η = tr(J I⁻¹ J) / tr(J)` at the fit, with `J` the Gauss–Newton curvature of the objective and `I` the variance of the scores of its terms, summed over blocks of positions as the meat of `Sandwich` (Holmes and Walker 2017; Lyddon, Holmes and Walker 2019). For the sum of squares of a model with Gaussian noise of variance `σ²` it estimates `1/(2σ²)`; for a correct observation model, 1.
 
@@ -36625,7 +36601,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class InformationMatchingEta(BaseModel):
+class InformationMatchingEta(RangeChecked):
     """
     Calibrate `η` by information matching: `η = tr(J I⁻¹ J) / tr(J)` at the
     fit, with ``J`` the Gauss–Newton curvature of the objective and ``I`` the
@@ -36653,12 +36629,12 @@ class InformationMatchingEta(BaseModel):
 
     kind: Literal["information_matching"] = "information_matching"
     block_length: BlockLength = Field(description="Positions per block.")
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+    starts: int = Field(default=1, description="Starts of the fit.")
 ```
 
 ## BootstrapCoverageEta
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Calibrate `η` by bootstrap coverage: the `η` at which the central intervals of `confidence_level` of the Gibbs posteriors of Bayesian-bootstrap data sets hold the fit at that rate, over the replicates and the parameters (Syring and Martin 2019).
 
@@ -36676,7 +36652,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class BootstrapCoverageEta(BaseModel):
+class BootstrapCoverageEta(RangeChecked):
     """
     Calibrate `η` by bootstrap coverage: the `η` at which the central
     intervals of `confidence_level` of the Gibbs posteriors of
@@ -36701,15 +36677,15 @@ class BootstrapCoverageEta(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: Literal["bootstrap_coverage"] = "bootstrap_coverage"
-    replicates: int = Field(ge=1, description="Number of bootstrap data sets.")
+    replicates: int = Field(description="Number of bootstrap data sets.")
     block_length: BlockLength = Field(description="Positions per block.")
-    confidence_level: ConfidenceLevel = Field(description="The level of the intervals.")
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+    confidence_level: float = Field(description="The level of the intervals.")
+    starts: int = Field(default=1, description="Starts of the fit.")
 ```
 
 ## ABCSMC
 
-Bases: `WithPriors`, `UncertaintyMethod[SMCResult]`
+Bases: `WithPriors`, `UncertaintyMethod[SMCResult]`, `RangeChecked`
 
 Approximate Bayesian computation by sequential Monte Carlo (Del Moral, Doucet and Jasra 2012): the tolerance `ε` falls step by step, and a particle is inside when the distance of its run is at most `ε`.
 
@@ -36729,7 +36705,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class ABCSMC(WithPriors, UncertaintyMethod[SMCResult]):
+class ABCSMC(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
     """
     Approximate Bayesian computation by sequential Monte Carlo (Del Moral,
     Doucet and Jasra 2012): the tolerance ``ε`` falls step by step, and a
@@ -36763,17 +36739,17 @@ class ABCSMC(WithPriors, UncertaintyMethod[SMCResult]):
     """
 
     distance: ABCDistance = Field(description="The distance.")
-    particles: int = Field(ge=2, description="Number of particles.")
-    target_cess: Share = Field(description="Share kept per step.")
-    min_acceptance: Share = Field(
+    particles: int = Field(description="Number of particles.")
+    target_cess: float = Field(description="Share kept per step.")
+    min_acceptance: float = Field(
         description="Acceptance rate below which the run stops."
     )
-    stay_probability: Share = Field(description="Probability a particle does not move.")
+    stay_probability: float = Field(description="Probability a particle does not move.")
 ```
 
 ## ABCRejection
 
-Bases: `WithPriors`, `UncertaintyMethod[SMCResult]`
+Bases: `WithPriors`, `UncertaintyMethod[SMCResult]`, `RangeChecked`
 
 ABC rejection: `draws` draws of the priors, of which the closest share `quantile` is kept, with equal weights. It is one step of `ABCSMC` with no move. With a stochastic engine each distance reads one fresh replicate.
 
@@ -36789,7 +36765,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class ABCRejection(WithPriors, UncertaintyMethod[SMCResult]):
+class ABCRejection(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
     """
     ABC rejection: `draws` draws of the priors, of which the closest share
     `quantile` is kept, with equal weights. It is one step of `ABCSMC` with
@@ -36810,8 +36786,8 @@ class ABCRejection(WithPriors, UncertaintyMethod[SMCResult]):
     """
 
     distance: ABCDistance = Field(description="The distance.")
-    draws: int = Field(ge=2, description="Number of draws.")
-    quantile: Share = Field(description="The share of draws kept.")
+    draws: int = Field(description="Number of draws.")
+    quantile: float = Field(description="The share of draws kept.")
 ```
 
 ## LossDistance
@@ -37032,7 +37008,7 @@ Guide: [Local Approximations](https://munqu.github.io/commol/latest/guide/uncert
 
 ## Laplace
 
-Bases: `UncertaintyMethod[LaplaceResult]`
+Bases: `UncertaintyMethod[LaplaceResult]`, `RangeChecked`
 
 The Laplace approximation of the problem's observation models: the normal `N(θ̂, H⁻¹)` on the unbounded scale of the parameters, centred on the fit, with `H` the curvature of `−log L` there.
 
@@ -37049,7 +37025,7 @@ Attributes:
 Source code in `commol/context/inference/local.py`
 
 ```python
-class Laplace(UncertaintyMethod[LaplaceResult]):
+class Laplace(UncertaintyMethod[LaplaceResult], RangeChecked):
     """
     The Laplace approximation of the problem's observation models: the normal
     ``N(θ̂, H⁻¹)`` on the unbounded scale of the parameters, centred on the
@@ -37071,16 +37047,16 @@ class Laplace(UncertaintyMethod[LaplaceResult]):
         hypercube over the bounds.
     """
 
-    draws: int = Field(ge=1, description="Number of draws.")
+    draws: int = Field(description="Number of draws.")
     curvature: CurvatureName = Field(
         default="gauss_newton", description="The curvature."
     )
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+    starts: int = Field(default=1, description="Starts of the fit.")
 ```
 
 ## Sandwich
 
-Bases: `UncertaintyMethod[SandwichResult]`
+Bases: `UncertaintyMethod[SandwichResult]`, `RangeChecked`
 
 The sandwich covariance `H⁻¹ B H⁻¹` at the fit, with the meat `B` summed over blocks of positions (the clustered estimator CR1): `B = G/(G − 1) · Σ_b s_b s_bᵀ`, with `s_b` the sum of the gradients of the terms of the observations of block `b`.
 
@@ -37098,7 +37074,7 @@ Attributes:
 Source code in `commol/context/inference/local.py`
 
 ```python
-class Sandwich(UncertaintyMethod[SandwichResult]):
+class Sandwich(UncertaintyMethod[SandwichResult], RangeChecked):
     """
     The sandwich covariance ``H⁻¹ B H⁻¹`` at the fit, with the meat ``B``
     summed over blocks of positions (the clustered estimator CR1):
@@ -37130,16 +37106,16 @@ class Sandwich(UncertaintyMethod[SandwichResult]):
     """
 
     block_length: BlockLength = Field(description="Positions per block.")
-    draws: int = Field(ge=1, description="Number of draws.")
+    draws: int = Field(description="Number of draws.")
     curvature: CurvatureName = Field(
         default="gauss_newton", description="The curvature."
     )
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+    starts: int = Field(default=1, description="Starts of the fit.")
 ```
 
 ## LaplaceMixture
 
-Bases: `UncertaintyMethod[ImportanceResult]`
+Bases: `UncertaintyMethod[ImportanceResult]`, `RangeChecked`
 
 The Laplace mixture: a Laplace approximation at each distinct optimum of a multi-start fit, weighted by its Laplace evidence, as the proposal of importance sampling of a posterior, with the largest weights smoothed (Pareto-smoothed importance sampling, Vehtari et al. 2024).
 
@@ -37157,7 +37133,7 @@ Attributes:
 Source code in `commol/context/inference/local.py`
 
 ```python
-class LaplaceMixture(UncertaintyMethod[ImportanceResult]):
+class LaplaceMixture(UncertaintyMethod[ImportanceResult], RangeChecked):
     """
     The Laplace mixture: a Laplace approximation at each distinct optimum of
     a multi-start fit, weighted by its Laplace evidence, as the proposal of
@@ -37184,8 +37160,8 @@ class LaplaceMixture(UncertaintyMethod[ImportanceResult]):
         The curvature of each component (default ``"gauss_newton"``).
     """
 
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
-    draws: int = Field(ge=25, description="Number of draws.")
+    starts: int = Field(default=1, description="Starts of the fit.")
+    draws: int = Field(description="Number of draws.")
     target: MixtureTarget = Field(description="The posterior to sample.")
     curvature: CurvatureName = Field(
         default="gauss_newton", description="The curvature."
@@ -37224,7 +37200,7 @@ class LikelihoodTarget(WithPriors):
 
 ## GibbsTarget
 
-Bases: `WithPriors`
+Bases: `WithPriors`, `RangeChecked`
 
 The Gibbs posterior of the problem's loss, `π(θ) ∝ prior(θ) · exp(−η · loss(θ))`, as the target of a `LaplaceMixture`.
 
@@ -37238,7 +37214,7 @@ Attributes:
 Source code in `commol/context/inference/local.py`
 
 ```python
-class GibbsTarget(WithPriors):
+class GibbsTarget(WithPriors, RangeChecked):
     """
     The Gibbs posterior of the problem's loss,
     ``π(θ) ∝ prior(θ) · exp(−η · loss(θ))``, as the target of a
@@ -37254,7 +37230,7 @@ class GibbsTarget(WithPriors):
     """
 
     kind: Literal["gibbs"] = "gibbs"
-    eta: float = Field(gt=0.0, allow_inf_nan=False, description="Scale of the loss.")
+    eta: float = Field(description="Scale of the loss.")
 ```
 
 ## LocalResult
@@ -37666,7 +37642,7 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
 
     score: ConformalScore = Field(description="The nonconformity score.")
     by: Pooling = Field(description="Which scores each quantile reads.")
-    confidence_level: ConfidenceLevel = Field(description="The level of the intervals.")
+    confidence_level: float = Field(description="The level of the intervals.")
 
     @model_validator(mode="before")
     @classmethod
@@ -37711,7 +37687,7 @@ def check_score_and_by(cls, data: JsonValue) -> JsonValue:
 
 ## SplitConformal
 
-Bases: `ConformalMethod`
+Bases: `ConformalMethod`, `RangeChecked`
 
 Split conformal prediction.
 
@@ -37731,7 +37707,7 @@ Attributes:
 Source code in `commol/context/inference/conformal.py`
 
 ```python
-class SplitConformal(ConformalMethod):
+class SplitConformal(ConformalMethod, RangeChecked):
     """
     Split conformal prediction.
 
@@ -37763,7 +37739,7 @@ class SplitConformal(ConformalMethod):
     sample: ParameterSample | None = Field(
         default=None, description="The sample whose predictive predicts."
     )
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+    starts: int = Field(default=1, description="Starts of the fit.")
 
     @model_validator(mode="after")
     def check_spread(self) -> Self:
@@ -37794,7 +37770,7 @@ def check_spread(self) -> Self:
 
 ## RollingConformal
 
-Bases: `ConformalMethod`
+Bases: `ConformalMethod`, `RangeChecked`
 
 Rolling-origin conformal prediction: intervals ahead of the data, one quantile per horizon.
 
@@ -37813,7 +37789,7 @@ Attributes:
 Source code in `commol/context/inference/conformal.py`
 
 ```python
-class RollingConformal(ConformalMethod):
+class RollingConformal(ConformalMethod, RangeChecked):
     """
     Rolling-origin conformal prediction: intervals ahead of the data, one
     quantile per horizon.
@@ -37837,7 +37813,7 @@ class RollingConformal(ConformalMethod):
 
     origins: list[float] = Field(min_length=1, description="The origins.")
     positions: list[float] = Field(min_length=1, description="Where the intervals are.")
-    starts: int = Field(default=1, ge=1, description="Starts of each fit.")
+    starts: int = Field(default=1, description="Starts of each fit.")
 
     @model_validator(mode="after")
     def check_spread(self) -> Self:
@@ -37876,7 +37852,7 @@ def check_spread(self) -> Self:
 
 ## JackknifePlus
 
-Bases: `ConformalMethod`
+Bases: `ConformalMethod`, `RangeChecked`
 
 Jackknife+ (Barber et al. 2021) with blocks: one refit per block left out, and intervals from the left-out residuals and predictions.
 
@@ -37895,7 +37871,7 @@ Attributes:
 Source code in `commol/context/inference/conformal.py`
 
 ```python
-class JackknifePlus(ConformalMethod):
+class JackknifePlus(ConformalMethod, RangeChecked):
     """
     Jackknife+ (Barber et al. 2021) with blocks: one refit per block left
     out, and intervals from the left-out residuals and predictions.
@@ -37917,12 +37893,12 @@ class JackknifePlus(ConformalMethod):
 
     block_length: BlockLength = Field(description="Positions per block.")
     positions: list[float] = Field(min_length=1, description="Where the intervals are.")
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    starts: int = Field(default=1, description="Starts per fit.")
 ```
 
 ## EnbPI
 
-Bases: `ConformalMethod`
+Bases: `ConformalMethod`, `RangeChecked`
 
 Ensemble batch prediction intervals (Xu and Xie 2021).
 
@@ -37942,7 +37918,7 @@ Attributes:
 Source code in `commol/context/inference/conformal.py`
 
 ```python
-class EnbPI(ConformalMethod):
+class EnbPI(ConformalMethod, RangeChecked):
     """
     Ensemble batch prediction intervals (Xu and Xie 2021).
 
@@ -37965,15 +37941,15 @@ class EnbPI(ConformalMethod):
         Starts of the fit and of each replicate (default 1).
     """
 
-    replicates: int = Field(ge=2, description="Number of replicates.")
+    replicates: int = Field(description="Number of replicates.")
     block_length: BlockLength = Field(description="Positions per block.")
     positions: list[float] = Field(min_length=1, description="Where the intervals are.")
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    starts: int = Field(default=1, description="Starts per fit.")
 ```
 
 ## AdaptiveConformal
 
-Bases: `ConformalMethod`
+Bases: `ConformalMethod`, `RangeChecked`
 
 Adaptive conformal inference (Gibbs and Candès 2021).
 
@@ -37993,7 +37969,7 @@ Attributes:
 Source code in `commol/context/inference/conformal.py`
 
 ```python
-class AdaptiveConformal(ConformalMethod):
+class AdaptiveConformal(ConformalMethod, RangeChecked):
     """
     Adaptive conformal inference (Gibbs and Candès 2021).
 
@@ -38017,14 +37993,14 @@ class AdaptiveConformal(ConformalMethod):
         Starts of the fit (default 1).
     """
 
-    step: float = Field(gt=0.0, description="The step of the working level.")
+    step: float = Field(description="The step of the working level.")
     stream: list[ObservedDataPoint] = Field(
         min_length=1, description="The observations that arrive."
     )
     sample: ParameterSample | None = Field(
         default=None, description="The sample whose predictive predicts."
     )
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+    starts: int = Field(default=1, description="Starts of the fit.")
 
     @model_validator(mode="after")
     def check_spread(self) -> Self:
@@ -40898,6 +40874,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+- The engine holds the range rule of every setting: a count, a share, a length, a scale, a tolerance, a bound of an optimizer, an observation, an observation model, an axis pattern, a distribution, a quantity of interest and the setting of an uncertainty, identifiability or sensitivity method. A value outside its range still raises `ValueError` when the object is built, and the same values are valid; the message is the engine's, and names the setting and its range: `replicates is a whole number of at least 1, got 0`, `sd is a finite number greater than 0, got 0`. A count gives one message for every value outside its range, a negative one included, also when a binding is called with no Python object in between, and for `Simulation.replicates` (`count is a whole number of at least 1, got 0`) and `Calibrator.run` (`starts is a whole number of at least 1, got 0`). A seed outside its range gives `seed is a whole number from 0 to 18446744073709551615, got -1` in every function that takes one: `Simulation.run`, `Simulation.run_at`, `Simulation.replicates`, `CalibrationProblem`, `SensitivityAnalysis` and each binding.
 - A calibration, a sensitivity analysis or any other method that sets a model parameter raises `ValueError` when it is built if the parameter is a formula or a series parameter. The engine computes such a parameter at each step, so a value set on it was lost and the method fitted nothing. The message is the engine's, for this case and for a parameter the model does not have: `Parameter 'k9' is not in the model; the parameters that can be set are k1, k2`. Python keeps no copy of this check.
 - The four engines of the aggregate kind name themselves in their messages by the name of the engine: a position an engine does not report at gives `The DifferenceEquations engine reports only at integer steps; 2.5 is not one`, and an impulse or a series point between two steps names `the DifferenceEquations engine` or `the StochasticSteps engine`.
 - `Predictive.at_observations` and every method that reads a predictive at other observations raise `ValueError` for a position the engine rejects, with the message of the engine, as a calibration does. The bands, the automatic block lengths and their estimates keep their values: one Rust function of each computes them for every method.

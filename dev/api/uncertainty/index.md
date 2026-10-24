@@ -2811,7 +2811,7 @@ class NoNoise(BaseModel):
 
 ## ResidualNoise
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Observation noise made of the residuals of a fit, with no noise model.
 
@@ -2828,7 +2828,7 @@ Attributes:
 Source code in `commol/context/inference/noise.py`
 
 ```python
-class ResidualNoise(BaseModel):
+class ResidualNoise(RangeChecked):
     """
     Observation noise made of the residuals of a fit, with no noise model.
 
@@ -2856,7 +2856,7 @@ class ResidualNoise(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     fit: CalibrationResult = Field(description="The fit whose residuals are added.")
-    block_length: int = Field(ge=1, description="Positions per block.")
+    block_length: int = Field(description="Positions per block.")
     residual_scale: Literal["additive", "multiplicative"] = Field(
         description="The scale of the residuals."
     )
@@ -2894,7 +2894,7 @@ Guide: [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resa
 
 ## BayesianBootstrap
 
-Bases: `UncertaintyMethod[BootstrapResult]`
+Bases: `UncertaintyMethod[BootstrapResult]`, `RangeChecked`
 
 The Bayesian (weighted) bootstrap by blocks.
 
@@ -2911,7 +2911,7 @@ Attributes:
 Source code in `commol/context/inference/resampling.py`
 
 ```python
-class BayesianBootstrap(UncertaintyMethod[BootstrapResult]):
+class BayesianBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
     """
     The Bayesian (weighted) bootstrap by blocks.
 
@@ -2933,14 +2933,14 @@ class BayesianBootstrap(UncertaintyMethod[BootstrapResult]):
         rows of a Latin hypercube over the bounds.
     """
 
-    replicates: int = Field(ge=1, description="Number of replicates.")
+    replicates: int = Field(description="Number of replicates.")
     block_length: BlockLength = Field(description="Positions per block.")
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    starts: int = Field(default=1, description="Starts per fit.")
 ```
 
 ## ResidualBootstrap
 
-Bases: `UncertaintyMethod[BootstrapResult]`
+Bases: `UncertaintyMethod[BootstrapResult]`, `RangeChecked`
 
 The residual block bootstrap.
 
@@ -2959,7 +2959,7 @@ Attributes:
 Source code in `commol/context/inference/resampling.py`
 
 ```python
-class ResidualBootstrap(UncertaintyMethod[BootstrapResult]):
+class ResidualBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
     """
     The residual block bootstrap.
 
@@ -2985,7 +2985,7 @@ class ResidualBootstrap(UncertaintyMethod[BootstrapResult]):
         Starts of the fit and of each replicate (default 1).
     """
 
-    replicates: int = Field(ge=1, description="Number of replicates.")
+    replicates: int = Field(description="Number of replicates.")
     block_length: BlockLength = Field(description="Positions per block.")
     residual_scale: Literal["additive", "multiplicative"] = Field(
         description="The scale of the residuals."
@@ -2993,12 +2993,12 @@ class ResidualBootstrap(UncertaintyMethod[BootstrapResult]):
     scheme: Literal["moving", "stationary"] = Field(
         description="How blocks of residuals are drawn."
     )
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    starts: int = Field(default=1, description="Starts per fit.")
 ```
 
 ## WildBootstrap
 
-Bases: `UncertaintyMethod[BootstrapResult]`
+Bases: `UncertaintyMethod[BootstrapResult]`, `RangeChecked`
 
 The wild block bootstrap.
 
@@ -3016,7 +3016,7 @@ Attributes:
 Source code in `commol/context/inference/resampling.py`
 
 ```python
-class WildBootstrap(UncertaintyMethod[BootstrapResult]):
+class WildBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
     """
     The wild block bootstrap.
 
@@ -3039,17 +3039,17 @@ class WildBootstrap(UncertaintyMethod[BootstrapResult]):
         Starts of the fit and of each replicate (default 1).
     """
 
-    replicates: int = Field(ge=1, description="Number of replicates.")
+    replicates: int = Field(description="Number of replicates.")
     block_length: BlockLength = Field(description="Positions per block.")
     multipliers: Literal["rademacher", "mammen"] = Field(
         description="The distribution of the multipliers."
     )
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    starts: int = Field(default=1, description="Starts per fit.")
 ```
 
 ## BlockJackknife
 
-Bases: `UncertaintyMethod[JackknifeResult]`
+Bases: `UncertaintyMethod[JackknifeResult]`, `RangeChecked`
 
 The block jackknife (Künsch 1989): one fit per block left out.
 
@@ -3065,7 +3065,7 @@ Attributes:
 Source code in `commol/context/inference/resampling.py`
 
 ```python
-class BlockJackknife(UncertaintyMethod[JackknifeResult]):
+class BlockJackknife(UncertaintyMethod[JackknifeResult], RangeChecked):
     """
     The block jackknife (Künsch 1989): one fit per block left out.
 
@@ -3082,12 +3082,12 @@ class BlockJackknife(UncertaintyMethod[JackknifeResult]):
     """
 
     block_length: BlockLength = Field(description="Positions per block.")
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    starts: int = Field(default=1, description="Starts per fit.")
 ```
 
 ## ParametricBootstrap
 
-Bases: `UncertaintyMethod[BootstrapResult]`
+Bases: `UncertaintyMethod[BootstrapResult]`, `RangeChecked`
 
 The parametric bootstrap of the problem's observation models.
 
@@ -3103,7 +3103,7 @@ Attributes:
 Source code in `commol/context/inference/resampling.py`
 
 ```python
-class ParametricBootstrap(UncertaintyMethod[BootstrapResult]):
+class ParametricBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
     """
     The parametric bootstrap of the problem's observation models.
 
@@ -3122,8 +3122,8 @@ class ParametricBootstrap(UncertaintyMethod[BootstrapResult]):
         rows of a Latin hypercube over the bounds.
     """
 
-    replicates: int = Field(ge=1, description="Number of replicates.")
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    replicates: int = Field(description="Number of replicates.")
+    starts: int = Field(default=1, description="Starts per fit.")
 ```
 
 ## BootstrapResult
@@ -3436,7 +3436,7 @@ Guide: [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertai
 
 ## ProfileLikelihood
 
-Bases: `UncertaintyMethod['ProfileResult']`
+Bases: `UncertaintyMethod['ProfileResult']`, `RangeChecked`
 
 The profile likelihood of parameters (Raue et al. 2009).
 
@@ -3454,7 +3454,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class ProfileLikelihood(UncertaintyMethod["ProfileResult"]):
+class ProfileLikelihood(UncertaintyMethod["ProfileResult"], RangeChecked):
     """
     The profile likelihood of parameters (Raue et al. 2009).
 
@@ -3480,8 +3480,12 @@ class ProfileLikelihood(UncertaintyMethod["ProfileResult"]):
 
     parameters: list[str] = Field(min_length=1)
     threshold: Threshold
-    max_steps: int = Field(default=100, ge=1)
-    starts: int = Field(default=1, ge=1)
+    max_steps: int = Field(
+        default=100,
+    )
+    starts: int = Field(
+        default=1,
+    )
 
     @model_validator(mode="after")
     def check_unique(self) -> Self:
@@ -3514,7 +3518,7 @@ def check_unique(self) -> Self:
 
 ## PredictionProfile
 
-Bases: `UncertaintyMethod['ProfileResult']`
+Bases: `UncertaintyMethod['ProfileResult']`, `RangeChecked`
 
 The profile likelihood of predictions (Kreutz et al. 2012).
 
@@ -3532,7 +3536,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class PredictionProfile(UncertaintyMethod["ProfileResult"]):
+class PredictionProfile(UncertaintyMethod["ProfileResult"], RangeChecked):
     """
     The profile likelihood of predictions (Kreutz et al. 2012).
 
@@ -3556,8 +3560,12 @@ class PredictionProfile(UncertaintyMethod["ProfileResult"]):
 
     specs: list[PredictionSpec] = Field(min_length=1)
     threshold: Threshold
-    max_steps: int = Field(default=100, ge=1)
-    starts: int = Field(default=1, ge=1)
+    max_steps: int = Field(
+        default=100,
+    )
+    starts: int = Field(
+        default=1,
+    )
 
     @model_validator(mode="after")
     def check_labels(self) -> Self:
@@ -3596,7 +3604,7 @@ def check_labels(self) -> Self:
 
 ## PredictionSpec
 
-Bases: `_Frozen`
+Bases: `_Frozen`, `RangeChecked`
 
 A prediction to profile: an output, or a sum of outputs, at a position, read as an observation is.
 
@@ -3614,7 +3622,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class PredictionSpec(_Frozen):
+class PredictionSpec(_Frozen, RangeChecked):
     """
     A prediction to profile: an output, or a sum of outputs, at a position,
     read as an observation is.
@@ -3636,11 +3644,13 @@ class PredictionSpec(_Frozen):
         A factor parameter that multiplies the prediction.
     """
 
-    at: float = Field(ge=0, allow_inf_nan=False)
+    at: float = Field()
     output: str | None = Field(default=None, min_length=1)
     outputs: list[str] | None = None
     label: str = ""
-    window: float | None = Field(default=None, gt=0)
+    window: float | None = Field(
+        default=None,
+    )
     factor_id: str | None = None
 
     def as_observation(self) -> ObservedDataPoint:
@@ -3720,7 +3730,7 @@ def as_observation(self) -> ObservedDataPoint:
 
 ## Threshold
 
-Bases: `_Frozen`
+Bases: `_Frozen`, `RangeChecked`
 
 How far the statistic of a profile may rise above the fit inside an interval of `confidence_level`.
 
@@ -3737,7 +3747,7 @@ Attributes:
 Source code in `commol/context/inference/profiles.py`
 
 ```python
-class Threshold(_Frozen):
+class Threshold(_Frozen, RangeChecked):
     """
     How far the statistic of a profile may rise above the fit inside an
     interval of `confidence_level`.
@@ -3755,7 +3765,7 @@ class Threshold(_Frozen):
     """  # noqa: E501
 
     kind: Literal["chi_square", "beale", "bootstrap_calibrated"]
-    confidence_level: ConfidenceLevel
+    confidence_level: float
     bootstrap: ProfileBootstrap | None = None
 
     @model_validator(mode="after")
@@ -4941,7 +4951,7 @@ class LogUniform(DistributionBase):
 
 ## Beta
 
-Bases: `DistributionBase`
+Bases: `DistributionBase`, `RangeChecked`
 
 The beta distribution of shapes `a` and `b`, scaled to the bounds; they must be finite.
 
@@ -4955,7 +4965,7 @@ Attributes:
 Source code in `commol/context/inference/distributions.py`
 
 ```python
-class Beta(DistributionBase):
+class Beta(DistributionBase, RangeChecked):
     """
     The beta distribution of shapes `a` and `b`, scaled to the bounds; they
     must be finite.
@@ -4970,8 +4980,8 @@ class Beta(DistributionBase):
 
     rust_kind: ClassVar[str] = "beta"
     kind: Literal["beta"] = "beta"
-    a: float = Field(gt=0.0, allow_inf_nan=False, description="The first shape.")
-    b: float = Field(gt=0.0, allow_inf_nan=False, description="The second shape.")
+    a: float = Field(description="The first shape.")
+    b: float = Field(description="The second shape.")
 
     def rust_parameters(self) -> list[float]:
         """The shapes `a` and `b`."""
@@ -4998,7 +5008,7 @@ def rust_parameters(self) -> list[float]:
 
 ## Normal
 
-Bases: `DistributionBase`
+Bases: `DistributionBase`, `RangeChecked`
 
 The normal distribution, truncated to the bounds.
 
@@ -5012,7 +5022,7 @@ Attributes:
 Source code in `commol/context/inference/distributions.py`
 
 ```python
-class Normal(DistributionBase):
+class Normal(DistributionBase, RangeChecked):
     """
     The normal distribution, truncated to the bounds.
 
@@ -5026,10 +5036,8 @@ class Normal(DistributionBase):
 
     rust_kind: ClassVar[str] = "normal"
     kind: Literal["normal"] = "normal"
-    mean: float = Field(allow_inf_nan=False, description="The mean.")
-    sd: float = Field(
-        gt=0.0, allow_inf_nan=False, description="The standard deviation."
-    )
+    mean: float = Field(description="The mean.")
+    sd: float = Field(description="The standard deviation.")
 
     def rust_parameters(self) -> list[float]:
         """The mean and the standard deviation."""
@@ -5056,7 +5064,7 @@ def rust_parameters(self) -> list[float]:
 
 ## LogNormal
 
-Bases: `DistributionBase`
+Bases: `DistributionBase`, `RangeChecked`
 
 The log-normal distribution, truncated to the bounds and to `(0, ∞)`: `log x` is normal. The upper bound must be above 0.
 
@@ -5070,7 +5078,7 @@ Attributes:
 Source code in `commol/context/inference/distributions.py`
 
 ```python
-class LogNormal(DistributionBase):
+class LogNormal(DistributionBase, RangeChecked):
     """
     The log-normal distribution, truncated to the bounds and to ``(0, ∞)``:
     ``log x`` is normal. The upper bound must be above 0.
@@ -5085,10 +5093,8 @@ class LogNormal(DistributionBase):
 
     rust_kind: ClassVar[str] = "log_normal"
     kind: Literal["log_normal"] = "log_normal"
-    mu: float = Field(allow_inf_nan=False, description="The mean of log x.")
-    sigma: float = Field(
-        gt=0.0, allow_inf_nan=False, description="The standard deviation of log x."
-    )
+    mu: float = Field(description="The mean of log x.")
+    sigma: float = Field(description="The standard deviation of log x.")
 
     def rust_parameters(self) -> list[float]:
         """`mu` and `sigma`."""
@@ -5115,7 +5121,7 @@ def rust_parameters(self) -> list[float]:
 
 ## Gamma
 
-Bases: `DistributionBase`
+Bases: `DistributionBase`, `RangeChecked`
 
 The gamma distribution of shape `shape` and rate `rate` (mean `shape / rate`), truncated to the bounds and to `(0, ∞)`. The upper bound must be above 0.
 
@@ -5129,7 +5135,7 @@ Attributes:
 Source code in `commol/context/inference/distributions.py`
 
 ```python
-class Gamma(DistributionBase):
+class Gamma(DistributionBase, RangeChecked):
     """
     The gamma distribution of shape `shape` and rate `rate` (mean
     ``shape / rate``), truncated to the bounds and to ``(0, ∞)``. The upper
@@ -5145,8 +5151,8 @@ class Gamma(DistributionBase):
 
     rust_kind: ClassVar[str] = "gamma"
     kind: Literal["gamma"] = "gamma"
-    shape: float = Field(gt=0.0, allow_inf_nan=False, description="The shape.")
-    rate: float = Field(gt=0.0, allow_inf_nan=False, description="The rate.")
+    shape: float = Field(description="The shape.")
+    rate: float = Field(description="The rate.")
 
     def rust_parameters(self) -> list[float]:
         """The shape and the rate."""
@@ -5173,7 +5179,7 @@ def rust_parameters(self) -> list[float]:
 
 ## GibbsPosterior
 
-Bases: `WithPriors`, `UncertaintyMethod[GibbsResult]`
+Bases: `WithPriors`, `UncertaintyMethod[GibbsResult]`, `RangeChecked`
 
 The Gibbs posterior `π(θ) ∝ prior(θ) · exp(−η · loss(θ))` of the problem's loss, with its weights and normalization, sampled by sequential Monte Carlo from the priors (temperature 0) to the posterior (temperature 1).
 
@@ -5193,7 +5199,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult]):
+class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult], RangeChecked):
     """
     The Gibbs posterior ``π(θ) ∝ prior(θ) · exp(−η · loss(θ))`` of the
     problem's loss, with its weights and normalization, sampled by sequential
@@ -5227,22 +5233,16 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult]):
     """
 
     eta: Eta = Field(description="The scale of the loss, or its calibration.")
-    particles: int = Field(ge=2, description="Number of particles.")
-    target_cess: Share = Field(description="Share kept per step.")
-    resample_threshold: float = Field(
-        gt=0.0, le=1.0, description="Resample below this share."
-    )
-    stay_probability: Share = Field(description="Probability a particle does not move.")
+    particles: int = Field(description="Number of particles.")
+    target_cess: float = Field(description="Share kept per step.")
+    resample_threshold: float = Field(description="Resample below this share.")
+    stay_probability: float = Field(description="Probability a particle does not move.")
 
     @model_validator(mode="before")
     @classmethod
     def require_eta(cls, data: JsonValue) -> JsonValue:
         """Name the choices of `eta` when it is missing."""
         _require(data, "eta", f"give {ETA_CHOICES}")
-        if isinstance(data, Mapping):
-            eta = data["eta"]
-            if isinstance(eta, int | float) and not eta > 0:
-                raise ValueError(f"eta must be {ETA_CHOICES}; got {eta}.")
         return data
 ```
 
@@ -5264,16 +5264,12 @@ Source code in `commol/context/inference/smc.py`
 def require_eta(cls, data: JsonValue) -> JsonValue:
     """Name the choices of `eta` when it is missing."""
     _require(data, "eta", f"give {ETA_CHOICES}")
-    if isinstance(data, Mapping):
-        eta = data["eta"]
-        if isinstance(eta, int | float) and not eta > 0:
-            raise ValueError(f"eta must be {ETA_CHOICES}; got {eta}.")
     return data
 ```
 
 ## BayesianPosterior
 
-Bases: `WithPriors`, `UncertaintyMethod[SMCResult]`
+Bases: `WithPriors`, `UncertaintyMethod[SMCResult]`, `RangeChecked`
 
 The posterior `π(θ) ∝ prior(θ) · L(θ)` of the problem's observation models, sampled by sequential Monte Carlo from the priors (temperature 0) to the posterior (temperature 1), with its log evidence.
 
@@ -5292,7 +5288,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class BayesianPosterior(WithPriors, UncertaintyMethod[SMCResult]):
+class BayesianPosterior(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
     """
     The posterior ``π(θ) ∝ prior(θ) · L(θ)`` of the problem's observation
     models, sampled by sequential Monte Carlo from the priors (temperature
@@ -5322,17 +5318,15 @@ class BayesianPosterior(WithPriors, UncertaintyMethod[SMCResult]):
         ``⌈log c / log(1 − a)⌉`` times.
     """
 
-    particles: int = Field(ge=2, description="Number of particles.")
-    target_cess: Share = Field(description="Share kept per step.")
-    resample_threshold: float = Field(
-        gt=0.0, le=1.0, description="Resample below this share."
-    )
-    stay_probability: Share = Field(description="Probability a particle does not move.")
+    particles: int = Field(description="Number of particles.")
+    target_cess: float = Field(description="Share kept per step.")
+    resample_threshold: float = Field(description="Resample below this share.")
+    stay_probability: float = Field(description="Probability a particle does not move.")
 ```
 
 ## InformationMatchingEta
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Calibrate `η` by information matching: `η = tr(J I⁻¹ J) / tr(J)` at the fit, with `J` the Gauss–Newton curvature of the objective and `I` the variance of the scores of its terms, summed over blocks of positions as the meat of `Sandwich` (Holmes and Walker 2017; Lyddon, Holmes and Walker 2019). For the sum of squares of a model with Gaussian noise of variance `σ²` it estimates `1/(2σ²)`; for a correct observation model, 1.
 
@@ -5348,7 +5342,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class InformationMatchingEta(BaseModel):
+class InformationMatchingEta(RangeChecked):
     """
     Calibrate `η` by information matching: `η = tr(J I⁻¹ J) / tr(J)` at the
     fit, with ``J`` the Gauss–Newton curvature of the objective and ``I`` the
@@ -5376,12 +5370,12 @@ class InformationMatchingEta(BaseModel):
 
     kind: Literal["information_matching"] = "information_matching"
     block_length: BlockLength = Field(description="Positions per block.")
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+    starts: int = Field(default=1, description="Starts of the fit.")
 ```
 
 ## BootstrapCoverageEta
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Calibrate `η` by bootstrap coverage: the `η` at which the central intervals of `confidence_level` of the Gibbs posteriors of Bayesian-bootstrap data sets hold the fit at that rate, over the replicates and the parameters (Syring and Martin 2019).
 
@@ -5399,7 +5393,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class BootstrapCoverageEta(BaseModel):
+class BootstrapCoverageEta(RangeChecked):
     """
     Calibrate `η` by bootstrap coverage: the `η` at which the central
     intervals of `confidence_level` of the Gibbs posteriors of
@@ -5424,15 +5418,15 @@ class BootstrapCoverageEta(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: Literal["bootstrap_coverage"] = "bootstrap_coverage"
-    replicates: int = Field(ge=1, description="Number of bootstrap data sets.")
+    replicates: int = Field(description="Number of bootstrap data sets.")
     block_length: BlockLength = Field(description="Positions per block.")
-    confidence_level: ConfidenceLevel = Field(description="The level of the intervals.")
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+    confidence_level: float = Field(description="The level of the intervals.")
+    starts: int = Field(default=1, description="Starts of the fit.")
 ```
 
 ## ABCSMC
 
-Bases: `WithPriors`, `UncertaintyMethod[SMCResult]`
+Bases: `WithPriors`, `UncertaintyMethod[SMCResult]`, `RangeChecked`
 
 Approximate Bayesian computation by sequential Monte Carlo (Del Moral, Doucet and Jasra 2012): the tolerance `ε` falls step by step, and a particle is inside when the distance of its run is at most `ε`.
 
@@ -5452,7 +5446,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class ABCSMC(WithPriors, UncertaintyMethod[SMCResult]):
+class ABCSMC(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
     """
     Approximate Bayesian computation by sequential Monte Carlo (Del Moral,
     Doucet and Jasra 2012): the tolerance ``ε`` falls step by step, and a
@@ -5486,17 +5480,17 @@ class ABCSMC(WithPriors, UncertaintyMethod[SMCResult]):
     """
 
     distance: ABCDistance = Field(description="The distance.")
-    particles: int = Field(ge=2, description="Number of particles.")
-    target_cess: Share = Field(description="Share kept per step.")
-    min_acceptance: Share = Field(
+    particles: int = Field(description="Number of particles.")
+    target_cess: float = Field(description="Share kept per step.")
+    min_acceptance: float = Field(
         description="Acceptance rate below which the run stops."
     )
-    stay_probability: Share = Field(description="Probability a particle does not move.")
+    stay_probability: float = Field(description="Probability a particle does not move.")
 ```
 
 ## ABCRejection
 
-Bases: `WithPriors`, `UncertaintyMethod[SMCResult]`
+Bases: `WithPriors`, `UncertaintyMethod[SMCResult]`, `RangeChecked`
 
 ABC rejection: `draws` draws of the priors, of which the closest share `quantile` is kept, with equal weights. It is one step of `ABCSMC` with no move. With a stochastic engine each distance reads one fresh replicate.
 
@@ -5512,7 +5506,7 @@ Attributes:
 Source code in `commol/context/inference/smc.py`
 
 ```python
-class ABCRejection(WithPriors, UncertaintyMethod[SMCResult]):
+class ABCRejection(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
     """
     ABC rejection: `draws` draws of the priors, of which the closest share
     `quantile` is kept, with equal weights. It is one step of `ABCSMC` with
@@ -5533,8 +5527,8 @@ class ABCRejection(WithPriors, UncertaintyMethod[SMCResult]):
     """
 
     distance: ABCDistance = Field(description="The distance.")
-    draws: int = Field(ge=2, description="Number of draws.")
-    quantile: Share = Field(description="The share of draws kept.")
+    draws: int = Field(description="Number of draws.")
+    quantile: float = Field(description="The share of draws kept.")
 ```
 
 ## LossDistance
@@ -5755,7 +5749,7 @@ Guide: [Local Approximations](https://munqu.github.io/commol/latest/guide/uncert
 
 ## Laplace
 
-Bases: `UncertaintyMethod[LaplaceResult]`
+Bases: `UncertaintyMethod[LaplaceResult]`, `RangeChecked`
 
 The Laplace approximation of the problem's observation models: the normal `N(θ̂, H⁻¹)` on the unbounded scale of the parameters, centred on the fit, with `H` the curvature of `−log L` there.
 
@@ -5772,7 +5766,7 @@ Attributes:
 Source code in `commol/context/inference/local.py`
 
 ```python
-class Laplace(UncertaintyMethod[LaplaceResult]):
+class Laplace(UncertaintyMethod[LaplaceResult], RangeChecked):
     """
     The Laplace approximation of the problem's observation models: the normal
     ``N(θ̂, H⁻¹)`` on the unbounded scale of the parameters, centred on the
@@ -5794,16 +5788,16 @@ class Laplace(UncertaintyMethod[LaplaceResult]):
         hypercube over the bounds.
     """
 
-    draws: int = Field(ge=1, description="Number of draws.")
+    draws: int = Field(description="Number of draws.")
     curvature: CurvatureName = Field(
         default="gauss_newton", description="The curvature."
     )
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+    starts: int = Field(default=1, description="Starts of the fit.")
 ```
 
 ## Sandwich
 
-Bases: `UncertaintyMethod[SandwichResult]`
+Bases: `UncertaintyMethod[SandwichResult]`, `RangeChecked`
 
 The sandwich covariance `H⁻¹ B H⁻¹` at the fit, with the meat `B` summed over blocks of positions (the clustered estimator CR1): `B = G/(G − 1) · Σ_b s_b s_bᵀ`, with `s_b` the sum of the gradients of the terms of the observations of block `b`.
 
@@ -5821,7 +5815,7 @@ Attributes:
 Source code in `commol/context/inference/local.py`
 
 ```python
-class Sandwich(UncertaintyMethod[SandwichResult]):
+class Sandwich(UncertaintyMethod[SandwichResult], RangeChecked):
     """
     The sandwich covariance ``H⁻¹ B H⁻¹`` at the fit, with the meat ``B``
     summed over blocks of positions (the clustered estimator CR1):
@@ -5853,16 +5847,16 @@ class Sandwich(UncertaintyMethod[SandwichResult]):
     """
 
     block_length: BlockLength = Field(description="Positions per block.")
-    draws: int = Field(ge=1, description="Number of draws.")
+    draws: int = Field(description="Number of draws.")
     curvature: CurvatureName = Field(
         default="gauss_newton", description="The curvature."
     )
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+    starts: int = Field(default=1, description="Starts of the fit.")
 ```
 
 ## LaplaceMixture
 
-Bases: `UncertaintyMethod[ImportanceResult]`
+Bases: `UncertaintyMethod[ImportanceResult]`, `RangeChecked`
 
 The Laplace mixture: a Laplace approximation at each distinct optimum of a multi-start fit, weighted by its Laplace evidence, as the proposal of importance sampling of a posterior, with the largest weights smoothed (Pareto-smoothed importance sampling, Vehtari et al. 2024).
 
@@ -5880,7 +5874,7 @@ Attributes:
 Source code in `commol/context/inference/local.py`
 
 ```python
-class LaplaceMixture(UncertaintyMethod[ImportanceResult]):
+class LaplaceMixture(UncertaintyMethod[ImportanceResult], RangeChecked):
     """
     The Laplace mixture: a Laplace approximation at each distinct optimum of
     a multi-start fit, weighted by its Laplace evidence, as the proposal of
@@ -5907,8 +5901,8 @@ class LaplaceMixture(UncertaintyMethod[ImportanceResult]):
         The curvature of each component (default ``"gauss_newton"``).
     """
 
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
-    draws: int = Field(ge=25, description="Number of draws.")
+    starts: int = Field(default=1, description="Starts of the fit.")
+    draws: int = Field(description="Number of draws.")
     target: MixtureTarget = Field(description="The posterior to sample.")
     curvature: CurvatureName = Field(
         default="gauss_newton", description="The curvature."
@@ -5947,7 +5941,7 @@ class LikelihoodTarget(WithPriors):
 
 ## GibbsTarget
 
-Bases: `WithPriors`
+Bases: `WithPriors`, `RangeChecked`
 
 The Gibbs posterior of the problem's loss, `π(θ) ∝ prior(θ) · exp(−η · loss(θ))`, as the target of a `LaplaceMixture`.
 
@@ -5961,7 +5955,7 @@ Attributes:
 Source code in `commol/context/inference/local.py`
 
 ```python
-class GibbsTarget(WithPriors):
+class GibbsTarget(WithPriors, RangeChecked):
     """
     The Gibbs posterior of the problem's loss,
     ``π(θ) ∝ prior(θ) · exp(−η · loss(θ))``, as the target of a
@@ -5977,7 +5971,7 @@ class GibbsTarget(WithPriors):
     """
 
     kind: Literal["gibbs"] = "gibbs"
-    eta: float = Field(gt=0.0, allow_inf_nan=False, description="Scale of the loss.")
+    eta: float = Field(description="Scale of the loss.")
 ```
 
 ## LocalResult
@@ -6389,7 +6383,7 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
 
     score: ConformalScore = Field(description="The nonconformity score.")
     by: Pooling = Field(description="Which scores each quantile reads.")
-    confidence_level: ConfidenceLevel = Field(description="The level of the intervals.")
+    confidence_level: float = Field(description="The level of the intervals.")
 
     @model_validator(mode="before")
     @classmethod
@@ -6434,7 +6428,7 @@ def check_score_and_by(cls, data: JsonValue) -> JsonValue:
 
 ## SplitConformal
 
-Bases: `ConformalMethod`
+Bases: `ConformalMethod`, `RangeChecked`
 
 Split conformal prediction.
 
@@ -6454,7 +6448,7 @@ Attributes:
 Source code in `commol/context/inference/conformal.py`
 
 ```python
-class SplitConformal(ConformalMethod):
+class SplitConformal(ConformalMethod, RangeChecked):
     """
     Split conformal prediction.
 
@@ -6486,7 +6480,7 @@ class SplitConformal(ConformalMethod):
     sample: ParameterSample | None = Field(
         default=None, description="The sample whose predictive predicts."
     )
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+    starts: int = Field(default=1, description="Starts of the fit.")
 
     @model_validator(mode="after")
     def check_spread(self) -> Self:
@@ -6517,7 +6511,7 @@ def check_spread(self) -> Self:
 
 ## RollingConformal
 
-Bases: `ConformalMethod`
+Bases: `ConformalMethod`, `RangeChecked`
 
 Rolling-origin conformal prediction: intervals ahead of the data, one quantile per horizon.
 
@@ -6536,7 +6530,7 @@ Attributes:
 Source code in `commol/context/inference/conformal.py`
 
 ```python
-class RollingConformal(ConformalMethod):
+class RollingConformal(ConformalMethod, RangeChecked):
     """
     Rolling-origin conformal prediction: intervals ahead of the data, one
     quantile per horizon.
@@ -6560,7 +6554,7 @@ class RollingConformal(ConformalMethod):
 
     origins: list[float] = Field(min_length=1, description="The origins.")
     positions: list[float] = Field(min_length=1, description="Where the intervals are.")
-    starts: int = Field(default=1, ge=1, description="Starts of each fit.")
+    starts: int = Field(default=1, description="Starts of each fit.")
 
     @model_validator(mode="after")
     def check_spread(self) -> Self:
@@ -6599,7 +6593,7 @@ def check_spread(self) -> Self:
 
 ## JackknifePlus
 
-Bases: `ConformalMethod`
+Bases: `ConformalMethod`, `RangeChecked`
 
 Jackknife+ (Barber et al. 2021) with blocks: one refit per block left out, and intervals from the left-out residuals and predictions.
 
@@ -6618,7 +6612,7 @@ Attributes:
 Source code in `commol/context/inference/conformal.py`
 
 ```python
-class JackknifePlus(ConformalMethod):
+class JackknifePlus(ConformalMethod, RangeChecked):
     """
     Jackknife+ (Barber et al. 2021) with blocks: one refit per block left
     out, and intervals from the left-out residuals and predictions.
@@ -6640,12 +6634,12 @@ class JackknifePlus(ConformalMethod):
 
     block_length: BlockLength = Field(description="Positions per block.")
     positions: list[float] = Field(min_length=1, description="Where the intervals are.")
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    starts: int = Field(default=1, description="Starts per fit.")
 ```
 
 ## EnbPI
 
-Bases: `ConformalMethod`
+Bases: `ConformalMethod`, `RangeChecked`
 
 Ensemble batch prediction intervals (Xu and Xie 2021).
 
@@ -6665,7 +6659,7 @@ Attributes:
 Source code in `commol/context/inference/conformal.py`
 
 ```python
-class EnbPI(ConformalMethod):
+class EnbPI(ConformalMethod, RangeChecked):
     """
     Ensemble batch prediction intervals (Xu and Xie 2021).
 
@@ -6688,15 +6682,15 @@ class EnbPI(ConformalMethod):
         Starts of the fit and of each replicate (default 1).
     """
 
-    replicates: int = Field(ge=2, description="Number of replicates.")
+    replicates: int = Field(description="Number of replicates.")
     block_length: BlockLength = Field(description="Positions per block.")
     positions: list[float] = Field(min_length=1, description="Where the intervals are.")
-    starts: int = Field(default=1, ge=1, description="Starts per fit.")
+    starts: int = Field(default=1, description="Starts per fit.")
 ```
 
 ## AdaptiveConformal
 
-Bases: `ConformalMethod`
+Bases: `ConformalMethod`, `RangeChecked`
 
 Adaptive conformal inference (Gibbs and Candès 2021).
 
@@ -6716,7 +6710,7 @@ Attributes:
 Source code in `commol/context/inference/conformal.py`
 
 ```python
-class AdaptiveConformal(ConformalMethod):
+class AdaptiveConformal(ConformalMethod, RangeChecked):
     """
     Adaptive conformal inference (Gibbs and Candès 2021).
 
@@ -6740,14 +6734,14 @@ class AdaptiveConformal(ConformalMethod):
         Starts of the fit (default 1).
     """
 
-    step: float = Field(gt=0.0, description="The step of the working level.")
+    step: float = Field(description="The step of the working level.")
     stream: list[ObservedDataPoint] = Field(
         min_length=1, description="The observations that arrive."
     )
     sample: ParameterSample | None = Field(
         default=None, description="The sample whose predictive predicts."
     )
-    starts: int = Field(default=1, ge=1, description="Starts of the fit.")
+    starts: int = Field(default=1, description="Starts of the fit.")
 
     @model_validator(mode="after")
     def check_spread(self) -> Self:

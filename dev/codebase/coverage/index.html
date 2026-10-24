@@ -3442,8 +3442,10 @@ that may carry a marker:</p>
 </table>
 <p>A <code>?</code> or an arm that no input reaches and that is none of these kinds is
 removed: the binding, the engine or the check before it already rules the
-input out. A check that the Python layer makes first is not repeated in the
-binding.</p>
+input out. A range rule of a setting lives in the engine, and Python does not
+repeat it. The Python model of an object calls the check of the engine when it
+is built, and a binding reads the same rule when it is called with no Python
+object in between (<code>py-commol/src/counts.rs</code>), so both lines run in a test.</p>
 <h2 id="mutation-testing">Mutation testing<a class="headerlink" href="#mutation-testing" title="Permanent link">&para;</a></h2>
 <p>Coverage says that a line ran, not that a test notices when it changes.
 Mutation testing changes the code, one small change at a time, and reports

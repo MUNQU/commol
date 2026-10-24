@@ -74,7 +74,7 @@ class Calibrator:
                     if models is None
                     else engine_state.rust_observation_models(models)
                 ),
-                seed=None if problem.seed is None else check_seed(problem.seed),
+                seed=problem.seed,
             )
         )
         if problem.seed is None:
@@ -382,8 +382,6 @@ class Calibrator:
             f"Starting calibration with {algorithm_name} algorithm, "
             f"{measure} and {starts} start(s)."
         )
-        if starts < 1:
-            raise ValueError(f"A calibration needs at least one start, got {starts}.")
         run = self._rust_problem.optimize(
             self._build_optimization_config(), starts, self.seed
         )
@@ -839,7 +837,7 @@ def __init__(
                 if models is None
                 else engine_state.rust_observation_models(models)
             ),
-            seed=None if problem.seed is None else check_seed(problem.seed),
+            seed=problem.seed,
         )
     )
     if problem.seed is None:
@@ -1318,8 +1316,6 @@ def run(self, starts: int = 1) -> CalibrationResult:
         f"Starting calibration with {algorithm_name} algorithm, "
         f"{measure} and {starts} start(s)."
     )
-    if starts < 1:
-        raise ValueError(f"A calibration needs at least one start, got {starts}.")
     run = self._rust_problem.optimize(
         self._build_optimization_config(), starts, self.seed
     )
@@ -1577,7 +1573,7 @@ def identifiability(self, method: IdentifiabilityMethod[ResultT]) -> ResultT:
 
 ## CalibrationProblem
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Defines a complete calibration problem.
 
@@ -1602,7 +1598,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class CalibrationProblem(BaseModel):
+class CalibrationProblem(RangeChecked):
     """
     Defines a complete calibration problem.
 
@@ -1706,7 +1702,6 @@ class CalibrationProblem(BaseModel):
     )
     replicates: int | None = Field(
         default=None,
-        ge=1,
         description="Replicates per evaluation of a stochastic engine.",
     )
     replicate_summary: ReplicateSummary | None = Field(
@@ -1715,7 +1710,6 @@ class CalibrationProblem(BaseModel):
     )
     seed: int | None = Field(
         default=None,
-        ge=0,
         description=(
             "Seed of every random number of a calibration: the replicates of a "
             "stochastic engine, the starts, a particle swarm and the methods"
@@ -1900,7 +1894,7 @@ def __init__(self, level: float) -> None:
 
 ## ObservedDataPoint
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Represents a single observed data point for calibration.
 
@@ -1923,7 +1917,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class ObservedDataPoint(BaseModel):
+class ObservedDataPoint(RangeChecked):
     """
     Represents a single observed data point for calibration.
 
@@ -1967,9 +1961,7 @@ class ObservedDataPoint(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    at: float = Field(
-        default=..., ge=0, allow_inf_nan=False, description="Position on the axis"
-    )
+    at: float = Field(default=..., description="Position on the axis")
     output: str | None = Field(
         default=None, min_length=1, description="The output being observed"
     )
@@ -1981,10 +1973,9 @@ class ObservedDataPoint(BaseModel):
         default="",
         description="Name of the observed series; defaults to `output`",
     )
-    value: float = Field(default=..., ge=0.0, description="Observed value")
+    value: float = Field(default=..., description="Observed value")
     weight: float = Field(
         default=1.0,
-        gt=0.0,
         description="Weight for this observation in the loss function",
     )
     factor_id: str | None = Field(
@@ -1993,8 +1984,6 @@ class ObservedDataPoint(BaseModel):
     )
     window: float | None = Field(
         default=None,
-        gt=0,
-        allow_inf_nan=False,
         description=(
             "Optional window length for cumulative-output observations. "
             "When set, prediction is value(at) - value(at - window)."
@@ -2002,7 +1991,6 @@ class ObservedDataPoint(BaseModel):
     )
     trials: int | None = Field(
         default=None,
-        ge=0,
         description="Trials of a binomial observation model that reads them here",
     )
 
@@ -2128,7 +2116,7 @@ One observation model of a series.
 
 ## NormalObservations
 
-Bases: `_ObservationModel`
+Bases: `_ObservationModel`, `RangeChecked`
 
 Normal noise: `y ~ N(μ, sd²)`, with `μ` the prediction.
 
@@ -2143,7 +2131,7 @@ Attributes:
 Source code in `commol/context/observation_models.py`
 
 ```python
-class NormalObservations(_ObservationModel):
+class NormalObservations(_ObservationModel, RangeChecked):
     """
     Normal noise: ``y ~ N(μ, sd²)``, with ``μ`` the prediction.
 
@@ -2162,7 +2150,7 @@ class NormalObservations(_ObservationModel):
 
 ## LogNormalObservations
 
-Bases: `_ObservationModel`
+Bases: `_ObservationModel`, `RangeChecked`
 
 Log-normal noise: `log y` is normal with standard deviation `sigma`.
 
@@ -2178,7 +2166,7 @@ Attributes:
 Source code in `commol/context/observation_models.py`
 
 ```python
-class LogNormalObservations(_ObservationModel):
+class LogNormalObservations(_ObservationModel, RangeChecked):
     """
     Log-normal noise: ``log y`` is normal with standard deviation ``sigma``.
 
@@ -2204,7 +2192,7 @@ class LogNormalObservations(_ObservationModel):
 
 ## StudentTObservations
 
-Bases: `_ObservationModel`
+Bases: `_ObservationModel`, `RangeChecked`
 
 Student-t noise of center `μ`, the prediction: normal noise with heavier tails, so an outlier pulls the fit less.
 
@@ -2218,7 +2206,7 @@ Attributes:
 Source code in `commol/context/observation_models.py`
 
 ```python
-class StudentTObservations(_ObservationModel):
+class StudentTObservations(_ObservationModel, RangeChecked):
     """
     Student-t noise of center ``μ``, the prediction: normal noise with heavier
     tails, so an outlier pulls the fit less.
@@ -2260,7 +2248,7 @@ class PoissonObservations(_ObservationModel):
 
 ## NegativeBinomialObservations
 
-Bases: `_ObservationModel`
+Bases: `_ObservationModel`, `RangeChecked`
 
 Negative binomial counts of mean `μ`, the prediction, and variance `μ + φμ²`: counts that scatter more than a Poisson.
 
@@ -2275,7 +2263,7 @@ Attributes:
 Source code in `commol/context/observation_models.py`
 
 ```python
-class NegativeBinomialObservations(_ObservationModel):
+class NegativeBinomialObservations(_ObservationModel, RangeChecked):
     """
     Negative binomial counts of mean ``μ``, the prediction, and variance
     ``μ + φμ²``: counts that scatter more than a Poisson.
@@ -2296,7 +2284,7 @@ class NegativeBinomialObservations(_ObservationModel):
 
 ## BinomialObservations
 
-Bases: `_ObservationModel`
+Bases: `_ObservationModel`, `RangeChecked`
 
 Binomial counts of `n` trials and mean `μ`, the prediction: the probability is `μ / n`, so the prediction is an expected count, not a proportion.
 
@@ -2311,7 +2299,7 @@ Attributes:
 Source code in `commol/context/observation_models.py`
 
 ```python
-class BinomialObservations(_ObservationModel):
+class BinomialObservations(_ObservationModel, RangeChecked):
     """
     Binomial counts of ``n`` trials and mean ``μ``, the prediction: the
     probability is ``μ / n``, so the prediction is an expected count, not a
@@ -2331,7 +2319,7 @@ class BinomialObservations(_ObservationModel):
     """
 
     kind: Literal["binomial"] = "binomial"
-    trials: int | None = Field(default=None, ge=0, description="The trials.")
+    trials: int | None = Field(default=None, description="The trials.")
 ```
 
 ## Unknowns, optimizers and results
@@ -2459,7 +2447,7 @@ def validate_bounds(self) -> Self:
 
 ## CalibrationConstraint
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 A constraint on calibration parameters defined as a mathematical expression.
 
@@ -2517,7 +2505,7 @@ Examples:
 Source code in `commol/context/calibration.py`
 
 ```python
-class CalibrationConstraint(BaseModel):
+class CalibrationConstraint(RangeChecked):
     """
     A constraint on calibration parameters defined as a mathematical expression.
 
@@ -2595,7 +2583,6 @@ class CalibrationConstraint(BaseModel):
     )
     weight: float = Field(
         default=1.0,
-        gt=0.0,
         description="Penalty weight multiplier for violations",
     )
     at: list[float] | None = Field(
@@ -2620,16 +2607,11 @@ class CalibrationConstraint(BaseModel):
 
     @model_validator(mode="after")
     def validate_positions(self) -> Self:
-        """Validate that the positions are finite and non-negative."""
-        if self.at is not None:
-            if len(self.at) == 0:
-                raise ValueError(
-                    f"at for constraint '{self.id}' must not be empty if specified"
-                )
-            if any(position < 0 or not math.isfinite(position) for position in self.at):
-                raise ValueError(
-                    f"at for constraint '{self.id}' must all be finite and non-negative"
-                )
+        """Validate that the positions, when given, are not empty."""
+        if self.at is not None and len(self.at) == 0:
+            raise ValueError(
+                f"at for constraint '{self.id}' must not be empty if specified"
+            )
         return self
 ```
 
@@ -2665,29 +2647,24 @@ def validate_expression(cls, value: str) -> str:
 validate_positions() -> Self
 ```
 
-Validate that the positions are finite and non-negative.
+Validate that the positions, when given, are not empty.
 
 Source code in `commol/context/calibration.py`
 
 ```python
 @model_validator(mode="after")
 def validate_positions(self) -> Self:
-    """Validate that the positions are finite and non-negative."""
-    if self.at is not None:
-        if len(self.at) == 0:
-            raise ValueError(
-                f"at for constraint '{self.id}' must not be empty if specified"
-            )
-        if any(position < 0 or not math.isfinite(position) for position in self.at):
-            raise ValueError(
-                f"at for constraint '{self.id}' must all be finite and non-negative"
-            )
+    """Validate that the positions, when given, are not empty."""
+    if self.at is not None and len(self.at) == 0:
+        raise ValueError(
+            f"at for constraint '{self.id}' must not be empty if specified"
+        )
     return self
 ```
 
 ## NelderMeadConfig
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Configuration for the Nelder-Mead optimization algorithm.
 
@@ -2710,7 +2687,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class NelderMeadConfig(BaseModel):
+class NelderMeadConfig(RangeChecked):
     """
     Configuration for the Nelder-Mead optimization algorithm.
 
@@ -2746,37 +2723,31 @@ class NelderMeadConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     max_iterations: int = Field(
-        default=1000, gt=0, description="Maximum number of iterations"
+        default=1000, description="Maximum number of iterations"
     )
     sd_tolerance: float = Field(
-        default=1e-6, gt=0.0, description="Convergence tolerance for standard deviation"
+        default=1e-6, description="Convergence tolerance for standard deviation"
     )
     initial_simplex_size: float = Field(
         default=0.1,
-        gt=0.0,
-        le=1.0,
         description=(
             "Size of the initial simplex, as a fraction of each parameter's bound width"
         ),
     )
     alpha: float | None = Field(
         default=None,
-        gt=0.0,
         description="Reflection coefficient (default: None, uses argmin's default)",
     )
     gamma: float | None = Field(
         default=None,
-        gt=0.0,
         description="Expansion coefficient (default: None, uses argmin's default)",
     )
     rho: float | None = Field(
         default=None,
-        gt=0.0,
         description="Contraction coefficient (default: None, uses argmin's default)",
     )
     sigma: float | None = Field(
         default=None,
-        gt=0.0,
         description="Shrink coefficient (default: None, uses argmin's default)",
     )
     verbose: bool = Field(
@@ -2785,7 +2756,6 @@ class NelderMeadConfig(BaseModel):
     )
     header_interval: int = Field(
         default=100,
-        gt=0,
         description=(
             "Number of iterations between table header repeats in verbose output "
             "(default: 100)"
@@ -2795,7 +2765,7 @@ class NelderMeadConfig(BaseModel):
 
 ## ParticleSwarmConfig
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Configuration for the Particle Swarm Optimization algorithm.
 
@@ -2822,7 +2792,7 @@ Methods:
 Source code in `commol/context/calibration.py`
 
 ```python
-class ParticleSwarmConfig(BaseModel):
+class ParticleSwarmConfig(RangeChecked):
     """
     Configuration for the Particle Swarm Optimization algorithm.
 
@@ -2856,11 +2826,9 @@ class ParticleSwarmConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # Core parameters
-    particles: int = Field(
-        default=20, gt=0, description="Number of particles in the swarm"
-    )
+    particles: int = Field(default=20, description="Number of particles in the swarm")
     max_iterations: int = Field(
-        default=1000, gt=0, description="Maximum number of iterations"
+        default=1000, description="Maximum number of iterations"
     )
     verbose: bool = Field(
         default=False,
@@ -3660,7 +3628,7 @@ def radius_stop(self, tol: float) -> Self:
 
 ## CalibrationResult
 
-Bases: `BaseModel`
+Bases: `RangeChecked`
 
 Result of a calibration: the best of its starts.
 
@@ -3680,7 +3648,7 @@ Attributes:
 Source code in `commol/context/calibration.py`
 
 ```python
-class CalibrationResult(BaseModel):
+class CalibrationResult(RangeChecked):
     """
     Result of a calibration: the best of its starts.
 
@@ -3715,9 +3683,7 @@ class CalibrationResult(BaseModel):
         default=..., description="Calibrated parameter values"
     )
     final_loss: float = Field(default=..., description="Final loss value")
-    iterations: int = Field(
-        default=..., ge=0, description="Number of iterations performed"
-    )
+    iterations: int = Field(default=..., description="Number of iterations performed")
     converged: bool = Field(default=..., description="Whether optimization converged")
     termination_reason: str = Field(
         default=..., description="Reason for optimization termination"
@@ -3729,7 +3695,7 @@ class CalibrationResult(BaseModel):
         default_factory=list, description="Each start that failed"
     )
     seed: int = Field(
-        default=..., ge=0, description="Seed of the calibration's random numbers"
+        default=..., description="Seed of the calibration's random numbers"
     )
 
     @override
