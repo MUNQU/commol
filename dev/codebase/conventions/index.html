@@ -3537,9 +3537,9 @@ check some of these rules. The rest depend on the author and the reviewer.</p>
 <td><code>tests/suite/</code> (CI) and review; pytest 10 deprecations fail the run (<code>filterwarnings</code>)</td>
 </tr>
 <tr>
-<td>Ranges of settings</td>
-<td>The engine holds each range rule; a Python model declares only the type</td>
-<td><code>tests/suite/test_rules.py</code> (CI)</td>
+<td>Rules of values</td>
+<td>The engine holds the range rule of each setting, the rule of each value of a model and every window; a Python model declares only the type</td>
+<td><code>tests/suite/test_engine_rules.py</code> (CI)</td>
 </tr>
 <tr>
 <td>Commits</td>
@@ -3573,7 +3573,7 @@ check some of these rules. The rest depend on the author and the reviewer.</p>
 <li>A setting keeps the name its meaning has elsewhere: <code>confidence_level</code> for
   the level of an interval, a plural noun for a count. See
   <a href="../decisions/results/#a-setting-has-one-name-and-one-check">Design decisions</a>;
-  <code>tests/suite/test_rules.py::test_a_setting_has_one_name</code> checks it.</li>
+  <code>tests/suite/test_engine_rules.py::test_a_setting_has_one_name</code> checks it.</li>
 <li>The engine holds the range of every setting; a Python model declares only
   its type (no <code>ge</code>, <code>gt</code>, <code>le</code>, <code>lt</code>, constrained number type or
   <code>allow_inf_nan=False</code>), and a model of an object with ranges lists
@@ -3582,8 +3582,15 @@ check some of these rules. The rest depend on the author and the reviewer.</p>
   <code>crates/commol-core/src/range.rs</code>, <code>crates/commol-calibration/src/ranges.rs</code>
   and <code>crates/commol-inference/src/ranges.rs</code>. See
   <a href="../decisions/results/#a-setting-has-one-name-and-one-check">Design decisions</a>;
-  <code>tests/suite/test_rules.py::test_no_model_declares_a_range_of_a_setting</code>
+  <code>tests/suite/test_engine_rules.py::test_no_model_declares_a_range_of_a_setting</code>
   checks it.</li>
+<li>The engine holds the rule of each value of a model, an initial amount, the
+  fractions of a stratification, an impulse or a point of a series
+  (<code>crates/commol-model/src/rules.rs</code>), and the
+  validator of its Python object calls it; see
+  <a href="../decisions/python-models/#a-value-of-a-model-has-its-rule-in-the-engine">Design decisions</a>.
+  The engine computes every window, and Python has no window arithmetic
+  (<code>tests/suite/test_engine_rules.py::test_only_the_engine_computes_a_window</code>).</li>
 <li>Context data structures are Pydantic v2 models.</li>
 <li><code>ModelBuilder</code> methods return <code>Self</code>, so calls chain.</li>
 <li>Log with the standard <code>logging</code> module. Library code never writes to the

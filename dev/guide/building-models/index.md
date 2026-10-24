@@ -149,6 +149,8 @@ A series gives a parameter its value from `(position, value)` points on the axis
 | `"step_function"` | `t`    | 0                      | the value                   | the value of the last point | the value of the last point |
 | `"linear"`        | `t`    | 0                      | the value                   | linear interpolation in `t` | 0                           |
 
+A series has at least one point, each position finite, not negative and in one point only, and each value finite. `SeriesValue(...)` checks its points with the rule of the engine (`check_series` in `crates/commol-model/src/rules.rs`), which the model compiler also reads.
+
 The engine decides which positions its model type accepts. `ModelBuilder.build` and `Model.update_parameters` reject a position the engine cannot run with `ValueError`, whose message names the parameter (`check_model` in `crates/commol-model/src/builder.rs`). A rejected update leaves the model unchanged.
 
 | Model                                       | Accepted positions                                                                                                                                                                                                                                                                   |
@@ -298,13 +300,14 @@ structure = Aggregate(
 | `compartment_amounts`      | `dict[str, float]`            | `{}`     | Overrides single expanded compartments with an amount in the unit of their bin.                                                                                                    |
 | `neighbors`                | `Complete \| Groups \| None`  | `None`   | Who the [neighbors](#neighbors) of a unit are. Required when a rate reads them.                                                                                                    |
 
-| Rule                                                                  | Checked when     |
-| --------------------------------------------------------------------- | ---------------- |
-| Every amount is finite and not negative; `0` is an amount             | `Aggregate(...)` |
-| Every bin has an amount, and no other id                              | `build`          |
-| Every stratification has fractions for its categories that sum to 1.0 | `build`          |
-| Override names are expanded compartments                              | `build`          |
-| With a stochastic engine, the amount of each bin is a whole number    | `build`          |
+| Rule                                                                                                                                                                           | Checked when                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| Every amount is finite and not negative; `0` is an amount. The engine holds the rule (`check_bin_amount` and `check_compartment_amount` in `crates/commol-model/src/rules.rs`) | `Aggregate(...)` and each update of an amount               |
+| Every bin has an amount, and no other id                                                                                                                                       | `build`                                                     |
+| Every stratification has a fraction for each of its categories, and no other category                                                                                          | `build`                                                     |
+| Every fraction is from 0 to 1, and the fractions of a stratification sum to 1 within 1e-6. The engine holds the rule (`check_fractions` in `crates/commol-model/src/rules.rs`) | `Aggregate(...)` and each `update_stratification_fractions` |
+| Override names are expanded compartments                                                                                                                                       | `build`                                                     |
+| With a stochastic engine, the amount of each bin is a whole number                                                                                                             | `build`                                                     |
 
 The initial amount of a compartment is `bin amount × the fraction of each of its categories`, unless an override names it. `model.structure.initial_state(model.process)` shows the result. To change amounts or fractions on a built model, see [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/#updating-the-initial-state-after-building).
 

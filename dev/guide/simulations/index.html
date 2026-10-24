@@ -4084,7 +4084,7 @@ the results.</p>
 </tr>
 <tr>
 <td><code>window</code></td>
-<td>The window length on the axis. Must be positive.</td>
+<td>The window length on the axis: a finite number greater than 0.</td>
 </tr>
 <tr>
 <td><code>at</code></td>
@@ -4105,7 +4105,11 @@ reduction for any series:</p>
 </span></code></pre></div>
 <p>A window of the grid is a whole number of steps. The <code>window</code> of
 <code>windowed_totals</code> need not be: see
-<a href="#reporting-at-any-position">Reporting at any position</a>.</p>
+<a href="#reporting-at-any-position">Reporting at any position</a>. The engine computes
+every window that results, reports and figures read, and checks its length
+(<code>window_ends</code> and the other functions of
+<code>crates/commol-calibration/src/observation.rs</code>), so a calibration and a report
+read the same windows.</p>
 <h2 id="values-at-positions">Values at positions<a class="headerlink" href="#values-at-positions" title="Permanent link">&para;</a></h2>
 <p>A bin holds an amount at a position, so it is read at the position, not over
 the window before it. <code>sample</code> reads the given bins and accumulators at each

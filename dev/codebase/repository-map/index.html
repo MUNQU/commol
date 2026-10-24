@@ -3471,6 +3471,11 @@
 <td>Flow logic.</td>
 </tr>
 <tr>
+<td><code>crates/commol-model/src/rules.rs</code></td>
+<td>The rule of each value of a model, declared once: an initial amount (<code>check_bin_amount</code>, <code>check_compartment_amount</code>), the fractions of a stratification (<code>check_fractions</code>), an impulse (<code>check_impulse</code>) and the points of a series (<code>check_series</code>). The compiler and the Python object of the value call them.</td>
+<td>A check of a value written in the compiler or in Python.</td>
+</tr>
+<tr>
 <td><code>crates/commol-model/src/system.rs</code></td>
 <td>The flows every engine reads: <code>flow_rates</code> (the value of each flow), <code>transition_rates</code> (its rate), <code>flow_changes</code> (the change of one event of each flow), the right-hand side <code>derivatives</code> built on them; impulses (<code>apply_impulses</code>, <code>impulse_rates</code>, <code>impulse_changes</code>, <code>impulse_positions</code>); the positions where a rate can jump (<code>breakpoints</code>, <code>reads_time</code>); the parameters a caller sets (<code>set_parameter</code>, <code>check_parameter</code>: a constant or a parameter to calibrate); the accessors the engines use.</td>
 <td>Stepping along the axis.</td>
@@ -3527,7 +3532,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/observation.rs</code></td>
-<td><code>ObservationOperator</code>: one prediction per observation from the rows of a run (rows, sums of outputs, windows, factors); <code>index_at</code>, the row of a position within the tolerance of the axis; <code>window_start</code> and <code>window_increments</code>, the window of an observation, which <code>windowed_totals</code> also reads.</td>
+<td><code>ObservationOperator</code>: one prediction per observation from the rows of a run (rows, sums of outputs, windows, factors); <code>index_at</code>, the row of a position within the tolerance of the axis; the arithmetic of every window: <code>window_start</code> and <code>check_window_end</code>, the window of an observation; <code>window_increments</code>, which <code>windowed_totals</code> also reads; the grid of windows that results, figures and reports read (<code>window_bounds</code>, <code>window_index</code>, <code>window_ends</code>, <code>windows_in</code>).</td>
 <td>Comparison with data.</td>
 </tr>
 <tr>
@@ -3709,7 +3714,7 @@
 </tr>
 <tr>
 <td><code>py-commol/src/model.rs</code></td>
-<td>The queries of <code>commol_rs.model</code> on a process and its aggregate structure: <code>initial_state</code>, <code>expanded_outputs</code>, <code>transition_flows</code>, <code>subgroup_total_names</code>; <code>check_model</code> on a model; the names <code>NEIGHBORS</code> and <code>NEIGHBORS_PREFIX</code>.</td>
+<td>The queries of <code>commol_rs.model</code> on a process and its aggregate structure: <code>initial_state</code>, <code>expanded_outputs</code>, <code>transition_flows</code>, <code>subgroup_total_names</code>; <code>check_model</code> on a model; the rules of the values of a model (<code>check_bin_amounts</code>, <code>check_compartment_amounts</code>, <code>check_fractions</code>, <code>check_impulse</code>, <code>check_series</code>); the names <code>NEIGHBORS</code> and <code>NEIGHBORS_PREFIX</code>.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
@@ -3724,7 +3729,7 @@
 </tr>
 <tr>
 <td><code>py-commol/src/calibration.rs</code></td>
-<td>The calibration types (observations, parameters, constraints, loss, optimizers, results) and the checks that take an <code>Engine</code>.</td>
+<td>The calibration types (observations, parameters, constraints, loss, optimizers, results), the checks that take an <code>Engine</code>, and the windows of the engine (<code>check_window</code>, <code>check_window_end</code>, <code>window_bounds</code>, <code>window_index</code>, <code>window_ends</code>, <code>windows_in</code>, <code>window_increments</code>).</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
@@ -3842,7 +3847,7 @@
 <tr>
 <td><code>api/patterns.py</code>, <code>api/windows.py</code></td>
 <td>Rates that change along the axis (<code>AxisPattern</code>), and windowed totals.</td>
-<td>Physical units inside the model.</td>
+<td>Physical units inside the model; window arithmetic (the engine's).</td>
 </tr>
 <tr>
 <td><code>api/plotting/</code></td>
@@ -3886,8 +3891,8 @@
 </tr>
 <tr>
 <td><code>context/initial_conditions.py</code></td>
-<td><code>InitialConditions</code>, the fields <code>Aggregate</code> holds (bin amounts, category fractions, compartment amounts), their checks of range and their updates.</td>
-<td>Checks against the process.</td>
+<td><code>InitialConditions</code>, the fields <code>Aggregate</code> holds (bin amounts, category fractions, compartment amounts), the check of each amount and fraction with the rule of the engine, and their updates.</td>
+<td>Checks against the process; the rule of an amount or a fraction (<code>rules.rs</code>).</td>
 </tr>
 <tr>
 <td><code>context/bin.py</code>, <code>context/stratification.py</code>, <code>context/stratification_condition.py</code></td>
@@ -3946,13 +3951,8 @@
 </tr>
 <tr>
 <td><code>context/axis_units.py</code></td>
-<td><code>AxisUnits</code>: values in units to steps of the axis, rates asked from the engine (<code>Model.axis_units</code>), the window grid of a width in a unit, and the calendar of an axis with an origin (dates to positions, ends of days and weeks).</td>
+<td><code>AxisUnits</code>: values in units to steps of the axis, rates asked from the engine (<code>Model.axis_units</code>), the window grid of a width in a unit (from the engine), and the calendar of an axis with an origin (dates to positions, ends of days and weeks).</td>
 <td>Formulas of a rate per engine (they are in <code>RateMeaning</code>).</td>
-</tr>
-<tr>
-<td><code>context/_windows.py</code></td>
-<td>The window grid in steps, private: what <code>AxisUnits</code>, <code>windowed_totals</code> and the reports read.</td>
-<td>Public API; units.</td>
 </tr>
 <tr>
 <td><code>context/engine.py</code></td>
@@ -4107,17 +4107,17 @@
 <tr>
 <td>Change impulses</td>
 <td><code>crates/commol-model/src/system.rs</code> (<code>apply_impulses</code>)</td>
-<td><code>crates/commol-stochastic/src/units.rs</code> (<code>apply_impulses</code>), every engine of the aggregate kind, <code>py-commol/commol/context/transition.py</code></td>
+<td><code>crates/commol-stochastic/src/units.rs</code> (<code>apply_impulses</code>), every engine of the aggregate kind, <code>crates/commol-model/src/rules.rs</code> (<code>check_impulse</code>), <code>py-commol/commol/context/transition.py</code></td>
 </tr>
 <tr>
 <td>Change which positions a model type accepts, or how results, windows and reports read them</td>
 <td><code>crates/commol-core/src/types/engine.rs</code> (<code>EngineType::check_position</code>); <code>py-commol/commol/api/results.py</code></td>
-<td><code>crates/commol-core/src/position.rs</code> (<code>same_position</code>), <code>crates/commol-calibration/src/observation.rs</code> (<code>index_at</code>, <code>window_increments</code>), each engine's <code>check_position</code>, <code>crates/commol-calibration/src/calibration_problem.rs</code> (<code>check_positions</code>), <code>api/windows.py</code>, <code>api/reporting.py</code>, <code>api/plotting/</code>, <code>api/inference/predictive.py</code></td>
+<td><code>crates/commol-core/src/position.rs</code> (<code>same_position</code>), <code>crates/commol-calibration/src/observation.rs</code> (<code>index_at</code>, <code>window_increments</code>, the grid of windows), each engine's <code>check_position</code>, <code>crates/commol-calibration/src/calibration_problem.rs</code> (<code>check_positions</code>), <code>api/windows.py</code>, <code>api/reporting.py</code>, <code>api/plotting/</code>, <code>api/inference/predictive.py</code></td>
 </tr>
 <tr>
 <td>Change axis units, the calendar of an axis or axis patterns</td>
 <td><code>py-commol/commol/context/axis_units.py</code>; <code>py-commol/commol/api/patterns.py</code></td>
-<td><code>context/_windows.py</code>, <code>context/_model/units.py</code>, <code>crates/commol-core/src/types/engine.rs</code> (<code>RateMeaning</code>), <code>docs/guide/units-and-equations.md</code>, <code>docs/guide/axis-patterns.md</code></td>
+<td><code>crates/commol-calibration/src/observation.rs</code> (the grid of windows), <code>context/_model/units.py</code>, <code>crates/commol-core/src/types/engine.rs</code> (<code>RateMeaning</code>), <code>docs/guide/units-and-equations.md</code>, <code>docs/guide/axis-patterns.md</code></td>
 </tr>
 <tr>
 <td>Change a figure</td>
@@ -4132,7 +4132,7 @@
 <tr>
 <td>Change initial conditions</td>
 <td><code>py-commol/commol/context/initial_conditions.py</code></td>
-<td><code>crates/commol-model/src/builder.rs</code> (<code>initial_state</code>), <code>py-commol/commol/context/aggregate.py</code>, <code>docs/guide/building-models.md</code></td>
+<td><code>crates/commol-model/src/builder.rs</code> (<code>initial_state</code>), <code>crates/commol-model/src/rules.rs</code> (the rule of an amount or a fraction), <code>py-commol/commol/context/aggregate.py</code>, <code>docs/guide/building-models.md</code></td>
 </tr>
 <tr>
 <td>Change a stochastic engine (events, chain binomial, whole units), seeds or samplers</td>

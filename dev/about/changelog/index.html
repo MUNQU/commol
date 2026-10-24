@@ -4628,6 +4628,21 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   18446744073709551615, got -1</code> in every function that takes one:
   <code>Simulation.run</code>, <code>Simulation.run_at</code>, <code>Simulation.replicates</code>,
   <code>CalibrationProblem</code>, <code>SensitivityAnalysis</code> and each binding.</li>
+<li>The engine holds the rule of every value of a model and of every window.
+  An initial amount, an impulse and the points of a series fail when their
+  object (<code>Aggregate</code>, <code>Transition</code>, <code>SeriesValue</code>) is built or an amount is
+  updated, as before, and the same values are valid; the message is the one
+  the model compiler gives, which names the bin, the compartment or the
+  transition: <code>Bin 'B': initial amount is a finite number of at least 0, got
+  -1</code>, <code>Transition 't': impulse period is a finite number greater than 0, got
+  0</code>, <code>a series has one point per position, got two at 2</code>. The windows of
+  <code>windowed_totals</code>, of reports, of figures and of <code>AxisUnits.window_start</code>,
+  <code>window_end</code>, <code>window_index</code> and <code>window_ends</code> come from the engine, with
+  its messages (<code>window is a finite number greater than 0, got 0</code>, <code>index is
+  a whole number of at least 0, got -1</code>), and an observation or a quantity
+  whose window starts before 0 gives <code>the window 4 that ends at 3 starts
+  before 0; an end is at least its window</code>. A <code>tick_every</code> of a figure that
+  is not a finite number greater than 0 raises <code>ValueError</code>.</li>
 <li>A calibration, a sensitivity analysis or any other method that sets a
   model parameter raises <code>ValueError</code> when it is built if the parameter is
   a formula or a series parameter. The engine computes such a parameter at
@@ -4719,6 +4734,16 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>A fraction of a stratification outside 0 to 1 raises <code>ValueError</code> when its
+  <code>Aggregate</code> is built, with the message of the engine: <code>Stratification 'g',
+  category 'g1': fraction is a number from 0 to 1, got 1.5</code>. Before, only the
+  sum was checked, so fractions such as <code>{"g1": 1.5, "g2": -0.5}</code> built a
+  model whose compartment started at a negative amount. The sum of the
+  fractions of a stratification, 1 within 1e-6, is checked at the same time
+  (<code>Stratification 'g': the fractions of its categories sum to 1 within 1e-6,
+  got 0.9</code>), where it was checked by <code>build</code>, and
+  <code>update_stratification_fractions</code> and the model compiler give the same
+  messages.</li>
 <li>Two results of commol with the same values are equal, also when they hold
   a NaN: a NaN equals a NaN, whatever the objects that hold it. Before, <code>==</code>
   compared the identity of the items of a list first, so two runs with one

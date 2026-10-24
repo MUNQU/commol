@@ -3672,8 +3672,8 @@
 </ul>
 <h3 id="initial-conditions">Initial conditions<a class="headerlink" href="#initial-conditions" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] Change the Pydantic validation in <code>context/initial_conditions.py</code> and the
-      engine rule in <code>builder.rs</code> (<code>initial_state</code>).</li>
+<li>[ ] Change the rule of an amount or a fraction in <code>rules.rs</code>
+      (<code>commol-model</code>), which <code>context/initial_conditions.py</code> and <code>initial_state</code> call.</li>
 <li>[ ] Check that <code>Aggregate.initial_state(process)</code> reports the new state.</li>
 <li>[ ] If calibration can set it, update
       <code>commol-model/src/initial_conditions.rs</code> (<code>InitialConditionPlan</code>) and the write-back
@@ -3716,7 +3716,7 @@ changing it (<a href="../decisions/uncertainty/#methods-plug-into-one-entry-poin
 <li>[ ] The runner, bound in <code>py-commol/src/</code> (<code>inference.rs</code> or the module
       of its family), which runs the method through <code>parallel</code>
       (<code>py-commol/src/parallelism.rs</code>), and its stub in <code>_commol_rs.pyi</code>
-      (<code>tests/suite/test_rules.py::test_the_stub_declares_what_the_extension_has</code>); a
+      (<code>tests/suite/test_engine_rules.py::test_the_stub_declares_what_the_extension_has</code>); a
       row in the table of <code>docs/guide/parallelism.md</code> and a case of <code>METHODS</code>
       in <code>tests/parallelism/test_threads.py</code>.</li>
 <li>[ ] The configuration, a subclass of <code>UncertaintyMethod[YourResult]</code>, and

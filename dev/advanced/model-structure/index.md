@@ -833,34 +833,13 @@ class Transition(BaseModel):
 
     @model_validator(mode="after")
     def validate_impulse(self) -> Self:
-        """Check the impulse schedule: one kind, valid positions and period."""
-        if self.impulse_at is not None and self.impulse_every is not None:
-            raise ValueError(
-                f"Transition '{self.id}': set impulse_at or impulse_every, not both."
-            )
-        if self.impulse_at is not None:
-            if not self.impulse_at:
-                raise ValueError(
-                    f"Transition '{self.id}': impulse_at needs at least one position."
-                )
-            bad = [p for p in self.impulse_at if not math.isfinite(p) or p < 0]
-            if bad:
-                raise ValueError(
-                    f"Transition '{self.id}': impulse positions must be finite "
-                    f"and not negative, got {bad}."
-                )
-        if self.impulse_every is not None:
-            period, offset = self.impulse_every
-            if not (math.isfinite(period) and period > 0):
-                raise ValueError(
-                    f"Transition '{self.id}': the impulse period must be "
-                    f"positive, got {period}."
-                )
-            if not (math.isfinite(offset) and offset >= 0):
-                raise ValueError(
-                    f"Transition '{self.id}': the impulse offset must be finite "
-                    f"and not negative, got {offset}."
-                )
+        """
+        Check the impulse with the rule of the engine (`check_impulse` of
+        `crates/commol-model/src/values.rs`): one of `impulse_at` and
+        `impulse_every`, at least one position on the axis, a positive period
+        and an offset that is not negative.
+        """
+        commol_rs.model.check_impulse(self.id, self.impulse_at, self.impulse_every)
         return self
 
     @field_validator("rate", mode="before")
@@ -892,41 +871,20 @@ Whether the transition is an impulse rather than a continuous flow.
 validate_impulse() -> Self
 ```
 
-Check the impulse schedule: one kind, valid positions and period.
+Check the impulse with the rule of the engine (`check_impulse` of `crates/commol-model/src/values.rs`): one of `impulse_at` and `impulse_every`, at least one position on the axis, a positive period and an offset that is not negative.
 
 Source code in `commol/context/transition.py`
 
 ```python
 @model_validator(mode="after")
 def validate_impulse(self) -> Self:
-    """Check the impulse schedule: one kind, valid positions and period."""
-    if self.impulse_at is not None and self.impulse_every is not None:
-        raise ValueError(
-            f"Transition '{self.id}': set impulse_at or impulse_every, not both."
-        )
-    if self.impulse_at is not None:
-        if not self.impulse_at:
-            raise ValueError(
-                f"Transition '{self.id}': impulse_at needs at least one position."
-            )
-        bad = [p for p in self.impulse_at if not math.isfinite(p) or p < 0]
-        if bad:
-            raise ValueError(
-                f"Transition '{self.id}': impulse positions must be finite "
-                f"and not negative, got {bad}."
-            )
-    if self.impulse_every is not None:
-        period, offset = self.impulse_every
-        if not (math.isfinite(period) and period > 0):
-            raise ValueError(
-                f"Transition '{self.id}': the impulse period must be "
-                f"positive, got {period}."
-            )
-        if not (math.isfinite(offset) and offset >= 0):
-            raise ValueError(
-                f"Transition '{self.id}': the impulse offset must be finite "
-                f"and not negative, got {offset}."
-            )
+    """
+    Check the impulse with the rule of the engine (`check_impulse` of
+    `crates/commol-model/src/values.rs`): one of `impulse_at` and
+    `impulse_every`, at least one position on the axis, a positive period
+    and an offset that is not negative.
+    """
+    commol_rs.model.check_impulse(self.id, self.impulse_at, self.impulse_every)
     return self
 ```
 
@@ -1236,11 +1194,11 @@ Every amount is in the unit of its bin, so bins of different units, such as a co
 
 Attributes:
 
-| Name                       | Type                          | Description                                                                                                                                                                                                     |
-| -------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bin_amounts`              | \`dict\[str, float            | None\]\`                                                                                                                                                                                                        |
-| `stratification_fractions` | `dict[str, dict[str, float]]` | The fraction of each category, by stratification id and category: the split of the amount of every bin the stratification applies to. A conditional stratification splits only the group its conditions select. |
-| `compartment_amounts`      | `dict[str, float]`            | Amounts of single expanded compartments, by compartment name, applied after the expansion.                                                                                                                      |
+| Name                       | Type                          | Description                                                                                                                                                                                                                                                   |
+| -------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bin_amounts`              | \`dict\[str, float            | None\]\`                                                                                                                                                                                                                                                      |
+| `stratification_fractions` | `dict[str, dict[str, float]]` | The fraction of each category, by stratification id and category: the split of the amount of every bin the stratification applies to; each from 0 to 1, and a sum of 1 within 1e-6. A conditional stratification splits only the group its conditions select. |
+| `compartment_amounts`      | `dict[str, float]`            | Amounts of single expanded compartments, by compartment name, applied after the expansion.                                                                                                                                                                    |
 
 Source code in `commol/context/initial_conditions.py`
 
@@ -1262,9 +1220,9 @@ class InitialConditions(BaseModel):
         bin; finite and not negative. None leaves an amount for calibration.
     stratification_fractions : dict[str, dict[str, float]]
         The fraction of each category, by stratification id and category: the
-        split of the amount of every bin the stratification applies to. A
-        conditional stratification splits only the group its conditions
-        select.
+        split of the amount of every bin the stratification applies to; each
+        from 0 to 1, and a sum of 1 within 1e-6. A conditional stratification
+        splits only the group its conditions select.
     compartment_amounts : dict[str, float]
         Amounts of single expanded compartments, by compartment name, applied
         after the expansion.
@@ -1317,18 +1275,25 @@ class InitialConditions(BaseModel):
     def validate_bin_amounts(
         cls, value: dict[str, float | None]
     ) -> dict[str, float | None]:
-        """Enforce that every bin amount is finite and not negative."""
-        for bin_id, amount in value.items():
-            if amount is not None:
-                _check_amount(f"bin '{bin_id}'", amount)
+        """Check every bin amount with the rule of the engine."""
+        commol_rs.model.check_bin_amounts(list(value.items()))
+        return value
+
+    @field_validator("stratification_fractions")
+    @classmethod
+    def validate_stratification_fractions(
+        cls, value: dict[str, dict[str, float]]
+    ) -> dict[str, dict[str, float]]:
+        """Check the fractions of every stratification with the rule of the
+        engine."""
+        _check_fractions(value)
         return value
 
     @field_validator("compartment_amounts")
     @classmethod
     def validate_compartment_amounts(cls, value: dict[str, float]) -> dict[str, float]:
-        """Enforce that every compartment amount is finite and not negative."""
-        for compartment, amount in value.items():
-            _check_amount(f"compartment '{compartment}'", amount)
+        """Check every compartment amount with the rule of the engine."""
+        commol_rs.model.check_compartment_amounts(list(value.items()))
         return value
 
     def get_uncalibrated_bins(self) -> list[str]:
@@ -1451,14 +1416,13 @@ class InitialConditions(BaseModel):
         stratification, name = self.resolve_category(category)
         return self.stratification_fractions[stratification][name]
 
-    def _apply_stratification_update(
+    def _updated_fractions(
         self, stratification: str, named: Mapping[str, float]
-    ) -> None:
-        """Write the fractions of a single stratification."""
+    ) -> dict[str, float]:
+        """The fractions of a single stratification after an update that
+        names ``named``; the one category left unnamed takes the rest."""
         categories = self.stratification_fractions[stratification]
         unnamed = [category for category in categories if category not in named]
-        total = sum(named.values())
-
         if len(unnamed) > 1:
             raise ValueError(
                 f"Cannot update stratification '{stratification}': "
@@ -1466,21 +1430,8 @@ class InitialConditions(BaseModel):
                 f"category may be omitted, so that it can take the remaining "
                 f"fraction."
             )
-        if not unnamed and not math.isclose(total, 1.0, abs_tol=1e-6):
-            raise ValueError(
-                f"Fractions for stratification '{stratification}' "
-                f"must sum to 1.0, got {total:.6f}. Values: {dict(named)}"
-            )
-        if unnamed and total > 1.0 + 1e-6:
-            raise ValueError(
-                f"Fractions for stratification '{stratification}' "
-                f"sum to {total:.6f}, which would leave a negative fraction for "
-                f"'{unnamed[0]}'. Values: {dict(named)}"
-            )
-
-        remainder = max(0.0, 1.0 - total)
-        for category in categories:
-            categories[category] = named.get(category, remainder)
+        remainder = max(0.0, 1.0 - sum(named.values()))
+        return {category: named.get(category, remainder) for category in categories}
 
     def update_stratification_fractions(self, fractions: Mapping[str, float]) -> None:
         """
@@ -1490,34 +1441,36 @@ class InitialConditions(BaseModel):
         call. A category name declared by more than one stratification must be
         qualified with its stratification, as in ``group:g1``. Within each
         stratification, at most one category may be omitted; the omitted
-        category receives the remaining fraction so that the stratification
-        sums to 1.0. When every category is given, the values
-        must already sum to 1.0.
+        category receives the rest of 1, or 0 when the given values pass 1.
+        The fractions of every stratification are checked with the rule of the
+        engine before any of them changes.
 
         Parameters
         ----------
         fractions : Mapping[str, float]
             Dictionary mapping category names, bare or qualified, to their new
-            fraction values. Each value must lie between 0.0 and 1.0.
+            fraction values.
 
         Raises
         ------
         ValueError
-            If a category is not found or is ambiguous, a value lies outside
-            [0.0, 1.0], a stratification has more than one category omitted,
-            fully specified values do not sum to 1.0, or the given values
-            exceed 1.0.
+            If a category is not found or is ambiguous, or a stratification
+            has more than one category omitted; with the message of the
+            engine, if a fraction is not from 0 to 1 or the fractions of a
+            stratification do not sum to 1 within 1e-6.
         """
-        for category, value in fractions.items():
-            _check_fraction(f"category '{category}'", value)
-
         by_stratification: dict[str, dict[str, float]] = {}
         for category, value in fractions.items():
             stratification, name = self.resolve_category(category)
             by_stratification.setdefault(stratification, {})[name] = value
 
-        for stratification, named in by_stratification.items():
-            self._apply_stratification_update(stratification, named)
+        updated = {
+            stratification: self._updated_fractions(stratification, named)
+            for stratification, named in by_stratification.items()
+        }
+        _check_fractions(updated)
+        for stratification, categories in updated.items():
+            self.stratification_fractions[stratification].update(categories)
 
     def _upsert_compartment_amounts(self, amounts: Mapping[str, float]) -> None:
         """
@@ -1532,10 +1485,10 @@ class InitialConditions(BaseModel):
         Raises
         ------
         ValueError
-            If an amount is not finite or is negative.
+            With the message of the engine, if an amount is not finite or is
+            negative.
         """
-        for compartment, amount in amounts.items():
-            _check_amount(f"compartment '{compartment}'", amount)
+        commol_rs.model.check_compartment_amounts(list(amounts.items()))
         self.compartment_amounts.update(amounts)
 
     def update_bin_amounts(self, amounts: Mapping[str, float | None]) -> None:
@@ -1555,8 +1508,8 @@ class InitialConditions(BaseModel):
         Raises
         ------
         ValueError
-            If a bin ID is not found in the initial conditions, or an amount
-            is not finite or is negative.
+            If a bin ID is not found in the initial conditions, or, with the
+            message of the engine, an amount is not finite or is negative.
         """
         unknown = sorted(set(amounts) - set(self.bin_amounts))
         if unknown:
@@ -1564,9 +1517,7 @@ class InitialConditions(BaseModel):
                 f"Bin(s) {unknown} not found in initial conditions. "
                 f"Available bins: {list(self.bin_amounts)}"
             )
-        for bin_id, amount in amounts.items():
-            if amount is not None:
-                _check_amount(f"bin '{bin_id}'", amount)
+        commol_rs.model.check_bin_amounts(list(amounts.items()))
         self.bin_amounts.update(amounts)
 ```
 
@@ -1614,7 +1565,7 @@ def reject_fractions_of_a_total(cls, data: JsonValue) -> JsonValue:
 validate_bin_amounts(value: dict[str, float | None]) -> dict[str, float | None]
 ```
 
-Enforce that every bin amount is finite and not negative.
+Check every bin amount with the rule of the engine.
 
 Source code in `commol/context/initial_conditions.py`
 
@@ -1624,10 +1575,30 @@ Source code in `commol/context/initial_conditions.py`
 def validate_bin_amounts(
     cls, value: dict[str, float | None]
 ) -> dict[str, float | None]:
-    """Enforce that every bin amount is finite and not negative."""
-    for bin_id, amount in value.items():
-        if amount is not None:
-            _check_amount(f"bin '{bin_id}'", amount)
+    """Check every bin amount with the rule of the engine."""
+    commol_rs.model.check_bin_amounts(list(value.items()))
+    return value
+```
+
+#### validate_stratification_fractions
+
+```python
+validate_stratification_fractions(value: dict[str, dict[str, float]]) -> dict[str, dict[str, float]]
+```
+
+Check the fractions of every stratification with the rule of the engine.
+
+Source code in `commol/context/initial_conditions.py`
+
+```python
+@field_validator("stratification_fractions")
+@classmethod
+def validate_stratification_fractions(
+    cls, value: dict[str, dict[str, float]]
+) -> dict[str, dict[str, float]]:
+    """Check the fractions of every stratification with the rule of the
+    engine."""
+    _check_fractions(value)
     return value
 ```
 
@@ -1637,7 +1608,7 @@ def validate_bin_amounts(
 validate_compartment_amounts(value: dict[str, float]) -> dict[str, float]
 ```
 
-Enforce that every compartment amount is finite and not negative.
+Check every compartment amount with the rule of the engine.
 
 Source code in `commol/context/initial_conditions.py`
 
@@ -1645,9 +1616,8 @@ Source code in `commol/context/initial_conditions.py`
 @field_validator("compartment_amounts")
 @classmethod
 def validate_compartment_amounts(cls, value: dict[str, float]) -> dict[str, float]:
-    """Enforce that every compartment amount is finite and not negative."""
-    for compartment, amount in value.items():
-        _check_amount(f"compartment '{compartment}'", amount)
+    """Check every compartment amount with the rule of the engine."""
+    commol_rs.model.check_compartment_amounts(list(value.items()))
     return value
 ```
 
@@ -1902,19 +1872,19 @@ update_stratification_fractions(fractions: Mapping[str, float]) -> None
 
 Update stratification category fractions by category name.
 
-Categories belonging to several stratifications may be given in one call. A category name declared by more than one stratification must be qualified with its stratification, as in `group:g1`. Within each stratification, at most one category may be omitted; the omitted category receives the remaining fraction so that the stratification sums to 1.0. When every category is given, the values must already sum to 1.0.
+Categories belonging to several stratifications may be given in one call. A category name declared by more than one stratification must be qualified with its stratification, as in `group:g1`. Within each stratification, at most one category may be omitted; the omitted category receives the rest of 1, or 0 when the given values pass 1. The fractions of every stratification are checked with the rule of the engine before any of them changes.
 
 Parameters:
 
-| Name        | Type                  | Description                                                                                                                  | Default    |
-| ----------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `fractions` | `Mapping[str, float]` | Dictionary mapping category names, bare or qualified, to their new fraction values. Each value must lie between 0.0 and 1.0. | *required* |
+| Name        | Type                  | Description                                                                         | Default    |
+| ----------- | --------------------- | ----------------------------------------------------------------------------------- | ---------- |
+| `fractions` | `Mapping[str, float]` | Dictionary mapping category names, bare or qualified, to their new fraction values. | *required* |
 
 Raises:
 
-| Type         | Description                                                                                                                                                                                                 |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If a category is not found or is ambiguous, a value lies outside [0.0, 1.0], a stratification has more than one category omitted, fully specified values do not sum to 1.0, or the given values exceed 1.0. |
+| Type         | Description                                                                                                                                                                                                                            |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If a category is not found or is ambiguous, or a stratification has more than one category omitted; with the message of the engine, if a fraction is not from 0 to 1 or the fractions of a stratification do not sum to 1 within 1e-6. |
 
 Source code in `commol/context/initial_conditions.py`
 
@@ -1927,34 +1897,36 @@ def update_stratification_fractions(self, fractions: Mapping[str, float]) -> Non
     call. A category name declared by more than one stratification must be
     qualified with its stratification, as in ``group:g1``. Within each
     stratification, at most one category may be omitted; the omitted
-    category receives the remaining fraction so that the stratification
-    sums to 1.0. When every category is given, the values
-    must already sum to 1.0.
+    category receives the rest of 1, or 0 when the given values pass 1.
+    The fractions of every stratification are checked with the rule of the
+    engine before any of them changes.
 
     Parameters
     ----------
     fractions : Mapping[str, float]
         Dictionary mapping category names, bare or qualified, to their new
-        fraction values. Each value must lie between 0.0 and 1.0.
+        fraction values.
 
     Raises
     ------
     ValueError
-        If a category is not found or is ambiguous, a value lies outside
-        [0.0, 1.0], a stratification has more than one category omitted,
-        fully specified values do not sum to 1.0, or the given values
-        exceed 1.0.
+        If a category is not found or is ambiguous, or a stratification
+        has more than one category omitted; with the message of the
+        engine, if a fraction is not from 0 to 1 or the fractions of a
+        stratification do not sum to 1 within 1e-6.
     """
-    for category, value in fractions.items():
-        _check_fraction(f"category '{category}'", value)
-
     by_stratification: dict[str, dict[str, float]] = {}
     for category, value in fractions.items():
         stratification, name = self.resolve_category(category)
         by_stratification.setdefault(stratification, {})[name] = value
 
-    for stratification, named in by_stratification.items():
-        self._apply_stratification_update(stratification, named)
+    updated = {
+        stratification: self._updated_fractions(stratification, named)
+        for stratification, named in by_stratification.items()
+    }
+    _check_fractions(updated)
+    for stratification, categories in updated.items():
+        self.stratification_fractions[stratification].update(categories)
 ```
 
 #### update_bin_amounts
@@ -1975,9 +1947,9 @@ Parameters:
 
 Raises:
 
-| Type         | Description                                                                                    |
-| ------------ | ---------------------------------------------------------------------------------------------- |
-| `ValueError` | If a bin ID is not found in the initial conditions, or an amount is not finite or is negative. |
+| Type         | Description                                                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If a bin ID is not found in the initial conditions, or, with the message of the engine, an amount is not finite or is negative. |
 
 Source code in `commol/context/initial_conditions.py`
 
@@ -1999,8 +1971,8 @@ def update_bin_amounts(self, amounts: Mapping[str, float | None]) -> None:
     Raises
     ------
     ValueError
-        If a bin ID is not found in the initial conditions, or an amount
-        is not finite or is negative.
+        If a bin ID is not found in the initial conditions, or, with the
+        message of the engine, an amount is not finite or is negative.
     """
     unknown = sorted(set(amounts) - set(self.bin_amounts))
     if unknown:
@@ -2008,8 +1980,6 @@ def update_bin_amounts(self, amounts: Mapping[str, float | None]) -> None:
             f"Bin(s) {unknown} not found in initial conditions. "
             f"Available bins: {list(self.bin_amounts)}"
         )
-    for bin_id, amount in amounts.items():
-        if amount is not None:
-            _check_amount(f"bin '{bin_id}'", amount)
+    commol_rs.model.check_bin_amounts(list(amounts.items()))
     self.bin_amounts.update(amounts)
 ```

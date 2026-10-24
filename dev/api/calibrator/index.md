@@ -2014,17 +2014,12 @@ class ObservedDataPoint(RangeChecked):
     @model_validator(mode="after")
     def validate_window(self) -> Self:
         """
-        A window must not start before position 0, with the start of the
-        engine (`window_start` of `crates/commol-calibration/src/observation.rs`).
+        A window must not start before position 0, with the rule of the
+        engine (`check_window_end` of
+        `crates/commol-calibration/src/observation.rs`).
         """
-        if (
-            self.window is not None
-            and commol_rs.calibration.window_start(self.at, self.window) < 0
-        ):
-            raise ValueError(
-                f"The window {self.window} that ends at {self.at} starts before "
-                "position 0."
-            )
+        if self.window is not None:
+            commol_rs.calibration.check_window_end(self.at, self.window)
         return self
 
     @property
@@ -2080,7 +2075,7 @@ def validate_observed_outputs(self) -> Self:
 validate_window() -> Self
 ```
 
-A window must not start before position 0, with the start of the engine (`window_start` of `crates/commol-calibration/src/observation.rs`).
+A window must not start before position 0, with the rule of the engine (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
 
 Source code in `commol/context/calibration.py`
 
@@ -2088,17 +2083,12 @@ Source code in `commol/context/calibration.py`
 @model_validator(mode="after")
 def validate_window(self) -> Self:
     """
-    A window must not start before position 0, with the start of the
-    engine (`window_start` of `crates/commol-calibration/src/observation.rs`).
+    A window must not start before position 0, with the rule of the
+    engine (`check_window_end` of
+    `crates/commol-calibration/src/observation.rs`).
     """
-    if (
-        self.window is not None
-        and commol_rs.calibration.window_start(self.at, self.window) < 0
-    ):
-        raise ValueError(
-            f"The window {self.window} that ends at {self.at} starts before "
-            "position 0."
-        )
+    if self.window is not None:
+        commol_rs.calibration.check_window_end(self.at, self.window)
     return self
 ```
 

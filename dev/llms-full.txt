@@ -667,10 +667,10 @@ overridden.structure.update_bin_amounts({"A": 8500, "B": 1500})
 overridden.structure.update_stratification_fractions({"g1": 0.7})  # g2 becomes 0.3
 ```
 
-| Method                            | Rule                                                                                                        |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `update_bin_amounts`              | Each amount is finite and not negative, or `None` for calibration. The other bins keep their amounts.       |
-| `update_stratification_fractions` | Within each stratification you may omit one category; it receives what remains of 1.0. Omitting two raises. |
+| Method                            | Rule                                                                                                                                                                                                                                                                                   |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `update_bin_amounts`              | Each amount is finite and not negative, or `None` for calibration. The other bins keep their amounts.                                                                                                                                                                                  |
+| `update_stratification_fractions` | Within each stratification you may omit one category; it receives what remains of 1, or 0 when the given fractions pass 1. Omitting two raises. Each fraction is from 0 to 1 and the fractions sum to 1 within 1e-6, with the rule of the engine; a rejected call changes no fraction. |
 
 A category name that two stratifications declare must be qualified with its stratification, as in `{"group:g1": 0.5}`. Calibration writes its results back through these same methods.
 
@@ -896,6 +896,8 @@ A series gives a parameter its value from `(position, value)` points on the axis
 | `"step_function"` | `t`    | 0                      | the value                   | the value of the last point | the value of the last point |
 | `"linear"`        | `t`    | 0                      | the value                   | linear interpolation in `t` | 0                           |
 
+A series has at least one point, each position finite, not negative and in one point only, and each value finite. `SeriesValue(...)` checks its points with the rule of the engine (`check_series` in `crates/commol-model/src/rules.rs`), which the model compiler also reads.
+
 The engine decides which positions its model type accepts. `ModelBuilder.build` and `Model.update_parameters` reject a position the engine cannot run with `ValueError`, whose message names the parameter (`check_model` in `crates/commol-model/src/builder.rs`). A rejected update leaves the model unchanged.
 
 | Model                                       | Accepted positions                                                                                                                                                                                                                                                                   |
@@ -1045,13 +1047,14 @@ structure = Aggregate(
 | `compartment_amounts`      | `dict[str, float]`            | `{}`     | Overrides single expanded compartments with an amount in the unit of their bin.                                                                                                    |
 | `neighbors`                | `Complete \| Groups \| None`  | `None`   | Who the [neighbors](#neighbors) of a unit are. Required when a rate reads them.                                                                                                    |
 
-| Rule                                                                  | Checked when     |
-| --------------------------------------------------------------------- | ---------------- |
-| Every amount is finite and not negative; `0` is an amount             | `Aggregate(...)` |
-| Every bin has an amount, and no other id                              | `build`          |
-| Every stratification has fractions for its categories that sum to 1.0 | `build`          |
-| Override names are expanded compartments                              | `build`          |
-| With a stochastic engine, the amount of each bin is a whole number    | `build`          |
+| Rule                                                                                                                                                                           | Checked when                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| Every amount is finite and not negative; `0` is an amount. The engine holds the rule (`check_bin_amount` and `check_compartment_amount` in `crates/commol-model/src/rules.rs`) | `Aggregate(...)` and each update of an amount               |
+| Every bin has an amount, and no other id                                                                                                                                       | `build`                                                     |
+| Every stratification has a fraction for each of its categories, and no other category                                                                                          | `build`                                                     |
+| Every fraction is from 0 to 1, and the fractions of a stratification sum to 1 within 1e-6. The engine holds the rule (`check_fractions` in `crates/commol-model/src/rules.rs`) | `Aggregate(...)` and each `update_stratification_fractions` |
+| Override names are expanded compartments                                                                                                                                       | `build`                                                     |
+| With a stochastic engine, the amount of each bin is a whole number                                                                                                             | `build`                                                     |
 
 The initial amount of a compartment is `bin amount × the fraction of each of its categories`, unless an override names it. `model.structure.initial_state(model.process)` shows the result. To change amounts or fractions on a built model, see [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/#updating-the-initial-state-after-building).
 
@@ -1575,17 +1578,17 @@ A calibration gives a run that stops this way a penalty and goes on; see [Calibr
 
 `build` plans every flow in the engine and rejects a transition it cannot simulate as written:
 
-| Rejected                                                                                     | Message names                                                      |
-| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| A source or target that is neither a bin nor a category of one stratification                | The transition                                                     |
-| A category transition without exactly one source and one target                              | The transition                                                     |
-| A rate variable that is not a parameter, bin, compartment or special variable                | The variable and the available names                               |
-| Several sources with a proportional rate                                                     | The transition; use an absolute rate or `$compartment`             |
-| A stratified rate whose `category` conditions match no source compartment                    | The transition; use `to` to reach another stratification           |
-| A `to` condition on a transition without a source                                            | The transition; use `category` to choose the compartment it enters |
-| A flow that ends in categories no compartment has                                            | The transition; add a `to` condition                               |
-| `impulse_at` and `impulse_every` together, a negative step, or a period that is not positive | The transition                                                     |
-| A non-integer impulse step in a `DifferenceEquations` or `StochasticSteps` model             | The transition and the step                                        |
+| Rejected                                                                                                                                                                                                                                                                                         | Message names                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| A source or target that is neither a bin nor a category of one stratification                                                                                                                                                                                                                    | The transition                                                     |
+| A category transition without exactly one source and one target                                                                                                                                                                                                                                  | The transition                                                     |
+| A rate variable that is not a parameter, bin, compartment or special variable                                                                                                                                                                                                                    | The variable and the available names                               |
+| Several sources with a proportional rate                                                                                                                                                                                                                                                         | The transition; use an absolute rate or `$compartment`             |
+| A stratified rate whose `category` conditions match no source compartment                                                                                                                                                                                                                        | The transition; use `to` to reach another stratification           |
+| A `to` condition on a transition without a source                                                                                                                                                                                                                                                | The transition; use `category` to choose the compartment it enters |
+| A flow that ends in categories no compartment has                                                                                                                                                                                                                                                | The transition; add a `to` condition                               |
+| `impulse_at` and `impulse_every` together, an `impulse_at` with no step, a step that is negative or not finite, a period that is not positive, or a negative offset; the `Transition` fails when it is made, with the rule of the engine (`check_impulse` in `crates/commol-model/src/rules.rs`) | The transition                                                     |
+| A non-integer impulse step in a `DifferenceEquations` or `StochasticSteps` model                                                                                                                                                                                                                 | The transition and the step                                        |
 
 ## Next steps
 
@@ -2687,7 +2690,7 @@ print(len(per_week))  # 7: the complete windows of a 50-step run
 | Argument | Meaning                                                                                                                                                                                                                                             |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ids`    | Accumulator ids, each for all its outputs, and output names, each for itself, such as some strata of an accumulator. Their outputs are summed first. An id that is neither raises `KeyError`, with the bins, accumulators and outputs of the model. |
-| `window` | The window length on the axis. Must be positive.                                                                                                                                                                                                    |
+| `window` | The window length on the axis: a finite number greater than 0.                                                                                                                                                                                      |
 | `at`     | The positions where windows close. By default, every complete window of the results. Pass observation positions to get the values a calibration compares against.                                                                                   |
 
 The axis of a model gives the window grid of a width in a unit (`Model.axis_units()`; [Units of the axis](https://munqu.github.io/commol/latest/guide/core-concepts/#units-of-the-axis)), and `windowed_totals` of `py-commol/commol/api/windows.py` gives the same reduction for any series:
@@ -2701,7 +2704,7 @@ print(daily.window_end(0, 1, "week"), daily.window_index(7, 1, "week"))  # 7.0 0
 print(windowed_totals([0, 1, 3, 6, 10, 15, 21, 28], range(8), 3))  # [6.0, 15.0]
 ```
 
-A window of the grid is a whole number of steps. The `window` of `windowed_totals` need not be: see [Reporting at any position](#reporting-at-any-position).
+A window of the grid is a whole number of steps. The `window` of `windowed_totals` need not be: see [Reporting at any position](#reporting-at-any-position). The engine computes every window that results, reports and figures read, and checks its length (`window_ends` and the other functions of `crates/commol-calibration/src/observation.rs`), so a calibration and a report read the same windows.
 
 ## Values at positions
 
@@ -3821,12 +3824,12 @@ windowed = [
 print(calibrate_k1(windowed))  # 0.4
 ```
 
-| Rule                            | Detail                                                                                                                |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| The window starts at 0 or later | `at − window`, read as 0 within the rounding of the window; otherwise the observation is rejected when it is created. |
-| Any output                      | Usually an accumulator, but any compartment works.                                                                    |
-| Mixed windows                   | Observations may use different windows, and positions need not be multiples of the window.                            |
-| Combinations                    | Works with `factor_id` and `outputs`.                                                                                 |
+| Rule                            | Detail                                                                                                                                                                                                                    |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The window starts at 0 or later | `at − window`, read as 0 within the rounding of the window; otherwise the observation is rejected when it is created, with the rule of the engine (`check_window_end` in `crates/commol-calibration/src/observation.rs`). |
+| Any output                      | Usually an accumulator, but any compartment works.                                                                                                                                                                        |
+| Mixed windows                   | Observations may use different windows, and positions need not be multiples of the window.                                                                                                                                |
+| Combinations                    | Works with `factor_id` and `outputs`.                                                                                                                                                                                     |
 
 `windowed_totals` (module function) and `Simulation.windowed_totals` apply the same reduction outside calibration, so a report shows exactly what the loss compared. See [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals). An observation without `window` reads its output at `at`; `sample` and `Simulation.sample` read a run there in the same way ([Values at positions](https://munqu.github.io/commol/latest/guide/simulations/#values-at-positions)).
 
@@ -8232,7 +8235,7 @@ Bases: `BaseModel`
 
 The unit of one step on a model axis, and the engine that reads its rates.
 
-The axis of a model is its independent variable, of any quantity: time (`"day"`), a length (`"meter"`) or `"step"`, the default increment. `steps` converts a value in a unit of the same dimension to steps. `rate_from_mean_span` and `rate_from_probability` ask the engine what a rate means (`rate_meaning`) and give the rate it reads. `window_start`, `window_end`, `window_index` and `window_ends` give the grid of windows of one width, a span in a unit: window `w` covers the positions `(w * width, (w + 1) * width]`.
+The axis of a model is its independent variable, of any quantity: time (`"day"`), a length (`"meter"`) or `"step"`, the default increment. `steps` converts a value in a unit of the same dimension to steps. `rate_from_mean_span` and `rate_from_probability` ask the engine what a rate means (`rate_meaning`) and give the rate it reads. `window_start`, `window_end`, `window_index` and `window_ends` give the grid of windows of one width, a span in a unit: window `w` covers the positions `(w * width, (w + 1) * width]`, as the engine computes it (`crates/commol-calibration/src/observation.rs`).
 
 An axis of time with an `origin` is on the calendar: `position_of` and `moment_of` convert between calendar moments and positions, and `day_ends` and `week_ends` give the positions where calendar days and weeks end.
 
@@ -8279,7 +8282,8 @@ class AxisUnits(BaseModel):
     rate means (`rate_meaning`) and give the rate it reads. `window_start`,
     `window_end`, `window_index` and `window_ends` give the grid of windows of
     one width, a span in a unit: window ``w`` covers the positions
-    ``(w * width, (w + 1) * width]``.
+    ``(w * width, (w + 1) * width]``, as the engine computes it
+    (`crates/commol-calibration/src/observation.rs`).
 
     An axis of time with an `origin` is on the calendar: `position_of` and
     `moment_of` convert between calendar moments and positions, and
@@ -8636,7 +8640,9 @@ class AxisUnits(BaseModel):
             If the width is not a positive whole number of steps, `unit` has
             another dimension than the step unit, or `index` is negative.
         """
-        return windows.window_start(index, self._window_steps(span, unit))
+        return commol_rs.calibration.window_bounds(
+            index, self._window_steps(span, unit)
+        )[0]
 
     def window_end(self, index: int, span: float, unit: str) -> float:
         """
@@ -8662,7 +8668,9 @@ class AxisUnits(BaseModel):
             If the width is not a positive whole number of steps, `unit` has
             another dimension than the step unit, or `index` is negative.
         """
-        return windows.window_end(index, self._window_steps(span, unit))
+        return commol_rs.calibration.window_bounds(
+            index, self._window_steps(span, unit)
+        )[1]
 
     def window_index(self, at: float, span: float, unit: str) -> int:
         """
@@ -8693,7 +8701,7 @@ class AxisUnits(BaseModel):
             If the width is not a positive whole number of steps, `unit` has
             another dimension than the step unit, or `at` is negative.
         """
-        return windows.window_index(at, self._window_steps(span, unit))
+        return commol_rs.calibration.window_index(at, self._window_steps(span, unit))
 
     def window_ends(self, span: float, unit: str, end: float) -> list[float]:
         """
@@ -8721,7 +8729,7 @@ class AxisUnits(BaseModel):
             If the width is not a positive whole number of steps, or `unit`
             has another dimension than the step unit.
         """
-        return windows.window_ends(self._window_steps(span, unit), end)
+        return commol_rs.calibration.window_ends(self._window_steps(span, unit), end)
 
     @property
     def rate_meaning(self) -> str:
@@ -9320,7 +9328,9 @@ def window_start(self, index: int, span: float, unit: str) -> float:
         If the width is not a positive whole number of steps, `unit` has
         another dimension than the step unit, or `index` is negative.
     """
-    return windows.window_start(index, self._window_steps(span, unit))
+    return commol_rs.calibration.window_bounds(
+        index, self._window_steps(span, unit)
+    )[0]
 ```
 
 #### window_end
@@ -9378,7 +9388,9 @@ def window_end(self, index: int, span: float, unit: str) -> float:
         If the width is not a positive whole number of steps, `unit` has
         another dimension than the step unit, or `index` is negative.
     """
-    return windows.window_end(index, self._window_steps(span, unit))
+    return commol_rs.calibration.window_bounds(
+        index, self._window_steps(span, unit)
+    )[1]
 ```
 
 #### window_index
@@ -9443,7 +9455,7 @@ def window_index(self, at: float, span: float, unit: str) -> int:
         If the width is not a positive whole number of steps, `unit` has
         another dimension than the step unit, or `at` is negative.
     """
-    return windows.window_index(at, self._window_steps(span, unit))
+    return commol_rs.calibration.window_index(at, self._window_steps(span, unit))
 ```
 
 #### window_ends
@@ -9503,7 +9515,7 @@ def window_ends(self, span: float, unit: str, end: float) -> list[float]:
         If the width is not a positive whole number of steps, or `unit`
         has another dimension than the step unit.
     """
-    return windows.window_ends(self._window_steps(span, unit), end)
+    return commol_rs.calibration.window_ends(self._window_steps(span, unit), end)
 ```
 
 # Calibration API
@@ -11522,17 +11534,12 @@ class ObservedDataPoint(RangeChecked):
     @model_validator(mode="after")
     def validate_window(self) -> Self:
         """
-        A window must not start before position 0, with the start of the
-        engine (`window_start` of `crates/commol-calibration/src/observation.rs`).
+        A window must not start before position 0, with the rule of the
+        engine (`check_window_end` of
+        `crates/commol-calibration/src/observation.rs`).
         """
-        if (
-            self.window is not None
-            and commol_rs.calibration.window_start(self.at, self.window) < 0
-        ):
-            raise ValueError(
-                f"The window {self.window} that ends at {self.at} starts before "
-                "position 0."
-            )
+        if self.window is not None:
+            commol_rs.calibration.check_window_end(self.at, self.window)
         return self
 
     @property
@@ -11588,7 +11595,7 @@ def validate_observed_outputs(self) -> Self:
 validate_window() -> Self
 ```
 
-A window must not start before position 0, with the start of the engine (`window_start` of `crates/commol-calibration/src/observation.rs`).
+A window must not start before position 0, with the rule of the engine (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
 
 Source code in `commol/context/calibration.py`
 
@@ -11596,17 +11603,12 @@ Source code in `commol/context/calibration.py`
 @model_validator(mode="after")
 def validate_window(self) -> Self:
     """
-    A window must not start before position 0, with the start of the
-    engine (`window_start` of `crates/commol-calibration/src/observation.rs`).
+    A window must not start before position 0, with the rule of the
+    engine (`check_window_end` of
+    `crates/commol-calibration/src/observation.rs`).
     """
-    if (
-        self.window is not None
-        and commol_rs.calibration.window_start(self.at, self.window) < 0
-    ):
-        raise ValueError(
-            f"The window {self.window} that ends at {self.at} starts before "
-            "position 0."
-        )
+    if self.window is not None:
+        commol_rs.calibration.check_window_end(self.at, self.window)
     return self
 ```
 
@@ -19112,7 +19114,9 @@ class Aggregate(ModelStructure, InitialConditions):
             )
 
     def _check_stratification_fractions(self, process: Process) -> None:
-        """Check the stratification fractions against the stratifications."""
+        """Check that the fractions name each stratification and its
+        categories; the rule of their values is the engine's, checked when the
+        structure is built."""
         strat_map = {strat.id: strat for strat in process.stratifications}
         actual_strat = set(self.stratification_fractions)
         expected_strat = set(strat_map)
@@ -19135,13 +19139,6 @@ class Aggregate(ModelStructure, InitialConditions):
                     f"match defined categories in instance '{strat_instance.id}'. "
                     f"Missing categories: {sorted(expected - actual)}, "
                     f"Extra categories: {sorted(actual - expected)}."
-                )
-
-            total = sum(fractions.values())
-            if not math.isclose(total, 1.0, abs_tol=1e-6):
-                raise ValueError(
-                    f"Stratification fractions for '{strat_id}' must sum to 1.0, "
-                    f"but got {total:.7}."
                 )
 ```
 
@@ -20148,21 +20145,12 @@ class SeriesValue(BaseModel):
     def validate_data(
         cls, value: list[tuple[float, float]]
     ) -> list[tuple[float, float]]:
-        """Validate series points before they reach the Rust engine."""
-        if not value:
-            raise ValueError("Series data must contain at least one point")
-
-        positions: list[float] = []
-        for position, point_value in value:
-            if not (math.isfinite(position) and position >= 0):
-                raise ValueError("Series positions must be finite and non-negative")
-            if not math.isfinite(point_value):
-                raise ValueError("Series values must be finite")
-            positions.append(position)
-
-        if len(positions) != len(set(positions)):
-            raise ValueError("Series positions must be unique")
-
+        """
+        Check the points with the rule of the engine (`check_series` of
+        `crates/commol-model/src/values.rs`): at least one point, each
+        position finite, not negative and once, each value finite.
+        """
+        commol_rs.model.check_series(value)
         return value
 ```
 
@@ -20174,7 +20162,7 @@ class SeriesValue(BaseModel):
 validate_data(value: list[tuple[float, float]]) -> list[tuple[float, float]]
 ```
 
-Validate series points before they reach the Rust engine.
+Check the points with the rule of the engine (`check_series` of `crates/commol-model/src/values.rs`): at least one point, each position finite, not negative and once, each value finite.
 
 Source code in `commol/context/parameter.py`
 
@@ -20184,21 +20172,12 @@ Source code in `commol/context/parameter.py`
 def validate_data(
     cls, value: list[tuple[float, float]]
 ) -> list[tuple[float, float]]:
-    """Validate series points before they reach the Rust engine."""
-    if not value:
-        raise ValueError("Series data must contain at least one point")
-
-    positions: list[float] = []
-    for position, point_value in value:
-        if not (math.isfinite(position) and position >= 0):
-            raise ValueError("Series positions must be finite and non-negative")
-        if not math.isfinite(point_value):
-            raise ValueError("Series values must be finite")
-        positions.append(position)
-
-    if len(positions) != len(set(positions)):
-        raise ValueError("Series positions must be unique")
-
+    """
+    Check the points with the rule of the engine (`check_series` of
+    `crates/commol-model/src/values.rs`): at least one point, each
+    position finite, not negative and once, each value finite.
+    """
+    commol_rs.model.check_series(value)
     return value
 ```
 
@@ -27409,25 +27388,16 @@ class Increments(_Outputs, RangeChecked):
 
     def check_ends(self, positions: Sequence[float]) -> None:
         """
-        No window starts before 0, with the start of the engine
-        (`window_start` of `crates/commol-calibration/src/observation.rs`).
+        No window starts before 0, with the rule of the engine
+        (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
 
         Raises
         ------
         ValueError
-            If a window starts before 0.
+            With the message of the engine, if a window starts before 0.
         """
-        early = [
-            at
-            for at in positions
-            if commol_rs.calibration.window_start(at, self.window) < 0
-        ]
-        if early:
-            raise ValueError(
-                f"Increments over windows of {_position_text(self.window)} start "
-                f"at 0 at the earliest, so each end is at least the window; got "
-                f"the end {_position_text(early[0])}"
-            )
+        for at in positions:
+            commol_rs.calibration.check_window_end(at, self.window)
 ```
 
 ### Attributes
@@ -27448,38 +27418,29 @@ The series as a label reads it: the gain over windows of a width.
 check_ends(positions: Sequence[float]) -> None
 ```
 
-No window starts before 0, with the start of the engine (`window_start` of `crates/commol-calibration/src/observation.rs`).
+No window starts before 0, with the rule of the engine (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
 
 Raises:
 
-| Type         | Description                  |
-| ------------ | ---------------------------- |
-| `ValueError` | If a window starts before 0. |
+| Type         | Description                                                  |
+| ------------ | ------------------------------------------------------------ |
+| `ValueError` | With the message of the engine, if a window starts before 0. |
 
 Source code in `commol/context/inference/quantities.py`
 
 ```python
 def check_ends(self, positions: Sequence[float]) -> None:
     """
-    No window starts before 0, with the start of the engine
-    (`window_start` of `crates/commol-calibration/src/observation.rs`).
+    No window starts before 0, with the rule of the engine
+    (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
 
     Raises
     ------
     ValueError
-        If a window starts before 0.
+        With the message of the engine, if a window starts before 0.
     """
-    early = [
-        at
-        for at in positions
-        if commol_rs.calibration.window_start(at, self.window) < 0
-    ]
-    if early:
-        raise ValueError(
-            f"Increments over windows of {_position_text(self.window)} start "
-            f"at 0 at the earliest, so each end is at least the window; got "
-            f"the end {_position_text(early[0])}"
-        )
+    for at in positions:
+        commol_rs.calibration.check_window_end(at, self.window)
 ```
 
 ## ValueAt
@@ -31182,12 +31143,12 @@ Each value is the series at the end of the window minus the series at its start,
 
 Parameters:
 
-| Name        | Type              | Description                                                              | Default                                                                                                                                                                                   |
-| ----------- | ----------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `series`    | `Sequence[float]` | A cumulative series, one value per position.                             | *required*                                                                                                                                                                                |
-| `positions` | `Sequence[float]` | Positions of the series, ascending, such as SimulationResults.positions. | *required*                                                                                                                                                                                |
-| `window`    | `float`           | Length of one window on the axis.                                        | *required*                                                                                                                                                                                |
-| `at`        | \`Iterable[float] | None\`                                                                   | Positions at which windows close. Defaults to every complete window of the series (:func:window_ends). Pass the observation positions to reproduce exactly the values a calibration used. |
+| Name        | Type              | Description                                                              | Default                                                                                                                                                                                                                              |
+| ----------- | ----------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `series`    | `Sequence[float]` | A cumulative series, one value per position.                             | *required*                                                                                                                                                                                                                           |
+| `positions` | `Sequence[float]` | Positions of the series, ascending, such as SimulationResults.positions. | *required*                                                                                                                                                                                                                           |
+| `window`    | `float`           | Length of one window on the axis.                                        | *required*                                                                                                                                                                                                                           |
+| `at`        | \`Iterable[float] | None\`                                                                   | Positions at which windows close. Defaults to every complete window of the series (window_ends of the engine, as AxisUnits.window_ends gives it). Pass the observation positions to reproduce exactly the values a calibration used. |
 
 Returns:
 
@@ -31197,9 +31158,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                                                                    |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ValueError` | If window is not positive, series and positions differ in length, a window starts before position 0, or the series has no value at the end or the start of a requested window. |
+| Type         | Description                                                                                                                                                                                                                 |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If series and positions differ in length, window is not a finite, positive length (the message of the engine), a window starts before position 0, or the series has no value at the end or the start of a requested window. |
 
 Source code in `commol/api/windows.py`
 
@@ -31231,8 +31192,9 @@ def windowed_totals(
         Length of one window on the axis.
     at : Iterable[float] | None, optional
         Positions at which windows close. Defaults to every complete window of
-        the series (:func:`window_ends`). Pass the observation positions to
-        reproduce exactly the values a calibration used.
+        the series (`window_ends` of the engine, as `AxisUnits.window_ends`
+        gives it). Pass the observation positions to reproduce exactly the
+        values a calibration used.
 
     Returns
     -------
@@ -31242,17 +31204,17 @@ def windowed_totals(
     Raises
     ------
     ValueError
-        If `window` is not positive, `series` and `positions` differ in
-        length, a window starts before position 0, or the series has no value
-        at the end or the start of a requested window.
+        If `series` and `positions` differ in length, `window` is not a
+        finite, positive length (the message of the engine), a window starts
+        before position 0, or the series has no value at the end or the start
+        of a requested window.
     """
-    check_window(window)
     if len(series) != len(positions):
         raise ValueError(
             f"The series has {len(series)} values for {len(positions)} positions."
         )
     ends = (
-        window_ends(window, positions[-1] if positions else 0.0)
+        commol_rs.calibration.window_ends(window, positions[-1] if positions else 0.0)
         if at is None
         else list(at)
     )
@@ -39738,34 +39700,13 @@ class Transition(BaseModel):
 
     @model_validator(mode="after")
     def validate_impulse(self) -> Self:
-        """Check the impulse schedule: one kind, valid positions and period."""
-        if self.impulse_at is not None and self.impulse_every is not None:
-            raise ValueError(
-                f"Transition '{self.id}': set impulse_at or impulse_every, not both."
-            )
-        if self.impulse_at is not None:
-            if not self.impulse_at:
-                raise ValueError(
-                    f"Transition '{self.id}': impulse_at needs at least one position."
-                )
-            bad = [p for p in self.impulse_at if not math.isfinite(p) or p < 0]
-            if bad:
-                raise ValueError(
-                    f"Transition '{self.id}': impulse positions must be finite "
-                    f"and not negative, got {bad}."
-                )
-        if self.impulse_every is not None:
-            period, offset = self.impulse_every
-            if not (math.isfinite(period) and period > 0):
-                raise ValueError(
-                    f"Transition '{self.id}': the impulse period must be "
-                    f"positive, got {period}."
-                )
-            if not (math.isfinite(offset) and offset >= 0):
-                raise ValueError(
-                    f"Transition '{self.id}': the impulse offset must be finite "
-                    f"and not negative, got {offset}."
-                )
+        """
+        Check the impulse with the rule of the engine (`check_impulse` of
+        `crates/commol-model/src/values.rs`): one of `impulse_at` and
+        `impulse_every`, at least one position on the axis, a positive period
+        and an offset that is not negative.
+        """
+        commol_rs.model.check_impulse(self.id, self.impulse_at, self.impulse_every)
         return self
 
     @field_validator("rate", mode="before")
@@ -39797,41 +39738,20 @@ Whether the transition is an impulse rather than a continuous flow.
 validate_impulse() -> Self
 ```
 
-Check the impulse schedule: one kind, valid positions and period.
+Check the impulse with the rule of the engine (`check_impulse` of `crates/commol-model/src/values.rs`): one of `impulse_at` and `impulse_every`, at least one position on the axis, a positive period and an offset that is not negative.
 
 Source code in `commol/context/transition.py`
 
 ```python
 @model_validator(mode="after")
 def validate_impulse(self) -> Self:
-    """Check the impulse schedule: one kind, valid positions and period."""
-    if self.impulse_at is not None and self.impulse_every is not None:
-        raise ValueError(
-            f"Transition '{self.id}': set impulse_at or impulse_every, not both."
-        )
-    if self.impulse_at is not None:
-        if not self.impulse_at:
-            raise ValueError(
-                f"Transition '{self.id}': impulse_at needs at least one position."
-            )
-        bad = [p for p in self.impulse_at if not math.isfinite(p) or p < 0]
-        if bad:
-            raise ValueError(
-                f"Transition '{self.id}': impulse positions must be finite "
-                f"and not negative, got {bad}."
-            )
-    if self.impulse_every is not None:
-        period, offset = self.impulse_every
-        if not (math.isfinite(period) and period > 0):
-            raise ValueError(
-                f"Transition '{self.id}': the impulse period must be "
-                f"positive, got {period}."
-            )
-        if not (math.isfinite(offset) and offset >= 0):
-            raise ValueError(
-                f"Transition '{self.id}': the impulse offset must be finite "
-                f"and not negative, got {offset}."
-            )
+    """
+    Check the impulse with the rule of the engine (`check_impulse` of
+    `crates/commol-model/src/values.rs`): one of `impulse_at` and
+    `impulse_every`, at least one position on the axis, a positive period
+    and an offset that is not negative.
+    """
+    commol_rs.model.check_impulse(self.id, self.impulse_at, self.impulse_every)
     return self
 ```
 
@@ -40141,11 +40061,11 @@ Every amount is in the unit of its bin, so bins of different units, such as a co
 
 Attributes:
 
-| Name                       | Type                          | Description                                                                                                                                                                                                     |
-| -------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bin_amounts`              | \`dict\[str, float            | None\]\`                                                                                                                                                                                                        |
-| `stratification_fractions` | `dict[str, dict[str, float]]` | The fraction of each category, by stratification id and category: the split of the amount of every bin the stratification applies to. A conditional stratification splits only the group its conditions select. |
-| `compartment_amounts`      | `dict[str, float]`            | Amounts of single expanded compartments, by compartment name, applied after the expansion.                                                                                                                      |
+| Name                       | Type                          | Description                                                                                                                                                                                                                                                   |
+| -------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bin_amounts`              | \`dict\[str, float            | None\]\`                                                                                                                                                                                                                                                      |
+| `stratification_fractions` | `dict[str, dict[str, float]]` | The fraction of each category, by stratification id and category: the split of the amount of every bin the stratification applies to; each from 0 to 1, and a sum of 1 within 1e-6. A conditional stratification splits only the group its conditions select. |
+| `compartment_amounts`      | `dict[str, float]`            | Amounts of single expanded compartments, by compartment name, applied after the expansion.                                                                                                                                                                    |
 
 Source code in `commol/context/initial_conditions.py`
 
@@ -40167,9 +40087,9 @@ class InitialConditions(BaseModel):
         bin; finite and not negative. None leaves an amount for calibration.
     stratification_fractions : dict[str, dict[str, float]]
         The fraction of each category, by stratification id and category: the
-        split of the amount of every bin the stratification applies to. A
-        conditional stratification splits only the group its conditions
-        select.
+        split of the amount of every bin the stratification applies to; each
+        from 0 to 1, and a sum of 1 within 1e-6. A conditional stratification
+        splits only the group its conditions select.
     compartment_amounts : dict[str, float]
         Amounts of single expanded compartments, by compartment name, applied
         after the expansion.
@@ -40222,18 +40142,25 @@ class InitialConditions(BaseModel):
     def validate_bin_amounts(
         cls, value: dict[str, float | None]
     ) -> dict[str, float | None]:
-        """Enforce that every bin amount is finite and not negative."""
-        for bin_id, amount in value.items():
-            if amount is not None:
-                _check_amount(f"bin '{bin_id}'", amount)
+        """Check every bin amount with the rule of the engine."""
+        commol_rs.model.check_bin_amounts(list(value.items()))
+        return value
+
+    @field_validator("stratification_fractions")
+    @classmethod
+    def validate_stratification_fractions(
+        cls, value: dict[str, dict[str, float]]
+    ) -> dict[str, dict[str, float]]:
+        """Check the fractions of every stratification with the rule of the
+        engine."""
+        _check_fractions(value)
         return value
 
     @field_validator("compartment_amounts")
     @classmethod
     def validate_compartment_amounts(cls, value: dict[str, float]) -> dict[str, float]:
-        """Enforce that every compartment amount is finite and not negative."""
-        for compartment, amount in value.items():
-            _check_amount(f"compartment '{compartment}'", amount)
+        """Check every compartment amount with the rule of the engine."""
+        commol_rs.model.check_compartment_amounts(list(value.items()))
         return value
 
     def get_uncalibrated_bins(self) -> list[str]:
@@ -40356,14 +40283,13 @@ class InitialConditions(BaseModel):
         stratification, name = self.resolve_category(category)
         return self.stratification_fractions[stratification][name]
 
-    def _apply_stratification_update(
+    def _updated_fractions(
         self, stratification: str, named: Mapping[str, float]
-    ) -> None:
-        """Write the fractions of a single stratification."""
+    ) -> dict[str, float]:
+        """The fractions of a single stratification after an update that
+        names ``named``; the one category left unnamed takes the rest."""
         categories = self.stratification_fractions[stratification]
         unnamed = [category for category in categories if category not in named]
-        total = sum(named.values())
-
         if len(unnamed) > 1:
             raise ValueError(
                 f"Cannot update stratification '{stratification}': "
@@ -40371,21 +40297,8 @@ class InitialConditions(BaseModel):
                 f"category may be omitted, so that it can take the remaining "
                 f"fraction."
             )
-        if not unnamed and not math.isclose(total, 1.0, abs_tol=1e-6):
-            raise ValueError(
-                f"Fractions for stratification '{stratification}' "
-                f"must sum to 1.0, got {total:.6f}. Values: {dict(named)}"
-            )
-        if unnamed and total > 1.0 + 1e-6:
-            raise ValueError(
-                f"Fractions for stratification '{stratification}' "
-                f"sum to {total:.6f}, which would leave a negative fraction for "
-                f"'{unnamed[0]}'. Values: {dict(named)}"
-            )
-
-        remainder = max(0.0, 1.0 - total)
-        for category in categories:
-            categories[category] = named.get(category, remainder)
+        remainder = max(0.0, 1.0 - sum(named.values()))
+        return {category: named.get(category, remainder) for category in categories}
 
     def update_stratification_fractions(self, fractions: Mapping[str, float]) -> None:
         """
@@ -40395,34 +40308,36 @@ class InitialConditions(BaseModel):
         call. A category name declared by more than one stratification must be
         qualified with its stratification, as in ``group:g1``. Within each
         stratification, at most one category may be omitted; the omitted
-        category receives the remaining fraction so that the stratification
-        sums to 1.0. When every category is given, the values
-        must already sum to 1.0.
+        category receives the rest of 1, or 0 when the given values pass 1.
+        The fractions of every stratification are checked with the rule of the
+        engine before any of them changes.
 
         Parameters
         ----------
         fractions : Mapping[str, float]
             Dictionary mapping category names, bare or qualified, to their new
-            fraction values. Each value must lie between 0.0 and 1.0.
+            fraction values.
 
         Raises
         ------
         ValueError
-            If a category is not found or is ambiguous, a value lies outside
-            [0.0, 1.0], a stratification has more than one category omitted,
-            fully specified values do not sum to 1.0, or the given values
-            exceed 1.0.
+            If a category is not found or is ambiguous, or a stratification
+            has more than one category omitted; with the message of the
+            engine, if a fraction is not from 0 to 1 or the fractions of a
+            stratification do not sum to 1 within 1e-6.
         """
-        for category, value in fractions.items():
-            _check_fraction(f"category '{category}'", value)
-
         by_stratification: dict[str, dict[str, float]] = {}
         for category, value in fractions.items():
             stratification, name = self.resolve_category(category)
             by_stratification.setdefault(stratification, {})[name] = value
 
-        for stratification, named in by_stratification.items():
-            self._apply_stratification_update(stratification, named)
+        updated = {
+            stratification: self._updated_fractions(stratification, named)
+            for stratification, named in by_stratification.items()
+        }
+        _check_fractions(updated)
+        for stratification, categories in updated.items():
+            self.stratification_fractions[stratification].update(categories)
 
     def _upsert_compartment_amounts(self, amounts: Mapping[str, float]) -> None:
         """
@@ -40437,10 +40352,10 @@ class InitialConditions(BaseModel):
         Raises
         ------
         ValueError
-            If an amount is not finite or is negative.
+            With the message of the engine, if an amount is not finite or is
+            negative.
         """
-        for compartment, amount in amounts.items():
-            _check_amount(f"compartment '{compartment}'", amount)
+        commol_rs.model.check_compartment_amounts(list(amounts.items()))
         self.compartment_amounts.update(amounts)
 
     def update_bin_amounts(self, amounts: Mapping[str, float | None]) -> None:
@@ -40460,8 +40375,8 @@ class InitialConditions(BaseModel):
         Raises
         ------
         ValueError
-            If a bin ID is not found in the initial conditions, or an amount
-            is not finite or is negative.
+            If a bin ID is not found in the initial conditions, or, with the
+            message of the engine, an amount is not finite or is negative.
         """
         unknown = sorted(set(amounts) - set(self.bin_amounts))
         if unknown:
@@ -40469,9 +40384,7 @@ class InitialConditions(BaseModel):
                 f"Bin(s) {unknown} not found in initial conditions. "
                 f"Available bins: {list(self.bin_amounts)}"
             )
-        for bin_id, amount in amounts.items():
-            if amount is not None:
-                _check_amount(f"bin '{bin_id}'", amount)
+        commol_rs.model.check_bin_amounts(list(amounts.items()))
         self.bin_amounts.update(amounts)
 ```
 
@@ -40519,7 +40432,7 @@ def reject_fractions_of_a_total(cls, data: JsonValue) -> JsonValue:
 validate_bin_amounts(value: dict[str, float | None]) -> dict[str, float | None]
 ```
 
-Enforce that every bin amount is finite and not negative.
+Check every bin amount with the rule of the engine.
 
 Source code in `commol/context/initial_conditions.py`
 
@@ -40529,10 +40442,30 @@ Source code in `commol/context/initial_conditions.py`
 def validate_bin_amounts(
     cls, value: dict[str, float | None]
 ) -> dict[str, float | None]:
-    """Enforce that every bin amount is finite and not negative."""
-    for bin_id, amount in value.items():
-        if amount is not None:
-            _check_amount(f"bin '{bin_id}'", amount)
+    """Check every bin amount with the rule of the engine."""
+    commol_rs.model.check_bin_amounts(list(value.items()))
+    return value
+```
+
+#### validate_stratification_fractions
+
+```python
+validate_stratification_fractions(value: dict[str, dict[str, float]]) -> dict[str, dict[str, float]]
+```
+
+Check the fractions of every stratification with the rule of the engine.
+
+Source code in `commol/context/initial_conditions.py`
+
+```python
+@field_validator("stratification_fractions")
+@classmethod
+def validate_stratification_fractions(
+    cls, value: dict[str, dict[str, float]]
+) -> dict[str, dict[str, float]]:
+    """Check the fractions of every stratification with the rule of the
+    engine."""
+    _check_fractions(value)
     return value
 ```
 
@@ -40542,7 +40475,7 @@ def validate_bin_amounts(
 validate_compartment_amounts(value: dict[str, float]) -> dict[str, float]
 ```
 
-Enforce that every compartment amount is finite and not negative.
+Check every compartment amount with the rule of the engine.
 
 Source code in `commol/context/initial_conditions.py`
 
@@ -40550,9 +40483,8 @@ Source code in `commol/context/initial_conditions.py`
 @field_validator("compartment_amounts")
 @classmethod
 def validate_compartment_amounts(cls, value: dict[str, float]) -> dict[str, float]:
-    """Enforce that every compartment amount is finite and not negative."""
-    for compartment, amount in value.items():
-        _check_amount(f"compartment '{compartment}'", amount)
+    """Check every compartment amount with the rule of the engine."""
+    commol_rs.model.check_compartment_amounts(list(value.items()))
     return value
 ```
 
@@ -40807,19 +40739,19 @@ update_stratification_fractions(fractions: Mapping[str, float]) -> None
 
 Update stratification category fractions by category name.
 
-Categories belonging to several stratifications may be given in one call. A category name declared by more than one stratification must be qualified with its stratification, as in `group:g1`. Within each stratification, at most one category may be omitted; the omitted category receives the remaining fraction so that the stratification sums to 1.0. When every category is given, the values must already sum to 1.0.
+Categories belonging to several stratifications may be given in one call. A category name declared by more than one stratification must be qualified with its stratification, as in `group:g1`. Within each stratification, at most one category may be omitted; the omitted category receives the rest of 1, or 0 when the given values pass 1. The fractions of every stratification are checked with the rule of the engine before any of them changes.
 
 Parameters:
 
-| Name        | Type                  | Description                                                                                                                  | Default    |
-| ----------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `fractions` | `Mapping[str, float]` | Dictionary mapping category names, bare or qualified, to their new fraction values. Each value must lie between 0.0 and 1.0. | *required* |
+| Name        | Type                  | Description                                                                         | Default    |
+| ----------- | --------------------- | ----------------------------------------------------------------------------------- | ---------- |
+| `fractions` | `Mapping[str, float]` | Dictionary mapping category names, bare or qualified, to their new fraction values. | *required* |
 
 Raises:
 
-| Type         | Description                                                                                                                                                                                                 |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If a category is not found or is ambiguous, a value lies outside [0.0, 1.0], a stratification has more than one category omitted, fully specified values do not sum to 1.0, or the given values exceed 1.0. |
+| Type         | Description                                                                                                                                                                                                                            |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If a category is not found or is ambiguous, or a stratification has more than one category omitted; with the message of the engine, if a fraction is not from 0 to 1 or the fractions of a stratification do not sum to 1 within 1e-6. |
 
 Source code in `commol/context/initial_conditions.py`
 
@@ -40832,34 +40764,36 @@ def update_stratification_fractions(self, fractions: Mapping[str, float]) -> Non
     call. A category name declared by more than one stratification must be
     qualified with its stratification, as in ``group:g1``. Within each
     stratification, at most one category may be omitted; the omitted
-    category receives the remaining fraction so that the stratification
-    sums to 1.0. When every category is given, the values
-    must already sum to 1.0.
+    category receives the rest of 1, or 0 when the given values pass 1.
+    The fractions of every stratification are checked with the rule of the
+    engine before any of them changes.
 
     Parameters
     ----------
     fractions : Mapping[str, float]
         Dictionary mapping category names, bare or qualified, to their new
-        fraction values. Each value must lie between 0.0 and 1.0.
+        fraction values.
 
     Raises
     ------
     ValueError
-        If a category is not found or is ambiguous, a value lies outside
-        [0.0, 1.0], a stratification has more than one category omitted,
-        fully specified values do not sum to 1.0, or the given values
-        exceed 1.0.
+        If a category is not found or is ambiguous, or a stratification
+        has more than one category omitted; with the message of the
+        engine, if a fraction is not from 0 to 1 or the fractions of a
+        stratification do not sum to 1 within 1e-6.
     """
-    for category, value in fractions.items():
-        _check_fraction(f"category '{category}'", value)
-
     by_stratification: dict[str, dict[str, float]] = {}
     for category, value in fractions.items():
         stratification, name = self.resolve_category(category)
         by_stratification.setdefault(stratification, {})[name] = value
 
-    for stratification, named in by_stratification.items():
-        self._apply_stratification_update(stratification, named)
+    updated = {
+        stratification: self._updated_fractions(stratification, named)
+        for stratification, named in by_stratification.items()
+    }
+    _check_fractions(updated)
+    for stratification, categories in updated.items():
+        self.stratification_fractions[stratification].update(categories)
 ```
 
 #### update_bin_amounts
@@ -40880,9 +40814,9 @@ Parameters:
 
 Raises:
 
-| Type         | Description                                                                                    |
-| ------------ | ---------------------------------------------------------------------------------------------- |
-| `ValueError` | If a bin ID is not found in the initial conditions, or an amount is not finite or is negative. |
+| Type         | Description                                                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If a bin ID is not found in the initial conditions, or, with the message of the engine, an amount is not finite or is negative. |
 
 Source code in `commol/context/initial_conditions.py`
 
@@ -40904,8 +40838,8 @@ def update_bin_amounts(self, amounts: Mapping[str, float | None]) -> None:
     Raises
     ------
     ValueError
-        If a bin ID is not found in the initial conditions, or an amount
-        is not finite or is negative.
+        If a bin ID is not found in the initial conditions, or, with the
+        message of the engine, an amount is not finite or is negative.
     """
     unknown = sorted(set(amounts) - set(self.bin_amounts))
     if unknown:
@@ -40913,9 +40847,7 @@ def update_bin_amounts(self, amounts: Mapping[str, float | None]) -> None:
             f"Bin(s) {unknown} not found in initial conditions. "
             f"Available bins: {list(self.bin_amounts)}"
         )
-    for bin_id, amount in amounts.items():
-        if amount is not None:
-            _check_amount(f"bin '{bin_id}'", amount)
+    commol_rs.model.check_bin_amounts(list(amounts.items()))
     self.bin_amounts.update(amounts)
 ```
 # Changelog
@@ -40933,6 +40865,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 - The engine holds the range rule of every setting: a count, a share, a length, a scale, a tolerance, a bound of an optimizer, an observation, an observation model, an axis pattern, a distribution, a quantity of interest and the setting of an uncertainty, identifiability or sensitivity method. A value outside its range still raises `ValueError` when the object is built, and the same values are valid; the message is the engine's, and names the setting and its range: `replicates is a whole number of at least 1, got 0`, `sd is a finite number greater than 0, got 0`. A count gives one message for every value outside its range, a negative one included, also when a binding is called with no Python object in between, and for `Simulation.replicates` (`count is a whole number of at least 1, got 0`) and `Calibrator.run` (`starts is a whole number of at least 1, got 0`). A seed outside its range gives `seed is a whole number from 0 to 18446744073709551615, got -1` in every function that takes one: `Simulation.run`, `Simulation.run_at`, `Simulation.replicates`, `CalibrationProblem`, `SensitivityAnalysis` and each binding.
+- The engine holds the rule of every value of a model and of every window. An initial amount, an impulse and the points of a series fail when their object (`Aggregate`, `Transition`, `SeriesValue`) is built or an amount is updated, as before, and the same values are valid; the message is the one the model compiler gives, which names the bin, the compartment or the transition: `Bin 'B': initial amount is a finite number of at least 0, got -1`, `Transition 't': impulse period is a finite number greater than 0, got 0`, `a series has one point per position, got two at 2`. The windows of `windowed_totals`, of reports, of figures and of `AxisUnits.window_start`, `window_end`, `window_index` and `window_ends` come from the engine, with its messages (`window is a finite number greater than 0, got 0`, `index is a whole number of at least 0, got -1`), and an observation or a quantity whose window starts before 0 gives `the window 4 that ends at 3 starts before 0; an end is at least its window`. A `tick_every` of a figure that is not a finite number greater than 0 raises `ValueError`.
 - A calibration, a sensitivity analysis or any other method that sets a model parameter raises `ValueError` when it is built if the parameter is a formula or a series parameter. The engine computes such a parameter at each step, so a value set on it was lost and the method fitted nothing. The message is the engine's, for this case and for a parameter the model does not have: `Parameter 'k9' is not in the model; the parameters that can be set are k1, k2`. Python keeps no copy of this check.
 - The four engines of the aggregate kind name themselves in their messages by the name of the engine: a position an engine does not report at gives `The DifferenceEquations engine reports only at integer steps; 2.5 is not one`, and an impulse or a series point between two steps names `the DifferenceEquations engine` or `the StochasticSteps engine`.
 - `Predictive.at_observations` and every method that reads a predictive at other observations raise `ValueError` for a position the engine rejects, with the message of the engine, as a calibration does. The bands, the automatic block lengths and their estimates keep their values: one Rust function of each computes them for every method.
@@ -40949,6 +40882,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- A fraction of a stratification outside 0 to 1 raises `ValueError` when its `Aggregate` is built, with the message of the engine: `Stratification 'g', category 'g1': fraction is a number from 0 to 1, got 1.5`. Before, only the sum was checked, so fractions such as `{"g1": 1.5, "g2": -0.5}` built a model whose compartment started at a negative amount. The sum of the fractions of a stratification, 1 within 1e-6, is checked at the same time (`Stratification 'g': the fractions of its categories sum to 1 within 1e-6, got 0.9`), where it was checked by `build`, and `update_stratification_fractions` and the model compiler give the same messages.
 - Two results of commol with the same values are equal, also when they hold a NaN: a NaN equals a NaN, whatever the objects that hold it. Before, `==` compared the identity of the items of a list first, so two runs with one seed gave results that were not equal when one held a NaN, such as a PRCC coefficient of an input that the other inputs explain entirely. A frozen result has a hash that agrees with `==`, also when it holds a list, a dict or a NaN. `ParameterSample` compares as every other result. A result no longer compares its private attributes ([Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/#comparing-results)).
 - `==` of `SimulationResults` and `SimulationReplicates` now also compares their positions, seed and model, and a NaN equals a NaN. Before, it read only the values, so two runs at other positions or with other seeds and the same values were equal, and two runs with one seed that held a NaN were not. A plain `dict` or `list` with the same values is no longer equal to a result: compare `dict(results)` to read the values only ([Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/#results)).
 - A profile reads a parameter with one finite bound, such as `[0, +∞)`, on its bound within `1e-8` of `max(1, |bound|)`, the rule of `Laplace`. Before, every value of such a parameter was on its bound, so a profile never saw the ridge leave the box through it, and the structure of a flat profile gave `undetermined="on_bound"` with that parameter in place of a reading.

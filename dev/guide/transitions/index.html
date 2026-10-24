@@ -4263,7 +4263,7 @@ simulate as written:</p>
 <td>The transition; add a <code>to</code> condition</td>
 </tr>
 <tr>
-<td><code>impulse_at</code> and <code>impulse_every</code> together, a negative step, or a period that is not positive</td>
+<td><code>impulse_at</code> and <code>impulse_every</code> together, an <code>impulse_at</code> with no step, a step that is negative or not finite, a period that is not positive, or a negative offset; the <code>Transition</code> fails when it is made, with the rule of the engine (<code>check_impulse</code> in <code>crates/commol-model/src/rules.rs</code>)</td>
 <td>The transition</td>
 </tr>
 <tr>

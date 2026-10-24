@@ -2904,7 +2904,9 @@ class Aggregate(ModelStructure, InitialConditions):
             )
 
     def _check_stratification_fractions(self, process: Process) -> None:
-        """Check the stratification fractions against the stratifications."""
+        """Check that the fractions name each stratification and its
+        categories; the rule of their values is the engine's, checked when the
+        structure is built."""
         strat_map = {strat.id: strat for strat in process.stratifications}
         actual_strat = set(self.stratification_fractions)
         expected_strat = set(strat_map)
@@ -2927,13 +2929,6 @@ class Aggregate(ModelStructure, InitialConditions):
                     f"match defined categories in instance '{strat_instance.id}'. "
                     f"Missing categories: {sorted(expected - actual)}, "
                     f"Extra categories: {sorted(actual - expected)}."
-                )
-
-            total = sum(fractions.values())
-            if not math.isclose(total, 1.0, abs_tol=1e-6):
-                raise ValueError(
-                    f"Stratification fractions for '{strat_id}' must sum to 1.0, "
-                    f"but got {total:.7}."
                 )
 ```
 
@@ -3940,21 +3935,12 @@ class SeriesValue(BaseModel):
     def validate_data(
         cls, value: list[tuple[float, float]]
     ) -> list[tuple[float, float]]:
-        """Validate series points before they reach the Rust engine."""
-        if not value:
-            raise ValueError("Series data must contain at least one point")
-
-        positions: list[float] = []
-        for position, point_value in value:
-            if not (math.isfinite(position) and position >= 0):
-                raise ValueError("Series positions must be finite and non-negative")
-            if not math.isfinite(point_value):
-                raise ValueError("Series values must be finite")
-            positions.append(position)
-
-        if len(positions) != len(set(positions)):
-            raise ValueError("Series positions must be unique")
-
+        """
+        Check the points with the rule of the engine (`check_series` of
+        `crates/commol-model/src/values.rs`): at least one point, each
+        position finite, not negative and once, each value finite.
+        """
+        commol_rs.model.check_series(value)
         return value
 ```
 
@@ -3966,7 +3952,7 @@ class SeriesValue(BaseModel):
 validate_data(value: list[tuple[float, float]]) -> list[tuple[float, float]]
 ```
 
-Validate series points before they reach the Rust engine.
+Check the points with the rule of the engine (`check_series` of `crates/commol-model/src/values.rs`): at least one point, each position finite, not negative and once, each value finite.
 
 Source code in `commol/context/parameter.py`
 
@@ -3976,21 +3962,12 @@ Source code in `commol/context/parameter.py`
 def validate_data(
     cls, value: list[tuple[float, float]]
 ) -> list[tuple[float, float]]:
-    """Validate series points before they reach the Rust engine."""
-    if not value:
-        raise ValueError("Series data must contain at least one point")
-
-    positions: list[float] = []
-    for position, point_value in value:
-        if not (math.isfinite(position) and position >= 0):
-            raise ValueError("Series positions must be finite and non-negative")
-        if not math.isfinite(point_value):
-            raise ValueError("Series values must be finite")
-        positions.append(position)
-
-    if len(positions) != len(set(positions)):
-        raise ValueError("Series positions must be unique")
-
+    """
+    Check the points with the rule of the engine (`check_series` of
+    `crates/commol-model/src/values.rs`): at least one point, each
+    position finite, not negative and once, each value finite.
+    """
+    commol_rs.model.check_series(value)
     return value
 ```
 

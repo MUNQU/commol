@@ -3920,6 +3920,10 @@ the series reads <code>step</code> or <code>t</code> (<code>SeriesParameter::eva
 </tr>
 </tbody>
 </table>
+<p>A series has at least one point, each position finite, not negative and in
+one point only, and each value finite. <code>SeriesValue(...)</code> checks its points
+with the rule of the engine (<code>check_series</code> in
+<code>crates/commol-model/src/rules.rs</code>), which the model compiler also reads.</p>
 <p>The engine decides which positions its model type accepts.
 <code>ModelBuilder.build</code> and <code>Model.update_parameters</code> reject a position the engine
 cannot run with <code>ValueError</code>, whose message names the parameter
@@ -4186,16 +4190,20 @@ of different units.</p>
 </thead>
 <tbody>
 <tr>
-<td>Every amount is finite and not negative; <code>0</code> is an amount</td>
-<td><code>Aggregate(...)</code></td>
+<td>Every amount is finite and not negative; <code>0</code> is an amount. The engine holds the rule (<code>check_bin_amount</code> and <code>check_compartment_amount</code> in <code>crates/commol-model/src/rules.rs</code>)</td>
+<td><code>Aggregate(...)</code> and each update of an amount</td>
 </tr>
 <tr>
 <td>Every bin has an amount, and no other id</td>
 <td><code>build</code></td>
 </tr>
 <tr>
-<td>Every stratification has fractions for its categories that sum to 1.0</td>
+<td>Every stratification has a fraction for each of its categories, and no other category</td>
 <td><code>build</code></td>
+</tr>
+<tr>
+<td>Every fraction is from 0 to 1, and the fractions of a stratification sum to 1 within 1e-6. The engine holds the rule (<code>check_fractions</code> in <code>crates/commol-model/src/rules.rs</code>)</td>
+<td><code>Aggregate(...)</code> and each <code>update_stratification_fractions</code></td>
 </tr>
 <tr>
 <td>Override names are expanded compartments</td>

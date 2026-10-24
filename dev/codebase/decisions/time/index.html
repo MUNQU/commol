@@ -3406,13 +3406,13 @@ and snaps a result within <code>1e-9</code> of an integer to it; whether a posit
 be whole is the engine's check, not the converter's.</p>
 <p>The axis owns the window grid: <code>AxisUnits.window_start</code>, <code>window_end</code>,
 <code>window_index</code> and <code>window_ends</code> take the width as a span and a unit, as
-<code>steps</code> does, and check that it is a positive whole number of steps. They call
-the grid in steps of <code>context/_windows.py</code>, private, the one grid that
-<code>windowed_totals</code> and <code>_observed_report</code> read; those two take a <code>window</code> of any
-positive length, because the window of an observation of a differential model
-need not be whole. No public function takes a width in steps: a width of <code>n</code>
-steps is the span <code>n</code> in the step unit. The grid is in the context layer, so
-<code>AxisUnits</code> does not import <code>api/</code>.</p>
+<code>steps</code> does, and check that it is a positive whole number of steps. The
+engine computes the grid in steps (<code>window_bounds</code>, <code>window_index</code>,
+<code>window_ends</code>, <code>windows_in</code> of <code>crates/commol-calibration/src/observation.rs</code>)
+that <code>windowed_totals</code>, <code>_observed_report</code> and the ticks of a figure read, with
+a <code>window</code> of any positive length: the window of an observation of a
+differential model need not be whole. No public function takes a width in
+steps: a width of <code>n</code> steps is the span <code>n</code> in the step unit.</p>
 <p>The rate conversions (<code>rate_from_mean_span</code>, <code>rate_from_probability</code>) ask the
 engine: <code>RateMeaning::rate_from_mean_span</code> and <code>rate_from_probability</code>
 (<code>crates/commol-core/src/types/engine.rs</code>) hold the formula of each meaning, so
@@ -3420,11 +3420,11 @@ a new engine picks a meaning and Python does not change. The per-step rate
 from a mean span is <code>1 - e^(-1/n)</code>: it keeps the survival of the continuous
 process at every step, and its mean residence is <code>1/rate</code>, not <code>n</code> (10.508
 steps for <code>n = 10</code>). <code>r = 1/n</code> keeps the mean and loses the survival.</p>
-<p><strong>Rule:</strong> no formula of a rate per engine in Python; ask the engine.</p>
+<p><strong>Rule:</strong> no formula of a rate per engine nor of a window in Python; ask the engine.</p>
 <p><strong>Guards:</strong> <code>tests/simulation/test_axis_units.py</code>,
 <code>crates/commol-core/src/types/engine.rs</code> (tests <code>a_rate_from_…</code>),
-<code>tests/simulation/test_windows.py::TestWindowGrid</code>,
-<code>tests/simulation/test_axis_units.py::TestWindowGrid</code>.</p>
+<code>tests/simulation/test_windows.py::test_windows_come_from_the_engine</code>,
+<code>tests/suite/test_engine_rules.py::test_only_the_engine_computes_a_window</code>.</p>
 <h2 id="an-origin-puts-the-axis-on-the-calendar">An origin puts the axis on the calendar<a class="headerlink" href="#an-origin-puts-the-axis-on-the-calendar" title="Permanent link">&para;</a></h2>
 <p><code>AxisUnits.origin</code> (<code>context/axis_units.py</code>) is the calendar moment of
 position 0. It belongs to the axis, so <code>ModelBuilder</code> declares it next to

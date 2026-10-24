@@ -3668,7 +3668,7 @@ model's prediction becomes the gain over the window:</p>
 <tbody>
 <tr>
 <td>The window starts at 0 or later</td>
-<td><code>at − window</code>, read as 0 within the rounding of the window; otherwise the observation is rejected when it is created.</td>
+<td><code>at − window</code>, read as 0 within the rounding of the window; otherwise the observation is rejected when it is created, with the rule of the engine (<code>check_window_end</code> in <code>crates/commol-calibration/src/observation.rs</code>).</td>
 </tr>
 <tr>
 <td>Any output</td>

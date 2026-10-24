@@ -2807,25 +2807,16 @@ class Increments(_Outputs, RangeChecked):
 
     def check_ends(self, positions: Sequence[float]) -> None:
         """
-        No window starts before 0, with the start of the engine
-        (`window_start` of `crates/commol-calibration/src/observation.rs`).
+        No window starts before 0, with the rule of the engine
+        (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
 
         Raises
         ------
         ValueError
-            If a window starts before 0.
+            With the message of the engine, if a window starts before 0.
         """
-        early = [
-            at
-            for at in positions
-            if commol_rs.calibration.window_start(at, self.window) < 0
-        ]
-        if early:
-            raise ValueError(
-                f"Increments over windows of {_position_text(self.window)} start "
-                f"at 0 at the earliest, so each end is at least the window; got "
-                f"the end {_position_text(early[0])}"
-            )
+        for at in positions:
+            commol_rs.calibration.check_window_end(at, self.window)
 ```
 
 ### Attributes
@@ -2846,38 +2837,29 @@ The series as a label reads it: the gain over windows of a width.
 check_ends(positions: Sequence[float]) -> None
 ```
 
-No window starts before 0, with the start of the engine (`window_start` of `crates/commol-calibration/src/observation.rs`).
+No window starts before 0, with the rule of the engine (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
 
 Raises:
 
-| Type         | Description                  |
-| ------------ | ---------------------------- |
-| `ValueError` | If a window starts before 0. |
+| Type         | Description                                                  |
+| ------------ | ------------------------------------------------------------ |
+| `ValueError` | With the message of the engine, if a window starts before 0. |
 
 Source code in `commol/context/inference/quantities.py`
 
 ```python
 def check_ends(self, positions: Sequence[float]) -> None:
     """
-    No window starts before 0, with the start of the engine
-    (`window_start` of `crates/commol-calibration/src/observation.rs`).
+    No window starts before 0, with the rule of the engine
+    (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
 
     Raises
     ------
     ValueError
-        If a window starts before 0.
+        With the message of the engine, if a window starts before 0.
     """
-    early = [
-        at
-        for at in positions
-        if commol_rs.calibration.window_start(at, self.window) < 0
-    ]
-    if early:
-        raise ValueError(
-            f"Increments over windows of {_position_text(self.window)} start "
-            f"at 0 at the earliest, so each end is at least the window; got "
-            f"the end {_position_text(early[0])}"
-        )
+    for at in positions:
+        commol_rs.calibration.check_window_end(at, self.window)
 ```
 
 ## ValueAt

@@ -2782,6 +2782,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-value-of-a-model-has-its-rule-in-the-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A value of a model has its rule in the engine
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#results-compare-by-their-values" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3229,6 +3240,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-value-of-a-model-has-its-rule-in-the-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A value of a model has its rule in the engine
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#results-compare-by-their-values" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3261,12 +3283,56 @@
 
 <h1 id="python-models">Python Models<a class="headerlink" href="#python-models" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
-<p>How the Pydantic models of the Python package read their fields and compare.</p>
+<p>How the Pydantic models of the Python package read their fields, check their
+values and compare.</p>
 <h2 id="public-models-forbid-unknown-fields">Public models forbid unknown fields<a class="headerlink" href="#public-models-forbid-unknown-fields" title="Permanent link">&para;</a></h2>
 <p>Every public Pydantic class sets <code>model_config = ConfigDict(extra="forbid")</code>.
 An unknown field, such as a misspelt or an old name (<code>window_steps</code>), raises a
 <code>ValidationError</code> that names it, instead of being dropped with no error.</p>
 <p><strong>Guard:</strong> <code>tests/building/test_unknown_fields.py</code>.</p>
+<h2 id="a-value-of-a-model-has-its-rule-in-the-engine">A value of a model has its rule in the engine<a class="headerlink" href="#a-value-of-a-model-has-its-rule-in-the-engine" title="Permanent link">&para;</a></h2>
+<p>An initial amount, the fractions of a stratification, an impulse and the
+points of a series have their rule once, in <code>crates/commol-model/src/rules.rs</code>
+(<code>check_bin_amount</code>, <code>check_compartment_amount</code>, <code>check_fractions</code>,
+<code>check_impulse</code>, <code>check_series</code>). The model
+compiler calls them when it compiles a model, <code>set_initial_condition</code> when a
+calibration writes an amount, and the Python object of the value when it is
+built: the validators of <code>InitialConditions</code>, <code>Transition</code> and <code>SeriesValue</code>
+call the bindings of <code>commol_rs.model</code>. A value outside its rule fails at the
+line that sets it, with the message of the engine. A range is a <code>Real</code> of
+<code>commol-core</code> after the owner of the value (<code>Bin 'B': initial amount is a
+finite number of at least 0, got -1</code>); a rule that is not a range, such as one
+point per position or fractions that sum to 1, has one message in the same
+module. <code>update_stratification_fractions</code> gives the one category left unnamed
+the rest of 1 and checks the result with <code>check_fractions</code>; the rule that at
+most one category is left unnamed stays in Python, because it is a rule of the
+update, not of a value, and the engine never gets an update.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A check in Python and one in the compiler</td>
+<td>Two messages for one rule, and rules that only one side has, such as the series without a point.</td>
+</tr>
+<tr>
+<td>A check only when the model compiles</td>
+<td>The error comes far from the line that set the value.</td>
+</tr>
+<tr>
+<td>A row of <code>RANGES</code> for the object (<code>RangeChecked</code>)</td>
+<td>A rule of <code>RANGES</code> has a fixed name, so the message cannot name the bin or the transition, and <code>(period, offset)</code> has two rules.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rule:</strong> a new value of a model gets its rule in <code>rules.rs</code>, which the
+compiler and the validator of its Python object call.</p>
+<p><strong>Guards:</strong> <code>tests/building/test_value_rules.py</code>,
+<code>crates/commol-model/tests/value_rules.rs</code>.</p>
 <h2 id="results-compare-by-their-values">Results compare by their values<a class="headerlink" href="#results-compare-by-their-values" title="Permanent link">&para;</a></h2>
 <p>Every result of commol compares with one rule, <code>ComparedByValue</code>
 (<code>py-commol/commol/context/result_model.py</code>). Its subclass <code>ResultModel</code> is
