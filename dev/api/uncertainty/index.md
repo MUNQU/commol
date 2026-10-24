@@ -129,20 +129,22 @@ class ParameterSample(BaseModel):
 
     _rust: "ParameterSampleProtocol" = PrivateAttr()
 
-    @model_validator(mode="before")
+    @field_validator("log_weights")
     @classmethod
-    def normalize_log_weights(cls, data: object) -> object:
-        """Check the invariants in Rust and normalize the log weights."""
-        if not isinstance(data, Mapping):
-            return data
+    def normalize_log_weights(
+        cls, log_weights: list[float], info: ValidationInfo
+    ) -> list[float]:
+        """
+        Check the invariants in Rust and normalize the log weights; with a
+        field before them that is not valid, pydantic reports that field.
+        """
+        data = info.data
+        if not {"names", "bounds", "values"} <= data.keys():
+            return log_weights
         rust = commol_rs.inference.ParameterSample(
-            list(data.get("names", [])),
-            [tuple(bound) for bound in data.get("bounds", [])],
-            [list(row) for row in data.get("values", [])],
-            [float(w) for w in data.get("log_weights", [])],
-            data.get("groups"),
+            data["names"], data["bounds"], data["values"], log_weights, None
         )
-        return {**data, "log_weights": rust.log_weights}
+        return rust.log_weights
 
     @model_validator(mode="after")
     def build_rust_sample(self) -> Self:
@@ -420,28 +422,30 @@ Kish's effective sample size, `1 / Σ wᵢ²`: between 1 and the number of draws
 #### normalize_log_weights
 
 ```python
-normalize_log_weights(data: object) -> object
+normalize_log_weights(log_weights: list[float], info: ValidationInfo) -> list[float]
 ```
 
-Check the invariants in Rust and normalize the log weights.
+Check the invariants in Rust and normalize the log weights; with a field before them that is not valid, pydantic reports that field.
 
 Source code in `commol/context/inference/sample.py`
 
 ```python
-@model_validator(mode="before")
+@field_validator("log_weights")
 @classmethod
-def normalize_log_weights(cls, data: object) -> object:
-    """Check the invariants in Rust and normalize the log weights."""
-    if not isinstance(data, Mapping):
-        return data
+def normalize_log_weights(
+    cls, log_weights: list[float], info: ValidationInfo
+) -> list[float]:
+    """
+    Check the invariants in Rust and normalize the log weights; with a
+    field before them that is not valid, pydantic reports that field.
+    """
+    data = info.data
+    if not {"names", "bounds", "values"} <= data.keys():
+        return log_weights
     rust = commol_rs.inference.ParameterSample(
-        list(data.get("names", [])),
-        [tuple(bound) for bound in data.get("bounds", [])],
-        [list(row) for row in data.get("values", [])],
-        [float(w) for w in data.get("log_weights", [])],
-        data.get("groups"),
+        data["names"], data["bounds"], data["values"], log_weights, None
     )
-    return {**data, "log_weights": rust.log_weights}
+    return rust.log_weights
 ```
 
 #### build_rust_sample
@@ -1039,7 +1043,7 @@ class Predictive:
         source: PredictiveSource,
         sample: ParameterSample,
         positions: Sequence[float],
-    ):
+    ) -> None:
         """
         Run every draw of `sample` at `positions`.
 
@@ -1374,7 +1378,7 @@ The figures of the draws: `plot.series()` and `plot.cumulative()`, the weighted 
 #### __init__
 
 ```python
-__init__(source: PredictiveSource, sample: ParameterSample, positions: Sequence[float])
+__init__(source: PredictiveSource, sample: ParameterSample, positions: Sequence[float]) -> None
 ```
 
 Run every draw of `sample` at `positions`.
@@ -1402,7 +1406,7 @@ def __init__(
     source: PredictiveSource,
     sample: ParameterSample,
     positions: Sequence[float],
-):
+) -> None:
     """
     Run every draw of `sample` at `positions`.
 
@@ -1982,7 +1986,7 @@ class ObservationDraws:
         self,
         observations: Sequence[ObservedDataPoint],
         draws: "ObservationDrawsProtocol",
-    ):
+    ) -> None:
         """
         Wrap the draws of `observations`.
 
@@ -2072,7 +2076,7 @@ The observed value of each observation.
 #### __init__
 
 ```python
-__init__(observations: Sequence[ObservedDataPoint], draws: ObservationDrawsProtocol)
+__init__(observations: Sequence[ObservedDataPoint], draws: ObservationDrawsProtocol) -> None
 ```
 
 Wrap the draws of `observations`.
@@ -2091,7 +2095,7 @@ def __init__(
     self,
     observations: Sequence[ObservedDataPoint],
     draws: "ObservationDrawsProtocol",
-):
+) -> None:
     """
     Wrap the draws of `observations`.
 
@@ -2200,7 +2204,7 @@ class Scenarios(Mapping[str, Predictive]):
         sample: ParameterSample,
         scenarios: Mapping[str, Mapping[str, "ParameterUpdate"]],
         positions: Sequence[float],
-    ):
+    ) -> None:
         """
         Run every draw of `sample` under each scenario, at `positions`.
 
@@ -2399,7 +2403,7 @@ The weight of each run, the same in every scenario; they sum to 1.
 #### __init__
 
 ```python
-__init__(source: PredictiveSource, sample: ParameterSample, scenarios: Mapping[str, Mapping[str, ParameterUpdate]], positions: Sequence[float])
+__init__(source: PredictiveSource, sample: ParameterSample, scenarios: Mapping[str, Mapping[str, ParameterUpdate]], positions: Sequence[float]) -> None
 ```
 
 Run every draw of `sample` under each scenario, at `positions`.
@@ -2429,7 +2433,7 @@ def __init__(
     sample: ParameterSample,
     scenarios: Mapping[str, Mapping[str, "ParameterUpdate"]],
     positions: Sequence[float],
-):
+) -> None:
     """
     Run every draw of `sample` under each scenario, at `positions`.
 
@@ -5224,17 +5228,15 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult]):
 
     eta: Eta = Field(description="The scale of the loss, or its calibration.")
     particles: int = Field(ge=2, description="Number of particles.")
-    target_cess: float = Field(gt=0.0, lt=1.0, description="Share kept per step.")
+    target_cess: Share = Field(description="Share kept per step.")
     resample_threshold: float = Field(
         gt=0.0, le=1.0, description="Resample below this share."
     )
-    stay_probability: float = Field(
-        gt=0.0, lt=1.0, description="Probability a particle does not move."
-    )
+    stay_probability: Share = Field(description="Probability a particle does not move.")
 
     @model_validator(mode="before")
     @classmethod
-    def require_eta(cls, data: object) -> object:
+    def require_eta(cls, data: JsonValue) -> JsonValue:
         """Name the choices of `eta` when it is missing."""
         _require(data, "eta", f"give {ETA_CHOICES}")
         if isinstance(data, Mapping):
@@ -5249,7 +5251,7 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult]):
 #### require_eta
 
 ```python
-require_eta(data: object) -> object
+require_eta(data: JsonValue) -> JsonValue
 ```
 
 Name the choices of `eta` when it is missing.
@@ -5259,7 +5261,7 @@ Source code in `commol/context/inference/smc.py`
 ```python
 @model_validator(mode="before")
 @classmethod
-def require_eta(cls, data: object) -> object:
+def require_eta(cls, data: JsonValue) -> JsonValue:
     """Name the choices of `eta` when it is missing."""
     _require(data, "eta", f"give {ETA_CHOICES}")
     if isinstance(data, Mapping):
@@ -5321,13 +5323,11 @@ class BayesianPosterior(WithPriors, UncertaintyMethod[SMCResult]):
     """
 
     particles: int = Field(ge=2, description="Number of particles.")
-    target_cess: float = Field(gt=0.0, lt=1.0, description="Share kept per step.")
+    target_cess: Share = Field(description="Share kept per step.")
     resample_threshold: float = Field(
         gt=0.0, le=1.0, description="Resample below this share."
     )
-    stay_probability: float = Field(
-        gt=0.0, lt=1.0, description="Probability a particle does not move."
-    )
+    stay_probability: Share = Field(description="Probability a particle does not move.")
 ```
 
 ## InformationMatchingEta
@@ -5487,13 +5487,11 @@ class ABCSMC(WithPriors, UncertaintyMethod[SMCResult]):
 
     distance: ABCDistance = Field(description="The distance.")
     particles: int = Field(ge=2, description="Number of particles.")
-    target_cess: float = Field(gt=0.0, lt=1.0, description="Share kept per step.")
-    min_acceptance: float = Field(
-        gt=0.0, lt=1.0, description="Acceptance rate below which the run stops."
+    target_cess: Share = Field(description="Share kept per step.")
+    min_acceptance: Share = Field(
+        description="Acceptance rate below which the run stops."
     )
-    stay_probability: float = Field(
-        gt=0.0, lt=1.0, description="Probability a particle does not move."
-    )
+    stay_probability: Share = Field(description="Probability a particle does not move.")
 ```
 
 ## ABCRejection
@@ -5536,7 +5534,7 @@ class ABCRejection(WithPriors, UncertaintyMethod[SMCResult]):
 
     distance: ABCDistance = Field(description="The distance.")
     draws: int = Field(ge=2, description="Number of draws.")
-    quantile: float = Field(gt=0.0, lt=1.0, description="The share of draws kept.")
+    quantile: Share = Field(description="The share of draws kept.")
 ```
 
 ## LossDistance
@@ -6395,7 +6393,7 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
 
     @model_validator(mode="before")
     @classmethod
-    def check_score_and_by(cls, data: object) -> object:
+    def check_score_and_by(cls, data: JsonValue) -> JsonValue:
         """Check, in Rust, that `score` and `by` are given and fit together."""
         if isinstance(data, Mapping):
 
@@ -6412,7 +6410,7 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
 #### check_score_and_by
 
 ```python
-check_score_and_by(data: object) -> object
+check_score_and_by(data: JsonValue) -> JsonValue
 ```
 
 Check, in Rust, that `score` and `by` are given and fit together.
@@ -6422,7 +6420,7 @@ Source code in `commol/context/inference/conformal.py`
 ```python
 @model_validator(mode="before")
 @classmethod
-def check_score_and_by(cls, data: object) -> object:
+def check_score_and_by(cls, data: JsonValue) -> JsonValue:
     """Check, in Rust, that `score` and `by` are given and fit together."""
     if isinstance(data, Mapping):
 

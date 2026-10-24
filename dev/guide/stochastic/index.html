@@ -3713,6 +3713,10 @@ takes <code>StochasticStepsSettings</code> (only <code>rounding</code>):</p>
 </tr>
 </tbody>
 </table>
+<p>The defaults are the engine's, and the engine checks the settings when they
+are built: <code>StochasticEventsSettings(epsilon=1.5)</code> raises <code>ValidationError</code>
+with the message of the engine, <code>epsilon is strictly between 0 and 1, got
+1.5</code>.</p>
 <ul>
 <li><strong>Cost of the direct method.</strong> The number of events grows with the total
   and with the rates: every unit that moves is one event. For a large total,

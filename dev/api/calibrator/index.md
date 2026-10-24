@@ -26,7 +26,7 @@ class Calibrator:
         self,
         simulation: Simulation,
         problem: CalibrationProblem,
-    ):
+    ) -> None:
         """
         Initializes the calibration from a Simulation and CalibrationProblem.
 
@@ -59,7 +59,6 @@ class Calibrator:
 
         loss_config = self._build_loss_config()
         self._validate_calibration_parameters()
-        self._validate_observed_data()
         self._warn_constraint_positions_beyond_observations()
         models = problem.observation_models
         self._rust_problem: "CalibrationProblemProtocol" = (
@@ -75,8 +74,14 @@ class Calibrator:
                     if models is None
                     else engine_state.rust_observation_models(models)
                 ),
+                seed=None if problem.seed is None else check_seed(problem.seed),
             )
         )
+        if problem.seed is None:
+            logger.info(
+                "No seed set; drew the seed %d, which repeats this calibration.",
+                self._rust_problem.seed,
+            )
 
     @property
     def rust_problem(self) -> "CalibrationProblemProtocol":
@@ -323,18 +328,10 @@ class Calibrator:
         Returns
         -------
         int
-            ``problem.seed``, or a seed drawn from the operating system once
-            per calibrator and logged.
+            ``problem.seed``, or the seed the engine drew when the
+            calibrator was built, which it logs.
         """
-        if self.problem.seed is not None:
-            return check_seed(self.problem.seed)
-        if not hasattr(self, "_drawn_seed"):
-            self._drawn_seed = draw_seed()
-            logger.info(
-                "No seed set; drew the seed %d, which repeats this calibration.",
-                self._drawn_seed,
-            )
-        return self._drawn_seed
+        return self._rust_problem.seed
 
     def run(self, starts: int = 1) -> CalibrationResult:
         """
@@ -552,15 +549,11 @@ class Calibrator:
         return run_method(self, method, IdentifiabilityMethod)
 
     def _build_loss_config(self) -> "LossConfigProtocol | None":
-        """The Rust loss, with the replicates of a stochastic engine; None with
+        """The Rust loss, with the settings of the replicates; None with
         observation models."""
         if self.problem.loss_function is None:
             return None
-        return engine_state.rust_loss_config(
-            self.problem,
-            self.problem.loss_function,
-            self.simulation.model_definition.engine.type,
-        )
+        return engine_state.rust_loss_config(self.problem, self.problem.loss_function)
 
     def _build_optimization_config(self) -> "OptimizationConfigProtocol":
         """Convert Python OptimizationConfig to Rust OptimizationConfig."""
@@ -632,7 +625,7 @@ class Calibrator:
 
     def _build_rust_inertia(
         self, inertia: PSOConstantInertia | PSOChaoticInertia | None
-    ):
+    ) -> "PSOInertiaConstantProtocol | PSOInertiaChaoticProtocol | None":
         """Convert Python inertia config to Rust type."""
         if inertia is None:
             return None
@@ -644,7 +637,7 @@ class Calibrator:
 
     def _build_rust_acceleration(
         self, acceleration: PSOConstantAcceleration | PSOTimeVaryingAcceleration | None
-    ):
+    ) -> "PSOAccelerationConstantProtocol | PSOAccelerationTimeVaryingProtocol | None":
         """Convert Python acceleration config to Rust type."""
         if acceleration is None:
             return None
@@ -689,34 +682,6 @@ class Calibrator:
             self._engine,
             self.problem.parameters,
             self.problem.initial_condition_remainder,
-        )
-
-    def _validate_observed_data(self) -> None:
-        """Validate that observed data compartments exist and have valid steps.
-
-        Raises
-        ------
-        ValueError
-            If observed data contains invalid compartments or negative positions.
-        """
-        simulation_output_names = set(self._engine.output_names)
-
-        for obs in self.problem.observed_data:
-            observed_outputs = obs.observed_outputs
-            missing_outputs = [
-                output
-                for output in observed_outputs
-                if output not in simulation_output_names
-            ]
-            if missing_outputs:
-                raise ValueError(
-                    f"Observed data output(s) {missing_outputs} for observation "
-                    f"'{obs.label}' not found in model simulation outputs. "
-                    f"Available outputs: {sorted(simulation_output_names)}"
-                )
-
-        engine_state.check_positions(
-            self._engine, self.problem.observed_data, self.problem.constraints
         )
 
     def _warn_constraint_positions_beyond_observations(self) -> None:
@@ -774,7 +739,7 @@ Returns:
 
 | Type  | Description                                                                             |
 | ----- | --------------------------------------------------------------------------------------- |
-| `int` | problem.seed, or a seed drawn from the operating system once per calibrator and logged. |
+| `int` | problem.seed, or the seed the engine drew when the calibrator was built, which it logs. |
 
 #### num_parameters
 
@@ -805,7 +770,7 @@ Names of parameters being calibrated.
 #### __init__
 
 ```python
-__init__(simulation: Simulation, problem: CalibrationProblem)
+__init__(simulation: Simulation, problem: CalibrationProblem) -> None
 ```
 
 Initializes the calibration from a Simulation and CalibrationProblem.
@@ -830,7 +795,7 @@ def __init__(
     self,
     simulation: Simulation,
     problem: CalibrationProblem,
-):
+) -> None:
     """
     Initializes the calibration from a Simulation and CalibrationProblem.
 
@@ -863,7 +828,6 @@ def __init__(
 
     loss_config = self._build_loss_config()
     self._validate_calibration_parameters()
-    self._validate_observed_data()
     self._warn_constraint_positions_beyond_observations()
     models = problem.observation_models
     self._rust_problem: "CalibrationProblemProtocol" = (
@@ -879,8 +843,14 @@ def __init__(
                 if models is None
                 else engine_state.rust_observation_models(models)
             ),
+            seed=None if problem.seed is None else check_seed(problem.seed),
         )
     )
+    if problem.seed is None:
+        logger.info(
+            "No seed set; drew the seed %d, which repeats this calibration.",
+            self._rust_problem.seed,
+        )
 ```
 
 #### rust_predictive
@@ -1696,7 +1666,8 @@ class CalibrationProblem(BaseModel):
         modelling choice.
     seed : int | None
         Seed of every random number of a calibration (default: None, a seed
-        drawn from the operating system, which `Calibrator.run` logs):
+        the engine draws when the calibrator is built, which `Calibrator.seed`
+        gives and the calibrator logs):
         the replicates of a stochastic engine, the starts of
         ``Calibrator.run(starts=n)``, a particle swarm, and the uncertainty
         methods. Required with a stochastic engine.
@@ -1889,9 +1860,9 @@ class Quantile(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    level: float = Field(..., ge=0.0, le=1.0, description="Level of the quantile.")
+    level: QuantileLevel = Field(..., description="Level of the quantile.")
 
-    def __init__(self, level: float, **data: object) -> None:
+    def __init__(self, level: float) -> None:
         """
         A quantile of the replicates.
 
@@ -1899,10 +1870,8 @@ class Quantile(BaseModel):
         ----------
         level : float
             The level, between 0 and 1.
-        **data : object
-            The other fields, as JSON holds them.
         """
-        super().__init__(level=level, **data)
+        super().__init__(level=level)
 ```
 
 ### Methods:
@@ -1910,22 +1879,21 @@ class Quantile(BaseModel):
 #### __init__
 
 ```python
-__init__(level: float, **data: object) -> None
+__init__(level: float) -> None
 ```
 
 A quantile of the replicates.
 
 Parameters:
 
-| Name     | Type     | Description                           | Default    |
-| -------- | -------- | ------------------------------------- | ---------- |
-| `level`  | `float`  | The level, between 0 and 1.           | *required* |
-| `**data` | `object` | The other fields, as JSON holds them. | `{}`       |
+| Name    | Type    | Description                 | Default    |
+| ------- | ------- | --------------------------- | ---------- |
+| `level` | `float` | The level, between 0 and 1. | *required* |
 
 Source code in `commol/context/calibration.py`
 
 ```python
-def __init__(self, level: float, **data: object) -> None:
+def __init__(self, level: float) -> None:
     """
     A quantile of the replicates.
 
@@ -1933,10 +1901,8 @@ def __init__(self, level: float, **data: object) -> None:
     ----------
     level : float
         The level, between 0 and 1.
-    **data : object
-        The other fields, as JSON holds them.
     """
-    super().__init__(level=level, **data)
+    super().__init__(level=level)
 ```
 
 ## ObservedDataPoint
@@ -2936,7 +2902,9 @@ class ParticleSwarmConfig(BaseModel):
         return v
 
     @overload
-    def inertia(self, type: str, *, factor: float = 0.721) -> Self: ...
+    def inertia(
+        self, type: str, *, factor: float = PSO_DEFAULT_INERTIA_FACTOR
+    ) -> Self: ...
 
     @overload
     def inertia(self, type: str, *, w_min: float, w_max: float) -> Self: ...
@@ -2954,9 +2922,10 @@ class ParticleSwarmConfig(BaseModel):
 
         Other Parameters
         ----------------
-        factor : float, default=0.721
-            Fixed inertia weight (canonical PSO: 1/(2*ln(2)) ≈ 0.721).
-            Only used when type="constant".
+        factor : float, default=PSO_DEFAULT_INERTIA_FACTOR
+            Fixed inertia weight; the default is the weight of canonical PSO,
+            1/(2 ln 2) ≈ 0.72135, which a swarm with no inertia strategy
+            uses. Only used when type="constant".
         w_min : float
             Minimum inertia weight. Only used when type="chaotic".
         w_max : float
@@ -2972,7 +2941,9 @@ class ParticleSwarmConfig(BaseModel):
                 f"Invalid inertia type: {type}. Must be one of {list(PSOInertiaType)}"
             )
         if type == PSOInertiaType.CONSTANT:
-            self._inertia = PSOConstantInertia(factor=kwargs.get("factor", 0.721))
+            self._inertia = PSOConstantInertia(
+                factor=kwargs.get("factor", PSO_DEFAULT_INERTIA_FACTOR)
+            )
         else:
             self._inertia = PSOChaoticInertia(
                 w_min=kwargs["w_min"], w_max=kwargs["w_max"]
@@ -2984,8 +2955,8 @@ class ParticleSwarmConfig(BaseModel):
         self,
         type: str,
         *,
-        cognitive: float = 1.193,
-        social: float = 1.193,
+        cognitive: float = PSO_DEFAULT_ACCELERATION,
+        social: float = PSO_DEFAULT_ACCELERATION,
     ) -> Self: ...
 
     @overload
@@ -3012,12 +2983,14 @@ class ParticleSwarmConfig(BaseModel):
 
         Other Parameters
         ----------------
-        cognitive : float, default=1.193
-            Cognitive coefficient (c1) - attraction to personal best.
-            Only used when type="constant".
-        social : float, default=1.193
-            Social coefficient (c2) - attraction to swarm best.
-            Only used when type="constant".
+        cognitive : float, default=PSO_DEFAULT_ACCELERATION
+            Cognitive coefficient (c1) - attraction to personal best; the
+            default is the coefficient of canonical PSO, 0.5 + ln 2 ≈ 1.19315,
+            which a swarm with no acceleration strategy uses. Only used when
+            type="constant".
+        social : float, default=PSO_DEFAULT_ACCELERATION
+            Social coefficient (c2) - attraction to swarm best, with the
+            same default. Only used when type="constant".
         c1_initial : float
             Initial cognitive factor (typically high, e.g., 2.5).
             Only used when type="time_varying".
@@ -3043,8 +3016,8 @@ class ParticleSwarmConfig(BaseModel):
             )
         if type == PSOAccelerationType.CONSTANT:
             self._acceleration = PSOConstantAcceleration(
-                cognitive=kwargs.get("cognitive", 1.193),
-                social=kwargs.get("social", 1.193),
+                cognitive=kwargs.get("cognitive", PSO_DEFAULT_ACCELERATION),
+                social=kwargs.get("social", PSO_DEFAULT_ACCELERATION),
             )
         else:
             self._acceleration = PSOTimeVaryingAcceleration(
@@ -3274,7 +3247,7 @@ Get the radius stop rule (for internal use).
 #### inertia
 
 ```python
-inertia(type: str, *, factor: float = 0.721) -> Self
+inertia(type: str, *, factor: float = PSO_DEFAULT_INERTIA_FACTOR) -> Self
 ```
 
 ```python
@@ -3296,11 +3269,11 @@ Parameters:
 
 Other Parameters:
 
-| Name     | Type    | Description                                                                                 |
-| -------- | ------- | ------------------------------------------------------------------------------------------- |
-| `factor` | `float` | Fixed inertia weight (canonical PSO: 1/(2\*ln(2)) ≈ 0.721). Only used when type="constant". |
-| `w_min`  | `float` | Minimum inertia weight. Only used when type="chaotic".                                      |
-| `w_max`  | `float` | Maximum inertia weight (must be > w_min). Only used when type="chaotic".                    |
+| Name     | Type    | Description                                                                                                                                                          |
+| -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `factor` | `float` | Fixed inertia weight; the default is the weight of canonical PSO, 1/(2 ln 2) ≈ 0.72135, which a swarm with no inertia strategy uses. Only used when type="constant". |
+| `w_min`  | `float` | Minimum inertia weight. Only used when type="chaotic".                                                                                                               |
+| `w_max`  | `float` | Maximum inertia weight (must be > w_min). Only used when type="chaotic".                                                                                             |
 
 Returns:
 
@@ -3324,9 +3297,10 @@ def inertia(self, type: str, **kwargs: float) -> Self:
 
     Other Parameters
     ----------------
-    factor : float, default=0.721
-        Fixed inertia weight (canonical PSO: 1/(2*ln(2)) ≈ 0.721).
-        Only used when type="constant".
+    factor : float, default=PSO_DEFAULT_INERTIA_FACTOR
+        Fixed inertia weight; the default is the weight of canonical PSO,
+        1/(2 ln 2) ≈ 0.72135, which a swarm with no inertia strategy
+        uses. Only used when type="constant".
     w_min : float
         Minimum inertia weight. Only used when type="chaotic".
     w_max : float
@@ -3342,7 +3316,9 @@ def inertia(self, type: str, **kwargs: float) -> Self:
             f"Invalid inertia type: {type}. Must be one of {list(PSOInertiaType)}"
         )
     if type == PSOInertiaType.CONSTANT:
-        self._inertia = PSOConstantInertia(factor=kwargs.get("factor", 0.721))
+        self._inertia = PSOConstantInertia(
+            factor=kwargs.get("factor", PSO_DEFAULT_INERTIA_FACTOR)
+        )
     else:
         self._inertia = PSOChaoticInertia(
             w_min=kwargs["w_min"], w_max=kwargs["w_max"]
@@ -3353,7 +3329,7 @@ def inertia(self, type: str, **kwargs: float) -> Self:
 #### acceleration
 
 ```python
-acceleration(type: str, *, cognitive: float = 1.193, social: float = 1.193) -> Self
+acceleration(type: str, *, cognitive: float = PSO_DEFAULT_ACCELERATION, social: float = PSO_DEFAULT_ACCELERATION) -> Self
 ```
 
 ```python
@@ -3375,14 +3351,14 @@ Parameters:
 
 Other Parameters:
 
-| Name         | Type    | Description                                                                               |
-| ------------ | ------- | ----------------------------------------------------------------------------------------- |
-| `cognitive`  | `float` | Cognitive coefficient (c1) - attraction to personal best. Only used when type="constant". |
-| `social`     | `float` | Social coefficient (c2) - attraction to swarm best. Only used when type="constant".       |
-| `c1_initial` | `float` | Initial cognitive factor (typically high, e.g., 2.5). Only used when type="time_varying". |
-| `c1_final`   | `float` | Final cognitive factor (typically low, e.g., 0.5). Only used when type="time_varying".    |
-| `c2_initial` | `float` | Initial social factor (typically low, e.g., 0.5). Only used when type="time_varying".     |
-| `c2_final`   | `float` | Final social factor (typically high, e.g., 2.5). Only used when type="time_varying".      |
+| Name         | Type    | Description                                                                                                                                                                                                        |
+| ------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `cognitive`  | `float` | Cognitive coefficient (c1) - attraction to personal best; the default is the coefficient of canonical PSO, 0.5 + ln 2 ≈ 1.19315, which a swarm with no acceleration strategy uses. Only used when type="constant". |
+| `social`     | `float` | Social coefficient (c2) - attraction to swarm best, with the same default. Only used when type="constant".                                                                                                         |
+| `c1_initial` | `float` | Initial cognitive factor (typically high, e.g., 2.5). Only used when type="time_varying".                                                                                                                          |
+| `c1_final`   | `float` | Final cognitive factor (typically low, e.g., 0.5). Only used when type="time_varying".                                                                                                                             |
+| `c2_initial` | `float` | Initial social factor (typically low, e.g., 0.5). Only used when type="time_varying".                                                                                                                              |
+| `c2_final`   | `float` | Final social factor (typically high, e.g., 2.5). Only used when type="time_varying".                                                                                                                               |
 
 Returns:
 
@@ -3406,12 +3382,14 @@ def acceleration(self, type: str, **kwargs: float) -> Self:
 
     Other Parameters
     ----------------
-    cognitive : float, default=1.193
-        Cognitive coefficient (c1) - attraction to personal best.
-        Only used when type="constant".
-    social : float, default=1.193
-        Social coefficient (c2) - attraction to swarm best.
-        Only used when type="constant".
+    cognitive : float, default=PSO_DEFAULT_ACCELERATION
+        Cognitive coefficient (c1) - attraction to personal best; the
+        default is the coefficient of canonical PSO, 0.5 + ln 2 ≈ 1.19315,
+        which a swarm with no acceleration strategy uses. Only used when
+        type="constant".
+    social : float, default=PSO_DEFAULT_ACCELERATION
+        Social coefficient (c2) - attraction to swarm best, with the
+        same default. Only used when type="constant".
     c1_initial : float
         Initial cognitive factor (typically high, e.g., 2.5).
         Only used when type="time_varying".
@@ -3437,8 +3415,8 @@ def acceleration(self, type: str, **kwargs: float) -> Self:
         )
     if type == PSOAccelerationType.CONSTANT:
         self._acceleration = PSOConstantAcceleration(
-            cognitive=kwargs.get("cognitive", 1.193),
-            social=kwargs.get("social", 1.193),
+            cognitive=kwargs.get("cognitive", PSO_DEFAULT_ACCELERATION),
+            social=kwargs.get("social", PSO_DEFAULT_ACCELERATION),
         )
     else:
         self._acceleration = PSOTimeVaryingAcceleration(

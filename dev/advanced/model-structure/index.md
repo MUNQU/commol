@@ -1153,10 +1153,14 @@ class ModelEngine(BaseModel):
 
     @field_validator("settings", mode="before")
     @classmethod
-    def settings_of_the_engine(cls, value: Any, info: ValidationInfo) -> Any:
+    def settings_of_the_engine(
+        cls,
+        value: EngineSettings | Mapping[str, JsonValue] | None,
+        info: ValidationInfo,
+    ) -> EngineSettings | Mapping[str, JsonValue] | None:
         """Read settings given as a mapping with the class of their engine."""
         settings_class = _SETTINGS.get(info.data.get("type", ""))
-        if isinstance(value, dict) and settings_class is not None:
+        if isinstance(value, Mapping) and settings_class is not None:
             return settings_class.model_validate(value)
         return value
 
@@ -1175,7 +1179,7 @@ class ModelEngine(BaseModel):
 #### settings_of_the_engine
 
 ```python
-settings_of_the_engine(value: Any, info: ValidationInfo) -> Any
+settings_of_the_engine(value: EngineSettings | Mapping[str, JsonValue] | None, info: ValidationInfo) -> EngineSettings | Mapping[str, JsonValue] | None
 ```
 
 Read settings given as a mapping with the class of their engine.
@@ -1185,10 +1189,14 @@ Source code in `commol/context/engine.py`
 ```python
 @field_validator("settings", mode="before")
 @classmethod
-def settings_of_the_engine(cls, value: Any, info: ValidationInfo) -> Any:
+def settings_of_the_engine(
+    cls,
+    value: EngineSettings | Mapping[str, JsonValue] | None,
+    info: ValidationInfo,
+) -> EngineSettings | Mapping[str, JsonValue] | None:
     """Read settings given as a mapping with the class of their engine."""
     settings_class = _SETTINGS.get(info.data.get("type", ""))
-    if isinstance(value, dict) and settings_class is not None:
+    if isinstance(value, Mapping) and settings_class is not None:
         return settings_class.model_validate(value)
     return value
 ```
@@ -1284,7 +1292,7 @@ class InitialConditions(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def reject_fractions_of_a_total(cls, data: Any) -> Any:
+    def reject_fractions_of_a_total(cls, data: JsonValue) -> JsonValue:
         """Name the field of amounts that replaces a field of fractions.
 
         A total over bins of different units has no meaning, so the initial
@@ -1567,7 +1575,7 @@ class InitialConditions(BaseModel):
 #### reject_fractions_of_a_total
 
 ```python
-reject_fractions_of_a_total(data: Any) -> Any
+reject_fractions_of_a_total(data: JsonValue) -> JsonValue
 ```
 
 Name the field of amounts that replaces a field of fractions.
@@ -1579,7 +1587,7 @@ Source code in `commol/context/initial_conditions.py`
 ```python
 @model_validator(mode="before")
 @classmethod
-def reject_fractions_of_a_total(cls, data: Any) -> Any:
+def reject_fractions_of_a_total(cls, data: JsonValue) -> JsonValue:
     """Name the field of amounts that replaces a field of fractions.
 
     A total over bins of different units has no meaning, so the initial

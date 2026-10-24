@@ -169,6 +169,8 @@ print(replicates.member_statistics("C", confidence_level=0.9)["ci_lower"][-1] >=
 | `tolerance` | `1e-8`     | Relative tolerance of the time of an event when a rate reads `t`                                                             |
 | `rounding`  | `None`     | See [Whole units](#whole-units)                                                                                              |
 
+The defaults are the engine's, and the engine checks the settings when they are built: `StochasticEventsSettings(epsilon=1.5)` raises `ValidationError` with the message of the engine, `epsilon is strictly between 0 and 1, got 1.5`.
+
 - **Cost of the direct method.** The number of events grows with the total and with the rates: every unit that moves is one event. For a large total, use `"tau_leaping"` or a deterministic engine.
 - **Tau-leaping.** A chosen leap is as long as the propensities allow while they change by less than `epsilon`; a leap that would hold fewer than ten events is one exact event instead, and a leap that leaves an amount below zero is halved and drawn again. A fixed `tau` is first-order accurate: a smaller `tau` is closer to the direct method.
 - **Rates that read `t`.** Between events the state is fixed, but a rate that reads `t`, such as `k * (1 + sin(t))`, still changes. The direct method then integrates the total propensity from the last event until it reaches an exponential draw (a time change, Anderson 2007), within `tolerance`. A model whose rates do not read `t` pays nothing for it.

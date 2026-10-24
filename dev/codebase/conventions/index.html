@@ -3461,7 +3461,7 @@ check some of these rules. The rest depend on the author and the reviewer.</p>
 <tr>
 <td>Python types</td>
 <td>Annotations on every signature; never <code>Any</code></td>
-<td><code>ty check</code> (pre-commit, CI) checks the types; review checks the annotations and <code>Any</code></td>
+<td><code>ruff check</code> (<code>ANN</code>, and <code>TID251</code>, which bans <code>typing.Any</code>, on <code>commol/</code>) checks the annotations; <code>ty check</code> (pre-commit, CI) checks the types</td>
 </tr>
 <tr>
 <td>Python dead code</td>

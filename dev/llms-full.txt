@@ -2540,11 +2540,11 @@ print([round(value) for value in rows[0]])  # [900, 100, 0, 0]
 
 A stochastic engine draws random numbers, so its runs depend on a seed; a deterministic engine, such as `DifferenceEquations` and `DifferentialEquations`, gives the same run for every seed (`EngineType.is_stochastic` in `crates/commol-core/src/types/engine.rs`).
 
-| Call                                   | Deterministic engine                                                      | Stochastic engine                                                                                 |
-| -------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `run(n, seed=s)`, `run_at(at, seed=s)` | Ignores the seed; `results.seed` is `None`                                | One run from seed `s`; `results.seed` is `s`                                                      |
-| `run(n)` without a seed                | `results.seed` is `None`                                                  | Draws a seed from the operating system and keeps it in `results.seed`, so the run can be repeated |
-| `replicates(count, seed=s).run(…)`     | Raises `ValueError` that names the engine: every replicate would be equal | `count` runs, in parallel in the engine, each with its own seed                                   |
+| Call                                   | Deterministic engine                                                      | Stochastic engine                                                                                                                       |
+| -------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `run(n, seed=s)`, `run_at(at, seed=s)` | Ignores the seed; `results.seed` is `None`                                | One run from seed `s`; `results.seed` is `s`                                                                                            |
+| `run(n)` without a seed                | `results.seed` is `None`                                                  | The engine draws a seed and keeps it in `results.seed`, so the run can be repeated                                                      |
+| `replicates(count, seed=s).run(…)`     | Raises `ValueError` that names the engine: every replicate would be equal | `count` runs, in parallel in the engine, each with its own seed; without `seed`, the engine draws one and keeps it in `replicates.seed` |
 
 ```python
 print(simulation.is_stochastic)                # False: a difference engine
@@ -2760,6 +2760,8 @@ print(round(ode.run(num_steps=10)["moved"][10], 1))  # 632.1: the integral of th
 | `method` | `"tsit45"` | `"tsit45"`: explicit Runge–Kutta 5(4), for non-stiff models. `"bdf"`: backward differentiation formulas, for stiff models (rates of very different speeds). |
 | `rtol`   | `1e-6`     | Relative tolerance of each state component.                                                                                                                 |
 | `atol`   | `1e-6`     | Absolute tolerance of each state component, in the unit of the bins.                                                                                        |
+
+The defaults are the engine's (`commol_rs.engine.ODE_DEFAULT_RTOL` and `ODE_DEFAULT_ATOL`), and the engine checks the settings when they are built: `ODESolver(rtol=0.0)` raises `ValidationError` with the message of the engine, `The solver tolerance rtol must be a positive number, got 0`.
 
 `bdf` builds its Jacobian from a finite-difference Jacobian-vector product. It uses a dense matrix below `SPARSE_THRESHOLD` state components and a sparse one from there (`crates/commol-differential/src/solve.rs`).
 
@@ -3147,6 +3149,8 @@ print(replicates.member_statistics("C", confidence_level=0.9)["ci_lower"][-1] >=
 | `tolerance` | `1e-8`     | Relative tolerance of the time of an event when a rate reads `t`                                                             |
 | `rounding`  | `None`     | See [Whole units](#whole-units)                                                                                              |
 
+The defaults are the engine's, and the engine checks the settings when they are built: `StochasticEventsSettings(epsilon=1.5)` raises `ValidationError` with the message of the engine, `epsilon is strictly between 0 and 1, got 1.5`.
+
 - **Cost of the direct method.** The number of events grows with the total and with the rates: every unit that moves is one event. For a large total, use `"tau_leaping"` or a deterministic engine.
 - **Tau-leaping.** A chosen leap is as long as the propensities allow while they change by less than `epsilon`; a leap that would hold fewer than ten events is one exact event instead, and a leap that leaves an amount below zero is halved and drawn again. A fixed `tau` is first-order accurate: a smaller `tau` is closer to the direct method.
 - **Rates that read `t`.** Between events the state is fixed, but a rate that reads `t`, such as `k * (1 + sin(t))`, still changes. The direct method then integrates the total propensity from the last event until it reaches an exponential draw (a time change, Anderson 2007), within `tolerance`. A model whose rates do not read `t` pays nothing for it.
@@ -3299,19 +3303,19 @@ A `Simulation` follows its model: after `apply_calibration_parameters` or `updat
 
 ## The problem
 
-| `CalibrationProblem` field    | Type                                                    | Default  | Meaning                                                                                                                                                                                                                                                                                                 |
-| ----------------------------- | ------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `observed_data`               | `list[ObservedDataPoint]`                               | required | What the model must reproduce. See [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md).                                                                                                                                                                       |
-| `parameters`                  | `list[CalibrationParameter]`                            | required | The unknowns and their bounds.                                                                                                                                                                                                                                                                          |
-| `loss_function`               | `str \| None`                                           | `None`   | How the misfit is measured; see [Losses](#losses). A problem has `loss_function` or `observation_models`, exactly one.                                                                                                                                                                                  |
-| `observation_models`          | `dict[str, ObservationModel] \| None`                   | `None`   | One observation model per series label: the fit maximizes their likelihood. See [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md).                                                                                                              |
-| `optimization_config`         | `NelderMeadConfig` or `ParticleSwarmConfig`             | required | The optimizer and its settings. See [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md).                                                                                                                                                                          |
-| `constraints`                 | `list[CalibrationConstraint]`                           | `[]`     | Relations the result must respect. See [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/index.md).                                                                                                                                                                     |
-| `normalize_observations`      | `bool`                                                  | `False`  | Divides each residual by the RMS of its observation series, so series of very different size weigh the same. Needs a loss.                                                                                                                                                                              |
-| `initial_condition_remainder` | `str \| None`                                           | `None`   | The compartment or bin that absorbs the difference when initial conditions are calibrated. See [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md).                                                                                   |
-| `replicates`                  | `int \| None`                                           | `None`   | How many replicates of a stochastic engine each evaluation runs. Required with a stochastic engine. See [Stochastic engines](#stochastic-engines) and [Stochastic Simulation](https://munqu.github.io/commol/latest/guide/stochastic/index.md).                                                         |
-| `replicate_summary`           | `"mean"`, `"median"`, `"crps"`, `Quantile(q)` or `None` | `None`   | What each observation is compared with when an evaluation runs replicates. Required with a stochastic engine. See [Stochastic engines](#stochastic-engines).                                                                                                                                            |
-| `seed`                        | `int \| None`                                           | `None`   | The seed of every random number of a calibration: the replicates of a stochastic engine, the starts, a particle swarm and the uncertainty methods. Without it, `Calibrator.seed` draws one. See [Reproducibility](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#reproducibility). |
+| `CalibrationProblem` field    | Type                                                    | Default  | Meaning                                                                                                                                                                                                                                                                                                                         |
+| ----------------------------- | ------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `observed_data`               | `list[ObservedDataPoint]`                               | required | What the model must reproduce. See [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md).                                                                                                                                                                                               |
+| `parameters`                  | `list[CalibrationParameter]`                            | required | The unknowns and their bounds.                                                                                                                                                                                                                                                                                                  |
+| `loss_function`               | `str \| None`                                           | `None`   | How the misfit is measured; see [Losses](#losses). A problem has `loss_function` or `observation_models`, exactly one.                                                                                                                                                                                                          |
+| `observation_models`          | `dict[str, ObservationModel] \| None`                   | `None`   | One observation model per series label: the fit maximizes their likelihood. See [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md).                                                                                                                                      |
+| `optimization_config`         | `NelderMeadConfig` or `ParticleSwarmConfig`             | required | The optimizer and its settings. See [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md).                                                                                                                                                                                                  |
+| `constraints`                 | `list[CalibrationConstraint]`                           | `[]`     | Relations the result must respect. See [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/index.md).                                                                                                                                                                                             |
+| `normalize_observations`      | `bool`                                                  | `False`  | Divides each residual by the RMS of its observation series, so series of very different size weigh the same. Needs a loss.                                                                                                                                                                                                      |
+| `initial_condition_remainder` | `str \| None`                                           | `None`   | The compartment or bin that absorbs the difference when initial conditions are calibrated. See [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md).                                                                                                           |
+| `replicates`                  | `int \| None`                                           | `None`   | How many replicates of a stochastic engine each evaluation runs. Required with a stochastic engine. See [Stochastic engines](#stochastic-engines) and [Stochastic Simulation](https://munqu.github.io/commol/latest/guide/stochastic/index.md).                                                                                 |
+| `replicate_summary`           | `"mean"`, `"median"`, `"crps"`, `Quantile(q)` or `None` | `None`   | What each observation is compared with when an evaluation runs replicates. Required with a stochastic engine. See [Stochastic engines](#stochastic-engines).                                                                                                                                                                    |
+| `seed`                        | `int \| None`                                           | `None`   | The seed of every random number of a calibration: the replicates of a stochastic engine, the starts, a particle swarm and the uncertainty methods. Without it, the engine draws one, which `Calibrator.seed` gives. See [Reproducibility](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#reproducibility). |
 
 ### Observations
 
@@ -3385,14 +3389,14 @@ result = Calibrator(Simulation(stochastic), problem).run()
 print(round(result.best_parameters["k1"], 1))  # 0.4
 ```
 
-| Rule                                                                                                                                                                                                                   | Where                                                                                                   |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| A stochastic engine needs `replicates`, `replicate_summary` and `seed`; without one, `Calibrator` raises and the message lists the summaries                                                                           | `rust_loss_config` in `py-commol/commol/context/_model/engine_state.py`                                 |
-| A deterministic engine does not use `replicates` and `replicate_summary`                                                                                                                                               | The same                                                                                                |
-| A stochastic engine needs a loss: with `observation_models`, `Calibrator` raises a `ValueError`                                                                                                                        | `PyCalibrationProblem::new` in `py-commol/src/inference.rs`; `Discrepancy::set_summary`                 |
-| The summaries and the CRPS are computed in `LossConfig`, and the observation weights apply to every option                                                                                                             | `LossConfig::replicate_loss` in `crates/commol-calibration/src/types.rs`                                |
-| The median and `Quantile(q)` are the one quantile of commol, the one of `weighted_quantiles` and `SimulationReplicates.quantiles` (NumPy's `method="hazen"`): `Quantile(0.25)` of the replicates 1, 2, 3, 4, 5 is 1.75 | `ReplicateSummary::summarize`; `statistics::quantiles` in `crates/commol-calibration/src/statistics.rs` |
-| A constraint at positions is checked on every replicate                                                                                                                                                                | `CalibrationProblem::evaluate`                                                                          |
+| Rule                                                                                                                                                                                                                   | Where                                                                                                                                      |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| A stochastic engine needs `replicates`, `replicate_summary` and `seed`; without one, `Calibrator` raises a `ValueError` that names the engine, and the message lists the summaries                                     | `CalibrationProblem::with_replicate_settings` in `crates/commol-calibration/src/calibration_problem.rs`; `SimulationEngine::is_stochastic` |
+| A deterministic engine does not use `replicates` and `replicate_summary`                                                                                                                                               | The same                                                                                                                                   |
+| A stochastic engine needs a loss: with `observation_models`, `Calibrator` raises a `ValueError`                                                                                                                        | `CalibrationProblem::new`; `Discrepancy::set_summary`                                                                                      |
+| The summaries and the CRPS are computed in `LossConfig`, and the observation weights apply to every option                                                                                                             | `LossConfig::replicate_loss` in `crates/commol-calibration/src/types.rs`                                                                   |
+| The median and `Quantile(q)` are the one quantile of commol, the one of `weighted_quantiles` and `SimulationReplicates.quantiles` (NumPy's `method="hazen"`): `Quantile(0.25)` of the replicates 1, 2, 3, 4, 5 is 1.75 | `ReplicateSummary::summarize`; `statistics::quantiles` in `crates/commol-calibration/src/statistics.rs`                                    |
+| A constraint at positions is checked on every replicate                                                                                                                                                                | `CalibrationProblem::evaluate`                                                                                                             |
 
 With one replicate the CRPS is the absolute error. The [predictive](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive) of a sample runs every replicate of each draw.
 
@@ -4006,9 +4010,9 @@ Each method returns the configuration, so they chain:
 
 | Method                                                                              | Arguments                     | Effect                                                                                                                                                                                         |
 | ----------------------------------------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.inertia("constant", factor=0.721)`                                                | `factor`                      | A fixed inertia weight.                                                                                                                                                                        |
+| `.inertia("constant", factor=0.72135)`                                              | `factor`                      | A fixed inertia weight. The default is the weight of canonical PSO, 1/(2 ln 2), which a swarm with no `.inertia` also uses.                                                                    |
 | `.inertia("chaotic", w_min=…, w_max=…)`                                             | `w_min < w_max`               | An inertia weight that varies chaotically between the two.                                                                                                                                     |
-| `.acceleration("constant", cognitive=1.193, social=1.193)`                          | `cognitive`, `social`         | Fixed pulls towards each particle's best and the swarm's best.                                                                                                                                 |
+| `.acceleration("constant", cognitive=1.19315, social=1.19315)`                      | `cognitive`, `social`         | Fixed pulls towards each particle's best and the swarm's best. The default of each is the coefficient of canonical PSO, 0.5 + ln 2, which a swarm with no `.acceleration` also uses.           |
 | `.acceleration("time_varying", c1_initial=…, c1_final=…, c2_initial=…, c2_final=…)` | four factors                  | Pulls that change from explore (high `c1`) to exploit (high `c2`).                                                                                                                             |
 | `.velocity(clamp_factor=None, mutation_threshold=None)`                             | fractions                     | `clamp_factor` limits speed to a share of the search box (0.1–0.2 is typical); `mutation_threshold` restarts particles slower than it (0.001–0.01).                                            |
 | `.mutation(strategy, *, scale, probability, application)`                           | see right                     | Random jumps to escape local minima: `strategy` `"gaussian"` or `"cauchy"` (larger jumps), `probability` per iteration, `application` `"global_best"`, `"all_particles"` or `"below_average"`. |
@@ -4076,7 +4080,7 @@ The result is the start of least loss; if every start fails, `run` raises a `Run
 
 ## Reproducibility
 
-Set `CalibrationProblem(seed=...)`: the starts, a particle swarm and the replicates of a stochastic engine then make the same random choices on every run. Without a seed, `Calibrator.seed` draws one from the operating system and logs it. The result keeps it in `CalibrationResult.seed`, and the sample of each uncertainty method in `sample.method.settings["seed"]`: set it as `problem.seed` to repeat the run, also from a result read back from JSON.
+Set `CalibrationProblem(seed=...)`: the starts, a particle swarm and the replicates of a stochastic engine then make the same random choices on every run. Without a seed, the engine draws one when the calibrator is built; `Calibrator.seed` gives it and the calibrator logs it. The result keeps it in `CalibrationResult.seed`, and the sample of each uncertainty method in `sample.method.settings["seed"]`: set it as `problem.seed` to repeat the run, also from a result read back from JSON.
 
 ```python
 again = problem.model_copy(update={"seed": result.seed})
@@ -6247,7 +6251,7 @@ Each input is a `CalibrationParameter`: a model parameter or an initial conditio
 
 An initial condition is an amount in the unit of its bin, or a category split in `[0, 1]`, with `initial_condition_remainder` as in a calibration problem. A factor or a noise parameter is not an input: both belong to observations, and an analysis has none.
 
-`SensitivityAnalysis(simulation, inputs, *, replicates=None, seed=None)` holds the inputs for every method you run on it. With a stochastic engine `replicates` (at least 1) and `seed` are required. A point of the design of PRCC, Morris, Sobol or a polynomial chaos runs `replicates` replicates, on the same seeds at every point, and holds their mean: the indices are those of the mean of `replicates` replicates, and they come close to those of the expected value as `replicates` grows. A propagation, and the `Predictive` of its draws, keep every replicate, each with a seed of its own. A deterministic engine does not use `replicates`, so the same analysis runs on either engine; with no seed, one is drawn and logged.
+`SensitivityAnalysis(simulation, inputs, *, replicates=None, seed=None)` holds the inputs for every method you run on it. With a stochastic engine `replicates` (at least 1) and `seed` are required. A point of the design of PRCC, Morris, Sobol or a polynomial chaos runs `replicates` replicates, on the same seeds at every point, and holds their mean: the indices are those of the mean of `replicates` replicates, and they come close to those of the expected value as `replicates` grows. A propagation, and the `Predictive` of its draws, keep every replicate, each with a seed of its own. A deterministic engine does not use `replicates`, so the same analysis runs on either engine; with no seed, the engine draws one, which `analysis.seed` gives and the analysis logs. A negative `replicates` raises `ValueError` that names the setting.
 
 ## Quantities of interest
 
@@ -9507,7 +9511,7 @@ class Calibrator:
         self,
         simulation: Simulation,
         problem: CalibrationProblem,
-    ):
+    ) -> None:
         """
         Initializes the calibration from a Simulation and CalibrationProblem.
 
@@ -9540,7 +9544,6 @@ class Calibrator:
 
         loss_config = self._build_loss_config()
         self._validate_calibration_parameters()
-        self._validate_observed_data()
         self._warn_constraint_positions_beyond_observations()
         models = problem.observation_models
         self._rust_problem: "CalibrationProblemProtocol" = (
@@ -9556,8 +9559,14 @@ class Calibrator:
                     if models is None
                     else engine_state.rust_observation_models(models)
                 ),
+                seed=None if problem.seed is None else check_seed(problem.seed),
             )
         )
+        if problem.seed is None:
+            logger.info(
+                "No seed set; drew the seed %d, which repeats this calibration.",
+                self._rust_problem.seed,
+            )
 
     @property
     def rust_problem(self) -> "CalibrationProblemProtocol":
@@ -9804,18 +9813,10 @@ class Calibrator:
         Returns
         -------
         int
-            ``problem.seed``, or a seed drawn from the operating system once
-            per calibrator and logged.
+            ``problem.seed``, or the seed the engine drew when the
+            calibrator was built, which it logs.
         """
-        if self.problem.seed is not None:
-            return check_seed(self.problem.seed)
-        if not hasattr(self, "_drawn_seed"):
-            self._drawn_seed = draw_seed()
-            logger.info(
-                "No seed set; drew the seed %d, which repeats this calibration.",
-                self._drawn_seed,
-            )
-        return self._drawn_seed
+        return self._rust_problem.seed
 
     def run(self, starts: int = 1) -> CalibrationResult:
         """
@@ -10033,15 +10034,11 @@ class Calibrator:
         return run_method(self, method, IdentifiabilityMethod)
 
     def _build_loss_config(self) -> "LossConfigProtocol | None":
-        """The Rust loss, with the replicates of a stochastic engine; None with
+        """The Rust loss, with the settings of the replicates; None with
         observation models."""
         if self.problem.loss_function is None:
             return None
-        return engine_state.rust_loss_config(
-            self.problem,
-            self.problem.loss_function,
-            self.simulation.model_definition.engine.type,
-        )
+        return engine_state.rust_loss_config(self.problem, self.problem.loss_function)
 
     def _build_optimization_config(self) -> "OptimizationConfigProtocol":
         """Convert Python OptimizationConfig to Rust OptimizationConfig."""
@@ -10113,7 +10110,7 @@ class Calibrator:
 
     def _build_rust_inertia(
         self, inertia: PSOConstantInertia | PSOChaoticInertia | None
-    ):
+    ) -> "PSOInertiaConstantProtocol | PSOInertiaChaoticProtocol | None":
         """Convert Python inertia config to Rust type."""
         if inertia is None:
             return None
@@ -10125,7 +10122,7 @@ class Calibrator:
 
     def _build_rust_acceleration(
         self, acceleration: PSOConstantAcceleration | PSOTimeVaryingAcceleration | None
-    ):
+    ) -> "PSOAccelerationConstantProtocol | PSOAccelerationTimeVaryingProtocol | None":
         """Convert Python acceleration config to Rust type."""
         if acceleration is None:
             return None
@@ -10170,34 +10167,6 @@ class Calibrator:
             self._engine,
             self.problem.parameters,
             self.problem.initial_condition_remainder,
-        )
-
-    def _validate_observed_data(self) -> None:
-        """Validate that observed data compartments exist and have valid steps.
-
-        Raises
-        ------
-        ValueError
-            If observed data contains invalid compartments or negative positions.
-        """
-        simulation_output_names = set(self._engine.output_names)
-
-        for obs in self.problem.observed_data:
-            observed_outputs = obs.observed_outputs
-            missing_outputs = [
-                output
-                for output in observed_outputs
-                if output not in simulation_output_names
-            ]
-            if missing_outputs:
-                raise ValueError(
-                    f"Observed data output(s) {missing_outputs} for observation "
-                    f"'{obs.label}' not found in model simulation outputs. "
-                    f"Available outputs: {sorted(simulation_output_names)}"
-                )
-
-        engine_state.check_positions(
-            self._engine, self.problem.observed_data, self.problem.constraints
         )
 
     def _warn_constraint_positions_beyond_observations(self) -> None:
@@ -10255,7 +10224,7 @@ Returns:
 
 | Type  | Description                                                                             |
 | ----- | --------------------------------------------------------------------------------------- |
-| `int` | problem.seed, or a seed drawn from the operating system once per calibrator and logged. |
+| `int` | problem.seed, or the seed the engine drew when the calibrator was built, which it logs. |
 
 #### num_parameters
 
@@ -10286,7 +10255,7 @@ Names of parameters being calibrated.
 #### __init__
 
 ```python
-__init__(simulation: Simulation, problem: CalibrationProblem)
+__init__(simulation: Simulation, problem: CalibrationProblem) -> None
 ```
 
 Initializes the calibration from a Simulation and CalibrationProblem.
@@ -10311,7 +10280,7 @@ def __init__(
     self,
     simulation: Simulation,
     problem: CalibrationProblem,
-):
+) -> None:
     """
     Initializes the calibration from a Simulation and CalibrationProblem.
 
@@ -10344,7 +10313,6 @@ def __init__(
 
     loss_config = self._build_loss_config()
     self._validate_calibration_parameters()
-    self._validate_observed_data()
     self._warn_constraint_positions_beyond_observations()
     models = problem.observation_models
     self._rust_problem: "CalibrationProblemProtocol" = (
@@ -10360,8 +10328,14 @@ def __init__(
                 if models is None
                 else engine_state.rust_observation_models(models)
             ),
+            seed=None if problem.seed is None else check_seed(problem.seed),
         )
     )
+    if problem.seed is None:
+        logger.info(
+            "No seed set; drew the seed %d, which repeats this calibration.",
+            self._rust_problem.seed,
+        )
 ```
 
 #### rust_predictive
@@ -11177,7 +11151,8 @@ class CalibrationProblem(BaseModel):
         modelling choice.
     seed : int | None
         Seed of every random number of a calibration (default: None, a seed
-        drawn from the operating system, which `Calibrator.run` logs):
+        the engine draws when the calibrator is built, which `Calibrator.seed`
+        gives and the calibrator logs):
         the replicates of a stochastic engine, the starts of
         ``Calibrator.run(starts=n)``, a particle swarm, and the uncertainty
         methods. Required with a stochastic engine.
@@ -11370,9 +11345,9 @@ class Quantile(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    level: float = Field(..., ge=0.0, le=1.0, description="Level of the quantile.")
+    level: QuantileLevel = Field(..., description="Level of the quantile.")
 
-    def __init__(self, level: float, **data: object) -> None:
+    def __init__(self, level: float) -> None:
         """
         A quantile of the replicates.
 
@@ -11380,10 +11355,8 @@ class Quantile(BaseModel):
         ----------
         level : float
             The level, between 0 and 1.
-        **data : object
-            The other fields, as JSON holds them.
         """
-        super().__init__(level=level, **data)
+        super().__init__(level=level)
 ```
 
 ### Methods:
@@ -11391,22 +11364,21 @@ class Quantile(BaseModel):
 #### __init__
 
 ```python
-__init__(level: float, **data: object) -> None
+__init__(level: float) -> None
 ```
 
 A quantile of the replicates.
 
 Parameters:
 
-| Name     | Type     | Description                           | Default    |
-| -------- | -------- | ------------------------------------- | ---------- |
-| `level`  | `float`  | The level, between 0 and 1.           | *required* |
-| `**data` | `object` | The other fields, as JSON holds them. | `{}`       |
+| Name    | Type    | Description                 | Default    |
+| ------- | ------- | --------------------------- | ---------- |
+| `level` | `float` | The level, between 0 and 1. | *required* |
 
 Source code in `commol/context/calibration.py`
 
 ```python
-def __init__(self, level: float, **data: object) -> None:
+def __init__(self, level: float) -> None:
     """
     A quantile of the replicates.
 
@@ -11414,10 +11386,8 @@ def __init__(self, level: float, **data: object) -> None:
     ----------
     level : float
         The level, between 0 and 1.
-    **data : object
-        The other fields, as JSON holds them.
     """
-    super().__init__(level=level, **data)
+    super().__init__(level=level)
 ```
 
 ## ObservedDataPoint
@@ -12417,7 +12387,9 @@ class ParticleSwarmConfig(BaseModel):
         return v
 
     @overload
-    def inertia(self, type: str, *, factor: float = 0.721) -> Self: ...
+    def inertia(
+        self, type: str, *, factor: float = PSO_DEFAULT_INERTIA_FACTOR
+    ) -> Self: ...
 
     @overload
     def inertia(self, type: str, *, w_min: float, w_max: float) -> Self: ...
@@ -12435,9 +12407,10 @@ class ParticleSwarmConfig(BaseModel):
 
         Other Parameters
         ----------------
-        factor : float, default=0.721
-            Fixed inertia weight (canonical PSO: 1/(2*ln(2)) ≈ 0.721).
-            Only used when type="constant".
+        factor : float, default=PSO_DEFAULT_INERTIA_FACTOR
+            Fixed inertia weight; the default is the weight of canonical PSO,
+            1/(2 ln 2) ≈ 0.72135, which a swarm with no inertia strategy
+            uses. Only used when type="constant".
         w_min : float
             Minimum inertia weight. Only used when type="chaotic".
         w_max : float
@@ -12453,7 +12426,9 @@ class ParticleSwarmConfig(BaseModel):
                 f"Invalid inertia type: {type}. Must be one of {list(PSOInertiaType)}"
             )
         if type == PSOInertiaType.CONSTANT:
-            self._inertia = PSOConstantInertia(factor=kwargs.get("factor", 0.721))
+            self._inertia = PSOConstantInertia(
+                factor=kwargs.get("factor", PSO_DEFAULT_INERTIA_FACTOR)
+            )
         else:
             self._inertia = PSOChaoticInertia(
                 w_min=kwargs["w_min"], w_max=kwargs["w_max"]
@@ -12465,8 +12440,8 @@ class ParticleSwarmConfig(BaseModel):
         self,
         type: str,
         *,
-        cognitive: float = 1.193,
-        social: float = 1.193,
+        cognitive: float = PSO_DEFAULT_ACCELERATION,
+        social: float = PSO_DEFAULT_ACCELERATION,
     ) -> Self: ...
 
     @overload
@@ -12493,12 +12468,14 @@ class ParticleSwarmConfig(BaseModel):
 
         Other Parameters
         ----------------
-        cognitive : float, default=1.193
-            Cognitive coefficient (c1) - attraction to personal best.
-            Only used when type="constant".
-        social : float, default=1.193
-            Social coefficient (c2) - attraction to swarm best.
-            Only used when type="constant".
+        cognitive : float, default=PSO_DEFAULT_ACCELERATION
+            Cognitive coefficient (c1) - attraction to personal best; the
+            default is the coefficient of canonical PSO, 0.5 + ln 2 ≈ 1.19315,
+            which a swarm with no acceleration strategy uses. Only used when
+            type="constant".
+        social : float, default=PSO_DEFAULT_ACCELERATION
+            Social coefficient (c2) - attraction to swarm best, with the
+            same default. Only used when type="constant".
         c1_initial : float
             Initial cognitive factor (typically high, e.g., 2.5).
             Only used when type="time_varying".
@@ -12524,8 +12501,8 @@ class ParticleSwarmConfig(BaseModel):
             )
         if type == PSOAccelerationType.CONSTANT:
             self._acceleration = PSOConstantAcceleration(
-                cognitive=kwargs.get("cognitive", 1.193),
-                social=kwargs.get("social", 1.193),
+                cognitive=kwargs.get("cognitive", PSO_DEFAULT_ACCELERATION),
+                social=kwargs.get("social", PSO_DEFAULT_ACCELERATION),
             )
         else:
             self._acceleration = PSOTimeVaryingAcceleration(
@@ -12755,7 +12732,7 @@ Get the radius stop rule (for internal use).
 #### inertia
 
 ```python
-inertia(type: str, *, factor: float = 0.721) -> Self
+inertia(type: str, *, factor: float = PSO_DEFAULT_INERTIA_FACTOR) -> Self
 ```
 
 ```python
@@ -12777,11 +12754,11 @@ Parameters:
 
 Other Parameters:
 
-| Name     | Type    | Description                                                                                 |
-| -------- | ------- | ------------------------------------------------------------------------------------------- |
-| `factor` | `float` | Fixed inertia weight (canonical PSO: 1/(2\*ln(2)) ≈ 0.721). Only used when type="constant". |
-| `w_min`  | `float` | Minimum inertia weight. Only used when type="chaotic".                                      |
-| `w_max`  | `float` | Maximum inertia weight (must be > w_min). Only used when type="chaotic".                    |
+| Name     | Type    | Description                                                                                                                                                          |
+| -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `factor` | `float` | Fixed inertia weight; the default is the weight of canonical PSO, 1/(2 ln 2) ≈ 0.72135, which a swarm with no inertia strategy uses. Only used when type="constant". |
+| `w_min`  | `float` | Minimum inertia weight. Only used when type="chaotic".                                                                                                               |
+| `w_max`  | `float` | Maximum inertia weight (must be > w_min). Only used when type="chaotic".                                                                                             |
 
 Returns:
 
@@ -12805,9 +12782,10 @@ def inertia(self, type: str, **kwargs: float) -> Self:
 
     Other Parameters
     ----------------
-    factor : float, default=0.721
-        Fixed inertia weight (canonical PSO: 1/(2*ln(2)) ≈ 0.721).
-        Only used when type="constant".
+    factor : float, default=PSO_DEFAULT_INERTIA_FACTOR
+        Fixed inertia weight; the default is the weight of canonical PSO,
+        1/(2 ln 2) ≈ 0.72135, which a swarm with no inertia strategy
+        uses. Only used when type="constant".
     w_min : float
         Minimum inertia weight. Only used when type="chaotic".
     w_max : float
@@ -12823,7 +12801,9 @@ def inertia(self, type: str, **kwargs: float) -> Self:
             f"Invalid inertia type: {type}. Must be one of {list(PSOInertiaType)}"
         )
     if type == PSOInertiaType.CONSTANT:
-        self._inertia = PSOConstantInertia(factor=kwargs.get("factor", 0.721))
+        self._inertia = PSOConstantInertia(
+            factor=kwargs.get("factor", PSO_DEFAULT_INERTIA_FACTOR)
+        )
     else:
         self._inertia = PSOChaoticInertia(
             w_min=kwargs["w_min"], w_max=kwargs["w_max"]
@@ -12834,7 +12814,7 @@ def inertia(self, type: str, **kwargs: float) -> Self:
 #### acceleration
 
 ```python
-acceleration(type: str, *, cognitive: float = 1.193, social: float = 1.193) -> Self
+acceleration(type: str, *, cognitive: float = PSO_DEFAULT_ACCELERATION, social: float = PSO_DEFAULT_ACCELERATION) -> Self
 ```
 
 ```python
@@ -12856,14 +12836,14 @@ Parameters:
 
 Other Parameters:
 
-| Name         | Type    | Description                                                                               |
-| ------------ | ------- | ----------------------------------------------------------------------------------------- |
-| `cognitive`  | `float` | Cognitive coefficient (c1) - attraction to personal best. Only used when type="constant". |
-| `social`     | `float` | Social coefficient (c2) - attraction to swarm best. Only used when type="constant".       |
-| `c1_initial` | `float` | Initial cognitive factor (typically high, e.g., 2.5). Only used when type="time_varying". |
-| `c1_final`   | `float` | Final cognitive factor (typically low, e.g., 0.5). Only used when type="time_varying".    |
-| `c2_initial` | `float` | Initial social factor (typically low, e.g., 0.5). Only used when type="time_varying".     |
-| `c2_final`   | `float` | Final social factor (typically high, e.g., 2.5). Only used when type="time_varying".      |
+| Name         | Type    | Description                                                                                                                                                                                                        |
+| ------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `cognitive`  | `float` | Cognitive coefficient (c1) - attraction to personal best; the default is the coefficient of canonical PSO, 0.5 + ln 2 ≈ 1.19315, which a swarm with no acceleration strategy uses. Only used when type="constant". |
+| `social`     | `float` | Social coefficient (c2) - attraction to swarm best, with the same default. Only used when type="constant".                                                                                                         |
+| `c1_initial` | `float` | Initial cognitive factor (typically high, e.g., 2.5). Only used when type="time_varying".                                                                                                                          |
+| `c1_final`   | `float` | Final cognitive factor (typically low, e.g., 0.5). Only used when type="time_varying".                                                                                                                             |
+| `c2_initial` | `float` | Initial social factor (typically low, e.g., 0.5). Only used when type="time_varying".                                                                                                                              |
+| `c2_final`   | `float` | Final social factor (typically high, e.g., 2.5). Only used when type="time_varying".                                                                                                                               |
 
 Returns:
 
@@ -12887,12 +12867,14 @@ def acceleration(self, type: str, **kwargs: float) -> Self:
 
     Other Parameters
     ----------------
-    cognitive : float, default=1.193
-        Cognitive coefficient (c1) - attraction to personal best.
-        Only used when type="constant".
-    social : float, default=1.193
-        Social coefficient (c2) - attraction to swarm best.
-        Only used when type="constant".
+    cognitive : float, default=PSO_DEFAULT_ACCELERATION
+        Cognitive coefficient (c1) - attraction to personal best; the
+        default is the coefficient of canonical PSO, 0.5 + ln 2 ≈ 1.19315,
+        which a swarm with no acceleration strategy uses. Only used when
+        type="constant".
+    social : float, default=PSO_DEFAULT_ACCELERATION
+        Social coefficient (c2) - attraction to swarm best, with the
+        same default. Only used when type="constant".
     c1_initial : float
         Initial cognitive factor (typically high, e.g., 2.5).
         Only used when type="time_varying".
@@ -12918,8 +12900,8 @@ def acceleration(self, type: str, **kwargs: float) -> Self:
         )
     if type == PSOAccelerationType.CONSTANT:
         self._acceleration = PSOConstantAcceleration(
-            cognitive=kwargs.get("cognitive", 1.193),
-            social=kwargs.get("social", 1.193),
+            cognitive=kwargs.get("cognitive", PSO_DEFAULT_ACCELERATION),
+            social=kwargs.get("social", PSO_DEFAULT_ACCELERATION),
         )
     else:
         self._acceleration = PSOTimeVaryingAcceleration(
@@ -13506,7 +13488,7 @@ class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport]):
     """
 
     points: int = Field(ge=1)
-    design: Literal["observations", "dense"]
+    design: StructuralDesign
 ```
 
 ## Collinearity
@@ -13552,7 +13534,7 @@ class Collinearity(IdentifiabilityMethod[IdentifiabilityReport]):
     """
 
     at: CalibrationResult | ParameterSample
-    max_subset_size: int = Field(ge=2)
+    max_subset_size: int
     threshold: float = Field(gt=1.0)
 ```
 
@@ -13597,13 +13579,13 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
     """
 
     sample: ParameterSample
-    reference: Literal["bounds", "prior"]
-    correlation_threshold: float = Field(gt=0.0, lt=1.0)
+    reference: SampleReference
+    correlation_threshold: Share
     priors: Priors | None = None
 
     @model_validator(mode="before")
     @classmethod
-    def read_priors(cls, data: object) -> object:
+    def read_priors(cls, data: JsonValue) -> JsonValue:
         """Read a mapping of parameter to distribution as `Priors`."""
         if isinstance(data, Mapping) and data.get("priors") is not None:
             return {**data, "priors": coerce_priors(data["priors"])}
@@ -13629,7 +13611,7 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
 #### read_priors
 
 ```python
-read_priors(data: object) -> object
+read_priors(data: JsonValue) -> JsonValue
 ```
 
 Read a mapping of parameter to distribution as `Priors`.
@@ -13639,7 +13621,7 @@ Source code in `commol/context/inference/identifiability.py`
 ```python
 @model_validator(mode="before")
 @classmethod
-def read_priors(cls, data: object) -> object:
+def read_priors(cls, data: JsonValue) -> JsonValue:
     """Read a mapping of parameter to distribution as `Priors`."""
     if isinstance(data, Mapping) and data.get("priors") is not None:
         return {**data, "priors": coerce_priors(data["priors"])}
@@ -14144,7 +14126,7 @@ class StructuralSection(_Frozen):
         The identifiable combinations.
     """
 
-    design: Literal["observations", "dense"]
+    design: StructuralDesign
     points: list[PointRank]
     skipped: list[str]
     generic_rank: int
@@ -14361,7 +14343,7 @@ class SampleSection(_Frozen):
         The modes of the marginal of each parameter.
     """
 
-    reference: Literal["bounds", "prior"]
+    reference: SampleReference
     correlation_threshold: float
     contraction: dict[str, float]
     correlation: dict[str, dict[str, float]]
@@ -14486,7 +14468,7 @@ class ProfileSection(_Frozen):
         cross the threshold.
     """
 
-    threshold: Literal["chi_square", "beale", "bootstrap_calibrated"]
+    threshold: ProfileThresholdName
     confidence_level: float
     tolerance: float
     verdicts: dict[str, ProfileVerdictName | None]
@@ -14527,7 +14509,7 @@ class ModelBuilder:
         bin_unit: str | None = None,
         step_unit: str | None = None,
         origin: date | None = None,
-    ):
+    ) -> None:
         """
         Initialize the ModelBuilder.
 
@@ -15329,7 +15311,7 @@ class ModelBuilder:
 #### __init__
 
 ```python
-__init__(name: str, description: str | None = None, version: str | None = None, bin_unit: str | None = None, step_unit: str | None = None, origin: date | None = None)
+__init__(name: str, description: str | None = None, version: str | None = None, bin_unit: str | None = None, step_unit: str | None = None, origin: date | None = None) -> None
 ```
 
 Initialize the ModelBuilder.
@@ -15356,7 +15338,7 @@ def __init__(
     bin_unit: str | None = None,
     step_unit: str | None = None,
     origin: date | None = None,
-):
+) -> None:
     """
     Initialize the ModelBuilder.
 
@@ -16351,7 +16333,7 @@ class Model(BaseModel, Generic[StructureT]):
 
     @field_validator("structure", mode="before")
     @classmethod
-    def read_structure_kind(cls, value: object) -> object:
+    def read_structure_kind(cls, value: JsonValue) -> JsonValue | ModelStructure:
         """Read a structure mapping as the class of its ``kind`` and ``variant``."""
         if not isinstance(value, Mapping):
             return value
@@ -16747,7 +16729,7 @@ def check_origin_unit(self) -> Self:
 #### read_structure_kind
 
 ```python
-read_structure_kind(value: object) -> object
+read_structure_kind(value: JsonValue) -> JsonValue | ModelStructure
 ```
 
 Read a structure mapping as the class of its `kind` and `variant`.
@@ -16757,7 +16739,7 @@ Source code in `commol/context/model.py`
 ```python
 @field_validator("structure", mode="before")
 @classmethod
-def read_structure_kind(cls, value: object) -> object:
+def read_structure_kind(cls, value: JsonValue) -> JsonValue | ModelStructure:
     """Read a structure mapping as the class of its ``kind`` and ``variant``."""
     if not isinstance(value, Mapping):
         return value
@@ -18728,10 +18710,11 @@ class Aggregate(ModelStructure, InitialConditions):
         Check the structure against the process and the parameters.
 
         The process needs a bin and a transition, the amounts must name every
-        bin and the fractions every category of the process, parameter ids
-        must not be engine variables or bin ids, and the engine must plan
-        every transition, resolve the neighbors, find every variable a rate or
-        a formula parameter reads, and build the initial state.
+        bin and the fractions every category of the process, and the engine
+        must plan every transition, accept every id (no parameter id is an
+        engine variable, a bin, a compartment or a subgroup total), resolve
+        the neighbors, find every variable a rate or a formula parameter
+        reads, and build the initial state.
 
         Parameters
         ----------
@@ -18750,7 +18733,6 @@ class Aggregate(ModelStructure, InitialConditions):
             raise ValueError("At least one transition must be defined.")
         self._check_bin_amounts(process)
         self._check_stratification_fractions(process)
-        self._check_parameter_names(model)
         engine_state.transition_flows(process, self)
         engine_state.check_model(model)
         if self.compartment_amounts:
@@ -19179,33 +19161,6 @@ class Aggregate(ModelStructure, InitialConditions):
                     f"Stratification fractions for '{strat_id}' must sum to 1.0, "
                     f"but got {total:.7}."
                 )
-
-    def _check_parameter_names(self, model: "Model[Self]") -> None:
-        """
-        Check that parameter ids are not engine variables or bin ids.
-
-        Expanded compartment names, subgroup totals and the names of the
-        neighbors are checked by the engine (``engine_state.check_model``).
-        """
-        bin_ids = {bin_item.id for bin_item in model.process.bins}
-        parameter_ids = {p.id for p in model.parameters}
-
-        special = sorted(parameter_ids & set(RESERVED_VARIABLE_NAMES))
-        if special:
-            raise ValueError(
-                f"Parameter IDs conflict with engine variables: {special}. "
-                f"{', '.join(RESERVED_VARIABLE_NAMES)} are reserved. "
-                f"Please rename the conflicting parameters."
-            )
-
-        conflicting_names = bin_ids & parameter_ids
-        if conflicting_names:
-            raise ValueError(
-                f"Parameter IDs conflict with reserved compartment names: "
-                f"{sorted(conflicting_names)}. "
-                f"Bin IDs ({sorted(bin_ids)}) are reserved variables. "
-                f"Please rename the conflicting parameters."
-            )
 ```
 
 ### Methods:
@@ -19218,7 +19173,7 @@ check_model(model: Model[Self]) -> None
 
 Check the structure against the process and the parameters.
 
-The process needs a bin and a transition, the amounts must name every bin and the fractions every category of the process, parameter ids must not be engine variables or bin ids, and the engine must plan every transition, resolve the neighbors, find every variable a rate or a formula parameter reads, and build the initial state.
+The process needs a bin and a transition, the amounts must name every bin and the fractions every category of the process, and the engine must plan every transition, accept every id (no parameter id is an engine variable, a bin, a compartment or a subgroup total), resolve the neighbors, find every variable a rate or a formula parameter reads, and build the initial state.
 
 Parameters:
 
@@ -19240,10 +19195,11 @@ def check_model(self, model: "Model[Self]") -> None:
     Check the structure against the process and the parameters.
 
     The process needs a bin and a transition, the amounts must name every
-    bin and the fractions every category of the process, parameter ids
-    must not be engine variables or bin ids, and the engine must plan
-    every transition, resolve the neighbors, find every variable a rate or
-    a formula parameter reads, and build the initial state.
+    bin and the fractions every category of the process, and the engine
+    must plan every transition, accept every id (no parameter id is an
+    engine variable, a bin, a compartment or a subgroup total), resolve
+    the neighbors, find every variable a rate or a formula parameter
+    reads, and build the initial state.
 
     Parameters
     ----------
@@ -19262,7 +19218,6 @@ def check_model(self, model: "Model[Self]") -> None:
         raise ValueError("At least one transition must be defined.")
     self._check_bin_amounts(process)
     self._check_stratification_fractions(process)
-    self._check_parameter_names(model)
     engine_state.transition_flows(process, self)
     engine_state.check_model(model)
     if self.compartment_amounts:
@@ -20048,7 +20003,8 @@ class Groups(BaseModel):
         self,
         stratification: str,
         weights: Mapping[str, Mapping[str, float]] | None = None,
-        **data: object,
+        *,
+        type: Literal["groups"] = "groups",
     ) -> None:
         """
         Group the neighbors of a unit by the categories of a stratification.
@@ -20060,15 +20016,15 @@ class Groups(BaseModel):
         weights : Mapping[str, Mapping[str, float]] | None, default=None
             ``weights[g][g']``, the weight of category ``g'`` for a unit in
             ``g``. None is the identity.
-        **data : object
-            The other fields, as JSON holds them.
+        type : {"groups"}, default="groups"
+            The kind of neighbors, as JSON holds it.
         """
         super().__init__(
             stratification=stratification,
             weights=None
             if weights is None
             else {own: dict(row) for own, row in weights.items()},
-            **data,
+            type=type,
         )
 ```
 
@@ -20077,7 +20033,7 @@ class Groups(BaseModel):
 #### __init__
 
 ```python
-__init__(stratification: str, weights: Mapping[str, Mapping[str, float]] | None = None, **data: object) -> None
+__init__(stratification: str, weights: Mapping[str, Mapping[str, float]] | None = None, *, type: Literal['groups'] = 'groups') -> None
 ```
 
 Group the neighbors of a unit by the categories of a stratification.
@@ -20088,7 +20044,7 @@ Parameters:
 | ---------------- | ------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | `stratification` | `str`                                 | Id of the stratification whose categories group the units. | *required*                                                                       |
 | `weights`        | \`Mapping\[str, Mapping[str, float]\] | None\`                                                     | weights[g][g'], the weight of category g' for a unit in g. None is the identity. |
-| `**data`         | `object`                              | The other fields, as JSON holds them.                      | `{}`                                                                             |
+| `type`           | `groups`                              | The kind of neighbors, as JSON holds it.                   | `"groups"`                                                                       |
 
 Source code in `commol/context/neighbors.py`
 
@@ -20097,7 +20053,8 @@ def __init__(
     self,
     stratification: str,
     weights: Mapping[str, Mapping[str, float]] | None = None,
-    **data: object,
+    *,
+    type: Literal["groups"] = "groups",
 ) -> None:
     """
     Group the neighbors of a unit by the categories of a stratification.
@@ -20109,15 +20066,15 @@ def __init__(
     weights : Mapping[str, Mapping[str, float]] | None, default=None
         ``weights[g][g']``, the weight of category ``g'`` for a unit in
         ``g``. None is the identity.
-    **data : object
-        The other fields, as JSON holds them.
+    type : {"groups"}, default="groups"
+        The kind of neighbors, as JSON holds it.
     """
     super().__init__(
         stratification=stratification,
         weights=None
         if weights is None
         else {own: dict(row) for own, row in weights.items()},
-        **data,
+        type=type,
     )
 ```
 
@@ -21412,7 +21369,7 @@ class ResultsPlot:
     panel of that series instead.
     """
 
-    def __init__(self, results: "SimulationResults"):
+    def __init__(self, results: "SimulationResults") -> None:
         """
         The figures of `results`.
 
@@ -21678,7 +21635,7 @@ class ResultsPlot:
 #### __init__
 
 ```python
-__init__(results: SimulationResults)
+__init__(results: SimulationResults) -> None
 ```
 
 The figures of `results`.
@@ -21692,7 +21649,7 @@ Parameters:
 Source code in `commol/api/plotting/accessors.py`
 
 ```python
-def __init__(self, results: "SimulationResults"):
+def __init__(self, results: "SimulationResults") -> None:
     """
     The figures of `results`.
 
@@ -22095,7 +22052,7 @@ class ReplicatesPlot:
     `series` adds the band of the replicates.
     """
 
-    def __init__(self, replicates: "SimulationReplicates"):
+    def __init__(self, replicates: "SimulationReplicates") -> None:
         """
         The figures of `replicates`.
 
@@ -22342,7 +22299,7 @@ class ReplicatesPlot:
 #### __init__
 
 ```python
-__init__(replicates: SimulationReplicates)
+__init__(replicates: SimulationReplicates) -> None
 ```
 
 The figures of `replicates`.
@@ -22356,7 +22313,7 @@ Parameters:
 Source code in `commol/api/plotting/accessors.py`
 
 ```python
-def __init__(self, replicates: "SimulationReplicates"):
+def __init__(self, replicates: "SimulationReplicates") -> None:
     """
     The figures of `replicates`.
 
@@ -22743,7 +22700,7 @@ class PredictivePlot:
     other run; the model of the source names the series.
     """
 
-    def __init__(self, predictive: "Predictive"):
+    def __init__(self, predictive: "Predictive") -> None:
         """
         The figures of `predictive`.
 
@@ -22992,7 +22949,7 @@ class PredictivePlot:
 #### __init__
 
 ```python
-__init__(predictive: Predictive)
+__init__(predictive: Predictive) -> None
 ```
 
 The figures of `predictive`.
@@ -23006,7 +22963,7 @@ Parameters:
 Source code in `commol/api/plotting/accessors.py`
 
 ```python
-def __init__(self, predictive: "Predictive"):
+def __init__(self, predictive: "Predictive") -> None:
     """
     The figures of `predictive`.
 
@@ -24696,7 +24653,7 @@ class SensitivityAnalysis:
         *,
         replicates: int | None = None,
         seed: int | None = None,
-    ):
+    ) -> None:
         """
         Build the analysis of `inputs` on `simulation`.
 
@@ -24715,36 +24672,20 @@ class SensitivityAnalysis:
             the same analysis runs on every engine.
         seed : int | None, optional
             The seed of the designs and the replicates. Required with a
-            stochastic engine; otherwise None draws one from the operating
-            system, which the analysis logs.
+            stochastic engine; otherwise None has the engine draw one, which
+            `seed` reports and the analysis logs.
 
         Raises
         ------
         ValueError
             If an input is not a value of the model, the replicates or the
-            seed do not fit the engine, `replicates` is below 1, or the seed
-            is not a whole number from 0 to ``2**64 - 1``.
+            seed do not fit the engine, `replicates` is below 1 (a negative
+            number included), or the seed is not a whole number from 0 to
+            ``2**64 - 1``.
         """
-        engine_type = simulation.model_definition.engine.type
-        stochastic = commol_rs.engine.EngineType(engine_type).is_stochastic
-        if replicates is not None and replicates < 1:
-            raise ValueError(f"replicates is at least 1, got {replicates}")
-        if stochastic and replicates is None:
-            raise ValueError(
-                f"The {engine_type} engine is stochastic: set replicates, how many "
-                "replicates each point of a design runs."
-            )
-        if stochastic and seed is None:
-            raise ValueError(
-                f"The {engine_type} engine is stochastic: set seed, so the "
-                "replicates and the analysis are reproducible."
-            )
         self.simulation: Simulation = simulation
         self.inputs: InputSpace = inputs
         self.replicates: int | None = replicates
-        if seed is not None:
-            check_seed(seed)
-        self._seed: int | None = seed
         check_values(
             simulation.model_definition,
             simulation.engine,
@@ -24757,9 +24698,14 @@ class SensitivityAnalysis:
             distributions=inputs.rust_distributions(),
             sample=None if inputs.sample is None else inputs.sample.rust_sample,
             initial_condition_remainder=inputs.initial_condition_remainder,
-            replicates=replicates if stochastic else None,
-            seed=self.seed,
+            replicates=replicates,
+            seed=None if seed is None else check_seed(seed),
         )
+        if seed is None:
+            logger.info(
+                "No seed set; drew the seed %d, which repeats this analysis.",
+                self._rust.seed,
+            )
 
     @property
     def rust_analysis(self) -> "ForwardAnalysisProtocol":
@@ -24896,18 +24842,10 @@ class SensitivityAnalysis:
         Returns
         -------
         int
-            The seed given, or a seed drawn from the operating system once
-            per analysis and logged.
+            The seed given, or the seed the engine drew when the analysis
+            was built, which it logs.
         """
-        if self._seed is not None:
-            return self._seed
-        if not hasattr(self, "_drawn_seed"):
-            self._drawn_seed = draw_seed()
-            logger.info(
-                "No seed set; drew the seed %d, which repeats this analysis.",
-                self._drawn_seed,
-            )
-        return self._drawn_seed
+        return self._rust.seed
 
     def run(self, method: SensitivityMethod[ResultT]) -> ResultT:
         """
@@ -24969,14 +24907,14 @@ Returns:
 
 | Type  | Description                                                                             |
 | ----- | --------------------------------------------------------------------------------------- |
-| `int` | The seed given, or a seed drawn from the operating system once per analysis and logged. |
+| `int` | The seed given, or the seed the engine drew when the analysis was built, which it logs. |
 
 ### Methods:
 
 #### __init__
 
 ```python
-__init__(simulation: Simulation, inputs: InputSpace, *, replicates: int | None = None, seed: int | None = None)
+__init__(simulation: Simulation, inputs: InputSpace, *, replicates: int | None = None, seed: int | None = None) -> None
 ```
 
 Build the analysis of `inputs` on `simulation`.
@@ -24988,13 +24926,13 @@ Parameters:
 | `simulation` | `Simulation` | The model to analyse. | *required*                                                                                                                                                                                                                                                                                                                                                                    |
 | `inputs`     | `InputSpace` | What varies.          | *required*                                                                                                                                                                                                                                                                                                                                                                    |
 | `replicates` | \`int        | None\`                | For a stochastic engine, required, at least 1: how many replicates each point runs. A point of the design of PRCC, Morris, Sobol or polynomial chaos holds the mean of its replicates, on the same seeds at every point; a propagation keeps every replicate, each with a seed of its own. A deterministic engine does not use it, so the same analysis runs on every engine. |
-| `seed`       | \`int        | None\`                | The seed of the designs and the replicates. Required with a stochastic engine; otherwise None draws one from the operating system, which the analysis logs.                                                                                                                                                                                                                   |
+| `seed`       | \`int        | None\`                | The seed of the designs and the replicates. Required with a stochastic engine; otherwise None has the engine draw one, which seed reports and the analysis logs.                                                                                                                                                                                                              |
 
 Raises:
 
-| Type         | Description                                                                                                                                                                |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If an input is not a value of the model, the replicates or the seed do not fit the engine, replicates is below 1, or the seed is not a whole number from 0 to 2\*\*64 - 1. |
+| Type         | Description                                                                                                                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If an input is not a value of the model, the replicates or the seed do not fit the engine, replicates is below 1 (a negative number included), or the seed is not a whole number from 0 to 2\*\*64 - 1. |
 
 Source code in `commol/api/sensitivity.py`
 
@@ -25006,7 +24944,7 @@ def __init__(
     *,
     replicates: int | None = None,
     seed: int | None = None,
-):
+) -> None:
     """
     Build the analysis of `inputs` on `simulation`.
 
@@ -25025,36 +24963,20 @@ def __init__(
         the same analysis runs on every engine.
     seed : int | None, optional
         The seed of the designs and the replicates. Required with a
-        stochastic engine; otherwise None draws one from the operating
-        system, which the analysis logs.
+        stochastic engine; otherwise None has the engine draw one, which
+        `seed` reports and the analysis logs.
 
     Raises
     ------
     ValueError
         If an input is not a value of the model, the replicates or the
-        seed do not fit the engine, `replicates` is below 1, or the seed
-        is not a whole number from 0 to ``2**64 - 1``.
+        seed do not fit the engine, `replicates` is below 1 (a negative
+        number included), or the seed is not a whole number from 0 to
+        ``2**64 - 1``.
     """
-    engine_type = simulation.model_definition.engine.type
-    stochastic = commol_rs.engine.EngineType(engine_type).is_stochastic
-    if replicates is not None and replicates < 1:
-        raise ValueError(f"replicates is at least 1, got {replicates}")
-    if stochastic and replicates is None:
-        raise ValueError(
-            f"The {engine_type} engine is stochastic: set replicates, how many "
-            "replicates each point of a design runs."
-        )
-    if stochastic and seed is None:
-        raise ValueError(
-            f"The {engine_type} engine is stochastic: set seed, so the "
-            "replicates and the analysis are reproducible."
-        )
     self.simulation: Simulation = simulation
     self.inputs: InputSpace = inputs
     self.replicates: int | None = replicates
-    if seed is not None:
-        check_seed(seed)
-    self._seed: int | None = seed
     check_values(
         simulation.model_definition,
         simulation.engine,
@@ -25067,9 +24989,14 @@ def __init__(
         distributions=inputs.rust_distributions(),
         sample=None if inputs.sample is None else inputs.sample.rust_sample,
         initial_condition_remainder=inputs.initial_condition_remainder,
-        replicates=replicates if stochastic else None,
-        seed=self.seed,
+        replicates=replicates,
+        seed=None if seed is None else check_seed(seed),
     )
+    if seed is None:
+        logger.info(
+            "No seed set; drew the seed %d, which repeats this analysis.",
+            self._rust.seed,
+        )
 ```
 
 #### rust_predictive
@@ -27404,8 +27331,10 @@ class Level(_Outputs):
 
     kind: Literal["level"] = "level"
 
-    def __init__(self, outputs: str | list[str], **data: Any) -> None:
-        super().__init__(outputs=outputs, **data)
+    def __init__(
+        self, outputs: str | list[str], *, kind: Literal["level"] = "level"
+    ) -> None:
+        BaseModel.__init__(self, outputs=outputs, kind=kind)
 
     @property
     def text(self) -> str:
@@ -27483,8 +27412,14 @@ class Increments(_Outputs):
     kind: Literal["increments"] = "increments"
     window: float = Field(gt=0.0, allow_inf_nan=False, description="The width.")
 
-    def __init__(self, outputs: str | list[str], window: float, **data: Any) -> None:
-        super().__init__(outputs=outputs, **{**data, "window": window})
+    def __init__(
+        self,
+        outputs: str | list[str],
+        window: float,
+        *,
+        kind: Literal["increments"] = "increments",
+    ) -> None:
+        BaseModel.__init__(self, outputs=outputs, window=window, kind=kind)
 
     @property
     def text(self) -> str:
@@ -28179,7 +28114,7 @@ class Simulation:
     from, for example after ``Model.update_parameters``.
     """
 
-    def __init__(self, model: Model):
+    def __init__(self, model: Model) -> None:
         """
         Initializes the simulation engine from a Pydantic Model definition.
 
@@ -28265,12 +28200,13 @@ class Simulation:
         ).is_stochastic
 
     def _seed_run(self, seed: int | None) -> int | None:
-        """Seed the engine of a stochastic model; None for a deterministic one."""
+        """
+        Seed the engine of a stochastic model, which draws a seed for None;
+        the seed it runs with, or None for a deterministic engine.
+        """
         if not self.is_stochastic:
             return None
-        seed = draw_seed() if seed is None else check_seed(seed)
-        self._engine.set_seed(seed)
-        return seed
+        return self._engine.set_seed(None if seed is None else check_seed(seed))
 
     def run(self, num_steps: int, *, seed: int | None = None) -> SimulationResults:
         """
@@ -28414,9 +28350,7 @@ class Simulation:
             )
         if isinstance(count, bool) or not isinstance(count, int) or count < 1:
             raise ValueError(f"The number of replicates is at least 1, got {count!r}.")
-        return ReplicateRuns(
-            self, count, draw_seed() if seed is None else check_seed(seed)
-        )
+        return ReplicateRuns(self, count, None if seed is None else check_seed(seed))
 
     @property
     def engine(self) -> "EngineProtocol":
@@ -28656,7 +28590,7 @@ Names of the columns returned by simulation runs.
 #### __init__
 
 ```python
-__init__(model: Model)
+__init__(model: Model) -> None
 ```
 
 Initializes the simulation engine from a Pydantic Model definition.
@@ -28676,7 +28610,7 @@ Raises:
 Source code in `commol/api/simulation.py`
 
 ```python
-def __init__(self, model: Model):
+def __init__(self, model: Model) -> None:
     """
     Initializes the simulation engine from a Pydantic Model definition.
 
@@ -28947,9 +28881,7 @@ def replicates(self, count: int, *, seed: int | None = None) -> "ReplicateRuns":
         )
     if isinstance(count, bool) or not isinstance(count, int) or count < 1:
         raise ValueError(f"The number of replicates is at least 1, got {count!r}.")
-    return ReplicateRuns(
-        self, count, draw_seed() if seed is None else check_seed(seed)
-    )
+    return ReplicateRuns(self, count, None if seed is None else check_seed(seed))
 ```
 
 #### outputs_for
@@ -29324,7 +29256,7 @@ class SimulationResults(dict[str, list[float]]):
         values: Mapping[str, Sequence[float]] | None = None,
         seed: int | None = None,
         model: "Model | None" = None,
-    ):
+    ) -> None:
         """
         Results at the given positions.
 
@@ -29539,7 +29471,7 @@ They name each series from `model`; results with no model draw only their output
 #### __init__
 
 ```python
-__init__(positions: Iterable[float], values: Mapping[str, Sequence[float]] | None = None, seed: int | None = None, model: Model | None = None)
+__init__(positions: Iterable[float], values: Mapping[str, Sequence[float]] | None = None, seed: int | None = None, model: Model | None = None) -> None
 ```
 
 Results at the given positions.
@@ -29568,7 +29500,7 @@ def __init__(
     values: Mapping[str, Sequence[float]] | None = None,
     seed: int | None = None,
     model: "Model | None" = None,
-):
+) -> None:
     """
     Results at the given positions.
 
@@ -29896,7 +29828,7 @@ Attributes:
 | ------------ | ------------ | ---------------------------------------------- |
 | `simulation` | `Simulation` | The simulation whose model the replicates run. |
 | `count`      | `int`        | How many replicates.                           |
-| `seed`       | `int`        | The seed the replicate seeds derive from.      |
+| `seed`       | \`int        | None\`                                         |
 
 Source code in `commol/api/simulation.py`
 
@@ -29911,11 +29843,12 @@ class ReplicateRuns:
         The simulation whose model the replicates run.
     count : int
         How many replicates.
-    seed : int
-        The seed the replicate seeds derive from.
+    seed : int | None
+        The seed the replicate seeds derive from; None draws one at each run,
+        which the replicates keep (`SimulationReplicates.seed`).
     """
 
-    def __init__(self, simulation: Simulation, count: int, seed: int):
+    def __init__(self, simulation: Simulation, count: int, seed: int | None) -> None:
         """
         The replicates of a simulation.
 
@@ -29925,8 +29858,9 @@ class ReplicateRuns:
             The simulation whose model the replicates run.
         count : int
             How many replicates.
-        seed : int
-            The seed the replicate seeds derive from.
+        seed : int | None
+            The seed the replicate seeds derive from; None draws one at each
+            run.
         """
         self.simulation = simulation
         self.count = count
@@ -29937,7 +29871,9 @@ class ReplicateRuns:
         simulation = self.simulation
         simulation._validate_all_parameters_calibrated(simulation.model_definition)
         engine = simulation.engine
-        positions, seeds, runs = engine.run_replicates(self.seed, self.count, grid)
+        seed, positions, seeds, runs = engine.run_replicates(
+            self.seed, self.count, grid
+        )
         outputs = simulation.simulation_outputs
         model = simulation.model_definition
         return SimulationReplicates(
@@ -29947,7 +29883,7 @@ class ReplicateRuns:
                 )
                 for replicate_seed, rows in zip(seeds, runs, strict=True)
             ),
-            seed=self.seed,
+            seed=seed,
             positions=positions,
             model=model,
         )
@@ -30006,23 +29942,23 @@ class ReplicateRuns:
 #### __init__
 
 ```python
-__init__(simulation: Simulation, count: int, seed: int)
+__init__(simulation: Simulation, count: int, seed: int | None) -> None
 ```
 
 The replicates of a simulation.
 
 Parameters:
 
-| Name         | Type         | Description                                    | Default    |
-| ------------ | ------------ | ---------------------------------------------- | ---------- |
-| `simulation` | `Simulation` | The simulation whose model the replicates run. | *required* |
-| `count`      | `int`        | How many replicates.                           | *required* |
-| `seed`       | `int`        | The seed the replicate seeds derive from.      | *required* |
+| Name         | Type         | Description                                    | Default                                                               |
+| ------------ | ------------ | ---------------------------------------------- | --------------------------------------------------------------------- |
+| `simulation` | `Simulation` | The simulation whose model the replicates run. | *required*                                                            |
+| `count`      | `int`        | How many replicates.                           | *required*                                                            |
+| `seed`       | \`int        | None\`                                         | The seed the replicate seeds derive from; None draws one at each run. |
 
 Source code in `commol/api/simulation.py`
 
 ```python
-def __init__(self, simulation: Simulation, count: int, seed: int):
+def __init__(self, simulation: Simulation, count: int, seed: int | None) -> None:
     """
     The replicates of a simulation.
 
@@ -30032,8 +29968,9 @@ def __init__(self, simulation: Simulation, count: int, seed: int):
         The simulation whose model the replicates run.
     count : int
         How many replicates.
-    seed : int
-        The seed the replicate seeds derive from.
+    seed : int | None
+        The seed the replicate seeds derive from; None draws one at each
+        run.
     """
     self.simulation = simulation
     self.count = count
@@ -30199,7 +30136,7 @@ class SimulationReplicates(list[SimulationResults]):
         seed: int,
         positions: Sequence[float],
         model: "Model | None" = None,
-    ):
+    ) -> None:
         """
         Replicates of one run.
 
@@ -30494,7 +30431,7 @@ The figures of the replicates: `plot.series()`, their mean and band, and `plot.c
 #### __init__
 
 ```python
-__init__(runs: Iterable[SimulationResults], seed: int, positions: Sequence[float], model: Model | None = None)
+__init__(runs: Iterable[SimulationResults], seed: int, positions: Sequence[float], model: Model | None = None) -> None
 ```
 
 Replicates of one run.
@@ -30523,7 +30460,7 @@ def __init__(
     seed: int,
     positions: Sequence[float],
     model: "Model | None" = None,
-):
+) -> None:
     """
     Replicates of one run.
 
@@ -30989,8 +30926,36 @@ class ODESolver(BaseModel):
     method: Literal["tsit45", "bdf"] = Field(
         default="tsit45", description="Integration method."
     )
-    rtol: float = Field(default=1e-6, gt=0.0, description="Relative tolerance.")
-    atol: float = Field(default=1e-6, gt=0.0, description="Absolute tolerance.")
+    rtol: float = Field(
+        default=commol_rs.engine.ODE_DEFAULT_RTOL, description="Relative tolerance."
+    )
+    atol: float = Field(
+        default=commol_rs.engine.ODE_DEFAULT_ATOL, description="Absolute tolerance."
+    )
+
+    @model_validator(mode="after")
+    def check_with_the_engine(self) -> Self:
+        """Ask the engine's list whether it takes the settings."""
+        return _checked(self)
+```
+
+### Methods:
+
+#### check_with_the_engine
+
+```python
+check_with_the_engine() -> Self
+```
+
+Ask the engine's list whether it takes the settings.
+
+Source code in `commol/context/engine.py`
+
+```python
+@model_validator(mode="after")
+def check_with_the_engine(self) -> Self:
+    """Ask the engine's list whether it takes the settings."""
+    return _checked(self)
 ```
 
 ## StochasticEventsSettings
@@ -31041,17 +31006,43 @@ class StochasticEventsSettings(BaseModel):
         default="direct", description="Simulation method."
     )
     tau: float | None = Field(
-        default=None, gt=0.0, description="Length of a leap of tau-leaping."
+        default=None, description="Length of a leap of tau-leaping."
     )
     epsilon: float = Field(
-        default=0.03, gt=0.0, lt=1.0, description="Bound of an adaptive leap."
+        default=commol_rs.engine.STOCHASTIC_EVENTS_DEFAULT_EPSILON,
+        description="Bound of an adaptive leap.",
     )
     tolerance: float = Field(
-        default=1e-8, gt=0.0, description="Relative tolerance of an event time."
+        default=commol_rs.engine.STOCHASTIC_EVENTS_DEFAULT_TOLERANCE,
+        description="Relative tolerance of an event time.",
     )
     rounding: Rounding | None = Field(
         default=None, description="How to make the initial amounts whole."
     )
+
+    @model_validator(mode="after")
+    def check_with_the_engine(self) -> Self:
+        """Ask the engine's list whether it takes the settings."""
+        return _checked(self)
+```
+
+### Methods:
+
+#### check_with_the_engine
+
+```python
+check_with_the_engine() -> Self
+```
+
+Ask the engine's list whether it takes the settings.
+
+Source code in `commol/context/engine.py`
+
+```python
+@model_validator(mode="after")
+def check_with_the_engine(self) -> Self:
+    """Ask the engine's list whether it takes the settings."""
+    return _checked(self)
 ```
 
 ## StochasticStepsSettings
@@ -31085,6 +31076,30 @@ class StochasticStepsSettings(BaseModel):
     rounding: Rounding | None = Field(
         default=None, description="How to make the initial amounts whole."
     )
+
+    @model_validator(mode="after")
+    def check_with_the_engine(self) -> Self:
+        """Ask the engine's list whether it takes the settings."""
+        return _checked(self)
+```
+
+### Methods:
+
+#### check_with_the_engine
+
+```python
+check_with_the_engine() -> Self
+```
+
+Ask the engine's list whether it takes the settings.
+
+Source code in `commol/context/engine.py`
+
+```python
+@model_validator(mode="after")
+def check_with_the_engine(self) -> Self:
+    """Ask the engine's list whether it takes the settings."""
+    return _checked(self)
 ```
 
 ## InfeasibleStateError
@@ -31397,20 +31412,22 @@ class ParameterSample(BaseModel):
 
     _rust: "ParameterSampleProtocol" = PrivateAttr()
 
-    @model_validator(mode="before")
+    @field_validator("log_weights")
     @classmethod
-    def normalize_log_weights(cls, data: object) -> object:
-        """Check the invariants in Rust and normalize the log weights."""
-        if not isinstance(data, Mapping):
-            return data
+    def normalize_log_weights(
+        cls, log_weights: list[float], info: ValidationInfo
+    ) -> list[float]:
+        """
+        Check the invariants in Rust and normalize the log weights; with a
+        field before them that is not valid, pydantic reports that field.
+        """
+        data = info.data
+        if not {"names", "bounds", "values"} <= data.keys():
+            return log_weights
         rust = commol_rs.inference.ParameterSample(
-            list(data.get("names", [])),
-            [tuple(bound) for bound in data.get("bounds", [])],
-            [list(row) for row in data.get("values", [])],
-            [float(w) for w in data.get("log_weights", [])],
-            data.get("groups"),
+            data["names"], data["bounds"], data["values"], log_weights, None
         )
-        return {**data, "log_weights": rust.log_weights}
+        return rust.log_weights
 
     @model_validator(mode="after")
     def build_rust_sample(self) -> Self:
@@ -31688,28 +31705,30 @@ Kish's effective sample size, `1 / Σ wᵢ²`: between 1 and the number of draws
 #### normalize_log_weights
 
 ```python
-normalize_log_weights(data: object) -> object
+normalize_log_weights(log_weights: list[float], info: ValidationInfo) -> list[float]
 ```
 
-Check the invariants in Rust and normalize the log weights.
+Check the invariants in Rust and normalize the log weights; with a field before them that is not valid, pydantic reports that field.
 
 Source code in `commol/context/inference/sample.py`
 
 ```python
-@model_validator(mode="before")
+@field_validator("log_weights")
 @classmethod
-def normalize_log_weights(cls, data: object) -> object:
-    """Check the invariants in Rust and normalize the log weights."""
-    if not isinstance(data, Mapping):
-        return data
+def normalize_log_weights(
+    cls, log_weights: list[float], info: ValidationInfo
+) -> list[float]:
+    """
+    Check the invariants in Rust and normalize the log weights; with a
+    field before them that is not valid, pydantic reports that field.
+    """
+    data = info.data
+    if not {"names", "bounds", "values"} <= data.keys():
+        return log_weights
     rust = commol_rs.inference.ParameterSample(
-        list(data.get("names", [])),
-        [tuple(bound) for bound in data.get("bounds", [])],
-        [list(row) for row in data.get("values", [])],
-        [float(w) for w in data.get("log_weights", [])],
-        data.get("groups"),
+        data["names"], data["bounds"], data["values"], log_weights, None
     )
-    return {**data, "log_weights": rust.log_weights}
+    return rust.log_weights
 ```
 
 #### build_rust_sample
@@ -32307,7 +32326,7 @@ class Predictive:
         source: PredictiveSource,
         sample: ParameterSample,
         positions: Sequence[float],
-    ):
+    ) -> None:
         """
         Run every draw of `sample` at `positions`.
 
@@ -32642,7 +32661,7 @@ The figures of the draws: `plot.series()` and `plot.cumulative()`, the weighted 
 #### __init__
 
 ```python
-__init__(source: PredictiveSource, sample: ParameterSample, positions: Sequence[float])
+__init__(source: PredictiveSource, sample: ParameterSample, positions: Sequence[float]) -> None
 ```
 
 Run every draw of `sample` at `positions`.
@@ -32670,7 +32689,7 @@ def __init__(
     source: PredictiveSource,
     sample: ParameterSample,
     positions: Sequence[float],
-):
+) -> None:
     """
     Run every draw of `sample` at `positions`.
 
@@ -33250,7 +33269,7 @@ class ObservationDraws:
         self,
         observations: Sequence[ObservedDataPoint],
         draws: "ObservationDrawsProtocol",
-    ):
+    ) -> None:
         """
         Wrap the draws of `observations`.
 
@@ -33340,7 +33359,7 @@ The observed value of each observation.
 #### __init__
 
 ```python
-__init__(observations: Sequence[ObservedDataPoint], draws: ObservationDrawsProtocol)
+__init__(observations: Sequence[ObservedDataPoint], draws: ObservationDrawsProtocol) -> None
 ```
 
 Wrap the draws of `observations`.
@@ -33359,7 +33378,7 @@ def __init__(
     self,
     observations: Sequence[ObservedDataPoint],
     draws: "ObservationDrawsProtocol",
-):
+) -> None:
     """
     Wrap the draws of `observations`.
 
@@ -33468,7 +33487,7 @@ class Scenarios(Mapping[str, Predictive]):
         sample: ParameterSample,
         scenarios: Mapping[str, Mapping[str, "ParameterUpdate"]],
         positions: Sequence[float],
-    ):
+    ) -> None:
         """
         Run every draw of `sample` under each scenario, at `positions`.
 
@@ -33667,7 +33686,7 @@ The weight of each run, the same in every scenario; they sum to 1.
 #### __init__
 
 ```python
-__init__(source: PredictiveSource, sample: ParameterSample, scenarios: Mapping[str, Mapping[str, ParameterUpdate]], positions: Sequence[float])
+__init__(source: PredictiveSource, sample: ParameterSample, scenarios: Mapping[str, Mapping[str, ParameterUpdate]], positions: Sequence[float]) -> None
 ```
 
 Run every draw of `sample` under each scenario, at `positions`.
@@ -33697,7 +33716,7 @@ def __init__(
     sample: ParameterSample,
     scenarios: Mapping[str, Mapping[str, "ParameterUpdate"]],
     positions: Sequence[float],
-):
+) -> None:
     """
     Run every draw of `sample` under each scenario, at `positions`.
 
@@ -36492,17 +36511,15 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult]):
 
     eta: Eta = Field(description="The scale of the loss, or its calibration.")
     particles: int = Field(ge=2, description="Number of particles.")
-    target_cess: float = Field(gt=0.0, lt=1.0, description="Share kept per step.")
+    target_cess: Share = Field(description="Share kept per step.")
     resample_threshold: float = Field(
         gt=0.0, le=1.0, description="Resample below this share."
     )
-    stay_probability: float = Field(
-        gt=0.0, lt=1.0, description="Probability a particle does not move."
-    )
+    stay_probability: Share = Field(description="Probability a particle does not move.")
 
     @model_validator(mode="before")
     @classmethod
-    def require_eta(cls, data: object) -> object:
+    def require_eta(cls, data: JsonValue) -> JsonValue:
         """Name the choices of `eta` when it is missing."""
         _require(data, "eta", f"give {ETA_CHOICES}")
         if isinstance(data, Mapping):
@@ -36517,7 +36534,7 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult]):
 #### require_eta
 
 ```python
-require_eta(data: object) -> object
+require_eta(data: JsonValue) -> JsonValue
 ```
 
 Name the choices of `eta` when it is missing.
@@ -36527,7 +36544,7 @@ Source code in `commol/context/inference/smc.py`
 ```python
 @model_validator(mode="before")
 @classmethod
-def require_eta(cls, data: object) -> object:
+def require_eta(cls, data: JsonValue) -> JsonValue:
     """Name the choices of `eta` when it is missing."""
     _require(data, "eta", f"give {ETA_CHOICES}")
     if isinstance(data, Mapping):
@@ -36589,13 +36606,11 @@ class BayesianPosterior(WithPriors, UncertaintyMethod[SMCResult]):
     """
 
     particles: int = Field(ge=2, description="Number of particles.")
-    target_cess: float = Field(gt=0.0, lt=1.0, description="Share kept per step.")
+    target_cess: Share = Field(description="Share kept per step.")
     resample_threshold: float = Field(
         gt=0.0, le=1.0, description="Resample below this share."
     )
-    stay_probability: float = Field(
-        gt=0.0, lt=1.0, description="Probability a particle does not move."
-    )
+    stay_probability: Share = Field(description="Probability a particle does not move.")
 ```
 
 ## InformationMatchingEta
@@ -36755,13 +36770,11 @@ class ABCSMC(WithPriors, UncertaintyMethod[SMCResult]):
 
     distance: ABCDistance = Field(description="The distance.")
     particles: int = Field(ge=2, description="Number of particles.")
-    target_cess: float = Field(gt=0.0, lt=1.0, description="Share kept per step.")
-    min_acceptance: float = Field(
-        gt=0.0, lt=1.0, description="Acceptance rate below which the run stops."
+    target_cess: Share = Field(description="Share kept per step.")
+    min_acceptance: Share = Field(
+        description="Acceptance rate below which the run stops."
     )
-    stay_probability: float = Field(
-        gt=0.0, lt=1.0, description="Probability a particle does not move."
-    )
+    stay_probability: Share = Field(description="Probability a particle does not move.")
 ```
 
 ## ABCRejection
@@ -36804,7 +36817,7 @@ class ABCRejection(WithPriors, UncertaintyMethod[SMCResult]):
 
     distance: ABCDistance = Field(description="The distance.")
     draws: int = Field(ge=2, description="Number of draws.")
-    quantile: float = Field(gt=0.0, lt=1.0, description="The share of draws kept.")
+    quantile: Share = Field(description="The share of draws kept.")
 ```
 
 ## LossDistance
@@ -37663,7 +37676,7 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
 
     @model_validator(mode="before")
     @classmethod
-    def check_score_and_by(cls, data: object) -> object:
+    def check_score_and_by(cls, data: JsonValue) -> JsonValue:
         """Check, in Rust, that `score` and `by` are given and fit together."""
         if isinstance(data, Mapping):
 
@@ -37680,7 +37693,7 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
 #### check_score_and_by
 
 ```python
-check_score_and_by(data: object) -> object
+check_score_and_by(data: JsonValue) -> JsonValue
 ```
 
 Check, in Rust, that `score` and `by` are given and fit together.
@@ -37690,7 +37703,7 @@ Source code in `commol/context/inference/conformal.py`
 ```python
 @model_validator(mode="before")
 @classmethod
-def check_score_and_by(cls, data: object) -> object:
+def check_score_and_by(cls, data: JsonValue) -> JsonValue:
     """Check, in Rust, that `score` and `by` are given and fit together."""
     if isinstance(data, Mapping):
 
@@ -40019,10 +40032,14 @@ class ModelEngine(BaseModel):
 
     @field_validator("settings", mode="before")
     @classmethod
-    def settings_of_the_engine(cls, value: Any, info: ValidationInfo) -> Any:
+    def settings_of_the_engine(
+        cls,
+        value: EngineSettings | Mapping[str, JsonValue] | None,
+        info: ValidationInfo,
+    ) -> EngineSettings | Mapping[str, JsonValue] | None:
         """Read settings given as a mapping with the class of their engine."""
         settings_class = _SETTINGS.get(info.data.get("type", ""))
-        if isinstance(value, dict) and settings_class is not None:
+        if isinstance(value, Mapping) and settings_class is not None:
             return settings_class.model_validate(value)
         return value
 
@@ -40041,7 +40058,7 @@ class ModelEngine(BaseModel):
 #### settings_of_the_engine
 
 ```python
-settings_of_the_engine(value: Any, info: ValidationInfo) -> Any
+settings_of_the_engine(value: EngineSettings | Mapping[str, JsonValue] | None, info: ValidationInfo) -> EngineSettings | Mapping[str, JsonValue] | None
 ```
 
 Read settings given as a mapping with the class of their engine.
@@ -40051,10 +40068,14 @@ Source code in `commol/context/engine.py`
 ```python
 @field_validator("settings", mode="before")
 @classmethod
-def settings_of_the_engine(cls, value: Any, info: ValidationInfo) -> Any:
+def settings_of_the_engine(
+    cls,
+    value: EngineSettings | Mapping[str, JsonValue] | None,
+    info: ValidationInfo,
+) -> EngineSettings | Mapping[str, JsonValue] | None:
     """Read settings given as a mapping with the class of their engine."""
     settings_class = _SETTINGS.get(info.data.get("type", ""))
-    if isinstance(value, dict) and settings_class is not None:
+    if isinstance(value, Mapping) and settings_class is not None:
         return settings_class.model_validate(value)
     return value
 ```
@@ -40150,7 +40171,7 @@ class InitialConditions(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def reject_fractions_of_a_total(cls, data: Any) -> Any:
+    def reject_fractions_of_a_total(cls, data: JsonValue) -> JsonValue:
         """Name the field of amounts that replaces a field of fractions.
 
         A total over bins of different units has no meaning, so the initial
@@ -40433,7 +40454,7 @@ class InitialConditions(BaseModel):
 #### reject_fractions_of_a_total
 
 ```python
-reject_fractions_of_a_total(data: Any) -> Any
+reject_fractions_of_a_total(data: JsonValue) -> JsonValue
 ```
 
 Name the field of amounts that replaces a field of fractions.
@@ -40445,7 +40466,7 @@ Source code in `commol/context/initial_conditions.py`
 ```python
 @model_validator(mode="before")
 @classmethod
-def reject_fractions_of_a_total(cls, data: Any) -> Any:
+def reject_fractions_of_a_total(cls, data: JsonValue) -> JsonValue:
     """Name the field of amounts that replaces a field of fractions.
 
     A total over bins of different units has no meaning, so the initial
@@ -40889,6 +40910,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - The four engines of the aggregate kind name themselves in their messages by the name of the engine: a position an engine does not report at gives `The DifferenceEquations engine reports only at integer steps; 2.5 is not one`, and an impulse or a series point between two steps names `the DifferenceEquations engine` or `the StochasticSteps engine`.
 - `Predictive.at_observations` and every method that reads a predictive at other observations raise `ValueError` for a position the engine rejects, with the message of the engine, as a calibration does. The bands, the automatic block lengths and their estimates keep their values: one Rust function of each computes them for every method.
 - The engine decides the practical verdicts of `Collinearity` and `SampleIdentifiability` and the two notes of a profile on its refits, and results read a position with the rule of an observation: the verdicts, reasons, notes and values stay. `windowed_totals` reads each window as a calibration reads a windowed observation, and it gives floats. A figure asked for a series that is neither an output nor a bin or accumulator raises `KeyError` with the message of `Simulation.outputs_for`, and a sum of outputs that the results do not hold gives one message, `Missing output series in results`, in a simulation, a report and a figure.
+- The engine checks a model, a calibration and the engine settings, and Python repeats none of its checks, so each mistake gets the message of the engine. A parameter named after an engine variable, a bin, a compartment or a subgroup total names each conflict and asks to rename the parameter. An observation of an output the model does not have names the output, the observation and the outputs: `Invalid observed output name 'X' for observation 'series1' (available: A, B, C)`. A factor with a bound of 0 or below fails with `Factor parameter 'f' must have positive bounds (got min=0, max=2)`. `Collinearity` checks `max_subset_size` when it runs, with `max_subset_size must be from 2 to the number of parameters (3), got 9`. The needs of a stochastic engine (`replicates`, `seed` and `replicate_summary` of a calibration; `replicates` and `seed` of a sensitivity analysis) keep their messages, which the engine now gives.
+- `ODESolver` and `StochasticEventsSettings` take their defaults from the engine and check themselves with the engine when they are built: `StochasticEventsSettings(epsilon=1.5)` gives `epsilon is strictly between 0 and 1, got 1.5`. Every other setting strictly between 0 and 1 (`target_cess`, `stay_probability`, `min_acceptance`, the `quantile` of `ABCRejection`, `correlation_threshold`) gives `<name> is strictly between 0 and 1, got <value>`, `Quantile(1.5)` gives `A quantile level is between 0 and 1, got 1.5`, and a Sobol analysis of the Rust API with fewer than 2 draws says `draws`, the name of the setting.
+- A negative count that reaches the engine, such as `Simulation.run(-1)`, the `replicates` of a `SensitivityAnalysis` or the `max_subset_size` of `Collinearity`, raises `ValueError` that names the setting, `num_steps is a whole number from 0, got -1`, in place of an `OverflowError` with no name. Every count of the bindings reads this way.
+- The engine draws a seed that its user does not set, in one place, and the result gives the seed it ran with, as before: `results.seed`, `SimulationReplicates.seed`, `Calibrator.seed` and `SensitivityAnalysis.seed`. A calibrator with no seed logs the seed it drew when it is built, not when it first runs.
+- Ruff checks that every signature of the package has annotations and that none is `typing.Any`; the raw input of a validator is a `JsonValue`. A keyword that `Quantile`, `Groups`, `Level` or `Increments` does not take raises `TypeError` that names it, such as `Quantile(0.5, unknown=1)`, in place of the `ValidationError` `Extra inputs are not permitted`. A `ParameterSample` whose `names`, `bounds` or `values` are not valid gets the pydantic message of that field before the engine checks the log weights.
 
 ### Fixed
 
@@ -40902,6 +40928,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - A formula with a long chain of terms, such as a sum of 20 000 terms, no longer stops the Python process with a segmentation fault. The engine reads formulas with a parser of its own: a sum or a product of any length is one level, and a formula that nests deeper than 100 levels of parentheses, calls, signs and powers fails with a message that names the limit. Before, the parse used one step of the stack for each term, and the process crashed near 20 000 terms, or near 2 000 on a thread of the parallel work.
 - A chain of powers groups from the right, as in Python: `2 ** 3 ** 2` is
 - Before, it was 64, `(2 ** 3) ** 2`.
+- `ParticleSwarmConfig.inertia("constant")` and `.acceleration("constant")` take the weight and the coefficients of canonical particle swarm, `1/(2 ln 2)` and `0.5 + ln 2`, which a swarm with no inertia or acceleration strategy uses. Before, their defaults were the rounded `0.721` and `1.193`, so a swarm that named the constant strategy moved a little differently from one that did not.
+- Three messages of a calibration with observation models no longer hold a run of spaces in the middle of a sentence.
 
 ## [0.10.1] - 2026-10-23
 

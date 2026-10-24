@@ -3458,7 +3458,10 @@ writes again at each evaluation, so a value set on it is lost. A calibration
 or any method on <code>ForwardModel</code> sets each parameter on a copy of the engine
 when it is built (<code>ValueWriter::new</code> in <code>crates/commol-calibration/src/values.rs</code>),
 so the engine's message reaches the user before any run, and Python checks no
-parameter id (<code>check_values</code> in <code>api/calibrator.py</code>).</p>
+parameter id (<code>check_values</code> in <code>api/calibrator.py</code>). <code>ValueWriter::new</code> also
+checks that a factor has positive bounds, the observed outputs and positions
+are checked by <code>CalibrationProblem::new</code> alone, and Python passes each
+message with no prefix.</p>
 <p><strong>Guards:</strong> <code>crates/commol-model/tests/parameters.rs</code>,
 <code>tests/calibration/test_problem.py::TestProblemAgainstTheModel</code>.</p>
 <h2 id="one-observation-operator">One observation operator<a class="headerlink" href="#one-observation-operator" title="Permanent link">&para;</a></h2>

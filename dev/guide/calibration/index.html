@@ -3609,7 +3609,7 @@ also when it was created while a parameter was <code>None</code>. See
 <td><code>seed</code></td>
 <td><code>int \| None</code></td>
 <td><code>None</code></td>
-<td>The seed of every random number of a calibration: the replicates of a stochastic engine, the starts, a particle swarm and the uncertainty methods. Without it, <code>Calibrator.seed</code> draws one. See <a href="../calibration-optimizers/#reproducibility">Reproducibility</a>.</td>
+<td>The seed of every random number of a calibration: the replicates of a stochastic engine, the starts, a particle swarm and the uncertainty methods. Without it, the engine draws one, which <code>Calibrator.seed</code> gives. See <a href="../calibration-optimizers/#reproducibility">Reproducibility</a>.</td>
 </tr>
 </tbody>
 </table>
@@ -3813,8 +3813,8 @@ because what to fit is a modelling choice:</p>
 </thead>
 <tbody>
 <tr>
-<td>A stochastic engine needs <code>replicates</code>, <code>replicate_summary</code> and <code>seed</code>; without one, <code>Calibrator</code> raises and the message lists the summaries</td>
-<td><code>rust_loss_config</code> in <code>py-commol/commol/context/_model/engine_state.py</code></td>
+<td>A stochastic engine needs <code>replicates</code>, <code>replicate_summary</code> and <code>seed</code>; without one, <code>Calibrator</code> raises a <code>ValueError</code> that names the engine, and the message lists the summaries</td>
+<td><code>CalibrationProblem::with_replicate_settings</code> in <code>crates/commol-calibration/src/calibration_problem.rs</code>; <code>SimulationEngine::is_stochastic</code></td>
 </tr>
 <tr>
 <td>A deterministic engine does not use <code>replicates</code> and <code>replicate_summary</code></td>
@@ -3822,7 +3822,7 @@ because what to fit is a modelling choice:</p>
 </tr>
 <tr>
 <td>A stochastic engine needs a loss: with <code>observation_models</code>, <code>Calibrator</code> raises a <code>ValueError</code></td>
-<td><code>PyCalibrationProblem::new</code> in <code>py-commol/src/inference.rs</code>; <code>Discrepancy::set_summary</code></td>
+<td><code>CalibrationProblem::new</code>; <code>Discrepancy::set_summary</code></td>
 </tr>
 <tr>
 <td>The summaries and the CRPS are computed in <code>LossConfig</code>, and the observation weights apply to every option</td>

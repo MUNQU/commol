@@ -102,11 +102,11 @@ print([round(value) for value in rows[0]])  # [900, 100, 0, 0]
 
 A stochastic engine draws random numbers, so its runs depend on a seed; a deterministic engine, such as `DifferenceEquations` and `DifferentialEquations`, gives the same run for every seed (`EngineType.is_stochastic` in `crates/commol-core/src/types/engine.rs`).
 
-| Call                                   | Deterministic engine                                                      | Stochastic engine                                                                                 |
-| -------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `run(n, seed=s)`, `run_at(at, seed=s)` | Ignores the seed; `results.seed` is `None`                                | One run from seed `s`; `results.seed` is `s`                                                      |
-| `run(n)` without a seed                | `results.seed` is `None`                                                  | Draws a seed from the operating system and keeps it in `results.seed`, so the run can be repeated |
-| `replicates(count, seed=s).run(…)`     | Raises `ValueError` that names the engine: every replicate would be equal | `count` runs, in parallel in the engine, each with its own seed                                   |
+| Call                                   | Deterministic engine                                                      | Stochastic engine                                                                                                                       |
+| -------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `run(n, seed=s)`, `run_at(at, seed=s)` | Ignores the seed; `results.seed` is `None`                                | One run from seed `s`; `results.seed` is `s`                                                                                            |
+| `run(n)` without a seed                | `results.seed` is `None`                                                  | The engine draws a seed and keeps it in `results.seed`, so the run can be repeated                                                      |
+| `replicates(count, seed=s).run(…)`     | Raises `ValueError` that names the engine: every replicate would be equal | `count` runs, in parallel in the engine, each with its own seed; without `seed`, the engine draws one and keeps it in `replicates.seed` |
 
 ```python
 print(simulation.is_stochastic)                # False: a difference engine
@@ -322,6 +322,8 @@ print(round(ode.run(num_steps=10)["moved"][10], 1))  # 632.1: the integral of th
 | `method` | `"tsit45"` | `"tsit45"`: explicit Runge–Kutta 5(4), for non-stiff models. `"bdf"`: backward differentiation formulas, for stiff models (rates of very different speeds). |
 | `rtol`   | `1e-6`     | Relative tolerance of each state component.                                                                                                                 |
 | `atol`   | `1e-6`     | Absolute tolerance of each state component, in the unit of the bins.                                                                                        |
+
+The defaults are the engine's (`commol_rs.engine.ODE_DEFAULT_RTOL` and `ODE_DEFAULT_ATOL`), and the engine checks the settings when they are built: `ODESolver(rtol=0.0)` raises `ValidationError` with the message of the engine, `The solver tolerance rtol must be a positive number, got 0`.
 
 `bdf` builds its Jacobian from a finite-difference Jacobian-vector product. It uses a dense matrix below `SPARSE_THRESHOLD` state components and a sparse one from there (`crates/commol-differential/src/solve.rs`).
 

@@ -22,7 +22,7 @@ class Simulation:
     from, for example after ``Model.update_parameters``.
     """
 
-    def __init__(self, model: Model):
+    def __init__(self, model: Model) -> None:
         """
         Initializes the simulation engine from a Pydantic Model definition.
 
@@ -108,12 +108,13 @@ class Simulation:
         ).is_stochastic
 
     def _seed_run(self, seed: int | None) -> int | None:
-        """Seed the engine of a stochastic model; None for a deterministic one."""
+        """
+        Seed the engine of a stochastic model, which draws a seed for None;
+        the seed it runs with, or None for a deterministic engine.
+        """
         if not self.is_stochastic:
             return None
-        seed = draw_seed() if seed is None else check_seed(seed)
-        self._engine.set_seed(seed)
-        return seed
+        return self._engine.set_seed(None if seed is None else check_seed(seed))
 
     def run(self, num_steps: int, *, seed: int | None = None) -> SimulationResults:
         """
@@ -257,9 +258,7 @@ class Simulation:
             )
         if isinstance(count, bool) or not isinstance(count, int) or count < 1:
             raise ValueError(f"The number of replicates is at least 1, got {count!r}.")
-        return ReplicateRuns(
-            self, count, draw_seed() if seed is None else check_seed(seed)
-        )
+        return ReplicateRuns(self, count, None if seed is None else check_seed(seed))
 
     @property
     def engine(self) -> "EngineProtocol":
@@ -499,7 +498,7 @@ Names of the columns returned by simulation runs.
 #### __init__
 
 ```python
-__init__(model: Model)
+__init__(model: Model) -> None
 ```
 
 Initializes the simulation engine from a Pydantic Model definition.
@@ -519,7 +518,7 @@ Raises:
 Source code in `commol/api/simulation.py`
 
 ```python
-def __init__(self, model: Model):
+def __init__(self, model: Model) -> None:
     """
     Initializes the simulation engine from a Pydantic Model definition.
 
@@ -790,9 +789,7 @@ def replicates(self, count: int, *, seed: int | None = None) -> "ReplicateRuns":
         )
     if isinstance(count, bool) or not isinstance(count, int) or count < 1:
         raise ValueError(f"The number of replicates is at least 1, got {count!r}.")
-    return ReplicateRuns(
-        self, count, draw_seed() if seed is None else check_seed(seed)
-    )
+    return ReplicateRuns(self, count, None if seed is None else check_seed(seed))
 ```
 
 #### outputs_for
@@ -1167,7 +1164,7 @@ class SimulationResults(dict[str, list[float]]):
         values: Mapping[str, Sequence[float]] | None = None,
         seed: int | None = None,
         model: "Model | None" = None,
-    ):
+    ) -> None:
         """
         Results at the given positions.
 
@@ -1382,7 +1379,7 @@ They name each series from `model`; results with no model draw only their output
 #### __init__
 
 ```python
-__init__(positions: Iterable[float], values: Mapping[str, Sequence[float]] | None = None, seed: int | None = None, model: Model | None = None)
+__init__(positions: Iterable[float], values: Mapping[str, Sequence[float]] | None = None, seed: int | None = None, model: Model | None = None) -> None
 ```
 
 Results at the given positions.
@@ -1411,7 +1408,7 @@ def __init__(
     values: Mapping[str, Sequence[float]] | None = None,
     seed: int | None = None,
     model: "Model | None" = None,
-):
+) -> None:
     """
     Results at the given positions.
 
@@ -1739,7 +1736,7 @@ Attributes:
 | ------------ | ------------ | ---------------------------------------------- |
 | `simulation` | `Simulation` | The simulation whose model the replicates run. |
 | `count`      | `int`        | How many replicates.                           |
-| `seed`       | `int`        | The seed the replicate seeds derive from.      |
+| `seed`       | \`int        | None\`                                         |
 
 Source code in `commol/api/simulation.py`
 
@@ -1754,11 +1751,12 @@ class ReplicateRuns:
         The simulation whose model the replicates run.
     count : int
         How many replicates.
-    seed : int
-        The seed the replicate seeds derive from.
+    seed : int | None
+        The seed the replicate seeds derive from; None draws one at each run,
+        which the replicates keep (`SimulationReplicates.seed`).
     """
 
-    def __init__(self, simulation: Simulation, count: int, seed: int):
+    def __init__(self, simulation: Simulation, count: int, seed: int | None) -> None:
         """
         The replicates of a simulation.
 
@@ -1768,8 +1766,9 @@ class ReplicateRuns:
             The simulation whose model the replicates run.
         count : int
             How many replicates.
-        seed : int
-            The seed the replicate seeds derive from.
+        seed : int | None
+            The seed the replicate seeds derive from; None draws one at each
+            run.
         """
         self.simulation = simulation
         self.count = count
@@ -1780,7 +1779,9 @@ class ReplicateRuns:
         simulation = self.simulation
         simulation._validate_all_parameters_calibrated(simulation.model_definition)
         engine = simulation.engine
-        positions, seeds, runs = engine.run_replicates(self.seed, self.count, grid)
+        seed, positions, seeds, runs = engine.run_replicates(
+            self.seed, self.count, grid
+        )
         outputs = simulation.simulation_outputs
         model = simulation.model_definition
         return SimulationReplicates(
@@ -1790,7 +1791,7 @@ class ReplicateRuns:
                 )
                 for replicate_seed, rows in zip(seeds, runs, strict=True)
             ),
-            seed=self.seed,
+            seed=seed,
             positions=positions,
             model=model,
         )
@@ -1849,23 +1850,23 @@ class ReplicateRuns:
 #### __init__
 
 ```python
-__init__(simulation: Simulation, count: int, seed: int)
+__init__(simulation: Simulation, count: int, seed: int | None) -> None
 ```
 
 The replicates of a simulation.
 
 Parameters:
 
-| Name         | Type         | Description                                    | Default    |
-| ------------ | ------------ | ---------------------------------------------- | ---------- |
-| `simulation` | `Simulation` | The simulation whose model the replicates run. | *required* |
-| `count`      | `int`        | How many replicates.                           | *required* |
-| `seed`       | `int`        | The seed the replicate seeds derive from.      | *required* |
+| Name         | Type         | Description                                    | Default                                                               |
+| ------------ | ------------ | ---------------------------------------------- | --------------------------------------------------------------------- |
+| `simulation` | `Simulation` | The simulation whose model the replicates run. | *required*                                                            |
+| `count`      | `int`        | How many replicates.                           | *required*                                                            |
+| `seed`       | \`int        | None\`                                         | The seed the replicate seeds derive from; None draws one at each run. |
 
 Source code in `commol/api/simulation.py`
 
 ```python
-def __init__(self, simulation: Simulation, count: int, seed: int):
+def __init__(self, simulation: Simulation, count: int, seed: int | None) -> None:
     """
     The replicates of a simulation.
 
@@ -1875,8 +1876,9 @@ def __init__(self, simulation: Simulation, count: int, seed: int):
         The simulation whose model the replicates run.
     count : int
         How many replicates.
-    seed : int
-        The seed the replicate seeds derive from.
+    seed : int | None
+        The seed the replicate seeds derive from; None draws one at each
+        run.
     """
     self.simulation = simulation
     self.count = count
@@ -2042,7 +2044,7 @@ class SimulationReplicates(list[SimulationResults]):
         seed: int,
         positions: Sequence[float],
         model: "Model | None" = None,
-    ):
+    ) -> None:
         """
         Replicates of one run.
 
@@ -2337,7 +2339,7 @@ The figures of the replicates: `plot.series()`, their mean and band, and `plot.c
 #### __init__
 
 ```python
-__init__(runs: Iterable[SimulationResults], seed: int, positions: Sequence[float], model: Model | None = None)
+__init__(runs: Iterable[SimulationResults], seed: int, positions: Sequence[float], model: Model | None = None) -> None
 ```
 
 Replicates of one run.
@@ -2366,7 +2368,7 @@ def __init__(
     seed: int,
     positions: Sequence[float],
     model: "Model | None" = None,
-):
+) -> None:
     """
     Replicates of one run.
 
@@ -2832,8 +2834,36 @@ class ODESolver(BaseModel):
     method: Literal["tsit45", "bdf"] = Field(
         default="tsit45", description="Integration method."
     )
-    rtol: float = Field(default=1e-6, gt=0.0, description="Relative tolerance.")
-    atol: float = Field(default=1e-6, gt=0.0, description="Absolute tolerance.")
+    rtol: float = Field(
+        default=commol_rs.engine.ODE_DEFAULT_RTOL, description="Relative tolerance."
+    )
+    atol: float = Field(
+        default=commol_rs.engine.ODE_DEFAULT_ATOL, description="Absolute tolerance."
+    )
+
+    @model_validator(mode="after")
+    def check_with_the_engine(self) -> Self:
+        """Ask the engine's list whether it takes the settings."""
+        return _checked(self)
+```
+
+### Methods:
+
+#### check_with_the_engine
+
+```python
+check_with_the_engine() -> Self
+```
+
+Ask the engine's list whether it takes the settings.
+
+Source code in `commol/context/engine.py`
+
+```python
+@model_validator(mode="after")
+def check_with_the_engine(self) -> Self:
+    """Ask the engine's list whether it takes the settings."""
+    return _checked(self)
 ```
 
 ## StochasticEventsSettings
@@ -2884,17 +2914,43 @@ class StochasticEventsSettings(BaseModel):
         default="direct", description="Simulation method."
     )
     tau: float | None = Field(
-        default=None, gt=0.0, description="Length of a leap of tau-leaping."
+        default=None, description="Length of a leap of tau-leaping."
     )
     epsilon: float = Field(
-        default=0.03, gt=0.0, lt=1.0, description="Bound of an adaptive leap."
+        default=commol_rs.engine.STOCHASTIC_EVENTS_DEFAULT_EPSILON,
+        description="Bound of an adaptive leap.",
     )
     tolerance: float = Field(
-        default=1e-8, gt=0.0, description="Relative tolerance of an event time."
+        default=commol_rs.engine.STOCHASTIC_EVENTS_DEFAULT_TOLERANCE,
+        description="Relative tolerance of an event time.",
     )
     rounding: Rounding | None = Field(
         default=None, description="How to make the initial amounts whole."
     )
+
+    @model_validator(mode="after")
+    def check_with_the_engine(self) -> Self:
+        """Ask the engine's list whether it takes the settings."""
+        return _checked(self)
+```
+
+### Methods:
+
+#### check_with_the_engine
+
+```python
+check_with_the_engine() -> Self
+```
+
+Ask the engine's list whether it takes the settings.
+
+Source code in `commol/context/engine.py`
+
+```python
+@model_validator(mode="after")
+def check_with_the_engine(self) -> Self:
+    """Ask the engine's list whether it takes the settings."""
+    return _checked(self)
 ```
 
 ## StochasticStepsSettings
@@ -2928,6 +2984,30 @@ class StochasticStepsSettings(BaseModel):
     rounding: Rounding | None = Field(
         default=None, description="How to make the initial amounts whole."
     )
+
+    @model_validator(mode="after")
+    def check_with_the_engine(self) -> Self:
+        """Ask the engine's list whether it takes the settings."""
+        return _checked(self)
+```
+
+### Methods:
+
+#### check_with_the_engine
+
+```python
+check_with_the_engine() -> Self
+```
+
+Ask the engine's list whether it takes the settings.
+
+Source code in `commol/context/engine.py`
+
+```python
+@model_validator(mode="after")
+def check_with_the_engine(self) -> Self:
+    """Ask the engine's list whether it takes the settings."""
+    return _checked(self)
 ```
 
 ## InfeasibleStateError

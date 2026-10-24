@@ -3851,12 +3851,12 @@ deterministic engine, such as <code>DifferenceEquations</code> and
 <tr>
 <td><code>run(n)</code> without a seed</td>
 <td><code>results.seed</code> is <code>None</code></td>
-<td>Draws a seed from the operating system and keeps it in <code>results.seed</code>, so the run can be repeated</td>
+<td>The engine draws a seed and keeps it in <code>results.seed</code>, so the run can be repeated</td>
 </tr>
 <tr>
 <td><code>replicates(count, seed=s).run(…)</code></td>
 <td>Raises <code>ValueError</code> that names the engine: every replicate would be equal</td>
-<td><code>count</code> runs, in parallel in the engine, each with its own seed</td>
+<td><code>count</code> runs, in parallel in the engine, each with its own seed; without <code>seed</code>, the engine draws one and keeps it in <code>replicates.seed</code></td>
 </tr>
 </tbody>
 </table>
@@ -4159,6 +4159,10 @@ engine rejects settings of another engine with an error that names both
 </tr>
 </tbody>
 </table>
+<p>The defaults are the engine's (<code>commol_rs.engine.ODE_DEFAULT_RTOL</code> and
+<code>ODE_DEFAULT_ATOL</code>), and the engine checks the settings when they are built:
+<code>ODESolver(rtol=0.0)</code> raises <code>ValidationError</code> with the message of the
+engine, <code>The solver tolerance rtol must be a positive number, got 0</code>.</p>
 <p><code>bdf</code> builds its Jacobian from a finite-difference Jacobian-vector product. It
 uses a dense matrix below <code>SPARSE_THRESHOLD</code> state components and a sparse one
 from there (<code>crates/commol-differential/src/solve.rs</code>).</p>

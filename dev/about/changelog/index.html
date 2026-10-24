@@ -4610,6 +4610,46 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>Simulation.outputs_for</code>, and a sum of outputs that the results do not hold
   gives one message, <code>Missing output series in results</code>, in a simulation, a
   report and a figure.</li>
+<li>The engine checks a model, a calibration and the engine settings, and
+  Python repeats none of its checks, so each mistake gets the message of the
+  engine. A parameter named after an engine variable, a bin, a compartment
+  or a subgroup total names each conflict and asks to rename the parameter.
+  An observation of an output the model does not have names the output, the
+  observation and the outputs: <code>Invalid observed output name 'X' for
+  observation 'series1' (available: A, B, C)</code>. A factor with a bound of 0 or
+  below fails with <code>Factor parameter 'f' must have positive bounds (got
+  min=0, max=2)</code>. <code>Collinearity</code> checks <code>max_subset_size</code> when it runs, with
+  <code>max_subset_size must be from 2 to the number of parameters (3), got 9</code>.
+  The needs of a stochastic engine (<code>replicates</code>, <code>seed</code> and
+  <code>replicate_summary</code> of a calibration; <code>replicates</code> and <code>seed</code> of a
+  sensitivity analysis) keep their messages, which the engine now gives.</li>
+<li><code>ODESolver</code> and <code>StochasticEventsSettings</code> take their defaults from the
+  engine and check themselves with the engine when they are built:
+  <code>StochasticEventsSettings(epsilon=1.5)</code> gives <code>epsilon is strictly between
+  0 and 1, got 1.5</code>. Every other setting strictly between 0 and 1
+  (<code>target_cess</code>, <code>stay_probability</code>, <code>min_acceptance</code>, the <code>quantile</code> of
+  <code>ABCRejection</code>, <code>correlation_threshold</code>) gives <code>&lt;name&gt; is strictly between
+  0 and 1, got &lt;value&gt;</code>, <code>Quantile(1.5)</code> gives <code>A quantile level is between 0
+  and 1, got 1.5</code>, and a Sobol analysis of the Rust API with fewer than 2
+  draws says <code>draws</code>, the name of the setting.</li>
+<li>A negative count that reaches the engine, such as <code>Simulation.run(-1)</code>, the
+  <code>replicates</code> of a <code>SensitivityAnalysis</code> or the <code>max_subset_size</code> of
+  <code>Collinearity</code>, raises <code>ValueError</code> that names the setting,
+  <code>num_steps is a whole number from 0, got -1</code>, in place of an
+  <code>OverflowError</code> with no name. Every count of the bindings reads this way.</li>
+<li>The engine draws a seed that its user does not set, in one place, and the
+  result gives the seed it ran with, as before: <code>results.seed</code>,
+  <code>SimulationReplicates.seed</code>, <code>Calibrator.seed</code> and
+  <code>SensitivityAnalysis.seed</code>. A calibrator with no seed logs the seed it drew
+  when it is built, not when it first runs.</li>
+<li>Ruff checks that every signature of the package has annotations and that
+  none is <code>typing.Any</code>; the raw input of a validator is a <code>JsonValue</code>. A
+  keyword that
+  <code>Quantile</code>, <code>Groups</code>, <code>Level</code> or <code>Increments</code> does not take raises
+  <code>TypeError</code> that names it, such as <code>Quantile(0.5, unknown=1)</code>, in place of
+  the <code>ValidationError</code> <code>Extra inputs are not permitted</code>. A <code>ParameterSample</code>
+  whose <code>names</code>, <code>bounds</code> or <code>values</code> are not valid gets the pydantic message
+  of that field before the engine checks the log weights.</li>
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
@@ -4659,7 +4699,19 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   the parse used one step of the stack for each term, and the process
   crashed near 20 000 terms, or near 2 000 on a thread of the parallel work.</li>
 <li>A chain of powers groups from the right, as in Python: <code>2 ** 3 ** 2</code> is</li>
-<li>Before, it was 64, <code>(2 ** 3) ** 2</code>.</li>
+<li>
+<p>Before, it was 64, <code>(2 ** 3) ** 2</code>.</p>
+</li>
+<li>
+<p><code>ParticleSwarmConfig.inertia("constant")</code> and
+  <code>.acceleration("constant")</code> take the weight and the coefficients of
+  canonical particle swarm, <code>1/(2 ln 2)</code> and <code>0.5 + ln 2</code>, which a swarm with
+  no inertia or acceleration strategy uses. Before, their defaults were the
+  rounded <code>0.721</code> and <code>1.193</code>, so a swarm that named the constant strategy
+  moved a little differently from one that did not.</p>
+</li>
+<li>Three messages of a calibration with observation models no longer hold a
+  run of spaces in the middle of a sentence.</li>
 </ul>
 <h2 id="0101-2026-10-23">[0.10.1] - 2026-10-23<a class="headerlink" href="#0101-2026-10-23" title="Permanent link">&para;</a></h2>
 <p>This release ships the fixes of the audit at 0.9.0 that change no API. In the

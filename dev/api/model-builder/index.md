@@ -32,7 +32,7 @@ class ModelBuilder:
         bin_unit: str | None = None,
         step_unit: str | None = None,
         origin: date | None = None,
-    ):
+    ) -> None:
         """
         Initialize the ModelBuilder.
 
@@ -834,7 +834,7 @@ class ModelBuilder:
 #### __init__
 
 ```python
-__init__(name: str, description: str | None = None, version: str | None = None, bin_unit: str | None = None, step_unit: str | None = None, origin: date | None = None)
+__init__(name: str, description: str | None = None, version: str | None = None, bin_unit: str | None = None, step_unit: str | None = None, origin: date | None = None) -> None
 ```
 
 Initialize the ModelBuilder.
@@ -861,7 +861,7 @@ def __init__(
     bin_unit: str | None = None,
     step_unit: str | None = None,
     origin: date | None = None,
-):
+) -> None:
     """
     Initialize the ModelBuilder.
 

@@ -3737,7 +3737,9 @@ seed of the analysis (<code>Stream</code>, <code>streams.rs</code>).</p>
       <code>commol-model</code>: it gives its compiled model, <code>delegate_to_compiled_model!</code>
       writes the methods that read it, and <code>record_steps</code> runs an engine that
       reports only at integer steps); <code>check_position</code> is the rule of
-      <code>EngineType</code>, and <code>try_from_model</code> rejects a model of another engine. A
+      <code>EngineType</code>, <code>engine_type</code> returns its entry (so <code>is_stochastic</code> and
+      the messages of a calibration read it), and <code>try_from_model</code> rejects a
+      model of another engine. A
       stochastic engine draws every random number from one
       <code>commol_random::Generator</code>, implements <code>set_seed</code>, and restores the
       generator in <code>reset</code>, so a run repeats from its seed.</li>
@@ -3805,6 +3807,10 @@ seed of the analysis (<code>Stream</code>, <code>streams.rs</code>).</p>
 <h3 id="pyo3-bindings">PyO3 bindings<a class="headerlink" href="#pyo3-bindings" title="Permanent link">&para;</a></h3>
 <ul>
 <li>[ ] Keep logic out of <code>py-commol/src/</code>: convert types and call the crate.</li>
+<li>[ ] Read each count a user sets with the reader of its name,
+      <code>#[pyo3(from_py_with = crate::counts::required::&lt;name&gt;)]</code> (or
+      <code>optional::&lt;name&gt;</code>), so a negative count raises <code>ValueError</code> that names
+      the setting; add the case to <code>tests/uncertainty/test_counts.py</code>.</li>
 <li>[ ] Update <code>_commol_rs.pyi</code>.</li>
 <li>[ ] Rebuild the extension with the test model kind
       (<a href="../../development/workflow/#quick-commands">Quick commands</a>) before you run

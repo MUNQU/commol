@@ -33,7 +33,7 @@ class SensitivityAnalysis:
         *,
         replicates: int | None = None,
         seed: int | None = None,
-    ):
+    ) -> None:
         """
         Build the analysis of `inputs` on `simulation`.
 
@@ -52,36 +52,20 @@ class SensitivityAnalysis:
             the same analysis runs on every engine.
         seed : int | None, optional
             The seed of the designs and the replicates. Required with a
-            stochastic engine; otherwise None draws one from the operating
-            system, which the analysis logs.
+            stochastic engine; otherwise None has the engine draw one, which
+            `seed` reports and the analysis logs.
 
         Raises
         ------
         ValueError
             If an input is not a value of the model, the replicates or the
-            seed do not fit the engine, `replicates` is below 1, or the seed
-            is not a whole number from 0 to ``2**64 - 1``.
+            seed do not fit the engine, `replicates` is below 1 (a negative
+            number included), or the seed is not a whole number from 0 to
+            ``2**64 - 1``.
         """
-        engine_type = simulation.model_definition.engine.type
-        stochastic = commol_rs.engine.EngineType(engine_type).is_stochastic
-        if replicates is not None and replicates < 1:
-            raise ValueError(f"replicates is at least 1, got {replicates}")
-        if stochastic and replicates is None:
-            raise ValueError(
-                f"The {engine_type} engine is stochastic: set replicates, how many "
-                "replicates each point of a design runs."
-            )
-        if stochastic and seed is None:
-            raise ValueError(
-                f"The {engine_type} engine is stochastic: set seed, so the "
-                "replicates and the analysis are reproducible."
-            )
         self.simulation: Simulation = simulation
         self.inputs: InputSpace = inputs
         self.replicates: int | None = replicates
-        if seed is not None:
-            check_seed(seed)
-        self._seed: int | None = seed
         check_values(
             simulation.model_definition,
             simulation.engine,
@@ -94,9 +78,14 @@ class SensitivityAnalysis:
             distributions=inputs.rust_distributions(),
             sample=None if inputs.sample is None else inputs.sample.rust_sample,
             initial_condition_remainder=inputs.initial_condition_remainder,
-            replicates=replicates if stochastic else None,
-            seed=self.seed,
+            replicates=replicates,
+            seed=None if seed is None else check_seed(seed),
         )
+        if seed is None:
+            logger.info(
+                "No seed set; drew the seed %d, which repeats this analysis.",
+                self._rust.seed,
+            )
 
     @property
     def rust_analysis(self) -> "ForwardAnalysisProtocol":
@@ -233,18 +222,10 @@ class SensitivityAnalysis:
         Returns
         -------
         int
-            The seed given, or a seed drawn from the operating system once
-            per analysis and logged.
+            The seed given, or the seed the engine drew when the analysis
+            was built, which it logs.
         """
-        if self._seed is not None:
-            return self._seed
-        if not hasattr(self, "_drawn_seed"):
-            self._drawn_seed = draw_seed()
-            logger.info(
-                "No seed set; drew the seed %d, which repeats this analysis.",
-                self._drawn_seed,
-            )
-        return self._drawn_seed
+        return self._rust.seed
 
     def run(self, method: SensitivityMethod[ResultT]) -> ResultT:
         """
@@ -306,14 +287,14 @@ Returns:
 
 | Type  | Description                                                                             |
 | ----- | --------------------------------------------------------------------------------------- |
-| `int` | The seed given, or a seed drawn from the operating system once per analysis and logged. |
+| `int` | The seed given, or the seed the engine drew when the analysis was built, which it logs. |
 
 ### Methods:
 
 #### __init__
 
 ```python
-__init__(simulation: Simulation, inputs: InputSpace, *, replicates: int | None = None, seed: int | None = None)
+__init__(simulation: Simulation, inputs: InputSpace, *, replicates: int | None = None, seed: int | None = None) -> None
 ```
 
 Build the analysis of `inputs` on `simulation`.
@@ -325,13 +306,13 @@ Parameters:
 | `simulation` | `Simulation` | The model to analyse. | *required*                                                                                                                                                                                                                                                                                                                                                                    |
 | `inputs`     | `InputSpace` | What varies.          | *required*                                                                                                                                                                                                                                                                                                                                                                    |
 | `replicates` | \`int        | None\`                | For a stochastic engine, required, at least 1: how many replicates each point runs. A point of the design of PRCC, Morris, Sobol or polynomial chaos holds the mean of its replicates, on the same seeds at every point; a propagation keeps every replicate, each with a seed of its own. A deterministic engine does not use it, so the same analysis runs on every engine. |
-| `seed`       | \`int        | None\`                | The seed of the designs and the replicates. Required with a stochastic engine; otherwise None draws one from the operating system, which the analysis logs.                                                                                                                                                                                                                   |
+| `seed`       | \`int        | None\`                | The seed of the designs and the replicates. Required with a stochastic engine; otherwise None has the engine draw one, which seed reports and the analysis logs.                                                                                                                                                                                                              |
 
 Raises:
 
-| Type         | Description                                                                                                                                                                |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If an input is not a value of the model, the replicates or the seed do not fit the engine, replicates is below 1, or the seed is not a whole number from 0 to 2\*\*64 - 1. |
+| Type         | Description                                                                                                                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If an input is not a value of the model, the replicates or the seed do not fit the engine, replicates is below 1 (a negative number included), or the seed is not a whole number from 0 to 2\*\*64 - 1. |
 
 Source code in `commol/api/sensitivity.py`
 
@@ -343,7 +324,7 @@ def __init__(
     *,
     replicates: int | None = None,
     seed: int | None = None,
-):
+) -> None:
     """
     Build the analysis of `inputs` on `simulation`.
 
@@ -362,36 +343,20 @@ def __init__(
         the same analysis runs on every engine.
     seed : int | None, optional
         The seed of the designs and the replicates. Required with a
-        stochastic engine; otherwise None draws one from the operating
-        system, which the analysis logs.
+        stochastic engine; otherwise None has the engine draw one, which
+        `seed` reports and the analysis logs.
 
     Raises
     ------
     ValueError
         If an input is not a value of the model, the replicates or the
-        seed do not fit the engine, `replicates` is below 1, or the seed
-        is not a whole number from 0 to ``2**64 - 1``.
+        seed do not fit the engine, `replicates` is below 1 (a negative
+        number included), or the seed is not a whole number from 0 to
+        ``2**64 - 1``.
     """
-    engine_type = simulation.model_definition.engine.type
-    stochastic = commol_rs.engine.EngineType(engine_type).is_stochastic
-    if replicates is not None and replicates < 1:
-        raise ValueError(f"replicates is at least 1, got {replicates}")
-    if stochastic and replicates is None:
-        raise ValueError(
-            f"The {engine_type} engine is stochastic: set replicates, how many "
-            "replicates each point of a design runs."
-        )
-    if stochastic and seed is None:
-        raise ValueError(
-            f"The {engine_type} engine is stochastic: set seed, so the "
-            "replicates and the analysis are reproducible."
-        )
     self.simulation: Simulation = simulation
     self.inputs: InputSpace = inputs
     self.replicates: int | None = replicates
-    if seed is not None:
-        check_seed(seed)
-    self._seed: int | None = seed
     check_values(
         simulation.model_definition,
         simulation.engine,
@@ -404,9 +369,14 @@ def __init__(
         distributions=inputs.rust_distributions(),
         sample=None if inputs.sample is None else inputs.sample.rust_sample,
         initial_condition_remainder=inputs.initial_condition_remainder,
-        replicates=replicates if stochastic else None,
-        seed=self.seed,
+        replicates=replicates,
+        seed=None if seed is None else check_seed(seed),
     )
+    if seed is None:
+        logger.info(
+            "No seed set; drew the seed %d, which repeats this analysis.",
+            self._rust.seed,
+        )
 ```
 
 #### rust_predictive
@@ -2741,8 +2711,10 @@ class Level(_Outputs):
 
     kind: Literal["level"] = "level"
 
-    def __init__(self, outputs: str | list[str], **data: Any) -> None:
-        super().__init__(outputs=outputs, **data)
+    def __init__(
+        self, outputs: str | list[str], *, kind: Literal["level"] = "level"
+    ) -> None:
+        BaseModel.__init__(self, outputs=outputs, kind=kind)
 
     @property
     def text(self) -> str:
@@ -2820,8 +2792,14 @@ class Increments(_Outputs):
     kind: Literal["increments"] = "increments"
     window: float = Field(gt=0.0, allow_inf_nan=False, description="The width.")
 
-    def __init__(self, outputs: str | list[str], window: float, **data: Any) -> None:
-        super().__init__(outputs=outputs, **{**data, "window": window})
+    def __init__(
+        self,
+        outputs: str | list[str],
+        window: float,
+        *,
+        kind: Literal["increments"] = "increments",
+    ) -> None:
+        BaseModel.__init__(self, outputs=outputs, window=window, kind=kind)
 
     @property
     def text(self) -> str:

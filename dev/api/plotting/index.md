@@ -23,7 +23,7 @@ class ResultsPlot:
     panel of that series instead.
     """
 
-    def __init__(self, results: "SimulationResults"):
+    def __init__(self, results: "SimulationResults") -> None:
         """
         The figures of `results`.
 
@@ -289,7 +289,7 @@ class ResultsPlot:
 #### __init__
 
 ```python
-__init__(results: SimulationResults)
+__init__(results: SimulationResults) -> None
 ```
 
 The figures of `results`.
@@ -303,7 +303,7 @@ Parameters:
 Source code in `commol/api/plotting/accessors.py`
 
 ```python
-def __init__(self, results: "SimulationResults"):
+def __init__(self, results: "SimulationResults") -> None:
     """
     The figures of `results`.
 
@@ -706,7 +706,7 @@ class ReplicatesPlot:
     `series` adds the band of the replicates.
     """
 
-    def __init__(self, replicates: "SimulationReplicates"):
+    def __init__(self, replicates: "SimulationReplicates") -> None:
         """
         The figures of `replicates`.
 
@@ -953,7 +953,7 @@ class ReplicatesPlot:
 #### __init__
 
 ```python
-__init__(replicates: SimulationReplicates)
+__init__(replicates: SimulationReplicates) -> None
 ```
 
 The figures of `replicates`.
@@ -967,7 +967,7 @@ Parameters:
 Source code in `commol/api/plotting/accessors.py`
 
 ```python
-def __init__(self, replicates: "SimulationReplicates"):
+def __init__(self, replicates: "SimulationReplicates") -> None:
     """
     The figures of `replicates`.
 
@@ -1354,7 +1354,7 @@ class PredictivePlot:
     other run; the model of the source names the series.
     """
 
-    def __init__(self, predictive: "Predictive"):
+    def __init__(self, predictive: "Predictive") -> None:
         """
         The figures of `predictive`.
 
@@ -1603,7 +1603,7 @@ class PredictivePlot:
 #### __init__
 
 ```python
-__init__(predictive: Predictive)
+__init__(predictive: Predictive) -> None
 ```
 
 The figures of `predictive`.
@@ -1617,7 +1617,7 @@ Parameters:
 Source code in `commol/api/plotting/accessors.py`
 
 ```python
-def __init__(self, predictive: "Predictive"):
+def __init__(self, predictive: "Predictive") -> None:
     """
     The figures of `predictive`.
 

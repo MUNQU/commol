@@ -107,7 +107,7 @@ class Model(BaseModel, Generic[StructureT]):
 
     @field_validator("structure", mode="before")
     @classmethod
-    def read_structure_kind(cls, value: object) -> object:
+    def read_structure_kind(cls, value: JsonValue) -> JsonValue | ModelStructure:
         """Read a structure mapping as the class of its ``kind`` and ``variant``."""
         if not isinstance(value, Mapping):
             return value
@@ -503,7 +503,7 @@ def check_origin_unit(self) -> Self:
 #### read_structure_kind
 
 ```python
-read_structure_kind(value: object) -> object
+read_structure_kind(value: JsonValue) -> JsonValue | ModelStructure
 ```
 
 Read a structure mapping as the class of its `kind` and `variant`.
@@ -513,7 +513,7 @@ Source code in `commol/context/model.py`
 ```python
 @field_validator("structure", mode="before")
 @classmethod
-def read_structure_kind(cls, value: object) -> object:
+def read_structure_kind(cls, value: JsonValue) -> JsonValue | ModelStructure:
     """Read a structure mapping as the class of its ``kind`` and ``variant``."""
     if not isinstance(value, Mapping):
         return value
@@ -2484,10 +2484,11 @@ class Aggregate(ModelStructure, InitialConditions):
         Check the structure against the process and the parameters.
 
         The process needs a bin and a transition, the amounts must name every
-        bin and the fractions every category of the process, parameter ids
-        must not be engine variables or bin ids, and the engine must plan
-        every transition, resolve the neighbors, find every variable a rate or
-        a formula parameter reads, and build the initial state.
+        bin and the fractions every category of the process, and the engine
+        must plan every transition, accept every id (no parameter id is an
+        engine variable, a bin, a compartment or a subgroup total), resolve
+        the neighbors, find every variable a rate or a formula parameter
+        reads, and build the initial state.
 
         Parameters
         ----------
@@ -2506,7 +2507,6 @@ class Aggregate(ModelStructure, InitialConditions):
             raise ValueError("At least one transition must be defined.")
         self._check_bin_amounts(process)
         self._check_stratification_fractions(process)
-        self._check_parameter_names(model)
         engine_state.transition_flows(process, self)
         engine_state.check_model(model)
         if self.compartment_amounts:
@@ -2935,33 +2935,6 @@ class Aggregate(ModelStructure, InitialConditions):
                     f"Stratification fractions for '{strat_id}' must sum to 1.0, "
                     f"but got {total:.7}."
                 )
-
-    def _check_parameter_names(self, model: "Model[Self]") -> None:
-        """
-        Check that parameter ids are not engine variables or bin ids.
-
-        Expanded compartment names, subgroup totals and the names of the
-        neighbors are checked by the engine (``engine_state.check_model``).
-        """
-        bin_ids = {bin_item.id for bin_item in model.process.bins}
-        parameter_ids = {p.id for p in model.parameters}
-
-        special = sorted(parameter_ids & set(RESERVED_VARIABLE_NAMES))
-        if special:
-            raise ValueError(
-                f"Parameter IDs conflict with engine variables: {special}. "
-                f"{', '.join(RESERVED_VARIABLE_NAMES)} are reserved. "
-                f"Please rename the conflicting parameters."
-            )
-
-        conflicting_names = bin_ids & parameter_ids
-        if conflicting_names:
-            raise ValueError(
-                f"Parameter IDs conflict with reserved compartment names: "
-                f"{sorted(conflicting_names)}. "
-                f"Bin IDs ({sorted(bin_ids)}) are reserved variables. "
-                f"Please rename the conflicting parameters."
-            )
 ```
 
 ### Methods:
@@ -2974,7 +2947,7 @@ check_model(model: Model[Self]) -> None
 
 Check the structure against the process and the parameters.
 
-The process needs a bin and a transition, the amounts must name every bin and the fractions every category of the process, parameter ids must not be engine variables or bin ids, and the engine must plan every transition, resolve the neighbors, find every variable a rate or a formula parameter reads, and build the initial state.
+The process needs a bin and a transition, the amounts must name every bin and the fractions every category of the process, and the engine must plan every transition, accept every id (no parameter id is an engine variable, a bin, a compartment or a subgroup total), resolve the neighbors, find every variable a rate or a formula parameter reads, and build the initial state.
 
 Parameters:
 
@@ -2996,10 +2969,11 @@ def check_model(self, model: "Model[Self]") -> None:
     Check the structure against the process and the parameters.
 
     The process needs a bin and a transition, the amounts must name every
-    bin and the fractions every category of the process, parameter ids
-    must not be engine variables or bin ids, and the engine must plan
-    every transition, resolve the neighbors, find every variable a rate or
-    a formula parameter reads, and build the initial state.
+    bin and the fractions every category of the process, and the engine
+    must plan every transition, accept every id (no parameter id is an
+    engine variable, a bin, a compartment or a subgroup total), resolve
+    the neighbors, find every variable a rate or a formula parameter
+    reads, and build the initial state.
 
     Parameters
     ----------
@@ -3018,7 +2992,6 @@ def check_model(self, model: "Model[Self]") -> None:
         raise ValueError("At least one transition must be defined.")
     self._check_bin_amounts(process)
     self._check_stratification_fractions(process)
-    self._check_parameter_names(model)
     engine_state.transition_flows(process, self)
     engine_state.check_model(model)
     if self.compartment_amounts:
@@ -3804,7 +3777,8 @@ class Groups(BaseModel):
         self,
         stratification: str,
         weights: Mapping[str, Mapping[str, float]] | None = None,
-        **data: object,
+        *,
+        type: Literal["groups"] = "groups",
     ) -> None:
         """
         Group the neighbors of a unit by the categories of a stratification.
@@ -3816,15 +3790,15 @@ class Groups(BaseModel):
         weights : Mapping[str, Mapping[str, float]] | None, default=None
             ``weights[g][g']``, the weight of category ``g'`` for a unit in
             ``g``. None is the identity.
-        **data : object
-            The other fields, as JSON holds them.
+        type : {"groups"}, default="groups"
+            The kind of neighbors, as JSON holds it.
         """
         super().__init__(
             stratification=stratification,
             weights=None
             if weights is None
             else {own: dict(row) for own, row in weights.items()},
-            **data,
+            type=type,
         )
 ```
 
@@ -3833,7 +3807,7 @@ class Groups(BaseModel):
 #### __init__
 
 ```python
-__init__(stratification: str, weights: Mapping[str, Mapping[str, float]] | None = None, **data: object) -> None
+__init__(stratification: str, weights: Mapping[str, Mapping[str, float]] | None = None, *, type: Literal['groups'] = 'groups') -> None
 ```
 
 Group the neighbors of a unit by the categories of a stratification.
@@ -3844,7 +3818,7 @@ Parameters:
 | ---------------- | ------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | `stratification` | `str`                                 | Id of the stratification whose categories group the units. | *required*                                                                       |
 | `weights`        | \`Mapping\[str, Mapping[str, float]\] | None\`                                                     | weights[g][g'], the weight of category g' for a unit in g. None is the identity. |
-| `**data`         | `object`                              | The other fields, as JSON holds them.                      | `{}`                                                                             |
+| `type`           | `groups`                              | The kind of neighbors, as JSON holds it.                   | `"groups"`                                                                       |
 
 Source code in `commol/context/neighbors.py`
 
@@ -3853,7 +3827,8 @@ def __init__(
     self,
     stratification: str,
     weights: Mapping[str, Mapping[str, float]] | None = None,
-    **data: object,
+    *,
+    type: Literal["groups"] = "groups",
 ) -> None:
     """
     Group the neighbors of a unit by the categories of a stratification.
@@ -3865,15 +3840,15 @@ def __init__(
     weights : Mapping[str, Mapping[str, float]] | None, default=None
         ``weights[g][g']``, the weight of category ``g'`` for a unit in
         ``g``. None is the identity.
-    **data : object
-        The other fields, as JSON holds them.
+    type : {"groups"}, default="groups"
+        The kind of neighbors, as JSON holds it.
     """
     super().__init__(
         stratification=stratification,
         weights=None
         if weights is None
         else {own: dict(row) for own, row in weights.items()},
-        **data,
+        type=type,
     )
 ```
 

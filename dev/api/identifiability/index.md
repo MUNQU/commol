@@ -65,7 +65,7 @@ class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport]):
     """
 
     points: int = Field(ge=1)
-    design: Literal["observations", "dense"]
+    design: StructuralDesign
 ```
 
 ## Collinearity
@@ -111,7 +111,7 @@ class Collinearity(IdentifiabilityMethod[IdentifiabilityReport]):
     """
 
     at: CalibrationResult | ParameterSample
-    max_subset_size: int = Field(ge=2)
+    max_subset_size: int
     threshold: float = Field(gt=1.0)
 ```
 
@@ -156,13 +156,13 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
     """
 
     sample: ParameterSample
-    reference: Literal["bounds", "prior"]
-    correlation_threshold: float = Field(gt=0.0, lt=1.0)
+    reference: SampleReference
+    correlation_threshold: Share
     priors: Priors | None = None
 
     @model_validator(mode="before")
     @classmethod
-    def read_priors(cls, data: object) -> object:
+    def read_priors(cls, data: JsonValue) -> JsonValue:
         """Read a mapping of parameter to distribution as `Priors`."""
         if isinstance(data, Mapping) and data.get("priors") is not None:
             return {**data, "priors": coerce_priors(data["priors"])}
@@ -188,7 +188,7 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
 #### read_priors
 
 ```python
-read_priors(data: object) -> object
+read_priors(data: JsonValue) -> JsonValue
 ```
 
 Read a mapping of parameter to distribution as `Priors`.
@@ -198,7 +198,7 @@ Source code in `commol/context/inference/identifiability.py`
 ```python
 @model_validator(mode="before")
 @classmethod
-def read_priors(cls, data: object) -> object:
+def read_priors(cls, data: JsonValue) -> JsonValue:
     """Read a mapping of parameter to distribution as `Priors`."""
     if isinstance(data, Mapping) and data.get("priors") is not None:
         return {**data, "priors": coerce_priors(data["priors"])}
@@ -703,7 +703,7 @@ class StructuralSection(_Frozen):
         The identifiable combinations.
     """
 
-    design: Literal["observations", "dense"]
+    design: StructuralDesign
     points: list[PointRank]
     skipped: list[str]
     generic_rank: int
@@ -920,7 +920,7 @@ class SampleSection(_Frozen):
         The modes of the marginal of each parameter.
     """
 
-    reference: Literal["bounds", "prior"]
+    reference: SampleReference
     correlation_threshold: float
     contraction: dict[str, float]
     correlation: dict[str, dict[str, float]]
@@ -1045,7 +1045,7 @@ class ProfileSection(_Frozen):
         cross the threshold.
     """
 
-    threshold: Literal["chi_square", "beale", "bootstrap_calibrated"]
+    threshold: ProfileThresholdName
     confidence_level: float
     tolerance: float
     verdicts: dict[str, ProfileVerdictName | None]

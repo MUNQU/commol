@@ -3451,16 +3451,26 @@ interval.</p>
 <td><code>confidence_level is strictly between 0 and 1, got 1.5; use 0.95 for a 95% interval</code></td>
 </tr>
 <tr>
-<td>Any other setting strictly between 0 and 1 (<code>target_cess</code>, <code>stay_probability</code>, <code>min_acceptance</code>, the <code>quantile</code> of ABC, <code>correlation_threshold</code>)</td>
-<td><code>statistics::check_open_unit(name, value)</code></td>
+<td>Any other setting strictly between 0 and 1 (<code>target_cess</code>, <code>stay_probability</code>, <code>min_acceptance</code>, the <code>quantile</code> of ABC, <code>correlation_threshold</code>, the <code>epsilon</code> of an adaptive leap)</td>
+<td><code>check_open_unit(name, value)</code> (<code>crates/commol-core/src/share.rs</code>)</td>
 <td><code>&lt;name&gt; is strictly between 0 and 1, got &lt;value&gt;</code></td>
+</tr>
+<tr>
+<td>A quantile level, <code>Quantile(level)</code> included</td>
+<td><code>statistics::check_levels</code></td>
+<td><code>A quantile level is between 0 and 1, got 1.5</code></td>
 </tr>
 </tbody>
 </table>
 <p>Python calls the first through the binding <code>commol_rs.inference.interval_levels</code>:
 <code>ci_percentiles</code>, <code>BootstrapResult.interval_error</code>, <code>PropagationResult.summary</code>,
 the scenario summaries, and every <code>confidence_level</code> field, whose type is
-<code>ConfidenceLevel</code> (<code>context/inference/levels.py</code>).</p>
+<code>ConfidenceLevel</code> (<code>context/inference/levels.py</code>). A field of a share has the
+type <code>Share</code> of the same module, which calls <code>commol_rs.inference.check_open_unit</code>
+with the name of the field, and <code>Quantile.level</code> calls
+<code>commol_rs.inference.check_levels</code>, so the error comes when the setting is
+built, with the message of Rust. The <code>epsilon</code> of <code>StochasticEventsSettings</code>
+reaches the check through the engine (<code>check_settings</code>).</p>
 <table>
 <thead>
 <tr>
@@ -3498,6 +3508,16 @@ data takes <code>starts</code>, at least 1 with the default 1, and fits with
 <code>Calibrator.run(starts)</code>: the bootstraps, the jackknife, the conformal
 methods, the profiles, <code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>,
 <code>InformationMatchingEta</code> and <code>BootstrapCoverageEta</code>.</p>
+<p>A seed that its user does not set is drawn in one place,
+<code>commol_random::seed_or_drawn</code> (<code>crates/commol-random/src/drawn.rs</code>, from the
+entropy of the operating system). The bindings of a run, its replicates, a
+calibration problem and a sensitivity analysis take <code>seed: Option&lt;u64&gt;</code>, and
+each result gives the seed it ran with (<code>results.seed</code>,
+<code>SimulationReplicates.seed</code>, <code>Calibrator.seed</code>, <code>SensitivityAnalysis.seed</code>),
+so a run can be repeated. A method that needs the seed of its user, such as a
+sensitivity analysis on a stochastic engine, refuses <code>None</code> with the message
+of the engine (<code>ForwardModel::unobserved</code>); no type tells the engine where a
+seed comes from.</p>
 <table>
 <thead>
 <tr>
@@ -3506,6 +3526,14 @@ methods, the profiles, <code>Laplace</code>, <code>Sandwich</code>, <code>Laplac
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>Python draws the seed and passes it to the engine</td>
+<td>Two places draw, and the engine cannot tell a seed its user set from one drawn for them, so it needs a second argument or type to refuse a drawn seed.</td>
+</tr>
+<tr>
+<td>A seed type that says where it comes from (<code>Set</code> or <code>Drawn</code>)</td>
+<td>The engine reads only whether a seed is set; <code>Option&lt;u64&gt;</code> says that.</td>
+</tr>
 <tr>
 <td>A <code>seed</code> of a method that overrides the seed of the source</td>
 <td>Two seeds choose the random numbers of one run, and <code>problem.seed</code> no longer repeats it.</td>
@@ -3519,6 +3547,9 @@ methods, the profiles, <code>Laplace</code>, <code>Sandwich</code>, <code>Laplac
 <p><strong>Rule:</strong> a new method takes no seed and reads the seed of its source; a new
 method that fits the data takes <code>starts</code> with the default 1.</p>
 <p><strong>Guards:</strong> <code>tests/uncertainty/test_identifiability.py::TestStructuralRank::test_structural_rank_takes_the_seed_of_the_calibrator</code>,
+<code>crates/commol-random/tests/test_seeds.rs::a_seed_that_is_set_is_kept_and_one_that_is_not_is_drawn</code>,
+<code>tests/model_kinds/test_stochastic.py</code> (<code>test_a_run_without_a_seed_keeps_the_seed_it_drew</code>, <code>test_replicates_without_a_seed_keep_the_seed_they_drew</code>),
+<code>tests/uncertainty/test_sensitivity.py::TestAnalysis::test_with_no_seed_one_is_drawn_and_logged</code>,
 <code>tests/uncertainty/test_scores.py::TestPit::test_the_pit_takes_the_seed_of_the_source</code>,
 <code>crates/commol-inference/tests/test_predictive.rs::the_pit_of_ties_follows_the_seed_of_the_draws</code>,
 <code>tests/uncertainty/test_local.py::TestStarts</code>,

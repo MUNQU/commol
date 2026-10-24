@@ -3379,12 +3379,17 @@
 </tr>
 <tr>
 <td><code>crates/commol-core/src/simulation_engine.rs</code></td>
-<td>The <code>SimulationEngine</code> trait, for an engine of any kind: runs at positions (<code>check_position</code>), outputs (<code>output_names</code>, <code>state_outputs</code>, <code>output_sums</code>), parameters, reset, the seed of a stochastic engine (<code>set_seed</code>), and the values of its kind (<code>plan_values</code>, <code>apply_values</code>, <code>ValuePlan</code>); <code>Trajectory</code>, <code>check_positions</code>, <code>run_replicates</code> (one run per seed, in parallel). What calibration needs from any engine.</td>
+<td>The <code>SimulationEngine</code> trait, for an engine of any kind: runs at positions (<code>check_position</code>), outputs (<code>output_names</code>, <code>state_outputs</code>, <code>output_sums</code>), parameters, reset, the seed of a stochastic engine (<code>set_seed</code>), the entry of the list of engines it runs and whether it draws random numbers (<code>engine_type</code>, <code>is_stochastic</code>), and the values of its kind (<code>plan_values</code>, <code>apply_values</code>, <code>ValuePlan</code>); <code>Trajectory</code>, <code>check_positions</code>, <code>run_replicates</code> (one run per seed, in parallel). What calibration needs from any engine.</td>
 <td>Code for one engine or one kind.</td>
 </tr>
 <tr>
+<td><code>crates/commol-core/src/share.rs</code></td>
+<td>The one check of a setting strictly between 0 and 1 (<code>check_open_unit</code>), for the settings of an engine and of the inference methods.</td>
+<td>A check of such a setting anywhere else.</td>
+</tr>
+<tr>
 <td><code>crates/commol-random/</code></td>
-<td>What every stochastic engine and inference method shares and no model: the generator (<code>Generator</code>, <code>Xoshiro256PlusPlus</code> seeded by SplitMix64, with its uniforms), <code>replicate_seed</code>, <code>stream_seed</code>, the samplers (<code>sample</code>: exponential, Poisson, binomial, multinomial, normal, gamma, an index below <code>n</code>), <code>SumTree</code>, the rates of a set of events, which the stochastic engine of the test kind uses (<code>StochasticEvents</code> scans its propensities), and <code>latin_hypercube</code> on the unit cube.</td>
+<td>What every stochastic engine and inference method shares and no model: the generator (<code>Generator</code>, <code>Xoshiro256PlusPlus</code> seeded by SplitMix64, with its uniforms), <code>replicate_seed</code>, <code>stream_seed</code>, <code>seed_or_drawn</code> (the one place a seed that its caller does not set is drawn), the samplers (<code>sample</code>: exponential, Poisson, binomial, multinomial, normal, gamma, an index below <code>n</code>), <code>SumTree</code>, the rates of a set of events, which the stochastic engine of the test kind uses (<code>StochasticEvents</code> scans its propensities), and <code>latin_hypercube</code> on the unit cube.</td>
 <td>Anything of a model or an engine; a sampler in another crate.</td>
 </tr>
 <tr>
@@ -3469,12 +3474,12 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/calibration_problem.rs</code></td>
-<td><code>CalibrationProblem</code>: the layers below, built once (<code>new</code>, <code>with_replicates</code>, <code>with_observation_normalization</code>, <code>with_initial_condition_remainder</code>), a copy with other observed values and weights (<code>with_data</code>), a copy whose runs also report at the positions of other observations (<code>observing</code>), the one evaluation of a point (<code>evaluate</code>), the predictions of one seeded run (<code>predict_once</code>), and the position check that names an observation or constraint (<code>check_positions</code>). It uses only <code>SimulationEngine</code>.</td>
+<td><code>CalibrationProblem</code>: the layers below, built once (<code>new</code>, which refuses observation models with a stochastic engine; <code>with_replicates</code>; <code>with_replicate_settings</code>, the replicates, seed and summary a stochastic engine needs, with the message that names a missing one; <code>with_observation_normalization</code>, <code>with_initial_condition_remainder</code>), a copy with other observed values and weights (<code>with_data</code>), a copy whose runs also report at the positions of other observations (<code>observing</code>), the one evaluation of a point (<code>evaluate</code>), the predictions of one seeded run (<code>predict_once</code>), and the position check that names an observation or constraint (<code>check_positions</code>). It uses only <code>SimulationEngine</code>.</td>
 <td>Penalties; optimizer setup; anything of one model kind.</td>
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/forward.rs</code></td>
-<td><code>ForwardModel</code>: every clone, reset, write of values and run of the engine (<code>run_schedule</code>, <code>run_observed</code>, <code>run_at</code>), one run per replicate of a stochastic engine, or one run seeded by its caller (<code>run_once</code>); the same model on other observations (<code>with_observations</code>, which checks their positions), or with none (<code>unobserved</code>); <code>Workspace</code>; the one schedule of a set of observations (<code>schedule_of</code>: each position and window start, sorted, once) and the one mean over replicates (<code>replicate_mean</code>).</td>
+<td><code>ForwardModel</code>: every clone, reset, write of values and run of the engine (<code>run_schedule</code>, <code>run_observed</code>, <code>run_at</code>), one run per replicate of a stochastic engine, or one run seeded by its caller (<code>run_once</code>); the same model on other observations (<code>with_observations</code>, which checks their positions), or with none (<code>unobserved</code>, which asks a stochastic engine for replicates and a seed); <code>Workspace</code>; the one schedule of a set of observations (<code>schedule_of</code>: each position and window start, sorted, once) and the one mean over replicates (<code>replicate_mean</code>).</td>
 <td>Loss, penalties, history; a second schedule or mean over replicates.</td>
 </tr>
 <tr>
@@ -3519,7 +3524,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/values.rs</code></td>
-<td>How calibrated values reach any engine: parameters by id, which the engine checks when a problem is built (<code>set_parameter</code> on a copy), values of the model kind through the engine (<code>ValueWriter</code>, <code>check_model_values</code>, <code>configured_engine</code>).</td>
+<td>How calibrated values reach any engine: parameters by id, which the engine checks when a problem is built (<code>set_parameter</code> on a copy), values of the model kind through the engine (<code>ValueWriter</code>, <code>check_model_values</code>, <code>configured_engine</code>); a factor has positive bounds (<code>ValueWriter::new</code>).</td>
 <td>How a kind resolves its values; a check of parameter ids in Python.</td>
 </tr>
 <tr>
@@ -3534,7 +3539,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/statistics.rs</code></td>
-<td>The one quantile (weighted, midpoints of the cumulative weights; Hazen with equal weights), used by the summary of the replicates of a calibration and by every interval, sample and band of <code>commol-inference</code>, which re-exports the module as <code>commol_inference::statistics</code>; weighted mean and covariance, Kish's effective size; the one check of a confidence level (<code>interval_levels</code>) and of any other setting strictly between 0 and 1 (<code>check_open_unit</code>).</td>
+<td>The one quantile (weighted, midpoints of the cumulative weights; Hazen with equal weights), used by the summary of the replicates of a calibration and by every interval, sample and band of <code>commol-inference</code>, which re-exports the module as <code>commol_inference::statistics</code>; weighted mean and covariance, Kish's effective size; the one check of a confidence level (<code>interval_levels</code>, on <code>commol_core::check_open_unit</code>) and of quantile levels (<code>check_levels</code>).</td>
 <td>Quantiles or checks of such a setting anywhere else.</td>
 </tr>
 <tr>
@@ -3584,7 +3589,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/global_sensitivity/</code></td>
-<td><code>analysis.rs</code> (<code>ForwardAnalysis</code>: the forward model, the inputs and the seed streams, and each method in one call), and the estimators: <code>prcc.rs</code> (weighted PRCC and its test), <code>morris.rs</code>, <code>sobol.rs</code> (with the bootstrap of rows), <code>chaos.rs</code> (<code>ChaosExpansion</code>, a surrogate, and <code>Truncation</code>, the terms its basis keeps).</td>
+<td><code>analysis.rs</code> (<code>ForwardAnalysis</code>: the forward model, the inputs and the seed streams, and each method in one call; with no seed it draws one, which a stochastic engine refuses), and the estimators: <code>prcc.rs</code> (weighted PRCC and its test), <code>morris.rs</code>, <code>sobol.rs</code> (with the bootstrap of rows), <code>chaos.rs</code> (<code>ChaosExpansion</code>, a surrogate, and <code>Truncation</code>, the terms its basis keeps).</td>
 <td>Designs; code of one engine.</td>
 </tr>
 <tr>
@@ -3653,6 +3658,11 @@
 <td><code>py-commol/src/core.rs</code></td>
 <td>Bindings of the model types (<code>Model</code>, <code>Process</code>, <code>Aggregate</code>, …).</td>
 <td>Logic.</td>
+</tr>
+<tr>
+<td><code>py-commol/src/counts.rs</code></td>
+<td><code>count</code>, the one reading of a count a binding takes from Python, and a reader per name (<code>required</code>, <code>optional</code>) for <code>#[pyo3(from_py_with = ...)]</code>: a negative number, or one above the type, raises <code>ValueError</code> that names the setting.</td>
+<td>The rule of a setting, which its method checks.</td>
 </tr>
 <tr>
 <td><code>py-commol/src/model.rs</code></td>
@@ -3798,7 +3808,7 @@
 </tr>
 <tr>
 <td><code>context/inference/</code></td>
-<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code>, <code>IdentifiabilityMethod</code> and <code>SensitivityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, the identifiability methods and <code>IdentifiabilityReport</code> (<code>context/inference/identifiability.py</code>), the observation noise (<code>noise.py</code>: <code>NoNoise</code>, <code>ResidualNoise</code>, <code>DistributionNoise</code>), the distributions and <code>Priors</code> (<code>distributions.py</code>), <code>ConfidenceLevel</code>, the type of every confidence level, checked in Rust (<code>levels.py</code>), and the settings and results of the resampling methods (<code>context/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>context/inference/smc.py</code>: <code>GibbsPosterior</code>, <code>BayesianPosterior</code>, <code>InformationMatchingEta</code>, <code>BootstrapCoverageEta</code>, <code>ABCSMC</code>, <code>ABCRejection</code>, the distances, <code>SMCResult</code>, <code>GibbsResult</code>), of the local approximations (<code>context/inference/local.py</code>: <code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>, its targets, <code>LaplaceResult</code>, <code>SandwichResult</code>, <code>DeltaBand</code>, <code>ImportanceResult</code>), of the conformal methods (<code>context/inference/conformal.py</code>), of the sensitivity methods with <code>InputSpace</code> (<code>context/inference/global_sensitivity.py</code>), the quantities of interest (<code>quantities.py</code>: a series, <code>Level</code> or <code>Increments</code>, and its reduction), and of the profiles (<code>context/inference/profiles.py</code>: <code>ProfileLikelihood</code>, <code>PredictionProfile</code>, <code>PredictionSpec</code>, <code>Threshold</code>, <code>ProfileResult</code>).</td>
+<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code>, <code>IdentifiabilityMethod</code> and <code>SensitivityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, the identifiability methods and <code>IdentifiabilityReport</code> (<code>context/inference/identifiability.py</code>), the observation noise (<code>noise.py</code>: <code>NoNoise</code>, <code>ResidualNoise</code>, <code>DistributionNoise</code>), the distributions and <code>Priors</code> (<code>distributions.py</code>), <code>ConfidenceLevel</code>, the type of every confidence level, and <code>Share</code>, the type of every other setting strictly between 0 and 1, both checked in Rust (<code>levels.py</code>), and the settings and results of the resampling methods (<code>context/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>context/inference/smc.py</code>: <code>GibbsPosterior</code>, <code>BayesianPosterior</code>, <code>InformationMatchingEta</code>, <code>BootstrapCoverageEta</code>, <code>ABCSMC</code>, <code>ABCRejection</code>, the distances, <code>SMCResult</code>, <code>GibbsResult</code>), of the local approximations (<code>context/inference/local.py</code>: <code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>, its targets, <code>LaplaceResult</code>, <code>SandwichResult</code>, <code>DeltaBand</code>, <code>ImportanceResult</code>), of the conformal methods (<code>context/inference/conformal.py</code>), of the sensitivity methods with <code>InputSpace</code> (<code>context/inference/global_sensitivity.py</code>), the quantities of interest (<code>quantities.py</code>: a series, <code>Level</code> or <code>Increments</code>, and its reduction), and of the profiles (<code>context/inference/profiles.py</code>: <code>ProfileLikelihood</code>, <code>PredictionProfile</code>, <code>PredictionSpec</code>, <code>Threshold</code>, <code>ProfileResult</code>).</td>
 <td>Runners.</td>
 </tr>
 <tr>
@@ -3893,7 +3903,7 @@
 </tr>
 <tr>
 <td><code>context/engine.py</code></td>
-<td><code>ModelEngine</code> (<code>Model.engine</code>: the engine type and its settings, read with the class of that engine), the settings classes <code>ODESolver</code>, <code>StochasticEventsSettings</code> and <code>StochasticStepsSettings</code>, <code>Rounding</code>, and the names of the engines as the <code>Literal</code> <code>EngineName</code>.</td>
+<td><code>ModelEngine</code> (<code>Model.engine</code>: the engine type and its settings, read with the class of that engine), the settings classes <code>ODESolver</code>, <code>StochasticEventsSettings</code> and <code>StochasticStepsSettings</code> (their defaults are constants of the engine, and each checks itself with <code>check_settings</code> of its engine), <code>Rounding</code>, and the names of the engines as the <code>Literal</code> <code>EngineName</code>.</td>
 <td>Settings validation or engine meanings: ask <code>commol_rs.engine.EngineType</code>.</td>
 </tr>
 <tr>
@@ -3928,7 +3938,7 @@
 </tr>
 <tr>
 <td><code>commol/constants.py</code></td>
-<td>The names of the variables every expression has (<code>TOTAL_VARIABLE</code>, <code>RESERVED_VARIABLE_NAMES</code>) and the prefix of the subgroup totals (<code>SUBGROUP_TOTAL_PREFIX</code>), read from the engine (<code>commol_rs.model</code>).</td>
+<td>The names of the variables every expression has (<code>TOTAL_VARIABLE</code>) and the prefix of the subgroup totals (<code>SUBGROUP_TOTAL_PREFIX</code>), read from the engine (<code>commol_rs.model</code>).</td>
 <td>Names that depend on a model (ask the engine).</td>
 </tr>
 <tr>

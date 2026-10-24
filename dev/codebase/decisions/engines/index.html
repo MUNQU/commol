@@ -3479,10 +3479,10 @@ there.</p>
 <code>reset</code> restores it, so a run is reproducible from its seed. The default
 <code>set_seed</code> does nothing, so a deterministic engine ignores a seed.
 <code>EngineType::is_stochastic</code> says which engines draw: <code>StochasticEvents</code> and
-<code>StochasticSteps</code> (<code>crates/commol-stochastic/</code>). A run does not depend on the
-positions it reports at: <code>StochasticEvents</code> measures each wait from the last
-change of the state, never from a reported position, and draws the flow of an
-event only when the event happens.</p>
+<code>StochasticSteps</code> (<code>crates/commol-stochastic/</code>); each engine reads its entry
+(<code>SimulationEngine::is_stochastic</code>). A run does not depend on its positions:
+<code>StochasticEvents</code> measures each wait from the last change of the state, never
+from a reported position, and draws the flow of an event when it happens.</p>
 <table>
 <thead>
 <tr>
