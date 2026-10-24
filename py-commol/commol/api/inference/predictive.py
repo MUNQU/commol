@@ -3,13 +3,14 @@
 from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
 from commol.api.plotting.accessors import PredictivePlot
 from commol.api.results import SimulationResults, quantities_of_runs
 from commol.context.calibration import ObservedDataPoint
 from commol.context.inference.noise import ObservationNoise
 from commol.context.inference.sample import ParameterSample
+from commol.context.result_model import ResultModel
 
 if TYPE_CHECKING:
     from commol.api.reporting import SimulationReport
@@ -63,7 +64,7 @@ class PredictiveSource(Protocol):
         ...
 
 
-class SeriesBand(BaseModel):
+class SeriesBand(ResultModel):
     """
     The band of one series: four values at each of its positions.
 
@@ -93,7 +94,7 @@ class SeriesBand(BaseModel):
     upper: list[float]
 
 
-class PredictiveBand(BaseModel):
+class PredictiveBand(ResultModel):
     """
     The band of every output of a predictive.
 

@@ -11,7 +11,7 @@ sets the width of every interval.
 from collections.abc import Mapping
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
+from pydantic import ConfigDict, Field, JsonValue, model_validator
 
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import ObservedDataPoint
@@ -19,6 +19,7 @@ from commol.context.inference.method import UncertaintyMethod
 from commol.context.inference.resampling import BlockLength
 from commol.context.inference.sample import ParameterSample
 from commol.context.ranges import RangeChecked
+from commol.context.result_model import ResultModel
 
 type ConformalScore = Literal["absolute", "normalized", "spread"]
 """How a predicted value ``ŷ`` and an observed value ``y`` become a score:
@@ -32,7 +33,7 @@ type Pooling = Literal["series", "all"]
 (observation label) apart; ``"all"``, the scores of every series together."""
 
 
-class SeriesIntervals(BaseModel):
+class SeriesIntervals(ResultModel):
     """
     The prediction intervals of one series.
 
@@ -56,7 +57,7 @@ class SeriesIntervals(BaseModel):
     upper: list[float]
 
 
-class PredictionIntervals(BaseModel):
+class PredictionIntervals(ResultModel):
     """
     Prediction intervals for observations: where new observations of each
     series fall, at a confidence level.
@@ -80,7 +81,7 @@ class PredictionIntervals(BaseModel):
     unbounded: dict[str, list[float]]
 
 
-class ConformalResult(BaseModel):
+class ConformalResult(ResultModel):
     """
     The result of a conformal method.
 

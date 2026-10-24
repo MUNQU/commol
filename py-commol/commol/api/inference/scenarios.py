@@ -3,18 +3,19 @@
 from collections.abc import Iterator, Mapping, Sequence
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 
 from commol.api.inference.predictive import Predictive, PredictiveSource
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.inference.sample import ParameterSample
+from commol.context.result_model import ResultModel
 
 if TYPE_CHECKING:
     from commol.context.inference.quantities import QuantityBase
     from commol.context.parameter import ParameterUpdate
 
 
-class ScenarioSummary(BaseModel):
+class ScenarioSummary(ResultModel):
     """
     The weighted distribution of one quantity across the runs of a scenario,
     or of its difference between two scenarios.

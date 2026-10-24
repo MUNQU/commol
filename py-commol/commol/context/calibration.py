@@ -27,6 +27,7 @@ from commol.context.constants import (
 from commol.context.observation_models import ObservationModel
 from commol.utils.security import validate_expression_security
 from commol.context.ranges import RangeChecked
+from commol.context.result_model import ResultModel
 
 
 # Re-export for documentation
@@ -1026,7 +1027,7 @@ class ParticleSwarmConfig(RangeChecked):
         return self._radius_stop
 
 
-class StartSummary(BaseModel):
+class StartSummary(ResultModel):
     """
     One start of a multi-start optimization.
 
@@ -1053,7 +1054,7 @@ class StartSummary(BaseModel):
     converged: bool = Field(description="Whether the optimizer converged")
 
 
-class CalibrationResult(RangeChecked):
+class CalibrationResult(ResultModel, RangeChecked):
     """
     Result of a calibration: the best of its starts.
 
@@ -1120,7 +1121,7 @@ class CalibrationResult(RangeChecked):
         )
 
 
-class CalibrationEvaluation(BaseModel):
+class CalibrationEvaluation(ResultModel):
     """
     One evaluation of a feasible point during an optimization.
 
@@ -1138,7 +1139,7 @@ class CalibrationEvaluation(BaseModel):
     loss: float = Field(description="Loss at these values")
 
 
-class CalibrationHistory(BaseModel):
+class CalibrationHistory(ResultModel):
     """
     A calibration and every evaluation of a feasible point it made.
 

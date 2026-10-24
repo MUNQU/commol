@@ -23,6 +23,7 @@ from commol.context.inference.method import SensitivityMethod
 from commol.context.inference.quantities import Quantity
 from commol.context.inference.sample import ParameterSample
 from commol.context.ranges import RangeChecked
+from commol.context.result_model import ResultModel
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
@@ -235,7 +236,7 @@ class InputSpace(BaseModel):
         return [self.distributions[name].rust_prior(name) for name in self.names]
 
 
-class QuantitySummary(BaseModel):
+class QuantitySummary(ResultModel):
     """
     The weighted distribution of one quantity across the runs of a
     propagation.
@@ -266,7 +267,7 @@ class QuantitySummary(BaseModel):
     upper: float
 
 
-class PropagationResult(BaseModel):
+class PropagationResult(ResultModel):
     """
     The draws of the inputs and what each run gives.
 
@@ -435,7 +436,7 @@ class Propagation(SensitivityMethod[PropagationResult], RangeChecked):
     )
 
 
-class PRCCResult(BaseModel):
+class PRCCResult(ResultModel):
     """
     The partial rank correlation of each input with each quantity.
 
@@ -549,7 +550,7 @@ class PRCC(SensitivityMethod[PRCCResult], RangeChecked):
     )
 
 
-class MorrisResult(BaseModel):
+class MorrisResult(ResultModel):
     """
     The Morris indices of each input for each quantity.
 
@@ -653,7 +654,7 @@ class Morris(SensitivityMethod[MorrisResult], RangeChecked):
     )
 
 
-class SobolResult(BaseModel):
+class SobolResult(ResultModel):
     """
     The Sobol indices of each input for each quantity, with their bootstrap
     intervals.
@@ -767,7 +768,7 @@ class Sobol(SensitivityMethod[SobolResult], RangeChecked):
     )
 
 
-class ChaosResult(BaseModel):
+class ChaosResult(ResultModel):
     """
     A polynomial chaos expansion of each quantity, its accuracy and the
     Sobol indices of its coefficients.

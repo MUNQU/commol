@@ -239,11 +239,3 @@ API becomes a compatibility promise.
 
 **Guards:** `tests/building/test_save_and_load.py::test_an_uncalibrated_parameter_round_trips`,
 `tests/building/test_save_and_load.py::test_an_uncalibrated_bin_amount_round_trips`.
-
-## Public models forbid unknown fields
-
-Every public Pydantic class sets `model_config = ConfigDict(extra="forbid")`.
-An unknown field, such as a misspelt or an old name (`window_steps`), raises a
-`ValidationError` that names it, instead of being dropped with no error.
-
-**Guard:** `tests/building/test_unknown_fields.py`.

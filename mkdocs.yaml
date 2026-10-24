@@ -205,6 +205,7 @@ nav:
               - Local approximations: codebase/decisions/local-approximations.md
               - Profiles: codebase/decisions/profiles.md
               - Results: codebase/decisions/results.md
+              - Python Models: codebase/decisions/python-models.md
               - Figures: codebase/decisions/figures.md
               - Security: codebase/decisions/security.md
           - Conventions: codebase/conventions.md

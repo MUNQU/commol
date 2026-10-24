@@ -22,13 +22,14 @@ verdict per parameter, and the evidence of its section.
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
+from pydantic import ConfigDict, Field, JsonValue, model_validator
 
 from commol.context.calibration import CalibrationResult
 from commol.context.inference.distributions import Priors, coerce_priors
 from commol.context.inference.method import IdentifiabilityMethod
 from commol.context.inference.sample import ParameterSample
 from commol.context.ranges import RangeChecked
+from commol.context.result_model import ResultModel
 
 if TYPE_CHECKING:
     from commol.api.reporting import IdentifiabilityReportData
@@ -56,11 +57,11 @@ ProfileThresholdName = Literal["chi_square", "beale", "bootstrap_calibrated"]
 """The threshold of a profile."""
 
 
-class _Frozen(BaseModel):
+class _FrozenResult(ResultModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class StructuralVerdict(_Frozen):
+class StructuralVerdict(_FrozenResult):
     """
     The structural verdict of one parameter.
 
@@ -86,7 +87,7 @@ class StructuralVerdict(_Frozen):
     combinations: list[str] = Field(default_factory=list)
 
 
-class PracticalVerdict(_Frozen):
+class PracticalVerdict(_FrozenResult):
     """
     The practical verdict of one parameter.
 
@@ -103,7 +104,7 @@ class PracticalVerdict(_Frozen):
     reasons: list[str] = Field(default_factory=list)
 
 
-class ParameterVerdicts(_Frozen):
+class ParameterVerdicts(_FrozenResult):
     """
     The two verdicts of one parameter; ``None`` when no evidence gives one.
 
@@ -119,7 +120,7 @@ class ParameterVerdicts(_Frozen):
     practical: PracticalVerdict | None = None
 
 
-class Combination(_Frozen):
+class Combination(_FrozenResult):
     """
     A combination of parameters the data determine: the product of each
     parameter raised to its exponent.
@@ -137,7 +138,7 @@ class Combination(_Frozen):
     text: str
 
 
-class PointRank(_Frozen):
+class PointRank(_FrozenResult):
     """
     The rank of the scaled sensitivities at one point.
 
@@ -160,7 +161,7 @@ class PointRank(_Frozen):
     rank: int
 
 
-class StructuralSection(_Frozen):
+class StructuralSection(_FrozenResult):
     """
     The evidence of `StructuralRank`.
 
@@ -193,7 +194,7 @@ class StructuralSection(_Frozen):
     combinations: list[Combination]
 
 
-class SubsetIndex(_Frozen):
+class SubsetIndex(_FrozenResult):
     """
     A subset of parameters and its collinearity index.
 
@@ -213,7 +214,7 @@ class SubsetIndex(_Frozen):
     share_below: float
 
 
-class CollinearitySection(_Frozen):
+class CollinearitySection(_FrozenResult):
     """
     The evidence of `Collinearity`.
 
@@ -245,7 +246,7 @@ class CollinearitySection(_Frozen):
     admissible: list[SubsetIndex]
 
 
-class CorrelatedPair(_Frozen):
+class CorrelatedPair(_FrozenResult):
     """
     Two parameters whose absolute correlation is above the threshold.
 
@@ -262,7 +263,7 @@ class CorrelatedPair(_Frozen):
     correlation: float
 
 
-class SampleSection(_Frozen):
+class SampleSection(_FrozenResult):
     """
     The evidence of `SampleIdentifiability`.
 
@@ -293,7 +294,7 @@ class SampleSection(_Frozen):
     modes: dict[str, list[float]]
 
 
-class StartsSection(_Frozen):
+class StartsSection(_FrozenResult):
     """
     The evidence of `StartsIdentifiability`.
 
@@ -319,7 +320,7 @@ class StartsSection(_Frozen):
     flagged: list[str]
 
 
-class ProfileSection(_Frozen):
+class ProfileSection(_FrozenResult):
     """
     The evidence of a `ProfileLikelihood`.
 
@@ -373,7 +374,7 @@ def _merge_practical(verdicts: list[PracticalVerdict]) -> PracticalVerdict | Non
     )
 
 
-class IdentifiabilityReport(_Frozen):
+class IdentifiabilityReport(_FrozenResult):
     """
     Which parameters the model and the data determine: one structural and one
     practical verdict per parameter, and the evidence of each method.

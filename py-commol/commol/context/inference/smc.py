@@ -18,6 +18,7 @@ from commol.context.inference.method import UncertaintyMethod
 from commol.context.inference.resampling import BlockLength
 from commol.context.inference.sample import ParameterSample
 from commol.context.ranges import RangeChecked
+from commol.context.result_model import ResultModel
 
 ETA_CHOICES = (
     "a number above 0, InformationMatchingEta(block_length=...) or "
@@ -132,7 +133,7 @@ type ABCDistance = Annotated[LossDistance | SeriesDistance, Field(discriminator=
 """How far a run is from the observations."""
 
 
-class SMCDiagnostics(BaseModel):
+class SMCDiagnostics(ResultModel):
     """
     What happened at each step of a sequential Monte Carlo run.
 
@@ -170,7 +171,7 @@ class SMCDiagnostics(BaseModel):
     notes: list[str]
 
 
-class SMCResult(BaseModel):
+class SMCResult(ResultModel):
     """
     The result of a sequential Monte Carlo method.
 

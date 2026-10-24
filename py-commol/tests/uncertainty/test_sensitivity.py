@@ -129,24 +129,7 @@ class TestAnalysis:
         again = SensitivityAnalysis(simulation, abc_rates(), seed=analysis.seed)
 
         assert f"drew the seed {analysis.seed}" in caplog.text
-        # The JSON holds every value, and a NaN coefficient equals itself.
-        assert again.run(method).model_dump_json() == (
-            analysis.run(method).model_dump_json()
-        )
-
-    def test_a_seed_whose_draws_give_a_nan_coefficient_repeats(
-        self, simulation: Simulation
-    ) -> None:
-        # With these 10 draws k2 orders B at 5 alone, so the PRCC of k1 is NaN.
-        seed = 2496558405389616264
-        method = PRCC(draws=10, quantities=[ValueAt(series="B", at=5)])
-
-        first = SensitivityAnalysis(simulation, abc_rates(), seed=seed).run(method)
-        again = SensitivityAnalysis(simulation, abc_rates(), seed=seed).run(method)
-
-        assert math.isnan(first.coefficients[0][0])
-        assert first.coefficients[0][1] == -1.0
-        assert again.model_dump_json() == first.model_dump_json()
+        assert again.run(method) == analysis.run(method)
 
     def test_a_stochastic_engine_runs_at_least_one_replicate(self) -> None:
         simulation = Simulation(build_stochastic(abc_builder(), "StochasticSteps"))

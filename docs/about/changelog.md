@@ -118,6 +118,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Two results of commol with the same values are equal, also when they hold
+  a NaN: a NaN equals a NaN, whatever the objects that hold it. Before, `==`
+  compared the identity of the items of a list first, so two runs with one
+  seed gave results that were not equal when one held a NaN, such as a PRCC
+  coefficient of an input that the other inputs explain entirely. A frozen
+  result has a hash that agrees with `==`, also when it holds a list, a dict
+  or a NaN. `ParameterSample` compares as every other result. A result no
+  longer compares its private attributes
+  ([Uncertainty](../guide/uncertainty/index.md#comparing-results)).
+- `==` of `SimulationResults` and `SimulationReplicates` now also compares
+  their positions, seed and model, and a NaN equals a NaN. Before, it read
+  only the values, so two runs at other positions or with other seeds and
+  the same values were equal, and two runs with one seed that held a NaN
+  were not. A plain `dict` or `list` with the same values is no longer equal
+  to a result: compare `dict(results)` to read the values only
+  ([Running Simulations](../guide/simulations.md#results)).
 - A profile reads a parameter with one finite bound, such as `[0, +∞)`, on
   its bound within `1e-8` of `max(1, |bound|)`, the rule of `Laplace`.
   Before, every value of such a parameter was on its bound, so a profile
