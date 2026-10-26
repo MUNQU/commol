@@ -3495,7 +3495,7 @@ privilege that no other axis has. Without <code>step_unit</code>, a failed check
 declare it. The check reads the flows the engine plans (<code>transition_flows</code>,
 in <code>UnitChecker._collect_unit_errors</code>), so a proportional rate is checked as
 its flow, <code>rate × source</code>, and never by a rule of its own in Python.
-<code>check_equation_units</code> requires every flow to be <strong>equal</strong> to
+<code>check_formula_units</code> requires every flow to be <strong>equal</strong> to
 <code>&lt;bin unit&gt;/&lt;step unit&gt;</code>, and every impulse to <code>&lt;bin unit&gt;</code>, not only
 convertible to it (<code>utils/equations.py</code>, <code>same_unit</code>).</p>
 <p>A unit means what <code>pint</code> defines; there is no list of aliases. A name that
@@ -3503,7 +3503,7 @@ convertible to it (<code>utils/equations.py</code>, <code>same_unit</code>).</p>
 (<code>define_units</code>). In the check, <code>t</code> (a position) has the step unit and <code>step</code>
 (a count) is dimensionless. A number written in a rate and added to,
 subtracted from or compared with a quantity is read in its unit, as the engine
-reads it (<code>parse_equation_unit</code>); a computed number stays dimensionless.</p>
+reads it (<code>formula_unit</code>); a computed number stays dimensionless.</p>
 <p><strong>Rule:</strong> never accept a convertible unit as equal. <code>1/week</code> and <code>1/day</code> in one
 model would read a weekly rate as a daily one.</p>
 <p><strong>Guards:</strong> <code>tests/units/test_model_units.py::TestConsistentModels</code>

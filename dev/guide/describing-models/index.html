@@ -3604,6 +3604,14 @@ plans, after it has decided which rates are proportional (see
 </tr>
 </tbody>
 </table>
+<p>Each rate and each flow is written from the tree that the parser of the
+engine reads, not from the text of the rate, so <code>k1*A*B/total</code> and
+<code>k1 * A * B / total</code> give the same description. The text has one space around
+each operator, only the parentheses that its grouping needs, <code>^</code> for a power,
+and each number as its value: <code>1e-5</code> is <code>1e-05</code> and <code>2.0</code> is <code>2</code>. The flow
+of a proportional rate is the whole rate times its source: <code>(k1 + k2) * B</code>.
+In LaTeX, a product is <code>\cdot</code>, a division outside parentheses is a fraction
+and a power raises its exponent.</p>
 <p>For the model above, the text rendering holds:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Bin Transitions:
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>t_ab (A -&gt; B):

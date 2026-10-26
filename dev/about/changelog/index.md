@@ -15,10 +15,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 - A formula has at most 100 000 nodes (numbers, variables, operators and calls), next to its limit of 100 levels of nesting: a longer one raises `ValueError` when its object is built, before it compiles. A message of the parser or of the compiler quotes the formula cut after its first 80 characters. See [Limits of the parser](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#limits-of-the-parser).
+- A rate gives the same description with or without spaces: the description and its LaTeX are written from the tree that the parser of the engine reads, so `k1*A*B/total` and `k1 * A * B / total` give one description. A formula shows one space around each operator, only the parentheses that its grouping needs, `^` for a power and each number as its value (`1e-5` shows as `1e-05`, `2.0` as `2`). In LaTeX, a power raises its exponent (`A^{2}`), `%` is `\bmod` and a comparison has its symbol (`\leq`). See [The equations](https://munqu.github.io/commol/latest/guide/describing-models/#the-equations).
+- The unit check reads the tree of the engine: it reads `!` in a condition and a variable named like a word of Python, such as `lambda`, and a formula outside the language gives the message of the parser.
 
 ### Removed
 
 - **Breaking:** `commol.utils.security` is removed, with `SecurityConfig`, `SecurityError`, `validate_expression_security` and the `config=` argument of `AxisPattern.combine` and `AxisPattern.from_formula`. The parser of the engine is the only check of a formula: a rate, a formula parameter, a calibration constraint or an axis pattern that it rejects raises `ValueError` with its message, and no setting changes its limits. Remove the `config=` argument, and catch `ValueError` instead of `SecurityError`. A formula of the language that the old text guards rejected is now valid: a name with letters outside ASCII (`α * β`), a name such as `__import__`, `os` or `my_key`, a number such as `1e400`, `nan` as the name of a variable, and a formula of more than 1000 nodes, 10 000 characters or 10 levels of nesting, within the limits of the parser. The build still rejects a variable that the model does not define. See [Limits of the parser](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#limits-of-the-parser).
+
+### Fixed
+
+- The flow of a proportional rate is the whole rate times its source, in the description and in the unit check: a rate `k1 + k2` from `B` is `(k1 + k2) * B`; before, both read `k1 + k2 * B`, and the unit check of such a model failed. In LaTeX, a division followed by a product is a fraction times the product: the flow of a proportional rate `a / b` from `B` is `\frac{a}{b} \cdot B`, no longer `\frac{a}{b \cdot B}`.
 
 ### Documentation
 

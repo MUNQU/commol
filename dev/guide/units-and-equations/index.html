@@ -3491,7 +3491,10 @@ only what its value means differs (see
 <a href="../core-concepts/#what-a-rate-means">What a rate means</a>).
 It reads the flows the engine plans (<code>transition_flows</code>), so a proportional
 rate is checked as its flow, the rate times its source: <code>k2</code> in <code>1/day</code> from a
-bin in <code>item</code> gives <code>item/day</code>. The bin unit of a flow is the unit of the bin
+bin in <code>item</code> gives <code>item/day</code>. It reads each formula as the tree that the
+parser of the engine reads, so a formula has the grouping of the engine: the
+flow of a proportional rate <code>k1 + k2</code> from <code>B</code> is <code>(k1 + k2) * B</code>, and
+<code>A ^ 2 ^ -1</code> is <code>A ^ (2 ^ -1)</code>. The bin unit of a flow is the unit of the bin
 it leaves, or of the bin it enters when it has no source; so a category
 transition in a model of bins in <code>item</code> and <code>kg</code> moves <code>item/day</code> in one bin
 and <code>kg/day</code> in the other. In such a model <code>total</code>, a subgroup total

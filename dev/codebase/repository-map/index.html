@@ -3430,7 +3430,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-core/src/math_expression/</code></td>
-<td>The language of formulas (<code>language.rs</code>: <code>FUNCTIONS</code> and the check of a formula, <code>MathExpression::check</code>), the engine variables (<code>variables.rs</code>); the parser of formulas and its limits (<code>jit/parser.rs</code>: <code>MAX_NESTING</code>, <code>MAX_NODES</code>), the cut of a formula that a message quotes (<code>math_expression/error.rs</code>: <code>quoted</code>), the tree of a formula (<code>jit/ast.rs</code>), the Cranelift JIT and its global cache (<code>jit/</code>).</td>
+<td>The language of formulas (<code>language.rs</code>: <code>FUNCTIONS</code> and the check of a formula, <code>MathExpression::check</code>), the engine variables (<code>variables.rs</code>); the parser of formulas and its limits (<code>jit/parser.rs</code>: <code>MAX_NESTING</code>, <code>MAX_NODES</code>), the cut of a formula that a message quotes (<code>math_expression/error.rs</code>: <code>quoted</code>), the tree of a formula (<code>jit/ast.rs</code>) and its JSON, the port through which Python reads it (<code>tree.rs</code>: <code>MathExpression::tree_json</code>), the Cranelift JIT and its global cache (<code>jit/</code>).</td>
 <td>Model-specific variables.</td>
 </tr>
 <tr>
@@ -3989,8 +3989,13 @@
 </tr>
 <tr>
 <td><code>context/_model/engine_state.py</code></td>
-<td>The only Python access to the engine queries, and <code>build_engine</code>, which builds the engine the model names.</td>
+<td>The only Python access to the engine queries, and <code>build_engine</code>, which builds the engine the model names; <code>formula_tree</code>, the tree of a formula as the parser of the engine reads it.</td>
 <td>Python re-implementations of them.</td>
+</tr>
+<tr>
+<td><code>context/_model/formula_tree.py</code></td>
+<td>The tree of a formula as plain data (one frozen dataclass per kind of node), read from the JSON of the engine (<code>read_tree</code>); its text (<code>FormulaWriter</code>, <code>formula_text</code>), its variables and the product of two trees.</td>
+<td>A reader of the text of a formula: the parser of the engine is the only one.</td>
 </tr>
 <tr>
 <td><code>context/_model/describe.py</code></td>
@@ -4009,8 +4014,8 @@
 </tr>
 <tr>
 <td><code>utils/equations.py</code></td>
-<td>Dimensional analysis with <code>pint</code>: one unit rule per function of the engine (<code>_FUNCTION_UNITS</code>).</td>
-<td>—</td>
+<td>Dimensional analysis with <code>pint</code> on the tree of the engine (<code>formula_unit</code>, <code>check_formula_units</code>): one unit rule per function of the engine (<code>_FUNCTION_UNITS</code>) and per operator (<code>_OPERATIONS</code>).</td>
+<td>A reader of the text of a formula.</td>
 </tr>
 <tr>
 <td><code>commol/constants.py</code></td>
@@ -4150,7 +4155,7 @@
 <tr>
 <td>Add a function, a variable or an operator to rate expressions, or change their grammar</td>
 <td><code>crates/commol-core/src/math_expression/</code> (<code>language.rs</code>: <code>FUNCTIONS</code>, <code>check</code>; <code>jit/parser.rs</code>: <code>parse_expression</code>, <code>MAX_NESTING</code>, <code>MAX_NODES</code>)</td>
-<td><code>jit/ast.rs</code> (<code>Expr</code>), <code>jit/codegen.rs</code>, <code>py-commol/commol/utils/equations.py</code> (<code>_FUNCTION_UNITS</code>), <code>docs/guide/mathematical-expressions.md</code></td>
+<td><code>jit/ast.rs</code> (<code>Expr</code>), <code>jit/codegen.rs</code>, <code>tree.rs</code> (the tree as JSON), <code>py-commol/commol/context/_model/formula_tree.py</code> (the tree in Python, <code>OPERATORS</code>), <code>py-commol/commol/utils/equations.py</code> (<code>_FUNCTION_UNITS</code>, <code>_OPERATIONS</code>), <code>context/_model/equations.py</code> (<code>_LatexWriter</code>), <code>docs/guide/mathematical-expressions.md</code></td>
 </tr>
 <tr>
 <td>Change initial conditions</td>

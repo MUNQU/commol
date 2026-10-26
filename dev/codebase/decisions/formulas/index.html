@@ -2838,6 +2838,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#python-reads-a-formula-only-as-the-tree-of-the-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python reads a formula only as the tree of the engine
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-engine-defines-the-language-of-formulas" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3279,6 +3290,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#python-reads-a-formula-only-as-the-tree-of-the-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python reads a formula only as the tree of the engine
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-engine-defines-the-language-of-formulas" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3333,8 +3355,8 @@
 
 <h1 id="formulas">Formulas<a class="headerlink" href="#formulas" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
-<p>How a formula is checked before it reaches the engine, and which limits it
-has.</p>
+<p>How a formula is checked before it reaches the engine, which limits it
+has, and how Python reads it.</p>
 <h2 id="the-parser-of-the-engine-is-the-only-check-of-a-formula">The parser of the engine is the only check of a formula<a class="headerlink" href="#the-parser-of-the-engine-is-the-only-check-of-a-formula" title="Permanent link">&para;</a></h2>
 <p>Rate expressions (<code>context/transition.py</code>), formula parameters
 (<code>context/parameter.py</code>), axis patterns (<code>AxisPattern.combine</code> and
@@ -3345,11 +3367,9 @@ built. A formula that the parser rejects raises <code>ValueError</code> with the
 of the parser. Python has no grammar, no limit and no tokenizer of a formula
 of its own, and no setting changes the limits of the parser.</p>
 <p><strong>Rule:</strong> a new field that holds a formula calls the check of the engine in
-its validator. No module of commol reads the text of a formula, but the
-readers that <code>FORMULA_READERS</code> (<code>tests/suite/test_engine_rules.py</code>) lists
-with their reasons: the check of units (<code>utils/equations.py</code>) and the
-description (<code>context/_model/equations.py</code>), which #402 moves onto the tree
-of the engine.</p>
+its validator. No module of commol reads the text of a formula: a module that
+needs its structure reads the tree of the engine
+(<a href="#python-reads-a-formula-only-as-the-tree-of-the-engine">Python reads a formula only as the tree of the engine</a>).</p>
 <table>
 <thead>
 <tr>
@@ -3369,6 +3389,64 @@ of the engine.</p>
 </tbody>
 </table>
 <p><strong>Guard:</strong> <code>py-commol/tests/rates/test_formula_rules.py::test_a_formula_gets_the_message_of_the_engine_parser</code>,
+<code>py-commol/tests/suite/test_engine_rules.py::test_only_the_engine_reads_a_formula</code>.</p>
+<h2 id="python-reads-a-formula-only-as-the-tree-of-the-engine">Python reads a formula only as the tree of the engine<a class="headerlink" href="#python-reads-a-formula-only-as-the-tree-of-the-engine" title="Permanent link">&para;</a></h2>
+<p>The check of units and the description need the structure of a formula. They
+read the tree that the parser of the engine reads, never the text:
+<code>MathExpression::tree_json</code> (<code>crates/commol-core/src/math_expression/tree.rs</code>)
+checks the formula and gives its tree (<code>Expr</code>, which derives <code>Serialize</code>) as
+JSON, the binding <code>commol_rs.core.MathExpression(formula).tree()</code> passes it to
+Python, and <code>engine_state.formula_tree</code> reads it into plain data
+(<code>context/_model/formula_tree.py</code>: one frozen dataclass per kind of node).
+<code>tree.rs</code> documents the shape: one object per node, keyed by its kind
+(<code>Constant</code>, <code>Variable</code>, <code>Chain</code> with its operators, <code>Power</code>, <code>UnaryOp</code>,
+<code>FunctionCall</code>, <code>Conditional</code>); a number keeps the value the parser read, and
+a value that is not finite is its text (<code>"inf"</code>).</p>
+<ul>
+<li>The check of units (<code>formula_unit</code> in <code>utils/equations.py</code>) walks the tree
+  with a <code>pint</code> quantity for each variable: <code>pint</code> does the algebra of units,
+  in the grouping of the parser, and a written number takes its unit as
+  <a href="../time/#one-step-unit-in-the-unit-check">One step unit in the unit check</a>
+  says.</li>
+<li>The description (<code>context/_model/equations.py</code>) writes each rate and each
+  flow from the tree: <code>FormulaWriter</code> writes the text, with one space around
+  each operator and only the parentheses the tree needs, so the text reads
+  back as the same tree; <code>_LatexWriter</code> writes LaTeX. The flow of a
+  proportional rate is the tree of the rate times its source
+  (<code>TransitionFlow.term</code>, <code>product</code>), which groups a sum as a whole, and a
+  rate gives the same description with or without spaces.</li>
+</ul>
+<p><strong>Rule:</strong> a module that needs the structure of a formula reads
+<code>engine_state.formula_tree</code>; a new node kind or operator of the parser is a
+case of the JSON of <code>tree.rs</code>, of <code>read_tree</code> and of the walks of
+<code>formula_tree.py</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A PyO3 class per node</td>
+<td>A third shape of the tree (Rust, PyO3, Python) to keep in step, against one JSON port, as the model is.</td>
+</tr>
+<tr>
+<td>A LaTeX writer in Rust</td>
+<td>Presentation in the core, with no Rust caller: the engine gives the structure, and the edge draws it, as <code>api/plotting/panels.py</code> and <code>figures.py</code> do.</td>
+</tr>
+<tr>
+<td>The text, read by the grammar of Python (<code>ast.parse</code> and <code>eval</code>) or split at <code>" * "</code> and <code>" / "</code></td>
+<td>A second grammar: Python reads <code>^</code>, <code>!</code> and names such as <code>lambda</code> in another way or not at all, and a split of the text depends on its spaces.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guard:</strong> <code>crates/commol-core/src/math_expression/tree.rs::the_tree_keeps_the_grouping_of_the_parser</code>,
+<code>py-commol/tests/rates/test_formula_rules.py::test_python_reads_the_tree_of_a_formula_from_the_engine</code>,
+<code>py-commol/tests/units/test_expression_units.py::test_the_unit_follows_the_grouping_of_the_parser</code>,
+<code>py-commol/tests/description/test_equation_text.py::test_the_spaces_of_a_rate_do_not_change_its_description</code>,
+<code>py-commol/tests/description/test_equation_text.py::test_a_rate_is_written_with_the_parentheses_its_tree_needs</code>,
 <code>py-commol/tests/suite/test_engine_rules.py::test_only_the_engine_reads_a_formula</code>.</p>
 <h2 id="the-engine-defines-the-language-of-formulas">The engine defines the language of formulas<a class="headerlink" href="#the-engine-defines-the-language-of-formulas" title="Permanent link">&para;</a></h2>
 <p>One Rust check decides whether an expression is in the language of formulas:
@@ -3410,8 +3488,7 @@ value of each function), <code>py-commol/tests/units/test_expression_units.py::t
 <h2 id="the-engine-parses-formulas-with-a-parser-of-its-own">The engine parses formulas with a parser of its own<a class="headerlink" href="#the-engine-parses-formulas-with-a-parser-of-its-own" title="Permanent link">&para;</a></h2>
 <p><code>parse_expression</code> (<code>crates/commol-core/src/math_expression/jit/parser.rs</code>)
 reads the text of a formula into its tree (<code>Expr</code>, <code>jit/ast.rs</code>) by
-precedence climbing; no other parser checks a formula, and the readers of
-the first section are the only other code that reads its text. The grammar sets the
+precedence climbing; no other code reads the text of a formula. The grammar sets the
 precedence and the grouping: the operators of one level apply from the
 left, and a chain of powers groups from the right, as in Python.</p>
 <p>A chain of operators of one level is one node (<code>Expr::Chain</code>), so a sum of
