@@ -2815,6 +2815,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/tests/" class="md-nav__link">
         
   
@@ -3151,6 +3179,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="[Unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3227,7 +3272,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
+  <a href="#documentation_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Documentation
@@ -3699,7 +3744,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#documentation_1" class="md-nav__link">
+  <a href="#documentation_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Documentation
@@ -3904,6 +3949,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="[Unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3980,7 +4042,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
+  <a href="#documentation_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Documentation
@@ -4452,7 +4514,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#documentation_1" class="md-nav__link">
+  <a href="#documentation_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Documentation
@@ -4632,6 +4694,17 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.0.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h3>
+<ul>
+<li><a href="../../codebase/design-principles/">Design principles</a>: the structure,
+  the rules of each unit and of the interface, and the proof that every part
+  of the code follows. «Before you change code» of <code>AGENTS.md</code> links them.
+  <code>tests/suite/test_architecture.py</code> fails when a crate of <code>crates/</code>
+  depends on PyO3 or on the bridge.</li>
+<li>A numbered list of the documentation keeps its first number, and a line
+  inside a paragraph that starts with a number and a period, such as <code>512.</code>,
+  stays in its paragraph: the site reads lists with <code>sane_lists</code>.</li>
+</ul>
 <h2 id="0102-2026-10-24">[0.10.2] - 2026-10-24<a class="headerlink" href="#0102-2026-10-24" title="Permanent link">&para;</a></h2>
 <p>This release makes the engine the one source of every rule: the range of
 each setting, the values of a model, the windows, the checks of a model and
@@ -4852,9 +4925,9 @@ model are equal, so a run is no longer equal to a plain <code>dict</code>. See
   calls, signs and powers fails with a message that names the limit. Before,
   the parse used one step of the stack for each term, and the process
   crashed near 20 000 terms, or near 2 000 on a thread of the parallel work.</li>
-<li>A chain of powers groups from the right, as in Python: <code>2 ** 3 ** 2</code> is</li>
 <li>
-<p>Before, it was 64, <code>(2 ** 3) ** 2</code>.</p>
+<p>A chain of powers groups from the right, as in Python: <code>2 ** 3 ** 2</code> is
+  512. Before, it was 64, <code>(2 ** 3) ** 2</code>.</p>
 </li>
 <li>
 <p><code>ParticleSwarmConfig.inertia("constant")</code> and
@@ -4902,7 +4975,7 @@ checks its own layout. Nothing breaks: code that runs on 0.10.0 runs on
   the words of the user pages and of the source of <code>commol</code>.</p>
 </li>
 </ul>
-<h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h3>
+<h3 id="documentation_1">Documentation<a class="headerlink" href="#documentation_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>The documentation reads as one account of the library: the home page, the
   quickstart and the examples show one process run by several engines, then
@@ -6789,7 +6862,7 @@ place), and every interval uses one quantile, so the intervals of
   found", and bin prefixes (<code>"B_g1"</code>) and qualified categories (<code>"group:g1"</code>)
   are accepted, as documented. Before, both were rejected as "not found".</li>
 </ul>
-<h3 id="documentation_1">Documentation<a class="headerlink" href="#documentation_1" title="Permanent link">&para;</a></h3>
+<h3 id="documentation_2">Documentation<a class="headerlink" href="#documentation_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>The guide is rewritten and split into pages with one job each (building
   models, transitions, expressions, time patterns, units, simulations, and six

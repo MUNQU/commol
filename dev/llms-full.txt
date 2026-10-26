@@ -40862,6 +40862,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Documentation
+
+- [Design principles](https://munqu.github.io/commol/latest/codebase/design-principles/index.md): the structure, the rules of each unit and of the interface, and the proof that every part of the code follows. «Before you change code» of `AGENTS.md` links them. `tests/suite/test_architecture.py` fails when a crate of `crates/` depends on PyO3 or on the bridge.
+- A numbered list of the documentation keeps its first number, and a line inside a paragraph that starts with a number and a period, such as `512.`, stays in its paragraph: the site reads lists with `sane_lists`.
+
 ## [0.10.2] - 2026-10-24
 
 This release makes the engine the one source of every rule: the range of each setting, the values of a model, the windows, the checks of a model and a calibration, and the language of formulas, which commol now reads with a parser of its own. A value that was valid stays valid, and an invalid one still raises `ValueError` when its object is built, but the messages are the engine's. Read the changes before you upgrade: seeded results change value, as every draw comes from one seed scheme in which neighbouring seeds share no replicate; a chain of powers groups from the right, so `2 ** 3 ** 2` is 512; `BootstrapCoverageEta` gives a slightly different η; a stratification fraction outside 0 to 1 is rejected; and two results are equal when their values, a NaN included, and their positions, seed and model are equal, so a run is no longer equal to a plain `dict`. See [Building models](https://munqu.github.io/commol/latest/guide/building-models/index.md) and [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
@@ -40898,8 +40903,7 @@ This release makes the engine the one source of every rule: the range of each se
 - `SecurityConfig.max_complexity_score` limits the number of nodes of the tree of a formula (numbers, variables, operators and calls), as the guide documents. Before, it limited nothing.
 - The unit check reads `^` as a power, as the engine does, and `cbrt` takes the cube root of a unit.
 - A formula with a long chain of terms, such as a sum of 20 000 terms, no longer stops the Python process with a segmentation fault. The engine reads formulas with a parser of its own: a sum or a product of any length is one level, and a formula that nests deeper than 100 levels of parentheses, calls, signs and powers fails with a message that names the limit. Before, the parse used one step of the stack for each term, and the process crashed near 20 000 terms, or near 2 000 on a thread of the parallel work.
-- A chain of powers groups from the right, as in Python: `2 ** 3 ** 2` is
-- Before, it was 64, `(2 ** 3) ** 2`.
+- A chain of powers groups from the right, as in Python: `2 ** 3 ** 2` is 512. Before, it was 64, `(2 ** 3) ** 2`.
 - `ParticleSwarmConfig.inertia("constant")` and `.acceleration("constant")` take the weight and the coefficients of canonical particle swarm, `1/(2 ln 2)` and `0.5 + ln 2`, which a swarm with no inertia or acceleration strategy uses. Before, their defaults were the rounded `0.721` and `1.193`, so a swarm that named the constant strategy moved a little differently from one that did not.
 - Three messages of a calibration with observation models no longer hold a run of spaces in the middle of a sentence.
 

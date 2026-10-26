@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://munqu.github.io/commol/dev/codebase/tests/">
       
       
-        <link rel="prev" href="../conventions/">
+        <link rel="prev" href="../design-principles/">
       
       
         <link rel="next" href="../coverage/">
@@ -2826,6 +2826,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -3520,7 +3548,7 @@ kind that is not aggregate through every generic layer.</p>
 </tr>
 <tr>
 <td><code>suite/</code></td>
-<td>The rules of this page that a program can check, for the Python tests (<code>test_rules.py</code>) and for the Rust tests (<code>test_rust_rules.py</code>), the rules of what the engine holds: the names and ranges of the settings, the windows and the stub of the extension (<code>test_engine_rules.py</code>), the plugin that records how long each test takes (<code>durations.py</code>), the settings of commol that the rules read: their names and the range constraints of the pydantic models (<code>settings.py</code>), the checks of the package as a whole: its version (<code>test_version.py</code>) and its logging, in a fresh interpreter (<code>test_logging.py</code>), the checks of CI: its rights, its pinned tools, the workspace of the crates and the commands the documentation shows (<code>test_workflows.py</code>), and the checks of the scripts of <code>.github/scripts/</code>: the next issues and what can run in parallel (<code>test_planning.py</code>), the precedence levels (<code>test_levels.py</code>), the links of the releases (<code>test_releases.py</code>), the REST calls (<code>test_github.py</code>), the affected issues (<code>test_affected.py</code>), the release notes (<code>test_release_notes.py</code>) and the Rust lines no test runs (<code>test_rust_uncovered.py</code>). No test calls GitHub: each one patches the REST calls (<code>support/planning.py</code>)</td>
+<td>The rules of this page that a program can check, for the Python tests (<code>test_rules.py</code>) and for the Rust tests (<code>test_rust_rules.py</code>), the rules of what the engine holds: the names and ranges of the settings, the windows and the stub of the extension (<code>test_engine_rules.py</code>), the layers: no crate of <code>crates/</code> depends on PyO3 or on the bridge (<code>test_architecture.py</code>), the plugin that records how long each test takes (<code>durations.py</code>), the settings of commol that the rules read: their names and the range constraints of the pydantic models (<code>settings.py</code>), the checks of the package as a whole: its version (<code>test_version.py</code>) and its logging, in a fresh interpreter (<code>test_logging.py</code>), the checks of CI: its rights, its pinned tools, the workspace of the crates and the commands the documentation shows (<code>test_workflows.py</code>), and the checks of the scripts of <code>.github/scripts/</code>: the next issues and what can run in parallel (<code>test_planning.py</code>), the precedence levels (<code>test_levels.py</code>), the links of the releases (<code>test_releases.py</code>), the REST calls (<code>test_github.py</code>), the affected issues (<code>test_affected.py</code>), the release notes (<code>test_release_notes.py</code>) and the Rust lines no test runs (<code>test_rust_uncovered.py</code>). No test calls GitHub: each one patches the REST calls (<code>support/planning.py</code>)</td>
 <td>—</td>
 </tr>
 <tr>
@@ -3747,7 +3775,7 @@ a test, or one case of a parametrized test with its parameter in brackets.</p>
 </tbody>
 </table>
 <h2 id="navigation">Navigation<a class="headerlink" href="#navigation" title="Permanent link">&para;</a></h2>
-<p>Previous: <a href="../conventions/">Conventions</a> | Next: <a href="../coverage/">Coverage and mutation testing</a></p>
+<p>Previous: <a href="../design-principles/">Design principles</a> | Next: <a href="../coverage/">Coverage and mutation testing</a></p>
 
 
 
