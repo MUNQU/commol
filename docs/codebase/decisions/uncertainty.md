@@ -176,7 +176,7 @@ level is an order statistic whose expected coverage is below it.
 
 **Guards:** `crates/commol-inference/tests/test_smc.rs`,
 `crates/commol-inference/tests/test_distributions.rs`,
-`tests/uncertainty/test_smc.py`,
+`tests/uncertainty/test_smc.py`, `tests/uncertainty/test_priors.py`,
 `tests/uncertainty/test_coverage.py` (`TestGibbsPosterior`, `TestABCSMC`).
 
 ## Observation noise is an argument

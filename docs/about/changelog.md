@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `GibbsResult` and `ConformalResult` give `block_length` and
+  `block_length_estimates`, as the bootstraps, the jackknife and the sandwich
+  do: the length a method ran with, and with `block_length="auto"` the
+  estimate of each series, by label. `GibbsResult` gives them for
+  `InformationMatchingEta` and `BootstrapCoverageEta`, and `None` for a
+  number `η`; `ConformalResult` for `JackknifePlus` and `EnbPI`, and `None`
+  for the variants without blocks. See
+  [Sequential Monte Carlo](../guide/uncertainty/smc.md#what-means) and
+  [Conformal Prediction Intervals](../guide/uncertainty/conformal.md#results-plots-and-reports).
+
 ### Changed
 
 - A formula has at most 100 000 nodes (numbers, variables, operators and

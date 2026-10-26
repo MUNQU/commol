@@ -382,7 +382,11 @@ def _gibbs(monkeypatch: pytest.MonkeyPatch) -> _Result:
     # A sampler run of a bootstrap replicate fails only with a model that
     # fails, which would fail the posterior too: the extension reports it.
     found = SimpleNamespace(
-        eta=0.1, coverage=0.8, failed=[f"Replicate 2 failed: {_NO_WEIGHT}"]
+        eta=0.1,
+        coverage=0.8,
+        failed=[f"Replicate 2 failed: {_NO_WEIGHT}"],
+        block_length=1,
+        block_length_estimates=None,
     )
     monkeypatch.setattr(
         smc_runners,

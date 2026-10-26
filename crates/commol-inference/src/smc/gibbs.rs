@@ -18,7 +18,7 @@ use super::sampler::{SmcRun, SmcSampler, SmcState, Stop};
 use crate::error::MethodError;
 use crate::local::{CurvatureKind, block_meat, blocks_at, curvature_at};
 use crate::priors::Priors;
-use crate::resampling::{BayesianBootstrap, BlockScheme};
+use crate::resampling::{BayesianBootstrap, BlockScheme, Estimates};
 use crate::target::discrepancy_in_support;
 use commol_random::Stream;
 
@@ -150,7 +150,9 @@ pub(crate) fn reached_the_posterior(run: SmcRun, posterior: &str) -> Result<SmcR
 /// the gradients of the terms summed over blocks of `block_length`
 /// positions, or of the automatic length for `None`, so `I` holds under
 /// dependence inside blocks. The terms are those of the sum of squares or of
-/// `−log L`; with a correct observation model `I ≈ J` and `η ≈ 1`.
+/// `−log L`; with a correct observation model `I ≈ J` and `η ≈ 1`. The
+/// outcome keeps the block length and, with the automatic length, the
+/// estimate of each series ([`BlockScheme::estimates`]).
 ///
 /// # Errors
 ///
@@ -162,7 +164,7 @@ pub fn information_matching_eta<E>(
     problem: &CalibrationProblem<E>,
     fit: &[f64],
     block_length: Option<usize>,
-) -> Result<f64, MethodError>
+) -> Result<InformationCalibration, MethodError>
 where
     E: SimulationEngine + Send + Sync,
 {
@@ -206,7 +208,22 @@ where
     })?;
     // With `I` positive definite, some gradient is not 0, so `tr(J) > 0`
     // and `η > 0`.
-    Ok((&information * inverse * &information).trace() / information.trace())
+    Ok(InformationCalibration {
+        eta: (&information * inverse * &information).trace() / information.trace(),
+        block_length: blocks.length(),
+        estimates: blocks.estimates().map(<[_]>::to_vec),
+    })
+}
+
+/// The outcome of [`information_matching_eta`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct InformationCalibration {
+    /// The calibrated `η`.
+    pub eta: f64,
+    /// The positions per block of the scores.
+    pub block_length: usize,
+    /// With the automatic length, the estimate of each series by label.
+    pub estimates: Option<Estimates>,
 }
 
 /// The outcome of [`bootstrap_coverage_eta`].

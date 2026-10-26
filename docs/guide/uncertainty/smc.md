@@ -173,9 +173,10 @@ is the problem's loss with its weights and normalization. It returns a
 `GibbsResult`: the sample at temperature 1, the temperatures, the log of
 `∫ prior(θ) exp(−η loss(θ)) dθ`, the diagnostics, the `η` it ran with, the fit
 a calibration of `η` read (`fit`), the coverage of a bootstrap calibration
-(`coverage`), and each replicate of a bootstrap calibration whose sampler
+(`coverage`), each replicate of a bootstrap calibration whose sampler
 failed, `"Replicate <index> failed: <reason>"`, also logged as a warning
-(`failed`).
+(`failed`), and the block length of a calibration with the estimate of each
+series of the automatic length (`block_length`, `block_length_estimates`).
 
 ### What `η` means
 
@@ -192,6 +193,14 @@ variance `σ²`, `η = 1/(2σ²)` makes the Gibbs posterior the Bayesian posteri
 
 Both calibrations read the fit `Calibrator.run(starts)`, the best of
 [several starts](../calibration-optimizers.md#several-starts).
+
+Both take `block_length="auto"`, the automatic length of
+[Blocks and their length](resampling.md#blocks-and-their-length) for
+non-overlapping blocks. `GibbsResult.block_length` gives the length used,
+and `block_length_estimates` the estimate of each series, by label, as the
+bootstraps, the sandwich and the conformal methods give them. Both are `None`
+for a number `η`, and `block_length_estimates` is `None` for an integer
+`block_length`.
 
 Information matching is cheap and local; it needs a sum of smooth terms, so
 `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic
