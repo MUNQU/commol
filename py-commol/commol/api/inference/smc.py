@@ -1,35 +1,30 @@
 """The runners of the sequential Monte Carlo methods, registered for
 ``Calibrator.uncertainty``.
 
-Each runner hands the priors and the settings to the Rust sampler, which
-draws, runs and moves every particle in parallel, and builds the result from
-the run.
+Each runner sends its method whole to the engine, which fits the problem and
+calibrates `η` when the method asks, then draws, runs and moves every
+particle in parallel; the runner builds the result from the run.
 """
 
 import logging
 from typing import TYPE_CHECKING
 
+from commol.api.inference.fit import fit_result
 from commol.api.inference.registry import register
 from commol.api.inference.resampling import (
     block_length_estimates,
-    fit_values,
     log_failed,
-    rust_block_length,
     sample_method,
 )
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context.calibration import CalibrationResult
+from commol.context.engine_json import engine_json
 from commol.context.inference.sample import ParameterSample, SampleMethod
 from commol.context.inference.smc import (
-    ABCDistance,
     ABCRejection,
     ABCSMC,
     BayesianPosterior,
-    BootstrapCoverageEta,
     GibbsPosterior,
     GibbsResult,
-    InformationMatchingEta,
-    LossDistance,
     SMCDiagnostics,
     SMCResult,
 )
@@ -39,8 +34,6 @@ if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import SMCRunProtocol
 
 logger = logging.getLogger(__name__)
-
-rust = commol_rs.inference
 
 ONE_REPLICATE = (
     "Each distance reads one fresh replicate of the stochastic engine, seeded "
@@ -76,11 +69,6 @@ def _diagnostics(run: "SMCRunProtocol", notes: list[str]) -> SMCDiagnostics:
     )
 
 
-def _metric(distance: ABCDistance) -> str | None:
-    """The metric of the series, or None for the problem's loss."""
-    return None if isinstance(distance, LossDistance) else distance.metric
-
-
 def run_gibbs_posterior(
     calibrator: "Calibrator", method: GibbsPosterior
 ) -> GibbsResult:
@@ -101,46 +89,14 @@ def run_gibbs_posterior(
         and, with a calibration of `η`, its block length and the estimates
         of the automatic length.
     """
-    problem = calibrator.rust_problem
-    priors = method.priors.rust_priors()
-    sampler = (
-        method.particles,
-        method.resample_threshold,
-        method.target_cess,
-        method.stay_probability,
+    starts, run, eta = commol_rs.inference.gibbs_posterior(
+        calibrator._rust_problem, engine_json(method)
     )
-    fit: CalibrationResult | None = None
-    coverage: float | None = None
-    failed: list[str] = []
-    block_length: int | None = None
-    estimates: list[tuple[str, float]] | None = None
-    if isinstance(method.eta, InformationMatchingEta):
-        fit = calibrator.run(starts=method.eta.starts)
-        eta, block_length, estimates = rust.information_matching_eta(
-            problem,
-            fit_values(calibrator, fit),
-            rust_block_length(method.eta.block_length),
-        )
-    elif isinstance(method.eta, BootstrapCoverageEta):
-        fit = calibrator.run(starts=method.eta.starts)
-        calibration = method.eta
-        found = rust.bootstrap_coverage_eta(
-            problem,
-            priors,
-            fit_values(calibrator, fit),
-            calibration.replicates,
-            rust_block_length(calibration.block_length),
-            calibration.confidence_level,
-            *sampler,
-            calibrator.seed,
-        )
-        eta, coverage = found.eta, found.coverage
-        failed = log_failed(found.failed, logger)
-        block_length = found.block_length
-        estimates = found.block_length_estimates
-    else:
-        eta = method.eta
-    run = rust.gibbs_posterior(problem, priors, eta, *sampler, calibrator.seed)
+    fit = (
+        None
+        if starts is None
+        else fit_result(starts, calibrator.parameter_names, calibrator.seed, logger)
+    )
     return GibbsResult(
         sample=_sample(
             calibrator,
@@ -151,12 +107,12 @@ def run_gibbs_posterior(
         kept=run.kept,
         log_evidence=run.log_evidence,
         diagnostics=_diagnostics(run, []),
-        eta=eta,
+        eta=eta.eta,
         fit=fit,
-        coverage=coverage,
-        failed=failed,
-        block_length=block_length,
-        block_length_estimates=block_length_estimates(estimates),
+        coverage=eta.coverage,
+        failed=log_failed(eta.failed, logger),
+        block_length=eta.block_length,
+        block_length_estimates=block_length_estimates(eta.block_length_estimates),
     )
 
 
@@ -178,14 +134,8 @@ def run_bayesian_posterior(
     SMCResult
         The sample, the temperatures, the log evidence and the diagnostics.
     """
-    run = rust.bayesian_posterior(
-        calibrator.rust_problem,
-        method.priors.rust_priors(),
-        method.particles,
-        method.resample_threshold,
-        method.target_cess,
-        method.stay_probability,
-        calibrator.seed,
+    run = commol_rs.inference.bayesian_posterior(
+        calibrator._rust_problem, engine_json(method)
     )
     return SMCResult(
         sample=_sample(
@@ -216,15 +166,8 @@ def run_abc_smc(calibrator: "Calibrator", method: ABCSMC) -> SMCResult:
     SMCResult
         The sample, the tolerances, the log evidence and the diagnostics.
     """
-    run, stochastic = rust.abc_smc(
-        calibrator.rust_problem,
-        method.priors.rust_priors(),
-        _metric(method.distance),
-        method.particles,
-        method.target_cess,
-        method.min_acceptance,
-        method.stay_probability,
-        calibrator.seed,
+    run, stochastic = commol_rs.inference.abc_smc(
+        calibrator._rust_problem, engine_json(method)
     )
     return SMCResult(
         sample=_sample(
@@ -255,13 +198,8 @@ def run_abc_rejection(calibrator: "Calibrator", method: ABCRejection) -> SMCResu
     SMCResult
         The kept draws, the tolerance, the log evidence and the diagnostics.
     """
-    run, stochastic = rust.abc_rejection(
-        calibrator.rust_problem,
-        method.priors.rust_priors(),
-        _metric(method.distance),
-        method.draws,
-        method.quantile,
-        calibrator.seed,
+    run, stochastic = commol_rs.inference.abc_rejection(
+        calibrator._rust_problem, engine_json(method)
     )
     return SMCResult(
         sample=_sample(

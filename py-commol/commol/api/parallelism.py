@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Literal, cast
 
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context.engine_json import engine_json
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import ParallelismProtocol
@@ -19,7 +20,7 @@ def _choice(n: int | None, levels: Levels | None) -> "ParallelismProtocol":
     current = commol_rs.parallelism.current()
     return commol_rs.parallelism.Parallelism(
         current.threads if n is None else n,
-        current.levels if levels is None else levels,
+        engine_json(current.levels if levels is None else levels),
     )
 
 

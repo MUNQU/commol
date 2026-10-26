@@ -30,8 +30,10 @@ use crate::special::{
 /// Newton steps.
 const INVERSION_STEPS: u64 = 200;
 
-/// A family of distributions and its parameters.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// A family of distributions and its parameters, read from the JSON of a
+/// distribution of the Python API, tagged by `kind`.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(remote = "Self", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Family {
     /// Uniform on the bounds.
     Uniform,
@@ -68,6 +70,13 @@ pub enum Family {
     },
 }
 
+commol_core::tagged!(Family, ranges = {
+    "beta" => crate::ranges::BETA,
+    "normal" => crate::ranges::NORMAL,
+    "log_normal" => crate::ranges::LOG_NORMAL,
+    "gamma" => crate::ranges::GAMMA,
+});
+
 /// The kinds of [`Family`], in the order messages list them.
 const KINDS: [&str; 6] = [
     "Uniform",
@@ -79,32 +88,6 @@ const KINDS: [&str; 6] = [
 ];
 
 impl Family {
-    /// The family of a kind and its parameters, in the order of the
-    /// variant's fields: `"uniform"`, `"log_uniform"`, `"beta"`, `"normal"`,
-    /// `"log_normal"` or `"gamma"`.
-    ///
-    /// # Errors
-    ///
-    /// Returns a message when the kind is unknown or the number of
-    /// parameters is wrong.
-    pub fn from_name(kind: &str, parameters: &[f64]) -> Result<Self, String> {
-        let family = match (kind, parameters) {
-            ("uniform", []) => Self::Uniform,
-            ("log_uniform", []) => Self::LogUniform,
-            ("beta", &[a, b]) => Self::Beta { a, b },
-            ("normal", &[mean, sd]) => Self::Normal { mean, sd },
-            ("log_normal", &[mu, sigma]) => Self::LogNormal { mu, sigma },
-            ("gamma", &[shape, rate]) => Self::Gamma { shape, rate },
-            _ => {
-                return Err(format!(
-                    "Unknown distribution '{kind}' with {} parameters",
-                    parameters.len()
-                ));
-            }
-        };
-        Ok(family)
-    }
-
     /// The kind, as the Python class names it, such as `"Beta"`.
     pub fn kind(&self) -> &'static str {
         match self {
@@ -516,15 +499,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_family_is_read_from_its_name() {
-        assert_eq!(
-            Family::from_name("gamma", &[2.0, 3.0]),
-            Ok(Family::Gamma {
-                shape: 2.0,
-                rate: 3.0
-            })
-        );
-        assert!(Family::from_name("normal", &[1.0]).is_err());
+    fn a_family_shows_its_kind_and_parameters() {
         assert_eq!(
             Family::Beta { a: 2.0, b: 0.5 }.to_string(),
             "Beta(a=2, b=0.5)"

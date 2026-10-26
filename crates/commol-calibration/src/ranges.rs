@@ -58,39 +58,48 @@ pub const SIGMA: Real = Real::positive_or_infinite("sigma");
 /// The particles of a swarm.
 pub const PARTICLES: Count = Count::at_least("particles", 1);
 /// The constant inertia weight of a swarm.
-pub const FACTOR: Real = Real::positive_or_infinite("factor");
+pub const INERTIA_FACTOR: Real = Real::positive_or_infinite("inertia_factor");
 /// The smallest chaotic inertia weight of a swarm.
-pub const W_MIN: Real = Real::positive_or_infinite("w_min");
+pub const INERTIA_MIN: Real = Real::positive_or_infinite("inertia_min");
 /// The largest chaotic inertia weight of a swarm.
-pub const W_MAX: Real = Real::positive_or_infinite("w_max");
+pub const INERTIA_MAX: Real = Real::positive_or_infinite("inertia_max");
 /// The constant cognitive coefficient of a swarm.
 pub const COGNITIVE: Real = Real::positive_or_infinite("cognitive");
 /// The constant social coefficient of a swarm.
 pub const SOCIAL: Real = Real::positive_or_infinite("social");
 /// The first cognitive coefficient of time-varying acceleration.
-pub const C1_INITIAL: Real = Real::positive_or_infinite("c1_initial");
+pub const COGNITIVE_INITIAL: Real = Real::positive_or_infinite("cognitive_initial");
 /// The last cognitive coefficient of time-varying acceleration.
-pub const C1_FINAL: Real = Real::positive_or_infinite("c1_final");
+pub const COGNITIVE_FINAL: Real = Real::positive_or_infinite("cognitive_final");
 /// The first social coefficient of time-varying acceleration.
-pub const C2_INITIAL: Real = Real::positive_or_infinite("c2_initial");
+pub const SOCIAL_INITIAL: Real = Real::positive_or_infinite("social_initial");
 /// The last social coefficient of time-varying acceleration.
-pub const C2_FINAL: Real = Real::positive_or_infinite("c2_final");
+pub const SOCIAL_FINAL: Real = Real::positive_or_infinite("social_final");
 /// The scale of a mutation of a swarm.
-pub const SCALE: Real = Real::positive_or_infinite("scale");
+pub const MUTATION_SCALE: Real = Real::positive_or_infinite("mutation_scale");
 /// The probability of a mutation of a swarm, per iteration.
-pub const PROBABILITY: Real = Real::new("probability", Bound::Closed(0.0), Bound::Closed(1.0));
+pub const MUTATION_PROBABILITY: Real = Real::new(
+    "mutation_probability",
+    Bound::Closed(0.0),
+    Bound::Closed(1.0),
+);
 /// The velocity clamp of a swarm, as a fraction of the width of each bound.
-pub const CLAMP_FACTOR: Real = Real::new("clamp_factor", Bound::Open(0.0), Bound::Closed(1.0));
+pub const VELOCITY_CLAMP_FACTOR: Real = Real::new(
+    "velocity_clamp_factor",
+    Bound::Open(0.0),
+    Bound::Closed(1.0),
+);
 /// The velocity below which a particle of a swarm is reinitialized.
-pub const MUTATION_THRESHOLD: Real = Real::non_negative_or_infinite("mutation_threshold");
+pub const VELOCITY_MUTATION_THRESHOLD: Real =
+    Real::non_negative_or_infinite("velocity_mutation_threshold");
 /// The iterations of the improvement stop of a swarm.
-pub const STOP_WINDOW: Count = Count::at_least("window", 1);
+pub const IMPROVEMENT_WINDOW: Count = Count::at_least("improvement_window", 1);
 /// The absolute tolerance of the improvement stop of a swarm.
-pub const TOL_ABS: Real = Real::non_negative_or_infinite("tol_abs");
+pub const IMPROVEMENT_TOL_ABS: Real = Real::non_negative_or_infinite("improvement_tol_abs");
 /// The relative tolerance of the improvement stop of a swarm.
-pub const TOL_REL: Real = Real::non_negative_or_infinite("tol_rel");
+pub const IMPROVEMENT_TOL_REL: Real = Real::non_negative_or_infinite("improvement_tol_rel");
 /// The tolerance of the radius stop of a swarm.
-pub const TOL: Real = Real::non_negative_or_infinite("tol");
+pub const RADIUS_TOL: Real = Real::non_negative_or_infinite("radius_tol");
 
 /// The starts of a multi-start optimization, the first from the initial
 /// guess or the fit.
@@ -100,107 +109,48 @@ pub const REPLICATES: Count = Count::at_least("replicates", 1);
 /// The iterations of a calibration result.
 pub const ITERATIONS: Count = Count::at_least("iterations", 0);
 
+/// The rules of a normal observation model.
+pub const NORMAL_OBSERVATIONS: Ranges = Ranges {
+    object: "NormalObservations",
+    rules: &[Rule::Real(SD)],
+};
+
+/// The rules of a log-normal observation model.
+pub const LOG_NORMAL_OBSERVATIONS: Ranges = Ranges {
+    object: "LogNormalObservations",
+    rules: &[Rule::Real(LOG_NORMAL_SIGMA)],
+};
+
+/// The rules of a Student-t observation model.
+pub const STUDENT_T_OBSERVATIONS: Ranges = Ranges {
+    object: "StudentTObservations",
+    rules: &[Rule::Real(DF), Rule::Real(STUDENT_T_SCALE)],
+};
+
+/// The rules of a negative binomial observation model.
+pub const NEGATIVE_BINOMIAL_OBSERVATIONS: Ranges = Ranges {
+    object: "NegativeBinomialObservations",
+    rules: &[Rule::Real(OVERDISPERSION)],
+};
+
+/// The rules of a binomial observation model.
+pub const BINOMIAL_OBSERVATIONS: Ranges = Ranges {
+    object: "BinomialObservations",
+    rules: &[Rule::Count(TRIALS)],
+};
+
 /// The rules of the settings of each object of a calibration, as the Python
 /// API names its class.
 pub const RANGES: &[Ranges] = &[
-    Ranges {
-        object: "ObservedDataPoint",
-        rules: &[
-            Rule::Real(AT),
-            Rule::Real(VALUE),
-            Rule::Real(WEIGHT),
-            Rule::Real(WINDOW),
-            Rule::Count(TRIALS),
-        ],
-    },
-    Ranges {
-        object: "CalibrationConstraint",
-        rules: &[Rule::Real(WEIGHT), Rule::Real(AT)],
-    },
-    Ranges {
-        object: "NormalObservations",
-        rules: &[Rule::Real(SD)],
-    },
-    Ranges {
-        object: "LogNormalObservations",
-        rules: &[Rule::Real(LOG_NORMAL_SIGMA)],
-    },
-    Ranges {
-        object: "StudentTObservations",
-        rules: &[Rule::Real(DF), Rule::Real(STUDENT_T_SCALE)],
-    },
-    Ranges {
-        object: "NegativeBinomialObservations",
-        rules: &[Rule::Real(OVERDISPERSION)],
-    },
-    Ranges {
-        object: "BinomialObservations",
-        rules: &[Rule::Count(TRIALS)],
-    },
-    Ranges {
-        object: "NelderMeadConfig",
-        rules: &[
-            Rule::Count(MAX_ITERATIONS),
-            Rule::Real(SD_TOLERANCE),
-            Rule::Real(INITIAL_SIMPLEX_SIZE),
-            Rule::Real(ALPHA),
-            Rule::Real(GAMMA),
-            Rule::Real(RHO),
-            Rule::Real(SIGMA),
-            Rule::Count(HEADER_INTERVAL),
-        ],
-    },
-    Ranges {
-        object: "PSOConstantInertia",
-        rules: &[Rule::Real(FACTOR)],
-    },
-    Ranges {
-        object: "PSOChaoticInertia",
-        rules: &[Rule::Real(W_MIN), Rule::Real(W_MAX)],
-    },
-    Ranges {
-        object: "PSOConstantAcceleration",
-        rules: &[Rule::Real(COGNITIVE), Rule::Real(SOCIAL)],
-    },
-    Ranges {
-        object: "PSOTimeVaryingAcceleration",
-        rules: &[
-            Rule::Real(C1_INITIAL),
-            Rule::Real(C1_FINAL),
-            Rule::Real(C2_INITIAL),
-            Rule::Real(C2_FINAL),
-        ],
-    },
-    Ranges {
-        object: "PSOMutationConfig",
-        rules: &[Rule::Real(SCALE), Rule::Real(PROBABILITY)],
-    },
-    Ranges {
-        object: "PSOVelocityConfig",
-        rules: &[Rule::Real(CLAMP_FACTOR), Rule::Real(MUTATION_THRESHOLD)],
-    },
-    Ranges {
-        object: "PSOImprovementStop",
-        rules: &[
-            Rule::Count(STOP_WINDOW),
-            Rule::Real(TOL_ABS),
-            Rule::Real(TOL_REL),
-        ],
-    },
-    Ranges {
-        object: "PSORadiusStop",
-        rules: &[Rule::Real(TOL)],
-    },
-    Ranges {
-        object: "ParticleSwarmConfig",
-        rules: &[Rule::Count(PARTICLES), Rule::Count(MAX_ITERATIONS)],
-    },
-    Ranges {
-        object: "CalibrationProblem",
-        rules: &[Rule::Count(REPLICATES), Rule::Count(commol_core::SEED)],
-    },
-    Ranges {
-        object: "CalibrationResult",
-        rules: &[Rule::Count(ITERATIONS), Rule::Count(commol_core::SEED)],
-    },
+    crate::settings::Observation::RANGES,
+    crate::types::CalibrationConstraint::RANGES,
+    NORMAL_OBSERVATIONS,
+    LOG_NORMAL_OBSERVATIONS,
+    STUDENT_T_OBSERVATIONS,
+    NEGATIVE_BINOMIAL_OBSERVATIONS,
+    BINOMIAL_OBSERVATIONS,
+    crate::settings::NelderMeadSettings::RANGES,
+    crate::settings::ParticleSwarmSettings::RANGES,
+    crate::settings::ProblemSettings::RANGES,
+    crate::settings::FitRecord::RANGES,
 ];

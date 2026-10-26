@@ -8,6 +8,7 @@ are those of a sample of one distribution: with a normal model of known
 of the fit is ``sd²/n``.
 """
 
+import json
 import logging
 import math
 
@@ -42,7 +43,7 @@ from commol import (
     scores,
 )
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context._model import engine_state
+from commol.context.engine_json import engine_json
 from tests.support import (
     a_to_b_builder,
     bounded,
@@ -219,7 +220,7 @@ class TestModels:
         fit = calibrator.run()
 
         values = [fit.best_parameters[name] for name in calibrator.parameter_names]
-        pointwise = calibrator.rust_problem.pointwise_log_likelihood(values)
+        pointwise = calibrator._rust_problem.pointwise_log_likelihood(values)
         assert len(pointwise) == len(observed)
         assert math.fsum(pointwise) == pytest.approx(-fit.final_loss, rel=1e-12)
         assert fit.best_parameters["c"] == pytest.approx(FLOW, rel=0.2)
@@ -232,7 +233,7 @@ class TestModels:
             values, windowed=True, observation_models={"B": PoissonObservations()}
         )
 
-        pointwise = calibrator.rust_problem.pointwise_log_likelihood([9.0])
+        pointwise = calibrator._rust_problem.pointwise_log_likelihood([9.0])
 
         expected = [y * math.log(9.0) - 9.0 - math.lgamma(y + 1) for y in values]
         assert pointwise == pytest.approx(expected, rel=1e-12)
@@ -256,51 +257,40 @@ class TestModels:
         assert report["parameters"]["p"]["value"] == fit.best_parameters["p"]
 
     @pytest.mark.parametrize("given", ["neither", "both"])
-    def test_the_rust_problem_takes_a_loss_or_models(self, given: str) -> None:
-        engine = _flow_simulation().engine
-        observed = engine_state.rust_observed_data(
-            flow_observations([1.0], windowed=True)
+    def test_the_engine_problem_takes_a_loss_or_models(self, given: str) -> None:
+        calibrator = flow_calibrator(
+            [1.0], windowed=True, observation_models={"B": PoissonObservations()}
         )
-        models = [("B", commol_rs.calibration.ObservationModel.poisson())]
+        problem = json.loads(engine_json(calibrator.problem))
+        if given == "both":
+            problem["loss_function"] = "sse"
+        else:
+            problem["observation_models"] = None
 
         with pytest.raises(ValueError, match="exactly one of them"):
             commol_rs.inference.CalibrationProblem(
-                engine,
-                observed,
-                engine_state.rust_parameters([bounded("c", 0.0, 5.0)]),
-                [],
-                loss_config=(
-                    commol_rs.calibration.LossConfig.sse() if given == "both" else None
-                ),
-                observation_models=models if given == "both" else None,
+                _flow_simulation().engine, json.dumps(problem)
             )
 
-    def test_observation_draws_take_one_noise(self) -> None:
+    def test_observation_draws_take_a_noise_of_a_known_kind(self) -> None:
         calibrator = flow_calibrator(
             [1.0], windowed=True, observation_models={"B": PoissonObservations()}
         )
         sample = ParameterSample.equally_weighted(
             ["c"], [(0.0, 50.0)], [[1.0]], SampleMethod(name="point")
         )
+        observed = engine_json(flow_observations([1.0], windowed=True))
 
-        observed = engine_state.rust_observed_data(
-            flow_observations([1.0], windowed=True)
-        )
-
-        with pytest.raises(ValueError, match="take one noise"):
-            calibrator.rust_problem.observation_draws(
-                sample.rust_sample,
-                observed,
-                1,
-                residual_noise=([1.0], 1, "additive"),
-                distribution_noise=True,
+        with pytest.raises(ValueError, match="kind"):
+            calibrator._rust_problem.observation_draws(
+                sample._rust, observed, '{"kind": "both"}'
             )
 
     def test_a_loss_has_no_pointwise_log_likelihood(self) -> None:
         calibrator = flow_calibrator([1.0], windowed=True)
 
         with pytest.raises(ValueError, match="needs observation models"):
-            calibrator.rust_problem.pointwise_log_likelihood([1.0])
+            calibrator._rust_problem.pointwise_log_likelihood([1.0])
 
 
 class TestMaximumLikelihood:
@@ -323,7 +313,7 @@ class TestMaximumLikelihood:
         # The standard error of φ from the curvature of the log-likelihood.
         def log_likelihood(phi: float) -> float:
             return math.fsum(
-                calibrator.rust_problem.pointwise_log_likelihood([fit["c"], phi])
+                calibrator._rust_problem.pointwise_log_likelihood([fit["c"], phi])
             )
 
         h = 1e-4

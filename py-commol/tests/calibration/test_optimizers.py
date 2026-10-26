@@ -1,5 +1,6 @@
 """Nelder-Mead and particle swarm recover known parameters and report convergence."""
 
+import re
 import pytest
 from pydantic import ValidationError
 
@@ -53,19 +54,20 @@ class TestRecovery:
     def test_particle_swarm_with_time_varying_acceleration_and_mutation(
         self, truth: Model, truth_run
     ) -> None:
-        config = (
-            ParticleSwarmConfig(particles=30, max_iterations=200, verbose=False)
-            .acceleration(
-                "time_varying",
-                c1_initial=2.5,
-                c1_final=0.5,
-                c2_initial=0.5,
-                c2_final=2.5,
-            )
-            .velocity(clamp_factor=0.2)
-            .mutation(
-                "gaussian", scale=0.1, probability=0.05, application="global_best"
-            )
+        config = ParticleSwarmConfig(
+            particles=30,
+            max_iterations=200,
+            verbose=False,
+            acceleration="time_varying",
+            cognitive_initial=2.5,
+            cognitive_final=0.5,
+            social_initial=0.5,
+            social_final=2.5,
+            velocity_clamp_factor=0.2,
+            mutation="gaussian",
+            mutation_scale=0.1,
+            mutation_probability=0.05,
+            mutation_application="global_best",
         )
 
         fitted = _fit_k1_and_k2(truth, truth_run, config)
@@ -78,7 +80,10 @@ class TestRecovery:
             max_iterations=200,
             verbose=False,
             initialization="opposition_based",
-        ).inertia("chaotic", w_min=0.4, w_max=0.9)
+            inertia="chaotic",
+            inertia_min=0.4,
+            inertia_max=0.9,
+        )
 
         fitted = _fit_k1_and_k2(truth, truth_run, config)
 
@@ -132,13 +137,19 @@ class TestConverged:
         assert result.converged is False
 
     def test_a_swarm_that_stagnates_stops_and_converges(self) -> None:
-        def swarm() -> ParticleSwarmConfig:
-            return ParticleSwarmConfig(particles=10, max_iterations=500)
+        def swarm(**stop: float) -> ParticleSwarmConfig:
+            return ParticleSwarmConfig.model_validate(
+                {"particles": 10, "max_iterations": 500, **stop}
+            )
 
         without = _calibrate(_k_problem(swarm(), seed=SEED))
         stopping = [
-            swarm().improvement_stop(window=20, tol_abs=1e-12, tol_rel=1e-10),
-            swarm().radius_stop(1e-6),
+            swarm(
+                improvement_window=20,
+                improvement_tol_abs=1e-12,
+                improvement_tol_rel=1e-10,
+            ),
+            swarm(radius_tol=1e-6),
         ]
 
         assert without.converged is False
@@ -207,49 +218,51 @@ class TestParticleSwarmSettings:
         return [evaluation.parameters["k"] for evaluation in history.evaluations]
 
     @pytest.mark.parametrize(
-        "configure",
+        "settings",
         [
             pytest.param(
-                lambda c: c.mutation(
-                    "gaussian", scale=0.5, probability=1.0, application="all_particles"
-                ),
+                {
+                    "mutation": "gaussian",
+                    "mutation_scale": 0.5,
+                    "mutation_probability": 1.0,
+                    "mutation_application": "all_particles",
+                },
                 id="mutation",
             ),
-            pytest.param(lambda c: c.inertia("constant", factor=0.1), id="inertia"),
+            pytest.param({"inertia": "constant", "inertia_factor": 0.1}, id="inertia"),
             pytest.param(
-                lambda c: c.inertia("chaotic", w_min=0.1, w_max=0.2),
+                {"inertia": "chaotic", "inertia_min": 0.1, "inertia_max": 0.2},
                 id="chaotic-inertia",
             ),
             pytest.param(
-                lambda c: c.acceleration("constant", cognitive=2.5, social=0.1),
+                {"acceleration": "constant", "cognitive": 2.5, "social": 0.1},
                 id="acceleration",
             ),
             pytest.param(
-                lambda c: c.acceleration(
-                    "time_varying",
-                    c1_initial=2.5,
-                    c1_final=0.1,
-                    c2_initial=0.1,
-                    c2_final=2.5,
-                ),
+                {
+                    "acceleration": "time_varying",
+                    "cognitive_initial": 2.5,
+                    "cognitive_final": 0.1,
+                    "social_initial": 0.1,
+                    "social_final": 2.5,
+                },
                 id="time-varying-acceleration",
             ),
-            pytest.param(lambda c: c.velocity(clamp_factor=0.01), id="velocity"),
-            pytest.param(
-                lambda c: c.velocity(mutation_threshold=1.0), id="velocity-threshold"
-            ),
-            pytest.param(
-                lambda c: c.model_copy(update={"particles": 6}), id="particles"
-            ),
-            pytest.param(
-                lambda c: c.model_copy(update={"initialization": "latin_hypercube"}),
-                id="initialization",
-            ),
+            pytest.param({"velocity_clamp_factor": 0.01}, id="velocity"),
+            pytest.param({"velocity_mutation_threshold": 1.0}, id="velocity-threshold"),
+            pytest.param({"particles": 6}, id="particles"),
+            pytest.param({"initialization": "latin_hypercube"}, id="initialization"),
         ],
     )
-    def test_a_setting_changes_the_search_of_one_seed(self, configure) -> None:
+    def test_a_setting_changes_the_search_of_one_seed(
+        self, settings: dict[str, object]
+    ) -> None:
+        configured = ParticleSwarmConfig.model_validate(
+            self._base().model_dump() | settings
+        )
+
         assert self._search(self._base()) == self._search(self._base())
-        assert self._search(configure(self._base())) != self._search(self._base())
+        assert self._search(configured) != self._search(self._base())
 
     def test_a_verbose_swarm_reports_its_iterations(self, capfd) -> None:
         _calibrate(_k_problem(self._base(), seed=SEED))
@@ -301,7 +314,7 @@ class TestParticleSwarmConfig:
     @pytest.mark.parametrize(
         ("setting", "other"),
         [
-            ("inertia", {"factor": 0.5}),
+            ("inertia", {"inertia_factor": 0.5}),
             ("acceleration", {"cognitive": 2.0, "social": 0.5}),
         ],
     )
@@ -309,97 +322,169 @@ class TestParticleSwarmConfig:
         self, setting: str, other: dict[str, float]
     ) -> None:
         def fit(**values: float) -> CalibrationResult:
-            swarm = ParticleSwarmConfig(particles=4, max_iterations=3, verbose=False)
-            config = getattr(swarm, setting)("constant", **values)
+            config = ParticleSwarmConfig.model_validate(
+                {"particles": 4, "max_iterations": 3, setting: "constant", **values}
+            )
             return _calibrate(_k_problem(config, seed=SEED))
 
         unset = _calibrate(
-            _k_problem(
-                ParticleSwarmConfig(particles=4, max_iterations=3, verbose=False),
-                seed=SEED,
-            )
+            _k_problem(ParticleSwarmConfig(particles=4, max_iterations=3), seed=SEED)
         )
 
         assert fit() == unset
         assert fit(**other).best_parameters != unset.best_parameters
 
     def test_a_chaotic_inertia_needs_a_range(self) -> None:
-        with pytest.raises(ValueError, match=r"w_max \(0.4\) must be greater"):
-            ParticleSwarmConfig().inertia("chaotic", w_min=0.9, w_max=0.4)
-
-    def test_an_initialization_is_one_of_the_known_ones(self) -> None:
-        with pytest.raises(ValueError, match="Invalid initialization: sobol"):
-            ParticleSwarmConfig(initialization="sobol")
+        with pytest.raises(
+            ValueError,
+            match=r"inertia_max \(0.4\) must be greater than inertia_min \(0.9\)",
+        ):
+            ParticleSwarmConfig(inertia="chaotic", inertia_min=0.9, inertia_max=0.4)
 
     @pytest.mark.parametrize(
-        ("configure", "field"),
+        ("settings", "message"),
         [
             (
-                lambda c: c.improvement_stop(window=0, tol_abs=0.0, tol_rel=0.0),
-                "window",
+                {"inertia_factor": 0.5},
+                "inertia_factor is read only with another inertia",
             ),
             (
-                lambda c: c.improvement_stop(window=5, tol_abs=-1.0, tol_rel=0.0),
-                "tol_abs",
+                {"inertia": "constant", "inertia_min": 0.4},
+                "inertia_min is read only with another inertia",
             ),
             (
-                lambda c: c.improvement_stop(window=5, tol_abs=0.0, tol_rel=-1.0),
-                "tol_rel",
+                {"inertia": "chaotic", "inertia_factor": 0.5},
+                "inertia_factor is read only with another inertia",
             ),
-            (lambda c: c.radius_stop(-1.0), "tol"),
+            (
+                {"inertia": "chaotic", "inertia_max": 0.9},
+                "inertia='chaotic' needs inertia_min",
+            ),
+            ({"cognitive": 2.0}, "cognitive is read only with another acceleration"),
+            (
+                {"social_initial": 2.0},
+                "social_initial is read only with another acceleration",
+            ),
+            (
+                {"acceleration": "constant", "social_final": 1.0},
+                "social_final is read only with another acceleration",
+            ),
+            (
+                {"acceleration": "time_varying", "social": 1.0},
+                "social is read only with another acceleration",
+            ),
+            (
+                {
+                    "acceleration": "time_varying",
+                    "cognitive_initial": 2.0,
+                    "cognitive_final": 1.0,
+                    "social_initial": 1.0,
+                },
+                "acceleration='time_varying' needs social_final",
+            ),
+            (
+                {"mutation_application": "global_best"},
+                "mutation_application is read only with another mutation",
+            ),
+            (
+                {
+                    "mutation": "cauchy",
+                    "mutation_probability": 0.1,
+                    "mutation_application": "global_best",
+                },
+                "mutation='cauchy' needs mutation_scale",
+            ),
+            (
+                {
+                    "mutation": "gaussian",
+                    "mutation_scale": 0.1,
+                    "mutation_application": "global_best",
+                },
+                "mutation='gaussian' needs mutation_probability",
+            ),
+            (
+                {
+                    "mutation": "gaussian",
+                    "mutation_scale": 0.1,
+                    "mutation_probability": 0.1,
+                },
+                "mutation='gaussian' needs mutation_application",
+            ),
+            (
+                {"improvement_window": 5, "improvement_tol_abs": 0.0},
+                "The improvement stop rule needs improvement_window, "
+                "improvement_tol_abs and improvement_tol_rel, all three",
+            ),
+        ],
+    )
+    def test_a_number_is_set_with_its_strategy_and_a_strategy_with_its_numbers(
+        self, settings: dict[str, object], message: str
+    ) -> None:
+        with pytest.raises(ValidationError, match=re.escape(message)):
+            ParticleSwarmConfig.model_validate(settings)
+
+    def test_an_initialization_is_one_of_the_known_ones(self) -> None:
+        with pytest.raises(
+            ValidationError,
+            match="'uniform', 'latin_hypercube' or 'opposition_based'",
+        ):
+            ParticleSwarmConfig(initialization="sobol")  # ty: ignore[invalid-argument-type]
+
+    @pytest.mark.parametrize(
+        ("settings", "field"),
+        [
+            (
+                {
+                    "improvement_window": 0,
+                    "improvement_tol_abs": 0.0,
+                    "improvement_tol_rel": 0.0,
+                },
+                "improvement_window",
+            ),
+            (
+                {
+                    "improvement_window": 5,
+                    "improvement_tol_abs": -1.0,
+                    "improvement_tol_rel": 0.0,
+                },
+                "improvement_tol_abs",
+            ),
+            (
+                {
+                    "improvement_window": 5,
+                    "improvement_tol_abs": 0.0,
+                    "improvement_tol_rel": -1.0,
+                },
+                "improvement_tol_rel",
+            ),
+            ({"radius_tol": -1.0}, "radius_tol"),
         ],
     )
     def test_a_stop_rule_out_of_its_range_names_its_setting(
-        self, configure, field: str
+        self, settings: dict[str, object], field: str
     ) -> None:
         with pytest.raises(
             ValidationError, match=rf"Value error, {field} is a (whole )?number"
         ):
-            configure(ParticleSwarmConfig())
+            ParticleSwarmConfig.model_validate(settings)
 
     @pytest.mark.parametrize(
-        ("configure", "message"),
+        ("settings", "names"),
         [
+            ({"inertia": "linear"}, "'constant' or 'chaotic'"),
+            ({"acceleration": "linear"}, "'constant' or 'time_varying'"),
+            ({"mutation": "uniform"}, "'gaussian' or 'cauchy'"),
             (
-                lambda c: c.inertia("linear"),
-                "Invalid inertia type: linear. Must be one of "
-                "[<PSOInertiaType.CONSTANT: 'constant'>, "
-                "<PSOInertiaType.CHAOTIC: 'chaotic'>]",
-            ),
-            (
-                lambda c: c.acceleration("linear"),
-                "Invalid acceleration type: linear. Must be one of "
-                "[<PSOAccelerationType.CONSTANT: 'constant'>, "
-                "<PSOAccelerationType.TIME_VARYING: 'time_varying'>]",
-            ),
-            (
-                lambda c: c.mutation(
-                    "uniform", scale=0.1, probability=0.1, application="global_best"
-                ),
-                "Invalid mutation strategy: uniform. Must be one of "
-                "[<PSOMutationStrategy.GAUSSIAN: 'gaussian'>, "
-                "<PSOMutationStrategy.CAUCHY: 'cauchy'>]",
+                {"mutation_application": "worst"},
+                "'global_best', 'all_particles' or 'below_average'",
             ),
         ],
     )
     def test_an_unknown_strategy_lists_the_known_ones(
-        self, configure, message: str
+        self, settings: dict[str, object], names: str
     ) -> None:
-        with pytest.raises(ValueError) as error:
-            configure(ParticleSwarmConfig())
-
-        assert str(error.value) == message
-
-    def test_an_unknown_mutation_application_lists_the_known_ones(self) -> None:
-        with pytest.raises(ValueError) as error:
-            ParticleSwarmConfig().mutation(
-                "gaussian", scale=0.1, probability=0.1, application="worst"
-            )
-
-        assert str(error.value).startswith(
-            "Invalid mutation application: worst. Must be one of "
-            "[<PSOMutationApplication.GLOBAL_BEST: 'global_best'>"
-        )
+        with pytest.raises(ValidationError, match=re.escape(names)):
+            ParticleSwarmConfig.model_validate(settings)
 
 
 def test_a_particle_swarm_takes_particles(capfd) -> None:

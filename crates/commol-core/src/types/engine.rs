@@ -11,8 +11,10 @@ use serde_json::Value;
 
 use crate::Real;
 
-/// The kind of model an engine runs: the kind of its structure.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// The kind of model an engine runs: the kind of its structure. It crosses
+/// from Python as the JSON of its name, such as `"aggregate"`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ModelKind {
     /// Amounts per compartment: bins expanded over stratifications.
     Aggregate,
@@ -36,22 +38,6 @@ impl ModelKind {
             #[cfg(feature = "test-kind")]
             Self::Test => "test",
         }
-    }
-
-    /// The kind with a name.
-    ///
-    /// # Errors
-    ///
-    /// Returns a message with every name when no kind has it.
-    pub fn from_name(name: &str) -> Result<Self, String> {
-        Self::ALL
-            .iter()
-            .copied()
-            .find(|kind| kind.name() == name)
-            .ok_or_else(|| {
-                let names: Vec<&str> = Self::ALL.iter().map(|kind| kind.name()).collect();
-                format!("Unknown model kind '{name}'; the kinds are {names:?}")
-            })
     }
 
     /// The types of value of the kind that calibration may set, besides
@@ -97,42 +83,15 @@ pub enum RateMeaning {
 ///
 /// The two differ only for a per-step rate: a model that discretizes a
 /// continuous process keeps its survival, and a model whose step is the unit
-/// of its process keeps its mean.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// of its process keeps its mean. It crosses from Python as the JSON of its
+/// name, `"survival"` or `"mean"`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum RateKeeps {
     /// The survival of the exponential residence at every step.
     Survival,
     /// The mean of the residence.
     Mean,
-}
-
-impl RateKeeps {
-    /// Every value.
-    pub const ALL: &'static [Self] = &[Self::Survival, Self::Mean];
-
-    /// Name of the value, as Python passes it.
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Survival => "survival",
-            Self::Mean => "mean",
-        }
-    }
-
-    /// The value with a name.
-    ///
-    /// # Errors
-    ///
-    /// Returns a message with every name when no value has it.
-    pub fn from_name(name: &str) -> Result<Self, String> {
-        Self::ALL
-            .iter()
-            .copied()
-            .find(|keep| keep.name() == name)
-            .ok_or_else(|| {
-                let names: Vec<&str> = Self::ALL.iter().map(|keep| keep.name()).collect();
-                format!("Unknown value '{name}' of what a rate keeps; the values are {names:?}")
-            })
-    }
 }
 
 impl RateMeaning {
@@ -283,7 +242,8 @@ impl DynamicsForm {
     }
 }
 
-/// The list of engines a model can name.
+/// The list of engines a model can name. An entry crosses from Python as the
+/// JSON of its name, such as `"DifferenceEquations"`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EngineType {
     /// Discrete time: each step applies every flow once (`commol-difference`).
@@ -334,22 +294,6 @@ impl EngineType {
             #[cfg(feature = "test-kind")]
             Self::TestStochasticEngine => "TestStochasticEngine",
         }
-    }
-
-    /// The entry with a name.
-    ///
-    /// # Errors
-    ///
-    /// Returns a message with every name of the list when no entry has it.
-    pub fn from_name(name: &str) -> Result<Self, String> {
-        Self::ALL
-            .iter()
-            .copied()
-            .find(|engine| engine.name() == name)
-            .ok_or_else(|| {
-                let names: Vec<&str> = Self::ALL.iter().map(|engine| engine.name()).collect();
-                format!("Unknown engine '{name}'; the engines are {names:?}")
-            })
     }
 
     /// The kinds of model the engine runs.
@@ -571,20 +515,17 @@ impl EngineType {
             #[cfg(feature = "test-kind")]
             Self::TestStochasticEngine => no_settings(EngineSettings::TestStochasticEngine),
             Self::DifferentialEquations => {
-                let solver: OdeSolver =
-                    serde_json::from_value(value.clone()).map_err(|error| error.to_string())?;
+                let solver: OdeSolver = crate::json::read(&value.to_string())?;
                 solver.validate()?;
                 Ok(EngineSettings::DifferentialEquations(solver))
             }
             Self::StochasticEvents => {
-                let settings: StochasticEventsSettings =
-                    serde_json::from_value(value.clone()).map_err(|error| error.to_string())?;
+                let settings: StochasticEventsSettings = crate::json::read(&value.to_string())?;
                 settings.validate()?;
                 Ok(EngineSettings::StochasticEvents(settings))
             }
             Self::StochasticSteps => {
-                let settings: StochasticStepsSettings =
-                    serde_json::from_value(value.clone()).map_err(|error| error.to_string())?;
+                let settings: StochasticStepsSettings = crate::json::read(&value.to_string())?;
                 Ok(EngineSettings::StochasticSteps(settings))
             }
         }
@@ -910,11 +851,11 @@ mod tests {
     #[test]
     fn every_entry_has_a_unique_name_that_reads_back() {
         for &engine in EngineType::ALL {
-            assert_eq!(EngineType::from_name(engine.name()), Ok(engine));
             let json = serde_json::to_value(engine).unwrap();
             assert_eq!(json, json!(engine.name()));
+            assert_eq!(crate::json::read(&json.to_string()), Ok(engine));
         }
-        let error = EngineType::from_name("Stochastic").unwrap_err();
+        let error = crate::json::read::<EngineType>(r#""Stochastic""#).unwrap_err();
         assert!(error.contains("DifferenceEquations") && error.contains("DifferentialEquations"));
     }
 
@@ -969,25 +910,22 @@ mod tests {
             RateMeaning::PerStep.rate_from_mean_span(10.0, RateKeeps::Mean),
             Ok(0.1)
         );
-        for keep in RateKeeps::ALL.iter().copied() {
+        for keep in [RateKeeps::Survival, RateKeeps::Mean] {
             assert_eq!(
                 RateMeaning::Continuous.rate_from_mean_span(10.0, keep),
                 Ok(0.1)
             );
-            assert_eq!(RateKeeps::from_name(keep.name()), Ok(keep));
+            assert_eq!(crate::json::read(&crate::json::write(&keep)), Ok(keep));
             for meaning in [RateMeaning::PerStep, RateMeaning::Continuous] {
                 for span in [0.0, -1.0, f64::INFINITY, f64::NAN] {
                     assert!(meaning.rate_from_mean_span(span, keep).is_err());
                 }
             }
         }
+        assert_eq!(crate::json::write(&RateKeeps::Survival), r#""survival""#);
         assert_eq!(
-            RateKeeps::from_name("median"),
-            Err(
-                "Unknown value 'median' of what a rate keeps; the values are \
-                 [\"survival\", \"mean\"]"
-                    .to_string()
-            )
+            crate::json::read::<RateKeeps>(r#""median""#),
+            Err("unknown variant `median`, expected `survival` or `mean`".to_string())
         );
     }
 
@@ -1213,9 +1151,11 @@ mod tests {
     #[test]
     fn every_kind_has_a_unique_name_that_reads_back() {
         for &kind in ModelKind::ALL {
-            assert_eq!(ModelKind::from_name(kind.name()), Ok(kind));
+            let json = serde_json::to_value(kind).unwrap();
+            assert_eq!(json, json!(kind.name()));
+            assert_eq!(crate::json::read(&json.to_string()), Ok(kind));
         }
-        let error = ModelKind::from_name("network").unwrap_err();
+        let error = crate::json::read::<ModelKind>(r#""network""#).unwrap_err();
         assert!(error.contains("aggregate"), "{error}");
         assert_eq!(
             ModelKind::Aggregate.value_types(),

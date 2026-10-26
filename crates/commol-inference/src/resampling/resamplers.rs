@@ -181,7 +181,8 @@ impl Resampler for ResidualBootstrap {
 
 /// The distribution of the multiplier of a wild bootstrap: mean 0 and
 /// variance 1.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Multipliers {
     /// `±1` with probability 1/2 each.
     Rademacher,
@@ -191,22 +192,6 @@ pub enum Multipliers {
 }
 
 impl Multipliers {
-    /// The multipliers of a name: `"rademacher"` or `"mammen"`.
-    ///
-    /// # Errors
-    ///
-    /// [`MethodError::Invalid`], which lists the names, when `name` is none
-    /// of them.
-    pub fn from_name(name: &str) -> Result<Self, MethodError> {
-        match name {
-            "rademacher" => Ok(Self::Rademacher),
-            "mammen" => Ok(Self::Mammen),
-            _ => Err(MethodError::Invalid(format!(
-                "multipliers is '{name}'; it must be \"rademacher\" or \"mammen\""
-            ))),
-        }
-    }
-
     /// One multiplier.
     pub fn draw(self, generator: &mut Generator) -> f64 {
         let u = generator.uniform();

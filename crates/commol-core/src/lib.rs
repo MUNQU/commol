@@ -24,6 +24,7 @@
 
 #![warn(missing_docs)]
 
+pub mod json;
 pub mod math_expression;
 pub mod parallelism;
 pub mod position;

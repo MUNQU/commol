@@ -32,13 +32,13 @@ class Complete(BaseModel):
 
     Attributes
     ----------
-    type : Literal["complete"]
+    kind : Literal["complete"]
         The tag of the neighbors in JSON.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["complete"] = "complete"
+    kind: Literal["complete"] = "complete"
 
 
 class Groups(BaseModel):
@@ -51,7 +51,7 @@ class Groups(BaseModel):
 
     Attributes
     ----------
-    type : Literal["groups"]
+    kind : Literal["groups"]
         The tag of the neighbors in JSON.
     stratification : str
         Id of the stratification whose categories group the units.
@@ -63,7 +63,7 @@ class Groups(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["groups"] = "groups"
+    kind: Literal["groups"] = "groups"
     stratification: str
     weights: dict[str, dict[str, float]] | None = None
 
@@ -72,7 +72,7 @@ class Groups(BaseModel):
         stratification: str,
         weights: Mapping[str, Mapping[str, float]] | None = None,
         *,
-        type: Literal["groups"] = "groups",
+        kind: Literal["groups"] = "groups",
     ) -> None:
         """
         Group the neighbors of a unit by the categories of a stratification.
@@ -84,7 +84,7 @@ class Groups(BaseModel):
         weights : Mapping[str, Mapping[str, float]] | None, default=None
             ``weights[g][g']``, the weight of category ``g'`` for a unit in
             ``g``. None is the identity.
-        type : {"groups"}, default="groups"
+        kind : {"groups"}, default="groups"
             The kind of neighbors, as JSON holds it.
         """
         super().__init__(
@@ -92,9 +92,9 @@ class Groups(BaseModel):
             weights=None
             if weights is None
             else {own: dict(row) for own, row in weights.items()},
-            type=type,
+            kind=kind,
         )
 
 
-type Neighbors = Annotated[Complete | Groups, Field(discriminator="type")]
+type Neighbors = Annotated[Complete | Groups, Field(discriminator="kind")]
 """Who the neighbors of a unit are: `Complete` or `Groups`."""

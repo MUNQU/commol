@@ -119,19 +119,20 @@ class TestFitting:
         assert result.best_parameters["B"] == pytest.approx(20, rel=1e-9)
 
     def test_a_parameter_and_an_initial_amount_together(self, b_every_5_steps) -> None:
-        config = (
-            ParticleSwarmConfig(particles=40, max_iterations=1000, verbose=False)
-            .acceleration(
-                "time_varying",
-                c1_initial=2.5,
-                c1_final=0.5,
-                c2_initial=0.5,
-                c2_final=2.5,
-            )
-            .velocity(clamp_factor=0.2)
-            .mutation(
-                "gaussian", scale=0.1, probability=0.05, application="global_best"
-            )
+        config = ParticleSwarmConfig(
+            particles=40,
+            max_iterations=1000,
+            verbose=False,
+            acceleration="time_varying",
+            cognitive_initial=2.5,
+            cognitive_final=0.5,
+            social_initial=0.5,
+            social_final=2.5,
+            velocity_clamp_factor=0.2,
+            mutation="gaussian",
+            mutation_scale=0.1,
+            mutation_probability=0.05,
+            mutation_application="global_best",
         )
         problem = CalibrationProblem(
             observed_data=b_every_5_steps,

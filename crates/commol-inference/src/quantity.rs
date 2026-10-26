@@ -45,7 +45,7 @@ use crate::ranges::{END, POSITIONS, START};
 
 /// What a quantity reads at each position of a run.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(remote = "Self", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Series {
     /// The sum of `outputs` at the position.
     Level {
@@ -62,6 +62,8 @@ pub enum Series {
     },
 }
 
+commol_core::tagged!(Series, ranges = {"increments" => crate::ranges::INCREMENTS});
+
 impl Series {
     /// The outputs summed.
     pub fn outputs(&self) -> &[String] {
@@ -73,7 +75,7 @@ impl Series {
 
 /// A series of a run and how it is reduced to scalars.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(remote = "Self", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Quantity {
     /// The value of `series` at `at`.
     ValueAt {
@@ -81,6 +83,10 @@ pub enum Quantity {
         series: Series,
         /// The position.
         at: f64,
+        /// The name of the quantity in the results of Python, which the
+        /// engine does not read.
+        #[serde(default)]
+        label: Option<String>,
     },
     /// The value at `end` minus the value at `start`, as an observation with
     /// the window `end − start` that starts at exactly `start`: what entered
@@ -92,6 +98,10 @@ pub enum Quantity {
         start: f64,
         /// The end of the window.
         end: f64,
+        /// The name of the quantity in the results of Python, which the
+        /// engine does not read.
+        #[serde(default)]
+        label: Option<String>,
     },
     /// The largest value of `series` at `positions`.
     Peak {
@@ -99,6 +109,10 @@ pub enum Quantity {
         series: Series,
         /// The positions compared.
         positions: Vec<f64>,
+        /// The name of the quantity in the results of Python, which the
+        /// engine does not read.
+        #[serde(default)]
+        label: Option<String>,
     },
     /// The first of `positions` where the value of `series` is largest.
     PeakPosition {
@@ -106,6 +120,10 @@ pub enum Quantity {
         series: Series,
         /// The positions compared.
         positions: Vec<f64>,
+        /// The name of the quantity in the results of Python, which the
+        /// engine does not read.
+        #[serde(default)]
+        label: Option<String>,
     },
     /// The value of `series` at each of `positions`: one scalar per
     /// position.
@@ -114,6 +132,10 @@ pub enum Quantity {
         series: Series,
         /// The positions.
         positions: Vec<f64>,
+        /// The name of the quantity in the results of Python, which the
+        /// engine does not read.
+        #[serde(default)]
+        label: Option<String>,
     },
     /// `numerator` divided by `denominator`, two quantities of one value
     /// each ([`Quantity::ValueAt`], [`Quantity::Gain`], [`Quantity::Peak`]).
@@ -125,8 +147,20 @@ pub enum Quantity {
         denominator: Box<Quantity>,
         /// How the replicates of a stochastic run combine.
         replicate_rule: ReplicateRule,
+        /// The name of the quantity in the results of Python, which the
+        /// engine does not read.
+        #[serde(default)]
+        label: Option<String>,
     },
 }
+
+commol_core::tagged!(Quantity, ranges = {
+    "value_at" => crate::ranges::VALUE_AT,
+    "gain" => crate::ranges::GAIN,
+    "peak" => crate::ranges::PEAK,
+    "peak_position" => crate::ranges::PEAK_POSITION,
+    "trajectory" => crate::ranges::TRAJECTORY,
+});
 
 /// How the replicates of a point combine into the value of a ratio of
 /// numerator N and denominator D.
@@ -340,13 +374,14 @@ impl Points<'_> {
     fn reduction(&mut self, quantity: &Quantity) -> Result<Reduction, String> {
         let index = self.index;
         Ok(match quantity {
-            Quantity::ValueAt { series, at } => {
+            Quantity::ValueAt { series, at, .. } => {
                 Reduction::Scalar(Scalar::One(self.read(series, &[*at], AT)?.start))
             }
             Quantity::Gain {
                 outputs,
                 start,
                 end,
+                ..
             } => {
                 START
                     .check(*start)
@@ -364,9 +399,15 @@ impl Points<'_> {
                 self.starts[row] = Some(*start);
                 Reduction::Scalar(Scalar::One(row))
             }
-            Quantity::Peak { series, positions }
-            | Quantity::PeakPosition { series, positions }
-            | Quantity::Trajectory { series, positions } => {
+            Quantity::Peak {
+                series, positions, ..
+            }
+            | Quantity::PeakPosition {
+                series, positions, ..
+            }
+            | Quantity::Trajectory {
+                series, positions, ..
+            } => {
                 if positions.is_empty() {
                     return Err(format!(
                         "Quantity {index}: a peak or a trajectory needs positions"

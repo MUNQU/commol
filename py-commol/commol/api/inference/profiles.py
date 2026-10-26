@@ -1,101 +1,39 @@
 """The runners of the profile likelihood, registered for
 ``Calibrator.uncertainty``.
 
-Each runner fits the problem with ``Calibrator.run`` and hands the fit and
-the threshold to the Rust tracer, which traces every profile in parallel.
+Each runner sends its method whole to the engine, which fits the problem,
+calibrates the threshold when a bootstrap calibrates it, and traces every
+profile in parallel.
 """
 
 import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
+from commol.api.inference.fit import fit_result
 from commol.api.inference.registry import register
-from commol.api.inference.resampling import (
-    fit_values,
-    log_failed,
-    rust_block_length,
-)
+from commol.api.inference.resampling import log_failed
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context._model import engine_state
 from commol.context.calibration import CalibrationResult
+from commol.context.engine_json import engine_json
 from commol.context.inference.profiles import (
     PredictionProfile,
     Profile,
-    ProfileBootstrap,
     ProfileInterval,
     ProfileLikelihood,
     ProfileResult,
     ProfileStructure,
     Threshold,
 )
-from commol.context.inference.resampling import (
-    BayesianBootstrap,
-    ParametricBootstrap,
-    ResidualBootstrap,
-)
 
 if TYPE_CHECKING:
     from commol.api.calibrator import Calibrator
     from commol.commol_rs._commol_rs import (
-        BootstrapSettingsProtocol,
-        ObservedDataPointProtocol,
         ProfileRunProtocol,
         ProfileStructureProtocol,
     )
 
 logger = logging.getLogger(__name__)
-
-
-def _bootstrap_settings(bootstrap: ProfileBootstrap) -> "BootstrapSettingsProtocol":
-    settings = commol_rs.inference.BootstrapSettings
-    if isinstance(bootstrap, ParametricBootstrap):
-        return settings("parametric", bootstrap.replicates, bootstrap.starts)
-    length = rust_block_length(bootstrap.block_length)
-    if isinstance(bootstrap, BayesianBootstrap):
-        return settings("bayesian", bootstrap.replicates, bootstrap.starts, length)
-    if isinstance(bootstrap, ResidualBootstrap):
-        return settings(
-            "residual",
-            bootstrap.replicates,
-            bootstrap.starts,
-            length,
-            residual_scale=bootstrap.residual_scale,
-            scheme=bootstrap.scheme,
-        )
-    return settings(
-        "wild",
-        bootstrap.replicates,
-        bootstrap.starts,
-        length,
-        multipliers=bootstrap.multipliers,
-    )
-
-
-def _trace(
-    calibrator: "Calibrator",
-    fit: CalibrationResult,
-    parameters: list[int],
-    predictions: list["ObservedDataPointProtocol"],
-    threshold: Threshold,
-    max_steps: int,
-) -> "ProfileRunProtocol":
-    kind = "bootstrap" if threshold.kind == "bootstrap_calibrated" else threshold.kind
-    return commol_rs.inference.trace_profiles(
-        calibrator.rust_problem,
-        calibrator.rust_optimizer,
-        fit_values(calibrator, fit),
-        parameters,
-        predictions,
-        kind,
-        threshold.confidence_level,
-        max_steps,
-        calibrator.seed,
-        bootstrap=(
-            None
-            if threshold.bootstrap is None
-            else _bootstrap_settings(threshold.bootstrap)
-        ),
-    )
 
 
 def _structure(
@@ -265,22 +203,10 @@ def run_profile_likelihood(
         If a name is not a parameter of the problem, or the threshold does not
         fit the problem.
     """
-    names = calibrator.parameter_names
-    for name in method.parameters:
-        if name not in names:
-            raise ValueError(
-                f"'{name}' is not a parameter of the problem; its parameters are "
-                f"{names}."
-            )
-    fit = calibrator.run(starts=method.starts)
-    run = _trace(
-        calibrator,
-        fit,
-        [names.index(name) for name in method.parameters],
-        [],
-        method.threshold,
-        method.max_steps,
+    starts, run = commol_rs.inference.profile_likelihood(
+        calibrator._rust_problem, engine_json(method)
     )
+    fit = fit_result(starts, calibrator.parameter_names, calibrator.seed, logger)
     return _result(
         calibrator, fit, "parameter", method.parameters, method.threshold, run
     )
@@ -310,21 +236,15 @@ def run_prediction_profile(
         If a prediction does not fit the model, or the threshold does not fit
         the problem.
     """
-    observations = [spec.as_observation() for spec in method.specs]
-    fit = calibrator.run(starts=method.starts)
-    run = _trace(
-        calibrator,
-        fit,
-        [],
-        engine_state.rust_observed_data(observations),
-        method.threshold,
-        method.max_steps,
+    starts, run = commol_rs.inference.prediction_profile(
+        calibrator._rust_problem, engine_json(method)
     )
+    fit = fit_result(starts, calibrator.parameter_names, calibrator.seed, logger)
     return _result(
         calibrator,
         fit,
         "prediction",
-        [observation.label for observation in observations],
+        [spec.as_observation().label for spec in method.specs],
         method.threshold,
         run,
     )

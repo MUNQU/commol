@@ -83,7 +83,7 @@ def coverage(
         the coverage. A calibrated interval covers about `confidence_level`.
     """
     draws = predictive.at_observations(observations, noise)
-    return _score(draws, draws.rust_draws.coverage(draws.observed, confidence_level))
+    return _score(draws, draws._draws.coverage(draws.observed, confidence_level))
 
 
 def interval_score(
@@ -112,9 +112,7 @@ def interval_score(
         Lower is better.
     """
     draws = predictive.at_observations(observations, noise)
-    return _score(
-        draws, draws.rust_draws.interval_score(draws.observed, confidence_level)
-    )
+    return _score(draws, draws._draws.interval_score(draws.observed, confidence_level))
 
 
 def weighted_interval_score(
@@ -154,7 +152,7 @@ def weighted_interval_score(
     draws = predictive.at_observations(observations, noise)
     return _score(
         draws,
-        draws.rust_draws.weighted_interval_score(
+        draws._draws.weighted_interval_score(
             draws.observed, [float(c) for c in confidence_levels]
         ),
     )
@@ -186,7 +184,7 @@ def crps(
         Lower is better; in the unit of the observations.
     """
     draws = predictive.at_observations(observations, noise)
-    return _score(draws, draws.rust_draws.crps(draws.observed))
+    return _score(draws, draws._draws.crps(draws.observed))
 
 
 def pit(
@@ -218,7 +216,7 @@ def pit(
         Values in ``[0, 1]``; calibrated predictions give uniform values.
     """
     draws = predictive.at_observations(observations, noise)
-    return _score(draws, draws.rust_draws.pit(draws.observed))
+    return _score(draws, draws._draws.pit(draws.observed))
 
 
 def log_score(
@@ -264,5 +262,5 @@ def log_score(
             f"The log score needs the density of the observation models, so it "
             f"takes DistributionNoise(); {type(noise).__name__} has no density."
         )
-    values = predictive.source.rust_log_score(predictive.sample, list(observations))
+    values = predictive.source._log_score(predictive.sample, list(observations))
     return _score_of(observations, values)

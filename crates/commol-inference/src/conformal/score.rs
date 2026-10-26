@@ -10,7 +10,8 @@ use crate::error::MethodError;
 
 /// How a predicted and an observed value become a score: `|y − ŷ| / s`,
 /// where the scale `s` depends on the score.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum NonconformityScore {
     /// `s = 1`.
     Absolute,
@@ -23,27 +24,6 @@ pub enum NonconformityScore {
 }
 
 impl NonconformityScore {
-    /// The score of a name, or why there is none.
-    ///
-    /// # Errors
-    ///
-    /// [`MethodError::Invalid`], which lists the names, when `name` is
-    /// missing or none of them.
-    pub fn from_name(name: Option<&str>) -> Result<Self, MethodError> {
-        const NAMES: &str = "\"absolute\", \"normalized\" or \"spread\"";
-        match name {
-            Some("absolute") => Ok(Self::Absolute),
-            Some("normalized") => Ok(Self::Normalized),
-            Some("spread") => Ok(Self::Spread),
-            Some(other) => Err(MethodError::Invalid(format!(
-                "score is '{other}'; it must be {NAMES}"
-            ))),
-            None => Err(MethodError::Invalid(format!(
-                "score is required; it must be {NAMES}"
-            ))),
-        }
-    }
-
     /// The score of `observed` against `predicted` on the scale `scale`.
     pub fn of(self, observed: f64, predicted: f64, scale: f64) -> f64 {
         (observed - predicted).abs() / scale
@@ -51,7 +31,8 @@ impl NonconformityScore {
 }
 
 /// Which scores a quantile is taken of.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Pooling {
     /// The scores of each series (observation label) apart.
     Series,
@@ -60,26 +41,6 @@ pub enum Pooling {
 }
 
 impl Pooling {
-    /// The pooling of a name, or why there is none.
-    ///
-    /// # Errors
-    ///
-    /// [`MethodError::Invalid`], which lists the names, when `name` is
-    /// missing or none of them.
-    pub fn from_name(name: Option<&str>) -> Result<Self, MethodError> {
-        const NAMES: &str = "\"series\" or \"all\"";
-        match name {
-            Some("series") => Ok(Self::Series),
-            Some("all") => Ok(Self::All),
-            Some(other) => Err(MethodError::Invalid(format!(
-                "by is '{other}'; it must be {NAMES}"
-            ))),
-            None => Err(MethodError::Invalid(format!(
-                "by is required; it must be {NAMES}"
-            ))),
-        }
-    }
-
     /// The group of a series: its label, or one group for every series.
     pub fn group(self, label: &str) -> &str {
         match self {

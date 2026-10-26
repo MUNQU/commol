@@ -15,6 +15,7 @@ from pydantic import (
 )
 
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context.engine_json import engine_json
 
 from commol.context._model.serialization import render_json
 from commol.context._model.units import DEFAULT_STEP_UNIT
@@ -184,7 +185,9 @@ class Model(BaseModel, Generic[StructureT]):
     @model_validator(mode="after")
     def validate_engine_runs_structure(self) -> Self:
         """Ask the engine whether it runs the kind of the structure."""
-        commol_rs.engine.EngineType(self.engine.type).check_kind(self.structure.kind)
+        commol_rs.engine.EngineType(engine_json(self.engine.type)).check_kind(
+            engine_json(self.structure.kind)
+        )
         return self
 
     @model_validator(mode="after")

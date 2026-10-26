@@ -1,10 +1,9 @@
 //! The quantities of interest as they cross from Python.
 //!
-//! A quantity crosses as the JSON that `model_dump_json()` of its pydantic
-//! class writes, read into [`Quantity`] with `kind` as the tag of each enum:
-//! a series and a reduction, never a tuple whose fields depend on a kind
-//! string. A list of quantities crosses once per analysis, or once per call
-//! that reduces runs that are done.
+//! A quantity crosses as the JSON of the `model_dump()` of its pydantic
+//! class, read into [`Quantity`] with `kind` as the tag of each enum
+//! ([`crate::json`]). A list of quantities crosses inside the JSON of a
+//! method, or once per call that reduces runs that are done.
 
 use commol_inference::quantity::{MissingPositions, Quantities, Quantity};
 use pyo3::exceptions::PyValueError;
@@ -14,26 +13,10 @@ use pyo3::prelude::*;
 ///
 /// # Errors
 ///
-/// A `ValueError` when `json` is not a list of quantities.
-pub(crate) fn read_quantities(json: &str) -> PyResult<Vec<Quantity>> {
-    serde_json::from_str(json)
-        .map_err(|error| PyValueError::new_err(format!("Not a list of quantities: {error}")))
-}
-
-/// The quantities of `json` as Rust reads them, written back as JSON
-///
-/// Args:
-///     json: A JSON list of quantities, as the quantity classes write them
-///
-/// Returns:
-///     The quantities Rust read, as JSON in the same form
-///
-/// Raises:
-///     ValueError: If `json` is not a list of quantities
-#[pyfunction]
-fn quantities_as_read(json: &str) -> PyResult<String> {
-    let read = read_quantities(json)?;
-    Ok(serde_json::to_string(&read).expect("a quantity is plain data that JSON writes"))
+/// A `ValueError` when `json` is not a list of quantities; the message names
+/// the path of the field.
+fn read_quantities(json: &str) -> PyResult<Vec<Quantity>> {
+    crate::json::read(json)
 }
 
 /// The positions a run must report at for the quantities of `json`: sorted,
@@ -114,7 +97,6 @@ fn missing_message(missing: &[MissingPositions], names: &[String]) -> String {
 
 /// Register the quantity bindings in the inference module.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(quantities_as_read, m)?)?;
     m.add_function(wrap_pyfunction!(quantity_schedule, m)?)?;
     m.add_function(wrap_pyfunction!(quantities_of_runs, m)?)?;
     Ok(())

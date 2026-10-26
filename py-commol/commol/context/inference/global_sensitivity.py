@@ -8,14 +8,14 @@ in Rust, so a design of thousands of runs never returns to Python.
 """
 
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Self
+from typing import ClassVar, Self, TYPE_CHECKING
 
 import numpy as np
 from numpy.typing import ArrayLike
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context._model import engine_state
+from commol.context.engine_json import engine_json
 from commol.context.calibration import CalibrationParameter
 from commol.context.constants import CalibrationParameterType
 from commol.context.inference.distributions import Distribution, Uniform
@@ -57,6 +57,8 @@ class InputSpace(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    _engine_handles: ClassVar[tuple[str, ...]] = ("sample",)
 
     parameters: list[CalibrationParameter] = Field(
         min_length=1, description="The inputs, in order."
@@ -228,12 +230,6 @@ class InputSpace(BaseModel):
     def names(self) -> list[str]:
         """The ids of the inputs, in order."""
         return [parameter.id for parameter in self.parameters]
-
-    def rust_distributions(self) -> list[tuple[str, str, list[float]]] | None:
-        """The distributions as the Rust runners read them, or None."""
-        if self.distributions is None:
-            return None
-        return [self.distributions[name].rust_prior(name) for name in self.names]
 
 
 class QuantitySummary(ResultModel):
@@ -888,8 +884,7 @@ class ChaosResult(ResultModel):
             coefficients do not fit the basis.
         """
         return commol_rs.inference.chaos_evaluate(
-            engine_state.rust_parameters(self.input_space.parameters),
-            self.input_space.rust_distributions() or [],
+            engine_json(self.input_space),
             self.degree,
             self.q_norm,
             self.max_interaction,

@@ -92,7 +92,7 @@ Use this page before you make or review a change. It turns the
       `discrepancy.rs`, penalties only in `objective.rs`. Use only
       `SimulationEngine`: a rule of one model kind goes behind
       `plan_values`, `apply_values` or `output_sums` of its engines.
-- [ ] Convert new options once, in `api/calibrator.py`.
+- [ ] Give a new option one field in the pydantic class and in `crates/commol-calibration/src/settings.rs` ([A data object crosses as the JSON of its dump](decisions/python-models.md#a-data-object-crosses-as-the-json-of-its-dump)).
 - [ ] Check that `tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss` still
       passes if the loss changes.
 - [ ] Update [Calibration](../guide/calibration.md).
@@ -118,7 +118,7 @@ changing it ([Design decisions](decisions/uncertainty.md#methods-plug-into-one-e
       own, and its configuration takes required `priors` (`WithPriors`)
       ([Design decisions](decisions/uncertainty.md#one-smc-core-many-targets)).
 - [ ] The runner, bound in `py-commol/src/` (`inference.rs` or the module
-      of its family), which runs the method through `parallel`
+      of its family), which reads the JSON of the method into its type of `crates/commol-inference/src/settings/` ([A data object crosses as the JSON of its dump](decisions/python-models.md#a-data-object-crosses-as-the-json-of-its-dump)) and runs it through `parallel`
       (`py-commol/src/parallelism.rs`), and its stub in `_commol_rs.pyi`
       (`tests/suite/test_engine_rules.py::test_the_stub_declares_what_the_extension_has`); a
       row in the table of `docs/guide/parallelism.md` and a case of `METHODS`
@@ -138,7 +138,7 @@ changing it ([Design decisions](decisions/uncertainty.md#methods-plug-into-one-e
       docstring lists `ValueError` and `RuntimeError` by that rule
       ([Design decisions](decisions/uncertainty.md#methods-raise-one-error-type)).
 - [ ] The Python runner in the module of its family under `api/inference/`,
-      which calls `register(YourMethod, runner)` (`api/inference/registry.py`);
+      which sends the method whole and calls `register(YourMethod, runner)` (`api/inference/registry.py`);
       `api/inference/__init__.py` imports every such module.
 - [ ] A coverage study (`tests/support/coverage.py`, marker `coverage_study`)
       that shows its intervals cover at their level.
@@ -154,8 +154,8 @@ A sensitivity method subclasses `SensitivityMethod[YourResult]` and runs
 through `SensitivityAnalysis.run`. Its Rust side is a method of
 `ForwardAnalysis` (`crates/commol-inference/src/global_sensitivity/`), which
 builds the design from `InputSpace` (`design.rs`), runs it with
-`BatchRunner` and calls the estimator; the binding and the Python runner only
-convert. A method of independent inputs refuses a sample through
+`BatchRunner` and calls the estimator; the binding reads the JSON of the
+method. A method of independent inputs refuses a sample through
 `InputSpace::independent`, and a random number comes from a stream of the
 seed of the analysis (`Stream`, `crates/commol-random/src/streams.rs`).
 
@@ -246,7 +246,7 @@ To add a kind of model, such as an agent network (see
 
 ### PyO3 bindings
 
-- [ ] Keep logic out of `py-commol/src/`: convert types and call the crate.
+- [ ] Keep logic out of `py-commol/src/`: read a data object with `crate::json::read` and call the crate; a `#[pyclass]` is a handle or a result ([A data object crosses as the JSON of its dump](decisions/python-models.md#a-data-object-crosses-as-the-json-of-its-dump)).
 - [ ] Take a count as `i64` (a seed as `i128`) and read it with its rule,
       `crate::counts::count(&RULE, value)` (`commol_core::SEED` for a seed),
       so a negative one raises the message of the rule; add the case to

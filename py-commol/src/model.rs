@@ -1,7 +1,7 @@
 //! Python bindings for commol-model: what the process of an aggregate model
 //! expands into, whatever engine runs it.
 
-use crate::core::{PyAggregate, PyModel, PyProcess};
+use crate::core::{aggregate, model, process};
 use pyo3::prelude::*;
 
 /// Expand a process into its compartments and their initial amounts
@@ -10,8 +10,8 @@ use pyo3::prelude::*;
 /// including per-compartment overrides.
 ///
 /// Args:
-///     process: The process of the model
-///     structure: The aggregate structure
+///     process: The JSON of the process of the model
+///     structure: The JSON of the aggregate structure
 ///
 /// Returns:
 ///     One `(name, bin, categories, amount)` tuple per expanded compartment,
@@ -24,10 +24,10 @@ use pyo3::prelude::*;
 #[pyfunction]
 #[allow(clippy::type_complexity)]
 fn initial_state(
-    process: &PyProcess,
-    structure: &PyAggregate,
+    process: &str,
+    structure: &str,
 ) -> PyResult<Vec<(String, String, Vec<(String, String)>, f64)>> {
-    let state = commol_model::initial_state(&process.inner, &structure.inner)
+    let state = commol_model::initial_state(&self::process(process)?, &aggregate(structure)?)
         .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
     Ok(state
         .into_iter()
@@ -47,38 +47,42 @@ fn initial_state(
 /// This is the authority for the names an aggregate model expands into.
 ///
 /// Args:
-///     process: The process of the model
+///     process: The JSON of the process of the model
 ///
 /// Returns:
 ///     A `(compartments, accumulators)` tuple. Each holds one
 ///     `(name, source, categories)` tuple per expanded output, in engine order,
 ///     where `source` is the bin or accumulator id and `categories` the
 ///     `(stratification, category)` pairs applied to it.
+///
+/// Raises:
+///     ValueError: If the JSON is not a process
 #[pyfunction]
 #[allow(clippy::type_complexity)]
 fn expanded_outputs(
-    process: &PyProcess,
-) -> (
+    process: &str,
+) -> PyResult<(
     Vec<(String, String, Vec<(String, String)>)>,
     Vec<(String, String, Vec<(String, String)>)>,
-) {
+)> {
+    let process = self::process(process)?;
     let as_tuples = |outputs: Vec<commol_model::ExpandedOutput>| {
         outputs
             .into_iter()
             .map(|output| (output.name, output.source, output.categories))
             .collect()
     };
-    (
-        as_tuples(commol_model::expand_compartments(&process.inner)),
-        as_tuples(commol_model::expand_accumulators(&process.inner)),
-    )
+    Ok((
+        as_tuples(commol_model::expand_compartments(&process)),
+        as_tuples(commol_model::expand_accumulators(&process)),
+    ))
 }
 
 /// Every transition flow of a process, exactly as the engine simulates it
 ///
 /// Args:
-///     process: The process of the model
-///     structure: The aggregate structure, whose neighbors resolve
+///     process: The JSON of the process of the model
+///     structure: The JSON of the aggregate structure, whose neighbors resolve
 ///         `neighbors_<bin>` and `neighbors`, whatever the engine of its
 ///         model
 ///
@@ -98,8 +102,8 @@ fn expanded_outputs(
 #[pyfunction]
 #[allow(clippy::type_complexity)]
 fn transition_flows(
-    process: &PyProcess,
-    structure: &PyAggregate,
+    process: &str,
+    structure: &str,
 ) -> PyResult<
     Vec<(
         String,
@@ -110,8 +114,10 @@ fn transition_flows(
         usize,
     )>,
 > {
-    let flows = commol_model::describe_flows(&process.inner, structure.inner.neighbors.as_ref())
-        .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
+    let structure = aggregate(structure)?;
+    let flows =
+        commol_model::describe_flows(&self::process(process)?, structure.neighbors.as_ref())
+            .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
     Ok(flows
         .into_iter()
         .map(|flow| {
@@ -132,7 +138,7 @@ fn transition_flows(
 /// the names the engine provides
 ///
 /// Args:
-///     model: An aggregate model
+///     model: The JSON of an aggregate model
 ///
 /// Raises:
 ///     ValueError: If the model is not aggregate, its variant or neighbors
@@ -142,8 +148,9 @@ fn transition_flows(
 ///         `total_…` name that is not a subgroup total of the model, or a
 ///         rate reads neighbors the model cannot resolve
 #[pyfunction]
-fn check_model(model: &PyModel) -> PyResult<()> {
-    commol_model::check_model(&model.inner).map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
+fn check_model(model: &str) -> PyResult<()> {
+    commol_model::check_model(&self::model(model)?)
+        .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
 }
 
 /// Names of the subgroup totals a rate of a process may read, sorted
@@ -153,13 +160,16 @@ fn check_model(model: &PyModel) -> PyResult<()> {
 /// declaration order of the stratifications.
 ///
 /// Args:
-///     process: The process of the model
+///     process: The JSON of the process of the model
 ///
 /// Returns:
 ///     The names, sorted. A process without stratifications has none.
+///
+/// Raises:
+///     ValueError: If the JSON is not a process
 #[pyfunction]
-fn subgroup_total_names(process: &PyProcess) -> Vec<String> {
-    commol_model::subgroup_total_names(&process.inner)
+fn subgroup_total_names(process: &str) -> PyResult<Vec<String>> {
+    Ok(commol_model::subgroup_total_names(&self::process(process)?))
 }
 
 /// The error of a value outside its rule, with the message of the rule.

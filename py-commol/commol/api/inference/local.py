@@ -1,24 +1,20 @@
 """The runners of the local approximations, registered for
 ``Calibrator.uncertainty``.
 
-Each runner fits the problem with ``Calibrator.run`` and hands the fit, or
-the ends of its starts, to the Rust runner, which differentiates the problem
-there and draws on the unbounded scale.
+Each runner sends its method whole to the engine, which fits the problem,
+differentiates it at the fit, or at the end of each start, and draws on the
+unbounded scale.
 """
 
 import logging
 from typing import TYPE_CHECKING
 
+from commol.api.inference.fit import fit_result
 from commol.api.inference.registry import register
-from commol.api.inference.resampling import (
-    block_length_estimates,
-    fit_values,
-    rust_block_length,
-    sample_method,
-)
+from commol.api.inference.resampling import block_length_estimates, sample_method
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context.engine_json import engine_json
 from commol.context.inference.local import (
-    GibbsTarget,
     ImportanceResult,
     Laplace,
     LaplaceMixture,
@@ -34,8 +30,6 @@ if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import LocalRunProtocol
 
 logger = logging.getLogger(__name__)
-
-rust = commol_rs.inference
 
 
 def _sample(
@@ -72,16 +66,11 @@ def run_laplace(calibrator: "Calibrator", method: Laplace) -> LaplaceResult:
     LaplaceResult
         The fit, the covariance on the unbounded scale and the draws.
     """
-    fit = calibrator.run(starts=method.starts)
-    run = rust.laplace(
-        calibrator.rust_problem,
-        fit_values(calibrator, fit),
-        method.curvature,
-        method.draws,
-        calibrator.seed,
+    starts, run = commol_rs.inference.laplace(
+        calibrator._rust_problem, engine_json(method)
     )
     return LaplaceResult(
-        fit=fit,
+        fit=fit_result(starts, calibrator.parameter_names, calibrator.seed, logger),
         covariance=run.covariance,
         sample=_sample(
             calibrator,
@@ -109,17 +98,11 @@ def run_sandwich(calibrator: "Calibrator", method: Sandwich) -> SandwichResult:
         The fit, the sandwich covariance on the unbounded scale, the draws
         and the blocks.
     """
-    fit = calibrator.run(starts=method.starts)
-    run, blocks, block_length, estimates = rust.sandwich(
-        calibrator.rust_problem,
-        fit_values(calibrator, fit),
-        method.curvature,
-        rust_block_length(method.block_length),
-        method.draws,
-        calibrator.seed,
+    starts, run, blocks, block_length, estimates = commol_rs.inference.sandwich(
+        calibrator._rust_problem, engine_json(method)
     )
     return SandwichResult(
-        fit=fit,
+        fit=fit_result(starts, calibrator.parameter_names, calibrator.seed, logger),
         covariance=run.covariance,
         sample=_sample(
             calibrator,
@@ -153,18 +136,11 @@ def run_laplace_mixture(
         The fit, the weighted draws, the components, ``k_hat`` and the
         effective size.
     """
-    fit = calibrator.run(starts=method.starts)
-    names = calibrator.parameter_names
-    target = method.target
-    run = rust.laplace_mixture(
-        calibrator.rust_problem,
-        target.priors.rust_priors(),
-        target.eta if isinstance(target, GibbsTarget) else None,
-        [[start.end[name] for name in names] for start in fit.starts],
-        method.draws,
-        method.curvature,
-        calibrator.seed,
+    starts, run = commol_rs.inference.laplace_mixture(
+        calibrator._rust_problem, engine_json(method)
     )
+    names = calibrator.parameter_names
+    fit = fit_result(starts, names, calibrator.seed, logger)
     for note in run.notes:
         logger.warning(note)
     parameters = calibrator.problem.parameters

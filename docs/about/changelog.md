@@ -23,6 +23,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** `ParticleSwarmConfig` is one class with plain fields, and
+  its chained methods `.inertia`, `.acceleration`, `.velocity`, `.mutation`,
+  `.improvement_stop` and `.radius_stop` and their `*_config` properties are
+  removed, with the `PSO*` classes of `commol.context.calibration` and the
+  `PSO*` enumerations of `commol.context.constants`. Each strategy is a name
+  (`inertia`, `acceleration`, `mutation`, `initialization`), and its numbers
+  are fields: `inertia_factor`, `inertia_min`, `inertia_max`, `cognitive`,
+  `social`, `cognitive_initial`, `cognitive_final`, `social_initial`,
+  `social_final`, `mutation_scale`, `mutation_probability`,
+  `mutation_application`, `velocity_clamp_factor`,
+  `velocity_mutation_threshold`, `improvement_window`, `improvement_tol_abs`,
+  `improvement_tol_rel` and `radius_tol`. A number set without its strategy
+  raises `ValueError`. Migration: `ParticleSwarmConfig().inertia("chaotic",
+  w_min=0.4, w_max=0.9).improvement_stop(window=30, tol_abs=1e-12,
+  tol_rel=1e-9)` is `ParticleSwarmConfig(inertia="chaotic", inertia_min=0.4,
+  inertia_max=0.9, improvement_window=30, improvement_tol_abs=1e-12,
+  improvement_tol_rel=1e-9)`; `c1_*` is `cognitive_*`, `c2_*` is `social_*`,
+  `.velocity(clamp_factor=…, mutation_threshold=…)` is
+  `velocity_clamp_factor=…, velocity_mutation_threshold=…` and
+  `.radius_stop(tol)` is `radius_tol=tol`. See
+  [Particle swarm](../guide/calibration-optimizers.md#particle-swarm).
+- **Breaking:** the members that converted an object to the engine are
+  removed: `Calibrator.rust_problem` and `rust_optimizer`, `rust_predictive`,
+  `rust_observation_draws` and `rust_log_score` of `Calibrator` and
+  `SensitivityAnalysis`, `SensitivityAnalysis.rust_analysis`,
+  `rust_parameters` and `rust_prior` of the distributions, `Priors.rust_priors`,
+  `InputSpace.rust_distributions`, `rust_json` of the quantities and
+  `ParameterSample.rust_sample`; the predictive members of a source are
+  private. Migration: build a predictive with `Predictive` and score it
+  with `commol.scores`, as before; the engine reads each object from the
+  JSON of its `model_dump()`.
+- **Breaking:** the tag of `Complete` and `Groups` in the JSON of a model is
+  `kind`, in place of `type`. Migration: in a saved model, rename the key
+  `"type"` of each `neighbors` entry to `"kind"`.
+- Each data object reaches the engine as the JSON of its `model_dump()`: the
+  model, the calibration problem and each inference method, whole. A setting
+  that the engine rejects raises `ValueError` with the path of its field
+  before the message of the engine
+  (`optimization_config.inertia_factor: inertia_factor is a number greater
+  than 0, got -1`). `NelderMeadConfig`, `ParticleSwarmConfig`, the four
+  bootstraps and the observation noises have a field `kind` with a default,
+  the tag of their union. The engine fits the problem for each method that
+  needs a fit, and calibrates `η` and the threshold of a profile. The results
+  are the same for the same settings and seed.
+- An unknown name of an engine, a model kind, the levels of
+  `commol.set_threads`, or the `score` or `by` of a conformal method gives
+  the message of the reader of the engine, which lists the valid names, such
+  as ``unknown variant `Stochastic`, expected one of `DifferenceEquations`,
+  … `` or ``score: unknown variant `other`, expected one of `absolute`,
+  `normalized`, `spread` ``. A conformal method without `score` or `by`
+  gives ``missing field `score` ``.
+- The JSON of every result (`model_dump_json`) is standard JSON: a number
+  that is not finite is the text `"Infinity"`, `"-Infinity"` or `"NaN"`, as
+  at the port of the engine. Before, `ParameterSample`, `SMCResult`,
+  `JackknifeResult`, `ConformalResult`, `PredictionIntervals` and
+  `SeriesIntervals` wrote the bare `Infinity` and `NaN`, which a standard JSON reader rejects, and the other results wrote
+  `null`, which did not load back. A result reads its JSON back equal, a NaN
+  included, and a result that 0.10 saved with bare `Infinity` or `NaN` still
+  loads.
+- A method that fits the problem before it runs (the bootstraps, the
+  jackknife, the local approximations, the conformal methods, the profiles,
+  and the Gibbs posterior with a calibration of `η`) no longer logs `Starting calibration …` at info
+  level, since the engine runs that fit. A start of the fit that fails is
+  still logged as a warning, and `Calibrator.run` still logs its start.
 - A formula has at most 100 000 nodes (numbers, variables, operators and
   calls), next to its limit of 100 levels of nesting: a longer one raises
   `ValueError` when its object is built, before it compiles. A message of
@@ -47,6 +111,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per-step engine. A continuous engine gives `1/n` with both. With
   `keep="mean"`, a per-step engine rejects a span shorter than one step with
   `ValueError`. Migration: add `keep="survival"` to keep each rate as it is.
+  Another value of `keep` raises `ValueError` with the message of the
+  engine, ``unknown variant `median`, expected `survival` or `mean` ``.
   See [Units of the axis](../guide/core-concepts.md#units-of-the-axis).
 
 ### Removed
@@ -68,6 +134,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A number that is not finite in a model or in the settings of an engine
+  reached the engine as `null`. An infinite tolerance of `ODESolver` raised
+  a message about the type of the setting, and an infinite parameter value
+  failed when the model ran, with a message about a parameter index. Such a
+  number now reaches the engine as its text, as every setting does:
+  `ODESolver(atol=float("inf"))` raises `atol is a finite number greater
+  than 0, got inf`, and the infinite parameter value is rejected when the
+  engine is built, with the name of the parameter.
 - The flow of a proportional rate is the whole rate times its source, in the
   description and in the unit check: a rate `k1 + k2` from `B` is
   `(k1 + k2) * B`; before, both read `k1 + k2 * B`, and the unit check of

@@ -132,7 +132,7 @@ class TestGroups:
 
         assert loaded == model
         assert loaded.model_dump(mode="json")["structure"]["neighbors"] == {
-            "type": "groups",
+            "kind": "groups",
             "stratification": "group",
             "weights": WEIGHTS,
         }

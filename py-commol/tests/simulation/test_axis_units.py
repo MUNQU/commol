@@ -165,7 +165,7 @@ class TestRates:
         )
 
     def test_an_unknown_engine_is_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="Unknown engine"):
+        with pytest.raises(ValidationError, match="unknown variant `Stochastic`"):
             AxisUnits(engine="Stochastic")
 
     def test_the_engine_says_what_a_rate_means(self) -> None:
@@ -211,8 +211,7 @@ class TestRates:
             DAILY_DIFFERENCE.rate_from_mean_span(10, "day", keep="median")  # ty: ignore[invalid-argument-type]
 
         assert str(error.value) == (
-            "Unknown value 'median' of what a rate keeps; the values are "
-            '["survival", "mean"]'
+            "unknown variant `median`, expected `survival` or `mean`"
         )
 
     @pytest.mark.parametrize("span", [0.0, -1.0])

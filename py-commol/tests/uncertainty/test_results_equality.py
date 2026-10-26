@@ -1,8 +1,10 @@
 """Two results compare by the values of their fields, a NaN equal to a NaN,
 and a frozen result has the hash of those values."""
 
+import json
 import math
 import sys
+from collections.abc import Iterator
 
 import pytest
 from pydantic import BaseModel
@@ -123,7 +125,7 @@ def test_a_sample_compares_its_fields_and_not_its_rust_sample() -> None:
     first = sample([[0.2], [0.4]])
     again = sample([[0.2], [0.4]])
 
-    assert first.rust_sample is not again.rust_sample
+    assert first._rust is not again._rust
     assert first == again
     assert hash(first) == hash(again)
     assert first != sample([[0.2], [0.5]])
@@ -166,3 +168,47 @@ def test_every_method_of_commol_returns_a_result_model() -> None:
 
     assert len(results) > 10
     assert [result for result in results if not issubclass(result, ResultModel)] == []
+
+
+def _reject_constant(name: str) -> float:
+    raise AssertionError(f"{name} is not JSON")
+
+
+def test_a_result_saved_to_json_loads_back_equal_with_a_nan(
+    simulation: Simulation,
+) -> None:
+    for result in (_conformal(float("-inf"), {"B": [1.0]}), _nan_prcc(simulation)):
+        text = result.model_dump_json()
+
+        json.loads(text, parse_constant=_reject_constant)
+        assert type(result).model_validate_json(text) == result
+    text = _conformal(float("-inf"), {"B": [1.0]}).model_dump_json()
+    assert '"lower":["-Infinity","-Infinity"]' in text
+    assert '"upper":["NaN","Infinity"]' in text
+
+
+def test_every_result_writes_a_number_that_is_not_finite_as_its_text() -> None:
+    def subclasses(cls: type) -> Iterator[type]:
+        for subclass in cls.__subclasses__():
+            yield subclass
+            yield from subclasses(subclass)
+
+    assert {
+        cls.__name__
+        for cls in subclasses(ResultModel)
+        if issubclass(cls, BaseModel)
+        and cls.model_config.get("ser_json_inf_nan") != "strings"
+    } == set()
+
+
+def test_a_result_saved_by_0_10_with_bare_constants_still_loads() -> None:
+    result = _conformal(float("-inf"), {"B": [1.0]})
+    saved = (
+        result.model_dump_json()
+        .replace('"-Infinity"', "-Infinity")
+        .replace('"Infinity"', "Infinity")
+        .replace('"NaN"', "NaN")
+    )
+
+    assert "NaN" in saved and '"NaN"' not in saved
+    assert ConformalResult.model_validate_json(saved) == result

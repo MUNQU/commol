@@ -34,7 +34,7 @@ fn setting(py: Python<'_>) -> PyResult<&Bound<'_, PyAny>> {
 ///
 /// Args:
 ///     threads: The number of threads, at least 1
-///     levels: "all" or "outer"
+///     levels: The JSON of "all" or "outer"
 ///
 /// Raises:
 ///     ValueError: If `threads` is below 1 or `levels` is neither name
@@ -50,7 +50,7 @@ pub struct PyParallelism {
 impl PyParallelism {
     #[new]
     fn new(threads: i64, levels: &str) -> PyResult<Self> {
-        let levels = Levels::from_name(levels).map_err(PyValueError::new_err)?;
+        let levels: Levels = crate::json::read(levels)?;
         Parallelism::new(threads, levels)
             .map(|inner| Self { inner })
             .map_err(PyValueError::new_err)

@@ -39,6 +39,7 @@ from pydantic import (
 )
 
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context.engine_json import engine_json
 from commol.context.ranges import RangeChecked
 
 
@@ -186,10 +187,6 @@ class QuantityBase(BaseModel, ABC):
         position.
         """
         return [(label, None) for label in self.labels()]
-
-    def rust_json(self) -> str:
-        """The quantity as Rust reads it: its JSON, without the label."""
-        return self.model_dump_json(exclude={"label"})
 
 
 class _OfSeries(QuantityBase):
@@ -452,12 +449,6 @@ class Ratio(_OneScalar):
         denominator = self.denominator.labels()[0]
         return f"({numerator}) / ({denominator})"
 
-    def rust_json(self) -> str:
-        """The ratio as Rust reads it: its JSON, without the labels."""
-        return self.model_dump_json(
-            exclude={"label": True, "numerator": {"label"}, "denominator": {"label"}}
-        )
-
 
 type Quantity = Annotated[
     ValueAt | Gain | Peak | PeakPosition | Trajectory | Ratio,
@@ -466,10 +457,9 @@ type Quantity = Annotated[
 """One of the quantities of interest."""
 
 
-def expand_quantities(quantities: Sequence[QuantityBase]) -> tuple[list[str], str]:
+def quantity_labels(quantities: Sequence[QuantityBase]) -> list[str]:
     """
-    The label of every scalar of `quantities`, in order, and the quantities
-    as Rust reads them.
+    The label of every scalar of `quantities`, in order.
 
     Parameters
     ----------
@@ -478,8 +468,8 @@ def expand_quantities(quantities: Sequence[QuantityBase]) -> tuple[list[str], st
 
     Returns
     -------
-    tuple[list[str], str]
-        The labels, and the JSON list of the quantities.
+    list[str]
+        The labels.
 
     Raises
     ------
@@ -494,12 +484,7 @@ def expand_quantities(quantities: Sequence[QuantityBase]) -> tuple[list[str], st
         raise ValueError(
             f"Two quantities have the labels {repeated}: give each a label of its own."
         )
-    return labels, rust_quantities(quantities)
-
-
-def rust_quantities(quantities: Sequence[QuantityBase]) -> str:
-    """The JSON list of `quantities` as Rust reads them, without labels."""
-    return "[" + ",".join(quantity.rust_json() for quantity in quantities) + "]"
+    return labels
 
 
 def quantity_schedule(quantities: Sequence[QuantityBase]) -> list[float]:
@@ -529,4 +514,4 @@ def quantity_schedule(quantities: Sequence[QuantityBase]) -> list[float]:
     """
     if not quantities:
         raise ValueError("Give at least one quantity of interest.")
-    return commol_rs.inference.quantity_schedule(rust_quantities(quantities))
+    return commol_rs.inference.quantity_schedule(engine_json(list(quantities)))

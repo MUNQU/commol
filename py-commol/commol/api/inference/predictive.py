@@ -38,13 +38,13 @@ class PredictiveSource(Protocol):
         """The simulation of the source."""
         ...
 
-    def rust_predictive(
+    def _predictive(
         self, sample: ParameterSample, positions: list[float]
     ) -> "PredictiveProtocol":
         """The run of every draw of `sample` at `positions`."""
         ...
 
-    def rust_observation_draws(
+    def _observation_draws(
         self,
         sample: ParameterSample,
         observed_data: list[ObservedDataPoint],
@@ -57,7 +57,7 @@ class PredictiveSource(Protocol):
         """The same source on `model`, with the same seed."""
         ...
 
-    def rust_log_score(
+    def _log_score(
         self, sample: ParameterSample, observed_data: list[ObservedDataPoint]
     ) -> list[float]:
         """The log score of each observation under the predictive."""
@@ -145,17 +145,17 @@ class ObservationDraws:
             The draws, computed in Rust.
         """
         self.observations: list[ObservedDataPoint] = list(observations)
-        self.rust_draws: "ObservationDrawsProtocol" = draws
+        self._draws: "ObservationDrawsProtocol" = draws
 
     @property
     def values(self) -> list[list[float]]:
         """Each draw's value of each observation, ``[draw][observation]``."""
-        return self.rust_draws.values
+        return self._draws.values
 
     @property
     def weights(self) -> list[float]:
         """The weight of each draw; they sum to 1."""
-        return self.rust_draws.weights
+        return self._draws.weights
 
     @property
     def observed(self) -> list[float]:
@@ -181,7 +181,7 @@ class ObservationDraws:
         ValueError
             If the confidence level is not strictly between 0 and 1.
         """
-        mean, median, lower, upper = self.rust_draws.band(confidence_level)
+        mean, median, lower, upper = self._draws.band(confidence_level)
         return SeriesBand(
             confidence_level=confidence_level,
             positions=[point.at for point in self.observations],
@@ -263,7 +263,7 @@ class Predictive:
         self.sample: ParameterSample = sample
         self.positions: list[float] = [float(position) for position in positions]
         self.output_names: list[str] = list(source.simulation.engine.output_names)
-        self._rust = source.rust_predictive(sample, self.positions)
+        self._rust = source._predictive(sample, self.positions)
 
     @property
     def weights(self) -> list[float]:
@@ -529,7 +529,5 @@ class Predictive:
             the parameter set, then says what the run says (the compartment,
             the step and the flows), or what the initial amounts exceed.
         """
-        draws = self.source.rust_observation_draws(
-            self.sample, list(observed_data), noise
-        )
+        draws = self.source._observation_draws(self.sample, list(observed_data), noise)
         return ObservationDraws(observed_data, draws)

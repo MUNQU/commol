@@ -22,8 +22,12 @@ use crate::Count;
 
 /// Which levels run in parallel when a method nests them, such as the
 /// starts of a calibration (the outer level) and the particles of the swarm
-/// of each start (an inner level).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+/// of each start (an inner level). It crosses from Python as the JSON of its
+/// name, `"all"` or `"outer"`.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Default, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "snake_case")]
 pub enum Levels {
     /// Every level runs in parallel in the one pool; work stealing balances
     /// them.
@@ -35,21 +39,6 @@ pub enum Levels {
 }
 
 impl Levels {
-    /// The levels of a name: `"all"` or `"outer"`.
-    ///
-    /// # Errors
-    ///
-    /// Returns a message that lists the names when `name` is none of them.
-    pub fn from_name(name: &str) -> Result<Self, String> {
-        match name {
-            "all" => Ok(Self::All),
-            "outer" => Ok(Self::Outer),
-            _ => Err(format!(
-                "Unknown levels '{name}'; the levels are 'all' and 'outer'"
-            )),
-        }
-    }
-
     /// The name of the levels: `"all"` or `"outer"`.
     pub fn name(self) -> &'static str {
         match self {
@@ -174,11 +163,13 @@ mod tests {
     #[test]
     fn the_levels_are_read_from_their_name() {
         for levels in [Levels::All, Levels::Outer] {
-            assert_eq!(Levels::from_name(levels.name()), Ok(levels));
+            let name = crate::json::write(&levels);
+            assert_eq!(name, format!("\"{}\"", levels.name()));
+            assert_eq!(crate::json::read(&name), Ok(levels));
         }
         assert_eq!(
-            Levels::from_name("inner"),
-            Err("Unknown levels 'inner'; the levels are 'all' and 'outer'".to_string())
+            crate::json::read::<Levels>(r#""inner""#),
+            Err("unknown variant `inner`, expected `all` or `outer`".to_string())
         );
     }
 

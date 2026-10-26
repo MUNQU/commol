@@ -21,7 +21,7 @@ with the better structure, also when it costs more work.
    (`py-commol/commol/`), the figures and the files a user saves. The core
    never imports an edge.
 3. **Each boundary is a port.** Two layers meet through one small typed
-   interface: the model as JSON, the stub of the extension
+   interface: each data object as the JSON of its dump, the stub of the extension
    (`commol_rs/_commol_rs.pyi`), a trait (`SimulationEngine`), a protocol
    (`PredictiveSource`). An adapter implements it. Change an adapter without
    a change to the core.

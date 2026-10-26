@@ -41,7 +41,8 @@ Python, and `engine_state.formula_tree` reads it into plain data
 `tree.rs` documents the shape: one object per node, keyed by its kind
 (`Constant`, `Variable`, `Chain` with its operators, `Power`, `UnaryOp`,
 `FunctionCall`, `Conditional`); a number keeps the value the parser read, and
-a value that is not finite is its text (`"inf"`).
+a value that is not finite is its text (`"Infinity"`), as in the JSON of the
+port ([A data object crosses as the JSON of its dump](python-models.md#a-data-object-crosses-as-the-json-of-its-dump)).
 
 - The check of units (`formula_unit` in `utils/equations.py`) walks the tree
   with a `pint` quantity for each variable: `pint` does the algebra of units,

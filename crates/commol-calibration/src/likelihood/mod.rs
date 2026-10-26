@@ -17,13 +17,15 @@ use std::collections::HashMap;
 pub use density::{Center, Noise, log_location};
 
 use commol_core::Real;
+use serde::{Deserialize, Serialize};
 
 use crate::feasibility::Violation;
 use crate::ranges::{DF, LOG_NORMAL_SIGMA, OVERDISPERSION, SD, STUDENT_T_SCALE};
 use crate::types::{CalibrationParameter, CalibrationParameterType, ObservedDataPoint};
 
 /// A noise argument of an observation model: a number, or the id of a noise
-/// parameter that is calibrated.
+/// parameter that is calibrated. JSON writes it as a number or a string; a
+/// string is always an id, since no argument is a number that is not finite.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Argument {
     /// A fixed number.
@@ -32,9 +34,36 @@ pub enum Argument {
     Parameter(String),
 }
 
+impl Serialize for Argument {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Value(value) => serializer.serialize_f64(*value),
+            Self::Parameter(id) => serializer.serialize_str(id),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Argument {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use commol_core::json::Value;
+        use serde::de::Error;
+        match Value::deserialize(deserializer)? {
+            Value::Int(value) => Ok(Self::Value(value as f64)),
+            Value::Float(value) => Ok(Self::Value(value)),
+            Value::String(id) => Ok(Self::Parameter(id)),
+            _ => Err(D::Error::custom(
+                "a noise argument is a number or the id of a noise parameter",
+            )),
+        }
+    }
+}
+
 /// How the observed values of one series scatter around their predicted
-/// mean `μ`.
-#[derive(Debug, Clone, PartialEq)]
+/// mean `μ`. The Python API writes it with its `kind`: `"normal"`,
+/// `"log_normal"`, `"student_t"`, `"poisson"`, `"negative_binomial"` or
+/// `"binomial"`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(remote = "Self", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ObservationModel {
     /// Normal of mean `μ` and standard deviation `sd`.
     Normal {
@@ -70,6 +99,14 @@ pub enum ObservationModel {
         trials: Option<u64>,
     },
 }
+
+commol_core::tagged!(ObservationModel, ranges = {
+    "normal" => crate::ranges::NORMAL_OBSERVATIONS,
+    "log_normal" => crate::ranges::LOG_NORMAL_OBSERVATIONS,
+    "student_t" => crate::ranges::STUDENT_T_OBSERVATIONS,
+    "negative_binomial" => crate::ranges::NEGATIVE_BINOMIAL_OBSERVATIONS,
+    "binomial" => crate::ranges::BINOMIAL_OBSERVATIONS,
+});
 
 /// A noise argument resolved against the parameters.
 #[derive(Debug, Clone, Copy, PartialEq)]

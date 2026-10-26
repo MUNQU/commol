@@ -163,26 +163,6 @@ pub enum InitializationStrategy {
     OppositionBased,
 }
 
-impl InitializationStrategy {
-    /// The strategy of a name: `"uniform"`, `"latin_hypercube"` or
-    /// `"opposition_based"`.
-    ///
-    /// # Errors
-    ///
-    /// Returns a message that lists the names when `name` is none of them.
-    pub fn from_name(name: &str) -> Result<Self, String> {
-        match name {
-            "uniform" => Ok(Self::UniformRandom),
-            "latin_hypercube" => Ok(Self::LatinHypercube),
-            "opposition_based" => Ok(Self::OppositionBased),
-            _ => Err(format!(
-                "Unknown initialization strategy '{name}'; the strategies are 'uniform', \
-                 'latin_hypercube' and 'opposition_based'"
-            )),
-        }
-    }
-}
-
 /// Mutation strategy for avoiding local optima
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MutationStrategy {
@@ -192,23 +172,6 @@ pub enum MutationStrategy {
     Gaussian(f64),
     /// Cauchy mutation with specified scale parameter
     Cauchy(f64),
-}
-
-impl MutationStrategy {
-    /// The mutation of a name, `"gaussian"` or `"cauchy"`, at `scale`.
-    ///
-    /// # Errors
-    ///
-    /// Returns a message that lists the names when `name` is none of them.
-    pub fn from_name(name: &str, scale: f64) -> Result<Self, String> {
-        match name {
-            "gaussian" => Ok(Self::Gaussian(scale)),
-            "cauchy" => Ok(Self::Cauchy(scale)),
-            _ => Err(format!(
-                "Unknown mutation strategy '{name}'; the strategies are 'gaussian' and 'cauchy'"
-            )),
-        }
-    }
 }
 
 /// Determines which particles to apply mutation to
@@ -222,26 +185,6 @@ pub enum MutationApplication {
     AllParticles,
     /// Apply mutation only to particles with below-average fitness (balanced approach)
     BelowAverage,
-}
-
-impl MutationApplication {
-    /// The particles of a name: `"global_best"`, `"all_particles"` or
-    /// `"below_average"`.
-    ///
-    /// # Errors
-    ///
-    /// Returns a message that lists the names when `name` is none of them.
-    pub fn from_name(name: &str) -> Result<Self, String> {
-        match name {
-            "global_best" => Ok(Self::GlobalBestOnly),
-            "all_particles" => Ok(Self::AllParticles),
-            "below_average" => Ok(Self::BelowAverage),
-            _ => Err(format!(
-                "Unknown mutation application '{name}'; the applications are 'global_best', \
-                 'all_particles' and 'below_average'"
-            )),
-        }
-    }
 }
 
 /// Configuration for Particle Swarm Optimization
@@ -330,9 +273,11 @@ impl ParticleSwarmConfig {
         ranges::MAX_ITERATIONS.check(self.max_iterations)?;
         let mut reals = Vec::new();
         match self.inertia_strategy {
-            Some(InertiaWeightStrategy::Constant(factor)) => reals.push((ranges::FACTOR, factor)),
+            Some(InertiaWeightStrategy::Constant(factor)) => {
+                reals.push((ranges::INERTIA_FACTOR, factor))
+            }
             Some(InertiaWeightStrategy::Chaotic { w_min, w_max }) => {
-                reals.extend([(ranges::W_MIN, w_min), (ranges::W_MAX, w_max)]);
+                reals.extend([(ranges::INERTIA_MIN, w_min), (ranges::INERTIA_MAX, w_max)]);
             }
             None => {}
         }
@@ -346,33 +291,36 @@ impl ParticleSwarmConfig {
                 c2_initial,
                 c2_final,
             }) => reals.extend([
-                (ranges::C1_INITIAL, c1_initial),
-                (ranges::C1_FINAL, c1_final),
-                (ranges::C2_INITIAL, c2_initial),
-                (ranges::C2_FINAL, c2_final),
+                (ranges::COGNITIVE_INITIAL, c1_initial),
+                (ranges::COGNITIVE_FINAL, c1_final),
+                (ranges::SOCIAL_INITIAL, c2_initial),
+                (ranges::SOCIAL_FINAL, c2_final),
             ]),
             None => {}
         }
         if let MutationStrategy::Gaussian(scale) | MutationStrategy::Cauchy(scale) =
             self.mutation_strategy
         {
-            reals.push((ranges::SCALE, scale));
+            reals.push((ranges::MUTATION_SCALE, scale));
         }
-        reals.push((ranges::PROBABILITY, self.mutation_probability));
+        reals.push((ranges::MUTATION_PROBABILITY, self.mutation_probability));
         reals.extend(
             [
-                (ranges::CLAMP_FACTOR, self.velocity_clamp_factor),
-                (ranges::MUTATION_THRESHOLD, self.velocity_mutation_threshold),
-                (ranges::TOL, self.radius_stop),
+                (ranges::VELOCITY_CLAMP_FACTOR, self.velocity_clamp_factor),
+                (
+                    ranges::VELOCITY_MUTATION_THRESHOLD,
+                    self.velocity_mutation_threshold,
+                ),
+                (ranges::RADIUS_TOL, self.radius_stop),
             ]
             .into_iter()
             .filter_map(|(rule, value)| value.map(|value| (rule, value))),
         );
         if let Some(stop) = self.improvement_stop {
-            ranges::STOP_WINDOW.check(stop.window)?;
+            ranges::IMPROVEMENT_WINDOW.check(stop.window)?;
             reals.extend([
-                (ranges::TOL_ABS, stop.tol_abs),
-                (ranges::TOL_REL, stop.tol_rel),
+                (ranges::IMPROVEMENT_TOL_ABS, stop.tol_abs),
+                (ranges::IMPROVEMENT_TOL_REL, stop.tol_rel),
             ]);
         }
         reals
@@ -1441,53 +1389,15 @@ mod tests {
         };
         assert_eq!(
             build(improvement(0, 0.0, 0.0), None),
-            "window is a whole number of at least 1, got 0"
+            "improvement_window is a whole number of at least 1, got 0"
         );
         assert_eq!(
             build(improvement(5, -1.0, 0.0), None),
-            "tol_abs is a number of at least 0, got -1"
+            "improvement_tol_abs is a number of at least 0, got -1"
         );
         assert_eq!(
             build(None, Some(f64::NAN)),
-            "tol is a number of at least 0, got NaN"
-        );
-    }
-
-    #[test]
-    fn a_name_gives_its_strategy_and_an_unknown_name_lists_the_names() {
-        assert!(matches!(
-            InitializationStrategy::from_name("latin_hypercube"),
-            Ok(InitializationStrategy::LatinHypercube)
-        ));
-        assert!(matches!(
-            InitializationStrategy::from_name("opposition_based"),
-            Ok(InitializationStrategy::OppositionBased)
-        ));
-        assert_eq!(
-            MutationStrategy::from_name("cauchy", 0.2),
-            Ok(MutationStrategy::Cauchy(0.2))
-        );
-        assert_eq!(
-            MutationApplication::from_name("below_average"),
-            Ok(MutationApplication::BelowAverage)
-        );
-        let unknown = [
-            InitializationStrategy::from_name("sobol").map(|_| ()),
-            MutationStrategy::from_name("uniform", 0.1).map(|_| ()),
-            MutationApplication::from_name("worst").map(|_| ()),
-        ];
-        assert_eq!(
-            unknown.map(Result::unwrap_err),
-            [
-                "Unknown initialization strategy 'sobol'; the strategies are 'uniform', \
-                 'latin_hypercube' and 'opposition_based'"
-                    .to_string(),
-                "Unknown mutation strategy 'uniform'; the strategies are 'gaussian' and 'cauchy'"
-                    .to_string(),
-                "Unknown mutation application 'worst'; the applications are 'global_best', \
-                 'all_particles' and 'below_average'"
-                    .to_string(),
-            ]
+            "radius_tol is a number of at least 0, got NaN"
         );
     }
 

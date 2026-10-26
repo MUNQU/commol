@@ -146,7 +146,7 @@ fn every_setting_outside_its_range_is_rejected() {
         ),
         (
             particles(|c| c.inertia_strategy = Some(InertiaWeightStrategy::Constant(0.0))),
-            real_message(ranges::FACTOR),
+            real_message(ranges::INERTIA_FACTOR),
         ),
         (
             particles(|c| {
@@ -155,7 +155,7 @@ fn every_setting_outside_its_range_is_rejected() {
                     w_max: 1.0,
                 })
             }),
-            real_message(ranges::W_MIN),
+            real_message(ranges::INERTIA_MIN),
         ),
         (
             particles(|c| {
@@ -164,7 +164,7 @@ fn every_setting_outside_its_range_is_rejected() {
                     w_max: 0.0,
                 })
             }),
-            real_message(ranges::W_MAX),
+            real_message(ranges::INERTIA_MAX),
         ),
         (
             particles(|c| {
@@ -193,7 +193,7 @@ fn every_setting_outside_its_range_is_rejected() {
                     c2_final: 1.0,
                 })
             }),
-            real_message(ranges::C1_INITIAL),
+            real_message(ranges::COGNITIVE_INITIAL),
         ),
         (
             particles(|c| {
@@ -204,7 +204,7 @@ fn every_setting_outside_its_range_is_rejected() {
                     c2_final: 1.0,
                 })
             }),
-            real_message(ranges::C1_FINAL),
+            real_message(ranges::COGNITIVE_FINAL),
         ),
         (
             particles(|c| {
@@ -215,7 +215,7 @@ fn every_setting_outside_its_range_is_rejected() {
                     c2_final: 1.0,
                 })
             }),
-            real_message(ranges::C2_INITIAL),
+            real_message(ranges::SOCIAL_INITIAL),
         ),
         (
             particles(|c| {
@@ -226,23 +226,23 @@ fn every_setting_outside_its_range_is_rejected() {
                     c2_final: 0.0,
                 })
             }),
-            real_message(ranges::C2_FINAL),
+            real_message(ranges::SOCIAL_FINAL),
         ),
         (
             particles(|c| c.mutation_strategy = MutationStrategy::Gaussian(0.0)),
-            real_message(ranges::SCALE),
+            real_message(ranges::MUTATION_SCALE),
         ),
         (
             particles(|c| c.mutation_probability = -1.0),
-            real_message(ranges::PROBABILITY),
+            real_message(ranges::MUTATION_PROBABILITY),
         ),
         (
             particles(|c| c.velocity_clamp_factor = Some(0.0)),
-            real_message(ranges::CLAMP_FACTOR),
+            real_message(ranges::VELOCITY_CLAMP_FACTOR),
         ),
         (
             particles(|c| c.velocity_mutation_threshold = Some(-1.0)),
-            real_message(ranges::MUTATION_THRESHOLD),
+            real_message(ranges::VELOCITY_MUTATION_THRESHOLD),
         ),
         (
             particles(|c| {
@@ -252,7 +252,7 @@ fn every_setting_outside_its_range_is_rejected() {
                     tol_rel: 0.0,
                 })
             }),
-            count_message(ranges::STOP_WINDOW),
+            count_message(ranges::IMPROVEMENT_WINDOW),
         ),
         (
             particles(|c| {
@@ -262,7 +262,7 @@ fn every_setting_outside_its_range_is_rejected() {
                     tol_rel: 0.0,
                 })
             }),
-            real_message(ranges::TOL_ABS),
+            real_message(ranges::IMPROVEMENT_TOL_ABS),
         ),
         (
             particles(|c| {
@@ -272,11 +272,11 @@ fn every_setting_outside_its_range_is_rejected() {
                     tol_rel: -1.0,
                 })
             }),
-            real_message(ranges::TOL_REL),
+            real_message(ranges::IMPROVEMENT_TOL_REL),
         ),
         (
             particles(|c| c.radius_stop = Some(-1.0)),
-            real_message(ranges::TOL),
+            real_message(ranges::RADIUS_TOL),
         ),
         (unobserved, count_message(ranges::REPLICATES)),
     ];
@@ -287,4 +287,15 @@ fn every_setting_outside_its_range_is_rejected() {
             "{error} does not end with {message}"
         );
     }
+}
+
+#[test]
+fn an_observation_with_its_trials_is_in_range() {
+    let point = ObservedDataPoint {
+        trials: Some(3),
+        window: Some(1.0),
+        ..point()
+    };
+
+    assert_eq!(point.check_ranges(), Ok(()));
 }

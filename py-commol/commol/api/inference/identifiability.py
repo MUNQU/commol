@@ -1,8 +1,9 @@
 """The runners of the identifiability methods.
 
-Each runner checks what only Python knows (the engine, the parameter names),
-calls the analysis in Rust and builds the `IdentifiabilityReport`. No runner
-computes a derivative, a rank or a statistic.
+Each runner sends its method whole to the engine, with the handle of the
+result the method reads, and builds the `IdentifiabilityReport` from the
+analysis. The engine checks the engine type and the parameter names; no
+runner computes a derivative, a rank or a statistic.
 """
 
 from collections.abc import Sequence
@@ -10,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from commol.api.inference.registry import register
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context.calibration import CalibrationResult
+from commol.context.engine_json import engine_handles, engine_json
 from commol.context.inference.identifiability import (
     Collinearity,
     CollinearitySection,
@@ -29,23 +30,9 @@ from commol.context.inference.identifiability import (
     StructuralVerdict,
     SubsetIndex,
 )
-from commol.context.inference.sample import ParameterSample
 
 if TYPE_CHECKING:
     from commol.api.calibrator import Calibrator
-
-rust = commol_rs.inference
-
-_PRACTICAL_METHODS = "SampleIdentifiability and StartsIdentifiability"
-
-
-def _deterministic(calibrator: "Calibrator", method: str) -> None:
-    if calibrator.simulation.is_stochastic:
-        raise ValueError(
-            f"{method} differentiates the model, which needs a deterministic "
-            "engine: the runs of a stochastic engine change in jumps with its "
-            f"parameters. {_PRACTICAL_METHODS} accept a stochastic engine."
-        )
 
 
 def _power(name: str, exponent: float) -> str:
@@ -90,13 +77,9 @@ def run_structural_rank(
     calibrator: "Calibrator", method: StructuralRank
 ) -> IdentifiabilityReport:
     """Run `StructuralRank` on `calibrator`."""
-    _deterministic(calibrator, "StructuralRank")
     names = calibrator.parameter_names
-    analysis = rust.structural_rank(
-        calibrator.rust_problem,
-        method.points,
-        method.design == "dense",
-        calibrator.seed,
+    analysis = commol_rs.inference.structural_rank(
+        calibrator._rust_problem, engine_json(method)
     )
     negative = {p.id for p in calibrator.problem.parameters if p.min_bound < 0}
     combinations = []
@@ -143,35 +126,13 @@ def run_structural_rank(
     return _report(calibrator, structural_verdicts=structural, structural=[section])
 
 
-def _points_of(
-    calibrator: "Calibrator", at: CalibrationResult | ParameterSample
-) -> tuple[list[list[float]], list[float]]:
-    names = calibrator.parameter_names
-    if isinstance(at, CalibrationResult):
-        missing = [name for name in names if name not in at.best_parameters]
-        if missing:
-            raise ValueError(f"The result has no value of {missing}.")
-        return [[at.best_parameters[name] for name in names]], [1.0]
-    if at.names != names:
-        raise ValueError(
-            f"The sample's parameters {at.names} are not the problem's {names}."
-        )
-    return at.values, at.weights
-
-
 def run_collinearity(
     calibrator: "Calibrator", method: Collinearity
 ) -> IdentifiabilityReport:
     """Run `Collinearity` on `calibrator`."""
-    _deterministic(calibrator, "Collinearity")
     names = calibrator.parameter_names
-    points, weights = _points_of(calibrator, method.at)
-    analysis = rust.collinearity(
-        calibrator.rust_problem,
-        points,
-        weights,
-        method.max_subset_size,
-        method.threshold,
+    analysis = commol_rs.inference.collinearity(
+        calibrator._rust_problem, engine_json(method), **engine_handles(method)
     )
 
     def subsets(entries: Sequence[tuple[list[int], float, float]]) -> list[SubsetIndex]:
@@ -221,14 +182,8 @@ def run_sample_identifiability(
 ) -> IdentifiabilityReport:
     """Run `SampleIdentifiability` on `calibrator`."""
     names = calibrator.parameter_names
-    sample = method.sample
-    if sample.names != names:
-        raise ValueError(
-            f"The sample's parameters {sample.names} are not the problem's {names}."
-        )
-    priors = method.priors.rust_priors() if method.priors is not None else None
-    analysis = rust.sample_identifiability(
-        sample.rust_sample, method.correlation_threshold, priors
+    analysis = commol_rs.inference.sample_identifiability(
+        calibrator._rust_problem, engine_json(method), **engine_handles(method)
     )
     pairs = [
         CorrelatedPair(first=names[j], second=names[k], correlation=r)
@@ -265,18 +220,8 @@ def run_starts_identifiability(
 ) -> IdentifiabilityReport:
     """Run `StartsIdentifiability` on `calibrator`."""
     names = calibrator.parameter_names
-    starts = method.result.starts
-    for start in starts:
-        missing = [name for name in names if name not in start.end]
-        if missing:
-            raise ValueError(f"A start has no value of {missing}.")
-    analysis = rust.starts_identifiability(
-        [[start.end[name] for name in names] for start in starts],
-        [start.loss for start in starts],
-        [start.converged for start in starts],
-        [(p.min_bound, p.max_bound) for p in calibrator.problem.parameters],
-        method.parameter_tolerance,
-        method.loss_tolerance,
+    analysis = commol_rs.inference.starts_identifiability(
+        calibrator._rust_problem, engine_json(method), **engine_handles(method)
     )
     flagged = [name for name, flag in zip(names, analysis.flagged, strict=True) if flag]
     spread = dict(zip(names, analysis.spread, strict=True))

@@ -10,31 +10,14 @@ use crate::error::MethodError;
 use crate::sensitivity::{Design, FiniteDifferences};
 
 /// The curvature a local approximation reads.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum CurvatureKind {
     /// The expected curvature: `Jᵀ W J` and the Fisher information of the
     /// noise arguments ([`Curvature::gauss_newton`]).
     GaussNewton,
     /// The central differences of the objective ([`Curvature::hessian`]).
     Hessian,
-}
-
-impl CurvatureKind {
-    /// The kind of a name: `"gauss_newton"` or `"hessian"`.
-    ///
-    /// # Errors
-    ///
-    /// [`MethodError::Invalid`], which lists the names, when `name` is
-    /// neither.
-    pub fn from_name(name: &str) -> Result<Self, MethodError> {
-        match name {
-            "gauss_newton" => Ok(Self::GaussNewton),
-            "hessian" => Ok(Self::Hessian),
-            _ => Err(MethodError::Invalid(format!(
-                "Unknown curvature '{name}'; the curvatures are 'gauss_newton' and 'hessian'"
-            ))),
-        }
-    }
 }
 
 /// The curvature of the objective of `problem` at `fit`, with the

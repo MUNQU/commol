@@ -1,88 +1,25 @@
 //! Python bindings of the profile likelihood of `commol-inference`.
 //!
-//! [`trace_profiles`] takes the problem built once by a `Calibrator`, the fit and
-//! the threshold, traces every profile in Rust and returns them as plain
-//! values; Python builds the result.
+//! [`profile_likelihood`] and [`prediction_profile`] take the problem built
+//! once by a `Calibrator` and the JSON of the method, fit the problem,
+//! trace every profile in Rust and return them as plain values; Python
+//! builds the result.
 
 use crate::parallelism::parallel;
 use commol_inference::profiles::{
     Profile, ProfileEnd, ProfileTracer, ProfileVerdict, ProfiledQuantity, StructuralReading,
     Structure, Undetermined, beale, bootstrap_thresholds, chi_square,
 };
-use commol_inference::resampling::{FitUnit, ReplicateRunner};
-use pyo3::exceptions::PyValueError;
+use commol_inference::resampling::FitUnit;
+use commol_inference::settings::profiles::{
+    PredictionProfileSettings, ProfileLikelihoodSettings, Threshold, ThresholdKind,
+};
 use pyo3::prelude::*;
 
-use crate::calibration::{PyObservedDataPoint, PyOptimizationConfig};
-use crate::inference::{PyCalibrationProblem, ResamplerSpec, method_error, value_error};
-
-/// The bootstrap that calibrates a profile threshold
-///
-/// Args:
-///     method: "bayesian", "parametric", "residual" or "wild"
-///     replicates: Number of replicates, at least 1
-///     starts: Starts per replicate, the fit first
-///     block_length: Positions per block, or None for the automatic length
-///     residual_scale: "additive" or "multiplicative", for "residual"
-///     scheme: "moving" or "stationary", for "residual"
-///     multipliers: "rademacher" or "mammen", for "wild"
-///
-/// Raises:
-///     ValueError: If the method is unknown or a setting it needs is
-///         missing or unknown
-#[pyclass(name = "BootstrapSettings", frozen)]
-pub struct PyBootstrapSettings {
-    spec: ResamplerSpec,
-    replicates: usize,
-    starts: usize,
-}
-
-#[pymethods]
-impl PyBootstrapSettings {
-    #[new]
-    #[pyo3(signature = (method, replicates, starts, block_length=None, residual_scale=None, scheme=None, multipliers=None))]
-    fn new(
-        method: &str,
-        replicates: i64,
-        starts: i64,
-        block_length: Option<i64>,
-        residual_scale: Option<&str>,
-        scheme: Option<&str>,
-        multipliers: Option<&str>,
-    ) -> PyResult<Self> {
-        let replicates: usize =
-            crate::counts::count(&commol_inference::ranges::REPLICATES, replicates)?;
-        let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
-        let block_length: Option<usize> =
-            crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
-        fn needed<'s>(method: &str, setting: Option<&'s str>, name: &str) -> PyResult<&'s str> {
-            setting.ok_or_else(|| value_error(format!("A {method} bootstrap needs {name}")))
-        }
-        let spec = match method {
-            "bayesian" => ResamplerSpec::Bayesian { block_length },
-            "parametric" => ResamplerSpec::Parametric,
-            "residual" => ResamplerSpec::residual(
-                block_length,
-                needed(method, residual_scale, "residual_scale")?,
-                needed(method, scheme, "scheme")?,
-            )?,
-            "wild" => {
-                ResamplerSpec::wild(block_length, needed(method, multipliers, "multipliers")?)?
-            }
-            _ => {
-                return Err(value_error(format!(
-                    "Unknown bootstrap '{method}'; the bootstraps are 'bayesian', \
-                     'parametric', 'residual' and 'wild'"
-                )));
-            }
-        };
-        Ok(Self {
-            spec,
-            replicates,
-            starts,
-        })
-    }
-}
+use crate::calibration::PyStarts;
+use crate::inference::{
+    PyCalibrationProblem, ResamplerSpec, best_values, method_error, python_list, value_error,
+};
 
 /// Where a side leaves the box: the value, and the index of the free
 /// parameter on its bound.
@@ -251,79 +188,47 @@ pub struct PyProfileRun {
     not_converged: usize,
 }
 
-/// Trace the profile of each parameter and prediction from the fit
-///
-/// Args:
-///     problem: The calibration problem
-///     config: The problem's optimizer
-///     fit: The fitted values, in problem order
-///     parameters: The indices of the parameters to profile
-///     predictions: The predictions to profile
-///     threshold: "chi_square", "beale" or "bootstrap"
-///     confidence_level: The level of the threshold
-///     max_steps: The most points on each side of a profile
-///     seed: The seed of the bootstrap and of a particle swarm
-///     bootstrap: The bootstrap of a "bootstrap" threshold
-///
-/// Raises:
-///     ValueError: If the threshold does not fit the problem, a setting is
-///         not valid, or the fit is not feasible
-///     RuntimeError: If a refit fails, or every replicate of the bootstrap
-///         fails
-#[pyfunction]
-#[pyo3(signature = (problem, config, fit, parameters, predictions, threshold, confidence_level, max_steps, seed, bootstrap=None))]
-#[allow(clippy::too_many_arguments)]
-fn trace_profiles(
+/// Fit the problem with `starts` starts and trace the profile of each of
+/// `quantities` from the fit, with `threshold`.
+fn trace(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
-    config: &PyOptimizationConfig,
-    fit: Vec<f64>,
-    parameters: Vec<usize>,
-    predictions: Vec<PyObservedDataPoint>,
-    threshold: &str,
-    confidence_level: f64,
-    max_steps: i64,
-    seed: i128,
-    bootstrap: Option<PyRef<'_, PyBootstrapSettings>>,
-) -> PyResult<PyProfileRun> {
-    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-    let max_steps: usize = crate::counts::count(&commol_inference::ranges::MAX_STEPS, max_steps)?;
+    starts: usize,
+    quantities: Vec<ProfiledQuantity>,
+    threshold: &Threshold,
+    max_steps: usize,
+) -> PyResult<(PyStarts, PyProfileRun)> {
+    let fitted = problem.fit(py, starts)?;
+    let fit = best_values(&fitted);
     let problem_ref = &problem.inner;
-    let tracer =
-        ProfileTracer::new(problem_ref, &config.inner, &fit, seed).map_err(method_error)?;
-    let quantities: Vec<ProfiledQuantity> = parameters
-        .into_iter()
-        .map(ProfiledQuantity::Parameter)
-        .chain(
-            predictions
-                .into_iter()
-                .map(|spec| ProfiledQuantity::Prediction(spec.inner)),
-        )
-        .collect();
+    let confidence_level = threshold.confidence_level;
+    let tracer = ProfileTracer::new(problem_ref, problem.optimizer(), &fit, problem.seed)
+        .map_err(method_error)?;
     let mut rises = None;
     let mut replicates = None;
     let mut failed = Vec::new();
     let mut not_converged = 0;
-    let thresholds = match (threshold, bootstrap) {
-        ("chi_square", None) => {
+    let thresholds = match (threshold.kind, &threshold.bootstrap) {
+        (ThresholdKind::ChiSquare, _) => {
             vec![chi_square(problem_ref, confidence_level).map_err(method_error)?; quantities.len()]
         }
-        ("beale", None) => vec![
+        (ThresholdKind::Beale, _) => vec![
             beale(problem_ref, tracer.fit_loss(), confidence_level)
                 .map_err(method_error)?;
             quantities.len()
         ],
-        ("bootstrap", Some(settings)) => {
+        (ThresholdKind::BootstrapCalibrated, bootstrap) => {
+            let bootstrap = bootstrap
+                .as_ref()
+                .expect("a calibrated threshold has its bootstrap (Threshold::check)");
             let centers = quantities
                 .iter()
                 .map(|quantity| tracer.center(quantity))
                 .collect::<Result<Vec<f64>, _>>()
                 .map_err(method_error)?;
-            let runner =
-                ReplicateRunner::new(problem_ref, &config.inner, &fit, settings.starts, seed)
-                    .map_err(method_error)?;
-            let (resampler, _) = problem.resampler(&settings.spec, runner.fit())?;
-            let count = settings.replicates;
+            let runner = problem.runner(&fit, bootstrap.starts())?;
+            let (resampler, _) = problem.resampler(&ResamplerSpec::of(bootstrap), runner.fit())?;
+            let count = bootstrap.replicates();
             let run = parallel(py, || {
                 bootstrap_thresholds(
                     &runner,
@@ -340,11 +245,6 @@ fn trace_profiles(
             failed = FitUnit::Replicate.entries(&run.failed);
             not_converged = run.not_converged;
             run.thresholds
-        }
-        _ => {
-            return Err(PyValueError::new_err(format!(
-                "The threshold '{threshold}' takes a bootstrap only when it is 'bootstrap'"
-            )));
         }
     };
     let traced = parallel(py, || tracer.trace_all(&quantities, &thresholds, max_steps))?;
@@ -378,7 +278,7 @@ fn trace_profiles(
             tracer.tolerance(),
         ));
     }
-    Ok(PyProfileRun {
+    let run = PyProfileRun {
         profiles,
         fit_loss: tracer.fit_loss(),
         tolerance: tracer.tolerance(),
@@ -388,15 +288,104 @@ fn trace_profiles(
         replicates,
         failed,
         not_converged,
-    })
+    };
+    Ok((PyStarts { inner: fitted }, run))
+}
+
+/// Fit the problem and trace the profile of each parameter from the fit
+///
+/// Args:
+///     problem: The calibration problem
+///     settings: The JSON of a `ProfileLikelihood`
+///
+/// Returns:
+///     The starts of the fit, and the profiles in the order of the
+///     parameters of the settings
+///
+/// Raises:
+///     ValueError: If a setting is not valid, a name is not a parameter of
+///         the problem, the threshold does not fit the problem, or the fit
+///         is not feasible
+///     RuntimeError: If the fit or a refit fails, or every replicate of the
+///         bootstrap fails
+#[pyfunction]
+fn profile_likelihood(
+    py: Python<'_>,
+    problem: &PyCalibrationProblem,
+    settings: &str,
+) -> PyResult<(PyStarts, PyProfileRun)> {
+    let settings: ProfileLikelihoodSettings = crate::json::read(settings)?;
+    let names = problem.names();
+    let quantities = settings
+        .parameters
+        .iter()
+        .map(|name| {
+            names
+                .iter()
+                .position(|parameter| parameter == name)
+                .map(ProfiledQuantity::Parameter)
+                .ok_or_else(|| {
+                    value_error(format!(
+                        "'{name}' is not a parameter of the problem; its parameters are {}.",
+                        python_list(&names)
+                    ))
+                })
+        })
+        .collect::<PyResult<Vec<_>>>()?;
+    trace(
+        py,
+        problem,
+        settings.starts,
+        quantities,
+        &settings.threshold,
+        settings.max_steps,
+    )
+}
+
+/// Fit the problem and trace the profile of each prediction from the fit
+///
+/// Args:
+///     problem: The calibration problem
+///     settings: The JSON of a `PredictionProfile`
+///
+/// Returns:
+///     The starts of the fit, and the profiles in the order of the
+///     predictions of the settings
+///
+/// Raises:
+///     ValueError: If a setting is not valid, a prediction does not fit the
+///         model, the threshold does not fit the problem, or the fit is not
+///         feasible
+///     RuntimeError: If the fit or a refit fails, or every replicate of the
+///         bootstrap fails
+#[pyfunction]
+fn prediction_profile(
+    py: Python<'_>,
+    problem: &PyCalibrationProblem,
+    settings: &str,
+) -> PyResult<(PyStarts, PyProfileRun)> {
+    let settings: PredictionProfileSettings = crate::json::read(settings)?;
+    let quantities = settings
+        .specs
+        .iter()
+        .map(|spec| ProfiledQuantity::Prediction(spec.point()))
+        .collect();
+    trace(
+        py,
+        problem,
+        settings.starts,
+        quantities,
+        &settings.threshold,
+        settings.max_steps,
+    )
 }
 
 /// Register the profile bindings with the inference module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<PyBootstrapSettings>()?;
     m.add_class::<PyProfile>()?;
     m.add_class::<PyStructure>()?;
     m.add_class::<PyProfileRun>()?;
-    m.add_function(wrap_pyfunction!(trace_profiles, m)?)?;
+    m.add_function(wrap_pyfunction!(profile_likelihood, m)?)?;
+    m.add_function(wrap_pyfunction!(prediction_profile, m)?)?;
     Ok(())
 }

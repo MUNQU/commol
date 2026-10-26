@@ -9,11 +9,12 @@ sets the width of every interval.
 """
 
 from collections.abc import Mapping
-from typing import Literal, Self
+from typing import ClassVar, Literal, Self
 
 from pydantic import ConfigDict, Field, JsonValue, model_validator
 
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context.engine_json import engine_json
 from commol.context.calibration import ObservedDataPoint
 from commol.context.inference.method import UncertaintyMethod
 from commol.context.inference.resampling import BlockLength
@@ -49,7 +50,7 @@ class SeriesIntervals(ResultModel):
         The upper end of each interval; ``inf`` when unbounded.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     positions: list[float]
     prediction: list[float]
@@ -74,7 +75,7 @@ class PredictionIntervals(ResultModel):
         is not a key.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     confidence_level: float
     series: dict[str, SeriesIntervals]
@@ -111,7 +112,7 @@ class ConformalResult(ResultModel):
         otherwise None.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     intervals: PredictionIntervals
     scores: dict[str, list[float]]
@@ -150,12 +151,10 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
     def check_score_and_by(cls, data: JsonValue) -> JsonValue:
         """Check, in Rust, that `score` and `by` are given and fit together."""
         if isinstance(data, Mapping):
-
-            def name(key: str) -> str | None:
-                value = data.get(key)
-                return None if value is None else str(value)
-
-            commol_rs.inference.check_conformal_settings(name("score"), name("by"))
+            given = {
+                key: data[key] for key in ("score", "by") if data.get(key) is not None
+            }
+            commol_rs.inference.check_conformal_settings(engine_json(given))
         return data
 
 
@@ -191,6 +190,8 @@ class SplitConformal(ConformalMethod, RangeChecked):
     starts : int
         Starts of the fit (default 1).
     """
+
+    _engine_handles: ClassVar[tuple[str, ...]] = ("sample",)
 
     calibration_data: list[ObservedDataPoint] = Field(
         min_length=1, description="Held-out observations."
@@ -327,6 +328,8 @@ class AdaptiveConformal(ConformalMethod, RangeChecked):
     stream: list[ObservedDataPoint] = Field(
         min_length=1, description="The observations that arrive."
     )
+    _engine_handles: ClassVar[tuple[str, ...]] = ("sample",)
+
     sample: ParameterSample | None = Field(
         default=None, description="The sample whose predictive predicts."
     )

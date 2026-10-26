@@ -9,7 +9,7 @@
 //!
 //! | Node | JSON |
 //! |---|---|
-//! | A number | `{"Constant": 0.5}`, the value the parser read; a value that is not finite, such as `1e400`, is its text: `{"Constant": "inf"}` |
+//! | A number | `{"Constant": 0.5}`, the value the parser read; a value that is not finite, such as `1e400`, is its text: `{"Constant": "Infinity"}`, as the JSON of the port writes it |
 //! | A variable | `{"Variable": "k"}` |
 //! | A chain | `{"Chain": {"first": node, "rest": [["Mul", node], ...]}}`, with the operators `Add`, `Sub`, `Mul`, `Div`, `Mod`, `Lt`, `Gt`, `Le`, `Ge`, `Eq` and `Ne` |
 //! | A power | `{"Power": {"base": node, "exponent": node}}` |
@@ -36,12 +36,13 @@ impl MathExpression {
 }
 
 /// The value of a number of the tree: a JSON number when it is finite, and
-/// its text (`inf`) when it is not, which JSON has no number for.
+/// its text (`"Infinity"`) when it is not, which JSON has no number for, as
+/// the JSON of the port writes it ([`crate::json::non_finite_text`]).
 pub(crate) fn number<S: Serializer>(value: &f64, serializer: S) -> Result<S::Ok, S::Error> {
     if value.is_finite() {
         serializer.serialize_f64(*value)
     } else {
-        serializer.serialize_str(&value.to_string())
+        serializer.serialize_str(crate::json::non_finite_text(*value))
     }
 }
 
@@ -86,7 +87,7 @@ mod tests {
             tree("if(!(a > 1e400), max(a, 0x10), c)"),
             json!({ "Conditional": {
                 "condition": { "UnaryOp": { "op": "Not", "operand":
-                    { "Chain": { "first": a, "rest": [["Gt", { "Constant": "inf" }]] } } } },
+                    { "Chain": { "first": a, "rest": [["Gt", { "Constant": "Infinity" }]] } } } },
                 "true_expr": { "FunctionCall": { "name": "max",
                     "args": [a, { "Constant": 16.0 }] } },
                 "false_expr": c
