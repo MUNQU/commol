@@ -28,7 +28,8 @@ pub mod transitions;
 pub use aggregate::{Aggregate, AggregateVariant, InitialConditions, Neighbors};
 pub use engine::{
     DynamicsForm, EngineSettings, EngineType, EventMethod, ModelEngine, ModelKind, ModelValueType,
-    OdeMethod, OdeSolver, RateMeaning, Rounding, StochasticEventsSettings, StochasticStepsSettings,
+    OdeMethod, OdeSolver, RateKeeps, RateMeaning, Rounding, StochasticEventsSettings,
+    StochasticStepsSettings,
 };
 pub use model::Model;
 pub use parameters::{Parameter, ParameterValue, SeriesMode};

@@ -29,15 +29,15 @@ steps: a width of `n` steps is the span `n` in the step unit.
 The rate conversions (`rate_from_mean_span`, `rate_from_probability`) ask the
 engine: `RateMeaning::rate_from_mean_span` and `rate_from_probability`
 (`crates/commol-core/src/types/engine.rs`) hold the formula of each meaning, so
-a new engine picks a meaning and Python does not change. The per-step rate
-from a mean span is `1 - e^(-1/n)`: it keeps the survival of the continuous
-process at every step, and its mean residence is `1/rate`, not `n` (10.508
-steps for `n = 10`). `r = 1/n` keeps the mean and loses the survival.
+a new engine picks a meaning and Python does not change. A per-step rate keeps
+the survival (`1 - e^(-1/n)`) or the mean (`1/n`) of a residence, never both:
+the caller passes `RateKeeps`, with no default, and the engine rejects the mean
+of a span below one step instead of clamping the rate to 1.
 
 **Rule:** no formula of a rate per engine nor of a window in Python; ask the engine.
 
 **Guards:** `tests/simulation/test_axis_units.py`,
-`crates/commol-core/src/types/engine.rs` (tests `a_rate_from_…`),
+`crates/commol-core/src/types/engine.rs` (tests `a_rate_from_…`, `a_mean_shorter_…`),
 `tests/simulation/test_windows.py::test_windows_come_from_the_engine`,
 `tests/suite/test_engine_rules.py::test_only_the_engine_computes_a_window`.
 

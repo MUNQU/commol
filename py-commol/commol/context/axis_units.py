@@ -2,7 +2,7 @@
 
 import math
 from datetime import date, datetime, time, timedelta
-from typing import TYPE_CHECKING, Annotated, Self
+from typing import TYPE_CHECKING, Annotated, Literal, Self
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
@@ -149,7 +149,7 @@ class AxisUnits(BaseModel):
     >>> hours.steps(3, "day")
     72.0
     >>> daily = AxisUnits(step_unit="day", engine="DifferentialEquations")
-    >>> daily.rate_from_mean_span(2, "week")
+    >>> daily.rate_from_mean_span(2, "week", keep="mean")
     0.07142857142857142
     >>> hours.window_end(2, 1, "week")
     504.0
@@ -383,16 +383,26 @@ class AxisUnits(BaseModel):
             return float(nearest)
         return result
 
-    def rate_from_mean_span(self, span: float, unit: str) -> float:
+    def rate_from_mean_span(
+        self, span: float, unit: str, *, keep: Literal["survival", "mean"]
+    ) -> float:
         """
         Rate of one outflow whose residence has a mean `span` on the axis.
 
-        The engine says what a rate means (`rate_meaning`). For a per-step
-        rate (``DifferenceEquations``) it is ``1 - exp(-1/n)``, with `span`
-        equal to ``n`` steps: the bin keeps ``exp(-k/n)`` of its start at each
-        step ``k``, as the continuous process does, and its mean residence is
-        ``1/rate`` steps, a little more than ``n``. For a continuous rate
-        (``DifferentialEquations``) it is ``1/n``.
+        The engine says what a rate means (`rate_meaning`), and `keep` says
+        what the rate keeps of the residence. With `span` equal to ``n``
+        steps, a per-step rate (``DifferenceEquations``) is:
+
+        - ``1 - exp(-1/n)`` with ``keep="survival"``: the bin keeps
+          ``exp(-k/n)`` of its start at each step ``k``, as a continuous
+          process does, and its mean residence is ``1/rate`` steps, a little
+          more than ``n``. It suits a model whose step discretizes a
+          continuous process.
+        - ``1/n`` with ``keep="mean"``: the residence is geometric, and its
+          mean is ``n`` steps. It suits a model whose step is the unit of its
+          process.
+
+        A continuous rate (``DifferentialEquations``) is ``1/n`` with both.
 
         Parameters
         ----------
@@ -400,6 +410,10 @@ class AxisUnits(BaseModel):
             Mean span of the residence, in `unit`.
         unit : str
             Unit of `span`, of the dimension of the step unit.
+        keep : {"survival", "mean"}
+            What the rate keeps of the residence: its exponential survival at
+            every step, or its mean. It has no default: it is a modelling
+            choice.
 
         Returns
         -------
@@ -410,9 +424,10 @@ class AxisUnits(BaseModel):
         ------
         ValueError
             If there is no engine, `unit` has another dimension than the step
-            unit, or `span` is not positive.
+            unit, `span` is not positive, `keep` is another value, or a
+            per-step rate keeps the mean of a span shorter than one step.
         """
-        return self._engine_type().rate_from_mean_span(self.steps(span, unit))
+        return self._engine_type().rate_from_mean_span(self.steps(span, unit), keep)
 
     def rate_from_probability(
         self, probability: float, period: float, unit: str
