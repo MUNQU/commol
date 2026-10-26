@@ -118,32 +118,27 @@
             {
               "source": "A",
               "target": "B",
-              "label": "ab: 0 * A * B"
+              "label": ""
             },
             {
               "source": "B",
               "target": "B",
-              "label": "ab: 0 * A * B"
+              "label": "0 * A * B"
             },
             {
               "source": null,
               "target": "A",
-              "label": "in: 0"
+              "label": "0"
             },
             {
               "source": null,
               "target": "B",
-              "label": "in: 0"
+              "label": "0"
             },
             {
               "source": "B",
               "target": null,
-              "label": "out: 0"
-            },
-            {
-              "source": "A",
-              "target": "B",
-              "label": "dose: 0"
+              "label": "0"
             }
           ],
           "expanded": false

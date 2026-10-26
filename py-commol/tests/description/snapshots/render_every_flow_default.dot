@@ -3,23 +3,20 @@ digraph "states" {
     n0 [label="State A"];
     n1 [label="State B"];
     n2 [label="State C"];
-    n3 [label="g1"];
-    n4 [label="g2"];
-    n0 -> n2 [label="pair: k1 * A * B"];
-    n1 -> n2 [label="pair: k1 * A * B"];
-    n0 -> n1 [label="spread: k1 * A * B / total"];
-    n1 -> n1 [label="spread: k1 * A * B / total"];
-    n0 -> n1 [label="split: 0.05"];
-    n0 -> n2 [label="split: 0.05"];
-    n1 -> n1 [label="loop: 0.1"];
-    in7 [shape=point, label=""];
-    in7 -> n0 [label="inflow: b"];
-    n0 -> n1 [label="dose: 0.1"];
-    out9 [shape=point, label=""];
-    n2 -> out9 [label="outflow: 0.01"];
-    n3 -> n4 [label="move: stratified rates"];
-    n0 -> n2 [label="pending: no rate"];
-    n1 -> n2 [label="boost: 0.5"];
+    inflow [shape=point, label=""];
+    outflow [shape=point, label=""];
+    n0 -> n2 [label="k1"];
+    n1 -> n2 [label="k1"];
+    n0 -> n1 [label="k1"];
+    n1 -> n1 [label="k1"];
+    inflow -> n0 [label="b"];
+    n2 -> outflow [label="0.01"];
+}
+digraph "strata" {
+    rankdir=LR;
+    n0 [label="g1"];
+    n1 [label="g2"];
+    n0 -> n1 [label="A, B, C: 0.02"];
 }
 digraph "compartments" {
     rankdir=LR;
@@ -29,6 +26,8 @@ digraph "compartments" {
     n3 [label="B_g2"];
     n4 [label="C_g1"];
     n5 [label="C_g2"];
+    inflow [shape=point, label=""];
+    outflow [shape=point, label=""];
     n0 -> n4 [label="pair: k1 * A * B"];
     n2 -> n4 [label="pair: k1 * A * B"];
     n1 -> n5 [label="pair: k1 * A * B"];
@@ -38,23 +37,17 @@ digraph "compartments" {
     n1 -> n3 [label="spread: k1 * A * B / total"];
     n3 -> n3 [label="spread: k1 * A * B / total"];
     n0 -> n2 [label="split: 0.05 * A_g1"];
-    in9 [shape=point, label=""];
-    in9 -> n4 [label="split: 0.05 * A_g1"];
+    inflow -> n4 [label="split: 0.05 * A_g1"];
     n1 -> n3 [label="split: 0.05 * A_g2"];
-    in11 [shape=point, label=""];
-    in11 -> n5 [label="split: 0.05 * A_g2"];
+    inflow -> n5 [label="split: 0.05 * A_g2"];
     n2 -> n2 [label="loop: 0.1 * B_g1"];
     n3 -> n3 [label="loop: 0.1 * B_g2"];
-    in14 [shape=point, label=""];
-    in14 -> n0 [label="inflow: b"];
-    in15 [shape=point, label=""];
-    in15 -> n1 [label="inflow: b"];
+    inflow -> n0 [label="inflow: b"];
+    inflow -> n1 [label="inflow: b"];
     n0 -> n2 [label="dose: 0.1 * A_g1"];
     n1 -> n3 [label="dose: 0.1 * A_g2"];
-    out18 [shape=point, label=""];
-    n4 -> out18 [label="outflow: 0.01 * C_g1"];
-    out19 [shape=point, label=""];
-    n5 -> out19 [label="outflow: 0.01 * C_g2"];
+    n4 -> outflow [label="outflow: 0.01 * C_g1"];
+    n5 -> outflow [label="outflow: 0.01 * C_g2"];
     n0 -> n1 [label="move: 0.02 * A_g1"];
     n2 -> n3 [label="move: 0.02 * B_g1"];
     n4 -> n5 [label="move: 0.02 * C_g1"];

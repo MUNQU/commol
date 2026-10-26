@@ -366,8 +366,8 @@ class ModelDescription(BaseModel):
         ----------
         format : {"text", "markdown", "latex", "json", "dot"}, default="text"
             ``"text"``: plain text, with the equations in their compact and
-            expanded forms. ``"markdown"``: Markdown, with the state graph of
-            the model as a Mermaid diagram. ``"latex"``: a LaTeX document.
+            expanded forms. ``"markdown"``: Markdown, with the graphs of the
+            bins and of the strata as Mermaid diagrams. ``"latex"``: a LaTeX document.
             ``"json"``: the description as data. ``"dot"``: every state graph
             in Graphviz DOT, the expanded one included.
 

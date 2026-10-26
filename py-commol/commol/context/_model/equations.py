@@ -13,12 +13,13 @@ description with or without spaces.
 
 from collections import Counter
 from collections.abc import Mapping
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from commol.commol_rs import _commol_rs as commol_rs
 
 from commol.context._model import engine_state
-from commol.context._model.engine_state import TransitionFlow
+from commol.context._model.engine_state import ExpandedOutput, TransitionFlow
 from commol.context._model.formula_tree import (
     PRIMARY,
     PRODUCT,
@@ -29,6 +30,7 @@ from commol.context._model.formula_tree import (
     binding,
     formula_text,
     product,
+    variables,
 )
 from commol.context._model.helpers import ModelCompartmentHelper
 from commol.context.description import (
@@ -49,6 +51,108 @@ if TYPE_CHECKING:
     from commol.context.transition import Transition
 
 
+type _Categories = tuple[tuple[str, str], ...]
+"""The categories of a node of the graph of the strata, as (stratification,
+category) pairs in the order of the stratifications."""
+
+
+@dataclass
+class _Moves:
+    """
+    What moves along one edge of a state graph.
+
+    Attributes
+    ----------
+    transitions : dict[str, None]
+        The ids of the transitions, in the order of the flows.
+    rates : dict[str, None]
+        The rates the engine evaluates for the flows of the edge.
+    bins : set[str]
+        The bins that move, for an edge between categories.
+    """
+
+    transitions: dict[str, None] = field(default_factory=dict)
+    rates: dict[str, None] = field(default_factory=dict)
+    bins: set[str] = field(default_factory=set)
+
+    def add(self, flow: TransitionFlow, bin_id: str | None = None) -> None:
+        self.transitions[flow.transition] = None
+        self.rates[flow.rate] = None
+        if bin_id is not None:
+            self.bins.add(bin_id)
+
+
+class _GraphMoves:
+    """
+    The edges of the graph of the bins and of the graph of the strata, with
+    what moves along each.
+
+    Attributes
+    ----------
+    bins : dict[tuple[str | None, str | None], _Moves]
+        The edges between bins, by source and target; None is the outside.
+    strata : dict[tuple[_Categories | None, _Categories | None], _Moves]
+        The edges between categories, by source and target.
+    """
+
+    def __init__(self, stratifications: list[str]) -> None:
+        self._stratifications = stratifications
+        self.bins: dict[tuple[str | None, str | None], _Moves] = {}
+        self.strata: dict[tuple[_Categories | None, _Categories | None], _Moves] = {}
+
+    def add_piece(
+        self,
+        flow: TransitionFlow,
+        leaves: ExpandedOutput | None,
+        enters: ExpandedOutput | None,
+    ) -> None:
+        """
+        A piece of `flow` from the compartment `leaves` to `enters`.
+
+        A piece that changes categories is an edge between the categories it
+        changes. A piece is an edge between bins unless it stays in one bin
+        and changes categories.
+        """
+        changed = []
+        if leaves is not None and enters is not None:
+            changed = [
+                strat
+                for strat in self._stratifications
+                if leaves.categories.get(strat) != enters.categories.get(strat)
+            ]
+            if changed:
+                pair = (
+                    _categories(leaves.categories, changed),
+                    _categories(enters.categories, changed),
+                )
+                self.strata.setdefault(pair, _Moves()).add(flow, leaves.source)
+        ends = (
+            None if leaves is None else leaves.source,
+            None if enters is None else enters.source,
+        )
+        if ends[0] != ends[1] or not changed:
+            self.bins.setdefault(ends, _Moves()).add(flow)
+
+    def add_declared(
+        self, transition: "Transition", stratification: str | None
+    ) -> None:
+        """
+        The edges of a transition with no flow, from its sources to its
+        targets: bins, or the categories of `stratification`.
+        """
+        for source in dict.fromkeys(transition.source) or [None]:
+            for target in dict.fromkeys(transition.target) or [None]:
+                if stratification is None:
+                    moves = self.bins.setdefault((source, target), _Moves())
+                else:
+                    pair = (
+                        None if source is None else ((stratification, source),),
+                        None if target is None else ((stratification, target),),
+                    )
+                    moves = self.strata.setdefault(pair, _Moves())
+                moves.transitions[transition.id] = None
+
+
 class DynamicsDescription:
     """
     Builds the blocks of the ``dynamics`` section of an aggregate model.
@@ -64,6 +168,7 @@ class DynamicsDescription:
         self._model = model
         self._helper = ModelCompartmentHelper(model)
         self._flows: list[TransitionFlow] | None = None
+        self._moves: _GraphMoves | None = None
 
     def _transition_flows(self) -> list[TransitionFlow]:
         if self._flows is None:
@@ -79,11 +184,17 @@ class DynamicsDescription:
         Returns
         -------
         list[Block]
-            The state graphs, the compact form, the expanded form when the
-            engine has equations or the events when it draws them, and the
-            impulses.
+            The graph of the bins, the graph of the strata when the model
+            moves amounts between categories, the graph of the compartments,
+            the compact form, the expanded form when the engine has equations
+            or the events when it draws them, and the impulses.
         """
-        blocks: list[Block] = [self.state_graph(), self.expanded_graph()]
+        strata = self.strata_graph()
+        blocks: list[Block] = [
+            self.state_graph(),
+            *([strata] if strata is not None else []),
+            self.expanded_graph(),
+        ]
         blocks.extend(self.compact_form())
         engine = commol_rs.engine.EngineType(self._model.engine.type)
         if engine.equation_lhs("X", False):
@@ -101,56 +212,162 @@ class DynamicsDescription:
 
     def state_graph(self) -> StateGraph:
         """
-        The bins, and one edge per transition, labelled with its rate.
+        The bins, and one edge per pair of bins that an amount moves between.
 
-        A transition between the categories of a stratification moves between
-        nodes of those categories. A transition with several sources or
-        targets has an edge from each source to each target; one with no
-        source or no target has an edge from or to nowhere.
+        The edges come from the flows of the engine. A flow between two
+        compartments of one bin is a move between categories: it is an edge of
+        `strata_graph`, not of this graph. An inflow starts at no node and an
+        outflow ends at no node. The label of an edge is `_label`.
 
         Returns
         -------
         StateGraph
-            The graph of the states of the model.
+            The graph of the bins of the model.
         """
-        process = self._model.process
-        nodes = [
-            GraphNode(id=bin_item.id, label=bin_item.name or bin_item.id, group="bin")
-            for bin_item in process.bins
-        ]
-        bin_ids = {bin_item.id for bin_item in process.bins}
-        category_nodes: dict[str, GraphNode] = {}
-        edges: list[GraphEdge] = []
-        for transition in process.transitions:
-            ids = [*transition.source, *transition.target]
-            if not set(ids) <= bin_ids:
-                stratification = next(
-                    strat
-                    for strat in process.stratifications
-                    if set(ids) <= set(strat.categories)
-                )
-                for category in ids:
-                    node_id = f"{stratification.id}:{category}"
-                    category_nodes.setdefault(
-                        category,
-                        GraphNode(id=node_id, label=category, group=stratification.id),
-                    )
-            label = f"{transition.id}: {_rate_text(transition)}"
-
-            def node(item: str) -> str:
-                found = category_nodes.get(item)
-                return item if found is None else found.id
-
-            sources = [node(item) for item in dict.fromkeys(transition.source)]
-            targets = [node(item) for item in dict.fromkeys(transition.target)]
-            for source in sources or [None]:
-                for target in targets or [None]:
-                    edges.append(GraphEdge(source=source, target=target, label=label))
+        bins = self._graph_moves().bins
         return StateGraph(
             heading="States and transitions",
             name="states",
-            nodes=[*nodes, *category_nodes.values()],
+            nodes=[
+                GraphNode(
+                    id=bin_item.id, label=bin_item.name or bin_item.id, group="bin"
+                )
+                for bin_item in self._model.process.bins
+            ],
+            edges=[
+                GraphEdge(source=source, target=target, label=self._label(moves))
+                for (source, target), moves in bins.items()
+            ],
+        )
+
+    def strata_graph(self) -> StateGraph | None:
+        """
+        The categories, and one edge per pair of categories that an amount
+        moves between, in any bin.
+
+        A node holds the categories of the stratifications that a move
+        changes: ``group:g1``, or ``group:g1, size:s1`` for a move that changes
+        two stratifications at once. The label of an edge names the bins that
+        move, in the order of their declaration, then `_label`.
+
+        Returns
+        -------
+        StateGraph | None
+            The graph of the strata, or None when no amount moves between
+            categories.
+        """
+        strata = self._graph_moves().strata
+        if not strata:
+            return None
+        order = {
+            (strat.id, category): (strat_index, category_index)
+            for strat_index, strat in enumerate(self._model.process.stratifications)
+            for category_index, category in enumerate(strat.categories)
+        }
+        ends = {end for pair in strata for end in pair if end is not None}
+        nodes = [
+            GraphNode(
+                id=_strata_id(categories),
+                label=", ".join(category for _, category in categories),
+                group=", ".join(strat for strat, _ in categories),
+            )
+            for categories in sorted(
+                ends, key=lambda node: [order[pair] for pair in node]
+            )
+        ]
+        edges = []
+        for (source, target), moves in strata.items():
+            rates = self._label(moves)
+            bins = ", ".join(
+                bin_item.id
+                for bin_item in self._model.process.bins
+                if bin_item.id in moves.bins
+            )
+            edges.append(
+                GraphEdge(
+                    source=None if source is None else _strata_id(source),
+                    target=None if target is None else _strata_id(target),
+                    label=": ".join(text for text in (bins, rates) if text),
+                )
+            )
+        return StateGraph(
+            heading="Moves between categories",
+            name="strata",
+            nodes=nodes,
             edges=edges,
+        )
+
+    def _graph_moves(self) -> "_GraphMoves":
+        """
+        The edges of the graph of the bins and of the graph of the strata.
+
+        Each piece of a flow goes from each source of the flow to each target
+        (`_GraphMoves.add_piece`). A transition with no flow, such as one with
+        no rate, has the edges of its sources and targets.
+        """
+        if self._moves is not None:
+            return self._moves
+        process = self._model.process
+        compartments, _ = engine_state.expanded_outputs(process)
+        found = {compartment.name: compartment for compartment in compartments}
+        moves = _GraphMoves([strat.id for strat in process.stratifications])
+
+        pieces: dict[int, list[TransitionFlow]] = {}
+        for flow in self._transition_flows():
+            pieces.setdefault(flow.flow, []).append(flow)
+        for flow_pieces in pieces.values():
+            sources = dict.fromkeys(f.source for f in flow_pieces if f.source)
+            targets = dict.fromkeys(f.target for f in flow_pieces if f.target)
+            for source in sources or [None]:
+                for target in targets or [None]:
+                    moves.add_piece(
+                        flow_pieces[0],
+                        None if source is None else found[source],
+                        None if target is None else found[target],
+                    )
+
+        moved = {flow.transition for flow in self._transition_flows()}
+        bin_ids = {bin_item.id for bin_item in process.bins}
+        for transition in process.transitions:
+            if transition.id in moved:
+                continue
+            ids = {*transition.source, *transition.target}
+            moves.add_declared(
+                transition,
+                None
+                if ids <= bin_ids
+                else next(
+                    strat.id
+                    for strat in process.stratifications
+                    if ids <= set(strat.categories)
+                ),
+            )
+        self._moves = moves
+        return moves
+
+    def _label(self, moves: _Moves) -> str:
+        """
+        The rates of an edge: the formula of the rate of its one transition
+        when the transition has one rate, and otherwise the parameters that
+        the rates of the edge read, in the order of their declaration.
+        """
+        if len(moves.transitions) == 1:
+            (transition_id,) = moves.transitions
+            transition = next(
+                t for t in self._model.process.transitions if t.id == transition_id
+            )
+            rates = _declared_rates(transition)
+            if len(rates) == 1:
+                return _formula(rates[0])
+            if not rates:
+                return "no rate"
+        read = {
+            name
+            for rate in moves.rates
+            for name in variables(engine_state.formula_tree(rate))
+        }
+        return ", ".join(
+            parameter.id for parameter in self._model.parameters if parameter.id in read
         )
 
     def expanded_graph(self) -> StateGraph:
@@ -460,13 +677,27 @@ class DynamicsDescription:
 # ======================================================================
 
 
-def _rate_text(transition: "Transition") -> str:
-    """The rate of a transition, or ``stratified`` when it has none."""
-    if transition.rate is not None:
-        return _formula(transition.rate)
-    if transition.stratified_rates:
-        return "stratified rates"
-    return "no rate"
+def _declared_rates(transition: "Transition") -> list[str]:
+    """The rates a transition declares: its rate and its stratified rates."""
+    rates = [] if transition.rate is None else [transition.rate]
+    rates.extend(rate.rate for rate in transition.stratified_rates or [])
+    return rates
+
+
+def _categories(
+    categories: Mapping[str, str], changed: list[str]
+) -> _Categories | None:
+    """The categories of `changed` that a compartment has, or None when it has
+    none of them."""
+    pairs = tuple(
+        (strat, categories[strat]) for strat in changed if strat in categories
+    )
+    return pairs or None
+
+
+def _strata_id(categories: _Categories) -> str:
+    """The id of a node of the graph of the strata, such as ``group:g1``."""
+    return ", ".join(f"{strat}:{category}" for strat, category in categories)
 
 
 def _formula(formula: str) -> str:

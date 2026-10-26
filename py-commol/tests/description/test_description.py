@@ -182,29 +182,172 @@ class TestKinds:
         assert _cells(description, "outputs") == ["x", "x"]
 
 
+def _moving(*bin_ids: str, rate: str = "0.01") -> Model:
+    """A → B → C split by ``group``; each of `bin_ids` moves from g1 to g2 by a
+    condition with ``to``."""
+    builder = abc_builder(stratifications={"group": {"g1": 0.3, "g2": 0.7}})
+    for bin_id in bin_ids:
+        builder.add_transition(
+            id=f"move_{bin_id}",
+            source=[bin_id],
+            target=[bin_id],
+            stratified_rates=[
+                {
+                    "conditions": [
+                        {"stratification": "group", "category": "g1", "to": "g2"}
+                    ],
+                    "rate": rate,
+                }
+            ],
+        )
+    return build(builder)
+
+
+def _ends(graph: StateGraph) -> list[tuple[str | None, str | None]]:
+    """The source and the target of each edge of a graph."""
+    return [(edge.source, edge.target) for edge in graph.edges]
+
+
+def _label(graph: StateGraph, source: str | None, target: str | None) -> str:
+    """The label of the edge from `source` to `target`."""
+    (label,) = [
+        edge.label
+        for edge in graph.edges
+        if (edge.source, edge.target) == (source, target)
+    ]
+    return label
+
+
 class TestStateGraphs:
-    def test_an_aggregate_gives_a_graph_of_bins_and_one_of_compartments(
+    def test_an_aggregate_gives_a_graph_of_bins_one_of_strata_and_one_of_compartments(
         self,
     ) -> None:
         graphs = _stratified().describe().graphs()
 
-        states, compartments = graphs
-        assert [node.id for node in states.nodes] == [
-            "A",
-            "B",
-            "C",
-            "group:g1",
-            "group:g2",
-        ]
-        assert not states.expanded
-        assert {(edge.source, edge.target) for edge in states.edges} == {
-            ("A", "B"),
-            ("B", "C"),
-            ("group:g1", "group:g2"),
-        }
-        assert compartments.expanded
+        bins, strata, compartments = graphs
+        assert [node.id for node in bins.nodes] == ["A", "B", "C"]
+        assert set(_ends(bins)) == {("A", "B"), ("B", "C")}
+        assert [node.id for node in strata.nodes] == ["group:g1", "group:g2"]
+        assert _ends(strata) == [("group:g1", "group:g2")]
+        assert [graph.expanded for graph in graphs] == [False, False, True]
         assert len(compartments.nodes) == 6
         assert len(compartments.edges) == 2 + 2 + 3
+
+    def test_a_model_with_no_move_between_categories_has_no_graph_of_strata(
+        self,
+    ) -> None:
+        builder = abc_builder(stratifications={"group": {"g1": 0.3, "g2": 0.7}})
+
+        graphs = build(builder).describe().graphs()
+
+        assert [graph.name for graph in graphs] == ["states", "compartments"]
+
+    def test_a_move_with_to_is_an_edge_between_categories(self) -> None:
+        graphs = _moving("A").describe().graphs()
+
+        bins, strata, _ = graphs
+        assert _ends(strata) == [("group:g1", "group:g2")]
+        for graph in graphs:
+            if not graph.expanded:
+                assert ("A", "A") not in _ends(graph)
+        assert set(_ends(bins)) == {("A", "B"), ("B", "C")}
+
+    def test_a_transition_between_categories_is_in_the_graph_of_the_strata(
+        self,
+    ) -> None:
+        strata = _stratified().describe().graphs()[1]
+
+        assert _ends(strata) == [("group:g1", "group:g2")]
+        assert _label(strata, "group:g1", "group:g2") == "A, B, C: 0.01"
+
+    def test_a_move_of_several_stratifications_joins_their_categories(
+        self,
+    ) -> None:
+        builder = abc_builder(
+            stratifications={
+                "group": {"g1": 0.3, "g2": 0.7},
+                "size": {"s1": 0.5, "s2": 0.5},
+            }
+        )
+        builder.add_transition(
+            id="grow",
+            source=["A"],
+            target=["A"],
+            stratified_rates=[
+                {
+                    "conditions": [
+                        {"stratification": "group", "category": "g1", "to": "g2"},
+                        {"stratification": "size", "category": "s1", "to": "s2"},
+                    ],
+                    "rate": "0.01",
+                }
+            ],
+        )
+
+        strata = build(builder).describe().graphs()[1]
+
+        assert _ends(strata) == [("group:g1, size:s1", "group:g2, size:s2")]
+        assert [node.label for node in strata.nodes] == ["g1, s1", "g2, s2"]
+
+    def test_moves_between_the_same_categories_are_one_edge(self) -> None:
+        strata = _moving("A", "B", "C").describe().graphs()[1]
+
+        assert _ends(strata) == [("group:g1", "group:g2")]
+        assert _label(strata, "group:g1", "group:g2") == "A, B, C"
+
+    def test_transitions_between_the_same_bins_are_one_edge(self) -> None:
+        builder = abc_builder()
+        builder.add_transition(id="ab2", source=["A"], target=["B"], rate="k2")
+
+        bins = build(builder).describe().graphs()[0]
+
+        assert _ends(bins).count(("A", "B")) == 1
+
+    def test_a_single_rate_labels_its_edge_with_its_formula(self) -> None:
+        bins = build(abc_builder(ab="k1 * A")).describe().graphs()[0]
+
+        assert _label(bins, "A", "B") == "k1 * A"
+
+    def test_stratified_rates_label_their_edge_with_their_parameters(self) -> None:
+        builder = abc_builder(
+            ab=None,
+            parameters={"k1": 0.3, "k2": 0.1, "m": 2.0},
+            stratifications={"group": {"g1": 0.3, "g2": 0.7}},
+        )
+        builder.add_transition(
+            id="ab",
+            source=["A"],
+            target=["B"],
+            stratified_rates=[
+                {
+                    "conditions": [{"stratification": "group", "category": g}],
+                    "rate": f"{k} * m * A",
+                }
+                for g, k in (("g1", "k1"), ("g2", "k2"))
+            ],
+        )
+
+        bins = build(builder).describe().graphs()[0]
+
+        assert _label(bins, "A", "B") == "k1, k2, m"
+
+    def test_a_shared_edge_names_the_parameters_of_every_rate(self) -> None:
+        builder = abc_builder(ab="k1")
+        builder.add_transition(id="ab2", source=["A"], target=["B"], rate="k2")
+
+        bins = build(builder).describe().graphs()[0]
+
+        assert _label(bins, "A", "B") == "k1, k2"
+
+    def test_a_transition_with_no_rate_keeps_its_edge(self) -> None:
+        builder = abc_builder(stratifications={"group": {"g1": 0.3, "g2": 0.7}})
+        builder.add_transition(id="pending", source=["A"], target=["C"])
+        builder.add_transition(id="move", source=["g1"], target=["g2"])
+
+        bins, strata, _ = build(builder).describe().graphs()
+
+        assert _label(bins, "A", "C") == "no rate"
+        assert _label(strata, "group:g1", "group:g2") == "no rate"
 
     def test_inflows_and_outflows_have_no_node_on_one_side(self) -> None:
         builder = abc_builder()
@@ -215,12 +358,8 @@ class TestStateGraphs:
         states = build(builder).describe().graphs()[0]
 
         assert StateGraph.model_validate(states.model_dump()) == states
-        ends = {
-            edge.label.split(":")[0]: (edge.source, edge.target)
-            for edge in states.edges
-        }
-        assert ends["in"] == (None, "A")
-        assert ends["out"] == ("C", None)
+        assert _label(states, None, "A") == "b"
+        assert _label(states, "C", None) == "0.01"
 
 
 class TestOddLayout:

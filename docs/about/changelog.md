@@ -23,6 +23,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `Model.describe()` gives a graph of the strata, between the graph of the
+  bins and the graph of the compartments, when the model moves amounts
+  between categories, so `ModelDescription.graphs()` gives three graphs for
+  such a model. A move between categories, also one by a stratified rate
+  whose condition has `to`, is an edge between categories, not an edge from
+  a bin to itself. The graphs of the bins and of the strata hold one edge per
+  pair of nodes, labelled with the formula of its one rate or with the
+  parameters that its rates read, and one node `none` for the inflows and one
+  for the outflows; the label no longer starts with the id of the
+  transition. The Markdown rendering draws both graphs. See
+  [The state graphs](../guide/describing-models.md#the-state-graphs).
 - A formula has at most 100 000 nodes (numbers, variables, operators and
   calls), next to its limit of 100 levels of nesting: a longer one raises
   `ValueError` when its object is built, before it compiles. A message of

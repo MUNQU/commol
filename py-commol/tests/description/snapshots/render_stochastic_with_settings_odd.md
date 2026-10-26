@@ -96,15 +96,13 @@ None: the model reads no series of values.
 flowchart LR
     n0["A"]
     n1["B"]
-    n0 -->|"ab: 0 * A * B"| n1
-    n1 -->|"ab: 0 * A * B"| n1
-    in2(("none"))
-    in2 -->|"in: 0"| n0
-    in3(("none"))
-    in3 -->|"in: 0"| n1
-    out4(("none"))
-    n1 -->|"out: 0"| out4
-    n0 -->|"dose: 0"| n1
+    inflow(("none"))
+    outflow(("none"))
+    n0 --> n1
+    n1 -->|"0 * A * B"| n1
+    inflow -->|"0"| n0
+    inflow -->|"0"| n1
+    n1 -->|"0"| outflow
 ```
 
 ### Expanded compartments

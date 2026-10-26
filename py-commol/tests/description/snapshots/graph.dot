@@ -3,15 +3,18 @@ digraph "states" {
     n0 [label="State A"];
     n1 [label="State B"];
     n2 [label="State C"];
-    n3 [label="g1"];
-    n4 [label="g2"];
-    n0 -> n2 [label="pair: k1 * A * B"];
-    n1 -> n2 [label="pair: k1 * A * B"];
-    in2 [shape=point, label=""];
-    in2 -> n0 [label="inflow: b"];
-    out3 [shape=point, label=""];
-    n2 -> out3 [label="outflow: 0.01"];
-    n3 -> n4 [label="move: 0.02"];
+    inflow [shape=point, label=""];
+    outflow [shape=point, label=""];
+    n0 -> n2 [label="k1 * A * B"];
+    n1 -> n2 [label="k1 * A * B"];
+    inflow -> n0 [label="b"];
+    n2 -> outflow [label="0.01"];
+}
+digraph "strata" {
+    rankdir=LR;
+    n0 [label="g1"];
+    n1 [label="g2"];
+    n0 -> n1 [label="A, B, C: 0.02"];
 }
 digraph "compartments" {
     rankdir=LR;
@@ -21,18 +24,16 @@ digraph "compartments" {
     n3 [label="B_g2"];
     n4 [label="C_g1"];
     n5 [label="C_g2"];
+    inflow [shape=point, label=""];
+    outflow [shape=point, label=""];
     n0 -> n4 [label="pair: k1 * A * B"];
     n2 -> n4 [label="pair: k1 * A * B"];
     n1 -> n5 [label="pair: k1 * A * B"];
     n3 -> n5 [label="pair: k1 * A * B"];
-    in4 [shape=point, label=""];
-    in4 -> n0 [label="inflow: b"];
-    in5 [shape=point, label=""];
-    in5 -> n1 [label="inflow: b"];
-    out6 [shape=point, label=""];
-    n4 -> out6 [label="outflow: 0.01 * C_g1"];
-    out7 [shape=point, label=""];
-    n5 -> out7 [label="outflow: 0.01 * C_g2"];
+    inflow -> n0 [label="inflow: b"];
+    inflow -> n1 [label="inflow: b"];
+    n4 -> outflow [label="outflow: 0.01 * C_g1"];
+    n5 -> outflow [label="outflow: 0.01 * C_g2"];
     n0 -> n1 [label="move: 0.02 * A_g1"];
     n2 -> n3 [label="move: 0.02 * B_g1"];
     n4 -> n5 [label="move: 0.02 * C_g1"];
