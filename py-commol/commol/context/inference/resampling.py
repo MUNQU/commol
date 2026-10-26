@@ -304,7 +304,7 @@ class JackknifeResult(ResultModel):
         The block length.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     fit: CalibrationResult
     estimate: dict[str, float]

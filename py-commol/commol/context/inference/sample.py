@@ -110,7 +110,7 @@ class ParameterSample(ResultModel):
         differ.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     names: list[str] = Field(description="One name per column.")
     bounds: list[tuple[float, float]] = Field(description="Bounds of each parameter.")

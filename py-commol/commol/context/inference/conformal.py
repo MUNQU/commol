@@ -49,7 +49,7 @@ class SeriesIntervals(ResultModel):
         The upper end of each interval; ``inf`` when unbounded.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     positions: list[float]
     prediction: list[float]
@@ -74,7 +74,7 @@ class PredictionIntervals(ResultModel):
         is not a key.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     confidence_level: float
     series: dict[str, SeriesIntervals]
@@ -111,7 +111,7 @@ class ConformalResult(ResultModel):
         otherwise None.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     intervals: PredictionIntervals
     scores: dict[str, list[float]]

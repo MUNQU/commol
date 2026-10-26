@@ -196,7 +196,7 @@ class SMCResult(ResultModel):
         The effective sizes, acceptance rates and move counts of each step.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     sample: ParameterSample
     levels: list[float]

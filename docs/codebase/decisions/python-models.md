@@ -65,7 +65,12 @@ a text as a number only where the type asks for a number (`deserialize_f64`),
 so a label `"NaN"` stays text; a range rule reads the text as its number, so
 an infinite setting gets the message of its rule. The writer of the engine,
 `commol_core::json::write`, and the tree of a formula write the same three
-texts.
+texts, and so does the JSON of every result: `ResultModel` sets
+`ser_json_inf_nan="strings"` for all of them. A value of an enum of the engine,
+such as what a rate keeps (`RateKeeps`), crosses as the JSON of its name, read
+with serde; a binding reads no value of an enum with a `from_name` of its own,
+except the names of handles listed in `NAMED` of
+`tests/suite/test_architecture.py`.
 
 Each union of classes carries one tag, `kind`, with a default, so a field is
 never read by the first variant that matches; `tagged!` of
@@ -97,6 +102,7 @@ and nothing else; a new data class gets its Rust type, an entry of
 conversion in Python, each runner sends its method whole),
 `tests/calibration/test_settings.py` (the path of an error),
 `tests/uncertainty/test_ranges.py` (an infinite setting gets the message of its rule),
+`tests/uncertainty/test_results_equality.py` (the JSON of a result),
 `crates/commol-core/tests/json.rs`, `crates/commol-calibration/tests/test_json.rs`.
 
 ## Results compare by their values

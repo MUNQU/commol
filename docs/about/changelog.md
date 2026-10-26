@@ -67,6 +67,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the tag of their union. The engine fits the problem for each method that
   needs a fit, and calibrates `η` and the threshold of a profile. The results
   are the same for the same settings and seed.
+- The JSON of every result (`model_dump_json`) is standard JSON: a number
+  that is not finite is the text `"Infinity"`, `"-Infinity"` or `"NaN"`, as
+  at the port of the engine. Before, `ParameterSample`, `SMCResult`,
+  `JackknifeResult`, `ConformalResult`, `PredictionIntervals` and
+  `SeriesIntervals` wrote the bare `Infinity` and `NaN`, which a standard JSON reader rejects, and the other results wrote
+  `null`, which did not load back. A result reads its JSON back equal, a NaN
+  included, and a result that 0.10 saved with bare `Infinity` or `NaN` still
+  loads.
 - A method that fits the problem before it runs (the bootstraps, the
   jackknife, the local approximations, the conformal methods, the profiles,
   and the Gibbs posterior with a calibration of `η`) no longer logs `Starting calibration …` at info
@@ -96,6 +104,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per-step engine. A continuous engine gives `1/n` with both. With
   `keep="mean"`, a per-step engine rejects a span shorter than one step with
   `ValueError`. Migration: add `keep="survival"` to keep each rate as it is.
+  Another value of `keep` raises `ValueError` with the message of the
+  engine, ``unknown variant `median`, expected `survival` or `mean` ``.
   See [Units of the axis](../guide/core-concepts.md#units-of-the-axis).
 
 ### Removed

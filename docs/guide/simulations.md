@@ -73,7 +73,7 @@ print(simulation.engine.state[0] < first["A"][-1])  # True: A keeps falling
 The engine follows the model. When the model changed after the
 `Simulation` was created, for example with `update_parameters` or
 `apply_calibration_parameters`, `run` and `engine` rebuild the engine from the
-model as it is now (`Simulation._sync_engine` compares `model_dump_json()`
+model as it is now (`Simulation._sync_engine` compares the JSON of the model
 with the JSON the engine was built from):
 
 ```python
