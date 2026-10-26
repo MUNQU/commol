@@ -133,12 +133,12 @@
             {
               "source": "A",
               "target": "B",
-              "label": "ab: k1 * A * B / total"
+              "label": "k1 * A * B / total"
             },
             {
               "source": "B",
               "target": "C",
-              "label": "bc: k2 * B"
+              "label": "k2 * B"
             }
           ],
           "expanded": false

@@ -2,10 +2,10 @@
 
 A renderer reads the blocks of a description and never its kind of model, so
 every kind renders the same way. The state graphs render as Mermaid in the
-Markdown rendering (only the graph of the states; an expanded graph can pass
-what a Mermaid diagram draws) and as Graphviz DOT in a ``.dot`` file (every
-graph). The text, LaTeX and JSON renderings draw no diagram; the JSON holds the
-graphs as data.
+Markdown rendering (every graph that is not expanded: the bins and the strata;
+an expanded graph can pass what a Mermaid diagram draws) and as Graphviz DOT
+in a ``.dot`` file (every graph). The text, LaTeX and JSON renderings draw no
+diagram; the JSON holds the graphs as data.
 """
 
 from collections.abc import Callable, Sequence
@@ -227,10 +227,10 @@ def render_markdown(description: ModelDescription) -> str:
     """
     A description as Markdown.
 
-    The state graph of the model is a Mermaid diagram, which GitHub, GitLab,
-    MkDocs Material, Obsidian and JupyterLab (from 4.1) draw; an expanded
-    graph is not drawn, and the rendering gives its size instead. The
-    equations are LaTeX math.
+    Each state graph that is not expanded, the bins and the strata, is a
+    Mermaid diagram, which GitHub, GitLab, MkDocs Material, Obsidian and
+    JupyterLab (from 4.1) draw; an expanded graph is not drawn, and the
+    rendering gives its size instead. The equations are LaTeX math.
 
     Parameters
     ----------
@@ -303,8 +303,9 @@ def mermaid(graph: StateGraph) -> str:
     A state graph as a Mermaid flowchart.
 
     Nodes take ids ``n0``, ``n1``, … so that no id of a model clashes with a
-    word of the Mermaid grammar; an inflow or an outflow starts or ends at a
-    node labelled ``none``.
+    word of the Mermaid grammar. Every inflow starts at one node labelled
+    ``none``, and every outflow ends at another; an edge with an empty label
+    has no label.
 
     Parameters
     ----------
@@ -321,17 +322,24 @@ def mermaid(graph: StateGraph) -> str:
     lines.extend(
         f'    {ids[node.id]}["{_mermaid_text(node.label)}"]' for node in graph.nodes
     )
-    for index, edge in enumerate(graph.edges):
-        ends = []
-        for side, end in (("in", edge.source), ("out", edge.target)):
-            if end is None:
-                nowhere = f"{side}{index}"
-                lines.append(f'    {nowhere}(("none"))')
-                ends.append(nowhere)
-            else:
-                ends.append(ids[end])
-        lines.append(f'    {ends[0]} -->|"{_mermaid_text(edge.label)}"| {ends[1]}')
+    lines.extend(f'    {nowhere}(("none"))' for nowhere in _nowhere(graph))
+    for edge in graph.edges:
+        source = "inflow" if edge.source is None else ids[edge.source]
+        target = "outflow" if edge.target is None else ids[edge.target]
+        label = f'|"{_mermaid_text(edge.label)}"|' if edge.label else ""
+        lines.append(f"    {source} -->{label} {target}")
     return "\n".join(lines)
+
+
+def _nowhere(graph: StateGraph) -> list[str]:
+    """The ids of the node ``none`` of the inflows and of the outflows of a
+    graph, for the sides that have one."""
+    nowhere = []
+    if any(edge.source is None for edge in graph.edges):
+        nowhere.append("inflow")
+    if any(edge.target is None for edge in graph.edges):
+        nowhere.append("outflow")
+    return nowhere
 
 
 def _mermaid_text(text: str) -> str:
@@ -495,7 +503,8 @@ def dot(graph: StateGraph) -> str:
     """
     A state graph as a Graphviz ``digraph``.
 
-    An inflow or an outflow starts or ends at a point with no label.
+    Every inflow starts at one point with no label, and every outflow ends at
+    another.
 
     Parameters
     ----------
@@ -512,16 +521,13 @@ def dot(graph: StateGraph) -> str:
     lines.extend(
         f"    {ids[node.id]} [label={_dot_text(node.label)}];" for node in graph.nodes
     )
-    for index, edge in enumerate(graph.edges):
-        ends = []
-        for side, end in (("in", edge.source), ("out", edge.target)):
-            if end is None:
-                nowhere = f"{side}{index}"
-                lines.append(f'    {nowhere} [shape=point, label=""];')
-                ends.append(nowhere)
-            else:
-                ends.append(ids[end])
-        lines.append(f"    {ends[0]} -> {ends[1]} [label={_dot_text(edge.label)}];")
+    lines.extend(
+        f'    {nowhere} [shape=point, label=""];' for nowhere in _nowhere(graph)
+    )
+    for edge in graph.edges:
+        source = "inflow" if edge.source is None else ids[edge.source]
+        target = "outflow" if edge.target is None else ids[edge.target]
+        lines.append(f"    {source} -> {target} [label={_dot_text(edge.label)}];")
     lines.append("}")
     return "\n".join(lines)
 

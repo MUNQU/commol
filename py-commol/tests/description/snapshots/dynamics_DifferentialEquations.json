@@ -21,7 +21,47 @@
      "id": "C",
      "label": "State C",
      "group": "bin"
+    }
+   ],
+   "edges": [
+    {
+     "source": "A",
+     "target": "C",
+     "label": "k1"
     },
+    {
+     "source": "B",
+     "target": "C",
+     "label": "k1"
+    },
+    {
+     "source": "A",
+     "target": "B",
+     "label": "k1"
+    },
+    {
+     "source": "B",
+     "target": "B",
+     "label": "k1"
+    },
+    {
+     "source": null,
+     "target": "A",
+     "label": "b"
+    },
+    {
+     "source": "C",
+     "target": null,
+     "label": "0.01"
+    }
+   ],
+   "expanded": false
+  },
+  {
+   "type": "state_graph",
+   "heading": "Moves between categories",
+   "name": "strata",
+   "nodes": [
     {
      "id": "group:g1",
      "label": "g1",
@@ -35,69 +75,9 @@
    ],
    "edges": [
     {
-     "source": "A",
-     "target": "C",
-     "label": "pair: k1 * A * B"
-    },
-    {
-     "source": "B",
-     "target": "C",
-     "label": "pair: k1 * A * B"
-    },
-    {
-     "source": "A",
-     "target": "B",
-     "label": "spread: k1 * A * B / total"
-    },
-    {
-     "source": "B",
-     "target": "B",
-     "label": "spread: k1 * A * B / total"
-    },
-    {
-     "source": "A",
-     "target": "B",
-     "label": "split: 0.05"
-    },
-    {
-     "source": "A",
-     "target": "C",
-     "label": "split: 0.05"
-    },
-    {
-     "source": "B",
-     "target": "B",
-     "label": "loop: 0.1"
-    },
-    {
-     "source": null,
-     "target": "A",
-     "label": "inflow: b"
-    },
-    {
-     "source": "A",
-     "target": "B",
-     "label": "dose: 0.1"
-    },
-    {
-     "source": "C",
-     "target": null,
-     "label": "outflow: 0.01"
-    },
-    {
      "source": "group:g1",
      "target": "group:g2",
-     "label": "move: stratified rates"
-    },
-    {
-     "source": "A",
-     "target": "C",
-     "label": "pending: no rate"
-    },
-    {
-     "source": "B",
-     "target": "C",
-     "label": "boost: 0.5"
+     "label": "A, B, C: 0.02"
     }
    ],
    "expanded": false

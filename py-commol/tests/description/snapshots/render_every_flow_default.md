@@ -48,23 +48,23 @@ flowchart LR
     n0["State A"]
     n1["State B"]
     n2["State C"]
-    n3["g1"]
-    n4["g2"]
-    n0 -->|"pair: k1 * A * B"| n2
-    n1 -->|"pair: k1 * A * B"| n2
-    n0 -->|"spread: k1 * A * B / total"| n1
-    n1 -->|"spread: k1 * A * B / total"| n1
-    n0 -->|"split: 0.05"| n1
-    n0 -->|"split: 0.05"| n2
-    n1 -->|"loop: 0.1"| n1
-    in7(("none"))
-    in7 -->|"inflow: b"| n0
-    n0 -->|"dose: 0.1"| n1
-    out9(("none"))
-    n2 -->|"outflow: 0.01"| out9
-    n3 -->|"move: stratified rates"| n4
-    n0 -->|"pending: no rate"| n2
-    n1 -->|"boost: 0.5"| n2
+    inflow(("none"))
+    outflow(("none"))
+    n0 -->|"k1"| n2
+    n1 -->|"k1"| n2
+    n0 -->|"k1"| n1
+    n1 -->|"k1"| n1
+    inflow -->|"b"| n0
+    n2 -->|"0.01"| outflow
+```
+
+### Moves between categories
+
+```mermaid
+flowchart LR
+    n0["g1"]
+    n1["g2"]
+    n0 -->|"A, B, C: 0.02"| n1
 ```
 
 ### Expanded compartments

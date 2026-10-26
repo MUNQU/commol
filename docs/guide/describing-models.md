@@ -4,7 +4,7 @@
 
 `Model.describe()` returns a description of a model as data: sections of
 tables, equations, state graphs and text. You can read it in Python, render it
-as text, Markdown, LaTeX or JSON, save it to a file, or draw its state graph.
+as text, Markdown, LaTeX or JSON, save it to a file, or draw its state graphs.
 The description works for every kind of model, and it is built from what the
 engine simulates, so the equations it shows are the equations that run. Use
 this page to document a model, to check the equations Commol derived, or to
@@ -32,13 +32,13 @@ model = (
 
 description = model.describe()
 print(description.render("text"))   # every section, in plain text
-description.save("model.md")        # Markdown, with the state graph as a Mermaid diagram
+description.save("model.md")        # Markdown, with the state graphs as Mermaid diagrams
 description.save("model.tex")       # a LaTeX document
 description.save("model.dot")       # every state graph, in Graphviz DOT
 ```
 
 In a Jupyter notebook, `model.describe()` as the last line of a cell shows the
-Markdown rendering, with the state graph drawn (JupyterLab draws Mermaid from
+Markdown rendering, with the state graphs drawn (JupyterLab draws Mermaid from
 version 4.1).
 
 ## What a description holds
@@ -84,7 +84,7 @@ without `format`, takes the format from the suffix of the path.
 | Format | Suffix | Equations | Diagrams |
 |---|---|---|---|
 | `"text"` | `.txt` | Compact and expanded forms in plain text | None |
-| `"markdown"` | `.md` | LaTeX math | The state graph of the model as a Mermaid diagram |
+| `"markdown"` | `.md` | LaTeX math | The graph of the bins and the graph of the strata as Mermaid diagrams |
 | `"latex"` | `.tex` | `align*` environments in a full document | None |
 | `"json"` | `.json` | As data | The graphs as data; `ModelDescription.model_validate_json` reads it back |
 | `"dot"` | `.dot` | None | Every state graph, the expanded one included |
@@ -94,6 +94,80 @@ a stratified model can have hundreds of edges, more than a Mermaid diagram
 draws. It gives the size of the graph instead. The DOT file holds every
 graph; `dot -Tpdf model.dot -o model.pdf` draws them with
 [Graphviz](https://graphviz.org/).
+
+## The state graphs
+
+`description.graphs()` gives the state graphs of the `dynamics` section, in
+order:
+
+| Graph | `name` | Nodes | Edges |
+|---|---|---|---|
+| The bins | `states` | Every bin | The moves between bins, the inflows and the outflows |
+| The strata | `strata` | The categories that a move changes | The moves between categories, in any bin |
+| The compartments | `compartments` | Every expanded compartment (`expanded`) | One edge per flow, labelled with its formula |
+
+The graph of the strata is there only when the model moves amounts between
+categories: with a transition between categories (`source=["g1"]`,
+`target=["g2"]`) or with a stratified rate whose condition has `to`. A move
+inside one bin is an edge of the graph of the strata, not an edge from the bin
+to itself. A node of the graph of the strata holds the categories of the
+stratifications that the move changes: `group:g1`, or `group:g1, size:s1`
+for a move that changes two stratifications at once.
+
+The graphs of the bins and of the strata hold one edge per pair of nodes,
+whatever the number of transitions between them, and every inflow starts at
+one node `none` and every outflow ends at another. The label of an edge says
+what drives the move:
+
+| The edge comes from | Its label |
+|---|---|
+| One transition with one rate | The formula of the rate, such as `k1 * A` |
+| One transition with stratified rates, or several transitions | The parameters that the rates read, in the order the model declares them, such as `k1, k2, m`; compartments, totals, `t` and `step` are left out |
+| A transition with no rate | `no rate` |
+
+In the graph of the strata, the label first names the bins that move, such as
+`A, B, C: k1, k2`. The formula of each flow is in the graph of the
+compartments and in the [equations](#the-equations).
+
+```python
+from commol import Aggregate, ModelBuilder
+
+moving = (
+    ModelBuilder(name="Moving", bin_unit="item", step_unit="day")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_stratification(id="group", categories=["g1", "g2"])
+    .add_parameter(id="k1", value=0.5, unit="1/day")
+    .add_parameter(id="k2", value=0.1, unit="1/day")
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")
+    .add_transition(
+        id="t_move",
+        source=["A"],
+        target=["A"],
+        stratified_rates=[
+            {
+                "conditions": [
+                    {"stratification": "group", "category": "g1", "to": "g2"}
+                ],
+                "rate": "k2",
+            }
+        ],
+    )
+    .build(
+        Aggregate(
+            bin_amounts={"A": 900, "B": 100},
+            stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
+        ),
+        engine="DifferenceEquations",
+    )
+)
+
+bins, strata, compartments = moving.describe().graphs()
+print([(edge.source, edge.target, edge.label) for edge in bins.edges])
+# [('A', 'B', 'k1')]
+print([(edge.source, edge.target, edge.label) for edge in strata.edges])
+# [('group:g1', 'group:g2', 'A: k2')]
+```
 
 The LaTeX document uses only standard packages (`amsmath`, `amssymb`,
 `longtable`, `fontenc`, `geometry`), so `latexmk -pdf model.tex` builds it.

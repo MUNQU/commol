@@ -101,14 +101,17 @@ class TestText:
 
 
 class TestMarkdown:
-    def test_markdown_draws_the_state_graph_and_not_the_expanded_one(self) -> None:
+    def test_markdown_draws_the_graphs_of_the_bins_and_the_strata(self) -> None:
         description = _graph_model().describe()
 
         markdown = description.render("markdown")
 
-        assert markdown.count("```mermaid") == 1
-        assert mermaid(description.graphs()[0]) in markdown
-        assert "A_g1" not in markdown.split("```mermaid")[1].split("```")[0]
+        bins, strata, _ = description.graphs()
+        assert markdown.count("```mermaid") == 2
+        assert mermaid(bins) in markdown
+        assert mermaid(strata) in markdown
+        diagrams = [part.split("```")[0] for part in markdown.split("```mermaid")[1:]]
+        assert not any("A_g1" in diagram for diagram in diagrams)
         assert "The graph of the expanded compartments has 6 nodes" in markdown
 
     def test_a_notebook_shows_the_markdown(self) -> None:
@@ -116,10 +119,22 @@ class TestMarkdown:
 
         assert description._repr_markdown_() == description.render("markdown")
 
-    def test_the_mermaid_graph_matches_its_snapshot(self) -> None:
-        states = _graph_model().describe().graphs()[0]
+    def test_the_mermaid_graphs_match_their_snapshot(self) -> None:
+        bins, strata, _ = _graph_model().describe().graphs()
 
-        matches_snapshot("graph.mmd", mermaid(states) + "\n")
+        matches_snapshot("graph.mmd", f"{mermaid(bins)}\n\n{mermaid(strata)}\n")
+
+    def test_the_outflows_of_a_graph_end_at_one_node(self) -> None:
+        builder = abc_builder()
+        for bin_id in ("A", "B", "C"):
+            builder.add_transition(
+                id=f"out_{bin_id}", source=[bin_id], target=[], rate="0.01"
+            )
+
+        diagram = mermaid(build(builder).describe().graphs()[0])
+
+        assert diagram.count('(("none"))') == 1
+        assert diagram.count("| outflow") == 3
 
 
 class TestDot:
@@ -127,8 +142,9 @@ class TestDot:
         path = _graph_model().describe().save(tmp_path / "model.dot")
 
         dot = path.read_text(encoding="utf-8")
-        assert dot.count("digraph") == 2
+        assert dot.count("digraph") == 3
         assert 'digraph "states"' in dot
+        assert 'digraph "strata"' in dot
         assert 'digraph "compartments"' in dot
         matches_snapshot("graph.dot", dot)
 
@@ -143,7 +159,11 @@ class TestDot:
         graphs = pydot.graph_from_dot_data(_graph_model().describe().render("dot"))
 
         assert graphs is not None
-        assert [graph.get_name() for graph in graphs] == ['"states"', '"compartments"']
+        assert [graph.get_name() for graph in graphs] == [
+            '"states"',
+            '"strata"',
+            '"compartments"',
+        ]
 
 
 class TestLatex:

@@ -2,7 +2,7 @@ digraph "states" {
     rankdir=LR;
     n0 [label="State \"A\" \\ start"];
     n1 [label="State B"];
-    n0 -> n1 [label="ab: s * k * neighbors_B / neighbors"];
+    n0 -> n1 [label="s * k * neighbors_B / neighbors"];
 }
 digraph "compartments" {
     rankdir=LR;

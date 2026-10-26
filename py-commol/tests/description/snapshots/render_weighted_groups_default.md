@@ -52,7 +52,7 @@
 flowchart LR
     n0["State #quot;A#quot; \ start"]
     n1["State B"]
-    n0 -->|"ab: s * k * neighbors_B / neighbors"| n1
+    n0 -->|"s * k * neighbors_B / neighbors"| n1
 ```
 
 ### Expanded compartments
