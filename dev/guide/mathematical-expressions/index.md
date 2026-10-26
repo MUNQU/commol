@@ -2,7 +2,7 @@
 
 [Back to Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)
 
-Rates and formula parameters are written as expressions, such as `"k1 * A * B / total"`. This page lists everything an expression can contain: operators, variables, functions, and the security limits. The engine checks each expression against this language, compiles it to machine code (Cranelift) once, and reuses it at every step.
+Rates and formula parameters are written as expressions, such as `"k1 * A * B / total"`. This page lists everything an expression can contain: operators, variables, functions, and the limits of the parser. The engine checks each expression against this language, compiles it to machine code (Cranelift) once, and reuses it at every step.
 
 ## Quick path
 
@@ -174,29 +174,25 @@ except ValueError as error:
 
 When the model is built, the engine checks the variables each rate and each formula parameter reads. A variable that no parameter, bin, compartment, subgroup total or engine variable defines fails the build, with a message that names the transition or the parameter, the expression, the undefined variables, and the parameters and bins of the model: `Undefined variables in transition 'bc' rate 'k9 * B': k9. Available parameters: k1, k2. Available bins: A, B, C.` A category id, such as `g1`, is not a variable: write `total_g1` for its compartments.
 
-## Security
+## Limits of the parser
 
-Every expression is also checked before it reaches the engine (`commol.utils.security.validate_expression_security`). An expression that is not plain mathematics is rejected when the transition is added:
+The parser of the engine is the only check of an expression. It checks each expression when its object is built: a rate when the transition is added, a formula parameter, a calibration constraint and an `AxisPattern`. An expression outside the language raises `ValueError` with the message of the parser, which quotes the expression (its first 80 characters, then `…`) and names the first part of it that is not in the language:
 
 ```python
 try:
-    ModelBuilder(name="Unsafe").add_bin(id="A", name="State A").add_transition(
+    ModelBuilder(name="Outside").add_bin(id="A", name="State A").add_transition(
         id="t", source=["A"], target=[], rate="__import__('os')"
     )
 except ValueError as error:
     print("rejected")
 ```
 
-| Limit (`SecurityConfig`)                                                                            | Value            |
-| --------------------------------------------------------------------------------------------------- | ---------------- |
-| Expression length                                                                                   | 10000 characters |
-| Nesting depth                                                                                       | 10 levels        |
-| Function calls                                                                                      | 500              |
-| Variable name length                                                                                | 50 characters    |
-| Numeric literal                                                                                     | 1e12             |
-| Complexity score: the nodes of the tree of the expression (numbers, variables, operators and calls) | 1000             |
+The parser has two limits, and no setting changes them:
 
-The engine has one limit of its own, which no configuration changes: a formula nests at most 100 levels deep. Each pair of parentheses, each call, each sign and each power is one level; a sum or a product of any number of terms is one. A deeper formula fails with `it nests deeper than 100 levels of parentheses, calls, signs and powers`.
+| Limit                                                                                                                                 | Value      | Message                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
+| Nesting: each pair of parentheses, each call, each sign and each power is one level; a sum or a product of any number of terms is one | 100 levels | `it nests deeper than 100 levels of parentheses, calls, signs and powers`                 |
+| Nodes of the tree: numbers, variables, operators and calls; a sum of n terms has 2n - 1                                               | 100 000    | `it has … nodes (numbers, variables, operators and calls), more than the limit of 100000` |
 
 ## Next steps
 

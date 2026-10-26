@@ -1150,16 +1150,16 @@ print([c.name for c in stratified_model.structure.initial_state(stratified_model
 
 `build` raises `ValueError` (or Pydantic's `ValidationError`, a subclass) when the definition is not valid:
 
-| Check                                                                                | Example of a rejected definition                                                                 |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| The engine runs the kind of the structure                                            | An `Aggregate` with an engine of another kind; the message lists the engines of `Aggregate`      |
-| At least one bin and one transition                                                  | A model with no transition                                                                       |
-| The structure follows the rules above                                                | A bin with no amount in `bin_amounts`                                                            |
-| Parameter ids are unique and are not [names the engine sets](#names-the-engine-sets) | A parameter named `A`, `total` or `A_g1`                                                         |
-| Every `total_…` variable names a subgroup total                                      | `total_t1_g1` when `group` is declared before `type`                                             |
-| A rate that reads the neighbors has them                                             | `k1 * neighbors_B` with no `neighbors=`                                                          |
-| Every rate expression passes the security check                                      | A formula with `__import__`                                                                      |
-| Every transition can be planned by the engine                                        | See [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#what-building-checks) |
+| Check                                                                                                                                                                     | Example of a rejected definition                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| The engine runs the kind of the structure                                                                                                                                 | An `Aggregate` with an engine of another kind; the message lists the engines of `Aggregate`      |
+| At least one bin and one transition                                                                                                                                       | A model with no transition                                                                       |
+| The structure follows the rules above                                                                                                                                     | A bin with no amount in `bin_amounts`                                                            |
+| Parameter ids are unique and are not [names the engine sets](#names-the-engine-sets)                                                                                      | A parameter named `A`, `total` or `A_g1`                                                         |
+| Every `total_…` variable names a subgroup total                                                                                                                           | `total_t1_g1` when `group` is declared before `type`                                             |
+| A rate that reads the neighbors has them                                                                                                                                  | `k1 * neighbors_B` with no `neighbors=`                                                          |
+| Every rate expression is in the language of formulas ([Limits of the parser](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#limits-of-the-parser)) | A formula with `__import__('os')`                                                                |
+| Every transition can be planned by the engine                                                                                                                             | See [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#what-building-checks) |
 
 ## Save and load
 
@@ -1603,7 +1603,7 @@ A calibration gives a run that stops this way a penalty and goes on; see [Calibr
 
 [Back to Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)
 
-Rates and formula parameters are written as expressions, such as `"k1 * A * B / total"`. This page lists everything an expression can contain: operators, variables, functions, and the security limits. The engine checks each expression against this language, compiles it to machine code (Cranelift) once, and reuses it at every step.
+Rates and formula parameters are written as expressions, such as `"k1 * A * B / total"`. This page lists everything an expression can contain: operators, variables, functions, and the limits of the parser. The engine checks each expression against this language, compiles it to machine code (Cranelift) once, and reuses it at every step.
 
 ## Quick path
 
@@ -1775,29 +1775,25 @@ except ValueError as error:
 
 When the model is built, the engine checks the variables each rate and each formula parameter reads. A variable that no parameter, bin, compartment, subgroup total or engine variable defines fails the build, with a message that names the transition or the parameter, the expression, the undefined variables, and the parameters and bins of the model: `Undefined variables in transition 'bc' rate 'k9 * B': k9. Available parameters: k1, k2. Available bins: A, B, C.` A category id, such as `g1`, is not a variable: write `total_g1` for its compartments.
 
-## Security
+## Limits of the parser
 
-Every expression is also checked before it reaches the engine (`commol.utils.security.validate_expression_security`). An expression that is not plain mathematics is rejected when the transition is added:
+The parser of the engine is the only check of an expression. It checks each expression when its object is built: a rate when the transition is added, a formula parameter, a calibration constraint and an `AxisPattern`. An expression outside the language raises `ValueError` with the message of the parser, which quotes the expression (its first 80 characters, then `…`) and names the first part of it that is not in the language:
 
 ```python
 try:
-    ModelBuilder(name="Unsafe").add_bin(id="A", name="State A").add_transition(
+    ModelBuilder(name="Outside").add_bin(id="A", name="State A").add_transition(
         id="t", source=["A"], target=[], rate="__import__('os')"
     )
 except ValueError as error:
     print("rejected")
 ```
 
-| Limit (`SecurityConfig`)                                                                            | Value            |
-| --------------------------------------------------------------------------------------------------- | ---------------- |
-| Expression length                                                                                   | 10000 characters |
-| Nesting depth                                                                                       | 10 levels        |
-| Function calls                                                                                      | 500              |
-| Variable name length                                                                                | 50 characters    |
-| Numeric literal                                                                                     | 1e12             |
-| Complexity score: the nodes of the tree of the expression (numbers, variables, operators and calls) | 1000             |
+The parser has two limits, and no setting changes them:
 
-The engine has one limit of its own, which no configuration changes: a formula nests at most 100 levels deep. Each pair of parentheses, each call, each sign and each power is one level; a sum or a product of any number of terms is one. A deeper formula fails with `it nests deeper than 100 levels of parentheses, calls, signs and powers`.
+| Limit                                                                                                                                 | Value      | Message                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------- |
+| Nesting: each pair of parentheses, each call, each sign and each power is one level; a sum or a product of any number of terms is one | 100 levels | `it nests deeper than 100 levels of parentheses, calls, signs and powers`                 |
+| Nodes of the tree: numbers, variables, operators and calls; a sum of n terms has 2n - 1                                               | 100 000    | `it has … nodes (numbers, variables, operators and calls), more than the limit of 100000` |
 
 ## Next steps
 
@@ -1854,7 +1850,7 @@ Each pattern reads `step` or `t` (see [Patterns in a differential model](#patter
 | `linear_ramp(start, end, start_value, end_value)`  | `t`           | From `start_value` at `start` towards `end_value`, for `start <= t < end`; else 0 | `start < end`, any finite positions                                |
 | `sinusoid(amplitude, period, phase=0, baseline=0)` | `t`           | `baseline + amplitude × sin(2π (t − phase) / period)`                             | numeric `period != 0`                                              |
 | `gaussian_pulse(center, width, peak)`              | `t`           | `peak × exp(−(t − center)² / (2 width²))`                                         | `width > 0`                                                        |
-| `from_formula(expr)`                               | What it names | The expression, wrapped in parentheses                                            | not empty; passes the security check                               |
+| `from_formula(expr)`                               | What it names | The expression, wrapped in parentheses                                            | the parser of the engine accepts it                                |
 
 An invalid argument raises `pydantic.ValidationError` (a `ValueError`). These arguments also accept a parameter name, so calibration can fit them: `value` of `pulse`, `pulses`, `periodic` and `interval`; every argument of `sinusoid`; and `peak` of `gaussian_pulse`.
 
@@ -1902,11 +1898,11 @@ print(flow_per_step(peak_or_interval))
 # [0.0, 0.0, 1.0, 2.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 ```
 
-| Rule                                                                                               | Otherwise    |
-| -------------------------------------------------------------------------------------------------- | ------------ |
-| At least one pattern                                                                               | `ValueError` |
-| All patterns have the same group binding (or none); the result keeps it                            | `ValueError` |
-| The result is not longer than `SecurityConfig.max_expression_length` (10000 characters by default) | `ValueError` |
+| Rule                                                                                                                                                                                                            | Otherwise    |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| At least one pattern                                                                                                                                                                                            | `ValueError` |
+| All patterns have the same group binding (or none); the result keeps it                                                                                                                                         | `ValueError` |
+| The parser of the engine accepts the result, within its [limits](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#limits-of-the-parser): a `MAX` or `MIN` nests one level for each pattern | `ValueError` |
 
 `combine(p)` with one pattern returns `p`.
 
@@ -4207,7 +4203,7 @@ Move every term to one side, so that the expression is `>= 0` when it holds:
 | `B <= 300` at steps 0 to 50   | `"300 - B"` with `at=list(range(51))` |
 | `A + B <= 100` at position 30 | `"100 - (A + B)"` with `at=[30]`      |
 
-The expression uses the [expression syntax](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) and passes the same security check.
+The expression uses the [expression syntax](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md), and the parser of the engine checks it when the constraint is built, within the [limits of the parser](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#limits-of-the-parser).
 
 | Kind         | Can name                                                                                                                                           | Checked                                                                              |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
@@ -7717,7 +7713,6 @@ class AxisPattern(BaseModel):
         cls,
         *patterns: "AxisPattern",
         mode: CombineMode = CombineMode.SUM,
-        config: SecurityConfig | None = None,
     ) -> "AxisPattern":
         """
         Combine patterns into a single composed pattern.
@@ -7728,8 +7723,9 @@ class AxisPattern(BaseModel):
         - ``mode`` is a `CombineMode` or its value (``"sum"``, ``"max"``,
           ``"min"``).
         - Raises ``ValueError`` if no patterns are supplied, ``mode`` is not a
-          mode, the inputs have inconsistent group bindings, or the combined
-          formula exceeds the security length cap.
+          mode, the inputs have inconsistent group bindings, or the parser of
+          the engine rejects the combined formula, such as a ``"max"`` of
+          more patterns than the nesting limit of a formula.
         """
         if len(patterns) == 0:
             raise ValueError("combine() requires at least one pattern")
@@ -7738,8 +7734,6 @@ class AxisPattern(BaseModel):
 
         shared_conditions, shared_source = _require_consistent_group(patterns)
         result = _compose_formulas([p.formula for p in patterns], CombineMode(mode))
-        _enforce_length_cap(result, config)
-
         return _ComputedAxisPattern(
             computed_formula=result,
             conditions=shared_conditions,
@@ -7747,22 +7741,15 @@ class AxisPattern(BaseModel):
         )
 
     @classmethod
-    def from_formula(
-        cls,
-        expr: str,
-        config: SecurityConfig | None = None,
-    ) -> "AxisPattern":
+    def from_formula(cls, expr: str) -> "AxisPattern":
         """
         Create a pattern from an arbitrary expression string.
 
-        The string is wrapped in ``(...)`` so it composes safely, then run
-        through the full expression security validator.
+        The string is wrapped in ``(...)`` so it composes safely. Raises
+        ``ValueError`` with the message of the parser of the engine if the
+        wrapped formula is not in the language of formulas.
         """
-        if not expr or not expr.strip():
-            raise ValueError("'expr' must be a non-empty expression")
-        wrapped = f"({expr})"
-        validate_expression_security(wrapped, config)
-        return _ComputedAxisPattern(computed_formula=wrapped)
+        return _ComputedAxisPattern(computed_formula=f"({expr})")
 ```
 
 ### Attributes
@@ -8143,7 +8130,7 @@ def linear_ramp(
 #### combine
 
 ```python
-combine(*patterns: AxisPattern, mode: CombineMode = SUM, config: SecurityConfig | None = None) -> AxisPattern
+combine(*patterns: AxisPattern, mode: CombineMode = SUM) -> AxisPattern
 ```
 
 Combine patterns into a single composed pattern.
@@ -8151,7 +8138,7 @@ Combine patterns into a single composed pattern.
 - `combine(p)` is the identity (returns `p` unchanged).
 - All input patterns must share the same `conditions` and `source_compartment` (or have none); the result preserves them.
 - `mode` is a `CombineMode` or its value (`"sum"`, `"max"`, `"min"`).
-- Raises `ValueError` if no patterns are supplied, `mode` is not a mode, the inputs have inconsistent group bindings, or the combined formula exceeds the security length cap.
+- Raises `ValueError` if no patterns are supplied, `mode` is not a mode, the inputs have inconsistent group bindings, or the parser of the engine rejects the combined formula, such as a `"max"` of more patterns than the nesting limit of a formula.
 
 Source code in `commol/api/patterns.py`
 
@@ -8161,7 +8148,6 @@ def combine(
     cls,
     *patterns: "AxisPattern",
     mode: CombineMode = CombineMode.SUM,
-    config: SecurityConfig | None = None,
 ) -> "AxisPattern":
     """
     Combine patterns into a single composed pattern.
@@ -8172,8 +8158,9 @@ def combine(
     - ``mode`` is a `CombineMode` or its value (``"sum"``, ``"max"``,
       ``"min"``).
     - Raises ``ValueError`` if no patterns are supplied, ``mode`` is not a
-      mode, the inputs have inconsistent group bindings, or the combined
-      formula exceeds the security length cap.
+      mode, the inputs have inconsistent group bindings, or the parser of
+      the engine rejects the combined formula, such as a ``"max"`` of
+      more patterns than the nesting limit of a formula.
     """
     if len(patterns) == 0:
         raise ValueError("combine() requires at least one pattern")
@@ -8182,8 +8169,6 @@ def combine(
 
     shared_conditions, shared_source = _require_consistent_group(patterns)
     result = _compose_formulas([p.formula for p in patterns], CombineMode(mode))
-    _enforce_length_cap(result, config)
-
     return _ComputedAxisPattern(
         computed_formula=result,
         conditions=shared_conditions,
@@ -8194,33 +8179,26 @@ def combine(
 #### from_formula
 
 ```python
-from_formula(expr: str, config: SecurityConfig | None = None) -> AxisPattern
+from_formula(expr: str) -> AxisPattern
 ```
 
 Create a pattern from an arbitrary expression string.
 
-The string is wrapped in `(...)` so it composes safely, then run through the full expression security validator.
+The string is wrapped in `(...)` so it composes safely. Raises `ValueError` with the message of the parser of the engine if the wrapped formula is not in the language of formulas.
 
 Source code in `commol/api/patterns.py`
 
 ```python
 @classmethod
-def from_formula(
-    cls,
-    expr: str,
-    config: SecurityConfig | None = None,
-) -> "AxisPattern":
+def from_formula(cls, expr: str) -> "AxisPattern":
     """
     Create a pattern from an arbitrary expression string.
 
-    The string is wrapped in ``(...)`` so it composes safely, then run
-    through the full expression security validator.
+    The string is wrapped in ``(...)`` so it composes safely. Raises
+    ``ValueError`` with the message of the parser of the engine if the
+    wrapped formula is not in the language of formulas.
     """
-    if not expr or not expr.strip():
-        raise ValueError("'expr' must be a non-empty expression")
-    wrapped = f"({expr})"
-    validate_expression_security(wrapped, config)
-    return _ComputedAxisPattern(computed_formula=wrapped)
+    return _ComputedAxisPattern(computed_formula=f"({expr})")
 ```
 
 # AxisUnits API
@@ -12085,7 +12063,6 @@ class CalibrationConstraint(RangeChecked):
     )
     expression: str = Field(
         default=...,
-        min_length=1,
         description="Mathematical expression that must evaluate >= 0",
     )
     description: str | None = Field(
@@ -12103,16 +12080,11 @@ class CalibrationConstraint(RangeChecked):
         ),
     )
 
-    @field_validator("expression", mode="before")
+    @field_validator("expression")
     @classmethod
     def validate_expression(cls, value: str) -> str:
-        """Perform security validation on the constraint expression."""
-        try:
-            validate_expression_security(value)
-        except ValueError as e:
-            raise ValueError(
-                f"Security validation failed for expression '{value}': {e}"
-            )
+        """Check the expression with the parser of the engine."""
+        commol_rs.core.MathExpression(value).check()
         return value
 
     @model_validator(mode="after")
@@ -12133,21 +12105,16 @@ class CalibrationConstraint(RangeChecked):
 validate_expression(value: str) -> str
 ```
 
-Perform security validation on the constraint expression.
+Check the expression with the parser of the engine.
 
 Source code in `commol/context/calibration.py`
 
 ```python
-@field_validator("expression", mode="before")
+@field_validator("expression")
 @classmethod
 def validate_expression(cls, value: str) -> str:
-    """Perform security validation on the constraint expression."""
-    try:
-        validate_expression_security(value)
-    except ValueError as e:
-        raise ValueError(
-            f"Security validation failed for expression '{value}': {e}"
-        )
+    """Check the expression with the parser of the engine."""
+    commol_rs.core.MathExpression(value).check()
     return value
 ```
 
@@ -14706,9 +14673,8 @@ class ModelBuilder:
         ------
         ValueError
             If ``value`` is a list but ``mode`` is not provided, if
-            ``mode`` is provided without a list ``value``, or if a formula
-            ``value`` fails the security check or is not in the language of
-            formulas.
+            ``mode`` is provided without a list ``value``, or if the parser
+            of the engine rejects a formula ``value``, with its message.
         """
         if isinstance(value, list):
             if mode is None:
@@ -15601,9 +15567,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                                                                  |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If value is a list but mode is not provided, if mode is provided without a list value, or if a formula value fails the security check or is not in the language of formulas. |
+| Type         | Description                                                                                                                                                      |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If value is a list but mode is not provided, if mode is provided without a list value, or if the parser of the engine rejects a formula value, with its message. |
 
 Source code in `commol/api/model_builder.py`
 
@@ -15655,9 +15621,8 @@ def add_parameter(
     ------
     ValueError
         If ``value`` is a list but ``mode`` is not provided, if
-        ``mode`` is provided without a list ``value``, or if a formula
-        ``value`` fails the security check or is not in the language of
-        formulas.
+        ``mode`` is provided without a list ``value``, or if the parser
+        of the engine rejects a formula ``value``, with its message.
     """
     if isinstance(value, list):
         if mode is None:
@@ -39353,17 +39318,15 @@ class Parameter(BaseModel):
             return value
         if isinstance(value, (int, float)):
             return float(value)
-        if not value.strip():
-            raise ValueError("Formula cannot be empty")
         return value.strip()
 
     @model_validator(mode="after")
     def validate_formula(self) -> Self:
-        """Check a formula value as a rate is checked: the security check and
-        the check of the language of formulas."""
+        """Check a formula value as a rate is checked, with the parser of the
+        engine."""
         if isinstance(self.value, str):
             try:
-                validate_expression_security(self.value)
+                commol_rs.core.MathExpression(self.value).check()
             except ValueError as error:
                 raise ValueError(f"Parameter '{self.id}': {error}")
         return self
@@ -39442,8 +39405,6 @@ def validate_value(
         return value
     if isinstance(value, (int, float)):
         return float(value)
-    if not value.strip():
-        raise ValueError("Formula cannot be empty")
     return value.strip()
 ```
 
@@ -39453,18 +39414,18 @@ def validate_value(
 validate_formula() -> Self
 ```
 
-Check a formula value as a rate is checked: the security check and the check of the language of formulas.
+Check a formula value as a rate is checked, with the parser of the engine.
 
 Source code in `commol/context/parameter.py`
 
 ```python
 @model_validator(mode="after")
 def validate_formula(self) -> Self:
-    """Check a formula value as a rate is checked: the security check and
-    the check of the language of formulas."""
+    """Check a formula value as a rate is checked, with the parser of the
+    engine."""
     if isinstance(self.value, str):
         try:
-            validate_expression_security(self.value)
+            commol_rs.core.MathExpression(self.value).check()
         except ValueError as error:
             raise ValueError(f"Parameter '{self.id}': {error}")
     return self
@@ -39611,8 +39572,8 @@ class Transition(BaseModel):
         Ids of the accumulators that add up the flow of this transition.
     rate : str | None
         Default mathematical formula, parameter name, or constant value for the flow.
-        Used when no stratified rate matches. Numeric values are automatically
-        converted to strings during validation.
+        Used when no stratified rate matches. ``ModelBuilder.add_transition``
+        writes a number as its string.
 
         Operators: +, -, *, /, % (modulo), ^ or ** (power)
         Functions: sin, cos, tan, exp, ln, sqrt, abs, min, max, if, etc.
@@ -39658,8 +39619,7 @@ class Transition(BaseModel):
         description=(
             "Default rate expression (fallback when no stratified rate matches). "
             "Can be a parameter reference (e.g., 'k1'), a constant (e.g., '0.5'), "
-            "or a mathematical expression (e.g., 'k1 * A * B / total'). "
-            "Numeric values are automatically converted to strings during validation."
+            "or a mathematical expression (e.g., 'k1 * A * B / total')."
         ),
     )
 
@@ -39709,12 +39669,10 @@ class Transition(BaseModel):
         commol_rs.model.check_impulse(self.id, self.impulse_at, self.impulse_every)
         return self
 
-    @field_validator("rate", mode="before")
+    @field_validator("rate")
     @classmethod
     def validate_rate(cls, value: str | None) -> str | None:
-        """
-        Convert numeric rates to strings and perform security and syntax validation.
-        """
+        """Check the rate, when there is one, with the parser of the engine."""
         if value is None:
             return value
         return _checked_rate(value)
@@ -39761,17 +39719,15 @@ def validate_impulse(self) -> Self:
 validate_rate(value: str | None) -> str | None
 ```
 
-Convert numeric rates to strings and perform security and syntax validation.
+Check the rate, when there is one, with the parser of the engine.
 
 Source code in `commol/context/transition.py`
 
 ```python
-@field_validator("rate", mode="before")
+@field_validator("rate")
 @classmethod
 def validate_rate(cls, value: str | None) -> str | None:
-    """
-    Convert numeric rates to strings and perform security and syntax validation.
-    """
+    """Check the rate, when there is one, with the parser of the engine."""
     if value is None:
         return value
     return _checked_rate(value)
@@ -39854,10 +39810,10 @@ class StratifiedRate(BaseModel):
             )
         return self
 
-    @field_validator("rate", mode="before")
+    @field_validator("rate")
     @classmethod
     def validate_rate(cls, value: str) -> str:
-        """Perform security and syntax validation on the rate expression."""
+        """Check the rate with the parser of the engine."""
         return _checked_rate(value)
 ```
 
@@ -39919,15 +39875,15 @@ def validate_unique_stratifications(self) -> Self:
 validate_rate(value: str) -> str
 ```
 
-Perform security and syntax validation on the rate expression.
+Check the rate with the parser of the engine.
 
 Source code in `commol/context/transition.py`
 
 ```python
-@field_validator("rate", mode="before")
+@field_validator("rate")
 @classmethod
 def validate_rate(cls, value: str) -> str:
-    """Perform security and syntax validation on the rate expression."""
+    """Check the rate with the parser of the engine."""
     return _checked_rate(value)
 ```
 
@@ -40861,6 +40817,14 @@ All notable changes to Commol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Changed
+
+- A formula has at most 100 000 nodes (numbers, variables, operators and calls), next to its limit of 100 levels of nesting: a longer one raises `ValueError` when its object is built, before it compiles. A message of the parser or of the compiler quotes the formula cut after its first 80 characters. See [Limits of the parser](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#limits-of-the-parser).
+
+### Removed
+
+- **Breaking:** `commol.utils.security` is removed, with `SecurityConfig`, `SecurityError`, `validate_expression_security` and the `config=` argument of `AxisPattern.combine` and `AxisPattern.from_formula`. The parser of the engine is the only check of a formula: a rate, a formula parameter, a calibration constraint or an axis pattern that it rejects raises `ValueError` with its message, and no setting changes its limits. Remove the `config=` argument, and catch `ValueError` instead of `SecurityError`. A formula of the language that the old text guards rejected is now valid: a name with letters outside ASCII (`α * β`), a name such as `__import__`, `os` or `my_key`, a number such as `1e400`, `nan` as the name of a variable, and a formula of more than 1000 nodes, 10 000 characters or 10 levels of nesting, within the limits of the parser. The build still rejects a variable that the model does not define. See [Limits of the parser](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#limits-of-the-parser).
 
 ### Documentation
 

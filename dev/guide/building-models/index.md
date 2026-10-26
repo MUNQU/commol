@@ -403,16 +403,16 @@ print([c.name for c in stratified_model.structure.initial_state(stratified_model
 
 `build` raises `ValueError` (or Pydantic's `ValidationError`, a subclass) when the definition is not valid:
 
-| Check                                                                                | Example of a rejected definition                                                                 |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| The engine runs the kind of the structure                                            | An `Aggregate` with an engine of another kind; the message lists the engines of `Aggregate`      |
-| At least one bin and one transition                                                  | A model with no transition                                                                       |
-| The structure follows the rules above                                                | A bin with no amount in `bin_amounts`                                                            |
-| Parameter ids are unique and are not [names the engine sets](#names-the-engine-sets) | A parameter named `A`, `total` or `A_g1`                                                         |
-| Every `total_…` variable names a subgroup total                                      | `total_t1_g1` when `group` is declared before `type`                                             |
-| A rate that reads the neighbors has them                                             | `k1 * neighbors_B` with no `neighbors=`                                                          |
-| Every rate expression passes the security check                                      | A formula with `__import__`                                                                      |
-| Every transition can be planned by the engine                                        | See [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#what-building-checks) |
+| Check                                                                                                                                                                     | Example of a rejected definition                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| The engine runs the kind of the structure                                                                                                                                 | An `Aggregate` with an engine of another kind; the message lists the engines of `Aggregate`      |
+| At least one bin and one transition                                                                                                                                       | A model with no transition                                                                       |
+| The structure follows the rules above                                                                                                                                     | A bin with no amount in `bin_amounts`                                                            |
+| Parameter ids are unique and are not [names the engine sets](#names-the-engine-sets)                                                                                      | A parameter named `A`, `total` or `A_g1`                                                         |
+| Every `total_…` variable names a subgroup total                                                                                                                           | `total_t1_g1` when `group` is declared before `type`                                             |
+| A rate that reads the neighbors has them                                                                                                                                  | `k1 * neighbors_B` with no `neighbors=`                                                          |
+| Every rate expression is in the language of formulas ([Limits of the parser](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#limits-of-the-parser)) | A formula with `__import__('os')`                                                                |
+| Every transition can be planned by the engine                                                                                                                             | See [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#what-building-checks) |
 
 ## Save and load
 

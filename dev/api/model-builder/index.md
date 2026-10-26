@@ -245,9 +245,8 @@ class ModelBuilder:
         ------
         ValueError
             If ``value`` is a list but ``mode`` is not provided, if
-            ``mode`` is provided without a list ``value``, or if a formula
-            ``value`` fails the security check or is not in the language of
-            formulas.
+            ``mode`` is provided without a list ``value``, or if the parser
+            of the engine rejects a formula ``value``, with its message.
         """
         if isinstance(value, list):
             if mode is None:
@@ -1140,9 +1139,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                                                                  |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If value is a list but mode is not provided, if mode is provided without a list value, or if a formula value fails the security check or is not in the language of formulas. |
+| Type         | Description                                                                                                                                                      |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If value is a list but mode is not provided, if mode is provided without a list value, or if the parser of the engine rejects a formula value, with its message. |
 
 Source code in `commol/api/model_builder.py`
 
@@ -1194,9 +1193,8 @@ def add_parameter(
     ------
     ValueError
         If ``value`` is a list but ``mode`` is not provided, if
-        ``mode`` is provided without a list ``value``, or if a formula
-        ``value`` fails the security check or is not in the language of
-        formulas.
+        ``mode`` is provided without a list ``value``, or if the parser
+        of the engine rejects a formula ``value``, with its message.
     """
     if isinstance(value, list):
         if mode is None:

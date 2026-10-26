@@ -87,7 +87,7 @@ Move every term to one side, so that the expression is `>= 0` when it holds:
 | `B <= 300` at steps 0 to 50   | `"300 - B"` with `at=list(range(51))` |
 | `A + B <= 100` at position 30 | `"100 - (A + B)"` with `at=[30]`      |
 
-The expression uses the [expression syntax](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md) and passes the same security check.
+The expression uses the [expression syntax](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md), and the parser of the engine checks it when the constraint is built, within the [limits of the parser](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#limits-of-the-parser).
 
 | Kind         | Can name                                                                                                                                           | Checked                                                                              |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |

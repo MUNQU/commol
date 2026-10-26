@@ -12,7 +12,7 @@
         <meta name="author" content="MUNQU Team">
       
       
-        <link rel="canonical" href="https://munqu.github.io/commol/dev/codebase/decisions/security/">
+        <link rel="canonical" href="https://munqu.github.io/commol/dev/codebase/decisions/formulas/">
       
       
         <link rel="prev" href="../figures/">
@@ -29,7 +29,7 @@
     
     
       
-        <title>Security - Commol Documentation</title>
+        <title>Formulas - Commol Documentation</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#security" class="md-skip">
+        <a href="#formulas" class="md-skip">
           Skip to content
         </a>
       
@@ -131,7 +131,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Security
+              Formulas
             
           </span>
         </div>
@@ -2783,7 +2783,7 @@
   <span class="md-ellipsis">
     
   
-    Security
+    Formulas
   
 
     
@@ -2801,7 +2801,7 @@
   <span class="md-ellipsis">
     
   
-    Security
+    Formulas
   
 
     
@@ -2827,10 +2827,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#every-user-expression-is-validated" class="md-nav__link">
+  <a href="#the-parser-of-the-engine-is-the-only-check-of-a-formula" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Every user expression is validated
+        The parser of the engine is the only check of a formula
       
     </span>
   </a>
@@ -2853,6 +2853,17 @@
     <span class="md-ellipsis">
       
         The engine parses formulas with a parser of its own
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-formula-has-at-most-max_nodes-nodes-and-a-message-cuts-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A formula has at most MAX_NODES nodes, and a message cuts it
       
     </span>
   </a>
@@ -3257,10 +3268,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#every-user-expression-is-validated" class="md-nav__link">
+  <a href="#the-parser-of-the-engine-is-the-only-check-of-a-formula" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Every user expression is validated
+        The parser of the engine is the only check of a formula
       
     </span>
   </a>
@@ -3289,6 +3300,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-formula-has-at-most-max_nodes-nodes-and-a-message-cuts-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A formula has at most MAX_NODES nodes, and a message cuts it
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3309,32 +3331,55 @@
   
 
 
-<h1 id="security">Security<a class="headerlink" href="#security" title="Permanent link">&para;</a></h1>
+<h1 id="formulas">Formulas<a class="headerlink" href="#formulas" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
-<p>How user expressions are checked before they reach the engine.</p>
-<h2 id="every-user-expression-is-validated">Every user expression is validated<a class="headerlink" href="#every-user-expression-is-validated" title="Permanent link">&para;</a></h2>
+<p>How a formula is checked before it reaches the engine, and which limits it
+has.</p>
+<h2 id="the-parser-of-the-engine-is-the-only-check-of-a-formula">The parser of the engine is the only check of a formula<a class="headerlink" href="#the-parser-of-the-engine-is-the-only-check-of-a-formula" title="Permanent link">&para;</a></h2>
 <p>Rate expressions (<code>context/transition.py</code>), formula parameters
-(<code>context/parameter.py</code>), axis patterns (<code>api/patterns.py</code>) and calibration
-constraints (<code>context/calibration.py</code>) pass through
-<code>validate_expression_security</code> (<code>utils/security.py</code>) before they reach the
-engine. The limits are in
-<code>SecurityConfig</code>.</p>
-<p><strong>Rule:</strong> any new field that accepts an expression must call it.</p>
-<p><strong>Guard:</strong> <code>tests/rates/test_security.py</code> (the limits and the rejected
-expressions); <code>tests/axis_patterns/test_patterns.py</code> (a pattern calls it).</p>
+(<code>context/parameter.py</code>), axis patterns (<code>AxisPattern.combine</code> and
+<code>AxisPattern.from_formula</code>, <code>api/patterns.py</code>) and calibration constraints
+(<code>context/calibration.py</code>) call the check of the engine
+(<code>commol_rs.core.MathExpression(formula).check()</code>) when their object is
+built. A formula that the parser rejects raises <code>ValueError</code> with the message
+of the parser. Python has no grammar, no limit and no tokenizer of a formula
+of its own, and no setting changes the limits of the parser.</p>
+<p><strong>Rule:</strong> a new field that holds a formula calls the check of the engine in
+its validator. No module of commol reads the text of a formula, but the
+readers that <code>FORMULA_READERS</code> (<code>tests/suite/test_engine_rules.py</code>) lists
+with their reasons: the check of units (<code>utils/equations.py</code>) and the
+description (<code>context/_model/equations.py</code>), which #402 moves onto the tree
+of the engine.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Text guards in Python in front of the parser</td>
+<td>A second grammar, which drifts from the parser. Python never evaluates a formula, so it guards nothing that the parser does not, and a limit that a user can raise is no guard.</td>
+</tr>
+<tr>
+<td>Limits that a setting changes</td>
+<td>A feature for limits that guard nothing.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guard:</strong> <code>py-commol/tests/rates/test_formula_rules.py::test_a_formula_gets_the_message_of_the_engine_parser</code>,
+<code>py-commol/tests/suite/test_engine_rules.py::test_only_the_engine_reads_a_formula</code>.</p>
 <h2 id="the-engine-defines-the-language-of-formulas">The engine defines the language of formulas<a class="headerlink" href="#the-engine-defines-the-language-of-formulas" title="Permanent link">&para;</a></h2>
-<p><code>validate_expression_security</code> runs two kinds of check. The text guards (the
-length, the encoding, the dangerous patterns, the nesting depth, the function
-calls, the numeric literals and the name length) read the text in Python.
-Then one Rust check decides whether the expression is in the language of
-formulas: <code>MathExpression::check</code> (<code>crates/commol-core/src/math_expression/mod.rs</code>,
+<p>One Rust check decides whether an expression is in the language of formulas:
+<code>MathExpression::check</code> (<code>crates/commol-core/src/math_expression/mod.rs</code>,
 <code>language.rs</code>) reads the tree that the JIT compiles, so a formula that passes
 it compiles. It rejects a function that is not in <code>FUNCTIONS</code>, a call with the
 wrong number of arguments, <code>&amp;&amp;</code> and <code>||</code>, and a comparison or <code>!</code> outside the
-condition of an <code>if</code>, and it counts the nodes of the tree, which
-<code>SecurityConfig.max_complexity_score</code> limits. The JIT compiles the functions
-of <code>FUNCTIONS</code> and no other, and the unit check (<code>_FUNCTION_UNITS</code> in
-<code>utils/equations.py</code>) has one rule for each of them.</p>
+condition of an <code>if</code>, and it counts the nodes of the tree, which <code>MAX_NODES</code>
+limits. The JIT compiles the functions of <code>FUNCTIONS</code> and no other, and the
+unit check (<code>_FUNCTION_UNITS</code> in <code>utils/equations.py</code>) has one rule for each
+of them.</p>
 <p>The engine runs the same check again when it builds a model (<code>check_model</code> in
 <code>crates/commol-model/src/builder.rs</code>) and a calibration problem
 (<code>Feasibility::new</code>), and <code>check_model</code> also rejects a variable that the model
@@ -3357,20 +3402,16 @@ them from <code>commol_rs.model</code>).</p>
 <td>An evaluation by an expression library with dummy values</td>
 <td>It evaluates another language than the JIT compiles: it rejects functions the JIT compiles and accepts a comparison the guide rejects.</td>
 </tr>
-<tr>
-<td>The complexity score counted on the text</td>
-<td>One more parser of the language in Python.</td>
-</tr>
 </tbody>
 </table>
 <p><strong>Guard:</strong> <code>crates/commol-core/tests/expressions.rs</code> (the language and the
 value of each function), <code>py-commol/tests/units/test_expression_units.py::test_the_unit_check_knows_every_function_of_the_engine</code>,
-<code>py-commol/tests/rates/test_security.py::test_a_formula_above_the_complexity_score_is_rejected</code>,
 <code>py-commol/tests/rates/test_variables.py::test_an_undefined_variable_is_rejected_by_the_engine</code>.</p>
 <h2 id="the-engine-parses-formulas-with-a-parser-of-its-own">The engine parses formulas with a parser of its own<a class="headerlink" href="#the-engine-parses-formulas-with-a-parser-of-its-own" title="Permanent link">&para;</a></h2>
 <p><code>parse_expression</code> (<code>crates/commol-core/src/math_expression/jit/parser.rs</code>)
 reads the text of a formula into its tree (<code>Expr</code>, <code>jit/ast.rs</code>) by
-precedence climbing; no other parser reads a formula. The grammar sets the
+precedence climbing; no other parser checks a formula, and the readers of
+the first section are the only other code that reads its text. The grammar sets the
 precedence and the grouping: the operators of one level apply from the
 left, and a chain of powers groups from the right, as in Python.</p>
 <p>A chain of operators of one level is one node (<code>Expr::Chain</code>), so a sum of
@@ -3408,7 +3449,39 @@ thread.</p>
 <code>crates/commol-core/tests/expressions.rs::a_chain_of_terms_is_one_level_and_adds_from_the_left</code>,
 <code>crates/commol-core/tests/expressions.rs::a_chain_of_powers_groups_from_the_right</code>,
 <code>crates/commol-model/tests/rates.rs::a_rate_at_the_nesting_limit_builds_and_runs_on_a_worker_thread</code>,
-<code>py-commol/tests/rates/test_security.py::test_a_formula_deeper_than_the_limit_raises</code>.</p>
+<code>py-commol/tests/rates/test_formula_rules.py::test_a_formula_gets_the_message_of_the_engine_parser</code>.</p>
+<h2 id="a-formula-has-at-most-max_nodes-nodes-and-a-message-cuts-it">A formula has at most MAX_NODES nodes, and a message cuts it<a class="headerlink" href="#a-formula-has-at-most-max_nodes-nodes-and-a-message-cuts-it" title="Permanent link">&para;</a></h2>
+<p>The check of the language rejects a tree of more than <code>MAX_NODES</code> (100 000)
+nodes (<code>jit/parser.rs</code>, <code>language.rs</code>) before the JIT compiles the formula.
+A sum of n terms has 2n - 1 nodes, so the limit allows a sum of 50 000
+terms, and stays far below the size that the JIT (Cranelift) rejects: about
+600 000 terms, after about 1 s and 450 MiB. A message of the parser or of the
+JIT quotes the formula cut after its first 80 characters (<code>quoted</code>,
+<code>math_expression/error.rs</code>), so it never repeats a long text.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No limit of nodes</td>
+<td>A huge formula costs about 1 s and 450 MiB before the JIT rejects it, with a message of several MB.</td>
+</tr>
+<tr>
+<td>The limit of the JIT</td>
+<td>A limit of Cranelift, which commol does not own, and too slow to test.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guard:</strong> <code>crates/commol-core/src/math_expression/language.rs::a_tree_of_the_most_nodes_is_in_the_language</code>,
+<code>crates/commol-core/src/math_expression/language.rs::a_tree_of_more_nodes_than_the_limit_is_rejected</code>,
+<code>crates/commol-core/tests/expressions.rs::a_formula_of_more_nodes_than_the_limit_is_rejected_before_it_compiles</code>,
+<code>crates/commol-core/src/math_expression/error.rs::a_long_formula_is_cut_after_its_first_characters</code>,
+<code>crates/commol-core/src/math_expression/mod.rs::a_formula_that_does_not_compile_is_quoted_cut</code>,
+<code>py-commol/tests/rates/test_formula_rules.py::test_a_formula_gets_the_message_of_the_engine_parser</code>.</p>
 
 
 

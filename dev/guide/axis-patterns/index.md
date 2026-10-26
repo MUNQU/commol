@@ -45,7 +45,7 @@ Each pattern reads `step` or `t` (see [Patterns in a differential model](#patter
 | `linear_ramp(start, end, start_value, end_value)`  | `t`           | From `start_value` at `start` towards `end_value`, for `start <= t < end`; else 0 | `start < end`, any finite positions                                |
 | `sinusoid(amplitude, period, phase=0, baseline=0)` | `t`           | `baseline + amplitude × sin(2π (t − phase) / period)`                             | numeric `period != 0`                                              |
 | `gaussian_pulse(center, width, peak)`              | `t`           | `peak × exp(−(t − center)² / (2 width²))`                                         | `width > 0`                                                        |
-| `from_formula(expr)`                               | What it names | The expression, wrapped in parentheses                                            | not empty; passes the security check                               |
+| `from_formula(expr)`                               | What it names | The expression, wrapped in parentheses                                            | the parser of the engine accepts it                                |
 
 An invalid argument raises `pydantic.ValidationError` (a `ValueError`). These arguments also accept a parameter name, so calibration can fit them: `value` of `pulse`, `pulses`, `periodic` and `interval`; every argument of `sinusoid`; and `peak` of `gaussian_pulse`.
 
@@ -93,11 +93,11 @@ print(flow_per_step(peak_or_interval))
 # [0.0, 0.0, 1.0, 2.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 ```
 
-| Rule                                                                                               | Otherwise    |
-| -------------------------------------------------------------------------------------------------- | ------------ |
-| At least one pattern                                                                               | `ValueError` |
-| All patterns have the same group binding (or none); the result keeps it                            | `ValueError` |
-| The result is not longer than `SecurityConfig.max_expression_length` (10000 characters by default) | `ValueError` |
+| Rule                                                                                                                                                                                                            | Otherwise    |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| At least one pattern                                                                                                                                                                                            | `ValueError` |
+| All patterns have the same group binding (or none); the result keeps it                                                                                                                                         | `ValueError` |
+| The parser of the engine accepts the result, within its [limits](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#limits-of-the-parser): a `MAX` or `MIN` nests one level for each pattern | `ValueError` |
 
 `combine(p)` with one pattern returns `p`.
 

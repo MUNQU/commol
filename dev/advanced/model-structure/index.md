@@ -486,17 +486,15 @@ class Parameter(BaseModel):
             return value
         if isinstance(value, (int, float)):
             return float(value)
-        if not value.strip():
-            raise ValueError("Formula cannot be empty")
         return value.strip()
 
     @model_validator(mode="after")
     def validate_formula(self) -> Self:
-        """Check a formula value as a rate is checked: the security check and
-        the check of the language of formulas."""
+        """Check a formula value as a rate is checked, with the parser of the
+        engine."""
         if isinstance(self.value, str):
             try:
-                validate_expression_security(self.value)
+                commol_rs.core.MathExpression(self.value).check()
             except ValueError as error:
                 raise ValueError(f"Parameter '{self.id}': {error}")
         return self
@@ -575,8 +573,6 @@ def validate_value(
         return value
     if isinstance(value, (int, float)):
         return float(value)
-    if not value.strip():
-        raise ValueError("Formula cannot be empty")
     return value.strip()
 ```
 
@@ -586,18 +582,18 @@ def validate_value(
 validate_formula() -> Self
 ```
 
-Check a formula value as a rate is checked: the security check and the check of the language of formulas.
+Check a formula value as a rate is checked, with the parser of the engine.
 
 Source code in `commol/context/parameter.py`
 
 ```python
 @model_validator(mode="after")
 def validate_formula(self) -> Self:
-    """Check a formula value as a rate is checked: the security check and
-    the check of the language of formulas."""
+    """Check a formula value as a rate is checked, with the parser of the
+    engine."""
     if isinstance(self.value, str):
         try:
-            validate_expression_security(self.value)
+            commol_rs.core.MathExpression(self.value).check()
         except ValueError as error:
             raise ValueError(f"Parameter '{self.id}': {error}")
     return self
@@ -744,8 +740,8 @@ class Transition(BaseModel):
         Ids of the accumulators that add up the flow of this transition.
     rate : str | None
         Default mathematical formula, parameter name, or constant value for the flow.
-        Used when no stratified rate matches. Numeric values are automatically
-        converted to strings during validation.
+        Used when no stratified rate matches. ``ModelBuilder.add_transition``
+        writes a number as its string.
 
         Operators: +, -, *, /, % (modulo), ^ or ** (power)
         Functions: sin, cos, tan, exp, ln, sqrt, abs, min, max, if, etc.
@@ -791,8 +787,7 @@ class Transition(BaseModel):
         description=(
             "Default rate expression (fallback when no stratified rate matches). "
             "Can be a parameter reference (e.g., 'k1'), a constant (e.g., '0.5'), "
-            "or a mathematical expression (e.g., 'k1 * A * B / total'). "
-            "Numeric values are automatically converted to strings during validation."
+            "or a mathematical expression (e.g., 'k1 * A * B / total')."
         ),
     )
 
@@ -842,12 +837,10 @@ class Transition(BaseModel):
         commol_rs.model.check_impulse(self.id, self.impulse_at, self.impulse_every)
         return self
 
-    @field_validator("rate", mode="before")
+    @field_validator("rate")
     @classmethod
     def validate_rate(cls, value: str | None) -> str | None:
-        """
-        Convert numeric rates to strings and perform security and syntax validation.
-        """
+        """Check the rate, when there is one, with the parser of the engine."""
         if value is None:
             return value
         return _checked_rate(value)
@@ -894,17 +887,15 @@ def validate_impulse(self) -> Self:
 validate_rate(value: str | None) -> str | None
 ```
 
-Convert numeric rates to strings and perform security and syntax validation.
+Check the rate, when there is one, with the parser of the engine.
 
 Source code in `commol/context/transition.py`
 
 ```python
-@field_validator("rate", mode="before")
+@field_validator("rate")
 @classmethod
 def validate_rate(cls, value: str | None) -> str | None:
-    """
-    Convert numeric rates to strings and perform security and syntax validation.
-    """
+    """Check the rate, when there is one, with the parser of the engine."""
     if value is None:
         return value
     return _checked_rate(value)
@@ -987,10 +978,10 @@ class StratifiedRate(BaseModel):
             )
         return self
 
-    @field_validator("rate", mode="before")
+    @field_validator("rate")
     @classmethod
     def validate_rate(cls, value: str) -> str:
-        """Perform security and syntax validation on the rate expression."""
+        """Check the rate with the parser of the engine."""
         return _checked_rate(value)
 ```
 
@@ -1052,15 +1043,15 @@ def validate_unique_stratifications(self) -> Self:
 validate_rate(value: str) -> str
 ```
 
-Perform security and syntax validation on the rate expression.
+Check the rate with the parser of the engine.
 
 Source code in `commol/context/transition.py`
 
 ```python
-@field_validator("rate", mode="before")
+@field_validator("rate")
 @classmethod
 def validate_rate(cls, value: str) -> str:
-    """Perform security and syntax validation on the rate expression."""
+    """Check the rate with the parser of the engine."""
     return _checked_rate(value)
 ```
 

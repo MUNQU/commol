@@ -2565,7 +2565,6 @@ class CalibrationConstraint(RangeChecked):
     )
     expression: str = Field(
         default=...,
-        min_length=1,
         description="Mathematical expression that must evaluate >= 0",
     )
     description: str | None = Field(
@@ -2583,16 +2582,11 @@ class CalibrationConstraint(RangeChecked):
         ),
     )
 
-    @field_validator("expression", mode="before")
+    @field_validator("expression")
     @classmethod
     def validate_expression(cls, value: str) -> str:
-        """Perform security validation on the constraint expression."""
-        try:
-            validate_expression_security(value)
-        except ValueError as e:
-            raise ValueError(
-                f"Security validation failed for expression '{value}': {e}"
-            )
+        """Check the expression with the parser of the engine."""
+        commol_rs.core.MathExpression(value).check()
         return value
 
     @model_validator(mode="after")
@@ -2613,21 +2607,16 @@ class CalibrationConstraint(RangeChecked):
 validate_expression(value: str) -> str
 ```
 
-Perform security validation on the constraint expression.
+Check the expression with the parser of the engine.
 
 Source code in `commol/context/calibration.py`
 
 ```python
-@field_validator("expression", mode="before")
+@field_validator("expression")
 @classmethod
 def validate_expression(cls, value: str) -> str:
-    """Perform security validation on the constraint expression."""
-    try:
-        validate_expression_security(value)
-    except ValueError as e:
-        raise ValueError(
-            f"Security validation failed for expression '{value}': {e}"
-        )
+    """Check the expression with the parser of the engine."""
+    commol_rs.core.MathExpression(value).check()
     return value
 ```
 

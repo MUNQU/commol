@@ -2921,14 +2921,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codebase/decisions/security/" class="md-nav__link">
+      <a href="../../codebase/decisions/formulas/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Security
+    Formulas
   
 
     
@@ -3547,7 +3547,7 @@ difference model both are the step <code>s</code>.</p>
 <td><code>from_formula(expr)</code></td>
 <td>What it names</td>
 <td>The expression, wrapped in parentheses</td>
-<td>not empty; passes the security check</td>
+<td>the parser of the engine accepts it</td>
 </tr>
 </tbody>
 </table>
@@ -3623,7 +3623,7 @@ expression.</p>
 <td><code>ValueError</code></td>
 </tr>
 <tr>
-<td>The result is not longer than <code>SecurityConfig.max_expression_length</code> (10000 characters by default)</td>
+<td>The parser of the engine accepts the result, within its <a href="../mathematical-expressions/#limits-of-the-parser">limits</a>: a <code>MAX</code> or <code>MIN</code> nests one level for each pattern</td>
 <td><code>ValueError</code></td>
 </tr>
 </tbody>

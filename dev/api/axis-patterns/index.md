@@ -333,7 +333,6 @@ class AxisPattern(BaseModel):
         cls,
         *patterns: "AxisPattern",
         mode: CombineMode = CombineMode.SUM,
-        config: SecurityConfig | None = None,
     ) -> "AxisPattern":
         """
         Combine patterns into a single composed pattern.
@@ -344,8 +343,9 @@ class AxisPattern(BaseModel):
         - ``mode`` is a `CombineMode` or its value (``"sum"``, ``"max"``,
           ``"min"``).
         - Raises ``ValueError`` if no patterns are supplied, ``mode`` is not a
-          mode, the inputs have inconsistent group bindings, or the combined
-          formula exceeds the security length cap.
+          mode, the inputs have inconsistent group bindings, or the parser of
+          the engine rejects the combined formula, such as a ``"max"`` of
+          more patterns than the nesting limit of a formula.
         """
         if len(patterns) == 0:
             raise ValueError("combine() requires at least one pattern")
@@ -354,8 +354,6 @@ class AxisPattern(BaseModel):
 
         shared_conditions, shared_source = _require_consistent_group(patterns)
         result = _compose_formulas([p.formula for p in patterns], CombineMode(mode))
-        _enforce_length_cap(result, config)
-
         return _ComputedAxisPattern(
             computed_formula=result,
             conditions=shared_conditions,
@@ -363,22 +361,15 @@ class AxisPattern(BaseModel):
         )
 
     @classmethod
-    def from_formula(
-        cls,
-        expr: str,
-        config: SecurityConfig | None = None,
-    ) -> "AxisPattern":
+    def from_formula(cls, expr: str) -> "AxisPattern":
         """
         Create a pattern from an arbitrary expression string.
 
-        The string is wrapped in ``(...)`` so it composes safely, then run
-        through the full expression security validator.
+        The string is wrapped in ``(...)`` so it composes safely. Raises
+        ``ValueError`` with the message of the parser of the engine if the
+        wrapped formula is not in the language of formulas.
         """
-        if not expr or not expr.strip():
-            raise ValueError("'expr' must be a non-empty expression")
-        wrapped = f"({expr})"
-        validate_expression_security(wrapped, config)
-        return _ComputedAxisPattern(computed_formula=wrapped)
+        return _ComputedAxisPattern(computed_formula=f"({expr})")
 ```
 
 ### Attributes
@@ -759,7 +750,7 @@ def linear_ramp(
 #### combine
 
 ```python
-combine(*patterns: AxisPattern, mode: CombineMode = SUM, config: SecurityConfig | None = None) -> AxisPattern
+combine(*patterns: AxisPattern, mode: CombineMode = SUM) -> AxisPattern
 ```
 
 Combine patterns into a single composed pattern.
@@ -767,7 +758,7 @@ Combine patterns into a single composed pattern.
 - `combine(p)` is the identity (returns `p` unchanged).
 - All input patterns must share the same `conditions` and `source_compartment` (or have none); the result preserves them.
 - `mode` is a `CombineMode` or its value (`"sum"`, `"max"`, `"min"`).
-- Raises `ValueError` if no patterns are supplied, `mode` is not a mode, the inputs have inconsistent group bindings, or the combined formula exceeds the security length cap.
+- Raises `ValueError` if no patterns are supplied, `mode` is not a mode, the inputs have inconsistent group bindings, or the parser of the engine rejects the combined formula, such as a `"max"` of more patterns than the nesting limit of a formula.
 
 Source code in `commol/api/patterns.py`
 
@@ -777,7 +768,6 @@ def combine(
     cls,
     *patterns: "AxisPattern",
     mode: CombineMode = CombineMode.SUM,
-    config: SecurityConfig | None = None,
 ) -> "AxisPattern":
     """
     Combine patterns into a single composed pattern.
@@ -788,8 +778,9 @@ def combine(
     - ``mode`` is a `CombineMode` or its value (``"sum"``, ``"max"``,
       ``"min"``).
     - Raises ``ValueError`` if no patterns are supplied, ``mode`` is not a
-      mode, the inputs have inconsistent group bindings, or the combined
-      formula exceeds the security length cap.
+      mode, the inputs have inconsistent group bindings, or the parser of
+      the engine rejects the combined formula, such as a ``"max"`` of
+      more patterns than the nesting limit of a formula.
     """
     if len(patterns) == 0:
         raise ValueError("combine() requires at least one pattern")
@@ -798,8 +789,6 @@ def combine(
 
     shared_conditions, shared_source = _require_consistent_group(patterns)
     result = _compose_formulas([p.formula for p in patterns], CombineMode(mode))
-    _enforce_length_cap(result, config)
-
     return _ComputedAxisPattern(
         computed_formula=result,
         conditions=shared_conditions,
@@ -810,31 +799,24 @@ def combine(
 #### from_formula
 
 ```python
-from_formula(expr: str, config: SecurityConfig | None = None) -> AxisPattern
+from_formula(expr: str) -> AxisPattern
 ```
 
 Create a pattern from an arbitrary expression string.
 
-The string is wrapped in `(...)` so it composes safely, then run through the full expression security validator.
+The string is wrapped in `(...)` so it composes safely. Raises `ValueError` with the message of the parser of the engine if the wrapped formula is not in the language of formulas.
 
 Source code in `commol/api/patterns.py`
 
 ```python
 @classmethod
-def from_formula(
-    cls,
-    expr: str,
-    config: SecurityConfig | None = None,
-) -> "AxisPattern":
+def from_formula(cls, expr: str) -> "AxisPattern":
     """
     Create a pattern from an arbitrary expression string.
 
-    The string is wrapped in ``(...)`` so it composes safely, then run
-    through the full expression security validator.
+    The string is wrapped in ``(...)`` so it composes safely. Raises
+    ``ValueError`` with the message of the parser of the engine if the
+    wrapped formula is not in the language of formulas.
     """
-    if not expr or not expr.strip():
-        raise ValueError("'expr' must be a non-empty expression")
-    wrapped = f"({expr})"
-    validate_expression_security(wrapped, config)
-    return _ComputedAxisPattern(computed_formula=wrapped)
+    return _ComputedAxisPattern(computed_formula=f"({expr})")
 ```

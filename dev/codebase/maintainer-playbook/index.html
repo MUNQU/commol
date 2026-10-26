@@ -2765,14 +2765,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../decisions/security/" class="md-nav__link">
+      <a href="../decisions/formulas/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Security
+    Formulas
   
 
     
@@ -3690,8 +3690,8 @@
       token and a level of the parser (<code>jit/parser.rs</code>), a case of <code>check</code>
       (<code>language.rs</code>) and of the JIT (<code>jit/codegen.rs</code>).</li>
 <li>[ ] Keep every walk of a tree (<code>Expr</code>) recursive only into the operands of
-      a node: a chain of one level is one node, and <code>MAX_NESTING</code> bounds the
-      depth. A new walk at the limit runs in
+      a node: a chain of one level is one node, <code>MAX_NESTING</code> bounds the
+      depth and <code>MAX_NODES</code> the number of nodes. A new walk at the limit runs in
       <code>crates/commol-core/tests/expressions.rs::every_level_of_operators_at_the_limit_reads_on_a_worker_thread</code>.</li>
 <li>[ ] Give a new function its value in
       <code>crates/commol-core/tests/expressions.rs::every_function_of_the_guide_has_its_value</code>
