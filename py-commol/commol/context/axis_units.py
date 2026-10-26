@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Annotated, Literal, Self
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context.engine_json import engine_json
 
 from commol.context._model.units import DEFAULT_STEP_UNIT, check_step_unit
 from commol.utils.equations import define_units, ureg
@@ -427,7 +428,9 @@ class AxisUnits(BaseModel):
             unit, `span` is not positive, `keep` is another value, or a
             per-step rate keeps the mean of a span shorter than one step.
         """
-        return self._engine_type().rate_from_mean_span(self.steps(span, unit), keep)
+        return self._engine_type().rate_from_mean_span(
+            self.steps(span, unit), engine_json(keep)
+        )
 
     def rate_from_probability(
         self, probability: float, period: float, unit: str

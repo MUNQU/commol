@@ -32,14 +32,15 @@ def _dump(value: BaseModel) -> object:
     return value.model_dump(exclude=set(handles))
 
 
-def engine_json(value: BaseModel | Sequence[BaseModel]) -> str:
+def engine_json(value: BaseModel | Sequence[BaseModel] | str) -> str:
     """
     The JSON of `value` that the engine reads.
 
     Parameters
     ----------
-    value : BaseModel | Sequence[BaseModel]
-        A data object, or a list of them.
+    value : BaseModel | Sequence[BaseModel] | str
+        A data object, a list of them, or the name of a value of an enum of
+        the engine, such as ``"survival"``.
 
     Returns
     -------
@@ -49,7 +50,9 @@ def engine_json(value: BaseModel | Sequence[BaseModel]) -> str:
         for the numbers that are not finite.
     """
     dumped = (
-        _dump(value)
+        value
+        if isinstance(value, str)
+        else _dump(value)
         if isinstance(value, BaseModel)
         else [_dump(item) for item in value]
     )

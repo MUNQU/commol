@@ -31,8 +31,8 @@ engine: `RateMeaning::rate_from_mean_span` and `rate_from_probability`
 (`crates/commol-core/src/types/engine.rs`) hold the formula of each meaning, so
 a new engine picks a meaning and Python does not change. A per-step rate keeps
 the survival (`1 - e^(-1/n)`) or the mean (`1/n`) of a residence, never both:
-the caller passes `RateKeeps`, with no default, and the engine rejects the mean
-of a span below one step instead of clamping the rate to 1.
+the caller passes `RateKeeps` (the JSON of its name), with no default, and the
+engine rejects the mean of a span below one step instead of clamping the rate to 1.
 
 **Rule:** no formula of a rate per engine nor of a window in Python; ask the engine.
 

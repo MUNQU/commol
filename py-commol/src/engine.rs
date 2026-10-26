@@ -599,14 +599,15 @@ impl PyEngineType {
     ///
     /// Args:
     ///     span: Mean span of the residence, in steps
-    ///     keep: What the rate keeps of the residence: "survival" or "mean"
+    ///     keep: The JSON of what the rate keeps of the residence:
+    ///         "survival" or "mean"
     ///
     /// Raises:
     ///     ValueError: If `keep` is another value, the span is not positive
     ///         and finite, or a per-step rate keeps the mean of a span shorter
     ///         than one step
     fn rate_from_mean_span(&self, span: f64, keep: &str) -> PyResult<f64> {
-        let keep = RateKeeps::from_name(keep).map_err(PyValueError::new_err)?;
+        let keep: RateKeeps = crate::json::read(keep)?;
         self.inner
             .rate_meaning()
             .rate_from_mean_span(span, keep)

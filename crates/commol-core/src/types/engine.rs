@@ -97,42 +97,15 @@ pub enum RateMeaning {
 ///
 /// The two differ only for a per-step rate: a model that discretizes a
 /// continuous process keeps its survival, and a model whose step is the unit
-/// of its process keeps its mean.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// of its process keeps its mean. It crosses from Python as the JSON of its
+/// name, `"survival"` or `"mean"`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum RateKeeps {
     /// The survival of the exponential residence at every step.
     Survival,
     /// The mean of the residence.
     Mean,
-}
-
-impl RateKeeps {
-    /// Every value.
-    pub const ALL: &'static [Self] = &[Self::Survival, Self::Mean];
-
-    /// Name of the value, as Python passes it.
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Survival => "survival",
-            Self::Mean => "mean",
-        }
-    }
-
-    /// The value with a name.
-    ///
-    /// # Errors
-    ///
-    /// Returns a message with every name when no value has it.
-    pub fn from_name(name: &str) -> Result<Self, String> {
-        Self::ALL
-            .iter()
-            .copied()
-            .find(|keep| keep.name() == name)
-            .ok_or_else(|| {
-                let names: Vec<&str> = Self::ALL.iter().map(|keep| keep.name()).collect();
-                format!("Unknown value '{name}' of what a rate keeps; the values are {names:?}")
-            })
-    }
 }
 
 impl RateMeaning {
@@ -966,25 +939,22 @@ mod tests {
             RateMeaning::PerStep.rate_from_mean_span(10.0, RateKeeps::Mean),
             Ok(0.1)
         );
-        for keep in RateKeeps::ALL.iter().copied() {
+        for keep in [RateKeeps::Survival, RateKeeps::Mean] {
             assert_eq!(
                 RateMeaning::Continuous.rate_from_mean_span(10.0, keep),
                 Ok(0.1)
             );
-            assert_eq!(RateKeeps::from_name(keep.name()), Ok(keep));
+            assert_eq!(crate::json::read(&crate::json::write(&keep)), Ok(keep));
             for meaning in [RateMeaning::PerStep, RateMeaning::Continuous] {
                 for span in [0.0, -1.0, f64::INFINITY, f64::NAN] {
                     assert!(meaning.rate_from_mean_span(span, keep).is_err());
                 }
             }
         }
+        assert_eq!(crate::json::write(&RateKeeps::Survival), r#""survival""#);
         assert_eq!(
-            RateKeeps::from_name("median"),
-            Err(
-                "Unknown value 'median' of what a rate keeps; the values are \
-                 [\"survival\", \"mean\"]"
-                    .to_string()
-            )
+            crate::json::read::<RateKeeps>(r#""median""#),
+            Err("unknown variant `median`, expected `survival` or `mean`".to_string())
         );
     }
 

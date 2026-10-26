@@ -319,3 +319,47 @@ def test_no_method_excludes_a_field() -> None:
     )
 
     assert not wrong, "Keep every field of a method in its dump:\n" + "\n".join(wrong)
+
+
+# The names that a binding still reads with `from_name`, each with the reason
+# it is not a value of an enum that crosses as JSON.
+NAMED = {
+    "EngineType": "the name of an entry of the list of engines, a handle",
+    "ModelKind": "the name of a kind of model, a handle",
+    "Levels": "the levels of the setting of the threads, a handle (Parallelism)",
+    "NonconformityScore": (
+        "the check of a conformal method before pydantic, which names a score "
+        "that is missing"
+    ),
+    "Pooling": (
+        "the check of a conformal method before pydantic, which names a pooling "
+        "that is missing"
+    ),
+}
+
+
+def enums_read_by_name(sources: Path) -> set[str]:
+    """Each type whose ``from_name`` a binding under ``sources`` calls."""
+    return {
+        match.group(1)
+        for source in sorted(sources.glob("*.rs"))
+        for match in re.finditer(r"(\w+)::from_name\(", source.read_text("utf-8"))
+    }
+
+
+def test_no_binding_reads_a_value_of_an_enum_from_its_name() -> None:
+    read = enums_read_by_name(BRIDGE_SOURCES)
+
+    assert read <= set(NAMED), (
+        "Read the value from the JSON of its name, with serde and the spelling "
+        f"of Python (D2 of #401): {sorted(read - set(NAMED))}"
+    )
+
+
+def test_the_check_names_each_enum_read_by_name(tmp_path: Path) -> None:
+    (tmp_path / "keep.rs").write_text(
+        "let keep = RateKeeps::from_name(keep)?;\nlet x = Levels::from_name(y);\n",
+        encoding="utf-8",
+    )
+
+    assert enums_read_by_name(tmp_path) == {"RateKeeps", "Levels"}
