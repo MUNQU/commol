@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from commol._model.model import Model
     from commol._problem.problem import CalibrationParameter, CalibrationProblem
     from commol.commol_rs._commol_rs import EngineProtocol
-    from commol.uncertainty.sample import ParameterSummary
+    from commol._model.report_entry import EntrySummary
 
 
 class Aggregate(ModelStructure, InitialConditions):
@@ -276,7 +276,7 @@ class Aggregate(ModelStructure, InitialConditions):
         self,
         model: "Model[Self]",
         calibrated_ids: set[str],
-        parameter_statistics: "Mapping[str, ParameterSummary] | None",
+        parameter_statistics: "Mapping[str, EntrySummary] | None",
     ) -> ReportSections:
         """
         The ``initial_amounts`` and ``category_splits`` sections of a report.
@@ -289,7 +289,7 @@ class Aggregate(ModelStructure, InitialConditions):
             The model that holds the applied values.
         calibrated_ids : set[str]
             Ids that calibration set.
-        parameter_statistics : Mapping[str, ParameterSummary] | None
+        parameter_statistics : Mapping[str, EntrySummary] | None
             Statistics of each id from a sample, or None without one.
 
         Returns

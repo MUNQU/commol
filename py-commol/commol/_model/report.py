@@ -10,7 +10,7 @@ from commol._model.report_entry import Interval, entry_interval
 if TYPE_CHECKING:
     from commol._model.aggregate import Aggregate
     from commol._model.process import Process
-    from commol.uncertainty.sample import ParameterSummary
+    from commol._model.report_entry import EntrySummary
 
 
 class InitialAmountEntry(TypedDict):
@@ -34,7 +34,7 @@ class CategorySplitEntry(TypedDict):
 def _interval(
     entry: InitialAmountEntry | CategorySplitEntry,
     entry_id: str,
-    statistics: "Mapping[str, ParameterSummary] | None",
+    statistics: "Mapping[str, EntrySummary] | None",
 ) -> None:
     """Add the interval of an entry, when the sample has one."""
     interval = entry_interval(entry_id, statistics)
@@ -47,7 +47,7 @@ def _amount_entry(
     amount: float | None,
     unit: str | None,
     calibrated: bool,
-    statistics: "Mapping[str, ParameterSummary] | None",
+    statistics: "Mapping[str, EntrySummary] | None",
 ) -> InitialAmountEntry:
     """One reported amount, with its interval when there is one."""
     entry: InitialAmountEntry = {
@@ -111,7 +111,7 @@ def initial_amounts_report(
     process: "Process",
     structure: "Aggregate",
     calibrated_ids: set[str],
-    parameter_statistics: "Mapping[str, ParameterSummary] | None",
+    parameter_statistics: "Mapping[str, EntrySummary] | None",
 ) -> dict[str, InitialAmountEntry]:
     """
     The amount of every bin and of every overridden compartment.
@@ -164,7 +164,7 @@ def category_splits_report(
     process: "Process",
     structure: "Aggregate",
     calibrated_ids: set[str],
-    parameter_statistics: "Mapping[str, ParameterSummary] | None",
+    parameter_statistics: "Mapping[str, EntrySummary] | None",
 ) -> dict[str, CategorySplitEntry]:
     """
     The split of every category within the group its stratification splits.

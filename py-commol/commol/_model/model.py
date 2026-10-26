@@ -17,6 +17,7 @@ from pydantic import (
 from commol._data.engine_json import engine_json
 from commol._fit.result import CalibrationResult
 from commol._model.axis_units import AxisUnits, Origin, seconds_per_step
+from commol._model.applied_parameters import applied_parameters_report
 from commol._model.description import ModelDescription
 from commol._model.parameter import Parameter, SeriesValue
 from commol._model.process import Process
@@ -28,8 +29,8 @@ from commol.commol_rs import _commol_rs as commol_rs
 from commol.engines.engine import ModelEngine
 
 if TYPE_CHECKING:
-    from commol._simulation.reports import AppliedParametersReport
-    from commol.uncertainty.sample import ParameterSample
+    from commol._model.applied_parameters import AppliedParametersReport
+    from commol._model.report_entry import SummarizedSample
 
 StructureT = TypeVar("StructureT", bound=ModelStructure)
 """The structure class of a model, which sets its kind."""
@@ -317,7 +318,7 @@ class Model(BaseModel, Generic[StructureT]):
         self,
         values: CalibrationResult | Mapping[str, float],
         problem: CalibrationProblem | None = None,
-        sample: "ParameterSample | None" = None,
+        sample: "SummarizedSample | None" = None,
         confidence_level: float | None = None,
     ) -> "AppliedParametersReport":
         """
@@ -376,9 +377,7 @@ class Model(BaseModel, Generic[StructureT]):
         ValueError
             If a sample is given without a confidence level.
         """
-        from commol._simulation.reports import _applied_parameters_report
-
-        return _applied_parameters_report(
+        return applied_parameters_report(
             self, values, problem, sample, confidence_level
         )
 

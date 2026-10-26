@@ -817,16 +817,14 @@ def calibrated_values(
     Raises
     ------
     TypeError
-        If `result` is a `ParameterSample`, which has no single set of
-        parameters.
+        If `result` is neither, such as a `ParameterSample`, which has no
+        single set of parameters.
     """
-    from commol.uncertainty.sample import ParameterSample
-
     if isinstance(result, CalibrationResult):
         return result.best_parameters
-    if isinstance(result, ParameterSample):
+    if not isinstance(result, Mapping):
         raise TypeError(
-            "A ParameterSample has no single set of parameters; pass one of "
-            "sample.draws() instead."
+            f"A {type(result).__name__} has no single set of parameters; pass one "
+            "of sample.draws() instead."
         )
     return result

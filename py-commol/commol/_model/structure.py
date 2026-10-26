@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from commol._model.report import CategorySplitEntry, InitialAmountEntry
     from commol._problem.problem import CalibrationParameter, CalibrationProblem
     from commol.commol_rs._commol_rs import EngineProtocol
-    from commol.uncertainty.sample import ParameterSummary
+    from commol._model.report_entry import EntrySummary
 
 
 class ReportSections(TypedDict, total=False):
@@ -285,7 +285,7 @@ class ModelStructure(BaseModel, ABC):
         self,
         model: "Model[Self]",  # noqa: ARG002
         calibrated_ids: set[str],  # noqa: ARG002
-        parameter_statistics: "Mapping[str, ParameterSummary] | None",  # noqa: ARG002
+        parameter_statistics: "Mapping[str, EntrySummary] | None",  # noqa: ARG002
     ) -> ReportSections:
         """
         Sections of this kind in a report of applied values.
@@ -296,7 +296,7 @@ class ModelStructure(BaseModel, ABC):
             The model that holds the applied values.
         calibrated_ids : set[str]
             Ids that calibration set.
-        parameter_statistics : Mapping[str, ParameterSummary] | None
+        parameter_statistics : Mapping[str, EntrySummary] | None
             Statistics of each id from a sample, or None without one.
 
         Returns

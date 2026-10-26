@@ -66,12 +66,12 @@ def engine_json(value: object) -> str:
 
 
 def _handle(value: object) -> "EngineHandle":
-    """The handle of `value`: the engine object of a sample, or the JSON of a
-    result that has none."""
-    from commol.uncertainty.sample import ParameterSample
-
-    if isinstance(value, ParameterSample):
-        return value._rust
+    """The handle of `value`: the object of the engine that a result holds in
+    ``_rust``, as a `ParameterSample` does, or the JSON of a result that holds
+    none."""
+    engine_object = getattr(value, "_rust", None)
+    if engine_object is not None:
+        return engine_object
     if isinstance(value, BaseModel):
         return engine_json(value)
     assert value is None, "a handle is a sample, a result or None"
