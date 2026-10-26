@@ -9,29 +9,6 @@ from numpy.typing import NDArray
 from commol.commol_rs import _commol_rs as commol_rs
 
 
-def _ci_percentiles(confidence_level: float) -> tuple[float, float]:
-    """
-    Lower and upper percentile points of a two-sided confidence interval.
-
-    Parameters
-    ----------
-    confidence_level : float
-        Confidence level of the interval, strictly between 0 and 1.
-
-    Returns
-    -------
-    tuple[float, float]
-        Lower and upper percentile points, on the 0-100 scale.
-
-    Raises
-    ------
-    ValueError
-        If ``confidence_level`` is not strictly between 0 and 1.
-    """
-    lower, upper = commol_rs.inference.interval_levels(confidence_level)
-    return lower * 100.0, upper * 100.0
-
-
 def weighted_quantiles(
     values: Sequence[float],
     levels: Sequence[float],

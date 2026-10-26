@@ -30,22 +30,7 @@ from commol.context.inference.resampling import (
 from commol.context.inference.global_sensitivity import (
     PropagationResult,
 )
-from commol.api.inference.intervals import _ci_percentiles as ci_percentiles
 from tests.support import abc_builder, bounded, build
-
-
-class TestCiPercentiles:
-    def test_returns_two_sided_points_on_the_numpy_scale(self) -> None:
-        assert ci_percentiles(0.95) == pytest.approx((2.5, 97.5))
-
-    def test_points_are_symmetric_about_the_median(self) -> None:
-        for confidence_level in (0.5, 0.8, 0.9, 0.99):
-            lower, upper = ci_percentiles(confidence_level)
-            assert lower + upper == pytest.approx(100.0)
-
-    def test_width_matches_the_confidence_level(self) -> None:
-        lower, upper = ci_percentiles(0.8)
-        assert upper - lower == pytest.approx(80.0)
 
 
 class TestMemberStatistics:
@@ -68,7 +53,7 @@ class TestMemberStatistics:
 
     def test_interval_uses_the_percentile_points(self) -> None:
         values = list(np.linspace(0.0, 100.0, 401) ** 2)
-        lower_point, upper_point = ci_percentiles(0.9)
+        lower_point, upper_point = 5.0, 95.0
         stats = member_statistics(values, 0.9)
 
         assert stats["ci_lower"] == pytest.approx(
@@ -188,7 +173,6 @@ def _scenarios() -> Scenarios:
 ONE = [ValueAt(series="C", at=1)]
 
 TAKES_A_LEVEL: dict[str, Callable[[float], object]] = {
-    "ci_percentiles": ci_percentiles,
     "member_statistics": lambda c: member_statistics([1.0, 2.0], c),
     "ParameterSample.interval": lambda c: _sample().interval(c),
     "BootstrapResult.interval_error": (

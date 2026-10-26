@@ -538,8 +538,8 @@ class SimulationReplicates(ComparedByValue, list[SimulationResults]):
 
     A ``list`` of runs at the same positions, each with its own seed:
     ``replicates[i].seed`` repeats replicate ``i``. The statistics reduce the
-    replicates position by position, and `member_statistics` reduces them as
-    ``ci_percentiles`` requires.
+    replicates position by position, and `member_statistics` reduces them to a
+    mean, a median, the extremes and an interval.
 
     Two replicates are equal when their runs, their seed, their positions and
     their model are (`ComparedByValue`); a plain ``list`` of the same runs is
