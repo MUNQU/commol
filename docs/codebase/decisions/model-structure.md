@@ -43,7 +43,7 @@ The library names what the compartments hold without assuming individuals:
 | "stock" | An economic term, new to the code. |
 | "content" | Ambiguous in software. |
 | "size" | Reads as a count. |
-| A function `total(g1, t1)` | No reserved names, but the expression language has no text arguments (`jit/ast.rs`), so the parser, the JIT and the security check would change. |
+| A function `total(g1, t1)` | No reserved names, but the expression language has no text arguments (`jit/ast.rs`), so the parser, the JIT and the check of the language would change. |
 
 **Guards:** `tests/building/test_reserved_names.py::test_a_bin_named_n_builds_and_runs`.
 

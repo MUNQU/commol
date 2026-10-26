@@ -1,8 +1,8 @@
 """Check the rules of what the engine holds, which a program can judge: every
 public setting of commol has the one name of its meaning, no pydantic model
-declares a range of a setting, only the engine computes a window, and the stub
-of the extension declares what the extension has. The rules are in
-``docs/codebase/conventions.md``."""
+declares a range of a setting, only the engine computes a window, only the
+engine reads a formula, and the stub of the extension declares what the
+extension has. The rules are in ``docs/codebase/conventions.md``."""
 
 import ast
 from collections.abc import Iterator
@@ -116,6 +116,77 @@ def test_only_the_engine_computes_a_window() -> None:
     assert not (PACKAGE_DIR / "context" / "_windows.py").exists()
     assert not computed, (
         "Ask the engine for the window (commol_rs.calibration):\n" + "\n".join(computed)
+    )
+
+
+# Formulas
+
+FORMULA_TEXT = {"(", ")", " * ", " / ", " + ", " - ", "^", "**"}
+"""The parentheses and the operators of the language, as a reader of the text
+of a formula compares them."""
+
+PYTHON_PARSERS = {"eval", "compile", "exec"}
+"""The builtins that read a text as Python."""
+
+FORMULA_READERS = {
+    "py-commol/commol/utils/equations.py": (
+        "#402: the check of units reads the formula with ast.parse and eval, "
+        "with a pint unit for each variable"
+    ),
+    "py-commol/commol/context/_model/equations.py": (
+        "#402: the description splits the text of a rate at ' * ' and ' / ' "
+        "and counts its parentheses"
+    ),
+}
+"""The modules that read the text of a formula outside the engine, and why.
+#402 moves each onto the tree of the engine and empties this list."""
+
+
+def formula_reading(path: Path) -> Iterator[str]:
+    """Each place of ``path`` that reads the text of a formula: a comparison
+    with a parenthesis or an operator of the language, or a parse of a text as
+    Python."""
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.Compare):
+            operands = [node.left, *node.comparators]
+            reads = any(
+                isinstance(operand, ast.Constant) and operand.value in FORMULA_TEXT
+                for operand in operands
+            )
+        elif isinstance(node, ast.Call):
+            function = node.func
+            reads = (
+                isinstance(function, ast.Name) and function.id in PYTHON_PARSERS
+            ) or (ast.unparse(function) == "ast.parse")
+        else:
+            reads = False
+        if reads:
+            yield f"{relative(path)}:{node.lineno}: {ast.unparse(node)}"
+
+
+def test_only_the_engine_reads_a_formula() -> None:
+    """The parser of the engine (``crates/commol-core/src/math_expression/``)
+    is the only reader and the only check of a formula: no module of commol
+    tokenizes or checks the text of a formula, but the readers of
+    ``FORMULA_READERS``, and each of them still reads one."""
+    readers: dict[str, list[str]] = {}
+    for path in sorted(PACKAGE_DIR.rglob("*.py")):
+        if places := list(formula_reading(path)):
+            readers[relative(path)] = places
+    unlisted = [
+        place
+        for module, places in readers.items()
+        if module not in FORMULA_READERS
+        for place in places
+    ]
+
+    assert not unlisted, (
+        "Ask the engine (commol_rs.core.MathExpression) instead of reading the "
+        "text of a formula:\n" + "\n".join(unlisted)
+    )
+    assert set(FORMULA_READERS) <= set(readers), (
+        "Remove from FORMULA_READERS the modules that no longer read a formula: "
+        f"{sorted(set(FORMULA_READERS) - set(readers))}"
     )
 
 

@@ -70,7 +70,7 @@ plugins:
           - guide/core-concepts.md: Compartments, parameters, transitions, accumulators, the process and the structure, the four engines and what a rate means in each, stratifications, units of the axis
           - guide/building-models.md: Every ModelBuilder method and argument, series parameters, the Aggregate structure and its neighbors, build, save and load
           - guide/transitions.md: Absolute and proportional rates, several sources, $compartment, category transitions, per_compartment, stratified rates, impulses, amounts below zero, what build checks
-          - guide/mathematical-expressions.md: Operators, variables, subgroup totals, functions and security limits of rate formulas
+          - guide/mathematical-expressions.md: Operators, variables, subgroup totals, functions and the limits of the parser of rate formulas
           - guide/axis-patterns.md: AxisPattern pulses, windows, ramps, sinusoids, combinations and schedules per subgroup
           - guide/units-and-equations.md: Unit checking of rates, the step unit, positions and numbers in a rate, impulses, and dates on the axis
           - guide/describing-models.md: Model.describe, its sections and blocks, text, Markdown, LaTeX, JSON and DOT renderings, the ODD layout
@@ -208,7 +208,7 @@ nav:
               - Results: codebase/decisions/results.md
               - Python Models: codebase/decisions/python-models.md
               - Figures: codebase/decisions/figures.md
-              - Security: codebase/decisions/security.md
+              - Formulas: codebase/decisions/formulas.md
           - Conventions: codebase/conventions.md
           - Design Principles: codebase/design-principles.md
           - Tests: codebase/tests.md

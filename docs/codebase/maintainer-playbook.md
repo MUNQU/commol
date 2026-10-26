@@ -65,8 +65,8 @@ Use this page before you make or review a change. It turns the
       token and a level of the parser (`jit/parser.rs`), a case of `check`
       (`language.rs`) and of the JIT (`jit/codegen.rs`).
 - [ ] Keep every walk of a tree (`Expr`) recursive only into the operands of
-      a node: a chain of one level is one node, and `MAX_NESTING` bounds the
-      depth. A new walk at the limit runs in
+      a node: a chain of one level is one node, `MAX_NESTING` bounds the
+      depth and `MAX_NODES` the number of nodes. A new walk at the limit runs in
       `crates/commol-core/tests/expressions.rs::every_level_of_operators_at_the_limit_reads_on_a_worker_thread`.
 - [ ] Give a new function its value in
       `crates/commol-core/tests/expressions.rs::every_function_of_the_guide_has_its_value`
