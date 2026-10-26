@@ -17,8 +17,10 @@ const SUM_TERMS: f64 = 1000.0;
 /// the negative binomial sums its terms whatever the count.
 const SMALL_OVERDISPERSION: f64 = 1e-8;
 
-/// What the predicted value of a log-normal model is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// What the predicted value of a log-normal model is: `"mean"` or
+/// `"median"` in the Python API.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Center {
     /// The mean: `log Y ~ N(log μ − σ²/2, σ²)`.
     Mean,

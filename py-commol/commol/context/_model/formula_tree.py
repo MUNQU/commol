@@ -111,7 +111,7 @@ def _node(data: object) -> Node:
     """The node of one JSON object of the tree."""
     match data:
         case {"Constant": float() | int() | str() as value}:
-            # A value that is not finite comes as its text, such as "inf".
+            # A value that is not finite comes as its text, such as "Infinity".
             return Constant(float(value))
         case {"Variable": str() as name}:
             return Variable(name)

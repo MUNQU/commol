@@ -5,7 +5,7 @@ import math
 from abc import abstractmethod
 from typing import override
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 _NAN = object()
@@ -115,7 +115,13 @@ class ResultModel(ComparedByValue, BaseModel):
     attributes, such as a Rust object, do not count. A frozen result
     (``frozen=True`` in its ``model_config``) has the hash of those values, so
     equal results have equal hashes; a result that can change has no hash.
+
+    The JSON of a result is standard JSON: a number that is not finite is the
+    text ``"Infinity"``, ``"-Infinity"`` or ``"NaN"``, as at the port of the
+    engine (``context/engine_json.py``), and the result reads it back.
     """
+
+    model_config = ConfigDict(ser_json_inf_nan="strings")
 
     @classmethod
     @override

@@ -360,12 +360,13 @@ def quantities_of_runs(
         an output the runs do not have, or the runs lack a position a
         quantity reads.
     """
-    from commol.context.inference.quantities import expand_quantities
+    from commol.context.engine_json import engine_json
+    from commol.context.inference.quantities import quantity_labels
 
-    labels, rust = expand_quantities(quantities)
+    labels = quantity_labels(quantities)
     names = [quantity.axes()[0][0] for quantity in quantities]
     values = commol_rs.inference.quantities_of_runs(
-        rust,
+        engine_json(list(quantities)),
         names,
         list(runs[0]),
         [float(position) for position in positions],

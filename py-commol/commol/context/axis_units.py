@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Annotated, Literal, Self
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context.engine_json import engine_json
 
 from commol.context._model.units import DEFAULT_STEP_UNIT, check_step_unit
 from commol.utils.equations import define_units, ureg
@@ -182,7 +183,7 @@ class AxisUnits(BaseModel):
         if self.origin is not None:
             seconds_per_step(self.step_unit)
         if self.engine is not None:
-            commol_rs.engine.EngineType(self.engine)
+            commol_rs.engine.EngineType(engine_json(self.engine))
         return self
 
     def position_of(self, moment: date) -> float:
@@ -427,7 +428,9 @@ class AxisUnits(BaseModel):
             unit, `span` is not positive, `keep` is another value, or a
             per-step rate keeps the mean of a span shorter than one step.
         """
-        return self._engine_type().rate_from_mean_span(self.steps(span, unit), keep)
+        return self._engine_type().rate_from_mean_span(
+            self.steps(span, unit), engine_json(keep)
+        )
 
     def rate_from_probability(
         self, probability: float, period: float, unit: str
@@ -610,4 +613,4 @@ class AxisUnits(BaseModel):
                 "A rate needs the engine that reads it: give AxisUnits an "
                 "engine, or use Model.axis_units()."
             )
-        return commol_rs.engine.EngineType(self.engine)
+        return commol_rs.engine.EngineType(engine_json(self.engine))

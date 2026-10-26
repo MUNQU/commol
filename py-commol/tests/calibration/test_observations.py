@@ -196,7 +196,7 @@ class TestPositionsAndEngines:
 
         calibrator = Calibrator(Simulation(model), problem)
 
-        [[[prediction]]] = calibrator.rust_problem.predict_observations([[0.0]])
+        [[[prediction]]] = calibrator._rust_problem.predict_observations([[0.0]])
         assert prediction == 0.0
 
     def test_a_difference_model_rejects_a_non_integer_observation(self) -> None:

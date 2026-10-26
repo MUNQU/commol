@@ -1,28 +1,88 @@
 //! Python bindings of the identifiability analyses of `commol-inference`.
 //!
-//! Each function takes the problem built once by a `Calibrator`, or a
-//! sample, and returns the analysis as plain values; Python builds the
-//! report.
+//! Each function takes the problem built once by a `Calibrator`, the JSON
+//! of its method ([`commol_inference::settings::identifiability`]) and the
+//! handle of the result the method reads, and returns the analysis as plain
+//! values; Python builds the report.
 
 use crate::parallelism::parallel;
+use commol_calibration::FitRecord;
+use commol_core::SimulationEngine;
 use commol_inference::identifiability::{
     self, CollinearityVerdict, Reference, SampleVerdict, StructuralVerdict, Subset,
 };
 use commol_inference::sensitivity::{Design, FiniteDifferences};
+use commol_inference::settings::identifiability::{
+    CollinearitySettings, RankDesign, Reference as ReferenceSettings,
+    SampleIdentifiabilitySettings, StartsIdentifiabilitySettings, StructuralRankSettings,
+};
 use pyo3::prelude::*;
 
-use crate::inference::{PyCalibrationProblem, PyParameterSample, method_error};
+use crate::inference::{
+    PyCalibrationProblem, PyParameterSample, method_error, python_list, value_error,
+};
 
+/// The methods that accept a stochastic engine, for the message of one that
+/// does not.
+const PRACTICAL_METHODS: &str = "SampleIdentifiability and StartsIdentifiability";
+
+/// The finite differences of `problem` on `design`, for the method `method`,
+/// which differentiates the model.
+///
+/// # Errors
+///
+/// A `ValueError` when the engine is stochastic or the design does not fit
+/// the problem.
 fn source(
     problem: &PyCalibrationProblem,
-    dense: bool,
+    design: Design,
+    method: &str,
 ) -> PyResult<FiniteDifferences<crate::engine::Engine>> {
-    let design = if dense {
-        Design::Dense
-    } else {
-        Design::Observations
-    };
+    if problem.inner.forward().base_engine().is_stochastic() {
+        return Err(value_error(format!(
+            "{method} differentiates the model, which needs a deterministic engine: the \
+             runs of a stochastic engine change in jumps with its parameters. \
+             {PRACTICAL_METHODS} accept a stochastic engine."
+        )));
+    }
     FiniteDifferences::new(&problem.inner, design).map_err(method_error)
+}
+
+/// A sample whose parameters are those of `problem`, in order.
+///
+/// # Errors
+///
+/// A `ValueError` that names both lists when they differ.
+fn problem_sample<'a>(
+    problem: &PyCalibrationProblem,
+    sample: &'a PyParameterSample,
+) -> PyResult<&'a commol_inference::ParameterSample> {
+    let names = problem.names();
+    if sample.inner.names() != names.as_slice() {
+        return Err(value_error(format!(
+            "The sample's parameters {} are not the problem's {}.",
+            python_list(sample.inner.names()),
+            python_list(&names)
+        )));
+    }
+    Ok(&sample.inner)
+}
+
+/// The names of `names` that `values` has no value of.
+fn missing(names: &[String], values: &commol_core::json::Pairs<f64>) -> Vec<String> {
+    names
+        .iter()
+        .filter(|name| values.get(name).is_none())
+        .cloned()
+        .collect()
+}
+
+/// The values of `values` in the order of `names`, which it has all of.
+fn ordered(names: &[String], values: &commol_core::json::Pairs<f64>) -> Vec<f64> {
+    names
+        .iter()
+        .map(|name| *values.get(name).expect("checked by missing"))
+        .collect()
 }
 
 /// The rank of the scaled sensitivities at one point
@@ -56,30 +116,30 @@ pub struct PyStructuralAnalysis {
     combinations: Vec<Vec<(usize, f64)>>,
 }
 
-/// The structural rank at `points` rows of a Latin hypercube over the bounds
+/// The structural rank at the points of the settings, rows of a Latin
+/// hypercube over the bounds drawn from the seed of the problem
 ///
 /// Args:
 ///     problem: The calibration problem
-///     points: How many points, at least 1
-///     dense: The dense design instead of the observations
-///     seed: The seed of the points
+///     settings: The JSON of a `StructuralRank`
 ///
 /// Raises:
-///     ValueError: If the engine is stochastic, `points` is 0, or every
-///         point is infeasible
+///     ValueError: If a setting is not valid, the engine is stochastic, or
+///         every point is infeasible
 #[pyfunction]
 fn structural_rank(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
-    points: i64,
-    dense: bool,
-    seed: i128,
+    settings: &str,
 ) -> PyResult<PyStructuralAnalysis> {
-    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-    let points: usize = crate::counts::count(&commol_inference::ranges::POINTS, points)?;
-    let source = source(problem, dense)?;
+    let settings: StructuralRankSettings = crate::json::read(settings)?;
+    let design = match settings.design {
+        RankDesign::Observations => Design::Observations,
+        RankDesign::Dense => Design::Dense,
+    };
+    let source = source(problem, design, "StructuralRank")?;
     let analysis = parallel(py, || {
-        identifiability::structural_rank(&source, points, seed)
+        identifiability::structural_rank(&source, settings.points, problem.seed)
     })?
     .map_err(method_error)?;
     Ok(PyStructuralAnalysis {
@@ -166,34 +226,62 @@ fn subsets(subsets: Vec<Subset>) -> Vec<(Vec<usize>, f64, f64)> {
         .collect()
 }
 
-/// Brun's indices at `points` with `weights`
+/// Where a collinearity analysis reads the model: the JSON of a
+/// `CalibrationResult`, or a sample.
+#[derive(FromPyObject)]
+enum At<'py> {
+    /// The draws of a sample, with their weights.
+    Sample(PyRef<'py, PyParameterSample>),
+    /// The best values of a fit.
+    Fit(String),
+}
+
+/// Brun's indices at the fit or the draws of `at`
 ///
 /// Args:
 ///     problem: The calibration problem
-///     points: The parameter values of each point
-///     weights: The weight of each point
-///     max_subset_size: The largest subset, from 2 to the number of
-///         parameters
-///     threshold: The index below which a subset can be fitted together
+///     settings: The JSON of a `Collinearity`
+///     at: The JSON of a `CalibrationResult`, or a sample
 ///
 /// Raises:
-///     ValueError: If the engine is stochastic, a setting is not valid
-///         (a negative max_subset_size included), or every point is
-///         infeasible
+///     ValueError: If a setting is not valid, the engine is stochastic, the
+///         fit lacks a parameter or the sample's parameters are not the
+///         problem's, or every point is infeasible
 #[pyfunction]
 fn collinearity(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
-    points: Vec<Vec<f64>>,
-    weights: Vec<f64>,
-    max_subset_size: i64,
-    threshold: f64,
+    settings: &str,
+    at: At<'_>,
 ) -> PyResult<PyCollinearityAnalysis> {
-    let max_subset_size: usize =
-        crate::counts::count(&commol_inference::ranges::MAX_SUBSET_SIZE, max_subset_size)?;
-    let source = source(problem, false)?;
+    let settings: CollinearitySettings = crate::json::read(settings)?;
+    let source = source(problem, Design::Observations, "Collinearity")?;
+    let names = problem.names();
+    let (points, weights) = match &at {
+        At::Fit(fit) => {
+            let fit: FitRecord = crate::json::read(fit)?;
+            let missing = missing(&names, &fit.best_parameters);
+            if !missing.is_empty() {
+                return Err(value_error(format!(
+                    "The result has no value of {}.",
+                    python_list(&missing)
+                )));
+            }
+            (vec![ordered(&names, &fit.best_parameters)], vec![1.0])
+        }
+        At::Sample(sample) => {
+            let sample = problem_sample(problem, sample)?;
+            (sample.values().to_vec(), sample.weights().to_vec())
+        }
+    };
     let analysis = parallel(py, || {
-        identifiability::collinearity(&source, &points, &weights, max_subset_size, threshold)
+        identifiability::collinearity(
+            &source,
+            &points,
+            &weights,
+            settings.max_subset_size,
+            settings.threshold,
+        )
     })?
     .map_err(method_error)?;
     Ok(PyCollinearityAnalysis {
@@ -249,30 +337,36 @@ pub struct PySampleAnalysis {
 /// The contraction, correlations and modes of `sample`
 ///
 /// Args:
+///     problem: The calibration problem
+///     settings: The JSON of a `SampleIdentifiability`
 ///     sample: The sample
-///     correlation_threshold: Strictly between 0 and 1
-///     priors: The prior of each parameter, the reference of the
-///         contraction; None compares with the uniform on the bounds
 ///
 /// Raises:
-///     ValueError: If `correlation_threshold` is not strictly between 0 and
-///         1, or a prior is missing or does not fit its bounds
+///     ValueError: If a setting is not valid, the sample's parameters are
+///         not the problem's, or a prior is missing or does not fit its
+///         bounds
 #[pyfunction]
-#[pyo3(signature = (sample, correlation_threshold, priors=None))]
 fn sample_identifiability(
+    problem: &PyCalibrationProblem,
+    settings: &str,
     sample: &PyParameterSample,
-    correlation_threshold: f64,
-    priors: Option<Vec<crate::smc::PriorArgs>>,
 ) -> PyResult<PySampleAnalysis> {
-    let priors = priors
-        .map(|given| crate::smc::priors(sample.inner.names(), sample.inner.bounds(), Some(given)))
-        .transpose()?;
+    let settings: SampleIdentifiabilitySettings = crate::json::read(settings)?;
+    let sample = problem_sample(problem, sample)?;
+    let priors = match (settings.reference, &settings.priors) {
+        (ReferenceSettings::Prior, Some(priors)) => Some(
+            priors
+                .priors(sample.names(), sample.bounds())
+                .map_err(value_error)?,
+        ),
+        _ => None,
+    };
     let reference = match &priors {
         Some(priors) => Reference::Prior(priors),
         None => Reference::Bounds,
     };
     let analysis =
-        identifiability::sample_identifiability(&sample.inner, reference, correlation_threshold)
+        identifiability::sample_identifiability(sample, reference, settings.correlation_threshold)
             .map_err(method_error)?;
     Ok(PySampleAnalysis {
         contraction: analysis.contraction,
@@ -295,27 +389,45 @@ pub struct PyStartsAnalysis {
     flagged: Vec<bool>,
 }
 
-/// Compare the ends of the starts that converged
+/// Compare the ends of the starts of a fit that converged
+///
+/// Args:
+///     problem: The calibration problem
+///     settings: The JSON of a `StartsIdentifiability`
+///     result: The JSON of the `CalibrationResult` whose starts are compared
 ///
 /// Raises:
-///     ValueError: If the inputs differ in length, a tolerance is negative,
-///         or fewer than two starts converged
+///     ValueError: If a setting is not valid, a start lacks a parameter, or
+///         fewer than two starts converged
 #[pyfunction]
 fn starts_identifiability(
-    ends: Vec<Vec<f64>>,
-    losses: Vec<f64>,
-    converged: Vec<bool>,
-    bounds: Vec<(f64, f64)>,
-    parameter_tolerance: f64,
-    loss_tolerance: f64,
+    problem: &PyCalibrationProblem,
+    settings: &str,
+    result: &str,
 ) -> PyResult<PyStartsAnalysis> {
+    let settings: StartsIdentifiabilitySettings = crate::json::read(settings)?;
+    let result: FitRecord = crate::json::read(result)?;
+    let names = problem.names();
+    let mut ends = Vec::with_capacity(result.starts.len());
+    for start in &result.starts {
+        let missing = missing(&names, &start.end);
+        if !missing.is_empty() {
+            return Err(value_error(format!(
+                "A start has no value of {}.",
+                python_list(&missing)
+            )));
+        }
+        ends.push(ordered(&names, &start.end));
+    }
+    let losses: Vec<f64> = result.starts.iter().map(|start| start.loss).collect();
+    let converged: Vec<bool> = result.starts.iter().map(|start| start.converged).collect();
     let analysis = identifiability::starts_identifiability(
         &ends,
         &losses,
         &converged,
-        &bounds,
-        parameter_tolerance,
-        loss_tolerance,
+        &problem.inner.parameter_bounds(),
+        settings.parameter_tolerance,
+        settings.loss_tolerance,
     )
     .map_err(method_error)?;
     Ok(PyStartsAnalysis {

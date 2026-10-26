@@ -1,5 +1,6 @@
 """The calibration problem: losses, normalization, and the whole workflow."""
 
+import json
 import math
 
 import pytest
@@ -16,6 +17,8 @@ from commol import (
     ParticleSwarmConfig,
     Simulation,
 )
+from commol.commol_rs import _commol_rs as commol_rs
+from commol.context.engine_json import engine_json
 from commol.context.model import Model
 from tests.support import bounded, build, observed, abc_builder
 
@@ -28,7 +31,7 @@ class TestLosses:
     def test_loss_config_carries_normalization_flag(
         self, truth: Model, loss_function: str, normalize: bool
     ) -> None:
-        """The problem's normalize_observations must reach the Rust LossConfig."""
+        """The problem's loss and normalize_observations reach the engine."""
         problem = CalibrationProblem(
             observed_data=[ObservedDataPoint(at=0, output="B", value=10.0)],
             parameters=[bounded("k1")],
@@ -37,9 +40,13 @@ class TestLosses:
             optimization_config=NelderMeadConfig(max_iterations=1, verbose=False),
         )
 
-        loss_config = Calibrator(Simulation(truth), problem)._build_loss_config()
+        Calibrator(Simulation(truth), problem)
+        read = json.loads(
+            commol_rs.json.as_read("CalibrationProblem", engine_json(problem))
+        )
 
-        assert loss_config.normalize_observations is normalize
+        assert read["loss_function"] == loss_function
+        assert read["normalize_observations"] is normalize
 
     def test_normalization_changes_deterministic_loss(
         self, truth: Model, truth_run

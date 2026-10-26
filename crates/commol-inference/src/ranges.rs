@@ -8,8 +8,8 @@
 //! the Python model of the object checks them when it is built
 //! ([`commol_core::Ranges::check`]).
 
-use commol_calibration::ranges::{AT, STARTS, WINDOW};
-use commol_core::{Bound, CONFIDENCE_LEVEL, Count, Ranges, Real, Rule};
+use commol_calibration::ranges::{AT, WINDOW};
+use commol_core::{Bound, Count, Ranges, Real, Rule};
 
 /// The replicates of a bootstrap.
 pub const REPLICATES: Count = Count::at_least("replicates", 1);
@@ -102,242 +102,111 @@ pub const END: Real = Real::non_negative("end");
 /// The positions a quantity reads.
 pub const POSITIONS: Real = Real::non_negative("positions");
 
+/// The rules of a beta distribution.
+pub const BETA: Ranges = Ranges {
+    object: "Beta",
+    rules: &[Rule::Real(A), Rule::Real(B)],
+};
+
+/// The rules of a normal distribution.
+pub const NORMAL: Ranges = Ranges {
+    object: "Normal",
+    rules: &[Rule::Real(MEAN), Rule::Real(SD)],
+};
+
+/// The rules of a log-normal distribution.
+pub const LOG_NORMAL: Ranges = Ranges {
+    object: "LogNormal",
+    rules: &[Rule::Real(MU), Rule::Real(SIGMA)],
+};
+
+/// The rules of a gamma distribution.
+pub const GAMMA: Ranges = Ranges {
+    object: "Gamma",
+    rules: &[Rule::Real(SHAPE), Rule::Real(RATE)],
+};
+
+/// The rules of the value of a series at a position.
+pub const VALUE_AT: Ranges = Ranges {
+    object: "ValueAt",
+    rules: &[Rule::Real(AT)],
+};
+
+/// The rules of a gain.
+pub const GAIN: Ranges = Ranges {
+    object: "Gain",
+    rules: &[Rule::Real(START), Rule::Real(END)],
+};
+
+/// The rules of a peak.
+pub const PEAK: Ranges = Ranges {
+    object: "Peak",
+    rules: &[Rule::Real(POSITIONS)],
+};
+
+/// The rules of the position of a peak.
+pub const PEAK_POSITION: Ranges = Ranges {
+    object: "PeakPosition",
+    rules: &[Rule::Real(POSITIONS)],
+};
+
+/// The rules of a trajectory.
+pub const TRAJECTORY: Ranges = Ranges {
+    object: "Trajectory",
+    rules: &[Rule::Real(POSITIONS)],
+};
+
+/// The rules of the increments of a series.
+pub const INCREMENTS: Ranges = Ranges {
+    object: "Increments",
+    rules: &[Rule::Real(WINDOW)],
+};
+
 /// The rules of the settings of each object of the methods, as the Python
 /// API names its class.
 pub const RANGES: &[Ranges] = &[
-    Ranges {
-        object: "InformationMatchingEta",
-        rules: &[Rule::Count(BLOCK_LENGTH), Rule::Count(STARTS)],
-    },
-    Ranges {
-        object: "BootstrapCoverageEta",
-        rules: &[
-            Rule::Count(REPLICATES),
-            Rule::Count(BLOCK_LENGTH),
-            Rule::Real(CONFIDENCE_LEVEL),
-            Rule::Count(STARTS),
-        ],
-    },
-    Ranges {
-        object: "GibbsPosterior",
-        rules: &[
-            Rule::Real(ETA),
-            Rule::Count(PARTICLES),
-            Rule::Real(TARGET_CESS),
-            Rule::Real(RESAMPLE_THRESHOLD),
-            Rule::Real(STAY_PROBABILITY),
-        ],
-    },
-    Ranges {
-        object: "BayesianPosterior",
-        rules: &[
-            Rule::Count(PARTICLES),
-            Rule::Real(TARGET_CESS),
-            Rule::Real(RESAMPLE_THRESHOLD),
-            Rule::Real(STAY_PROBABILITY),
-        ],
-    },
-    Ranges {
-        object: "ABCSMC",
-        rules: &[
-            Rule::Count(PARTICLES),
-            Rule::Real(TARGET_CESS),
-            Rule::Real(MIN_ACCEPTANCE),
-            Rule::Real(STAY_PROBABILITY),
-        ],
-    },
-    Ranges {
-        object: "ABCRejection",
-        rules: &[Rule::Count(TWO_DRAWS), Rule::Real(QUANTILE)],
-    },
-    Ranges {
-        object: "BayesianBootstrap",
-        rules: &[
-            Rule::Count(REPLICATES),
-            Rule::Count(BLOCK_LENGTH),
-            Rule::Count(STARTS),
-        ],
-    },
-    Ranges {
-        object: "ParametricBootstrap",
-        rules: &[Rule::Count(REPLICATES), Rule::Count(STARTS)],
-    },
-    Ranges {
-        object: "ResidualBootstrap",
-        rules: &[
-            Rule::Count(REPLICATES),
-            Rule::Count(BLOCK_LENGTH),
-            Rule::Count(STARTS),
-        ],
-    },
-    Ranges {
-        object: "WildBootstrap",
-        rules: &[
-            Rule::Count(REPLICATES),
-            Rule::Count(BLOCK_LENGTH),
-            Rule::Count(STARTS),
-        ],
-    },
-    Ranges {
-        object: "BlockJackknife",
-        rules: &[Rule::Count(BLOCK_LENGTH), Rule::Count(STARTS)],
-    },
-    Ranges {
-        object: "ResidualNoise",
-        rules: &[Rule::Count(BLOCK_LENGTH)],
-    },
-    Ranges {
-        object: "SplitConformal",
-        rules: &[Rule::Real(CONFIDENCE_LEVEL), Rule::Count(STARTS)],
-    },
-    Ranges {
-        object: "RollingConformal",
-        rules: &[Rule::Real(CONFIDENCE_LEVEL), Rule::Count(STARTS)],
-    },
-    Ranges {
-        object: "JackknifePlus",
-        rules: &[
-            Rule::Real(CONFIDENCE_LEVEL),
-            Rule::Count(BLOCK_LENGTH),
-            Rule::Count(STARTS),
-        ],
-    },
-    Ranges {
-        object: "EnbPI",
-        rules: &[
-            Rule::Real(CONFIDENCE_LEVEL),
-            Rule::Count(TWO_REPLICATES),
-            Rule::Count(BLOCK_LENGTH),
-            Rule::Count(STARTS),
-        ],
-    },
-    Ranges {
-        object: "AdaptiveConformal",
-        rules: &[
-            Rule::Real(CONFIDENCE_LEVEL),
-            Rule::Real(STEP),
-            Rule::Count(STARTS),
-        ],
-    },
-    Ranges {
-        object: "Threshold",
-        rules: &[Rule::Real(CONFIDENCE_LEVEL)],
-    },
-    Ranges {
-        object: "PredictionSpec",
-        rules: &[Rule::Real(AT), Rule::Real(WINDOW)],
-    },
-    Ranges {
-        object: "ProfileLikelihood",
-        rules: &[Rule::Count(MAX_STEPS), Rule::Count(STARTS)],
-    },
-    Ranges {
-        object: "PredictionProfile",
-        rules: &[Rule::Count(MAX_STEPS), Rule::Count(STARTS)],
-    },
-    Ranges {
-        object: "StructuralRank",
-        rules: &[Rule::Count(POINTS)],
-    },
-    Ranges {
-        object: "Collinearity",
-        rules: &[Rule::Count(MAX_SUBSET_SIZE), Rule::Real(THRESHOLD)],
-    },
-    Ranges {
-        object: "SampleIdentifiability",
-        rules: &[Rule::Real(CORRELATION_THRESHOLD)],
-    },
-    Ranges {
-        object: "StartsIdentifiability",
-        rules: &[Rule::Real(PARAMETER_TOLERANCE), Rule::Real(LOSS_TOLERANCE)],
-    },
-    Ranges {
-        object: "Laplace",
-        rules: &[Rule::Count(DRAWS), Rule::Count(STARTS)],
-    },
-    Ranges {
-        object: "Sandwich",
-        rules: &[
-            Rule::Count(BLOCK_LENGTH),
-            Rule::Count(DRAWS),
-            Rule::Count(STARTS),
-        ],
-    },
-    Ranges {
-        object: "GibbsTarget",
-        rules: &[Rule::Real(ETA)],
-    },
-    Ranges {
-        object: "LaplaceMixture",
-        rules: &[Rule::Count(STARTS), Rule::Count(MIXTURE_DRAWS)],
-    },
-    Ranges {
-        object: "Propagation",
-        rules: &[Rule::Count(DRAWS)],
-    },
-    Ranges {
-        object: "PRCC",
-        rules: &[Rule::Count(DRAWS)],
-    },
-    Ranges {
-        object: "Morris",
-        rules: &[Rule::Count(TRAJECTORIES), Rule::Count(LEVELS)],
-    },
-    Ranges {
-        object: "Sobol",
-        rules: &[
-            Rule::Count(TWO_DRAWS),
-            Rule::Count(TWO_REPLICATES),
-            Rule::Real(CONFIDENCE_LEVEL),
-        ],
-    },
-    Ranges {
-        object: "PolynomialChaos",
-        rules: &[
-            Rule::Count(DEGREE),
-            Rule::Real(Q_NORM),
-            Rule::Count(MAX_INTERACTION),
-            Rule::Count(TWO_DRAWS),
-        ],
-    },
-    Ranges {
-        object: "Beta",
-        rules: &[Rule::Real(A), Rule::Real(B)],
-    },
-    Ranges {
-        object: "Normal",
-        rules: &[Rule::Real(MEAN), Rule::Real(SD)],
-    },
-    Ranges {
-        object: "LogNormal",
-        rules: &[Rule::Real(MU), Rule::Real(SIGMA)],
-    },
-    Ranges {
-        object: "Gamma",
-        rules: &[Rule::Real(SHAPE), Rule::Real(RATE)],
-    },
-    Ranges {
-        object: "ValueAt",
-        rules: &[Rule::Real(AT)],
-    },
-    Ranges {
-        object: "Gain",
-        rules: &[Rule::Real(START), Rule::Real(END)],
-    },
-    Ranges {
-        object: "Peak",
-        rules: &[Rule::Real(POSITIONS)],
-    },
-    Ranges {
-        object: "PeakPosition",
-        rules: &[Rule::Real(POSITIONS)],
-    },
-    Ranges {
-        object: "Trajectory",
-        rules: &[Rule::Real(POSITIONS)],
-    },
-    Ranges {
-        object: "Increments",
-        rules: &[Rule::Real(WINDOW)],
-    },
+    crate::settings::smc::InformationMatchingEta::RANGES,
+    crate::settings::smc::BootstrapCoverageEta::RANGES,
+    crate::settings::smc::GibbsPosteriorSettings::RANGES,
+    crate::settings::smc::BayesianPosteriorSettings::RANGES,
+    crate::settings::smc::AbcSmcSettings::RANGES,
+    crate::settings::smc::AbcRejectionSettings::RANGES,
+    crate::settings::resampling::BayesianBootstrapSettings::RANGES,
+    crate::settings::resampling::ParametricBootstrapSettings::RANGES,
+    crate::settings::resampling::ResidualBootstrapSettings::RANGES,
+    crate::settings::resampling::WildBootstrapSettings::RANGES,
+    crate::settings::resampling::BlockJackknifeSettings::RANGES,
+    crate::settings::resampling::ResidualNoiseSettings::RANGES,
+    crate::settings::conformal::SplitConformalSettings::RANGES,
+    crate::settings::conformal::RollingConformalSettings::RANGES,
+    crate::settings::conformal::JackknifePlusSettings::RANGES,
+    crate::settings::conformal::EnbPiSettings::RANGES,
+    crate::settings::conformal::AdaptiveConformalSettings::RANGES,
+    crate::settings::profiles::Threshold::RANGES,
+    crate::settings::profiles::PredictionSpec::RANGES,
+    crate::settings::profiles::ProfileLikelihoodSettings::RANGES,
+    crate::settings::profiles::PredictionProfileSettings::RANGES,
+    crate::settings::identifiability::StructuralRankSettings::RANGES,
+    crate::settings::identifiability::CollinearitySettings::RANGES,
+    crate::settings::identifiability::SampleIdentifiabilitySettings::RANGES,
+    crate::settings::identifiability::StartsIdentifiabilitySettings::RANGES,
+    crate::settings::local::LaplaceSettings::RANGES,
+    crate::settings::local::SandwichSettings::RANGES,
+    crate::settings::local::GibbsTargetSettings::RANGES,
+    crate::settings::local::LaplaceMixtureSettings::RANGES,
+    crate::settings::sensitivity::PropagationSettings::RANGES,
+    crate::settings::sensitivity::PrccSettings::RANGES,
+    crate::settings::sensitivity::MorrisSettings::RANGES,
+    crate::settings::sensitivity::SobolSettings::RANGES,
+    crate::settings::sensitivity::PolynomialChaosSettings::RANGES,
+    BETA,
+    NORMAL,
+    LOG_NORMAL,
+    GAMMA,
+    VALUE_AT,
+    GAIN,
+    PEAK,
+    PEAK_POSITION,
+    TRAJECTORY,
+    INCREMENTS,
 ];

@@ -44,7 +44,9 @@ def test_a_thread_limit_below_one_is_rejected() -> None:
         with pytest.raises(ValueError, match=f"at least 1, got {value}"):
             with commol.threads(value):
                 pass
-    with pytest.raises(ValueError, match="'inner'; the levels are 'all' and 'outer'"):
+    with pytest.raises(
+        ValueError, match="unknown variant `inner`, expected `all` or `outer`"
+    ):
         commol.set_threads(2, levels="inner")  # type: ignore[arg-type]
 
 

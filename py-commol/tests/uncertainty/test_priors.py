@@ -133,8 +133,8 @@ class TestPriors:
         assert log_normal.cdf(1.0, (0.0, math.inf)) == pytest.approx(0.5)
         with pytest.raises(ValueError, match="between 0 and 1, got 1.5"):
             log_normal.quantile(1.5, (0.0, math.inf))
-        with pytest.raises(ValueError, match="Unknown distribution 'cauchy'"):
-            commol_rs.inference.Distribution("cauchy", [], 0.0, 1.0)
+        with pytest.raises(ValueError, match="kind: unknown variant `cauchy`"):
+            commol_rs.inference.Distribution('{"kind": "cauchy"}', 0.0, 1.0)
         with pytest.raises(ValidationError):
             GibbsPosterior.model_validate("not a configuration")
 

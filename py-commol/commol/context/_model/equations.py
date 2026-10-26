@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context.engine_json import engine_json
 
 from commol.context._model import engine_state
 from commol.context._model.engine_state import ExpandedOutput, TransitionFlow
@@ -196,7 +197,7 @@ class DynamicsDescription:
             self.expanded_graph(),
         ]
         blocks.extend(self.compact_form())
-        engine = commol_rs.engine.EngineType(self._model.engine.type)
+        engine = commol_rs.engine.EngineType(engine_json(self._model.engine.type))
         if engine.equation_lhs("X", False):
             blocks.append(self.expanded_form())
         if engine.dynamics_form == "stochastic_events":
@@ -751,11 +752,13 @@ def _impulse_schedule(transition: "Transition") -> str:
 
 def _equation_lhs(variable_name: str, latex: bool, engine_type: str) -> str:
     """The left-hand side of an equation, as the engine of the model writes it."""
-    lhs = commol_rs.engine.EngineType(engine_type).equation_lhs(variable_name, latex)
+    lhs = commol_rs.engine.EngineType(engine_json(engine_type)).equation_lhs(
+        variable_name, latex
+    )
     if lhs is None:
         raise ValueError(
             f"The {engine_type} engine has no equations: its dynamics are "
-            f"{commol_rs.engine.EngineType(engine_type).dynamics_form}"
+            f"{commol_rs.engine.EngineType(engine_json(engine_type)).dynamics_form}"
         )
     return lhs
 

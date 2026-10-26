@@ -907,43 +907,6 @@ fn every_replicate_method_counts_the_same_fits() {
 }
 
 #[test]
-fn a_name_gives_its_setting_and_an_unknown_name_lists_the_names() {
-    assert!(matches!(
-        ResidualScale::from_name("multiplicative"),
-        Ok(ResidualScale::Multiplicative)
-    ));
-    assert!(matches!(
-        ResidualBlocks::from_name("stationary"),
-        Ok(ResidualBlocks::Stationary)
-    ));
-    assert!(matches!(
-        Multipliers::from_name("mammen"),
-        Ok(Multipliers::Mammen)
-    ));
-    assert_eq!(
-        ResidualScale::from_name("log")
-            .err()
-            .map(|error| error.to_string())
-            .as_deref(),
-        Some("residual_scale is 'log'; it must be \"additive\" or \"multiplicative\"")
-    );
-    assert_eq!(
-        ResidualBlocks::from_name("circular")
-            .err()
-            .map(|error| error.to_string())
-            .as_deref(),
-        Some("scheme is 'circular'; it must be \"moving\" or \"stationary\"")
-    );
-    assert_eq!(
-        Multipliers::from_name("gauss")
-            .err()
-            .map(|error| error.to_string())
-            .as_deref(),
-        Some("multipliers is 'gauss'; it must be \"rademacher\" or \"mammen\"")
-    );
-}
-
-#[test]
 fn a_bootstrap_of_a_parameter_named_twice_has_no_sample() {
     // The problem takes two parameters 'k'; a sample names each column once.
     let problem = problem(sine, &[("k", 0.0, 1.0), ("k", 0.0, 1.0)], &[0.0, 0.5, 0.8]);
@@ -955,4 +918,20 @@ fn a_bootstrap_of_a_parameter_named_twice_has_no_sample() {
     let error = bootstrap(&runner, &resampler, 2).unwrap_err().to_string();
 
     assert_eq!(error, "A sample names 'k' twice; one name per column");
+}
+
+#[test]
+fn a_block_length_is_a_number_or_auto() {
+    use commol_inference::settings::BlockLength;
+
+    for text in [r#""auto""#, "3"] {
+        let length: BlockLength = commol_core::json::read(text).unwrap();
+
+        assert_eq!(commol_core::json::write(&length), text);
+    }
+    let message = commol_core::json::read::<BlockLength>("true").unwrap_err();
+    assert_eq!(
+        message,
+        r#"block_length is a whole number of at least 1 or "auto""#
+    );
 }

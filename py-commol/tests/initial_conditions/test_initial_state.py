@@ -100,12 +100,9 @@ class TestInitialState:
 
     def test_the_binding_reports_bins_and_categories(self) -> None:
         model = build(conditional_pathway_builder())
-        rust_process = commol_rs.core.Process.from_json(model.process.model_dump_json())
-        rust_structure = commol_rs.core.Aggregate.from_json(
-            model.structure.model_dump_json()
+        state = commol_rs.model.initial_state(
+            model.process.model_dump_json(), model.structure.model_dump_json()
         )
-
-        state = commol_rs.model.initial_state(rust_process, rust_structure)
 
         assert state[0] == ("A_g1", "A", [("group", "g1")], 450.0)
         assert [name for name, _, _, _ in state] == Simulation(

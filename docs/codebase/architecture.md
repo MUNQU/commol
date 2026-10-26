@@ -22,7 +22,7 @@ flowchart TB
     RS["Rust: crates/<br/>compiler, engines, calibration, inference"]
     U --> API
     API --> CTX
-    CTX -->|model as JSON| BR
+    CTX -->|model, problem and methods as JSON| BR
     BR --> RS
     RS -.->|results| API
 ```

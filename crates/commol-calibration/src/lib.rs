@@ -75,6 +75,7 @@ pub mod observation;
 pub mod optimization;
 pub mod ranges;
 pub mod series;
+pub mod settings;
 pub mod starts;
 pub mod subproblem;
 pub mod types;
@@ -99,6 +100,10 @@ pub use optimization::{
     optimize_from, optimize_subproblem, optimize_with_history,
 };
 pub use series::SeriesIndex;
+pub use settings::{
+    FitRecord, NelderMeadSettings, Observation, OptimizerSettings, ParticleSwarmSettings,
+    ProblemSettings, StartRecord, observed_data,
+};
 pub use starts::{
     StartOutcome, Starts, optimize_starts, optimize_starts_with_observer, start_points,
 };

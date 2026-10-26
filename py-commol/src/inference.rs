@@ -1,21 +1,25 @@
 //! Python bindings of a built calibration problem and of the inference
 //! methods that read it.
 //!
-//! [`PyCalibrationProblem`] is built once from a `Calibrator` and passed to
+//! [`PyCalibrationProblem`] is built once from the JSON of a
+//! `CalibrationProblem`, with its optimizer and its seed, and passed to
 //! every call, so Python never converts the problem twice and never
-//! transforms a prediction: the observation operator, the replicates and the
-//! starts all run here.
+//! transforms a prediction: the observation operator, the replicates, the
+//! starts and the fit of every method all run here. Each method takes the
+//! problem, the JSON of its settings ([`commol_inference::settings`]) and
+//! the handles of the results it reads.
 
 use crate::parallelism::parallel;
 use commol_calibration::{
-    CalibrationProblem, DiscrepancyConfig, EvaluationError, Violation, Workspace, optimize_starts,
-    optimize_with_history, start_points,
+    CalibrationProblem, EvaluationError, OptimizationConfig, ProblemSettings, Starts, Violation,
+    Workspace, observed_data, optimize_starts, optimize_with_history, start_points,
 };
 use commol_inference::resampling::{
     BayesianBootstrap, BlockDrawing, BlockScheme, FitUnit, Multipliers, ParametricResampler,
     ReplicateRunner, Resampler, ResidualBlocks, ResidualBootstrap, ResidualNoise, ResidualScale,
-    Residuals, WildBootstrap, block_jackknife, bootstrap,
+    Residuals, WildBootstrap, bootstrap as run_replicates,
 };
+use commol_inference::settings::resampling::{BlockJackknifeSettings, Bootstrap, NoiseSettings};
 use commol_inference::{
     DistributionNoise, ErrorKind, MethodError, NoNoise, ObservationDraws, ObservationNoise,
     ParameterSample, Predictive, PredictiveError, observation_draws, scores,
@@ -24,17 +28,21 @@ use commol_statistics::statistics;
 use pyo3::prelude::*;
 use rayon::prelude::*;
 
-use crate::calibration::{
-    PyCalibrationConstraint, PyCalibrationParameter, PyCalibrationResultWithHistory, PyLossConfig,
-    PyObservationModel, PyObservedDataPoint, PyOptimizationConfig, PyStarts,
-};
+use crate::calibration::{PyCalibrationResultWithHistory, PyStarts};
 use crate::engine::{Engine, InfeasibleStateError, PyEngine};
 
-/// A calibration problem, built once
+/// A calibration problem, built once, with its optimizer and its seed
 #[pyclass(name = "CalibrationProblem", frozen)]
 pub struct PyCalibrationProblem {
     pub(crate) inner: CalibrationProblem<Engine>,
-    seed: u64,
+    /// The optimizer of every fit.
+    optimizer: OptimizationConfig,
+    /// Whether the optimizer writes its progress.
+    verbose: bool,
+    /// Iterations between two headers of the progress table.
+    header_interval: u64,
+    /// The seed of every random number of the calibration.
+    pub(crate) seed: u64,
 }
 
 /// The Python error of a parameter set that has no prediction:
@@ -92,29 +100,104 @@ pub(crate) enum ResamplerSpec {
 }
 
 impl ResamplerSpec {
-    /// The residual bootstrap of a scale and a scheme by name.
-    pub(crate) fn residual(
-        block_length: Option<usize>,
-        residual_scale: &str,
-        scheme: &str,
-    ) -> PyResult<Self> {
-        Ok(Self::Residual {
-            block_length,
-            scale: ResidualScale::from_name(residual_scale).map_err(method_error)?,
-            blocks: ResidualBlocks::from_name(scheme).map_err(method_error)?,
-        })
-    }
-
-    /// The wild bootstrap of multipliers by name.
-    pub(crate) fn wild(block_length: Option<usize>, multipliers: &str) -> PyResult<Self> {
-        Ok(Self::Wild {
-            block_length,
-            multipliers: Multipliers::from_name(multipliers).map_err(method_error)?,
-        })
+    /// How the bootstrap of `settings` draws its replicates.
+    pub(crate) fn of(settings: &Bootstrap) -> Self {
+        match settings {
+            Bootstrap::Bayesian(settings) => Self::Bayesian {
+                block_length: settings.block_length.0,
+            },
+            Bootstrap::Parametric(_) => Self::Parametric,
+            Bootstrap::Residual(settings) => Self::Residual {
+                block_length: settings.block_length.0,
+                scale: settings.residual_scale,
+                blocks: settings.scheme,
+            },
+            Bootstrap::Wild(settings) => Self::Wild {
+                block_length: settings.block_length.0,
+                multipliers: settings.multipliers,
+            },
+        }
     }
 }
 
+/// The values of the best start of `starts`, in problem order.
+pub(crate) fn best_values(starts: &Starts) -> Vec<f64> {
+    starts.best().best_parameters.clone()
+}
+
+/// The end of each start of `starts` that did not fail, in order.
+pub(crate) fn start_ends(starts: &Starts) -> Vec<Vec<f64>> {
+    starts
+        .outcomes()
+        .iter()
+        .filter_map(|outcome| outcome.result.as_ref().ok())
+        .map(|result| result.best_parameters.clone())
+        .collect()
+}
+
+/// A list of names as Python writes it, `['a', 'b']`, for a message that
+/// names them as Python does.
+pub(crate) fn python_list(names: &[String]) -> String {
+    let quoted: Vec<String> = names.iter().map(|name| format!("'{name}'")).collect();
+    format!("[{}]", quoted.join(", "))
+}
+
 impl PyCalibrationProblem {
+    /// The optimizer of every fit.
+    pub(crate) fn optimizer(&self) -> &OptimizationConfig {
+        &self.optimizer
+    }
+
+    /// The names of the parameters, in problem order.
+    pub(crate) fn names(&self) -> Vec<String> {
+        self.inner.parameter_names()
+    }
+
+    /// Fit the problem from `starts` start points in parallel with its
+    /// optimizer and its seed, and keep every start.
+    ///
+    /// # Errors
+    ///
+    /// A `ValueError` when a verbose optimizer has more than one start, and
+    /// a `RuntimeError` when every start fails.
+    pub(crate) fn fit(&self, py: Python<'_>, starts: usize) -> PyResult<Starts> {
+        if self.verbose && starts > 1 {
+            return Err(value_error(
+                "A verbose optimizer shows one start; set starts=1 or verbose=False".to_string(),
+            ));
+        }
+        let points = start_points(self.inner.parameters(), starts, self.seed);
+        parallel(py, || {
+            if self.verbose {
+                crate::python_observer::optimize_with_python_observer(
+                    &self.inner,
+                    &self.optimizer,
+                    points,
+                    self.seed,
+                    self.header_interval,
+                )
+            } else {
+                optimize_starts(&self.inner, &self.optimizer, points, self.seed)
+            }
+        })?
+        .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)
+    }
+
+    /// The runner of the refits of a method from `fit`, with `starts`
+    /// starts per refit.
+    ///
+    /// # Errors
+    ///
+    /// As [`ReplicateRunner::new`].
+    pub(crate) fn runner(
+        &self,
+        fit: &[f64],
+        starts: usize,
+    ) -> PyResult<ReplicateRunner<'_, Engine>> {
+        ReplicateRunner::new(&self.inner, &self.optimizer, fit, starts, self.seed)
+            .map_err(method_error)
+    }
+
     /// The resampler of `spec` around the fit `fit`, and its blocks, if it
     /// draws blocks.
     pub(crate) fn resampler(
@@ -184,39 +267,22 @@ impl PyCalibrationProblem {
         }
     }
 
-    /// Run `replicates` of the resampler that `resampler` makes from the fit,
-    /// and the block length of its blocks, if it draws blocks.
-    #[allow(clippy::too_many_arguments)]
-    fn run_bootstrap(
-        &self,
-        py: Python<'_>,
-        config: &PyOptimizationConfig,
-        fit: &[f64],
-        replicates: usize,
-        starts: usize,
-        seed: u64,
-        resampler: impl FnOnce(&[f64]) -> PyResult<(Box<dyn Resampler>, Option<BlockScheme>)>,
-    ) -> PyResult<PyBootstrapRun> {
-        let runner = ReplicateRunner::new(&self.inner, &config.inner, fit, starts, seed)
-            .map_err(method_error)?;
-        let (resampler, scheme) = resampler(runner.fit())?;
-        let run = parallel(py, || bootstrap(&runner, resampler.as_ref(), replicates))?
-            .map_err(method_error)?;
-        Ok(PyBootstrapRun {
-            values: run.sample.values().to_vec(),
-            groups: run
-                .sample
-                .groups()
-                .map(<[usize]>::to_vec)
-                .unwrap_or_default(),
-            failed: FitUnit::Replicate.entries(&run.failed),
-            not_converged: run.not_converged,
-            negative_values: run.negative_values,
-            block_length: scheme.as_ref().map(BlockScheme::length),
-            block_length_estimates: scheme
-                .as_ref()
-                .and_then(BlockScheme::estimates)
-                .map(<[_]>::to_vec),
+    /// The noise of `settings`, the JSON of an observation noise.
+    fn noise(&self, settings: &str) -> PyResult<Box<dyn ObservationNoise>> {
+        Ok(match crate::json::read::<NoiseSettings>(settings)? {
+            NoiseSettings::None => Box::new(NoNoise),
+            NoiseSettings::Distribution => {
+                Box::new(DistributionNoise::new(&self.inner).map_err(value_error)?)
+            }
+            NoiseSettings::Residual(noise) => {
+                let fit = noise.fit.values(&self.names()).map_err(value_error)?;
+                let residuals = Residuals::new(&self.inner, &fit, noise.residual_scale)
+                    .map_err(method_error)?;
+                Box::new(
+                    ResidualNoise::new(self.inner.observed_data(), &residuals, noise.block_length)
+                        .map_err(method_error)?,
+                )
+            }
         })
     }
 }
@@ -229,79 +295,29 @@ impl PyCalibrationProblem {
     ///
     /// Args:
     ///     engine: The simulation engine built from the model
-    ///     observed_data: Observations to fit
-    ///     parameters: Parameters to calibrate, in problem order
-    ///     constraints: Constraints on parameters and outputs
-    ///     loss_config: Loss, normalization and replicates; None with
-    ///         observation models
-    ///     initial_condition_remainder: Compartment or bin that takes what
-    ///         the other compartments leave of the amounts the model states,
-    ///         if any
-    ///     observation_models: `(series label, model)` of each series; None
-    ///         with a loss
-    ///     seed: The seed of every random number of the calibration; None
-    ///         draws one, which `seed` reports, and a stochastic engine needs
-    ///         it set
+    ///     problem: The JSON of the `CalibrationProblem`: its observations,
+    ///         parameters, constraints, loss or observation models,
+    ///         optimizer, replicates and seed; a seed of None draws one,
+    ///         which `seed` reports, and a stochastic engine needs it set
     ///
     /// Raises:
-    ///     ValueError: If the problem is not valid for the engine, it has
-    ///         both or neither of a loss and observation models, it has
-    ///         observation models and a stochastic engine, or a stochastic
-    ///         engine lacks a setting of its replicates
+    ///     ValueError: If the JSON is not a problem, a setting is outside
+    ///         its rule (the message names its path), the problem is not
+    ///         valid for the engine, it has both or neither of a loss and
+    ///         observation models, it has observation models and a
+    ///         stochastic engine, or a stochastic engine lacks a setting of
+    ///         its replicates
     #[new]
-    #[pyo3(signature = (engine, observed_data, parameters, constraints, loss_config=None, initial_condition_remainder=None, observation_models=None, seed=None))]
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        engine: PyRef<'_, PyEngine>,
-        observed_data: Vec<PyObservedDataPoint>,
-        parameters: Vec<PyCalibrationParameter>,
-        constraints: Vec<PyCalibrationConstraint>,
-        loss_config: Option<PyRef<'_, PyLossConfig>>,
-        initial_condition_remainder: Option<String>,
-        observation_models: Option<Vec<(String, PyObservationModel)>>,
-        seed: Option<i128>,
-    ) -> PyResult<Self> {
-        let seed: Option<u64> = crate::counts::optional_count(&commol_core::SEED, seed)?;
-        let engine = engine.engine();
-        let discrepancy = match (&loss_config, observation_models) {
-            (Some(loss), None) => DiscrepancyConfig::Loss(loss.inner),
-            (None, Some(models)) => DiscrepancyConfig::Likelihood(
-                models
-                    .into_iter()
-                    .map(|(label, model)| (label, model.inner))
-                    .collect(),
-            ),
-            _ => {
-                return Err(value_error(
-                    "A calibration problem has a loss or observation models: exactly one of them"
-                        .to_string(),
-                ));
-            }
-        };
-        let mut problem = CalibrationProblem::new(
-            engine,
-            observed_data.into_iter().map(|d| d.inner).collect(),
-            parameters.into_iter().map(|p| p.inner).collect(),
-            constraints.into_iter().map(|c| c.inner).collect(),
-            discrepancy,
-        )
-        .map_err(value_error)?;
-        if let Some(loss) = loss_config {
-            problem = problem
-                .with_observation_normalization(loss.normalize_observations)
-                .and_then(|problem| {
-                    problem.with_replicate_settings(loss.replicates, seed, loss.summary)
-                })
-                .map_err(value_error)?;
-        }
-        if let Some(remainder) = initial_condition_remainder {
-            problem = problem
-                .with_initial_condition_remainder(&remainder)
-                .map_err(value_error)?;
-        }
+    fn new(engine: PyRef<'_, PyEngine>, problem: &str) -> PyResult<Self> {
+        let settings: ProblemSettings = crate::json::read(problem)?;
+        let optimizer = settings.optimization_config.config().map_err(value_error)?;
+        let inner = settings.problem(engine.engine()).map_err(value_error)?;
         Ok(Self {
-            inner: problem,
-            seed: commol_random::seed_or_drawn(seed),
+            inner,
+            optimizer,
+            verbose: settings.optimization_config.verbose(),
+            header_interval: settings.optimization_config.header_interval(),
+            seed: commol_random::seed_or_drawn(settings.seed),
         })
     }
 
@@ -315,67 +331,33 @@ impl PyCalibrationProblem {
     /// Optimize from `starts` start points in parallel, and choose the best
     ///
     /// Start 0 is the initial guess; the others are rows of a Latin
-    /// hypercube over the bounds. `seed` gives the hypercube and the seed of
-    /// each start of a particle swarm.
+    /// hypercube over the bounds. The seed of the problem gives the
+    /// hypercube and the seed of each start of a particle swarm.
     ///
     /// Args:
-    ///     config: The optimizer
-    ///     starts: Number of starts, at least 1 (the caller checks it)
-    ///     seed: Seed of the starts
+    ///     starts: Number of starts, at least 1
     ///
     /// Returns:
     ///     The outcome of each start, in order, and the index of the best
     ///
     /// Raises:
-    ///     ValueError: If a verbose optimizer has more than one start
+    ///     ValueError: If `starts` is below 1, or a verbose optimizer has
+    ///         more than one start
     ///     RuntimeError: If every start fails; the message gives the reason
     ///         of each
-    fn optimize(
-        &self,
-        py: Python<'_>,
-        config: &PyOptimizationConfig,
-        starts: i64,
-        seed: i128,
-    ) -> PyResult<PyStarts> {
-        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+    fn optimize(&self, py: Python<'_>, starts: i64) -> PyResult<PyStarts> {
         let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
-        if config.verbose && starts > 1 {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "A verbose optimizer shows one start; set starts=1 or verbose=False",
-            ));
-        }
-        let points = start_points(self.inner.parameters(), starts, seed);
-        parallel(py, || {
-            if config.verbose {
-                crate::python_observer::optimize_with_python_observer(
-                    &self.inner,
-                    &config.inner,
-                    points,
-                    seed,
-                    config.header_interval,
-                )
-            } else {
-                optimize_starts(&self.inner, &config.inner, points, seed)
-            }
-        })?
-        .map(|inner| PyStarts { inner })
-        .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)
+        self.fit(py, starts).map(|inner| PyStarts { inner })
     }
 
-    /// Optimize from the initial guess, as start 0 of `optimize` with
-    /// `seed`, and keep every evaluation of a feasible point
+    /// Optimize from the initial guess, as start 0 of `optimize`, and keep
+    /// every evaluation of a feasible point
     ///
     /// Raises:
     ///     RuntimeError: If the optimization fails
-    fn optimize_with_history(
-        &self,
-        py: Python<'_>,
-        config: &PyOptimizationConfig,
-        seed: i128,
-    ) -> PyResult<PyCalibrationResultWithHistory> {
-        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
+    fn optimize_with_history(&self, py: Python<'_>) -> PyResult<PyCalibrationResultWithHistory> {
         parallel(py, || {
-            optimize_with_history(&self.inner, &config.inner, seed)
+            optimize_with_history(&self.inner, &self.optimizer, self.seed)
         })?
         .map(|inner| PyCalibrationResultWithHistory { inner })
         .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)
@@ -419,7 +401,7 @@ impl PyCalibrationProblem {
     }
 
     /// The run of every draw of `sample` at `positions`, in parallel, each
-    /// replicate of a stochastic engine seeded from `seed`
+    /// replicate of a stochastic engine seeded from the seed of the problem
     ///
     /// Raises:
     ///     ValueError: Before any draw runs, if the sample's parameters are
@@ -431,73 +413,46 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         sample: &PyParameterSample,
         positions: Vec<f64>,
-        seed: i128,
     ) -> PyResult<PyPredictive> {
-        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
         parallel(py, || {
-            Predictive::new(self.inner.forward(), &sample.inner, &positions, seed)
+            Predictive::new(self.inner.forward(), &sample.inner, &positions, self.seed)
         })?
         .map(|inner| PyPredictive { inner })
         .map_err(method_error)
     }
 
     /// Every draw's value of `observations`, read through the observation
-    /// operator, with observation noise drawn from `seed`
+    /// operator, with observation noise drawn from the seed of the problem
     ///
     /// Args:
     ///     sample: The draws
-    ///     observations: The observations, which need not be the problem's
-    ///     seed: Seed of the noise
-    ///     residual_noise: `(fit, block_length, residual_scale)` to add
-    ///         blocks of residuals of the fit at `fit`, or None
-    ///     distribution_noise: Whether to draw from the observation models
-    ///         of the problem; with neither noise, no noise
+    ///     observations: The JSON of the observations, which need not be the
+    ///         problem's
+    ///     noise: The JSON of the noise: `NoNoise`, `ResidualNoise` or
+    ///         `DistributionNoise`
     ///
     /// Raises:
     ///     ValueError: If the sample's parameters are not the problem's, an
     ///         observation names an unknown output or factor, a series the
     ///         fit has no residuals of or a series with no observation
-    ///         model, both noises are asked for, or the noise is not valid
+    ///         model, or the noise is not valid
     ///     InfeasibleStateError: If a draw leaves the values its model allows
-    #[pyo3(signature = (sample, observations, seed, residual_noise=None, distribution_noise=false))]
     fn observation_draws(
         &self,
         py: Python<'_>,
         sample: &PyParameterSample,
-        observations: Vec<PyObservedDataPoint>,
-        seed: i128,
-        residual_noise: Option<(Vec<f64>, i64, String)>,
-        distribution_noise: bool,
+        observations: &str,
+        noise: &str,
     ) -> PyResult<PyObservationDraws> {
-        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-        let observations: Vec<_> = observations.into_iter().map(|o| o.inner).collect();
-        let noise: Box<dyn ObservationNoise> = match residual_noise {
-            None if distribution_noise => {
-                Box::new(DistributionNoise::new(&self.inner).map_err(value_error)?)
-            }
-            None => Box::new(NoNoise),
-            Some(_) if distribution_noise => {
-                return Err(value_error(
-                    "Observation draws take one noise: residual or distribution".to_string(),
-                ));
-            }
-            Some((fit, length, scale)) => {
-                let length = crate::counts::count(&commol_inference::ranges::BLOCK_LENGTH, length)?;
-                let scale = ResidualScale::from_name(&scale).map_err(method_error)?;
-                let residuals = Residuals::new(&self.inner, &fit, scale).map_err(method_error)?;
-                Box::new(
-                    ResidualNoise::new(self.inner.observed_data(), &residuals, length)
-                        .map_err(method_error)?,
-                )
-            }
-        };
+        let observations = observed_data(&crate::json::read::<Vec<_>>(observations)?);
+        let noise = self.noise(noise)?;
         parallel(py, || {
             observation_draws(
                 self.inner.forward(),
                 &sample.inner,
                 &observations,
                 noise.as_ref(),
-                seed,
+                self.seed,
             )
         })?
         .map(|inner| PyObservationDraws { inner })
@@ -506,7 +461,11 @@ impl PyCalibrationProblem {
 
     /// The log score of each of `observations` under the predictive of
     /// `sample` and the observation models of the problem, each replicate of
-    /// a stochastic engine seeded from `seed`
+    /// a stochastic engine seeded from the seed of the problem
+    ///
+    /// Args:
+    ///     sample: The draws
+    ///     observations: The JSON of the observations
     ///
     /// Raises:
     ///     ValueError: If the sample's parameters are not the problem's, the
@@ -517,14 +476,12 @@ impl PyCalibrationProblem {
         &self,
         py: Python<'_>,
         sample: &PyParameterSample,
-        observations: Vec<PyObservedDataPoint>,
-        seed: i128,
+        observations: &str,
     ) -> PyResult<Vec<f64>> {
-        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-        let observations: Vec<_> = observations.into_iter().map(|o| o.inner).collect();
+        let observations = observed_data(&crate::json::read::<Vec<_>>(observations)?);
         let noise = DistributionNoise::new(&self.inner).map_err(value_error)?;
         parallel(py, || {
-            scores::log_score(&self.inner, &sample.inner, &observations, &noise, seed)
+            scores::log_score(&self.inner, &sample.inner, &observations, &noise, self.seed)
         })?
         .map_err(method_error)
     }
@@ -539,211 +496,105 @@ impl PyCalibrationProblem {
             .pointwise_log_likelihood(&values, &mut Workspace::default())
             .map_err(|error| value_error(error.to_string()))
     }
+}
 
-    /// Fit replicates of the data drawn from the observation models at the
-    /// fit (parametric bootstrap), from the fit
-    ///
-    /// Args:
-    ///     config: The optimizer
-    ///     fit: The fitted values, in problem order
-    ///     replicates: Number of replicates
-    ///     starts: Starts per replicate, the fit first
-    ///     seed: Seed of the replicates
-    ///
-    /// Raises:
-    ///     ValueError: If the problem has a loss or the fit is not feasible
-    ///     RuntimeError: If the run at the fit fails or every replicate fails
-    fn parametric_bootstrap(
-        &self,
-        py: Python<'_>,
-        config: &PyOptimizationConfig,
-        fit: Vec<f64>,
-        replicates: i64,
-        starts: i64,
-        seed: i128,
-    ) -> PyResult<PyBootstrapRun> {
-        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-        let replicates: usize =
-            crate::counts::count(&commol_inference::ranges::REPLICATES, replicates)?;
-        let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
-        self.run_bootstrap(py, config, &fit, replicates, starts, seed, |fit| {
-            self.resampler(&ResamplerSpec::Parametric, fit)
-        })
-    }
+/// Fit the problem, then fit replicates of the data a bootstrap draws
+/// around the fit
+///
+/// Args:
+///     problem: The calibration problem
+///     settings: The JSON of a `BayesianBootstrap`, `ParametricBootstrap`,
+///         `ResidualBootstrap` or `WildBootstrap`, by its `kind`
+///
+/// Returns:
+///     The starts of the fit, and the replicates
+///
+/// Raises:
+///     ValueError: If a setting is not valid, the problem does not fit the
+///         bootstrap (a parametric bootstrap needs observation models), the
+///         fit is not feasible, the block length does not fit the positions,
+///         or the residuals cannot be taken on their scale
+///     RuntimeError: If the fit, the run at the fit or every replicate fails
+#[pyfunction]
+fn bootstrap(
+    py: Python<'_>,
+    problem: &PyCalibrationProblem,
+    settings: &str,
+) -> PyResult<(PyStarts, PyBootstrapRun)> {
+    let settings: Bootstrap = crate::json::read(settings)?;
+    let starts = problem.fit(py, settings.starts())?;
+    let runner = problem.runner(&best_values(&starts), settings.starts())?;
+    let (resampler, scheme) = problem.resampler(&ResamplerSpec::of(&settings), runner.fit())?;
+    let run = parallel(py, || {
+        run_replicates(&runner, resampler.as_ref(), settings.replicates())
+    })?
+    .map_err(method_error)?;
+    let run = PyBootstrapRun {
+        values: run.sample.values().to_vec(),
+        groups: run
+            .sample
+            .groups()
+            .map(<[usize]>::to_vec)
+            .unwrap_or_default(),
+        failed: FitUnit::Replicate.entries(&run.failed),
+        not_converged: run.not_converged,
+        negative_values: run.negative_values,
+        block_length: scheme.as_ref().map(BlockScheme::length),
+        block_length_estimates: scheme
+            .as_ref()
+            .and_then(BlockScheme::estimates)
+            .map(<[_]>::to_vec),
+    };
+    Ok((PyStarts { inner: starts }, run))
+}
 
-    /// Fit replicates of the data reweighted by blocks (Bayesian
-    /// bootstrap), from the fit
-    ///
-    /// Args:
-    ///     config: The optimizer
-    ///     fit: The fitted values, in problem order
-    ///     replicates: Number of replicates
-    ///     block_length: Positions per block, or None for the automatic
-    ///         length
-    ///     starts: Starts per replicate, the fit first
-    ///     seed: Seed of the replicates
-    ///
-    /// Raises:
-    ///     ValueError: If the block length does not fit the positions
-    ///     RuntimeError: If every replicate fails
-    #[allow(clippy::too_many_arguments)]
-    fn bayesian_bootstrap(
-        &self,
-        py: Python<'_>,
-        config: &PyOptimizationConfig,
-        fit: Vec<f64>,
-        replicates: i64,
-        block_length: Option<i64>,
-        starts: i64,
-        seed: i128,
-    ) -> PyResult<PyBootstrapRun> {
-        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-        let replicates: usize =
-            crate::counts::count(&commol_inference::ranges::REPLICATES, replicates)?;
-        let block_length: Option<usize> =
-            crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
-        let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
-        self.run_bootstrap(py, config, &fit, replicates, starts, seed, |fit| {
-            self.resampler(&ResamplerSpec::Bayesian { block_length }, fit)
-        })
-    }
-
-    /// Fit replicates of the fit plus blocks of its residuals, from the fit
-    ///
-    /// Args:
-    ///     config: The optimizer
-    ///     fit: The fitted values, in problem order
-    ///     replicates: Number of replicates
-    ///     block_length: Positions per block, or None for the automatic
-    ///         length
-    ///     starts: Starts per replicate, the fit first
-    ///     seed: Seed of the replicates
-    ///     residual_scale: "additive" or "multiplicative"
-    ///     scheme: "moving" or "stationary"
-    ///
-    /// Raises:
-    ///     ValueError: If a setting is not valid, the block length does not
-    ///         fit the positions, or the residuals cannot be taken on their
-    ///         scale
-    ///     RuntimeError: If every replicate fails
-    #[allow(clippy::too_many_arguments)]
-    fn residual_bootstrap(
-        &self,
-        py: Python<'_>,
-        config: &PyOptimizationConfig,
-        fit: Vec<f64>,
-        replicates: i64,
-        block_length: Option<i64>,
-        starts: i64,
-        seed: i128,
-        residual_scale: &str,
-        scheme: &str,
-    ) -> PyResult<PyBootstrapRun> {
-        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-        let replicates: usize =
-            crate::counts::count(&commol_inference::ranges::REPLICATES, replicates)?;
-        let block_length: Option<usize> =
-            crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
-        let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
-        let spec = ResamplerSpec::residual(block_length, residual_scale, scheme)?;
-        self.run_bootstrap(py, config, &fit, replicates, starts, seed, |fit| {
-            self.resampler(&spec, fit)
-        })
-    }
-
-    /// Fit replicates of the fit plus its residuals times random
-    /// multipliers shared by a block (wild bootstrap), from the fit
-    ///
-    /// Args:
-    ///     config: The optimizer
-    ///     fit: The fitted values, in problem order
-    ///     replicates: Number of replicates
-    ///     block_length: Positions per block, or None for the automatic
-    ///         length
-    ///     starts: Starts per replicate, the fit first
-    ///     seed: Seed of the replicates
-    ///     multipliers: "rademacher" or "mammen"
-    ///
-    /// Raises:
-    ///     ValueError: If a setting is not valid or the block length does
-    ///         not fit the positions
-    ///     RuntimeError: If every replicate fails
-    #[allow(clippy::too_many_arguments)]
-    fn wild_bootstrap(
-        &self,
-        py: Python<'_>,
-        config: &PyOptimizationConfig,
-        fit: Vec<f64>,
-        replicates: i64,
-        block_length: Option<i64>,
-        starts: i64,
-        seed: i128,
-        multipliers: &str,
-    ) -> PyResult<PyBootstrapRun> {
-        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-        let replicates: usize =
-            crate::counts::count(&commol_inference::ranges::REPLICATES, replicates)?;
-        let block_length: Option<usize> =
-            crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
-        let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
-        let spec = ResamplerSpec::wild(block_length, multipliers)?;
-        self.run_bootstrap(py, config, &fit, replicates, starts, seed, |fit| {
-            self.resampler(&spec, fit)
-        })
-    }
-
-    /// Fit once per block left out, from the fit
-    ///
-    /// Args:
-    ///     config: The optimizer
-    ///     fit: The fitted values, in problem order
-    ///     block_length: Positions per block, or None for the automatic
-    ///         length
-    ///     starts: Starts per fit, the fit first
-    ///     seed: Seed of the starts
-    ///
-    /// Raises:
-    ///     ValueError: If the block length does not fit the positions or
-    ///         makes fewer than two blocks
-    ///     RuntimeError: If fewer than two fits succeed
-    fn jackknife(
-        &self,
-        py: Python<'_>,
-        config: &PyOptimizationConfig,
-        fit: Vec<f64>,
-        block_length: Option<i64>,
-        starts: i64,
-        seed: i128,
-    ) -> PyResult<PyJackknifeRun> {
-        let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-        let block_length: Option<usize> =
-            crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
-        let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
-        let runner = ReplicateRunner::new(&self.inner, &config.inner, &fit, starts, seed)
-            .map_err(method_error)?;
-        let scheme = BlockScheme::at_fit(
-            &self.inner,
-            runner.fit(),
-            block_length,
-            BlockDrawing::NonOverlapping,
-        )
-        .map_err(method_error)?;
-        let jackknife =
-            parallel(py, || block_jackknife(&runner, &scheme))?.map_err(method_error)?;
-        let spans = scheme.spans();
-        Ok(PyJackknifeRun {
-            spans: jackknife.blocks.iter().map(|&b| spans[b]).collect(),
-            estimate: jackknife.statistics.estimate,
-            bias: jackknife.statistics.bias,
-            standard_error: jackknife.statistics.standard_error,
-            pseudo_values: jackknife.statistics.pseudo_values,
-            influence: jackknife.statistics.influence,
-            failed: FitUnit::Block.entries(&jackknife.failed),
-            not_converged: jackknife.not_converged,
-            block_length: scheme.length(),
-            block_length_estimates: scheme.estimates().map(<[_]>::to_vec),
-        })
-    }
+/// Fit the problem, then fit it once per block left out
+///
+/// Args:
+///     problem: The calibration problem
+///     settings: The JSON of a `BlockJackknife`
+///
+/// Returns:
+///     The starts of the fit, and the jackknife
+///
+/// Raises:
+///     ValueError: If a setting is not valid, or the block length does not
+///         fit the positions or makes fewer than two blocks
+///     RuntimeError: If the fit fails or fewer than two refits succeed
+#[pyfunction]
+fn block_jackknife(
+    py: Python<'_>,
+    problem: &PyCalibrationProblem,
+    settings: &str,
+) -> PyResult<(PyStarts, PyJackknifeRun)> {
+    let settings: BlockJackknifeSettings = crate::json::read(settings)?;
+    let starts = problem.fit(py, settings.starts)?;
+    let runner = problem.runner(&best_values(&starts), settings.starts)?;
+    let scheme = BlockScheme::at_fit(
+        &problem.inner,
+        runner.fit(),
+        settings.block_length.0,
+        BlockDrawing::NonOverlapping,
+    )
+    .map_err(method_error)?;
+    let jackknife = parallel(py, || {
+        commol_inference::resampling::block_jackknife(&runner, &scheme)
+    })?
+    .map_err(method_error)?;
+    let spans = scheme.spans();
+    let run = PyJackknifeRun {
+        spans: jackknife.blocks.iter().map(|&b| spans[b]).collect(),
+        estimate: jackknife.statistics.estimate,
+        bias: jackknife.statistics.bias,
+        standard_error: jackknife.statistics.standard_error,
+        pseudo_values: jackknife.statistics.pseudo_values,
+        influence: jackknife.statistics.influence,
+        failed: FitUnit::Block.entries(&jackknife.failed),
+        not_converged: jackknife.not_converged,
+        block_length: scheme.length(),
+        block_length_estimates: scheme.estimates().map(<[_]>::to_vec),
+    };
+    Ok((PyStarts { inner: starts }, run))
 }
 
 /// The replicates of a bootstrap, as the runner returns them
@@ -1168,6 +1019,8 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyObservationDraws>()?;
     m.add_class::<PyBootstrapRun>()?;
     m.add_class::<PyJackknifeRun>()?;
+    m.add_function(wrap_pyfunction!(bootstrap, m)?)?;
+    m.add_function(wrap_pyfunction!(block_jackknife, m)?)?;
     m.add_function(wrap_pyfunction!(quantile_error, m)?)?;
     m.add_function(wrap_pyfunction!(weighted_quantiles, m)?)?;
     m.add_function(wrap_pyfunction!(interval_levels, m)?)?;

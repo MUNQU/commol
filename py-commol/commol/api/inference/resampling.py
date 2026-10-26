@@ -1,8 +1,8 @@
 """The runners of the resampling methods, registered for
 ``Calibrator.uncertainty``.
 
-Each runner fits the problem with ``Calibrator.run`` and hands the fit to the
-Rust runner, which draws and fits every replicate in parallel.
+Each runner sends its method whole to the engine, which fits the problem and
+then draws and fits every replicate in parallel.
 """
 
 import logging
@@ -10,12 +10,14 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
+from commol.api.inference.fit import fit_result
 from commol.api.inference.registry import register
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import CalibrationResult
+from commol.context.engine_json import engine_json
 from commol.context.inference.resampling import (
     BayesianBootstrap,
     BlockJackknife,
-    BlockLength,
     BootstrapResult,
     JackknifeResult,
     ParametricBootstrap,
@@ -30,25 +32,6 @@ if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import BootstrapRunProtocol
 
 logger = logging.getLogger(__name__)
-
-
-def fit_values(calibrator: "Calibrator", fit: CalibrationResult) -> list[float]:
-    """
-    The values of a fit in the order of the problem's parameters.
-
-    Parameters
-    ----------
-    calibrator : Calibrator
-        The calibration problem.
-    fit : CalibrationResult
-        A fit of that problem.
-
-    Returns
-    -------
-    list[float]
-        One value per parameter.
-    """
-    return [fit.best_parameters[name] for name in calibrator.parameter_names]
 
 
 def sample_method(
@@ -75,23 +58,6 @@ def sample_method(
     settings = method.model_dump(mode="json")
     settings["seed"] = calibrator.seed
     return SampleMethod(name=name, settings=settings)
-
-
-def rust_block_length(block_length: BlockLength) -> int | None:
-    """
-    A block length as the Rust runners take it.
-
-    Parameters
-    ----------
-    block_length : int | "auto"
-        Positions per block.
-
-    Returns
-    -------
-    int | None
-        The length, or None for ``"auto"``.
-    """
-    return None if block_length == "auto" else block_length
 
 
 def block_length_estimates(
@@ -171,17 +137,19 @@ def _bootstrap_result(
     )
 
 
-def run_bayesian_bootstrap(
-    calibrator: "Calibrator", method: BayesianBootstrap
+def run_bootstrap(
+    calibrator: "Calibrator",
+    method: BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap,
 ) -> BootstrapResult:
     """
-    Run a Bayesian (weighted) bootstrap.
+    Run a bootstrap: Bayesian, parametric, residual or wild, by its ``kind``.
 
     Parameters
     ----------
     calibrator : Calibrator
-        The calibration problem.
-    method : BayesianBootstrap
+        The calibration problem; a parametric bootstrap needs observation
+        models.
+    method : BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap
         The settings.
 
     Returns
@@ -189,127 +157,14 @@ def run_bayesian_bootstrap(
     BootstrapResult
         The fit, one draw per replicate and the diagnostics.
     """
-    fit = calibrator.run(starts=method.starts)
-    run = calibrator.rust_problem.bayesian_bootstrap(
-        calibrator.rust_optimizer,
-        fit_values(calibrator, fit),
-        method.replicates,
-        rust_block_length(method.block_length),
-        method.starts,
-        calibrator.seed,
+    starts, run = commol_rs.inference.bootstrap(
+        calibrator._rust_problem, engine_json(method)
     )
     return _bootstrap_result(
         calibrator,
-        fit,
+        fit_result(starts, calibrator.parameter_names, calibrator.seed, logger),
         run,
-        sample_method(calibrator, "bayesian_bootstrap", method),
-    )
-
-
-def run_parametric_bootstrap(
-    calibrator: "Calibrator", method: ParametricBootstrap
-) -> BootstrapResult:
-    """
-    Run a parametric bootstrap of the observation models.
-
-    Parameters
-    ----------
-    calibrator : Calibrator
-        The calibration problem, with observation models.
-    method : ParametricBootstrap
-        The settings.
-
-    Returns
-    -------
-    BootstrapResult
-        The fit, one draw per replicate and the diagnostics.
-    """
-    fit = calibrator.run(starts=method.starts)
-    run = calibrator.rust_problem.parametric_bootstrap(
-        calibrator.rust_optimizer,
-        fit_values(calibrator, fit),
-        method.replicates,
-        method.starts,
-        calibrator.seed,
-    )
-    return _bootstrap_result(
-        calibrator,
-        fit,
-        run,
-        sample_method(calibrator, "parametric_bootstrap", method),
-    )
-
-
-def run_residual_bootstrap(
-    calibrator: "Calibrator", method: ResidualBootstrap
-) -> BootstrapResult:
-    """
-    Run a residual block bootstrap.
-
-    Parameters
-    ----------
-    calibrator : Calibrator
-        The calibration problem.
-    method : ResidualBootstrap
-        The settings.
-
-    Returns
-    -------
-    BootstrapResult
-        The fit, one draw per replicate and the diagnostics.
-    """
-    fit = calibrator.run(starts=method.starts)
-    run = calibrator.rust_problem.residual_bootstrap(
-        calibrator.rust_optimizer,
-        fit_values(calibrator, fit),
-        method.replicates,
-        rust_block_length(method.block_length),
-        method.starts,
-        calibrator.seed,
-        method.residual_scale,
-        method.scheme,
-    )
-    return _bootstrap_result(
-        calibrator,
-        fit,
-        run,
-        sample_method(calibrator, "residual_bootstrap", method),
-    )
-
-
-def run_wild_bootstrap(
-    calibrator: "Calibrator", method: WildBootstrap
-) -> BootstrapResult:
-    """
-    Run a wild block bootstrap.
-
-    Parameters
-    ----------
-    calibrator : Calibrator
-        The calibration problem.
-    method : WildBootstrap
-        The settings.
-
-    Returns
-    -------
-    BootstrapResult
-        The fit, one draw per replicate and the diagnostics.
-    """
-    fit = calibrator.run(starts=method.starts)
-    run = calibrator.rust_problem.wild_bootstrap(
-        calibrator.rust_optimizer,
-        fit_values(calibrator, fit),
-        method.replicates,
-        rust_block_length(method.block_length),
-        method.starts,
-        calibrator.seed,
-        method.multipliers,
-    )
-    return _bootstrap_result(
-        calibrator,
-        fit,
-        run,
-        sample_method(calibrator, "wild_bootstrap", method),
+        sample_method(calibrator, f"{method.kind}_bootstrap", method),
     )
 
 
@@ -331,15 +186,11 @@ def run_block_jackknife(
     JackknifeResult
         The fit, the jackknife statistics and the diagnostics.
     """
-    fit = calibrator.run(starts=method.starts)
-    run = calibrator.rust_problem.jackknife(
-        calibrator.rust_optimizer,
-        fit_values(calibrator, fit),
-        rust_block_length(method.block_length),
-        method.starts,
-        calibrator.seed,
+    starts, run = commol_rs.inference.block_jackknife(
+        calibrator._rust_problem, engine_json(method)
     )
     names = calibrator.parameter_names
+    fit = fit_result(starts, names, calibrator.seed, logger)
 
     def by_parameter(rows: list[list[float]]) -> dict[str, list[float]]:
         return {name: [row[j] for row in rows] for j, name in enumerate(names)}
@@ -358,8 +209,8 @@ def run_block_jackknife(
     )
 
 
-register(BayesianBootstrap, run_bayesian_bootstrap)
-register(ParametricBootstrap, run_parametric_bootstrap)
-register(ResidualBootstrap, run_residual_bootstrap)
-register(WildBootstrap, run_wild_bootstrap)
+register(BayesianBootstrap, run_bootstrap)
+register(ParametricBootstrap, run_bootstrap)
+register(ResidualBootstrap, run_bootstrap)
+register(WildBootstrap, run_bootstrap)
 register(BlockJackknife, run_block_jackknife)

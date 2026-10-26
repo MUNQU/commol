@@ -238,14 +238,19 @@ def swarm(
     particles: int = 12, iterations: int = 15, *, mutation: bool = True
 ) -> ParticleSwarmConfig:
     """A quiet swarm, with a Gaussian mutation of the particles below average."""
-    config = ParticleSwarmConfig(
-        particles=particles, max_iterations=iterations, verbose=False
-    )
-    if mutation:
-        config = config.mutation(
-            "gaussian", scale=0.1, probability=0.3, application="below_average"
+    if not mutation:
+        return ParticleSwarmConfig(
+            particles=particles, max_iterations=iterations, verbose=False
         )
-    return config
+    return ParticleSwarmConfig(
+        particles=particles,
+        max_iterations=iterations,
+        verbose=False,
+        mutation="gaussian",
+        mutation_scale=0.1,
+        mutation_probability=0.3,
+        mutation_application="below_average",
+    )
 
 
 def abc_swarm_calibrator(config: ParticleSwarmConfig) -> Calibrator:

@@ -14,6 +14,7 @@ use commol_inference::conformal::{
     conformal_quantile, enbpi, jackknife_plus, rolling_conformal, scales, split_conformal,
 };
 use commol_inference::resampling::{BlockScheme, ReplicateRunner};
+use commol_inference::settings::conformal::ScoreAndPooling;
 use commol_inference::{MethodError, PredictiveError};
 
 /// One output `x = c` at every position; a run with `c` above `cap`
@@ -184,15 +185,29 @@ fn an_adaptive_level_or_step_out_of_range_is_rejected() {
 
 #[test]
 fn scores_and_poolings_name_their_valid_values() {
-    for name in [None, Some("other")] {
-        let score = NonconformityScore::from_name(name).unwrap_err().to_string();
-        assert!(
-            score.contains("\"absolute\", \"normalized\" or \"spread\""),
-            "{score}"
-        );
-        let by = Pooling::from_name(name).unwrap_err().to_string();
-        assert!(by.contains("\"series\" or \"all\""), "{by}");
-    }
+    let read = |text: &str| commol_core::json::read::<ScoreAndPooling>(text);
+    assert_eq!(
+        read(r#"{"score": "other", "by": "all"}"#),
+        Err(
+            "score: unknown variant `other`, expected one of `absolute`, `normalized`, \
+             `spread`"
+                .to_string()
+        )
+    );
+    assert_eq!(
+        read(r#"{"score": "absolute", "by": "other"}"#),
+        Err("by: unknown variant `other`, expected `series` or `all`".to_string())
+    );
+    assert_eq!(
+        read(r#"{"by": "all"}"#),
+        Err("missing field `score`".to_string())
+    );
+    let pair = read(r#"{"score": "normalized", "by": "series"}"#).unwrap();
+    assert!(pair.check().unwrap_err().to_string().contains("by=\"all\""));
+    assert_eq!(
+        read(r#"{"score": "normalized", "by": "all"}"#).map(|pair| pair.check().is_ok()),
+        Ok(true)
+    );
     let pair = ConformalSettings::new(NonconformityScore::Normalized, Pooling::Series, 0.9);
     assert!(pair.unwrap_err().to_string().contains("by=\"all\""));
     let level = ConformalSettings::new(NonconformityScore::Absolute, Pooling::All, 1.0);

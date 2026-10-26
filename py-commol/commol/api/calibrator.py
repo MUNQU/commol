@@ -10,17 +10,12 @@ if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import (
         CalibrationProblemProtocol,
         EngineProtocol,
-        LossConfigProtocol,
         ObservationDrawsProtocol,
-        OptimizationConfigProtocol,
         PredictiveProtocol,
-        PSOAccelerationConstantProtocol,
-        PSOAccelerationTimeVaryingProtocol,
-        PSOInertiaChaoticProtocol,
-        PSOInertiaConstantProtocol,
     )
     from commol.context.model import Model
 
+from commol.api.inference.fit import fit_result
 from commol.api.inference.predictive import by_output
 from commol.api.simulation import Simulation
 from commol.commol_rs import _commol_rs as commol_rs
@@ -31,26 +26,13 @@ from commol.context.calibration import (
     CalibrationHistory,
     CalibrationProblem,
     CalibrationResult,
-    NelderMeadConfig,
     ObservedDataPoint,
-    ParticleSwarmConfig,
-    PSOChaoticInertia,
-    PSOConstantAcceleration,
-    PSOConstantInertia,
-    PSOTimeVaryingAcceleration,
-    StartSummary,
 )
-from commol.context.constants import OptimizationAlgorithm
+from commol.context.engine_json import engine_json
 from commol.context.inference.local import DeltaBand, LocalResult
 from commol.context.inference.method import IdentifiabilityMethod, UncertaintyMethod
-from commol.context.inference.noise import (
-    DistributionNoise,
-    ObservationNoise,
-    ResidualNoise,
-)
+from commol.context.inference.noise import ObservationNoise
 from commol.context.inference.sample import ParameterSample, SampleMethod
-
-rust_calibration = commol_rs.calibration
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +67,9 @@ class Calibrator:
         ------
         ValueError
             If a parameter, observation, position or constraint does not fit
-            the model.
+            the model, or a setting of the problem is outside its rule; the
+            message names the path of the setting, such as
+            ``optimization_config.inertia_factor``.
         """
         logger.info(
             f"Initializing Calibration for model: '{simulation.model_definition.name}'"
@@ -101,25 +85,10 @@ class Calibrator:
             )
         )
 
-        loss_config = self._build_loss_config()
         self._validate_calibration_parameters()
         self._warn_constraint_positions_beyond_observations()
-        models = problem.observation_models
         self._rust_problem: "CalibrationProblemProtocol" = (
-            commol_rs.inference.CalibrationProblem(
-                self._engine,
-                engine_state.rust_observed_data(problem.observed_data),
-                engine_state.rust_parameters(problem.parameters),
-                engine_state.rust_constraints(problem.constraints),
-                loss_config=loss_config,
-                initial_condition_remainder=problem.initial_condition_remainder,
-                observation_models=(
-                    None
-                    if models is None
-                    else engine_state.rust_observation_models(models)
-                ),
-                seed=problem.seed,
-            )
+            commol_rs.inference.CalibrationProblem(self._engine, engine_json(problem))
         )
         if problem.seed is None:
             logger.info(
@@ -127,19 +96,7 @@ class Calibrator:
                 self._rust_problem.seed,
             )
 
-    @property
-    def rust_problem(self) -> "CalibrationProblemProtocol":
-        """
-        The calibration problem built in Rust, for the runners of methods.
-
-        Returns
-        -------
-        CalibrationProblemProtocol
-            The problem every optimization, prediction and method reads.
-        """
-        return self._rust_problem
-
-    def rust_predictive(
+    def _predictive(
         self, sample: ParameterSample, positions: list[float]
     ) -> "PredictiveProtocol":
         """
@@ -159,7 +116,7 @@ class Calibrator:
         PredictiveProtocol
             The runs, computed in Rust.
         """
-        return self._rust_problem.predictive(sample.rust_sample, positions, self.seed)
+        return self._rust_problem.predictive(sample._rust, positions)
 
     def with_model(self, model: "Model") -> "Calibrator":
         """
@@ -289,7 +246,7 @@ class Calibrator:
             upper=by_output(outputs, upper),
         )
 
-    def rust_observation_draws(
+    def _observation_draws(
         self,
         sample: ParameterSample,
         observed_data: list[ObservedDataPoint],
@@ -312,22 +269,11 @@ class Calibrator:
         ObservationDrawsProtocol
             The draws, computed in Rust.
         """
-        residual_noise = None
-        if isinstance(noise, ResidualNoise):
-            residual_noise = (
-                [noise.fit.best_parameters[name] for name in self.parameter_names],
-                noise.block_length,
-                noise.residual_scale,
-            )
         return self._rust_problem.observation_draws(
-            sample.rust_sample,
-            engine_state.rust_observed_data(observed_data),
-            self.seed,
-            residual_noise=residual_noise,
-            distribution_noise=isinstance(noise, DistributionNoise),
+            sample._rust, engine_json(observed_data), engine_json(noise)
         )
 
-    def rust_log_score(
+    def _log_score(
         self, sample: ParameterSample, observed_data: list[ObservedDataPoint]
     ) -> list[float]:
         """
@@ -346,23 +292,7 @@ class Calibrator:
         list[float]
             One log score per observation, computed in Rust.
         """
-        return self._rust_problem.log_score(
-            sample.rust_sample,
-            engine_state.rust_observed_data(observed_data),
-            self.seed,
-        )
-
-    @property
-    def rust_optimizer(self) -> "OptimizationConfigProtocol":
-        """
-        The optimizer built in Rust, for the runners of methods.
-
-        Returns
-        -------
-        OptimizationConfigProtocol
-            The optimizer of ``problem.optimization_config``.
-        """
-        return self._build_optimization_config()
+        return self._rust_problem.log_score(sample._rust, engine_json(observed_data))
 
     @property
     def seed(self) -> int:
@@ -412,51 +342,17 @@ class Calibrator:
         RuntimeError
             If every start fails.
         """
-        algorithm_name = (
-            OptimizationAlgorithm.NELDER_MEAD
-            if isinstance(self.problem.optimization_config, NelderMeadConfig)
-            else OptimizationAlgorithm.PARTICLE_SWARM
-        )
         measure = (
             f"{self.problem.loss_function} loss function"
             if self.problem.loss_function is not None
             else "the negative log-likelihood of its observation models"
         )
         logger.info(
-            f"Starting calibration with {algorithm_name} algorithm, "
-            f"{measure} and {starts} start(s)."
+            f"Starting calibration with {self.problem.optimization_config.kind} "
+            f"algorithm, {measure} and {starts} start(s)."
         )
-        run = self._rust_problem.optimize(
-            self._build_optimization_config(), starts, self.seed
-        )
-        names = self.parameter_names
-        summaries: list[StartSummary] = []
-        failed: list[str] = []
-        for index, outcome in enumerate(run.outcomes):
-            if outcome.result is None:
-                reason = f"Start {index} failed: {outcome.error}"
-                logger.warning(reason)
-                failed.append(reason)
-                continue
-            summaries.append(
-                StartSummary(
-                    start=dict(zip(names, outcome.start, strict=True)),
-                    end=dict(outcome.result.best_parameters),
-                    loss=outcome.result.final_loss,
-                    converged=outcome.result.converged,
-                )
-            )
-        best = run.outcomes[run.best].result
-        assert best is not None, "the best start did not fail"
-        result = CalibrationResult(
-            best_parameters=dict(best.best_parameters),
-            final_loss=best.final_loss,
-            iterations=best.iterations,
-            converged=best.converged,
-            termination_reason=best.termination_reason,
-            starts=summaries,
-            failed=failed,
-            seed=self.seed,
+        result = fit_result(
+            self._rust_problem.optimize(starts), self.parameter_names, self.seed, logger
         )
         logger.info(
             (
@@ -483,17 +379,15 @@ class Calibrator:
             If optimization fails.
         """
         logger.info("Starting calibration with history tracking")
-        history = self._rust_problem.optimize_with_history(
-            self._build_optimization_config(), self.seed
-        )
+        history = self._rust_problem.optimize_with_history()
         names = self.parameter_names
-        rust_result = history.result
+        best = history.result
         result = CalibrationResult(
-            best_parameters=dict(rust_result.best_parameters),
-            final_loss=rust_result.final_loss,
-            iterations=rust_result.iterations,
-            converged=rust_result.converged,
-            termination_reason=rust_result.termination_reason,
+            best_parameters=dict(best.best_parameters),
+            final_loss=best.final_loss,
+            iterations=best.iterations,
+            converged=best.converged,
+            termination_reason=best.termination_reason,
             seed=self.seed,
         )
         evaluations = [
@@ -586,110 +480,6 @@ class Calibrator:
         from commol.api.inference.registry import run_method
 
         return run_method(self, method, IdentifiabilityMethod)
-
-    def _build_loss_config(self) -> "LossConfigProtocol | None":
-        """The Rust loss, with the settings of the replicates; None with
-        observation models."""
-        if self.problem.loss_function is None:
-            return None
-        return engine_state.rust_loss_config(self.problem, self.problem.loss_function)
-
-    def _build_optimization_config(self) -> "OptimizationConfigProtocol":
-        """Convert Python OptimizationConfig to Rust OptimizationConfig."""
-        opt_config = self.problem.optimization_config
-
-        if isinstance(opt_config, NelderMeadConfig):
-            nm_config = rust_calibration.NelderMeadConfig(
-                max_iterations=opt_config.max_iterations,
-                sd_tolerance=opt_config.sd_tolerance,
-                initial_simplex_size=opt_config.initial_simplex_size,
-                alpha=opt_config.alpha,
-                gamma=opt_config.gamma,
-                rho=opt_config.rho,
-                sigma=opt_config.sigma,
-                verbose=opt_config.verbose,
-                header_interval=opt_config.header_interval,
-            )
-            return rust_calibration.OptimizationConfig.nelder_mead(nm_config)
-
-        return self._build_pso_config(opt_config)
-
-    def _build_pso_config(
-        self, opt_config: ParticleSwarmConfig
-    ) -> "OptimizationConfigProtocol":
-        """Convert ParticleSwarmConfig to Rust OptimizationConfig."""
-        rust_inertia = self._build_rust_inertia(opt_config.inertia_config)
-        rust_acceleration = self._build_rust_acceleration(
-            opt_config.acceleration_config
-        )
-
-        mutation = opt_config.mutation_config
-        rust_mutation = None
-        if mutation is not None:
-            rust_mutation = rust_calibration.PSOMutation(
-                strategy=mutation.strategy,
-                scale=mutation.scale,
-                probability=mutation.probability,
-                application=mutation.application,
-            )
-
-        velocity = opt_config.velocity_config
-        rust_velocity = None
-        if velocity is not None:
-            rust_velocity = rust_calibration.PSOVelocity(
-                clamp_factor=velocity.clamp_factor,
-                mutation_threshold=velocity.mutation_threshold,
-            )
-
-        improvement = opt_config.improvement_stop_config
-        radius = opt_config.radius_stop_config
-        ps_config = rust_calibration.ParticleSwarmConfig(
-            particles=opt_config.particles,
-            max_iterations=opt_config.max_iterations,
-            verbose=opt_config.verbose,
-            inertia=rust_inertia,
-            acceleration=rust_acceleration,
-            mutation=rust_mutation,
-            velocity=rust_velocity,
-            initialization=opt_config.initialization,
-            improvement_stop=(
-                None
-                if improvement is None
-                else (improvement.window, improvement.tol_abs, improvement.tol_rel)
-            ),
-            radius_stop=None if radius is None else radius.tol,
-        )
-        return rust_calibration.OptimizationConfig.particle_swarm(ps_config)
-
-    def _build_rust_inertia(
-        self, inertia: PSOConstantInertia | PSOChaoticInertia | None
-    ) -> "PSOInertiaConstantProtocol | PSOInertiaChaoticProtocol | None":
-        """Convert Python inertia config to Rust type."""
-        if inertia is None:
-            return None
-        if isinstance(inertia, PSOConstantInertia):
-            return rust_calibration.PSOInertiaConstant(factor=inertia.factor)
-        return rust_calibration.PSOInertiaChaotic(
-            w_min=inertia.w_min, w_max=inertia.w_max
-        )
-
-    def _build_rust_acceleration(
-        self, acceleration: PSOConstantAcceleration | PSOTimeVaryingAcceleration | None
-    ) -> "PSOAccelerationConstantProtocol | PSOAccelerationTimeVaryingProtocol | None":
-        """Convert Python acceleration config to Rust type."""
-        if acceleration is None:
-            return None
-        if isinstance(acceleration, PSOConstantAcceleration):
-            return rust_calibration.PSOAccelerationConstant(
-                cognitive=acceleration.cognitive,
-                social=acceleration.social,
-            )
-        return rust_calibration.PSOAccelerationTimeVarying(
-            c1_initial=acceleration.c1_initial,
-            c1_final=acceleration.c1_final,
-            c2_initial=acceleration.c2_initial,
-            c2_final=acceleration.c2_final,
-        )
 
     @property
     def num_parameters(self) -> int:

@@ -1,6 +1,7 @@
 """Profile likelihood: parameter and prediction profiles, their thresholds
 and intervals; the verdicts are in test_profile_verdicts.py."""
 
+import json
 from statistics import NormalDist
 
 
@@ -295,27 +296,44 @@ class TestSettings:
                 threshold=Threshold.chi_square(0.9),
             )
 
-    def test_the_bindings_refuse_a_bootstrap_they_cannot_build(self) -> None:
-        settings = commol_rs.inference.BootstrapSettings
-        with pytest.raises(ValueError, match="Unknown bootstrap 'jackknife'"):
-            settings("jackknife", 10, 1)
-        with pytest.raises(ValueError, match="A residual bootstrap needs scheme"):
-            settings("residual", 10, 1, 1, residual_scale="additive")
+    def test_the_engine_refuses_a_bootstrap_it_cannot_build(self) -> None:
+        def threshold(kind: str, bootstrap: dict | None) -> str:
+            return json.dumps(
+                {"kind": kind, "confidence_level": 0.9, "bootstrap": bootstrap}
+            )
+
+        residual = {
+            "kind": "residual",
+            "replicates": 10,
+            "starts": 1,
+            "block_length": 1,
+            "residual_scale": "additive",
+        }
+        read = commol_rs.json.as_read
+        with pytest.raises(ValueError, match="jackknife"):
+            read("Threshold", threshold("bootstrap_calibrated", {"kind": "jackknife"}))
+        with pytest.raises(ValueError, match="scheme"):
+            read("Threshold", threshold("bootstrap_calibrated", residual))
         with pytest.raises(ValueError, match="bogus"):
-            settings("residual", 10, 1, 1, residual_scale="bogus", scheme="moving")
-        calibrator = line_calibrator(VALUES)
-        with pytest.raises(ValueError, match="only when it is 'bootstrap'"):
-            commol_rs.inference.trace_profiles(
-                calibrator.rust_problem,
-                calibrator.rust_optimizer,
-                [2.0, 5.0],
-                [0],
-                [],
-                "beale",
-                0.9,
-                5,
-                1,
-                bootstrap=settings("bayesian", 10, 1, 1),
+            read(
+                "Threshold",
+                threshold(
+                    "bootstrap_calibrated",
+                    residual | {"residual_scale": "bogus", "scheme": "moving"},
+                ),
+            )
+        with pytest.raises(ValueError, match="'bootstrap_calibrated' and no other"):
+            read(
+                "Threshold",
+                threshold(
+                    "beale",
+                    {
+                        "kind": "bayesian",
+                        "replicates": 10,
+                        "starts": 1,
+                        "block_length": 1,
+                    },
+                ),
             )
 
 

@@ -38,7 +38,7 @@ pub struct InitialConditions {
 /// Who the neighbors of a unit are, for the rate variables `neighbors_<bin>`
 /// and `neighbors`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Neighbors {
     /// Every unit is a neighbor of every other: `neighbors_<bin>` is the bin
     /// total and `neighbors` is `total`.

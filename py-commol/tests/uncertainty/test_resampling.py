@@ -6,11 +6,11 @@ observation is either ``c`` (windowed), so the fit is the mean of the values,
 or ``c·t``, a regression through the origin.
 """
 
+import json
 import logging
 import math
 import re
 from collections.abc import Callable
-from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -40,7 +40,6 @@ from commol import (
     Threshold,
     WildBootstrap,
 )
-from commol.api.inference import smc as smc_runners
 from commol.commol_rs import _commol_rs as commol_rs
 from tests.support import flow_calibrator, flow_observations, line_calibrator
 
@@ -289,31 +288,17 @@ class _OneMoreFailed:
         return getattr(self._run, name)
 
 
-class _ProblemWithAFailedFit:
-    """The problem of the extension `problem`, whose `name` reports one more
-    failed fit, `entry`."""
-
-    def __init__(self, problem: object, name: str, entry: str) -> None:
-        self._problem = problem
-        self._name = name
-        self._entry = entry
-
-    def __getattr__(self, name: str) -> object:
-        found = getattr(self._problem, name)
-        if name != self._name:
-            return found
-        return lambda *arguments: _OneMoreFailed(found(*arguments), self._entry)
-
-
 def _fails_one_fit(monkeypatch: pytest.MonkeyPatch, name: str, entry: str) -> None:
     """Make the function `name` of ``commol_rs.inference`` report one more
-    failed fit, `entry`."""
+    failed fit, `entry`, in the last value it returns: the run, or the
+    calibration of `η` of a Gibbs posterior."""
     found = getattr(commol_rs.inference, name)
-    monkeypatch.setattr(
-        commol_rs.inference,
-        name,
-        lambda *arguments: _OneMoreFailed(found(*arguments), entry),
-    )
+
+    def failing(*arguments: object) -> tuple[object, ...]:
+        *first, last = found(*arguments)
+        return (*first, _OneMoreFailed(last, entry))
+
+    monkeypatch.setattr(commol_rs.inference, name, failing)
 
 
 type _Result = (
@@ -332,11 +317,9 @@ def _bootstrap(_: pytest.MonkeyPatch) -> _Result:
     return _log_normal().uncertainty(_BELOW_ZERO)
 
 
-def _jackknife(_: pytest.MonkeyPatch) -> _Result:
+def _jackknife(monkeypatch: pytest.MonkeyPatch) -> _Result:
+    _fails_one_fit(monkeypatch, "block_jackknife", f"Block 1 failed: {_NO_WEIGHT}")
     calibrator = flow_calibrator(_noisy(9, 2), windowed=True)
-    calibrator._rust_problem = _ProblemWithAFailedFit(
-        calibrator.rust_problem, "jackknife", f"Block 1 failed: {_NO_WEIGHT}"
-    )
     return calibrator.uncertainty(BlockJackknife(block_length=3))
 
 
@@ -380,22 +363,17 @@ def _rolling(monkeypatch: pytest.MonkeyPatch) -> _Result:
 
 def _gibbs(monkeypatch: pytest.MonkeyPatch) -> _Result:
     # A sampler run of a bootstrap replicate fails only with a model that
-    # fails, which would fail the posterior too: the extension reports it.
-    found = SimpleNamespace(
-        eta=0.1,
-        coverage=0.8,
-        failed=[f"Replicate 2 failed: {_NO_WEIGHT}"],
-        block_length=1,
-        block_length_estimates=None,
-    )
-    monkeypatch.setattr(
-        smc_runners,
-        "rust",
-        SimpleNamespace(
-            bootstrap_coverage_eta=lambda *_: found,
-            gibbs_posterior=commol_rs.inference.gibbs_posterior,
-        ),
-    )
+    # fails, which would fail the posterior too: the extension reports one
+    # failed replicate of a calibration of η that gives 0.1.
+    found = commol_rs.inference.gibbs_posterior
+
+    def calibrated(problem: object, settings: str) -> tuple[object, ...]:
+        starts, run, eta = found(
+            problem, json.dumps(json.loads(settings) | {"eta": 0.1})
+        )
+        return starts, run, _OneMoreFailed(eta, f"Replicate 2 failed: {_NO_WEIGHT}")
+
+    monkeypatch.setattr(commol_rs.inference, "gibbs_posterior", calibrated)
     return flow_calibrator(_noisy(10, 3), windowed=True).uncertainty(
         GibbsPosterior(
             priors=Priors.uniform_on_bounds(),

@@ -6,7 +6,7 @@ Three kinds of method share one base and one registry: an uncertainty method
 (``SensitivityAnalysis.run``). Each entry point takes only its kind.
 """
 
-from typing import Generic, TypeVar
+from typing import ClassVar, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
@@ -20,10 +20,16 @@ class InferenceMethod(BaseModel, Generic[ResultT]):
 
     A method subclasses one of its kinds, `UncertaintyMethod`,
     `IdentifiabilityMethod` or `SensitivityMethod`, with its result type, and
-    registers its runner (`commol.api.inference.registry.register`).
+    registers its runner (`commol.api.inference.registry.register`). The
+    runner sends it whole to the engine, as the JSON of its dump
+    (`commol.context.engine_json.engine_json`); a field that holds a result
+    with behavior in the engine, such as a sample, is named in
+    ``_engine_handles`` and crosses as its handle.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    _engine_handles: ClassVar[tuple[str, ...]] = ()
 
 
 class UncertaintyMethod(InferenceMethod[ResultT], Generic[ResultT]):

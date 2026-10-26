@@ -4,8 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use commol_statistics::statistics;
 
-/// Type of value being calibrated
+/// Type of value being calibrated, named as the Python API names it:
+/// `"parameter"`, `"initial_condition"`, `"factor"` or `"noise"`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum CalibrationParameterType {
     /// Model parameter (e.g., k1, k2)
     Parameter,
@@ -21,8 +23,9 @@ pub enum CalibrationParameterType {
     Noise,
 }
 
-/// Represents an observed data point to fit against
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Represents an observed data point to fit against. The Python API writes
+/// it as an [`Observation`](crate::settings::Observation).
+#[derive(Debug, Clone, PartialEq)]
 pub struct ObservedDataPoint {
     /// Position of the observation on the axis. The engine decides which
     /// positions its model type accepts.
@@ -54,7 +57,6 @@ pub struct ObservedDataPoint {
 
     /// The trials of a binomial observation model that takes them from each
     /// observation; `None` for every other observation.
-    #[serde(default)]
     pub trials: Option<u64>,
 }
 
@@ -123,8 +125,9 @@ impl ObservedDataPoint {
     }
 }
 
-/// Parameter to be calibrated with its bounds
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Parameter to be calibrated with its bounds, as the Python API writes it
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CalibrationParameter {
     /// Parameter identifier (parameter ID for parameters, bin ID for initial conditions)
     pub id: String,
@@ -222,16 +225,21 @@ impl CalibrationParameter {
 /// | `MeanAbsoluteError` | `Σ w·|r| / Σ w` |
 ///
 /// With every weight at 1 they are the usual unweighted losses.
+///
+/// The Python API names them `"sse"`, `"rmse"` and `"mae"`.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub enum LossConfig {
     /// Weighted sum of squared errors: `Σ w·r²`.
     #[default]
+    #[serde(rename = "sse")]
     SumSquaredError,
 
     /// Weighted root mean squared error: `√(Σ w·r² / Σ w)`.
+    #[serde(rename = "rmse")]
     RootMeanSquaredError,
 
     /// Weighted mean absolute error: `Σ w·|r| / Σ w`.
+    #[serde(rename = "mae")]
     MeanAbsoluteError,
 }
 
@@ -316,6 +324,9 @@ impl LossConfig {
 /// What the observations are compared with when each evaluation runs several
 /// replicates of a stochastic engine. The user chooses it; there is no
 /// default.
+///
+/// The Python API writes it as a name, `"mean"`, `"median"` or `"crps"`, or
+/// as the object of a quantile, `{"level": 0.9}`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ReplicateSummary {
     /// The mean of the replicates.
@@ -366,6 +377,41 @@ impl ReplicateSummary {
             Self::Median => quantile(values, 0.5),
             Self::Quantile(level) => quantile(values, level),
             Self::Crps => panic!("the CRPS scores a distribution; use `crps`"),
+        }
+    }
+}
+
+/// The object of a quantile summary, as the Python class `Quantile` writes
+/// it.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct QuantileLevel {
+    level: f64,
+}
+
+impl Serialize for ReplicateSummary {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Mean => serializer.serialize_str("mean"),
+            Self::Median => serializer.serialize_str("median"),
+            Self::Crps => serializer.serialize_str("crps"),
+            Self::Quantile(level) => QuantileLevel { level: *level }.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ReplicateSummary {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use commol_core::json::{self, Value};
+        use serde::de::Error;
+        match Value::deserialize(deserializer)? {
+            Value::String(name) => Self::from_name(&name, None).map_err(D::Error::custom),
+            value @ Value::Map(_) => {
+                json::from_value::<QuantileLevel, D::Error>(value).map(|q| Self::Quantile(q.level))
+            }
+            _ => Err(D::Error::custom(
+                "a replicate summary is 'mean', 'median', 'crps' or a quantile with a level",
+            )),
         }
     }
 }
@@ -514,7 +560,8 @@ impl Replicates {
 /// assert_eq!(max_b.at.as_deref(), Some(&[10.0, 20.0, 30.0, 40.0][..]));
 /// assert!([total, ratio].iter().all(|constraint| constraint.at.is_some()));
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(remote = "Self", deny_unknown_fields)]
 pub struct CalibrationConstraint {
     /// Unique identifier for this constraint
     pub id: String,
@@ -532,6 +579,11 @@ pub struct CalibrationConstraint {
     /// - "500.0 - B" (with `at`) → B <= 500 at those positions
     pub expression: String,
 
+    /// What the constraint states, for a reader; the engine does not read
+    /// it.
+    #[serde(default)]
+    pub description: Option<String>,
+
     /// Penalty weight multiplier (default 1.0)
     ///
     /// Higher values make this constraint more important relative to others.
@@ -547,12 +599,22 @@ pub struct CalibrationConstraint {
     pub at: Option<Vec<f64>>,
 }
 
+commol_core::checked!(
+    CalibrationConstraint,
+    "CalibrationConstraint",
+    [
+        commol_core::Rule::Real(crate::ranges::WEIGHT),
+        commol_core::Rule::Real(crate::ranges::AT)
+    ]
+);
+
 impl CalibrationConstraint {
     /// Create a new calibration constraint
     pub fn new(id: String, expression: String) -> Self {
         Self {
             id,
             expression,
+            description: None,
             weight: 1.0,
             at: None,
         }

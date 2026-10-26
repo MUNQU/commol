@@ -213,7 +213,7 @@ def test_windowed_totals_equal_the_prediction_of_a_windowed_observation() -> Non
     )
     calibrator = Calibrator(_model(None), problem)
 
-    [[predictions]] = calibrator.rust_problem.predict_observations([[truth]])
+    [[predictions]] = calibrator._rust_problem.predict_observations([[truth]])
 
     assert windowed_totals(results["events"], results.positions, 7, [7, 14]) == (
         predictions

@@ -52,23 +52,28 @@ fn quantities_equal_hand_computations() {
     let quantities = Quantities::new(
         &[
             Quantity::ValueAt {
+                label: None,
                 series: level(&["A"]),
                 at: 2.0,
             },
             Quantity::ValueAt {
+                label: None,
                 series: level(&["A", "B"]),
                 at: 3.0,
             },
             Quantity::Gain {
+                label: None,
                 outputs: names(&["B"]),
                 start: 1.0,
                 end: 3.0,
             },
             Quantity::Peak {
+                label: None,
                 series: level(&["A"]),
                 positions: vec![1.0, 2.0, 3.0],
             },
             Quantity::PeakPosition {
+                label: None,
                 series: level(&["B"]),
                 positions: vec![1.0, 2.0, 3.0],
             },
@@ -112,6 +117,7 @@ fn a_gain_reads_its_start_exactly() {
     let outputs = names(&["A", "B"]);
     let gain = Quantities::new(
         &[Quantity::Gain {
+            label: None,
             outputs: names(&["B"]),
             start: 0.1,
             end: 0.4,
@@ -122,10 +128,12 @@ fn a_gain_reads_its_start_exactly() {
     let with_value = Quantities::new(
         &[
             Quantity::ValueAt {
+                label: None,
                 series: level(&["B"]),
                 at: 0.1,
             },
             Quantity::Gain {
+                label: None,
                 outputs: names(&["B"]),
                 start: 0.1,
                 end: 0.4,
@@ -151,6 +159,7 @@ fn stochastic_points_average_replicates_with_common_seeds() {
     let forward = ForwardModel::unobserved(engine.clone(), k(), None, Some(4), Some(9)).unwrap();
     let quantities = Quantities::new(
         &[Quantity::ValueAt {
+            label: None,
             series: level(&["A"]),
             at: 5.0,
         }],
@@ -181,33 +190,39 @@ fn a_quantity_reads_only_what_the_model_has() {
     let quantity = |quantity: Quantity| Quantities::new(&[quantity], &outputs);
 
     let unknown = quantity(Quantity::ValueAt {
+        label: None,
         series: level(&["C"]),
         at: 1.0,
     })
     .unwrap_err();
     let backwards = quantity(Quantity::Gain {
+        label: None,
         outputs: names(&["B"]),
         start: 3.0,
         end: 1.0,
     })
     .unwrap_err();
     let no_positions = quantity(Quantity::Peak {
+        label: None,
         series: level(&["A"]),
         positions: vec![],
     })
     .unwrap_err();
     let no_outputs = quantity(Quantity::ValueAt {
+        label: None,
         series: Series::Level { outputs: vec![] },
         at: 1.0,
     })
     .unwrap_err();
     let not_finite = quantity(Quantity::ValueAt {
+        label: None,
         series: level(&["A"]),
         at: f64::NAN,
     })
     .unwrap_err();
     let none = Quantities::new(&[], &outputs).unwrap_err();
     let half_step = quantity(Quantity::ValueAt {
+        label: None,
         series: level(&["A"]),
         at: 1.5,
     })
@@ -534,6 +549,7 @@ fn analysis<E: SimulationEngine + Send + Sync>(
 
 fn a_at(at: f64) -> Vec<Quantity> {
     vec![Quantity::ValueAt {
+        label: None,
         series: level(&["A"]),
         at,
     }]
@@ -751,6 +767,7 @@ fn an_analysis_runs_each_method_in_one_call() {
             2,
             4,
             &[Quantity::ValueAt {
+                label: None,
                 series: level(&["C"]),
                 at: 1.0,
             }],

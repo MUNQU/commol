@@ -36,7 +36,8 @@ from commol import (
     weighted_quantiles,
 )
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context.inference.quantities import Quantity, expand_quantities
+from commol.context.engine_json import engine_json
+from commol.context.inference.quantities import Quantity, quantity_labels
 from tests.support import bounded, build
 from tests.support.models import a_to_b_builder
 
@@ -247,7 +248,7 @@ class TestRatio:
 
 class TestLabels:
     def test_each_quantity_has_a_label(self) -> None:
-        labels, _ = expand_quantities(
+        labels = quantity_labels(
             [
                 ValueAt(series="B", at=10),
                 Gain(outputs=["B", "C"], start=5, end=10),
@@ -268,7 +269,7 @@ class TestLabels:
         ]
 
     def test_the_labels_of_close_positions_differ(self) -> None:
-        labels, _ = expand_quantities(
+        labels = quantity_labels(
             [
                 Trajectory(series="B", positions=[1000000, 1000001]),
                 ValueAt(series="B", at=0.1234567),
@@ -294,11 +295,11 @@ class TestLabels:
 
     def test_quantities_have_labels_of_their_own(self) -> None:
         with pytest.raises(ValueError, match=r"\['B at 1'\]"):
-            expand_quantities(
+            quantity_labels(
                 [ValueAt(series="B", at=1), Trajectory(series="B", positions=[1])]
             )
         with pytest.raises(ValueError, match=r"at least one quantity"):
-            expand_quantities([])
+            quantity_labels([])
 
 
 class TestBoundary:
@@ -316,9 +317,10 @@ class TestBoundary:
                 replicate_rule="within_positive",
             ),
         ]
-        _, rust = expand_quantities(quantities)
-
-        read = commol_rs.inference.quantities_as_read(rust)
+        read = [
+            commol_rs.json.as_read(type(quantity).__name__, engine_json(quantity))
+            for quantity in quantities
+        ]
         labelled = Ratio(
             numerator=ValueAt(series="A", at=1, label="a"),
             denominator=ValueAt(series="B", at=1, label="b"),
@@ -326,11 +328,15 @@ class TestBoundary:
             label="a over b",
         )
 
-        assert TypeAdapter(list[Quantity]).validate_json(read) == quantities
-        assert '"label"' not in labelled.rust_json()
+        adapter: TypeAdapter[Quantity] = TypeAdapter(Quantity)
+        assert [adapter.validate_json(text) for text in read] == quantities
+        assert (
+            json.loads(commol_rs.json.as_read("Ratio", engine_json(labelled)))["label"]
+            == "a over b"
+        )
         assert labelled.labels() == ["a over b"]
-        with pytest.raises(ValueError, match=r"Not a list of quantities"):
-            commol_rs.inference.quantities_as_read('[{"kind": "mean"}]')
+        with pytest.raises(ValueError, match=r"kind"):
+            commol_rs.json.as_read("ValueAt", '{"kind": "mean"}')
 
 
 def _propagation() -> PropagationResult:
@@ -410,7 +416,5 @@ def test_a_ratio_takes_a_replicate_rule(rule: str) -> None:
     value = ValueAt(series="A", at=1)
     ratio = Ratio(numerator=value, denominator=value, replicate_rule=rule)
 
-    _, rust = expand_quantities([ratio])
-
-    [read] = json.loads(commol_rs.inference.quantities_as_read(rust))
+    read = json.loads(commol_rs.json.as_read("Ratio", engine_json(ratio)))
     assert read["replicate_rule"] == rule

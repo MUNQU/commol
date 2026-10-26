@@ -1,25 +1,23 @@
 //! Python bindings of the conformal prediction intervals of
 //! `commol-inference`.
 //!
-//! Each function takes the problem built once by a `Calibrator` and returns
-//! the intervals and scores as plain values; Python builds the result.
+//! Each function takes the problem built once by a `Calibrator`, the JSON of
+//! the method and, for a predictor that is a sample, its handle; it fits the
+//! problem when the method needs a fit and returns the intervals and scores
+//! as plain values; Python builds the result.
 
 use crate::parallelism::parallel;
-use commol_inference::conformal::{
-    self, ConformalRun, ConformalSettings, NonconformityScore, Pooling, Predictor,
+use commol_calibration::observed_data;
+use commol_inference::conformal::{self, ConformalRun, Predictor};
+use commol_inference::resampling::{BlockDrawing, BlockScheme, FitUnit, ReplicateRunner};
+use commol_inference::settings::conformal::{
+    AdaptiveConformalSettings, EnbPiSettings, JackknifePlusSettings, RollingConformalSettings,
+    ScoreAndPooling, SplitConformalSettings,
 };
 use pyo3::prelude::*;
 
-use commol_inference::resampling::{BlockDrawing, BlockScheme, FitUnit, ReplicateRunner};
-
-use crate::calibration::{PyObservedDataPoint, PyOptimizationConfig};
-use crate::inference::{PyCalibrationProblem, PyParameterSample, method_error};
-
-fn settings(score: &str, by: &str, confidence_level: f64) -> PyResult<ConformalSettings> {
-    let score = NonconformityScore::from_name(Some(score)).map_err(method_error)?;
-    let by = Pooling::from_name(Some(by)).map_err(method_error)?;
-    ConformalSettings::new(score, by, confidence_level).map_err(method_error)
-}
+use crate::calibration::PyStarts;
+use crate::inference::{PyCalibrationProblem, PyParameterSample, best_values, method_error};
 
 /// The intervals of a conformal method, as the runner returns them
 #[pyclass(name = "ConformalRun", frozen, get_all)]
@@ -72,118 +70,123 @@ impl PyConformalRun {
     }
 }
 
-/// The predictor of a method that does not refit: the sample when there is
-/// one, otherwise the fit (the runner passes one of them)
-fn predictor<'a>(fit: Option<&'a [f64]>, sample: Option<&'a PyParameterSample>) -> Predictor<'a> {
+/// The starts of the fit of a method that does not refit, when it has no
+/// sample, and its predictor: the sample when there is one, otherwise the
+/// fit
+fn predictor<'a>(
+    py: Python<'_>,
+    problem: &PyCalibrationProblem,
+    starts: usize,
+    sample: Option<&'a PyParameterSample>,
+    fit: &'a mut Vec<f64>,
+) -> PyResult<(Option<PyStarts>, Predictor<'a>)> {
     match sample {
-        Some(sample) => Predictor::Sample(&sample.inner),
-        None => Predictor::Fit(fit.unwrap_or_default()),
+        Some(sample) => Ok((None, Predictor::Sample(&sample.inner))),
+        None => {
+            let starts = problem.fit(py, starts)?;
+            *fit = best_values(&starts);
+            Ok((Some(PyStarts { inner: starts }), Predictor::Fit(fit)))
+        }
     }
 }
 
+/// The fit of a method that refits, and the runner of its refits.
+fn refits<'a>(
+    py: Python<'_>,
+    problem: &'a PyCalibrationProblem,
+    starts: usize,
+) -> PyResult<(PyStarts, ReplicateRunner<'a, crate::engine::Engine>)> {
+    let fitted = problem.fit(py, starts)?;
+    let runner = problem.runner(&best_values(&fitted), starts)?;
+    Ok((PyStarts { inner: fitted }, runner))
+}
+
 /// Check the score and the pooling of a conformal method
+///
+/// Args:
+///     settings: The JSON of the fields `score` and `by` that are given
 ///
 /// Raises:
 ///     ValueError: If one is missing or not a valid name, or the pair is
 ///         rejected
 #[pyfunction]
-#[pyo3(signature = (score, by))]
-fn check_conformal_settings(score: Option<&str>, by: Option<&str>) -> PyResult<()> {
-    let score = NonconformityScore::from_name(score).map_err(method_error)?;
-    let by = Pooling::from_name(by).map_err(method_error)?;
-    ConformalSettings::check_pair(score, by).map_err(method_error)
+fn check_conformal_settings(settings: &str) -> PyResult<()> {
+    crate::json::read::<ScoreAndPooling>(settings)?
+        .check()
+        .map_err(method_error)
 }
 
-/// Split conformal intervals at `positions`, for each series of
-/// `calibration`
+/// Split conformal intervals at the positions of the settings, for each
+/// series of the held-out observations
 ///
 /// Args:
 ///     problem: The calibration problem
-///     fit: The fitted values, in problem order, or None with a sample
-///     sample: The sample whose predictive is the predictor, or None
-///     calibration: The held-out observations
-///     positions: Where the intervals are
-///     score: "absolute", "normalized" or "spread"
-///     by: "series" or "all"
-///     confidence_level: The level of the intervals
+///     settings: The JSON of a `SplitConformal`
+///     sample: The sample whose predictive is the predictor, or None for
+///         the fit of the problem
+///
+/// Returns:
+///     The starts of the fit, or None with a sample, and the intervals
 ///
 /// Raises:
 ///     ValueError: If a setting is not valid, the score has no scale, or a
 ///         point names an unknown output
+///     RuntimeError: If the fit fails
 ///     InfeasibleStateError: If a run leaves the values its model allows
 #[pyfunction]
-#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (problem, settings, sample=None))]
 fn split_conformal(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
-    fit: Option<Vec<f64>>,
+    settings: &str,
     sample: Option<&PyParameterSample>,
-    calibration: Vec<PyObservedDataPoint>,
-    positions: Vec<f64>,
-    score: &str,
-    by: &str,
-    confidence_level: f64,
-) -> PyResult<PyConformalRun> {
-    let settings = settings(score, by, confidence_level)?;
-    let calibration: Vec<_> = calibration.into_iter().map(|o| o.inner).collect();
-    let predictor = predictor(fit.as_deref(), sample);
-    parallel(py, || {
+) -> PyResult<(Option<PyStarts>, PyConformalRun)> {
+    let settings: SplitConformalSettings = crate::json::read(settings)?;
+    let conformal = settings.conformal().map_err(method_error)?;
+    let calibration = observed_data(&settings.calibration_data);
+    let mut fit = Vec::new();
+    let (starts, predictor) = predictor(py, problem, settings.starts, sample, &mut fit)?;
+    let run = parallel(py, || {
         conformal::split_conformal(
             &problem.inner,
             predictor,
             &calibration,
-            &positions,
-            settings,
+            &settings.positions,
+            conformal,
         )
     })?
-    .map(|run| PyConformalRun::of(run, FitUnit::Replicate))
-    .map_err(method_error)
+    .map_err(method_error)?;
+    Ok((starts, PyConformalRun::of(run, FitUnit::Replicate)))
 }
 
-/// Rolling-origin conformal intervals at `positions`, after the data, for
-/// each series of the problem
+/// Rolling-origin conformal intervals at the positions of the settings,
+/// after the data, for each series of the problem
 ///
 /// Args:
 ///     problem: The calibration problem
-///     config: The optimizer
-///     fit: The fit of every observation, in problem order
-///     origins: The positions of the origins
-///     positions: Where the intervals are
-///     score: "absolute" or "normalized"
-///     by: "series" or "all"
-///     confidence_level: The level of the intervals
-///     starts: Starts per fit, the fit first
-///     seed: Seed of the starts
+///     settings: The JSON of a `RollingConformal`
+///
+/// Returns:
+///     The starts of the fit of every observation, and the intervals
 ///
 /// Raises:
 ///     ValueError: If a setting is not valid, a position is not after the
 ///         data, or an origin has no observation before or after it
-///     RuntimeError: If every fit fails
+///     RuntimeError: If the fit or every refit fails
 #[pyfunction]
-#[allow(clippy::too_many_arguments)]
 fn rolling_conformal(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
-    config: &PyOptimizationConfig,
-    fit: Vec<f64>,
-    origins: Vec<f64>,
-    positions: Vec<f64>,
-    score: &str,
-    by: &str,
-    confidence_level: f64,
-    starts: i64,
-    seed: i128,
-) -> PyResult<PyConformalRun> {
-    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-    let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
-    let settings = settings(score, by, confidence_level)?;
-    let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
-        .map_err(method_error)?;
-    parallel(py, || {
-        conformal::rolling_conformal(&runner, &origins, &positions, settings)
+    settings: &str,
+) -> PyResult<(PyStarts, PyConformalRun)> {
+    let settings: RollingConformalSettings = crate::json::read(settings)?;
+    let conformal = settings.conformal().map_err(method_error)?;
+    let (starts, runner) = refits(py, problem, settings.starts)?;
+    let run = parallel(py, || {
+        conformal::rolling_conformal(&runner, &settings.origins, &settings.positions, conformal)
     })?
-    .map(|run| PyConformalRun::of(run, FitUnit::Origin))
-    .map_err(method_error)
+    .map_err(method_error)?;
+    Ok((starts, PyConformalRun::of(run, FitUnit::Origin)))
 }
 
 /// The blocks of `runner`'s problem with `block_length` positions, or the
@@ -196,155 +199,130 @@ fn blocks(
     BlockScheme::at_fit(runner.problem(), runner.fit(), block_length, drawing).map_err(method_error)
 }
 
-/// Jackknife+ intervals at `positions`, for each series of the problem
+/// Jackknife+ intervals at the positions of the settings, for each series
+/// of the problem
 ///
 /// Args:
 ///     problem: The calibration problem
-///     config: The optimizer
-///     fit: The fit of every observation, in problem order
-///     block_length: Positions per block, or None for the automatic length
-///     positions: Where the intervals are
-///     score: "absolute", "normalized" or "spread"
-///     by: "series" or "all"
-///     confidence_level: The level of the intervals
-///     starts: Starts per refit, the fit first
-///     seed: Seed of the starts
+///     settings: The JSON of a `JackknifePlus`
+///
+/// Returns:
+///     The starts of the fit, and the intervals
 ///
 /// Raises:
 ///     ValueError: If a setting is not valid or the blocks are fewer than
 ///         two
-///     RuntimeError: If fewer than two refits succeed
+///     RuntimeError: If the fit fails or fewer than two refits succeed
 #[pyfunction]
-#[allow(clippy::too_many_arguments)]
 fn jackknife_plus(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
-    config: &PyOptimizationConfig,
-    fit: Vec<f64>,
-    block_length: Option<i64>,
-    positions: Vec<f64>,
-    score: &str,
-    by: &str,
-    confidence_level: f64,
-    starts: i64,
-    seed: i128,
-) -> PyResult<PyConformalRun> {
-    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-    let block_length: Option<usize> =
-        crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
-    let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
-    let settings = settings(score, by, confidence_level)?;
-    let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
-        .map_err(method_error)?;
-    let scheme = blocks(&runner, block_length, BlockDrawing::NonOverlapping)?;
+    settings: &str,
+) -> PyResult<(PyStarts, PyConformalRun)> {
+    let settings: JackknifePlusSettings = crate::json::read(settings)?;
+    let conformal = settings.conformal().map_err(method_error)?;
+    let (starts, runner) = refits(py, problem, settings.starts)?;
+    let scheme = blocks(
+        &runner,
+        settings.block_length.0,
+        BlockDrawing::NonOverlapping,
+    )?;
     let run = parallel(py, || {
-        conformal::jackknife_plus(&runner, &scheme, &positions, settings)
+        conformal::jackknife_plus(&runner, &scheme, &settings.positions, conformal)
     })?
     .map_err(method_error)?;
-    Ok(PyConformalRun {
+    let run = PyConformalRun {
         bound: Some(run.bound),
         blocks: Some(run.blocks),
         block_length: Some(scheme.length()),
         block_length_estimates: scheme.estimates().map(<[_]>::to_vec),
         ..PyConformalRun::of(run.run, FitUnit::Block)
-    })
+    };
+    Ok((starts, run))
 }
 
-/// EnbPI intervals at `positions`, for each series of the problem
+/// EnbPI intervals at the positions of the settings, for each series of the
+/// problem
 ///
 /// Args:
 ///     problem: The calibration problem
-///     config: The optimizer
-///     fit: The fit every replicate starts from, in problem order
-///     replicates: Number of replicates
-///     block_length: Positions per block, or None for the automatic length
-///     positions: Where the intervals are
-///     score: "absolute", "normalized" or "spread"
-///     by: "series" or "all"
-///     confidence_level: The level of the intervals
-///     starts: Starts per replicate, the fit first
-///     seed: Seed of the replicates
+///     settings: The JSON of an `EnbPI`
+///
+/// Returns:
+///     The starts of the fit, and the intervals
 ///
 /// Raises:
 ///     ValueError: If a setting is not valid or a block is left out by no
 ///         replicate
-///     RuntimeError: If every replicate fails
+///     RuntimeError: If the fit or every replicate fails
 #[pyfunction]
-#[allow(clippy::too_many_arguments)]
 fn enbpi(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
-    config: &PyOptimizationConfig,
-    fit: Vec<f64>,
-    replicates: i64,
-    block_length: Option<i64>,
-    positions: Vec<f64>,
-    score: &str,
-    by: &str,
-    confidence_level: f64,
-    starts: i64,
-    seed: i128,
-) -> PyResult<PyConformalRun> {
-    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-    let replicates: usize =
-        crate::counts::count(&commol_inference::ranges::TWO_REPLICATES, replicates)?;
-    let block_length: Option<usize> =
-        crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
-    let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
-    let settings = settings(score, by, confidence_level)?;
-    let runner = ReplicateRunner::new(&problem.inner, &config.inner, &fit, starts, seed)
-        .map_err(method_error)?;
-    let scheme = blocks(&runner, block_length, BlockDrawing::NonOverlapping)?;
+    settings: &str,
+) -> PyResult<(PyStarts, PyConformalRun)> {
+    let settings: EnbPiSettings = crate::json::read(settings)?;
+    let conformal = settings.conformal().map_err(method_error)?;
+    let (starts, runner) = refits(py, problem, settings.starts)?;
+    let scheme = blocks(
+        &runner,
+        settings.block_length.0,
+        BlockDrawing::NonOverlapping,
+    )?;
     let run = parallel(py, || {
-        conformal::enbpi(&runner, &scheme, replicates, &positions, settings)
+        conformal::enbpi(
+            &runner,
+            &scheme,
+            settings.replicates,
+            &settings.positions,
+            conformal,
+        )
     })?
     .map_err(method_error)?;
-    Ok(PyConformalRun {
+    let run = PyConformalRun {
         blocks: Some(scheme.count()),
         block_length: Some(scheme.length()),
         block_length_estimates: scheme.estimates().map(<[_]>::to_vec),
         ..PyConformalRun::of(run, FitUnit::Replicate)
-    })
+    };
+    Ok((starts, run))
 }
 
-/// Adaptive conformal intervals at each point of `stream`, in order of
-/// position
+/// Adaptive conformal intervals at each point of the stream of the
+/// settings, in order of position
 ///
 /// Args:
 ///     problem: The calibration problem
-///     fit: The fitted values, in problem order, or None with a sample
-///     sample: The sample whose predictive is the predictor, or None
-///     stream: The observations that arrive
-///     step: The step of the working level
-///     score: "absolute", "normalized" or "spread"
-///     by: "series" or "all"
-///     confidence_level: The target level of the intervals
+///     settings: The JSON of an `AdaptiveConformal`
+///     sample: The sample whose predictive is the predictor, or None for
+///         the fit of the problem
+///
+/// Returns:
+///     The starts of the fit, or None with a sample, and the intervals
 ///
 /// Raises:
 ///     ValueError: If a setting is not valid, the score has no scale, or a
 ///         point names an unknown output
+///     RuntimeError: If the fit fails
 ///     InfeasibleStateError: If a run leaves the values its model allows
 #[pyfunction]
-#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (problem, settings, sample=None))]
 fn adaptive_conformal(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
-    fit: Option<Vec<f64>>,
+    settings: &str,
     sample: Option<&PyParameterSample>,
-    stream: Vec<PyObservedDataPoint>,
-    step: f64,
-    score: &str,
-    by: &str,
-    confidence_level: f64,
-) -> PyResult<PyConformalRun> {
-    let settings = settings(score, by, confidence_level)?;
-    let stream: Vec<_> = stream.into_iter().map(|o| o.inner).collect();
-    let predictor = predictor(fit.as_deref(), sample);
-    parallel(py, || {
-        conformal::adaptive_conformal(&problem.inner, predictor, &stream, step, settings)
+) -> PyResult<(Option<PyStarts>, PyConformalRun)> {
+    let settings: AdaptiveConformalSettings = crate::json::read(settings)?;
+    let conformal = settings.conformal().map_err(method_error)?;
+    let stream = observed_data(&settings.stream);
+    let mut fit = Vec::new();
+    let (starts, predictor) = predictor(py, problem, settings.starts, sample, &mut fit)?;
+    let run = parallel(py, || {
+        conformal::adaptive_conformal(&problem.inner, predictor, &stream, settings.step, conformal)
     })?
-    .map(|run| PyConformalRun::of(run, FitUnit::Replicate))
-    .map_err(method_error)
+    .map_err(method_error)?;
+    Ok((starts, PyConformalRun::of(run, FitUnit::Replicate)))
 }
 
 /// Register the conformal functions with the inference module

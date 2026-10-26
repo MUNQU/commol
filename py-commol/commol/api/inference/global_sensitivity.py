@@ -1,10 +1,10 @@
 """The runners of the sensitivity methods, registered for
 ``SensitivityAnalysis.run``.
 
-Each runner is one call into Rust (`ForwardAnalysis`), which builds the
-design from the inputs of the analysis, runs it through the forward model
-with no observations and estimates; the runner builds the result from the
-values Rust returns.
+Each runner sends its method whole to the engine, with the forward analysis
+of the inputs (`ForwardAnalysis`); the engine builds the design, runs it
+through the forward model with no observations and estimates, and the runner
+builds the result from the values it returns.
 """
 
 from typing import TYPE_CHECKING
@@ -22,7 +22,9 @@ from commol.context.inference.global_sensitivity import (
     Sobol,
     SobolResult,
 )
-from commol.context.inference.quantities import expand_quantities
+from commol.commol_rs import _commol_rs as commol_rs
+from commol.context.engine_json import engine_json
+from commol.context.inference.quantities import quantity_labels
 from commol.context.inference.sample import ParameterSample, SampleMethod
 
 if TYPE_CHECKING:
@@ -77,11 +79,9 @@ def run_propagation(
         If independent inputs have no `draws`, inputs from a sample have
         `draws`, or a quantity does not fit the model.
     """
-    labels, quantities = (
-        expand_quantities(method.quantities) if method.quantities else ([], "[]")
-    )
-    draws, values, weights, draw_seeds = analysis.rust_analysis.propagate(
-        method.draws, quantities
+    labels = quantity_labels(method.quantities) if method.quantities else []
+    draws, values, weights, draw_seeds = commol_rs.inference.propagation(
+        analysis._rust, engine_json(method)
     )
     return PropagationResult(
         sample=_sample(analysis, "propagation", draws),
@@ -115,9 +115,9 @@ def run_prcc(analysis: "SensitivityAnalysis", method: PRCC) -> PRCCResult:
         model or is NaN at a draw, there are too few draws for the inputs, or
         their ranks are collinear.
     """
-    labels, quantities = expand_quantities(method.quantities)
-    draws, coefficients, p_values, effective_size = analysis.rust_analysis.prcc(
-        method.draws, quantities
+    labels = quantity_labels(method.quantities)
+    draws, coefficients, p_values, effective_size = commol_rs.inference.prcc(
+        analysis._rust, engine_json(method)
     )
     axes = [pair for quantity in method.quantities for pair in quantity.axes()]
     return PRCCResult(
@@ -154,9 +154,9 @@ def run_morris(analysis: "SensitivityAnalysis", method: Morris) -> MorrisResult:
         If the inputs come from a sample, the levels are not even, or a
         quantity does not fit the model or is NaN at a point.
     """
-    labels, quantities = expand_quantities(method.quantities)
-    mu, mu_star, sigma, runs = analysis.rust_analysis.morris(
-        method.trajectories, method.levels, quantities
+    labels = quantity_labels(method.quantities)
+    mu, mu_star, sigma, runs = commol_rs.inference.morris(
+        analysis._rust, engine_json(method)
     )
     return MorrisResult(
         inputs=analysis.inputs.names,
@@ -190,10 +190,8 @@ def run_sobol(analysis: "SensitivityAnalysis", method: Sobol) -> SobolResult:
         If the inputs come from a sample, or a quantity does not fit the
         model or is NaN at a point.
     """
-    labels, quantities = expand_quantities(method.quantities)
-    run = analysis.rust_analysis.sobol(
-        method.draws, method.replicates, method.confidence_level, quantities
-    )
+    labels = quantity_labels(method.quantities)
+    run = commol_rs.inference.sobol(analysis._rust, engine_json(method))
     return SobolResult(
         inputs=analysis.inputs.names,
         labels=labels,
@@ -231,14 +229,8 @@ def run_chaos(analysis: "SensitivityAnalysis", method: PolynomialChaos) -> Chaos
         (checked before any run), or a quantity does not fit the model or is
         NaN at a point.
     """
-    labels, quantities = expand_quantities(method.quantities)
-    run = analysis.rust_analysis.chaos(
-        method.degree,
-        method.q_norm,
-        method.max_interaction,
-        method.draws,
-        quantities,
-    )
+    labels = quantity_labels(method.quantities)
+    run = commol_rs.inference.polynomial_chaos(analysis._rust, engine_json(method))
     return ChaosResult(
         inputs=analysis.inputs.names,
         input_space=analysis.inputs,

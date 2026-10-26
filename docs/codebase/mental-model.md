@@ -31,7 +31,7 @@ py-commol/commol/api/        ModelBuilder, Simulation, Calibrator, reports
   v
 py-commol/commol/context/    Pydantic model: validation and serialization
   |
-  |  Model.model_dump_json()
+  |  the JSON of model_dump(): the model, a calibration problem, each method
   v
 py-commol/src/               PyO3 bindings (module commol.commol_rs._commol_rs)
   |
@@ -94,8 +94,7 @@ ModelBuilder ... .build(Aggregate(...), engine)
                                       checks model.engine and its kind; the
                                       structure checks itself against the process)
 Simulation(model)                  -> engine_state.build_engine(model JSON)
-                                   -> commol_rs.core.Model.from_json(...)
-                                   -> commol_rs.engine.Engine(...): the implementation of
+                                   -> commol_rs.engine.Engine(model JSON): the implementation of
                                       the engine model.engine.type names (EngineType list)
                                       for the kind of model.structure
                                    every engine of the aggregate kind compiles it with commol-model (CompiledModel):

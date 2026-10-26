@@ -697,7 +697,7 @@ mod tests {
     fn groups(weights: Option<&str>) -> Neighbors {
         let weights = weights.unwrap_or("null");
         serde_json::from_str(&format!(
-            r#"{{"type":"groups","stratification":"group","weights":{weights}}}"#
+            r#"{{"kind":"groups","stratification":"group","weights":{weights}}}"#
         ))
         .unwrap()
     }

@@ -1,23 +1,19 @@
 """The runners of the conformal methods, registered for
 ``Calibrator.uncertainty``.
 
-Each runner fits the problem with ``Calibrator.run`` when its predictor is a
-fit and hands the rest to Rust, which predicts, scores, refits and takes the
-quantiles.
+Each runner sends its method whole to the engine, with the handle of its
+sample when its predictor is a sample; the engine fits the problem when the
+method needs a fit, predicts, scores, refits and takes the quantiles.
 """
 
 import logging
 from typing import TYPE_CHECKING
 
+from commol.api.inference.fit import failed_starts
 from commol.api.inference.registry import register
-from commol.api.inference.resampling import (
-    block_length_estimates,
-    fit_values,
-    log_failed,
-    rust_block_length,
-)
+from commol.api.inference.resampling import block_length_estimates, log_failed
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context._model import engine_state
+from commol.context.engine_json import engine_handles, engine_json
 from commol.context.inference.conformal import (
     AdaptiveConformal,
     ConformalResult,
@@ -31,26 +27,19 @@ from commol.context.inference.conformal import (
 
 if TYPE_CHECKING:
     from commol.api.calibrator import Calibrator
-    from commol.commol_rs._commol_rs import (
-        ConformalRunProtocol,
-        ParameterSampleProtocol,
-    )
+    from commol.commol_rs._commol_rs import ConformalRunProtocol, StartsProtocol
 
 logger = logging.getLogger(__name__)
 
 
-def _predictor(
-    calibrator: "Calibrator", method: SplitConformal | AdaptiveConformal
-) -> tuple[list[float] | None, "ParameterSampleProtocol | None"]:
-    """The fit, when the method has no sample, or the sample."""
-    if method.sample is not None:
-        return None, method.sample.rust_sample
-    return fit_values(calibrator, calibrator.run(starts=method.starts)), None
-
-
 def _result(
-    run: "ConformalRunProtocol", confidence_level: float, guarantee: str
+    starts: "StartsProtocol | None",
+    run: "ConformalRunProtocol",
+    confidence_level: float,
+    guarantee: str,
 ) -> ConformalResult:
+    if starts is not None:
+        failed_starts(starts, logger)
     series: dict[str, dict[str, list[float]]] = {}
     unbounded: dict[str, list[float]] = {}
     for label, at, prediction, lower, upper in zip(
@@ -104,18 +93,11 @@ def run_split_conformal(
         The intervals at the positions, the scores of the held-out
         observations and the guarantee.
     """
-    fit, sample = _predictor(calibrator, method)
-    run = commol_rs.inference.split_conformal(
-        calibrator.rust_problem,
-        fit,
-        sample,
-        engine_state.rust_observed_data(method.calibration_data),
-        method.positions,
-        method.score,
-        method.by,
-        method.confidence_level,
+    starts, run = commol_rs.inference.split_conformal(
+        calibrator._rust_problem, engine_json(method), **engine_handles(method)
     )
     return _result(
+        starts,
         run,
         method.confidence_level,
         f"Each interval covers a new observation with probability at least "
@@ -143,20 +125,11 @@ def run_rolling_conformal(
         The intervals at the positions, around the fit of every observation;
         the scores of every origin and horizon; and the guarantee.
     """
-    fit = calibrator.run(starts=method.starts)
-    run = commol_rs.inference.rolling_conformal(
-        calibrator.rust_problem,
-        calibrator.rust_optimizer,
-        fit_values(calibrator, fit),
-        method.origins,
-        method.positions,
-        method.score,
-        method.by,
-        method.confidence_level,
-        method.starts,
-        calibrator.seed,
+    starts, run = commol_rs.inference.rolling_conformal(
+        calibrator._rust_problem, engine_json(method)
     )
     return _result(
+        starts,
         run,
         method.confidence_level,
         f"Each interval covers a new observation at its horizon with probability "
@@ -184,20 +157,11 @@ def run_jackknife_plus(
         The intervals at the positions, the left-out residuals and the
         guarantee, with the CV+ bound of its blocks.
     """
-    fit = calibrator.run(starts=method.starts)
-    run = commol_rs.inference.jackknife_plus(
-        calibrator.rust_problem,
-        calibrator.rust_optimizer,
-        fit_values(calibrator, fit),
-        rust_block_length(method.block_length),
-        method.positions,
-        method.score,
-        method.by,
-        method.confidence_level,
-        method.starts,
-        calibrator.seed,
+    starts, run = commol_rs.inference.jackknife_plus(
+        calibrator._rust_problem, engine_json(method)
     )
     return _result(
+        starts,
         run,
         method.confidence_level,
         f"Each interval covers a new observation with probability at least "
@@ -225,21 +189,11 @@ def run_enbpi(calibrator: "Calibrator", method: EnbPI) -> ConformalResult:
         The intervals at the positions, the leave-one-out scores and the
         guarantee.
     """
-    fit = calibrator.run(starts=method.starts)
-    run = commol_rs.inference.enbpi(
-        calibrator.rust_problem,
-        calibrator.rust_optimizer,
-        fit_values(calibrator, fit),
-        method.replicates,
-        rust_block_length(method.block_length),
-        method.positions,
-        method.score,
-        method.by,
-        method.confidence_level,
-        method.starts,
-        calibrator.seed,
+    starts, run = commol_rs.inference.enbpi(
+        calibrator._rust_problem, engine_json(method)
     )
     return _result(
+        starts,
         run,
         method.confidence_level,
         f"Each interval covers a new observation with probability near "
@@ -268,18 +222,11 @@ def run_adaptive_conformal(
         The interval given at each point of the stream before it was seen,
         the scores of the stream and the guarantee.
     """
-    fit, sample = _predictor(calibrator, method)
-    run = commol_rs.inference.adaptive_conformal(
-        calibrator.rust_problem,
-        fit,
-        sample,
-        engine_state.rust_observed_data(method.stream),
-        method.step,
-        method.score,
-        method.by,
-        method.confidence_level,
+    starts, run = commol_rs.inference.adaptive_conformal(
+        calibrator._rust_problem, engine_json(method), **engine_handles(method)
     )
     return _result(
+        starts,
         run,
         method.confidence_level,
         f"The long-run share of the stream outside its intervals tends to "
