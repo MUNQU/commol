@@ -4,6 +4,7 @@ position on the axis in a rate, and the units of the variables of a rate."""
 import pytest
 
 from commol import Aggregate
+from commol.context._model.engine_state import formula_tree
 from commol.context._model.helpers import ModelCompartmentHelper
 from commol.context.model import Model
 from commol.utils.equations import UnitConsistencyError
@@ -311,7 +312,7 @@ class TestVariableUnits:
         helper = ModelCompartmentHelper(self._model("item"))
 
         annotated = helper.annotate_rate_variables(
-            "k * A_g1 / g1", {"k": "1/day", "A_g1": "g1", "g1": "item"}
+            formula_tree("k * A_g1 / g1"), {"k": "1/day", "A_g1": "g1", "g1": "item"}
         )
 
         assert annotated == "k(1/day) * A_g1(g1) / g1(item)"
@@ -320,8 +321,10 @@ class TestVariableUnits:
         helper = ModelCompartmentHelper(self._model("item"))
         units = {"k": "1/day"}
 
-        assert helper.format_rate_with_unit("k * x", units) == "k(1/day) * x"
-        assert helper.format_rate_with_unit("k * x", units, latex=True) == (
+        rate = formula_tree("k * x")
+
+        assert helper.format_rate_with_unit(rate, units) == "k(1/day) * x"
+        assert helper.format_rate_with_unit(rate, units, latex=True) == (
             "k(\\text{1/day}) \\cdot x"
         )
 

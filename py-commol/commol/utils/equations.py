@@ -1,14 +1,27 @@
-"""Dimensional analysis of model equations with pint."""
+"""Dimensional analysis of model equations with pint, on the tree of the
+engine."""
 
-import ast
 import math
+import operator
 import re
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 
 import pint
 from pint.facets.plain import PlainQuantity
 
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context._model.engine_state import formula_tree
+from commol.context._model.formula_tree import (
+    Chain,
+    Conditional,
+    Constant,
+    FunctionCall,
+    Node,
+    Power,
+    UnaryOp,
+    Variable,
+    formula_text,
+)
 from commol.context.parameter import Parameter
 from commol.constants import SUBGROUP_TOTAL_PREFIX, TOTAL_VARIABLE
 
@@ -80,8 +93,36 @@ def check_equation_units(
     converts values between units.
     """
     try:
-        # Parse the equation to build a pint Quantity
-        equation_unit = parse_equation_unit(equation, variable_units)
+        tree = formula_tree(equation)
+    except ValueError as e:
+        return (False, f"Error checking units for equation '{equation}': {e}")
+    return check_formula_units(tree, variable_units, expected_unit)
+
+
+def check_formula_units(
+    tree: Node, variable_units: Mapping[str, str], expected_unit: str
+) -> tuple[bool, str | None]:
+    """
+    Check if the tree of a formula is unit-consistent.
+
+    Parameters
+    ----------
+    tree : Node
+        The tree of the formula (``engine_state.formula_tree``).
+    variable_units : Mapping[str, str]
+        Mapping of variable names to their units.
+    expected_unit : str
+        The expected unit of the formula.
+
+    Returns
+    -------
+    tuple[bool, str | None]
+        As `check_equation_units`; a message names the formula as the tree
+        writes it.
+    """
+    equation = formula_text(tree)
+    try:
+        equation_unit = formula_unit(tree, variable_units)
 
         if not same_unit(str(equation_unit.units), expected_unit):
             return (
@@ -234,57 +275,114 @@ _FUNCTIONS: dict[str, Callable[..., Operand]] = {
 """The rule of each function of the engine (``commol_rs.core.FUNCTIONS``)."""
 
 
-class _ReadWrittenNumbers(ast.NodeTransformer):
-    """Mark written numbers, and route sums, differences and comparisons."""
+_OPERATIONS: dict[str, Callable[[Operand, Operand], Operand]] = {
+    "Add": _add,
+    "Sub": _subtract,
+    "Mul": operator.mul,
+    "Div": operator.truediv,
+    "Mod": operator.mod,
+    **dict.fromkeys(("Lt", "Gt", "Le", "Ge", "Eq", "Ne"), _compare),
+}
+"""The rule of each operator of a chain: a sum, a difference and a comparison
+read a written number in the unit of the other operand."""
 
-    def visit_Constant(self, node: ast.Constant) -> ast.AST:
-        if isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
-            return _call("_literal", [node])
-        return node
-
-    def visit_UnaryOp(self, node: ast.UnaryOp) -> ast.AST:
-        if isinstance(node.op, (ast.USub, ast.UAdd)) and isinstance(
-            node.operand, ast.Constant
-        ):
-            return _call("_literal", [node])
-        return self.generic_visit(node)
-
-    def visit_BinOp(self, node: ast.BinOp) -> ast.AST:
-        self.generic_visit(node)
-        if isinstance(node.op, ast.Add):
-            return _call("_add", [node.left, node.right])
-        if isinstance(node.op, ast.Sub):
-            return _call("_subtract", [node.left, node.right])
-        return node
-
-    def visit_Compare(self, node: ast.Compare) -> ast.AST:
-        self.generic_visit(node)
-        return _call("_compare", [node.left, *node.comparators])
+_CONSTANTS: dict[str, Operand] = {"pi": math.pi, "e": math.e}
+"""The constants of the language, numbers without a unit."""
 
 
-def _call(name: str, arguments: list) -> ast.Call:
-    return ast.Call(func=ast.Name(id=name, ctx=ast.Load()), args=arguments, keywords=[])
+def _operand(node: Node, values: Mapping[str, Operand]) -> Operand:
+    """The value of `node`, with each variable a quantity of its unit."""
+    match node:
+        case Constant(value):
+            return _Literal(value)
+        case Variable(name):
+            if name not in values:
+                raise ValueError(f"the variable '{name}' has no unit")
+            return values[name]
+        case Chain(first, rest):
+            result = _operand(first, values)
+            for op, operand in rest:
+                result = _OPERATIONS[op](result, _operand(operand, values))
+            return result
+        case Power(base, exponent):
+            return _operand(base, values) ** _operand(exponent, values)
+        case UnaryOp(op, operand):
+            return _unary(op, operand, values)
+        case FunctionCall(name, args):
+            return _FUNCTIONS[name](*(_operand(arg, values) for arg in args))
+        case Conditional(condition, true_expr, false_expr):
+            return _if(
+                _operand(condition, values),
+                _operand(true_expr, values),
+                _operand(false_expr, values),
+            )
 
 
-_IF_CALL = re.compile(r"\bif\s*\(")
+def _unary(op: str, operand: Node, values: Mapping[str, Operand]) -> Operand:
+    """A sign keeps the unit of its operand, and a written number with a sign
+    is a written number; the negation of a condition is a number, as a
+    comparison."""
+    if isinstance(operand, Constant) and op == "Neg":
+        return _Literal(-operand.value)
+    value = _operand(operand, values)
+    return -value if op == "Neg" else _compare(value)
+
+
+def formula_unit(tree: Node, variable_units: Mapping[str, str]) -> pint.Quantity:
+    """
+    The unit of the tree of a formula.
+
+    The tree is evaluated with every variable as a `pint` quantity of value 1
+    in its unit, in the grouping of the parser. A number written in the
+    formula and added to, subtracted from or compared with a quantity is read
+    in that quantity's unit, as the engine reads it; the two branches of
+    ``if(c, a, b)`` and the arguments of ``min`` and ``max`` share one unit.
+    ``cbrt`` takes the cube root of a unit, ``abs`` and ``round`` keep it,
+    and the other functions take and give numbers without a unit. ``pi`` and
+    ``e`` are numbers without a unit.
+
+    Parameters
+    ----------
+    tree : Node
+        The tree of the formula (``engine_state.formula_tree``).
+    variable_units : Mapping[str, str]
+        Mapping of variable names to their units.
+
+    Returns
+    -------
+    pint.Quantity
+        A pint Quantity representing the unit of the formula.
+
+    Raises
+    ------
+    pint.UndefinedUnitError
+        If a unit of `variable_units` is not defined.
+    ValueError
+        If a variable has no unit, or the units do not combine.
+    """
+    values: dict[str, Operand] = {
+        var: ureg(unit_str) for var, unit_str in variable_units.items()
+    }
+    values.update(_CONSTANTS)
+    try:
+        result = _operand(tree, values)
+    except Exception as e:
+        raise ValueError(
+            f"Failed to evaluate equation '{formula_text(tree)}': {str(e)}"
+        ) from e
+    if isinstance(result, pint.Quantity):
+        return result
+    return ureg.Quantity(float(result), ureg.dimensionless)
 
 
 def parse_equation_unit(equation: str, variable_units: dict[str, str]) -> pint.Quantity:
     """
-    Parse an equation and compute its resulting unit.
-
-    The equation is evaluated with every variable as a `pint` quantity of
-    value 1 in its unit. ``^`` and ``**`` are a power. A number written in the
-    equation and added to, subtracted from or compared with a quantity is read
-    in that quantity's unit, as the engine reads it; the two branches of
-    ``if(c, a, b)`` and the arguments of ``min`` and ``max`` share one unit.
-    ``cbrt`` takes the cube root of a unit, ``abs`` and ``round`` keep it,
-    and the other functions take and give numbers without a unit.
+    The unit of an equation: the unit of its tree (`formula_unit`).
 
     Parameters
     ----------
     equation : str
-        The equation to parse.
+        The equation, a formula of the language.
     variable_units : dict[str, str]
         Mapping of variable names to their units.
 
@@ -292,42 +390,14 @@ def parse_equation_unit(equation: str, variable_units: dict[str, str]) -> pint.Q
     -------
     pint.Quantity
         A pint Quantity representing the unit of the equation.
+
+    Raises
+    ------
+    ValueError
+        If the equation is not in the language of formulas, a variable has
+        no unit, or the units do not combine.
     """
-    namespace: dict[str, Operand | Callable[..., Operand]] = {}
-
-    for var, unit_str in variable_units.items():
-        namespace[var] = ureg(unit_str)
-
-    namespace.update(_FUNCTIONS)
-    namespace.update(
-        {
-            "pi": math.pi,
-            "e": math.e,
-            "_literal": _Literal,
-            "_add": _add,
-            "_subtract": _subtract,
-            "_compare": _compare,
-            "_if": _if,
-        }
-    )
-
-    try:
-        python = _IF_CALL.sub("_if(", equation).replace("^", "**")
-        tree = ast.parse(python, mode="eval")
-        tree = ast.fix_missing_locations(_ReadWrittenNumbers().visit(tree))
-        eval_result: Operand = eval(
-            compile(tree, "<equation>", "eval"), {"__builtins__": {}}, namespace
-        )
-    except Exception as e:
-        raise ValueError(f"Failed to evaluate equation '{equation}': {str(e)}")
-
-    if isinstance(eval_result, pint.Quantity):
-        return eval_result
-    if isinstance(eval_result, (int, float)):
-        return ureg.Quantity(float(eval_result), ureg.dimensionless)
-    raise ValueError(
-        f"Unexpected result type {type(eval_result)} from equation '{equation}'"
-    )
+    return formula_unit(formula_tree(equation), variable_units)
 
 
 def get_predefined_variable_units(

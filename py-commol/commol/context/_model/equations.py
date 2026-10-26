@@ -5,16 +5,31 @@ equations a description shows are the ones the engine simulates: each flow
 moves an amount from one compartment to another, and a proportional rate is
 shown multiplied by its source. An impulse is not part of the equations: it is
 listed apart, with the positions where it moves its amount at once.
+
+Each rate and each flow is written from the tree of the engine
+(``engine_state.formula_tree``), never from its text: a rate gives the same
+description with or without spaces.
 """
 
-import re
-from collections.abc import Callable, Mapping
+from collections import Counter
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from commol.commol_rs import _commol_rs as commol_rs
 
 from commol.context._model import engine_state
 from commol.context._model.engine_state import TransitionFlow
+from commol.context._model.formula_tree import (
+    PRIMARY,
+    PRODUCT,
+    Chain,
+    Constant,
+    FormulaWriter,
+    Node,
+    binding,
+    formula_text,
+    product,
+)
 from commol.context._model.helpers import ModelCompartmentHelper
 from commol.context.description import (
     Block,
@@ -158,7 +173,7 @@ class DynamicsDescription:
             GraphEdge(
                 source=flow.source,
                 target=flow.target,
-                label=f"{flow.transition}: {flow.term}",
+                label=f"{flow.transition}: {formula_text(flow.term)}",
             )
             for flow in self._transition_flows()
         ]
@@ -299,7 +314,7 @@ class DynamicsDescription:
         # Net coefficient of each flow term per compartment, in first-seen
         # order: a piece that leaves and enters the same compartment cancels,
         # and a compartment a flow enters twice gains it twice.
-        net: dict[str, dict[str, int]] = {
+        net: dict[str, dict[Node, int]] = {
             compartment.name: {} for compartment in compartments
         }
         impulse_ids = {t.id for t in self._model.process.transitions if t.is_impulse}
@@ -317,7 +332,7 @@ class DynamicsDescription:
             raw_terms = [
                 (
                     1 if count > 0 else -1,
-                    term if abs(count) == 1 else f"{abs(count)} * {term}",
+                    term if abs(count) == 1 else product(Constant(abs(count)), term),
                 )
                 for term, count in net[compartment.name].items()
                 if count != 0
@@ -381,7 +396,7 @@ class DynamicsDescription:
                         f"{name} {units:+d}" for name, units in change.items() if units
                     )
                     or "none",
-                    first.term if continuous else _draw(pieces),
+                    formula_text(first.term) if continuous else _draw(pieces),
                 ]
             )
         table = Table(
@@ -420,7 +435,7 @@ class DynamicsDescription:
             equations = [
                 Equation(
                     left=_text_arrow(flow),
-                    right=flow.term,
+                    right=formula_text(flow.term),
                     left_latex=_latex_transition_arrow(
                         _display_name(flow.source, latex=True),
                         _display_name(flow.target, latex=True),
@@ -446,23 +461,29 @@ class DynamicsDescription:
 
 
 def _rate_text(transition: "Transition") -> str:
-    """The rate of a transition as written, or ``stratified`` when it has none."""
+    """The rate of a transition, or ``stratified`` when it has none."""
     if transition.rate is not None:
-        return str(transition.rate)
+        return _formula(transition.rate)
     if transition.stratified_rates:
         return "stratified rates"
     return "no rate"
 
 
+def _formula(formula: str) -> str:
+    """A formula as its tree writes it."""
+    return formula_text(engine_state.formula_tree(formula))
+
+
 def _draw(pieces: list[TransitionFlow]) -> str:
     """How many units a flow moves in a step of the chain binomial."""
     first = pieces[0]
+    rate = _formula(first.rate)
     if first.proportional_to is not None:
-        return f"Binomial({first.proportional_to}, {first.rate})"
+        return f"Binomial({first.proportional_to}, {rate})"
     sources = [piece.source for piece in pieces if piece.source is not None]
     if not sources:
-        return f"Poisson({first.rate})"
-    return f"Poisson({first.rate}), at most {', '.join(dict.fromkeys(sources))}"
+        return f"Poisson({rate})"
+    return f"Poisson({rate}), at most {', '.join(dict.fromkeys(sources))}"
 
 
 def _text_arrow(flow: TransitionFlow) -> str:
@@ -476,9 +497,10 @@ def _display_name(name: str | None, latex: bool = False) -> str:
     return latex_variable(name) if latex else name
 
 
-def _format_equation(raw_terms: list[tuple[int, str]], latex: bool) -> str:
+def _format_equation(raw_terms: list[tuple[int, Node]], latex: bool) -> str:
     terms = [
-        f"{'+' if sign > 0 else '-'} ({latex_rate_expression(rate) if latex else rate})"
+        f"{'+' if sign > 0 else '-'} "
+        f"({latex_rate_expression(rate) if latex else formula_text(rate)})"
         for sign, rate in simplify_complementary_terms(raw_terms)
     ]
     if not terms:
@@ -562,9 +584,48 @@ def latex_variable(var_name: str) -> str:
     return var_name
 
 
-def latex_rate_expression(rate: str, units: Mapping[str, str] | None = None) -> str:
+class _LatexWriter(FormulaWriter):
     """
-    Convert a rate expression to LaTeX math mode.
+    Writes a tree in LaTeX: a product with ``\\cdot``, a division that no
+    parenthesis holds as a fraction, a power with its exponent raised, and
+    each variable as `latex_variable` writes it.
+    """
+
+    SYMBOLS = FormulaWriter.SYMBOLS | {
+        "Mul": "\\cdot",
+        "Mod": "\\bmod",
+        "Le": "\\leq",
+        "Ge": "\\geq",
+        "Eq": "=",
+        "Ne": "\\neq",
+    }
+    UNARY = {"Neg": "-", "Not": "\\lnot "}
+
+    def chain(self, first: Node, rest: tuple[tuple[str, Node], ...], free: bool) -> str:
+        if not free or all(op != "Div" for op, _ in rest):
+            return super().chain(first, rest, free)
+        # A fraction holds the whole product before it: its numerator and its
+        # denominator need no parentheses.
+        text = self.operand(first, PRODUCT, free=False)
+        alone: Node | None = first
+        for op, operand in rest:
+            if op == "Div":
+                numerator = text if alone is None else self.node(alone, free=False)
+                denominator = self.node(operand, free=False)
+                text = f"\\frac{{{numerator}}}{{{denominator}}}"
+            else:
+                text += f" {self.SYMBOLS[op]} {self.operand(operand, PRODUCT, False)}"
+            alone = None
+        return text
+
+    def power(self, base: Node, exponent: Node) -> str:
+        base_text = self.grouped(base, binding(base) < PRIMARY, free=False)
+        return f"{base_text}^{{{self.node(exponent, free=False)}}}"
+
+
+def latex_rate_expression(rate: Node, units: Mapping[str, str] | None = None) -> str:
+    """
+    The tree of a rate in LaTeX math mode.
 
     With `units`, each variable that has one is followed by it, as in
     ``k(\\text{1/day})``.
@@ -576,78 +637,7 @@ def latex_rate_expression(rate: str, units: Mapping[str, str] | None = None) -> 
             latex_var += f"(\\text{{{units[var]}}})"
         return latex_var
 
-    latex_rate = replace_variables(rate.replace(" * ", " \\cdot "), rate, latex)
-    return _convert_division_to_frac(latex_rate)
-
-
-def replace_variables(text: str, rate: str, replace: Callable[[str], str]) -> str:
-    """
-    `text` with each variable of `rate` replaced by ``replace(name)``.
-
-    One pass replaces every variable, so a replacement is never read again:
-    the category ``g1`` inside ``A_{g1}``, which replaces ``A_g1``, stays.
-    """
-    variables = engine_state.formula_inputs(rate)
-    if not variables:
-        return text
-    names = "|".join(re.escape(variable) for variable in variables)
-    return re.sub(rf"\b({names})\b", lambda match: replace(match.group(1)), text)
-
-
-def _convert_division_to_frac(expr: str) -> str:
-    """Convert division operations to LaTeX fractions."""
-    if " / " not in expr:
-        return expr
-
-    divisions = []
-    paren_depth = 0
-    i = 0
-
-    while i < len(expr):
-        if expr[i] == "(":
-            paren_depth += 1
-        elif expr[i] == ")":
-            paren_depth -= 1
-        elif paren_depth == 0 and expr[i : i + 3] == " / ":
-            divisions.append(i)
-            i += 2
-        i += 1
-
-    if not divisions:
-        return expr
-
-    parts = []
-    start = 0
-    for div_pos in divisions:
-        parts.append(expr[start:div_pos].strip())
-        start = div_pos + 3
-    parts.append(expr[start:].strip())
-
-    result = _strip_outer_parens(parts[0])
-    for i in range(1, len(parts)):
-        denominator = _strip_outer_parens(parts[i])
-        result = f"\\frac{{{result}}}{{{denominator}}}"
-
-    return result
-
-
-def _strip_outer_parens(expr: str) -> str:
-    """Remove outer parentheses if they wrap the entire expression."""
-    expr = expr.strip()
-    if not expr.startswith("(") or not expr.endswith(")"):
-        return expr
-
-    depth = 0
-    for i, char in enumerate(expr):
-        if char == "(":
-            depth += 1
-        elif char == ")":
-            depth -= 1
-
-        if depth == 0 and i < len(expr) - 1:
-            return expr
-
-    return expr[1:-1]
+    return _LatexWriter(latex).write(rate)
 
 
 # ------------------------------------------------------------------
@@ -655,56 +645,62 @@ def _strip_outer_parens(expr: str) -> str:
 # ------------------------------------------------------------------
 
 
-def tokenize_rate(rate: str) -> list[str]:
-    """Tokenize a rate expression by ``*`` respecting parentheses."""
-    tokens: list[str] = []
-    depth = 0
-    current_start = 0
-    i = 0
-    while i < len(rate):
-        if rate[i] == "(":
-            depth += 1
-        elif rate[i] == ")":
-            depth -= 1
-        elif depth == 0 and rate[i : i + 3] == " * ":
-            tokens.append(rate[current_start:i].strip())
-            i += 3
-            current_start = i
-            continue
-        i += 1
-    tokens.append(rate[current_start:].strip())
-    return tokens
+def _factors(rate: Node) -> list[Node]:
+    """
+    The factors of a product: its operands between two ``*``, each with the
+    ``/`` that follow it. A rate that is no product, or a product with
+    ``%``, which does not split, is one factor.
+    """
+    if not isinstance(rate, Chain) or binding(rate) != PRODUCT:
+        return [rate]
+    if any(op == "Mod" for op, _ in rate.rest):
+        return [rate]
+    factors: list[list[tuple[str, Node]]] = [[("Mul", rate.first)]]
+    for op, operand in rate.rest:
+        if op == "Mul":
+            factors.append([(op, operand)])
+        else:
+            factors[-1].append((op, operand))
+    return [
+        first if not rest else Chain(first, tuple(rest))
+        for (_, first), *rest in factors
+    ]
 
 
-def are_complementary_factors(varying: list[str]) -> bool:
-    """Check if a list of varying tokens are complementary percentages."""
+def _product_of(factors: list[Node]) -> Node:
+    """The product of `factors`, in order."""
+    result = factors[0]
+    for factor in factors[1:]:
+        result = product(result, factor)
+    return result
+
+
+def _one_minus(factor: Node) -> Counter[Node] | None:
+    """What ``1 - x - y`` subtracts from 1, or None for another factor."""
+    if (
+        isinstance(factor, Chain)
+        and factor.first == Constant(1.0)
+        and all(op == "Sub" for op, _ in factor.rest)
+    ):
+        return Counter(operand for _, operand in factor.rest)
+    return None
+
+
+def are_complementary_factors(varying: list[Node]) -> bool:
+    """Whether one factor is one minus the others: ``p``, ``q`` and
+    ``1 - p - q``."""
     if len(varying) < 2:
         return False
-
-    complement_idx = None
-    for i, token in enumerate(varying):
-        if token.startswith("(1 - ") and token.endswith(")"):
-            complement_idx = i
-            break
-
-    if complement_idx is None:
-        return False
-
-    complement_token = varying[complement_idx]
-    other_tokens = [t for i, t in enumerate(varying) if i != complement_idx]
-
-    expected = "(1 - " + " - ".join(sorted(other_tokens)) + ")"
-
-    # The token starts with "(1 - ", so its first part is "1".
-    parts = [p.strip() for p in complement_token[1:-1].split(" - ")]
-    actual_sorted = "(1 - " + " - ".join(sorted(parts[1:])) + ")"
-
-    return actual_sorted == expected
+    for i, factor in enumerate(varying):
+        subtracted = _one_minus(factor)
+        if subtracted is not None:
+            return subtracted == Counter(varying[:i] + varying[i + 1 :])
+    return False
 
 
 def simplify_complementary_terms(
-    raw_terms: list[tuple[int, str]],
-) -> list[tuple[int, str]]:
+    raw_terms: list[tuple[int, Node]],
+) -> list[tuple[int, Node]]:
     """
     Merge the terms of one sign that differ only by complementary factors.
 
@@ -712,30 +708,31 @@ def simplify_complementary_terms(
     ``(1 - p)`` are complementary, so they merge into ``k``. A merged term
     takes the place of the first term of its group.
     """
-    merged: dict[int, tuple[int, str]] = {}
+    merged: dict[int, tuple[int, Node]] = {}
     used: set[int] = set()
     for sign in (-1, 1):
         # The terms that share the same other factors, by those factors.
-        groups: dict[tuple[str, ...], list[tuple[int, str, list[str]]]] = {}
+        groups: dict[
+            frozenset[tuple[Node, int]], list[tuple[int, Node, list[Node]]]
+        ] = {}
         for i, (term_sign, rate) in enumerate(raw_terms):
             if term_sign != sign:
                 continue
-            tokens = tokenize_rate(rate)
-            for k, varying in enumerate(tokens):
-                common = tokens[:k] + tokens[k + 1 :]
+            factors = _factors(rate)
+            for k, varying in enumerate(factors):
+                common = factors[:k] + factors[k + 1 :]
                 if common:
-                    groups.setdefault(tuple(sorted(common)), []).append(
-                        (i, varying, common)
-                    )
+                    key = frozenset(Counter(common).items())
+                    groups.setdefault(key, []).append((i, varying, common))
         for members in groups.values():
             # A term already merged, or a repeat of a factor, stays out.
-            free: dict[str, tuple[int, str, list[str]]] = {}
+            free: dict[Node, tuple[int, Node, list[Node]]] = {}
             for member in members:
                 if member[0] not in used:
                     free.setdefault(member[1], member)
             if len(free) >= 2 and are_complementary_factors(list(free)):
                 first, _, common = next(iter(free.values()))
-                merged[first] = (sign, " * ".join(common))
+                merged[first] = (sign, _product_of(common))
                 used.update(i for i, _, _ in free.values())
     return [
         merged.get(i, term)

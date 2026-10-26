@@ -63,7 +63,7 @@ Use this page before you make or review a change. It turns the
       function is one entry of `FUNCTIONS` (`language.rs`), which the check,
       the JIT and Python (`commol_rs.core.FUNCTIONS`) read; an operator is a
       token and a level of the parser (`jit/parser.rs`), a case of `check`
-      (`language.rs`) and of the JIT (`jit/codegen.rs`).
+      (`language.rs`), of the JIT and of `OPERATORS` (`formula_tree.py`).
 - [ ] Keep every walk of a tree (`Expr`) recursive only into the operands of
       a node: a chain of one level is one node, `MAX_NESTING` bounds the
       depth and `MAX_NODES` the number of nodes. A new walk at the limit runs in

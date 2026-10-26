@@ -154,13 +154,17 @@ CONSISTENT = [
 
 INCONSISTENT = [
     pytest.param(
-        "k * True", {"k": "1/day"}, "1/day", "unsupported operand", id="boolean"
+        "k * true",
+        {"k": "1/day"},
+        "1/day",
+        "the boolean 'true' is not a number",
+        id="boolean",
     ),
     pytest.param(
         "k, A",
         {"k": "1/day", "A": "item"},
         "item",
-        "Unexpected result type <class 'tuple'>",
+        "expected an operator or the end at character 2, got ','",
         id="tuple",
     ),
     pytest.param(

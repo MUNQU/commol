@@ -2,8 +2,8 @@
 
 [Back to Design decisions](../design-decisions.md)
 
-How a formula is checked before it reaches the engine, and which limits it
-has.
+How a formula is checked before it reaches the engine, which limits it
+has, and how Python reads it.
 
 ## The parser of the engine is the only check of a formula
 
@@ -17,11 +17,9 @@ of the parser. Python has no grammar, no limit and no tokenizer of a formula
 of its own, and no setting changes the limits of the parser.
 
 **Rule:** a new field that holds a formula calls the check of the engine in
-its validator. No module of commol reads the text of a formula, but the
-readers that `FORMULA_READERS` (`tests/suite/test_engine_rules.py`) lists
-with their reasons: the check of units (`utils/equations.py`) and the
-description (`context/_model/equations.py`), which #402 moves onto the tree
-of the engine.
+its validator. No module of commol reads the text of a formula: a module that
+needs its structure reads the tree of the engine
+([Python reads a formula only as the tree of the engine](#python-reads-a-formula-only-as-the-tree-of-the-engine)).
 
 | Alternative | Why not |
 |---|---|
@@ -29,6 +27,51 @@ of the engine.
 | Limits that a setting changes | A feature for limits that guard nothing. |
 
 **Guard:** `py-commol/tests/rates/test_formula_rules.py::test_a_formula_gets_the_message_of_the_engine_parser`,
+`py-commol/tests/suite/test_engine_rules.py::test_only_the_engine_reads_a_formula`.
+
+## Python reads a formula only as the tree of the engine
+
+The check of units and the description need the structure of a formula. They
+read the tree that the parser of the engine reads, never the text:
+`MathExpression::tree_json` (`crates/commol-core/src/math_expression/tree.rs`)
+checks the formula and gives its tree (`Expr`, which derives `Serialize`) as
+JSON, the binding `commol_rs.core.MathExpression(formula).tree()` passes it to
+Python, and `engine_state.formula_tree` reads it into plain data
+(`context/_model/formula_tree.py`: one frozen dataclass per kind of node).
+`tree.rs` documents the shape: one object per node, keyed by its kind
+(`Constant`, `Variable`, `Chain` with its operators, `Power`, `UnaryOp`,
+`FunctionCall`, `Conditional`); a number keeps the value the parser read, and
+a value that is not finite is its text (`"inf"`).
+
+- The check of units (`formula_unit` in `utils/equations.py`) walks the tree
+  with a `pint` quantity for each variable: `pint` does the algebra of units,
+  in the grouping of the parser, and a written number takes its unit as
+  [One step unit in the unit check](time.md#one-step-unit-in-the-unit-check)
+  says.
+- The description (`context/_model/equations.py`) writes each rate and each
+  flow from the tree: `FormulaWriter` writes the text, with one space around
+  each operator and only the parentheses the tree needs, so the text reads
+  back as the same tree; `_LatexWriter` writes LaTeX. The flow of a
+  proportional rate is the tree of the rate times its source
+  (`TransitionFlow.term`, `product`), which groups a sum as a whole, and a
+  rate gives the same description with or without spaces.
+
+**Rule:** a module that needs the structure of a formula reads
+`engine_state.formula_tree`; a new node kind or operator of the parser is a
+case of the JSON of `tree.rs`, of `read_tree` and of the walks of
+`formula_tree.py`.
+
+| Alternative | Why not |
+|---|---|
+| A PyO3 class per node | A third shape of the tree (Rust, PyO3, Python) to keep in step, against one JSON port, as the model is. |
+| A LaTeX writer in Rust | Presentation in the core, with no Rust caller: the engine gives the structure, and the edge draws it, as `api/plotting/panels.py` and `figures.py` do. |
+| The text, read by the grammar of Python (`ast.parse` and `eval`) or split at `" * "` and `" / "` | A second grammar: Python reads `^`, `!` and names such as `lambda` in another way or not at all, and a split of the text depends on its spaces. |
+
+**Guard:** `crates/commol-core/src/math_expression/tree.rs::the_tree_keeps_the_grouping_of_the_parser`,
+`py-commol/tests/rates/test_formula_rules.py::test_python_reads_the_tree_of_a_formula_from_the_engine`,
+`py-commol/tests/units/test_expression_units.py::test_the_unit_follows_the_grouping_of_the_parser`,
+`py-commol/tests/description/test_equation_text.py::test_the_spaces_of_a_rate_do_not_change_its_description`,
+`py-commol/tests/description/test_equation_text.py::test_a_rate_is_written_with_the_parentheses_its_tree_needs`,
 `py-commol/tests/suite/test_engine_rules.py::test_only_the_engine_reads_a_formula`.
 
 ## The engine defines the language of formulas
@@ -63,8 +106,7 @@ value of each function), `py-commol/tests/units/test_expression_units.py::test_t
 
 `parse_expression` (`crates/commol-core/src/math_expression/jit/parser.rs`)
 reads the text of a formula into its tree (`Expr`, `jit/ast.rs`) by
-precedence climbing; no other parser checks a formula, and the readers of
-the first section are the only other code that reads its text. The grammar sets the
+precedence climbing; no other code reads the text of a formula. The grammar sets the
 precedence and the grouping: the operators of one level apply from the
 left, and a chain of powers groups from the right, as in Python.
 

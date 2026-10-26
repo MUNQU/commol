@@ -91,6 +91,9 @@ class TestConsistentModels:
     def test_a_proportional_rate_is_checked_as_its_flow(self) -> None:
         assert_accepted(_abc(bc="k2").check_unit_consistency)
 
+    def test_a_proportional_sum_is_multiplied_by_its_source_as_a_whole(self) -> None:
+        assert_accepted(_abc(bc="k1 + k2").check_unit_consistency)
+
     def test_a_proportional_rate_in_the_unit_of_a_flow_fails(self) -> None:
         model = _abc(bc="k2", units={"k1": "1/day", "k2": "item/day"})
 

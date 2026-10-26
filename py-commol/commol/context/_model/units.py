@@ -1,11 +1,12 @@
 from typing import TYPE_CHECKING
 
 from commol.context._model import engine_state
+from commol.context._model.formula_tree import Node, formula_text, variables
 from commol.context._model.helpers import ModelCompartmentHelper
 from commol.utils.equations import (
     DEFAULT_STEP_UNIT,
     UnitConsistencyError,
-    check_equation_units,
+    check_formula_units,
     ureg,
 )
 
@@ -139,7 +140,7 @@ class UnitChecker:
                 process, self._model.structure
             )
         }
-        checked: set[tuple[str, str, str]] = set()
+        checked: set[tuple[str, Node, str]] = set()
         flows = engine_state.transition_flows(process, self._model.structure)
         for flow in flows:
             compartment = flow.source if flow.source is not None else flow.target
@@ -175,7 +176,7 @@ class UnitChecker:
 
     def _flow_unit_error(
         self,
-        rate: str,
+        rate: Node,
         transition_id: str,
         variable_units: dict[str, str],
         bin_unit: str,
@@ -187,28 +188,25 @@ class UnitChecker:
         A flow moves ``<bin unit>`` per step; an impulse moves ``<bin unit>``
         at once.
         """
-        variables = engine_state.formula_inputs(rate)
-
-        rate_variable_units: dict[str, str] = {}
-        for var in variables:
+        text = formula_text(rate)
+        for var in variables(rate):
             if var in self._mixed_unit_totals:
                 units = ", ".join(sorted(set(self._helper.bin_units().values())))
                 return (
                     f"Transition '{transition_id}': Variable '{var}' in rate "
-                    f"'{rate}' adds bins of different units ({units}); read the "
+                    f"'{text}' adds bins of different units ({units}); read the "
                     "bins or the compartments it sums instead"
                 )
             if var not in variable_units:
                 return (
                     f"Transition '{transition_id}': Variable '{var}' in rate "
-                    f"'{rate}' has no defined unit"
+                    f"'{text}' has no defined unit"
                 )
-            rate_variable_units[var] = variable_units[var]
 
         expected_unit = bin_unit if is_impulse else f"{bin_unit}/{self._step_unit()}"
 
-        is_consistent, error_msg = check_equation_units(
-            rate, rate_variable_units, expected_unit
+        is_consistent, error_msg = check_formula_units(
+            rate, variable_units, expected_unit
         )
         if not is_consistent:
             return f"Transition '{transition_id}': {error_msg}"

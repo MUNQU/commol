@@ -108,7 +108,6 @@ def test_the_variables_of_a_formula_come_from_the_engine() -> None:
     expression = commol_rs.core.MathExpression("k1 * exp(-e1 * step) + 1e5")
 
     assert expression.variables == ["k1", "e1"]
-    assert expression.inputs == ["k1", "e1", "step"]
 
 
 def test_the_engine_variables_come_from_the_engine() -> None:
