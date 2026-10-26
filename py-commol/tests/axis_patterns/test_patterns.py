@@ -4,13 +4,8 @@ import pytest
 from pydantic import ValidationError
 
 from commol import ModelBuilder, AxisPattern
-from commol.utils.security import (
-    SecurityConfig,
-    SecurityError,
-    validate_expression_security,
-)
 from tests.axis_patterns.conditions import condition
-from tests.support import assert_accepted
+from tests.support import abc_builder, assert_accepted
 
 
 class TestPulse:
@@ -234,36 +229,14 @@ class TestCombine:
         with pytest.raises(ValueError, match="'mean' is not a valid CombineMode"):
             AxisPattern.combine(a, b, mode="mean")  # ty: ignore[invalid-argument-type]
 
-    def test_a_combined_formula_may_reach_the_length_cap(self):
-        a, b = AxisPattern.from_formula("a"), AxisPattern.from_formula("b")
-        length = len("((a) + (b))")
+    def test_a_combined_formula_deeper_than_the_limit_gets_the_parser_message(self):
+        patterns = [AxisPattern.from_formula(f"k{i}") for i in range(120)]
 
-        combined = AxisPattern.combine(
-            a, b, config=SecurityConfig(max_expression_length=length)
-        )
-
-        assert str(combined) == "((a) + (b))"
-        with pytest.raises(ValueError) as error:
-            AxisPattern.combine(
-                a, b, config=SecurityConfig(max_expression_length=length - 1)
-            )
-        assert str(error.value) == (
-            f"Combined formula length {length} exceeds maximum {length - 1} characters"
-        )
-
-    def test_a_formula_longer_than_the_default_cap_follows_its_configuration(self):
-        expr = " + ".join(f"rate_of_part_{i}_of_the_long_formula" for i in range(400))
-        config = SecurityConfig(max_expression_length=len(expr) + 2)
-
-        pattern = AxisPattern.from_formula(expr, config=config)
-
-        assert str(pattern) == f"({expr})"
-
-    def test_a_formula_is_checked_with_its_configuration(self):
-        with pytest.raises(SecurityError, match="6 characters \\(maximum: 4\\)"):
-            AxisPattern.from_formula(
-                "abcd", config=SecurityConfig(max_expression_length=4)
-            )
+        with pytest.raises(
+            ValueError,
+            match="it nests deeper than 100 levels of parentheses, calls, signs",
+        ):
+            AxisPattern.combine(*patterns, mode=AxisPattern.MAX)
 
     def test_single_pattern_is_identity(self):
         """combine(p) returns p unchanged."""
@@ -331,23 +304,6 @@ class TestFromFormula:
         p = AxisPattern.from_formula("(x + y)")
         assert str(p) == "((x + y))"
 
-    @pytest.mark.parametrize("expr", ["", "   "])
-    def test_empty_raises(self, expr: str):
-        with pytest.raises(ValueError) as error:
-            AxisPattern.from_formula(expr)
-
-        assert str(error.value) == "'expr' must be a non-empty expression"
-
-    def test_too_long_raises(self):
-        config = SecurityConfig()
-        with pytest.raises((ValueError, ValidationError)):
-            AxisPattern.from_formula("x" * (config.max_expression_length + 1))
-
-    def test_dangerous_pattern_rejected(self):
-        """Full security validation runs at construction time."""
-        with pytest.raises(SecurityError):
-            AxisPattern.from_formula("__import__")
-
 
 class TestForGroup:
     def test_original_is_unchanged(self):
@@ -393,8 +349,9 @@ class TestCompositionSafety:
         )
 
 
-class TestSecurityValidation:
-    """Pattern-generated formulas must survive add_transition's security check."""
+class TestEngineCheck:
+    """The formula of each pattern is one that the parser of the engine
+    accepts as a rate."""
 
     @pytest.mark.parametrize(
         "pattern",
@@ -414,9 +371,8 @@ class TestSecurityValidation:
             ),
         ],
     )
-    def test_pattern_survives_security_validator(self, pattern: AxisPattern):
-        """Each pattern's formula passes the full security validator."""
-        assert_accepted(validate_expression_security, str(pattern))
+    def test_the_formula_of_a_pattern_is_a_rate(self, pattern: AxisPattern):
+        assert_accepted(abc_builder, ab=pattern)
 
 
 class TestAbstract:

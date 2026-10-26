@@ -21,7 +21,7 @@ check some of these rules. The rest depend on the author and the reviewer.
 | Doc examples | Abstract names; every block runs | `pytest -m docs` (CI) and review |
 | Field words | No application field in the user pages or the source of `commol` | `tests/docs/test_pages.py` (`pytest -m docs`, CI) |
 | Tests | One package per guide page; shared factories; every test checks a result, once, within its time budget: [Tests](tests.md) | `tests/suite/` (CI) and review; pytest 10 deprecations fail the run (`filterwarnings`) |
-| Rules of values | The engine holds the range rule of each setting, the rule of each value of a model and every window; a Python model declares only the type | `tests/suite/test_engine_rules.py` (CI) |
+| Rules of values | The engine holds the range rule of each setting, the rule of each value of a model, every window and the check of a formula; a Python model declares only the type | `tests/suite/test_engine_rules.py` (CI) |
 | Commits | `type(scope): description` | Review |
 
 ## Python
@@ -67,6 +67,13 @@ check some of these rules. The rest depend on the author and the reviewer.
   [Design decisions](decisions/python-models.md#a-value-of-a-model-has-its-rule-in-the-engine).
   The engine computes every window, and Python has no window arithmetic
   (`tests/suite/test_engine_rules.py::test_only_the_engine_computes_a_window`).
+- The parser of the engine is the only check of a formula: the validator of
+  each Python object that holds a formula calls
+  `commol_rs.core.MathExpression(formula).check()`, and no module tokenizes
+  or checks the text of a formula, but the readers that `FORMULA_READERS`
+  lists with their reasons; see
+  [Design decisions](decisions/formulas.md#the-parser-of-the-engine-is-the-only-check-of-a-formula)
+  (`tests/suite/test_engine_rules.py::test_only_the_engine_reads_a_formula`).
 - Context data structures are Pydantic v2 models.
 - `ModelBuilder` methods return `Self`, so calls chain.
 - Log with the standard `logging` module. Library code never writes to the

@@ -385,9 +385,7 @@ class TestInvalidFormulas:
     def test_an_incomplete_rate_names_itself_and_its_first_error(
         self, formula: str, reason: str
     ) -> None:
-        message = (
-            f"Validation failed for rate '{formula}': Formula '{formula}': {reason}"
-        )
+        message = f"Formula '{formula}': {reason}"
 
         with pytest.raises(ValueError, match=re.escape(message)):
             abc_builder(parameters={"k1": 0.1, "k2": 0.05}, ab=formula)

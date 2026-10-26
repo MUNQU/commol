@@ -6,16 +6,12 @@ from pydantic import ConfigDict, BaseModel, Field, field_validator, model_valida
 
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.stratification_condition import StratificationCondition
-from commol.utils.security import validate_expression_security
 
 
 def _checked_rate(value: str) -> str:
-    """``value`` once it passes the security check and the check of the
-    language of formulas."""
-    try:
-        validate_expression_security(value)
-    except ValueError as e:
-        raise ValueError(f"Validation failed for rate '{value}': {e}")
+    """``value`` once the parser of the engine accepts it as a formula of the
+    language (``commol_rs.core.MathExpression.check``)."""
+    commol_rs.core.MathExpression(value).check()
     return value
 
 
@@ -79,10 +75,10 @@ class StratifiedRate(BaseModel):
             )
         return self
 
-    @field_validator("rate", mode="before")
+    @field_validator("rate")
     @classmethod
     def validate_rate(cls, value: str) -> str:
-        """Perform security and syntax validation on the rate expression."""
+        """Check the rate with the parser of the engine."""
         return _checked_rate(value)
 
 
@@ -102,8 +98,8 @@ class Transition(BaseModel):
         Ids of the accumulators that add up the flow of this transition.
     rate : str | None
         Default mathematical formula, parameter name, or constant value for the flow.
-        Used when no stratified rate matches. Numeric values are automatically
-        converted to strings during validation.
+        Used when no stratified rate matches. ``ModelBuilder.add_transition``
+        writes a number as its string.
 
         Operators: +, -, *, /, % (modulo), ^ or ** (power)
         Functions: sin, cos, tan, exp, ln, sqrt, abs, min, max, if, etc.
@@ -149,8 +145,7 @@ class Transition(BaseModel):
         description=(
             "Default rate expression (fallback when no stratified rate matches). "
             "Can be a parameter reference (e.g., 'k1'), a constant (e.g., '0.5'), "
-            "or a mathematical expression (e.g., 'k1 * A * B / total'). "
-            "Numeric values are automatically converted to strings during validation."
+            "or a mathematical expression (e.g., 'k1 * A * B / total')."
         ),
     )
 
@@ -200,12 +195,10 @@ class Transition(BaseModel):
         commol_rs.model.check_impulse(self.id, self.impulse_at, self.impulse_every)
         return self
 
-    @field_validator("rate", mode="before")
+    @field_validator("rate")
     @classmethod
     def validate_rate(cls, value: str | None) -> str | None:
-        """
-        Convert numeric rates to strings and perform security and syntax validation.
-        """
+        """Check the rate, when there is one, with the parser of the engine."""
         if value is None:
             return value
         return _checked_rate(value)

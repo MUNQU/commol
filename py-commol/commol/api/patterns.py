@@ -15,7 +15,7 @@ returned instance. The user never instantiates or names any other class.
 from abc import abstractmethod
 from collections.abc import Iterable
 from enum import StrEnum
-from typing import Annotated, ClassVar, NotRequired, Protocol, Self, TypedDict
+from typing import ClassVar, NotRequired, Protocol, Self, TypedDict
 
 from pydantic import (
     ConfigDict,
@@ -26,10 +26,7 @@ from pydantic import (
     model_validator,
 )
 
-from commol.utils.security import (
-    SecurityConfig,
-    validate_expression_security,
-)
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.ranges import RangeChecked
 
 
@@ -130,15 +127,6 @@ def _compose_formulas(sub_formulas: list[str], mode: "CombineMode") -> str:
     for f in sub_formulas[1:]:
         body = f"{mode.value}({body}, {f})"
     return f"({body})"
-
-
-def _enforce_length_cap(formula: str, config: SecurityConfig | None) -> None:
-    cfg = config or SecurityConfig()
-    if len(formula) > cfg.max_expression_length:
-        raise ValueError(
-            f"Combined formula length {len(formula)} exceeds maximum "
-            f"{cfg.max_expression_length} characters"
-        )
 
 
 def _copy_condition(c: ConditionDict) -> ConditionDict:
@@ -532,7 +520,6 @@ class AxisPattern(BaseModel):
         cls,
         *patterns: "AxisPattern",
         mode: CombineMode = CombineMode.SUM,
-        config: SecurityConfig | None = None,
     ) -> "AxisPattern":
         """
         Combine patterns into a single composed pattern.
@@ -543,8 +530,9 @@ class AxisPattern(BaseModel):
         - ``mode`` is a `CombineMode` or its value (``"sum"``, ``"max"``,
           ``"min"``).
         - Raises ``ValueError`` if no patterns are supplied, ``mode`` is not a
-          mode, the inputs have inconsistent group bindings, or the combined
-          formula exceeds the security length cap.
+          mode, the inputs have inconsistent group bindings, or the parser of
+          the engine rejects the combined formula, such as a ``"max"`` of
+          more patterns than the nesting limit of a formula.
         """
         if len(patterns) == 0:
             raise ValueError("combine() requires at least one pattern")
@@ -553,8 +541,6 @@ class AxisPattern(BaseModel):
 
         shared_conditions, shared_source = _require_consistent_group(patterns)
         result = _compose_formulas([p.formula for p in patterns], CombineMode(mode))
-        _enforce_length_cap(result, config)
-
         return _ComputedAxisPattern(
             computed_formula=result,
             conditions=shared_conditions,
@@ -562,22 +548,15 @@ class AxisPattern(BaseModel):
         )
 
     @classmethod
-    def from_formula(
-        cls,
-        expr: str,
-        config: SecurityConfig | None = None,
-    ) -> "AxisPattern":
+    def from_formula(cls, expr: str) -> "AxisPattern":
         """
         Create a pattern from an arbitrary expression string.
 
-        The string is wrapped in ``(...)`` so it composes safely, then run
-        through the full expression security validator.
+        The string is wrapped in ``(...)`` so it composes safely. Raises
+        ``ValueError`` with the message of the parser of the engine if the
+        wrapped formula is not in the language of formulas.
         """
-        if not expr or not expr.strip():
-            raise ValueError("'expr' must be a non-empty expression")
-        wrapped = f"({expr})"
-        validate_expression_security(wrapped, config)
-        return _ComputedAxisPattern(computed_formula=wrapped)
+        return _ComputedAxisPattern(computed_formula=f"({expr})")
 
 
 # ---------------------------------------------------------------------------
@@ -754,10 +733,17 @@ class _LinearRampAxisPattern(AxisPattern, RangeChecked):
 
 
 class _ComputedAxisPattern(AxisPattern):
-    """A formula that ``combine`` or ``from_formula`` checked with its
-    configuration."""
+    """A formula that ``combine`` or ``from_formula`` wrote, which the parser
+    of the engine checks."""
 
-    computed_formula: Annotated[str, Field(min_length=1)]
+    computed_formula: str
+
+    @field_validator("computed_formula")
+    @classmethod
+    def check_formula(cls, value: str) -> str:
+        """Check the formula with the parser of the engine."""
+        commol_rs.core.MathExpression(value).check()
+        return value
 
     @property
     def formula(self) -> str:

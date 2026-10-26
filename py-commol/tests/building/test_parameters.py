@@ -198,7 +198,7 @@ class TestSeriesParameters:
                 {"k": 0.3, "d": [(-1, 0.5)]},
                 "Parameter 'd' cannot take .*series position is a finite number",
             ),
-            ({"k": "  "}, "Parameter 'k' cannot take .* Formula cannot be empty"),
+            ({"k": "  "}, "Parameter 'k' cannot take .* holds nothing"),
             ({"d": [1.0]}, "Parameter 'd' cannot take .* valid tuple"),
             ({"k": "total_g1"}, "Unknown subgroup total.*'total_g1'"),
         ],
@@ -219,7 +219,7 @@ class TestSeriesParameters:
 
 class TestValues:
     def test_a_formula_is_not_blank(self) -> None:
-        with pytest.raises(ValidationError, match="Formula cannot be empty"):
+        with pytest.raises(ValidationError, match="Parameter 'x': .* holds nothing"):
             ModelBuilder("M").add_parameter("x", "   ")
 
     def test_a_series_has_a_mode_and_only_a_series_has_one(self) -> None:

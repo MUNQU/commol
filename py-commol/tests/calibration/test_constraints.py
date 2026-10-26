@@ -1,5 +1,7 @@
 """Constraints keep the fitted parameters and outputs inside stated limits."""
 
+import re
+
 import pytest
 from pydantic import ValidationError
 
@@ -171,7 +173,7 @@ class TestOutputConstraints:
         assert rerun["cumulative_ab"][-1] <= 0.5 * rerun_total + 1e-6
 
 
-class TestExpressionSecurity:
+class TestExpressionCheck:
     @pytest.mark.parametrize(
         ("expression", "at"),
         [
@@ -182,11 +184,11 @@ class TestExpressionSecurity:
             ("eval(B)", [10, 20, 30]),
         ],
     )
-    def test_a_dangerous_expression_is_rejected(
+    def test_an_expression_outside_the_language_gets_the_parser_message(
         self, expression: str, at: list[int] | None
     ) -> None:
-        with pytest.raises(ValidationError, match="Security validation failed"):
-            CalibrationConstraint(id="evil", expression=expression, at=at)
+        with pytest.raises(ValidationError, match=re.escape(f"Formula '{expression}'")):
+            CalibrationConstraint(id="c", expression=expression, at=at)
 
     @pytest.mark.parametrize(
         ("expression", "at"),

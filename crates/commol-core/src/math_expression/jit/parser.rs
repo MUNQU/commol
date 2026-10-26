@@ -20,7 +20,8 @@
 //! The parser counts how deep the formula nests: each parenthesis, call,
 //! sign and power is one level. A formula that nests deeper than
 //! [`MAX_NESTING`] is rejected before the parser reads the level, so
-//! neither the parser nor a walk of the tree runs out of stack.
+//! neither the parser nor a walk of the tree runs out of stack. The check
+//! of the language rejects a tree of more than [`MAX_NODES`] nodes.
 
 use super::ast::{BinaryOperator, Expr, Level, UnaryOperator};
 use crate::math_expression::error::MathExpressionError;
@@ -29,6 +30,13 @@ use crate::math_expression::error::MathExpressionError;
 /// one level each. A walk of a tree at this depth fits the stack of a
 /// worker thread of the parallel work (2 MiB) in a debug build.
 pub const MAX_NESTING: usize = 100;
+
+/// The most nodes the tree of a formula may have: numbers, variables,
+/// operators and calls, `if` among them. The check of the language
+/// ([`MathExpression::check`](crate::MathExpression::check)) counts them
+/// before the JIT compiles the formula, so a formula too long to compile is
+/// rejected fast, and far below the size the JIT rejects.
+pub const MAX_NODES: usize = 100_000;
 
 /// A token of a formula.
 #[derive(Debug, Clone, Copy, PartialEq)]

@@ -475,7 +475,7 @@ the definition is not valid:
 | Parameter ids are unique and are not [names the engine sets](#names-the-engine-sets) | A parameter named `A`, `total` or `A_g1` |
 | Every `total_…` variable names a subgroup total | `total_t1_g1` when `group` is declared before `type` |
 | A rate that reads the neighbors has them | `k1 * neighbors_B` with no `neighbors=` |
-| Every rate expression passes the security check | A formula with `__import__` |
+| Every rate expression is in the language of formulas ([Limits of the parser](mathematical-expressions.md#limits-of-the-parser)) | A formula with `__import__('os')` |
 | Every transition can be planned by the engine | See [Transitions](transitions.md#what-building-checks) |
 
 ## Save and load

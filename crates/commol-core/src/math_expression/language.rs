@@ -12,6 +12,7 @@
 use std::collections::HashSet;
 
 use super::jit::ast::{BinaryOperator, Expr, Level, UnaryOperator};
+use super::jit::parser::MAX_NODES;
 
 /// How many arguments a function takes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -134,10 +135,17 @@ fn function_names() -> String {
 ///
 /// # Errors
 ///
-/// Returns the first part of the tree that is not in the language, and why.
+/// Returns the first part of the tree that is not in the language, and why,
+/// or the count of nodes when it is more than [`MAX_NODES`].
 pub(crate) fn check(tree: &Expr) -> Result<usize, String> {
     let mut nodes = 0;
     number(tree, &mut nodes)?;
+    if nodes > MAX_NODES {
+        return Err(format!(
+            "it has {nodes} nodes (numbers, variables, operators and calls), more than \
+             the limit of {MAX_NODES}"
+        ));
+    }
     Ok(nodes)
 }
 
@@ -263,4 +271,40 @@ pub(crate) fn variables(tree: &Expr) -> Vec<String> {
     let mut out = Vec::new();
     collect(tree, &mut HashSet::new(), &mut out);
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::math_expression::jit::parser::tree;
+
+    /// A sum of `terms` terms with `signs` of them negated: `2 * terms - 1 +
+    /// signs` nodes.
+    fn sum(terms: usize, signs: usize) -> String {
+        (0..terms)
+            .map(|term| if term < signs { "-x" } else { "x" })
+            .collect::<Vec<_>>()
+            .join(" + ")
+    }
+
+    #[test]
+    fn a_tree_of_the_most_nodes_is_in_the_language() {
+        let formula = sum(MAX_NODES / 2, 1);
+
+        assert_eq!(check(&tree(&formula).unwrap()), Ok(MAX_NODES));
+    }
+
+    #[test]
+    fn a_tree_of_more_nodes_than_the_limit_is_rejected() {
+        let formula = sum(MAX_NODES / 2, 2);
+
+        assert_eq!(
+            check(&tree(&formula).unwrap()),
+            Err(format!(
+                "it has {} nodes (numbers, variables, operators and calls), more than the \
+                 limit of {MAX_NODES}",
+                MAX_NODES + 1
+            ))
+        );
+    }
 }
