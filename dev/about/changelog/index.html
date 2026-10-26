@@ -4813,6 +4813,14 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>The unit check reads the tree of the engine: it reads <code>!</code> in a condition
   and a variable named like a word of Python, such as <code>lambda</code>, and a formula
   outside the language gives the message of the parser.</li>
+<li><strong>Breaking:</strong> <code>AxisUnits.rate_from_mean_span</code> takes a required keyword
+  <code>keep</code>, with no default: <code>"survival"</code> gives the rate of today, which keeps
+  the exponential survival at every step (<code>1 - exp(-1/n)</code> on a per-step
+  engine), and <code>"mean"</code> gives <code>1/n</code>, whose mean residence is <code>n</code> steps on a
+  per-step engine. A continuous engine gives <code>1/n</code> with both. With
+  <code>keep="mean"</code>, a per-step engine rejects a span shorter than one step with
+  <code>ValueError</code>. Migration: add <code>keep="survival"</code> to keep each rate as it is.
+  See <a href="../../guide/core-concepts/#units-of-the-axis">Units of the axis</a>.</li>
 </ul>
 <h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
 <ul>

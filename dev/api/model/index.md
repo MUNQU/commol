@@ -432,7 +432,7 @@ class Model(BaseModel, Generic[StructureT]):
         >>> units = model.axis_units()
         >>> units.steps(2, "week")  # with step_unit="day"
         14.0
-        >>> gamma = units.rate_from_mean_span(5, "day")
+        >>> k = units.rate_from_mean_span(5, "day", keep="survival")
         """
         return AxisUnits(
             step_unit=self.step_unit or DEFAULT_STEP_UNIT,
@@ -1088,7 +1088,7 @@ Examples:
 >>> units = model.axis_units()
 >>> units.steps(2, "week")  # with step_unit="day"
 14.0
->>> gamma = units.rate_from_mean_span(5, "day")
+>>> k = units.rate_from_mean_span(5, "day", keep="survival")
 ```
 
 Source code in `commol/context/model.py`
@@ -1113,7 +1113,7 @@ def axis_units(self) -> AxisUnits:
     >>> units = model.axis_units()
     >>> units.steps(2, "week")  # with step_unit="day"
     14.0
-    >>> gamma = units.rate_from_mean_span(5, "day")
+    >>> k = units.rate_from_mean_span(5, "day", keep="survival")
     """
     return AxisUnits(
         step_unit=self.step_unit or DEFAULT_STEP_UNIT,

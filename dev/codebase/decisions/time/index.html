@@ -3444,13 +3444,13 @@ steps: a width of <code>n</code> steps is the span <code>n</code> in the step un
 <p>The rate conversions (<code>rate_from_mean_span</code>, <code>rate_from_probability</code>) ask the
 engine: <code>RateMeaning::rate_from_mean_span</code> and <code>rate_from_probability</code>
 (<code>crates/commol-core/src/types/engine.rs</code>) hold the formula of each meaning, so
-a new engine picks a meaning and Python does not change. The per-step rate
-from a mean span is <code>1 - e^(-1/n)</code>: it keeps the survival of the continuous
-process at every step, and its mean residence is <code>1/rate</code>, not <code>n</code> (10.508
-steps for <code>n = 10</code>). <code>r = 1/n</code> keeps the mean and loses the survival.</p>
+a new engine picks a meaning and Python does not change. A per-step rate keeps
+the survival (<code>1 - e^(-1/n)</code>) or the mean (<code>1/n</code>) of a residence, never both:
+the caller passes <code>RateKeeps</code>, with no default, and the engine rejects the mean
+of a span below one step instead of clamping the rate to 1.</p>
 <p><strong>Rule:</strong> no formula of a rate per engine nor of a window in Python; ask the engine.</p>
 <p><strong>Guards:</strong> <code>tests/simulation/test_axis_units.py</code>,
-<code>crates/commol-core/src/types/engine.rs</code> (tests <code>a_rate_from_…</code>),
+<code>crates/commol-core/src/types/engine.rs</code> (tests <code>a_rate_from_…</code>, <code>a_mean_shorter_…</code>),
 <code>tests/simulation/test_windows.py::test_windows_come_from_the_engine</code>,
 <code>tests/suite/test_engine_rules.py::test_only_the_engine_computes_a_window</code>.</p>
 <h2 id="an-origin-puts-the-axis-on-the-calendar">An origin puts the axis on the calendar<a class="headerlink" href="#an-origin-puts-the-axis-on-the-calendar" title="Permanent link">&para;</a></h2>

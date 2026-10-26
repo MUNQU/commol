@@ -4077,8 +4077,13 @@ position is used. A result within <code>1e-9</code> of an integer is that intege
 </thead>
 <tbody>
 <tr>
-<td><code>rate_from_mean_span(span, unit)</code></td>
+<td><code>rate_from_mean_span(span, unit, keep="survival")</code></td>
 <td><code>1 - exp(-1 / n)</code>, with <code>span</code> equal to <code>n</code> steps</td>
+<td><code>1 / n</code></td>
+</tr>
+<tr>
+<td><code>rate_from_mean_span(span, unit, keep="mean")</code></td>
+<td><code>1 / n</code>, with <code>span</code> equal to <code>n</code> steps and <code>n &gt;= 1</code></td>
 <td><code>1 / n</code></td>
 </tr>
 <tr>
@@ -4091,16 +4096,45 @@ position is used. A result within <code>1e-9</code> of an integer is that intege
 <div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">difference</span> <span class="o">=</span> <span class="n">AxisUnits</span><span class="p">(</span><span class="n">step_unit</span><span class="o">=</span><span class="s2">&quot;day&quot;</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">)</span>
 </span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="n">differential</span> <span class="o">=</span> <span class="n">AxisUnits</span><span class="p">(</span><span class="n">step_unit</span><span class="o">=</span><span class="s2">&quot;day&quot;</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferentialEquations&quot;</span><span class="p">)</span>
 </span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">difference</span><span class="o">.</span><span class="n">rate_from_mean_span</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="s2">&quot;day&quot;</span><span class="p">))</span>    <span class="c1"># 0.2212 = 1 - exp(-1/4)</span>
-</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">differential</span><span class="o">.</span><span class="n">rate_from_mean_span</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="s2">&quot;day&quot;</span><span class="p">))</span>  <span class="c1"># 0.25</span>
-</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">difference</span><span class="o">.</span><span class="n">rate_from_probability</span><span class="p">(</span><span class="mf">0.3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">))</span>
-</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="nb">print</span><span class="p">(</span><span class="n">differential</span><span class="o">.</span><span class="n">rate_from_probability</span><span class="p">(</span><span class="mf">0.3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">))</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">difference</span><span class="o">.</span><span class="n">rate_from_mean_span</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="s2">&quot;day&quot;</span><span class="p">,</span> <span class="n">keep</span><span class="o">=</span><span class="s2">&quot;survival&quot;</span><span class="p">))</span>  <span class="c1"># 0.2212</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">difference</span><span class="o">.</span><span class="n">rate_from_mean_span</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="s2">&quot;day&quot;</span><span class="p">,</span> <span class="n">keep</span><span class="o">=</span><span class="s2">&quot;mean&quot;</span><span class="p">))</span>      <span class="c1"># 0.25</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">differential</span><span class="o">.</span><span class="n">rate_from_mean_span</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="s2">&quot;day&quot;</span><span class="p">,</span> <span class="n">keep</span><span class="o">=</span><span class="s2">&quot;survival&quot;</span><span class="p">))</span>  <span class="c1"># 0.25</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="nb">print</span><span class="p">(</span><span class="n">difference</span><span class="o">.</span><span class="n">rate_from_probability</span><span class="p">(</span><span class="mf">0.3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">))</span>
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="nb">print</span><span class="p">(</span><span class="n">differential</span><span class="o">.</span><span class="n">rate_from_probability</span><span class="p">(</span><span class="mf">0.3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">))</span>
 </span></code></pre></div>
-<p>With either rate, one outflow moves <code>p</code> of its bin over the period, and the bin
-keeps <code>exp(-n / span)</code> at each step <code>n</code>. In the difference model the mean
-residence is then <code>1 / rate</code> steps (<code>4.52</code> for a span of 4), not the span: a
-per-step rate cannot keep both the survival and the mean of the continuous
-process, and these conversions keep the survival.</p>
+<p>With either engine, a rate from a probability moves <code>p</code> of its bin over the
+period.</p>
+<p>A per-step rate cannot keep both the survival and the mean of a residence, so
+<code>rate_from_mean_span</code> has a required argument <code>keep</code>, with no default: which
+one a model keeps is a modelling choice.</p>
+<table>
+<thead>
+<tr>
+<th><code>keep</code></th>
+<th>Per-step rate</th>
+<th>What the bin does</th>
+<th>Use it when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"survival"</code></td>
+<td><code>1 - exp(-1 / n)</code></td>
+<td>Keeps <code>exp(-k / n)</code> at each step <code>k</code>, as the continuous process does; its mean residence is <code>1 / rate</code> steps (<code>4.52</code> for a span of 4, <code>10.508</code> for 10)</td>
+<td>The step discretizes a continuous process</td>
+</tr>
+<tr>
+<td><code>"mean"</code></td>
+<td><code>1 / n</code></td>
+<td>Keeps <code>(1 - 1/n)^k</code> at each step <code>k</code>: a geometric residence whose mean is <code>n</code> steps</td>
+<td>The step is the unit of the process, such as a cycle or a generation</td>
+</tr>
+</tbody>
+</table>
+<p>A continuous rate is <code>1 / n</code> with both values. With <code>keep="mean"</code>, a per-step
+rate needs a span of at least one step: a shorter one raises <code>ValueError</code>,
+which names the span in steps. Another value of <code>keep</code> raises <code>ValueError</code>
+with both values.</p>
 <p>An axis of time with an origin also converts between dates and positions,
 and gives the ends of calendar days and weeks; see
 <a href="../units-and-equations/#dates-on-the-axis">Dates on the axis</a>.</p>

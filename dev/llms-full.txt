@@ -699,22 +699,33 @@ print(along_a_line.steps(2, "km"))  # 2000.0
 
 The rate conversions ask the engine what a rate means ([What a rate means](#what-a-rate-means)):
 
-| Method                                   | `DifferenceEquations` (`per_step`)                         | `DifferentialEquations` (`continuous`) |
-| ---------------------------------------- | ---------------------------------------------------------- | -------------------------------------- |
-| `rate_from_mean_span(span, unit)`        | `1 - exp(-1 / n)`, with `span` equal to `n` steps          | `1 / n`                                |
-| `rate_from_probability(p, period, unit)` | `1 - (1 - p) ** (1 / n)`, with `period` equal to `n` steps | `-ln(1 - p) / n`                       |
+| Method                                             | `DifferenceEquations` (`per_step`)                         | `DifferentialEquations` (`continuous`) |
+| -------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------- |
+| `rate_from_mean_span(span, unit, keep="survival")` | `1 - exp(-1 / n)`, with `span` equal to `n` steps          | `1 / n`                                |
+| `rate_from_mean_span(span, unit, keep="mean")`     | `1 / n`, with `span` equal to `n` steps and `n >= 1`       | `1 / n`                                |
+| `rate_from_probability(p, period, unit)`           | `1 - (1 - p) ** (1 / n)`, with `period` equal to `n` steps | `-ln(1 - p) / n`                       |
 
 ```python
 difference = AxisUnits(step_unit="day", engine="DifferenceEquations")
 differential = AxisUnits(step_unit="day", engine="DifferentialEquations")
 
-print(difference.rate_from_mean_span(4, "day"))    # 0.2212 = 1 - exp(-1/4)
-print(differential.rate_from_mean_span(4, "day"))  # 0.25
+print(difference.rate_from_mean_span(4, "day", keep="survival"))  # 0.2212
+print(difference.rate_from_mean_span(4, "day", keep="mean"))      # 0.25
+print(differential.rate_from_mean_span(4, "day", keep="survival"))  # 0.25
 print(difference.rate_from_probability(0.3, 1, "week"))
 print(differential.rate_from_probability(0.3, 1, "week"))
 ```
 
-With either rate, one outflow moves `p` of its bin over the period, and the bin keeps `exp(-n / span)` at each step `n`. In the difference model the mean residence is then `1 / rate` steps (`4.52` for a span of 4), not the span: a per-step rate cannot keep both the survival and the mean of the continuous process, and these conversions keep the survival.
+With either engine, a rate from a probability moves `p` of its bin over the period.
+
+A per-step rate cannot keep both the survival and the mean of a residence, so `rate_from_mean_span` has a required argument `keep`, with no default: which one a model keeps is a modelling choice.
+
+| `keep`       | Per-step rate     | What the bin does                                                                                                                                      | Use it when                                                          |
+| ------------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| `"survival"` | `1 - exp(-1 / n)` | Keeps `exp(-k / n)` at each step `k`, as the continuous process does; its mean residence is `1 / rate` steps (`4.52` for a span of 4, `10.508` for 10) | The step discretizes a continuous process                            |
+| `"mean"`     | `1 / n`           | Keeps `(1 - 1/n)^k` at each step `k`: a geometric residence whose mean is `n` steps                                                                    | The step is the unit of the process, such as a cycle or a generation |
+
+A continuous rate is `1 / n` with both values. With `keep="mean"`, a per-step rate needs a span of at least one step: a shorter one raises `ValueError`, which names the span in steps. Another value of `keep` raises `ValueError` with both values.
 
 An axis of time with an origin also converts between dates and positions, and gives the ends of calendar days and weeks; see [Dates on the axis](https://munqu.github.io/commol/latest/guide/units-and-equations/#dates-on-the-axis).
 
@@ -8238,7 +8249,7 @@ Examples:
 >>> hours.steps(3, "day")
 72.0
 >>> daily = AxisUnits(step_unit="day", engine="DifferentialEquations")
->>> daily.rate_from_mean_span(2, "week")
+>>> daily.rate_from_mean_span(2, "week", keep="mean")
 0.07142857142857142
 >>> hours.window_end(2, 1, "week")
 504.0
@@ -8295,7 +8306,7 @@ class AxisUnits(BaseModel):
     >>> hours.steps(3, "day")
     72.0
     >>> daily = AxisUnits(step_unit="day", engine="DifferentialEquations")
-    >>> daily.rate_from_mean_span(2, "week")
+    >>> daily.rate_from_mean_span(2, "week", keep="mean")
     0.07142857142857142
     >>> hours.window_end(2, 1, "week")
     504.0
@@ -8529,16 +8540,26 @@ class AxisUnits(BaseModel):
             return float(nearest)
         return result
 
-    def rate_from_mean_span(self, span: float, unit: str) -> float:
+    def rate_from_mean_span(
+        self, span: float, unit: str, *, keep: Literal["survival", "mean"]
+    ) -> float:
         """
         Rate of one outflow whose residence has a mean `span` on the axis.
 
-        The engine says what a rate means (`rate_meaning`). For a per-step
-        rate (``DifferenceEquations``) it is ``1 - exp(-1/n)``, with `span`
-        equal to ``n`` steps: the bin keeps ``exp(-k/n)`` of its start at each
-        step ``k``, as the continuous process does, and its mean residence is
-        ``1/rate`` steps, a little more than ``n``. For a continuous rate
-        (``DifferentialEquations``) it is ``1/n``.
+        The engine says what a rate means (`rate_meaning`), and `keep` says
+        what the rate keeps of the residence. With `span` equal to ``n``
+        steps, a per-step rate (``DifferenceEquations``) is:
+
+        - ``1 - exp(-1/n)`` with ``keep="survival"``: the bin keeps
+          ``exp(-k/n)`` of its start at each step ``k``, as a continuous
+          process does, and its mean residence is ``1/rate`` steps, a little
+          more than ``n``. It suits a model whose step discretizes a
+          continuous process.
+        - ``1/n`` with ``keep="mean"``: the residence is geometric, and its
+          mean is ``n`` steps. It suits a model whose step is the unit of its
+          process.
+
+        A continuous rate (``DifferentialEquations``) is ``1/n`` with both.
 
         Parameters
         ----------
@@ -8546,6 +8567,10 @@ class AxisUnits(BaseModel):
             Mean span of the residence, in `unit`.
         unit : str
             Unit of `span`, of the dimension of the step unit.
+        keep : {"survival", "mean"}
+            What the rate keeps of the residence: its exponential survival at
+            every step, or its mean. It has no default: it is a modelling
+            choice.
 
         Returns
         -------
@@ -8556,9 +8581,10 @@ class AxisUnits(BaseModel):
         ------
         ValueError
             If there is no engine, `unit` has another dimension than the step
-            unit, or `span` is not positive.
+            unit, `span` is not positive, `keep` is another value, or a
+            per-step rate keeps the mean of a span shorter than one step.
         """
-        return self._engine_type().rate_from_mean_span(self.steps(span, unit))
+        return self._engine_type().rate_from_mean_span(self.steps(span, unit), keep)
 
     def rate_from_probability(
         self, probability: float, period: float, unit: str
@@ -9122,19 +9148,25 @@ def steps(self, value: float, unit: str) -> float:
 #### rate_from_mean_span
 
 ```python
-rate_from_mean_span(span: float, unit: str) -> float
+rate_from_mean_span(span: float, unit: str, *, keep: Literal['survival', 'mean']) -> float
 ```
 
 Rate of one outflow whose residence has a mean `span` on the axis.
 
-The engine says what a rate means (`rate_meaning`). For a per-step rate (`DifferenceEquations`) it is `1 - exp(-1/n)`, with `span` equal to `n` steps: the bin keeps `exp(-k/n)` of its start at each step `k`, as the continuous process does, and its mean residence is `1/rate` steps, a little more than `n`. For a continuous rate (`DifferentialEquations`) it is `1/n`.
+The engine says what a rate means (`rate_meaning`), and `keep` says what the rate keeps of the residence. With `span` equal to `n` steps, a per-step rate (`DifferenceEquations`) is:
+
+- `1 - exp(-1/n)` with `keep="survival"`: the bin keeps `exp(-k/n)` of its start at each step `k`, as a continuous process does, and its mean residence is `1/rate` steps, a little more than `n`. It suits a model whose step discretizes a continuous process.
+- `1/n` with `keep="mean"`: the residence is geometric, and its mean is `n` steps. It suits a model whose step is the unit of its process.
+
+A continuous rate (`DifferentialEquations`) is `1/n` with both.
 
 Parameters:
 
-| Name   | Type    | Description                                      | Default    |
-| ------ | ------- | ------------------------------------------------ | ---------- |
-| `span` | `float` | Mean span of the residence, in unit.             | *required* |
-| `unit` | `str`   | Unit of span, of the dimension of the step unit. | *required* |
+| Name   | Type               | Description                                                                                                                             | Default      |
+| ------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| `span` | `float`            | Mean span of the residence, in unit.                                                                                                    | *required*   |
+| `unit` | `str`              | Unit of span, of the dimension of the step unit.                                                                                        | *required*   |
+| `keep` | `(survival, mean)` | What the rate keeps of the residence: its exponential survival at every step, or its mean. It has no default: it is a modelling choice. | `"survival"` |
 
 Returns:
 
@@ -9144,23 +9176,33 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                    |
-| ------------ | ---------------------------------------------------------------------------------------------- |
-| `ValueError` | If there is no engine, unit has another dimension than the step unit, or span is not positive. |
+| Type         | Description                                                                                                                                                                           |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If there is no engine, unit has another dimension than the step unit, span is not positive, keep is another value, or a per-step rate keeps the mean of a span shorter than one step. |
 
 Source code in `commol/context/axis_units.py`
 
 ```python
-def rate_from_mean_span(self, span: float, unit: str) -> float:
+def rate_from_mean_span(
+    self, span: float, unit: str, *, keep: Literal["survival", "mean"]
+) -> float:
     """
     Rate of one outflow whose residence has a mean `span` on the axis.
 
-    The engine says what a rate means (`rate_meaning`). For a per-step
-    rate (``DifferenceEquations``) it is ``1 - exp(-1/n)``, with `span`
-    equal to ``n`` steps: the bin keeps ``exp(-k/n)`` of its start at each
-    step ``k``, as the continuous process does, and its mean residence is
-    ``1/rate`` steps, a little more than ``n``. For a continuous rate
-    (``DifferentialEquations``) it is ``1/n``.
+    The engine says what a rate means (`rate_meaning`), and `keep` says
+    what the rate keeps of the residence. With `span` equal to ``n``
+    steps, a per-step rate (``DifferenceEquations``) is:
+
+    - ``1 - exp(-1/n)`` with ``keep="survival"``: the bin keeps
+      ``exp(-k/n)`` of its start at each step ``k``, as a continuous
+      process does, and its mean residence is ``1/rate`` steps, a little
+      more than ``n``. It suits a model whose step discretizes a
+      continuous process.
+    - ``1/n`` with ``keep="mean"``: the residence is geometric, and its
+      mean is ``n`` steps. It suits a model whose step is the unit of its
+      process.
+
+    A continuous rate (``DifferentialEquations``) is ``1/n`` with both.
 
     Parameters
     ----------
@@ -9168,6 +9210,10 @@ def rate_from_mean_span(self, span: float, unit: str) -> float:
         Mean span of the residence, in `unit`.
     unit : str
         Unit of `span`, of the dimension of the step unit.
+    keep : {"survival", "mean"}
+        What the rate keeps of the residence: its exponential survival at
+        every step, or its mean. It has no default: it is a modelling
+        choice.
 
     Returns
     -------
@@ -9178,9 +9224,10 @@ def rate_from_mean_span(self, span: float, unit: str) -> float:
     ------
     ValueError
         If there is no engine, `unit` has another dimension than the step
-        unit, or `span` is not positive.
+        unit, `span` is not positive, `keep` is another value, or a
+        per-step rate keeps the mean of a span shorter than one step.
     """
-    return self._engine_type().rate_from_mean_span(self.steps(span, unit))
+    return self._engine_type().rate_from_mean_span(self.steps(span, unit), keep)
 ```
 
 #### rate_from_probability
@@ -16611,7 +16658,7 @@ class Model(BaseModel, Generic[StructureT]):
         >>> units = model.axis_units()
         >>> units.steps(2, "week")  # with step_unit="day"
         14.0
-        >>> gamma = units.rate_from_mean_span(5, "day")
+        >>> k = units.rate_from_mean_span(5, "day", keep="survival")
         """
         return AxisUnits(
             step_unit=self.step_unit or DEFAULT_STEP_UNIT,
@@ -17267,7 +17314,7 @@ Examples:
 >>> units = model.axis_units()
 >>> units.steps(2, "week")  # with step_unit="day"
 14.0
->>> gamma = units.rate_from_mean_span(5, "day")
+>>> k = units.rate_from_mean_span(5, "day", keep="survival")
 ```
 
 Source code in `commol/context/model.py`
@@ -17292,7 +17339,7 @@ def axis_units(self) -> AxisUnits:
     >>> units = model.axis_units()
     >>> units.steps(2, "week")  # with step_unit="day"
     14.0
-    >>> gamma = units.rate_from_mean_span(5, "day")
+    >>> k = units.rate_from_mean_span(5, "day", keep="survival")
     """
     return AxisUnits(
         step_unit=self.step_unit or DEFAULT_STEP_UNIT,
@@ -40853,6 +40900,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - A formula has at most 100 000 nodes (numbers, variables, operators and calls), next to its limit of 100 levels of nesting: a longer one raises `ValueError` when its object is built, before it compiles. A message of the parser or of the compiler quotes the formula cut after its first 80 characters. See [Limits of the parser](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#limits-of-the-parser).
 - A rate gives the same description with or without spaces: the description and its LaTeX are written from the tree that the parser of the engine reads, so `k1*A*B/total` and `k1 * A * B / total` give one description. A formula shows one space around each operator, only the parentheses that its grouping needs, `^` for a power and each number as its value (`1e-5` shows as `1e-05`, `2.0` as `2`). In LaTeX, a power raises its exponent (`A^{2}`), `%` is `\bmod` and a comparison has its symbol (`\leq`). See [The equations](https://munqu.github.io/commol/latest/guide/describing-models/#the-equations).
 - The unit check reads the tree of the engine: it reads `!` in a condition and a variable named like a word of Python, such as `lambda`, and a formula outside the language gives the message of the parser.
+- **Breaking:** `AxisUnits.rate_from_mean_span` takes a required keyword `keep`, with no default: `"survival"` gives the rate of today, which keeps the exponential survival at every step (`1 - exp(-1/n)` on a per-step engine), and `"mean"` gives `1/n`, whose mean residence is `n` steps on a per-step engine. A continuous engine gives `1/n` with both. With `keep="mean"`, a per-step engine rejects a span shorter than one step with `ValueError`. Migration: add `keep="survival"` to keep each rate as it is. See [Units of the axis](https://munqu.github.io/commol/latest/guide/core-concepts/#units-of-the-axis).
 
 ### Removed
 

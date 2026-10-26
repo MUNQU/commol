@@ -6272,7 +6272,7 @@ axis has no dates.</p>
 </span><span id="__span-0-442"><a id="__codelineno-0-442" name="__codelineno-0-442"></a><span class="sd">        &gt;&gt;&gt; units = model.axis_units()</span>
 </span><span id="__span-0-443"><a id="__codelineno-0-443" name="__codelineno-0-443"></a><span class="sd">        &gt;&gt;&gt; units.steps(2, &quot;week&quot;)  # with step_unit=&quot;day&quot;</span>
 </span><span id="__span-0-444"><a id="__codelineno-0-444" name="__codelineno-0-444"></a><span class="sd">        14.0</span>
-</span><span id="__span-0-445"><a id="__codelineno-0-445" name="__codelineno-0-445"></a><span class="sd">        &gt;&gt;&gt; gamma = units.rate_from_mean_span(5, &quot;day&quot;)</span>
+</span><span id="__span-0-445"><a id="__codelineno-0-445" name="__codelineno-0-445"></a><span class="sd">        &gt;&gt;&gt; k = units.rate_from_mean_span(5, &quot;day&quot;, keep=&quot;survival&quot;)</span>
 </span><span id="__span-0-446"><a id="__codelineno-0-446" name="__codelineno-0-446"></a><span class="sd">        &quot;&quot;&quot;</span>
 </span><span id="__span-0-447"><a id="__codelineno-0-447" name="__codelineno-0-447"></a>        <span class="k">return</span> <span class="n">AxisUnits</span><span class="p">(</span>
 </span><span id="__span-0-448"><a id="__codelineno-0-448" name="__codelineno-0-448"></a>            <span class="n">step_unit</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">step_unit</span> <span class="ow">or</span> <span class="n">DEFAULT_STEP_UNIT</span><span class="p">,</span>
@@ -7834,7 +7834,7 @@ model, so the rates of <code>AxisUnits</code> mean what this engine reads.</p>
     <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">units</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">axis_units</span><span class="p">()</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">units</span><span class="o">.</span><span class="n">steps</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;week&quot;</span><span class="p">)</span>  <span class="c1"># with step_unit=&quot;day&quot;</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="go">14.0</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">gamma</span> <span class="o">=</span> <span class="n">units</span><span class="o">.</span><span class="n">rate_from_mean_span</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="s2">&quot;day&quot;</span><span class="p">)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">k</span> <span class="o">=</span> <span class="n">units</span><span class="o">.</span><span class="n">rate_from_mean_span</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="s2">&quot;day&quot;</span><span class="p">,</span> <span class="n">keep</span><span class="o">=</span><span class="s2">&quot;survival&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 
 
@@ -7884,7 +7884,7 @@ model, so the rates of <code>AxisUnits</code> mean what this engine reads.</p>
 </span><span id="__span-0-442"><a id="__codelineno-0-442" name="__codelineno-0-442"></a><span class="sd">    &gt;&gt;&gt; units = model.axis_units()</span>
 </span><span id="__span-0-443"><a id="__codelineno-0-443" name="__codelineno-0-443"></a><span class="sd">    &gt;&gt;&gt; units.steps(2, &quot;week&quot;)  # with step_unit=&quot;day&quot;</span>
 </span><span id="__span-0-444"><a id="__codelineno-0-444" name="__codelineno-0-444"></a><span class="sd">    14.0</span>
-</span><span id="__span-0-445"><a id="__codelineno-0-445" name="__codelineno-0-445"></a><span class="sd">    &gt;&gt;&gt; gamma = units.rate_from_mean_span(5, &quot;day&quot;)</span>
+</span><span id="__span-0-445"><a id="__codelineno-0-445" name="__codelineno-0-445"></a><span class="sd">    &gt;&gt;&gt; k = units.rate_from_mean_span(5, &quot;day&quot;, keep=&quot;survival&quot;)</span>
 </span><span id="__span-0-446"><a id="__codelineno-0-446" name="__codelineno-0-446"></a><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="__span-0-447"><a id="__codelineno-0-447" name="__codelineno-0-447"></a>    <span class="k">return</span> <span class="n">AxisUnits</span><span class="p">(</span>
 </span><span id="__span-0-448"><a id="__codelineno-0-448" name="__codelineno-0-448"></a>        <span class="n">step_unit</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">step_unit</span> <span class="ow">or</span> <span class="n">DEFAULT_STEP_UNIT</span><span class="p">,</span>

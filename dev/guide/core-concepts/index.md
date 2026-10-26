@@ -313,22 +313,33 @@ print(along_a_line.steps(2, "km"))  # 2000.0
 
 The rate conversions ask the engine what a rate means ([What a rate means](#what-a-rate-means)):
 
-| Method                                   | `DifferenceEquations` (`per_step`)                         | `DifferentialEquations` (`continuous`) |
-| ---------------------------------------- | ---------------------------------------------------------- | -------------------------------------- |
-| `rate_from_mean_span(span, unit)`        | `1 - exp(-1 / n)`, with `span` equal to `n` steps          | `1 / n`                                |
-| `rate_from_probability(p, period, unit)` | `1 - (1 - p) ** (1 / n)`, with `period` equal to `n` steps | `-ln(1 - p) / n`                       |
+| Method                                             | `DifferenceEquations` (`per_step`)                         | `DifferentialEquations` (`continuous`) |
+| -------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------- |
+| `rate_from_mean_span(span, unit, keep="survival")` | `1 - exp(-1 / n)`, with `span` equal to `n` steps          | `1 / n`                                |
+| `rate_from_mean_span(span, unit, keep="mean")`     | `1 / n`, with `span` equal to `n` steps and `n >= 1`       | `1 / n`                                |
+| `rate_from_probability(p, period, unit)`           | `1 - (1 - p) ** (1 / n)`, with `period` equal to `n` steps | `-ln(1 - p) / n`                       |
 
 ```python
 difference = AxisUnits(step_unit="day", engine="DifferenceEquations")
 differential = AxisUnits(step_unit="day", engine="DifferentialEquations")
 
-print(difference.rate_from_mean_span(4, "day"))    # 0.2212 = 1 - exp(-1/4)
-print(differential.rate_from_mean_span(4, "day"))  # 0.25
+print(difference.rate_from_mean_span(4, "day", keep="survival"))  # 0.2212
+print(difference.rate_from_mean_span(4, "day", keep="mean"))      # 0.25
+print(differential.rate_from_mean_span(4, "day", keep="survival"))  # 0.25
 print(difference.rate_from_probability(0.3, 1, "week"))
 print(differential.rate_from_probability(0.3, 1, "week"))
 ```
 
-With either rate, one outflow moves `p` of its bin over the period, and the bin keeps `exp(-n / span)` at each step `n`. In the difference model the mean residence is then `1 / rate` steps (`4.52` for a span of 4), not the span: a per-step rate cannot keep both the survival and the mean of the continuous process, and these conversions keep the survival.
+With either engine, a rate from a probability moves `p` of its bin over the period.
+
+A per-step rate cannot keep both the survival and the mean of a residence, so `rate_from_mean_span` has a required argument `keep`, with no default: which one a model keeps is a modelling choice.
+
+| `keep`       | Per-step rate     | What the bin does                                                                                                                                      | Use it when                                                          |
+| ------------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| `"survival"` | `1 - exp(-1 / n)` | Keeps `exp(-k / n)` at each step `k`, as the continuous process does; its mean residence is `1 / rate` steps (`4.52` for a span of 4, `10.508` for 10) | The step discretizes a continuous process                            |
+| `"mean"`     | `1 / n`           | Keeps `(1 - 1/n)^k` at each step `k`: a geometric residence whose mean is `n` steps                                                                    | The step is the unit of the process, such as a cycle or a generation |
+
+A continuous rate is `1 / n` with both values. With `keep="mean"`, a per-step rate needs a span of at least one step: a shorter one raises `ValueError`, which names the span in steps. Another value of `keep` raises `ValueError` with both values.
 
 An axis of time with an origin also converts between dates and positions, and gives the ends of calendar days and weeks; see [Dates on the axis](https://munqu.github.io/commol/latest/guide/units-and-equations/#dates-on-the-axis).
 
