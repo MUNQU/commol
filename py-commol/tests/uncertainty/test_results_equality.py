@@ -53,6 +53,8 @@ def _conformal(lower: float, scores: dict[str, list[float]]) -> ConformalResult:
         guarantee="marginal",
         failed=[],
         not_converged=0,
+        block_length=None,
+        block_length_estimates=None,
     )
 
 

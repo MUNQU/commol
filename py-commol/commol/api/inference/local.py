@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 from commol.api.inference.registry import register
 from commol.api.inference.resampling import (
+    block_length_estimates,
     fit_values,
     rust_block_length,
     sample_method,
@@ -128,7 +129,7 @@ def run_sandwich(calibrator: "Calibrator", method: Sandwich) -> SandwichResult:
         notes=_notes(run),
         blocks=blocks,
         block_length=block_length,
-        block_length_estimates=dict(estimates) if estimates is not None else None,
+        block_length_estimates=block_length_estimates(estimates),
     )
 
 

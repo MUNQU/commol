@@ -305,13 +305,18 @@ print(round(sum(misses) / len(misses), 3))  # 0.125
 ## Results, plots and reports
 
 Every variant returns a `ConformalResult(intervals, scores, guarantee, failed,
-not_converged)`. A variant that refits lists each refit that failed in
+not_converged, block_length, block_length_estimates)`. A variant that refits lists each refit that failed in
 `failed`, named by its unit: `"Origin <index> failed: <reason>"` for
 `RollingConformal`, `"Block <index> failed: <reason>"` for `JackknifePlus`, and
 `"Replicate <index> failed: <reason>"` for `EnbPI`; each is also logged as a
 warning, and gives no score. `not_converged` counts the refits kept although
 their optimizer did not converge. Split and adaptive conformal do not refit, so
 their `failed` is empty and their `not_converged` is 0.
+`JackknifePlus` and `EnbPI` give the block length they ran with in
+`block_length`, and with `block_length="auto"` the estimate of each series, by
+label, in `block_length_estimates`, as the
+[bootstraps](resampling.md#blocks-and-their-length) give them; the other
+variants have no blocks, so both are `None`.
 `intervals` is a `PredictionIntervals`: its `confidence_level`, a
 `SeriesIntervals` per
 series (`positions`, `prediction`, `lower`, `upper`), and `unbounded`.

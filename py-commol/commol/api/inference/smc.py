@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 from commol.api.inference.registry import register
 from commol.api.inference.resampling import (
+    block_length_estimates,
     fit_values,
     log_failed,
     rust_block_length,
@@ -96,7 +97,9 @@ def run_gibbs_posterior(
     Returns
     -------
     GibbsResult
-        The sample, the levels, the log evidence, the diagnostics and `η`.
+        The sample, the levels, the log evidence, the diagnostics, `η`
+        and, with a calibration of `η`, its block length and the estimates
+        of the automatic length.
     """
     problem = calibrator.rust_problem
     priors = method.priors.rust_priors()
@@ -109,9 +112,11 @@ def run_gibbs_posterior(
     fit: CalibrationResult | None = None
     coverage: float | None = None
     failed: list[str] = []
+    block_length: int | None = None
+    estimates: list[tuple[str, float]] | None = None
     if isinstance(method.eta, InformationMatchingEta):
         fit = calibrator.run(starts=method.eta.starts)
-        eta = rust.information_matching_eta(
+        eta, block_length, estimates = rust.information_matching_eta(
             problem,
             fit_values(calibrator, fit),
             rust_block_length(method.eta.block_length),
@@ -131,6 +136,8 @@ def run_gibbs_posterior(
         )
         eta, coverage = found.eta, found.coverage
         failed = log_failed(found.failed, logger)
+        block_length = found.block_length
+        estimates = found.block_length_estimates
     else:
         eta = method.eta
     run = rust.gibbs_posterior(problem, priors, eta, *sampler, calibrator.seed)
@@ -148,6 +155,8 @@ def run_gibbs_posterior(
         fit=fit,
         coverage=coverage,
         failed=failed,
+        block_length=block_length,
+        block_length_estimates=block_length_estimates(estimates),
     )
 
 
