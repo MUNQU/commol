@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 from commol.api.inference.registry import register
 from commol.api.inference.resampling import (
+    block_length_estimates,
     fit_values,
     log_failed,
     rust_block_length,
@@ -80,11 +81,7 @@ def _result(
         failed=log_failed(run.failed, logger),
         not_converged=run.not_converged,
         block_length=run.block_length,
-        block_length_estimates=(
-            dict(run.block_length_estimates)
-            if run.block_length_estimates is not None
-            else None
-        ),
+        block_length_estimates=block_length_estimates(run.block_length_estimates),
     )
 
 

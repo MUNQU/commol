@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 from commol.api.inference.registry import register
 from commol.api.inference.resampling import (
+    block_length_estimates,
     fit_values,
     log_failed,
     rust_block_length,
@@ -155,7 +156,7 @@ def run_gibbs_posterior(
         coverage=coverage,
         failed=failed,
         block_length=block_length,
-        block_length_estimates=dict(estimates) if estimates is not None else None,
+        block_length_estimates=block_length_estimates(estimates),
     )
 
 

@@ -94,6 +94,26 @@ def rust_block_length(block_length: BlockLength) -> int | None:
     return None if block_length == "auto" else block_length
 
 
+def block_length_estimates(
+    estimates: list[tuple[str, float]] | None,
+) -> dict[str, float] | None:
+    """
+    The estimates of an automatic block length as a result gives them.
+
+    Parameters
+    ----------
+    estimates : list[tuple[str, float]] | None
+        The estimate of each series, as the Rust runners give it; None for a
+        length given.
+
+    Returns
+    -------
+    dict[str, float] | None
+        The estimate of each series, by label; None for a length given.
+    """
+    return dict(estimates) if estimates is not None else None
+
+
 def log_failed(failed: list[str], log: logging.Logger = logger) -> list[str]:
     """
     Log each fit that failed as a warning.
@@ -122,7 +142,7 @@ def _diagnostics(
 ) -> ResamplingDiagnostics:
     return ResamplingDiagnostics(
         block_length=block_length,
-        block_length_estimates=dict(estimates) if estimates is not None else None,
+        block_length_estimates=block_length_estimates(estimates),
         negative_values=negative_values,
     )
 
