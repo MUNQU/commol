@@ -7,6 +7,18 @@ import re
 import pytest
 
 from commol import AxisPattern, CalibrationConstraint, ModelBuilder
+from commol.context._model.engine_state import formula_tree
+from commol.context._model.formula_tree import (
+    Chain,
+    Conditional,
+    Constant,
+    FunctionCall,
+    Power,
+    UnaryOp,
+    Variable,
+    read_tree,
+    variables,
+)
 from tests.support import abc_builder, assert_accepted
 
 
@@ -101,3 +113,25 @@ def test_the_error_of_a_formula_parameter_names_the_parameter() -> None:
 
     with pytest.raises(ValueError, match=re.escape(message)):
         a_parameter("k1 * (step > 30)")
+
+
+def test_python_reads_the_tree_of_a_formula_from_the_engine() -> None:
+    a, k = Variable("a"), Variable("k")
+
+    assert formula_tree("if(!(a > 1e400), max(a, 0x10), -k ^ 2)") == Conditional(
+        UnaryOp("Not", Chain(a, (("Gt", Constant(float("inf"))),))),
+        FunctionCall("max", (a, Constant(16.0))),
+        UnaryOp("Neg", Power(k, Constant(2.0))),
+    )
+    assert variables(formula_tree("k * a ^ x + if(x > 0, -k, max(a, 2))")) == [
+        "k",
+        "a",
+        "x",
+    ]
+    with pytest.raises(ValueError, match="the boolean 'true' is not a number"):
+        formula_tree("k * true")
+
+
+def test_a_json_object_that_is_no_node_of_a_formula_is_rejected() -> None:
+    with pytest.raises(ValueError, match="Not a node of the tree of a formula"):
+        read_tree('{"Chain": {"first": {"Variable": "a"}, "rest": [["Mul", 2]]}}')

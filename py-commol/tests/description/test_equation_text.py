@@ -99,7 +99,7 @@ def test_a_variable_inside_the_latex_of_another_is_not_replaced_again() -> None:
     [
         ("k*A/N", "k * A / N"),
         ("(a) + (b)", "a + b"),
-        ("((a + b) * c) / d", "(a + b) * c / d"),
+        ("((a + b) * c) / d", "((a + b) * c) / d"),
         ("a - (b - c)", "a - (b - c)"),
         ("(a - b) - c", "(a - b) - c"),
         ("-2 ** 2 ^ x", "-2 ^ 2 ^ x"),

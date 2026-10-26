@@ -2,11 +2,13 @@ from typing import TYPE_CHECKING
 
 from commol.constants import SUBGROUP_TOTAL_PREFIX, TOTAL_VARIABLE
 from commol.context._model import engine_state
+from commol.context._model.formula_tree import Node, formula_text, variables
 from commol.context.neighbors import NEIGHBORS_PREFIX, NEIGHBORS_VARIABLE
 from commol.utils.equations import (
     DEFAULT_STEP_UNIT,
     UnitConsistencyError,
     define_units,
+    formula_unit,
     get_predefined_variable_units,
 )
 
@@ -152,33 +154,24 @@ class ModelCompartmentHelper:
                 failures[param.id] = error
         return inferred_any
 
-    def get_rate_unit(self, rate: str, variable_units: dict[str, str]) -> str | None:
+    def get_rate_unit(self, rate: Node, variable_units: dict[str, str]) -> str | None:
         """
-        The unit of a rate expression, or None when a variable has no unit or
+        The unit of the tree of a rate, or None when a variable has no unit or
         the units do not combine, such as a sum of days and items.
         """
         try:
             self.register_custom_units()
-            variables = engine_state.formula_inputs(rate)
-            rate_variable_units: dict[str, str] = {}
-            for var in variables:
-                if var in variable_units:
-                    rate_variable_units[var] = variable_units[var]
-                else:
-                    return None
-            from commol.utils.equations import parse_equation_unit
-
-            equation_unit = parse_equation_unit(rate, rate_variable_units)
-            return str(equation_unit.units)
+            if not set(variables(rate)) <= set(variable_units):
+                return None
+            return str(formula_unit(rate, variable_units).units)
         except ValueError:
             return None
 
-    def annotate_rate_variables(self, rate: str, variable_units: dict[str, str]) -> str:
-        """Annotate variables in a rate expression with their units."""
-        from commol.context._model.equations import replace_variables
-
-        return replace_variables(
-            rate,
+    def annotate_rate_variables(
+        self, rate: Node, variable_units: dict[str, str]
+    ) -> str:
+        """The text of the tree of a rate, each variable with its unit."""
+        return formula_text(
             rate,
             lambda var: (
                 f"{var}({variable_units[var]})" if var in variable_units else var
@@ -187,12 +180,12 @@ class ModelCompartmentHelper:
 
     def format_rate_with_unit(
         self,
-        rate: str,
+        rate: Node,
         variable_units: dict[str, str] | None,
         latex: bool = False,
     ) -> str:
         """
-        Format a rate expression, with the unit of each variable and of the
+        Format the tree of a rate, with the unit of each variable and of the
         rate when the model has units (`variable_units` is not None).
         """
         if latex:
@@ -205,7 +198,7 @@ class ModelCompartmentHelper:
             return f"{latex_rate} [\\text{{{unit}}}]" if unit else latex_rate
 
         if variable_units is None:
-            return rate
+            return formula_text(rate)
 
         annotated_rate = self.annotate_rate_variables(rate, variable_units)
         unit = self.get_rate_unit(rate, variable_units)
@@ -231,18 +224,8 @@ def _infer_single_formula_unit(
     parameter_id: str, formula: str, variable_units: dict[str, str]
 ) -> bool:
     """Infer unit for a single formula parameter. Returns True if successful."""
-    formula_vars = engine_state.formula_inputs(formula)
-    formula_var_units: dict[str, str] = {}
-    for var in formula_vars:
-        if var in variable_units:
-            formula_var_units[var] = variable_units[var]
-        else:
-            return False
-    if formula_var_units:
-        from commol.utils.equations import parse_equation_unit
-
-        inferred_unit = parse_equation_unit(formula, formula_var_units)
-        variable_units[parameter_id] = str(inferred_unit.units)
-    else:
-        variable_units[parameter_id] = "dimensionless"
+    tree = engine_state.formula_tree(formula)
+    if not set(variables(tree)) <= set(variable_units):
+        return False
+    variable_units[parameter_id] = str(formula_unit(tree, variable_units).units)
     return True

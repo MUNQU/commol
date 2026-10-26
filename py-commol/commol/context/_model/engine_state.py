@@ -7,10 +7,12 @@ This module only asks the engine; it does not reproduce any of those rules.
 """
 
 from collections.abc import Mapping, Sequence
+from functools import lru_cache
 from typing import TYPE_CHECKING, NamedTuple
 
 from commol.commol_rs import _commol_rs as commol_rs
 
+from commol.context._model.formula_tree import Node, Variable, product, read_tree
 from commol.context.constants import CalibrationParameterType
 
 if TYPE_CHECKING:
@@ -211,11 +213,13 @@ class TransitionFlow(NamedTuple):
     flow: int
 
     @property
-    def term(self) -> str:
-        """The flow as an expression: the rate, times its source if proportional."""
+    def term(self) -> Node:
+        """The tree of the flow: the tree of the rate, times its source if
+        proportional."""
+        rate = formula_tree(self.rate)
         if self.proportional_to is None:
-            return self.rate
-        return f"{self.rate} * {self.proportional_to}"
+            return rate
+        return product(rate, Variable(self.proportional_to))
 
 
 def transition_flows(
@@ -554,9 +558,10 @@ def subgroup_total_names(process: "Process") -> list[str]:
     return commol_rs.model.subgroup_total_names(_rust_process(process))
 
 
-def formula_inputs(formula: str) -> list[str]:
+@lru_cache(maxsize=1024)
+def formula_tree(formula: str) -> Node:
     """
-    The values a formula reads, as the engine compiles it.
+    The tree of a formula, as the parser of the engine reads it.
 
     Parameters
     ----------
@@ -565,17 +570,16 @@ def formula_inputs(formula: str) -> list[str]:
 
     Returns
     -------
-    list[str]
-        Its variables and the engine variables ``total``, ``step`` and ``t``
-        it reads, in the order it first reads them; not the constants ``pi``
-        and ``e``.
+    Node
+        The root of its tree (``formula_tree.py``), the one the engine
+        compiles. A tree is immutable, so one formula has one tree.
 
     Raises
     ------
     ValueError
         If the formula is not in the language of formulas.
     """
-    return commol_rs.core.MathExpression(formula).inputs
+    return read_tree(commol_rs.core.MathExpression(formula).tree())
 
 
 def rust_loss_config(

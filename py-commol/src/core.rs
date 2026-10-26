@@ -131,24 +131,6 @@ impl PyMathExpression {
     fn variables(&self) -> Vec<String> {
         self.inner.get_variables()
     }
-
-    /// The values the compiled formula reads, in the order it first reads
-    /// them: its variables and the engine variables `total`, `step` and `t`,
-    /// but not the constants `pi` and `e`
-    ///
-    /// Raises:
-    ///     ValueError: If the formula does not compile
-    #[getter]
-    fn inputs(&self) -> PyResult<Vec<String>> {
-        self.inner
-            .check()
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
-        Ok(self
-            .inner
-            .jit_variable_names()
-            .expect("a formula that passes the check compiles")
-            .to_vec())
-    }
 }
 
 /// Register all core types with the Python module
