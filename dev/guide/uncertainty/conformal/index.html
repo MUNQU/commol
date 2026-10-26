@@ -3894,13 +3894,18 @@ at each point before it was seen.</p>
 </span></code></pre></div>
 <h2 id="results-plots-and-reports">Results, plots and reports<a class="headerlink" href="#results-plots-and-reports" title="Permanent link">&para;</a></h2>
 <p>Every variant returns a <code>ConformalResult(intervals, scores, guarantee, failed,
-not_converged)</code>. A variant that refits lists each refit that failed in
+not_converged, block_length, block_length_estimates)</code>. A variant that refits lists each refit that failed in
 <code>failed</code>, named by its unit: <code>"Origin &lt;index&gt; failed: &lt;reason&gt;"</code> for
 <code>RollingConformal</code>, <code>"Block &lt;index&gt; failed: &lt;reason&gt;"</code> for <code>JackknifePlus</code>, and
 <code>"Replicate &lt;index&gt; failed: &lt;reason&gt;"</code> for <code>EnbPI</code>; each is also logged as a
 warning, and gives no score. <code>not_converged</code> counts the refits kept although
 their optimizer did not converge. Split and adaptive conformal do not refit, so
 their <code>failed</code> is empty and their <code>not_converged</code> is 0.
+<code>JackknifePlus</code> and <code>EnbPI</code> give the block length they ran with in
+<code>block_length</code>, and with <code>block_length="auto"</code> the estimate of each series, by
+label, in <code>block_length_estimates</code>, as the
+<a href="../resampling/#blocks-and-their-length">bootstraps</a> give them; the other
+variants have no blocks, so both are <code>None</code>.
 <code>intervals</code> is a <code>PredictionIntervals</code>: its <code>confidence_level</code>, a
 <code>SeriesIntervals</code> per
 series (<code>positions</code>, <code>prediction</code>, <code>lower</code>, <code>upper</code>), and <code>unbounded</code>.

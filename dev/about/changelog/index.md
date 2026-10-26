@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `GibbsResult` and `ConformalResult` give `block_length` and `block_length_estimates`, as the bootstraps, the jackknife and the sandwich do: the length a method ran with, and with `block_length="auto"` the estimate of each series, by label. `GibbsResult` gives them for `InformationMatchingEta` and `BootstrapCoverageEta`, and `None` for a number `η`; `ConformalResult` for `JackknifePlus` and `EnbPI`, and `None` for the variants without blocks. See [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means) and [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#results-plots-and-reports).
+
 ### Changed
 
 - A formula has at most 100 000 nodes (numbers, variables, operators and calls), next to its limit of 100 levels of nesting: a longer one raises `ValueError` when its object is built, before it compiles. A message of the parser or of the compiler quotes the formula cut after its first 80 characters. See [Limits of the parser](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#limits-of-the-parser).

@@ -3671,9 +3671,10 @@ is the problem's loss with its weights and normalization. It returns a
 <code>GibbsResult</code>: the sample at temperature 1, the temperatures, the log of
 <code>∫ prior(θ) exp(−η loss(θ)) dθ</code>, the diagnostics, the <code>η</code> it ran with, the fit
 a calibration of <code>η</code> read (<code>fit</code>), the coverage of a bootstrap calibration
-(<code>coverage</code>), and each replicate of a bootstrap calibration whose sampler
+(<code>coverage</code>), each replicate of a bootstrap calibration whose sampler
 failed, <code>"Replicate &lt;index&gt; failed: &lt;reason&gt;"</code>, also logged as a warning
-(<code>failed</code>).</p>
+(<code>failed</code>), and the block length of a calibration with the estimate of each
+series of the automatic length (<code>block_length</code>, <code>block_length_estimates</code>).</p>
 <h3 id="what-means">What <code>η</code> means<a class="headerlink" href="#what-means" title="Permanent link">&para;</a></h3>
 <p><code>η</code> weighs the data against the priors. The loss has no scale of its own, so
 <code>η</code> has no default: with <code>η</code> too large the posterior is too narrow, with <code>η</code>
@@ -3711,6 +3712,13 @@ variance <code>σ²</code>, <code>η = 1/(2σ²)</code> makes the Gibbs posterio
 </table>
 <p>Both calibrations read the fit <code>Calibrator.run(starts)</code>, the best of
 <a href="../../calibration-optimizers/#several-starts">several starts</a>.</p>
+<p>Both take <code>block_length="auto"</code>, the automatic length of
+<a href="../resampling/#blocks-and-their-length">Blocks and their length</a> for
+non-overlapping blocks. <code>GibbsResult.block_length</code> gives the length used,
+and <code>block_length_estimates</code> the estimate of each series, by label, as the
+bootstraps, the sandwich and the conformal methods give them. Both are <code>None</code>
+for a number <code>η</code>, and <code>block_length_estimates</code> is <code>None</code> for an integer
+<code>block_length</code>.</p>
 <p>Information matching is cheap and local; it needs a sum of smooth terms, so
 <code>"rmse"</code> (a square root of a sum), <code>"mae"</code> (no curvature) and a stochastic
 engine raise a <code>ValueError</code> that points to the other choices. <code>J</code> and <code>I</code> are

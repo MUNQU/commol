@@ -5356,7 +5356,7 @@ None of them has a default: each sets the cost and the accuracy of the run.
 
 ## Gibbs posterior
 
-`GibbsPosterior` samples `π(θ) ∝ prior(θ) · exp(−η · loss(θ))`, where `loss` is the problem's loss with its weights and normalization. It returns a `GibbsResult`: the sample at temperature 1, the temperatures, the log of `∫ prior(θ) exp(−η loss(θ)) dθ`, the diagnostics, the `η` it ran with, the fit a calibration of `η` read (`fit`), the coverage of a bootstrap calibration (`coverage`), and each replicate of a bootstrap calibration whose sampler failed, `"Replicate <index> failed: <reason>"`, also logged as a warning (`failed`).
+`GibbsPosterior` samples `π(θ) ∝ prior(θ) · exp(−η · loss(θ))`, where `loss` is the problem's loss with its weights and normalization. It returns a `GibbsResult`: the sample at temperature 1, the temperatures, the log of `∫ prior(θ) exp(−η loss(θ)) dθ`, the diagnostics, the `η` it ran with, the fit a calibration of `η` read (`fit`), the coverage of a bootstrap calibration (`coverage`), each replicate of a bootstrap calibration whose sampler failed, `"Replicate <index> failed: <reason>"`, also logged as a warning (`failed`), and the block length of a calibration with the estimate of each series of the automatic length (`block_length`, `block_length_estimates`).
 
 ### What `η` means
 
@@ -5369,6 +5369,8 @@ None of them has a default: each sets the cost and the accuracy of the run.
 | `BootstrapCoverageEta(replicates, block_length, confidence_level, starts=1)` | The posteriors of Bayesian-bootstrap data sets hold the fit at `confidence_level` (Syring and Martin 2019)                                                                                                         | Any loss and engine                                                                              | A fit and one sampler per replicate, then one |
 
 Both calibrations read the fit `Calibrator.run(starts)`, the best of [several starts](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts).
+
+Both take `block_length="auto"`, the automatic length of [Blocks and their length](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#blocks-and-their-length) for non-overlapping blocks. `GibbsResult.block_length` gives the length used, and `block_length_estimates` the estimate of each series, by label, as the bootstraps, the sandwich and the conformal methods give them. Both are `None` for a number `η`, and `block_length_estimates` is `None` for an integer `block_length`.
 
 Information matching is cheap and local; it needs a sum of smooth terms, so `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic engine raise a `ValueError` that points to the other choices. `J` and `I` are the curvature and the meat of the [sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich): `I` sums the scores over blocks, so it holds when the noise depends on its neighbours inside a block, and `block_length` has no default: `block_length=1` gives the independent version, every observation its own block. Bootstrap coverage runs one tempered sampler per replicate to a large `η`, reads the posterior of every smaller `η` by reweighting, so its search runs no model, and finds for each replicate and parameter the `η` where the interval stops holding the fit. `η` is the one quantile of commol of the log thresholds at `1 − c` (with equal weights, as [`weighted_quantiles`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-one-quantile) reads them), which interpolates between two of them; it needs at least `1/(2(1 − c))` replicates times parameters, so that the level is not below the smallest threshold.
 
@@ -6170,7 +6172,7 @@ print(round(sum(misses) / len(misses), 3))  # 0.125
 
 ## Results, plots and reports
 
-Every variant returns a `ConformalResult(intervals, scores, guarantee, failed, not_converged)`. A variant that refits lists each refit that failed in `failed`, named by its unit: `"Origin <index> failed: <reason>"` for `RollingConformal`, `"Block <index> failed: <reason>"` for `JackknifePlus`, and `"Replicate <index> failed: <reason>"` for `EnbPI`; each is also logged as a warning, and gives no score. `not_converged` counts the refits kept although their optimizer did not converge. Split and adaptive conformal do not refit, so their `failed` is empty and their `not_converged` is 0. `intervals` is a `PredictionIntervals`: its `confidence_level`, a `SeriesIntervals` per series (`positions`, `prediction`, `lower`, `upper`), and `unbounded`. `plot.series(prediction_intervals=...)` of a run, of replicates or of a predictive draws the band of each series on its panel. `SimulationResults.report`, `SimulationReplicates.report` and `Predictive.report` take `prediction_intervals=...` too, and add the intervals under the key `prediction_intervals`.
+Every variant returns a `ConformalResult(intervals, scores, guarantee, failed, not_converged, block_length, block_length_estimates)`. A variant that refits lists each refit that failed in `failed`, named by its unit: `"Origin <index> failed: <reason>"` for `RollingConformal`, `"Block <index> failed: <reason>"` for `JackknifePlus`, and `"Replicate <index> failed: <reason>"` for `EnbPI`; each is also logged as a warning, and gives no score. `not_converged` counts the refits kept although their optimizer did not converge. Split and adaptive conformal do not refit, so their `failed` is empty and their `not_converged` is 0. `JackknifePlus` and `EnbPI` give the block length they ran with in `block_length`, and with `block_length="auto"` the estimate of each series, by label, in `block_length_estimates`, as the [bootstraps](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#blocks-and-their-length) give them; the other variants have no blocks, so both are `None`. `intervals` is a `PredictionIntervals`: its `confidence_level`, a `SeriesIntervals` per series (`positions`, `prediction`, `lower`, `upper`), and `unbounded`. `plot.series(prediction_intervals=...)` of a run, of replicates or of a predictive draws the band of each series on its panel. `SimulationResults.report`, `SimulationReplicates.report` and `Predictive.report` take `prediction_intervals=...` too, and add the intervals under the key `prediction_intervals`.
 
 ```python
 run = Simulation(ab_model(0.05)).run(num_steps=90)
@@ -36892,12 +36894,14 @@ The result of a Gibbs posterior: the attributes of `SMCResult`, and these.
 
 Attributes:
 
-| Name       | Type                | Description                                                                                                                                      |
-| ---------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `eta`      | `float`             | The η the posterior ran with.                                                                                                                    |
-| `fit`      | \`CalibrationResult | None\`                                                                                                                                           |
-| `coverage` | \`float             | None\`                                                                                                                                           |
-| `failed`   | `list[str]`         | With BootstrapCoverageEta, each replicate whose sampler failed: "Replicate <index> failed: <reason>", also logged as a warning. Empty otherwise. |
+| Name                     | Type                | Description                                                                                                                                      |
+| ------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `eta`                    | `float`             | The η the posterior ran with.                                                                                                                    |
+| `fit`                    | \`CalibrationResult | None\`                                                                                                                                           |
+| `coverage`               | \`float             | None\`                                                                                                                                           |
+| `failed`                 | `list[str]`         | With BootstrapCoverageEta, each replicate whose sampler failed: "Replicate <index> failed: <reason>", also logged as a warning. Empty otherwise. |
+| `block_length`           | \`int               | None\`                                                                                                                                           |
+| `block_length_estimates` | \`dict[str, float]  | None\`                                                                                                                                           |
 
 Source code in `commol/context/inference/smc.py`
 
@@ -36920,11 +36924,19 @@ class GibbsResult(SMCResult):
         With `BootstrapCoverageEta`, each replicate whose sampler failed:
         ``"Replicate <index> failed: <reason>"``, also logged as a warning.
         Empty otherwise.
+    block_length : int | None
+        With a calibration of `η`, the positions per block it ran with; None
+        when `η` is a number.
+    block_length_estimates : dict[str, float] | None
+        With a calibration of `η` and ``block_length="auto"``, the estimate
+        of each series, by label; otherwise None.
     """
 
     eta: float
     fit: CalibrationResult | None
     coverage: float | None
+    block_length: int | None
+    block_length_estimates: dict[str, float] | None
     failed: list[str] = Field(default_factory=list)
 ```
 
@@ -38022,13 +38034,15 @@ The result of a conformal method.
 
 Attributes:
 
-| Name            | Type                     | Description                                                                                                                                                                                                                                                                 |
-| --------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `intervals`     | `PredictionIntervals`    | The intervals at the positions the method was given.                                                                                                                                                                                                                        |
-| `scores`        | `dict[str, list[float]]` | The scores of each series, by label, in the order the method took them.                                                                                                                                                                                                     |
-| `guarantee`     | `str`                    | The coverage the method guarantees, and what the guarantee assumes.                                                                                                                                                                                                         |
-| `failed`        | `list[str]`              | Each refit that failed, which gives no score: "Origin <index> failed: <reason>" for RollingConformal, "Block <index> failed: <reason>" for JackknifePlus, "Replicate <index> failed: <reason>" for EnbPI; also logged as a warning. Empty for a method that does not refit. |
-| `not_converged` | `int`                    | Refits kept although their optimizer did not converge; 0 for a method that does not refit.                                                                                                                                                                                  |
+| Name                     | Type                     | Description                                                                                                                                                                                                                                                                 |
+| ------------------------ | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `intervals`              | `PredictionIntervals`    | The intervals at the positions the method was given.                                                                                                                                                                                                                        |
+| `scores`                 | `dict[str, list[float]]` | The scores of each series, by label, in the order the method took them.                                                                                                                                                                                                     |
+| `guarantee`              | `str`                    | The coverage the method guarantees, and what the guarantee assumes.                                                                                                                                                                                                         |
+| `failed`                 | `list[str]`              | Each refit that failed, which gives no score: "Origin <index> failed: <reason>" for RollingConformal, "Block <index> failed: <reason>" for JackknifePlus, "Replicate <index> failed: <reason>" for EnbPI; also logged as a warning. Empty for a method that does not refit. |
+| `not_converged`          | `int`                    | Refits kept although their optimizer did not converge; 0 for a method that does not refit.                                                                                                                                                                                  |
+| `block_length`           | \`int                    | None\`                                                                                                                                                                                                                                                                      |
+| `block_length_estimates` | \`dict[str, float]       | None\`                                                                                                                                                                                                                                                                      |
 
 Source code in `commol/context/inference/conformal.py`
 
@@ -38055,6 +38069,12 @@ class ConformalResult(ResultModel):
     not_converged : int
         Refits kept although their optimizer did not converge; 0 for a
         method that does not refit.
+    block_length : int | None
+        With `JackknifePlus` and `EnbPI`, the positions per block they ran
+        with; None for a method without blocks.
+    block_length_estimates : dict[str, float] | None
+        With ``block_length="auto"``, the estimate of each series, by label;
+        otherwise None.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
@@ -38064,6 +38084,10 @@ class ConformalResult(ResultModel):
     guarantee: str
     failed: list[str] = Field(description="Each refit that failed.")
     not_converged: int = Field(description="Refits that did not converge.")
+    block_length: int | None = Field(description="The block length used.")
+    block_length_estimates: dict[str, float] | None = Field(
+        description="The estimate of each series with the automatic length."
+    )
 ```
 
 ## PredictionIntervals
@@ -40817,6 +40841,10 @@ All notable changes to Commol will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+
+- `GibbsResult` and `ConformalResult` give `block_length` and `block_length_estimates`, as the bootstraps, the jackknife and the sandwich do: the length a method ran with, and with `block_length="auto"` the estimate of each series, by label. `GibbsResult` gives them for `InformationMatchingEta` and `BootstrapCoverageEta`, and `None` for a number `η`; `ConformalResult` for `JackknifePlus` and `EnbPI`, and `None` for the variants without blocks. See [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means) and [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#results-plots-and-reports).
 
 ### Changed
 
