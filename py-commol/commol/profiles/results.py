@@ -447,6 +447,6 @@ class ProfileResult(_FrozenResult):
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.plotting.figures import _profiles
+        from commol.profiles.plots import profiles_figure
 
-        return _profiles(self, output_file=output_file, config=config, axes=axes)
+        return profiles_figure(self, output_file=output_file, config=config, axes=axes)

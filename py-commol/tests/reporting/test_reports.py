@@ -17,9 +17,9 @@ from commol import (
     ObservedDataPoint,
     Simulation,
 )
-from commol._simulation import reports as reporting
 from commol._simulation.reports import SimulationReport, _ReportLeaf
 from commol._simulation.results import SimulationResults
+from commol.identifiability import report as identifiability_report
 from commol.identifiability import results as identifiability
 from commol.identifiability.results import (
     IdentifiabilityReport,
@@ -313,7 +313,7 @@ def test_an_identifiability_report_has_a_section_of_each_method() -> None:
 )
 def test_the_data_of_a_section_has_the_fields_of_its_model(model: str) -> None:
     fields = getattr(identifiability, model).model_fields
-    data = getattr(reporting, f"{model}Data")
+    data = getattr(identifiability_report, f"{model}Data")
 
     assert list(data.__annotations__) == list(fields)
 

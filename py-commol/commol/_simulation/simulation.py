@@ -14,13 +14,9 @@ from commol._data.engine_json import engine_json
 from commol._model.engine_state import build_engine
 from commol._model.model import Model
 from commol._model.structure import ModelStructure
-from commol._simulation.results import (
-    SimulationReplicates,
-    SimulationResults,
-    outputs_for,
-    series_names,
-    total_series,
-)
+from commol._model.outputs import outputs_for, series_names
+from commol._simulation.results import SimulationReplicates, SimulationResults
+from commol._simulation.series import total_series
 
 logger = logging.getLogger("commol")
 

@@ -1,24 +1,37 @@
-"""The `plot` accessors of a run, of replicates and of a predictive.
+"""The `plot` accessors of a run and of replicates, and their figures.
 
 ``results.plot.series()``, ``results.plot.cumulative()`` and
 ``results.plot.observations()`` draw the figures of the results they are read
-from, with the model of those results. Each method takes the arguments of its
-drawing function (`commol.plotting.figures`) and passes them on;
-matplotlib is imported when a figure is drawn.
+from, with the model of those results. Each method passes its arguments to
+its drawing function, which builds the panels (`commol._simulation.panels`)
+and draws them (`commol.plotting.figures`); matplotlib is imported when a
+figure is drawn. The accessor is also what `plot_compared` reads of a run or
+of replicates (`commol.plotting.panels.PanelSource`).
 """
 
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from commol._simulation.panels import (
+    cumulative_panels,
+    replicate_observation_panels,
+    replicate_panels,
+    replicates_window,
+    run_observation_panels,
+    run_panels,
+    run_window,
+)
+from commol.plotting.panels import Band, ObservationPanel, Panel, PanelOutputs, Trace
+
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
+    from commol._data.intervals import PredictionIntervalsData
     from commol._fit.result import CalibrationResult
+    from commol._model.model import Model
     from commol._problem.problem import ObservedDataPoint
     from commol._simulation.results import SimulationReplicates, SimulationResults
-    from commol.conformal.results import PredictionIntervals
     from commol.plotting.config import PlotConfig
-    from commol.uncertainty.predictive import Predictive
 
 
 class ResultsPlot:
@@ -53,7 +66,7 @@ class ResultsPlot:
         position_label: Callable[[float], str] | None = None,
         tick_every: float | None = None,
         x_label: str = "Step",
-        prediction_intervals: "PredictionIntervals | None" = None,
+        prediction_intervals: "PredictionIntervalsData | None" = None,
         axes: "Figure | None" = None,
         **kwargs: str | int | float | bool | None,
     ) -> "Figure":
@@ -94,7 +107,7 @@ class ResultsPlot:
             ticks matplotlib places on a dated axis.
         x_label : str
             The label of the x axis.
-        prediction_intervals : PredictionIntervals | None
+        prediction_intervals : PredictionIntervalsData | None
             Prediction intervals of a conformal method
             (``ConformalResult.intervals``). The panel of each of their
             series, by label, shows the band between their lower and upper
@@ -126,9 +139,7 @@ class ResultsPlot:
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.plotting.figures import _run_series
-
-        return _run_series(
+        return run_series(
             self._results,
             output_file=output_file,
             observed_data=observed_data,
@@ -192,9 +203,7 @@ class ResultsPlot:
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.plotting.figures import _run_cumulative
-
-        return _run_cumulative(
+        return run_cumulative(
             self._results,
             output_file=output_file,
             observed_data=observed_data,
@@ -275,9 +284,7 @@ class ResultsPlot:
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.plotting.figures import _run_observations
-
-        return _run_observations(
+        return run_observations(
             self._results,
             observed_data,
             output_file=output_file,
@@ -290,6 +297,41 @@ class ResultsPlot:
             axes=axes,
             **kwargs,
         )
+
+    def _panel_model(self) -> "Model | None":
+        """The model of the run."""
+        return self._results.model
+
+    def _panel_outputs(self) -> PanelOutputs:
+        """The outputs of the run."""
+        return PanelOutputs(self._results, self._results.model)
+
+    def _series_panels(
+        self,
+        confidence_level: float,  # noqa: ARG002
+        observed_data: "list[ObservedDataPoint]",
+        series: list[str],
+    ) -> list[Panel]:
+        """The panels of `series`, as `series` draws them."""
+        return run_panels(self._results, observed_data, series=series)
+
+    def _window_trace(
+        self,
+        outputs: PanelOutputs,
+        series_id: str,
+        confidence_level: float,  # noqa: ARG002
+        window: float,
+    ) -> tuple[Trace, Band | None]:
+        """The gain of a series over each complete window."""
+        return run_window(self._results, outputs, series_id, window)
+
+    def _observation_panels(
+        self,
+        confidence_level: float,  # noqa: ARG002
+        observed_data: "list[ObservedDataPoint]",
+    ) -> list[ObservationPanel]:
+        """The panels of the observed series, as `observations` draws them."""
+        return run_observation_panels(self._results, observed_data)
 
 
 class ReplicatesPlot:
@@ -323,7 +365,7 @@ class ReplicatesPlot:
         position_label: Callable[[float], str] | None = None,
         tick_every: float | None = None,
         x_label: str = "Step",
-        prediction_intervals: "PredictionIntervals | None" = None,
+        prediction_intervals: "PredictionIntervalsData | None" = None,
         confidence_level: float = 0.95,
         axes: "Figure | None" = None,
         **kwargs: str | int | float | bool | None,
@@ -357,7 +399,7 @@ class ReplicatesPlot:
             `ResultsPlot.series`.
         x_label : str
             The label of the x axis.
-        prediction_intervals : PredictionIntervals | None
+        prediction_intervals : PredictionIntervalsData | None
             Prediction intervals of a conformal method, as in
             `ResultsPlot.series`.
         confidence_level : float
@@ -382,9 +424,7 @@ class ReplicatesPlot:
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.plotting.figures import _replicates_series
-
-        return _replicates_series(
+        return replicates_series(
             self._replicates,
             output_file=output_file,
             observed_data=observed_data,
@@ -446,9 +486,7 @@ class ReplicatesPlot:
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.plotting.figures import _replicates_cumulative
-
-        return _replicates_cumulative(
+        return replicates_cumulative(
             self._replicates,
             output_file=output_file,
             observed_data=observed_data,
@@ -525,9 +563,7 @@ class ReplicatesPlot:
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.plotting.figures import _replicates_observations
-
-        return _replicates_observations(
+        return replicates_observations(
             self._replicates,
             observed_data,
             output_file=output_file,
@@ -542,254 +578,217 @@ class ReplicatesPlot:
             **kwargs,
         )
 
+    def _panel_model(self) -> "Model | None":
+        """The model of the replicates."""
+        return self._replicates.model
 
-class PredictivePlot:
-    """
-    The figures of a predictive, read from ``predictive.plot``.
+    def _panel_outputs(self) -> PanelOutputs:
+        """The outputs of the replicates."""
+        return PanelOutputs(self._replicates.mean(), self._replicates.model)
 
-    Each panel shows the weighted median of the draws and their band, with no
-    other run; the model of the source names the series.
-    """
-
-    def __init__(self, predictive: "Predictive") -> None:
-        """
-        The figures of `predictive`.
-
-        Parameters
-        ----------
-        predictive : Predictive
-            The predictive.
-        """
-        self._predictive = predictive
-
-    def series(
+    def _series_panels(
         self,
-        output_file: str | None = None,
-        observed_data: "list[ObservedDataPoint] | None" = None,
-        config: "PlotConfig | None" = None,
-        series: list[str] | None = None,
-        show_legend: bool = True,
-        position_label: Callable[[float], str] | None = None,
-        tick_every: float | None = None,
-        x_label: str = "Step",
-        prediction_intervals: "PredictionIntervals | None" = None,
-        confidence_level: float = 0.95,
-        axes: "Figure | None" = None,
-        **kwargs: str | int | float | bool | None,
-    ) -> "Figure":
-        """
-        Draw the weighted median of the draws of each series and their band,
-        one panel per series.
-
-        Each draw is read through the observation operator of the problem
-        (the sums, windows and factors of the observations of the series,
-        each at its own position when they do not share one operator with no
-        window), then the draws are reduced with their weights.
-
-        Parameters
-        ----------
-        output_file : str | None
-            Path to save the figure to. If None, the figure is only returned.
-        observed_data : list[ObservedDataPoint] | None
-            Observations, each drawn as a point on the panel of its label;
-            they set the operator each draw is read through.
-        config : PlotConfig | None
-            Layout and style. If None, the defaults.
-        series : list[str] | None
-            What to draw, as in `ResultsPlot.series`.
-        show_legend : bool
-            Whether each panel shows its legend.
-        position_label : Callable[[float], str] | None
-            Turns a position into a tick label, as in `ResultsPlot.series`.
-        tick_every : float | None
-            The distance between labelled positions, as in
-            `ResultsPlot.series`.
-        x_label : str
-            The label of the x axis.
-        prediction_intervals : PredictionIntervals | None
-            Prediction intervals of a conformal method, as in
-            `ResultsPlot.series`.
-        confidence_level : float
-            The level of the band, strictly between 0 and 1.
-        axes : Figure | None
-            A figure of commol to draw on, as in `ResultsPlot.series`.
-        **kwargs : str | int | float | bool | None
-            Passed to ``Axes.plot`` for the line of the median.
-
-        Returns
-        -------
-        Figure
-            The matplotlib figure.
-
-        Raises
-        ------
-        ValueError
-            If an observation names an unknown output or factor, the
-            confidence level is out of range, or ``axes`` has no panel of a
-            series.
-        KeyError
-            If an entry of ``series`` is neither an output nor a bin or
-            accumulator id of the model.
-        ImportError
-            If matplotlib is not installed (``pip install 'commol[plot]'``).
-        """
-        from commol.plotting.figures import _predictive_series
-
-        return _predictive_series(
-            self._predictive,
-            output_file=output_file,
-            observed_data=observed_data,
-            config=config,
-            series=series,
-            show_legend=show_legend,
-            position_label=position_label,
-            tick_every=tick_every,
-            x_label=x_label,
-            prediction_intervals=prediction_intervals,
-            confidence_level=confidence_level,
-            axes=axes,
-            **kwargs,
-        )
-
-    def cumulative(
-        self,
-        output_file: str | None = None,
-        observed_data: "list[ObservedDataPoint] | None" = None,
-        config: "PlotConfig | None" = None,
-        series: list[str] | None = None,
-        confidence_level: float = 0.95,
-        axes: "Figure | None" = None,
-        **kwargs: str | int | float | bool | None,
-    ) -> "Figure":
-        """
-        Draw the weighted median and the band of the running total of each
-        series across the draws, one panel per series.
-
-        Parameters
-        ----------
-        output_file : str | None
-            Path to save the figure to. If None, the figure is only returned.
-        observed_data : list[ObservedDataPoint] | None
-            Observations, drawn as their running total on the panel of their
-            label. An observation with a factor is divided by the weighted
-            median of that factor in the sample.
-        config : PlotConfig | None
-            Layout, size and style. If None, the defaults.
-        series : list[str] | None
-            What to draw, as in `ResultsPlot.series`.
-        confidence_level : float
-            The level of the band, strictly between 0 and 1.
-        axes : Figure | None
-            A figure of commol to draw on, as in `ResultsPlot.series`.
-        **kwargs : str | int | float | bool | None
-            Passed to ``Axes.plot`` for the line of the median.
-
-        Returns
-        -------
-        Figure
-            The matplotlib figure.
-
-        Raises
-        ------
-        ValueError
-            If the confidence level is out of range, or ``axes`` has no panel
-            of a series.
-        KeyError
-            If an entry of ``series`` is neither an output nor a bin or
-            accumulator id of the model.
-        ImportError
-            If matplotlib is not installed (``pip install 'commol[plot]'``).
-        """
-        from commol.plotting.figures import _predictive_cumulative
-
-        return _predictive_cumulative(
-            self._predictive,
-            output_file=output_file,
-            observed_data=observed_data,
-            config=config,
-            series=series,
-            confidence_level=confidence_level,
-            axes=axes,
-            **kwargs,
-        )
-
-    def observations(
-        self,
+        confidence_level: float,
         observed_data: "list[ObservedDataPoint]",
-        output_file: str | None = None,
-        config: "PlotConfig | None" = None,
-        show_legend: bool = True,
-        position_label: Callable[[float], str] | None = None,
-        tick_every: float | None = None,
-        x_label: str = "Step",
-        confidence_level: float = 0.95,
-        axes: "Figure | None" = None,
-        **kwargs: str | int | float | bool | None,
-    ) -> "Figure":
-        """
-        Draw each observed series with the weighted median of the draws and
-        their band, read through its observation operator, one panel per
-        label.
-
-        The values are those of ``at_observations(observed_data, NoNoise())``:
-        each draw's value of each observation through its own operator (the
-        sum of its outputs, its window and the draw's value of its factor),
-        the values the loss compares. A value with a window is drawn as a
-        step over its window with a marker at ``at``, and its band as a
-        rectangle over the same window; a value with no window is a marker,
-        joined only as a guide. The band is a band of the model, with no
-        observation noise, not a prediction interval, and its legend says so.
-
-        Parameters
-        ----------
-        observed_data : list[ObservedDataPoint]
-            The observations, as in `ResultsPlot.observations`.
-        output_file : str | None
-            Path to save the figure to. If None, the figure is only returned.
-        config : PlotConfig | None
-            Layout and style. If None, the defaults.
-        show_legend : bool
-            Whether each panel shows its legend.
-        position_label : Callable[[float], str] | None
-            Turns a position into a tick label, as in `ResultsPlot.series`.
-        tick_every : float | None
-            The distance between labelled positions, as in
-            `ResultsPlot.series`.
-        x_label : str
-            The label of the x axis.
-        confidence_level : float
-            The level of the band, strictly between 0 and 1.
-        axes : Figure | None
-            A figure of commol to draw on, as in `ResultsPlot.observations`.
-        **kwargs : str | int | float | bool | None
-            Passed to ``Axes.plot`` for the steps and the guide of the median.
-
-        Returns
-        -------
-        Figure
-            The matplotlib figure.
-
-        Raises
-        ------
-        ValueError
-            If there are no observations, an observation names an unknown
-            output or factor, the confidence level is out of range, or
-            ``axes`` has no panel of a label.
-        ImportError
-            If matplotlib is not installed (``pip install 'commol[plot]'``).
-        """
-        from commol.plotting.figures import _predictive_observations
-
-        return _predictive_observations(
-            self._predictive,
-            observed_data,
-            output_file=output_file,
-            config=config,
-            show_legend=show_legend,
-            position_label=position_label,
-            tick_every=tick_every,
-            x_label=x_label,
-            confidence_level=confidence_level,
-            axes=axes,
-            **kwargs,
+        series: list[str],
+    ) -> list[Panel]:
+        """The panels of `series`, as `series` draws them."""
+        return replicate_panels(
+            self._replicates, confidence_level, observed_data, series=series
         )
+
+    def _window_trace(
+        self,
+        outputs: PanelOutputs,
+        series_id: str,
+        confidence_level: float,
+        window: float,
+    ) -> tuple[Trace, Band | None]:
+        """The mean gain of a series over each complete window, and its band."""
+        return replicates_window(
+            self._replicates, outputs, series_id, confidence_level, window
+        )
+
+    def _observation_panels(
+        self, confidence_level: float, observed_data: "list[ObservedDataPoint]"
+    ) -> list[ObservationPanel]:
+        """The panels of the observed series, as `observations` draws them."""
+        return replicate_observation_panels(
+            self._replicates, confidence_level, observed_data
+        )
+
+
+def run_series(
+    results: "SimulationResults",
+    output_file: str | None = None,
+    observed_data: "list[ObservedDataPoint] | None" = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: "PlotConfig | None" = None,
+    series: list[str] | None = None,
+    show_legend: bool = True,
+    position_label: Callable[[float], str] | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    prediction_intervals: "PredictionIntervalsData | None" = None,
+    axes: "Figure | None" = None,
+    **kwargs: str | int | float | bool | None,
+) -> "Figure":
+    """The figure of `ResultsPlot.series`."""
+    from commol.plotting.figures import series_figure
+
+    return series_figure(
+        run_panels(results, observed_data, calibration_result, series),
+        results.model,
+        output_file,
+        config,
+        show_legend,
+        position_label,
+        tick_every,
+        x_label,
+        prediction_intervals,
+        axes,
+        kwargs,
+    )
+
+
+def replicates_series(
+    replicates: "SimulationReplicates",
+    output_file: str | None = None,
+    observed_data: "list[ObservedDataPoint] | None" = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: "PlotConfig | None" = None,
+    series: list[str] | None = None,
+    show_legend: bool = True,
+    position_label: Callable[[float], str] | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    prediction_intervals: "PredictionIntervalsData | None" = None,
+    confidence_level: float = 0.95,
+    axes: "Figure | None" = None,
+    **kwargs: str | int | float | bool | None,
+) -> "Figure":
+    """The figure of `ReplicatesPlot.series`."""
+    from commol.plotting.figures import series_figure
+
+    return series_figure(
+        replicate_panels(
+            replicates, confidence_level, observed_data, calibration_result, series
+        ),
+        replicates.model,
+        output_file,
+        config,
+        show_legend,
+        position_label,
+        tick_every,
+        x_label,
+        prediction_intervals,
+        axes,
+        kwargs,
+    )
+
+
+def run_cumulative(
+    results: "SimulationResults",
+    output_file: str | None = None,
+    observed_data: "list[ObservedDataPoint] | None" = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: "PlotConfig | None" = None,
+    series: list[str] | None = None,
+    axes: "Figure | None" = None,
+    **kwargs: str | int | float | bool | None,
+) -> "Figure":
+    """The figure of `ResultsPlot.cumulative`."""
+    from commol.plotting.figures import cumulative_figure
+
+    return cumulative_figure(
+        cumulative_panels(results, observed_data, calibration_result, series),
+        output_file,
+        config,
+        axes,
+        kwargs,
+    )
+
+
+def replicates_cumulative(
+    replicates: "SimulationReplicates",
+    output_file: str | None = None,
+    observed_data: "list[ObservedDataPoint] | None" = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: "PlotConfig | None" = None,
+    series: list[str] | None = None,
+    axes: "Figure | None" = None,
+    **kwargs: str | int | float | bool | None,
+) -> "Figure":
+    """The figure of `ReplicatesPlot.cumulative`."""
+    from commol.plotting.figures import cumulative_figure
+
+    return cumulative_figure(
+        cumulative_panels(replicates.mean(), observed_data, calibration_result, series),
+        output_file,
+        config,
+        axes,
+        kwargs,
+    )
+
+
+def run_observations(
+    results: "SimulationResults",
+    observed_data: "list[ObservedDataPoint]",
+    output_file: str | None = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: "PlotConfig | None" = None,
+    show_legend: bool = True,
+    position_label: Callable[[float], str] | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    axes: "Figure | None" = None,
+    **kwargs: str | int | float | bool | None,
+) -> "Figure":
+    """The figure of `ResultsPlot.observations`."""
+    from commol.plotting.figures import observations_figure
+
+    return observations_figure(
+        run_observation_panels(results, observed_data, calibration_result),
+        results.model,
+        output_file,
+        config,
+        show_legend,
+        position_label,
+        tick_every,
+        x_label,
+        axes,
+        kwargs,
+    )
+
+
+def replicates_observations(
+    replicates: "SimulationReplicates",
+    observed_data: "list[ObservedDataPoint]",
+    output_file: str | None = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: "PlotConfig | None" = None,
+    show_legend: bool = True,
+    position_label: Callable[[float], str] | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    confidence_level: float = 0.95,
+    axes: "Figure | None" = None,
+    **kwargs: str | int | float | bool | None,
+) -> "Figure":
+    """The figure of `ReplicatesPlot.observations`."""
+    from commol.plotting.figures import observations_figure
+
+    return observations_figure(
+        replicate_observation_panels(
+            replicates, confidence_level, observed_data, calibration_result
+        ),
+        replicates.model,
+        output_file,
+        config,
+        show_legend,
+        position_label,
+        tick_every,
+        x_label,
+        axes,
+        kwargs,
+    )

@@ -1,9 +1,12 @@
 """The drawing functions of the figures, private to commol.
 
-The `plot` accessors of the results (`commol.plotting.accessors`) and the
-`plot` method of a result with one figure call them, with the arguments they
-take. Each draws in a copy of `matplotlib.rcParams` (`_scoped_style`) and
-returns the matplotlib `Figure`. Each panel holds the id of its series as the
+Each result builds the data of its figure and passes it here: the panels of
+a run, of replicates and of a predictive (`series_figure`,
+`cumulative_figure`, `observations_figure`), and the charts of a result with
+one figure (`chart_figure`). `plot_compared` reads each result through its
+`plot` accessor (`commol.plotting.panels.PanelSource`). Each figure is drawn
+in a copy of `matplotlib.rcParams` (`_scoped_style`) and is returned as the
+matplotlib `Figure`. Each panel holds the id of its series as the
 label of its `Axes`, so a later figure given that `Figure` as `axes` draws on
 the same panels.
 
@@ -13,7 +16,6 @@ Importing this module imports matplotlib, the optional extra ``commol[plot]``.
 import functools
 import logging
 import math
-from collections import defaultdict
 from collections.abc import Callable, Mapping, Sequence
 from datetime import time
 from typing import TYPE_CHECKING, Literal
@@ -33,25 +35,20 @@ except ModuleNotFoundError as error:
 
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.plotting import panels as _panels
+from commol.plotting.charts import Chart, Line, Point
 from commol.plotting.config import PlotConfig
 from commol.plotting.panels import (
-    Compared,
+    Plotted,
     ComparedObservationPanel,
     ObservationPanel,
     Panel,
 )
-from commol.sensitivity.results import SobolResult
 
 if TYPE_CHECKING:
-    from commol._fit.result import CalibrationResult
     from commol._model.axis_units import AxisUnits
     from commol._model.model import Model
     from commol._problem.problem import ObservedDataPoint
-    from commol._simulation.results import SimulationReplicates, SimulationResults
-    from commol.conformal.results import PredictionIntervals
-    from commol.profiles.results import ProfileResult
-    from commol.sensitivity.results import ChaosResult, MorrisResult, PRCCResult
-    from commol.uncertainty.predictive import Predictive
+    from commol._data.intervals import PredictionIntervalsData
 
 logger = logging.getLogger("commol.plotting")
 
@@ -77,174 +74,8 @@ def _scoped_style[**P, R](draw: Callable[P, R]) -> Callable[P, R]:
 
 
 @_scoped_style
-def _run_series(
-    results: "SimulationResults",
-    output_file: str | None = None,
-    observed_data: "list[ObservedDataPoint] | None" = None,
-    calibration_result: "CalibrationResult | None" = None,
-    config: PlotConfig | None = None,
-    series: list[str] | None = None,
-    show_legend: bool = True,
-    position_label: PositionLabel | None = None,
-    tick_every: float | None = None,
-    x_label: str = "Step",
-    prediction_intervals: "PredictionIntervals | None" = None,
-    axes: Figure | None = None,
-    **kwargs: LineKeywords,
-) -> Figure:
-    """The figure of `ResultsPlot.series`."""
-    return _series_figure(
-        _panels.run_panels(results, observed_data, calibration_result, series),
-        results.model,
-        output_file,
-        config,
-        show_legend,
-        position_label,
-        tick_every,
-        x_label,
-        prediction_intervals,
-        axes,
-        kwargs,
-    )
-
-
-@_scoped_style
-def _replicates_series(
-    replicates: "SimulationReplicates",
-    output_file: str | None = None,
-    observed_data: "list[ObservedDataPoint] | None" = None,
-    calibration_result: "CalibrationResult | None" = None,
-    config: PlotConfig | None = None,
-    series: list[str] | None = None,
-    show_legend: bool = True,
-    position_label: PositionLabel | None = None,
-    tick_every: float | None = None,
-    x_label: str = "Step",
-    prediction_intervals: "PredictionIntervals | None" = None,
-    confidence_level: float = 0.95,
-    axes: Figure | None = None,
-    **kwargs: LineKeywords,
-) -> Figure:
-    """The figure of `ReplicatesPlot.series`."""
-    return _series_figure(
-        _panels.replicate_panels(
-            replicates, confidence_level, observed_data, calibration_result, series
-        ),
-        replicates.model,
-        output_file,
-        config,
-        show_legend,
-        position_label,
-        tick_every,
-        x_label,
-        prediction_intervals,
-        axes,
-        kwargs,
-    )
-
-
-@_scoped_style
-def _predictive_series(
-    predictive: "Predictive",
-    output_file: str | None = None,
-    observed_data: "list[ObservedDataPoint] | None" = None,
-    config: PlotConfig | None = None,
-    series: list[str] | None = None,
-    show_legend: bool = True,
-    position_label: PositionLabel | None = None,
-    tick_every: float | None = None,
-    x_label: str = "Step",
-    prediction_intervals: "PredictionIntervals | None" = None,
-    confidence_level: float = 0.95,
-    axes: Figure | None = None,
-    **kwargs: LineKeywords,
-) -> Figure:
-    """The figure of `PredictivePlot.series`."""
-    return _series_figure(
-        _panels.predictive_panels(predictive, confidence_level, observed_data, series),
-        predictive.source.simulation.model_definition,
-        output_file,
-        config,
-        show_legend,
-        position_label,
-        tick_every,
-        x_label,
-        prediction_intervals,
-        axes,
-        kwargs,
-    )
-
-
-@_scoped_style
-def _run_cumulative(
-    results: "SimulationResults",
-    output_file: str | None = None,
-    observed_data: "list[ObservedDataPoint] | None" = None,
-    calibration_result: "CalibrationResult | None" = None,
-    config: PlotConfig | None = None,
-    series: list[str] | None = None,
-    axes: Figure | None = None,
-    **kwargs: LineKeywords,
-) -> Figure:
-    """The figure of `ResultsPlot.cumulative`."""
-    return _cumulative_figure(
-        _panels.cumulative_panels(results, observed_data, calibration_result, series),
-        output_file,
-        config,
-        axes,
-        kwargs,
-    )
-
-
-@_scoped_style
-def _replicates_cumulative(
-    replicates: "SimulationReplicates",
-    output_file: str | None = None,
-    observed_data: "list[ObservedDataPoint] | None" = None,
-    calibration_result: "CalibrationResult | None" = None,
-    config: PlotConfig | None = None,
-    series: list[str] | None = None,
-    axes: Figure | None = None,
-    **kwargs: LineKeywords,
-) -> Figure:
-    """The figure of `ReplicatesPlot.cumulative`."""
-    return _cumulative_figure(
-        _panels.cumulative_panels(
-            replicates.mean(), observed_data, calibration_result, series
-        ),
-        output_file,
-        config,
-        axes,
-        kwargs,
-    )
-
-
-@_scoped_style
-def _predictive_cumulative(
-    predictive: "Predictive",
-    output_file: str | None = None,
-    observed_data: "list[ObservedDataPoint] | None" = None,
-    config: PlotConfig | None = None,
-    series: list[str] | None = None,
-    confidence_level: float = 0.95,
-    axes: Figure | None = None,
-    **kwargs: LineKeywords,
-) -> Figure:
-    """The figure of `PredictivePlot.cumulative`."""
-    return _cumulative_figure(
-        _panels.predictive_cumulative_panels(
-            predictive, confidence_level, observed_data, series
-        ),
-        output_file,
-        config,
-        axes,
-        kwargs,
-    )
-
-
-@_scoped_style
 def _compared_series(
-    results: Mapping[str, Compared],
+    results: Mapping[str, Plotted],
     series: list[str] | None = None,
     window: float | None = None,
     observed_data: "list[ObservedDataPoint] | None" = None,
@@ -273,7 +104,7 @@ def _compared_series(
             _panels.compared_observation_panels(
                 results, confidence_level, observed_data or []
             ),
-            _panels.model_of(next(iter(results.values()))),
+            next(iter(results.values())).plot._panel_model(),
             config,
             show_legend,
             position_label,
@@ -287,7 +118,7 @@ def _compared_series(
             _panels.compared_panels(
                 results, confidence_level, observed_data, series, window
             ),
-            _panels.model_of(next(iter(results.values()))),
+            next(iter(results.values())).plot._panel_model(),
             config,
             show_legend,
             position_label,
@@ -303,239 +134,7 @@ def _compared_series(
 
 
 @_scoped_style
-def _run_observations(
-    results: "SimulationResults",
-    observed_data: "list[ObservedDataPoint]",
-    output_file: str | None = None,
-    calibration_result: "CalibrationResult | None" = None,
-    config: PlotConfig | None = None,
-    show_legend: bool = True,
-    position_label: PositionLabel | None = None,
-    tick_every: float | None = None,
-    x_label: str = "Step",
-    axes: Figure | None = None,
-    **kwargs: LineKeywords,
-) -> Figure:
-    """The figure of `ResultsPlot.observations`."""
-    return _observations_figure(
-        _panels.run_observation_panels(results, observed_data, calibration_result),
-        results.model,
-        output_file,
-        config,
-        show_legend,
-        position_label,
-        tick_every,
-        x_label,
-        axes,
-        kwargs,
-    )
-
-
-@_scoped_style
-def _replicates_observations(
-    replicates: "SimulationReplicates",
-    observed_data: "list[ObservedDataPoint]",
-    output_file: str | None = None,
-    calibration_result: "CalibrationResult | None" = None,
-    config: PlotConfig | None = None,
-    show_legend: bool = True,
-    position_label: PositionLabel | None = None,
-    tick_every: float | None = None,
-    x_label: str = "Step",
-    confidence_level: float = 0.95,
-    axes: Figure | None = None,
-    **kwargs: LineKeywords,
-) -> Figure:
-    """The figure of `ReplicatesPlot.observations`."""
-    return _observations_figure(
-        _panels.replicate_observation_panels(
-            replicates, confidence_level, observed_data, calibration_result
-        ),
-        replicates.model,
-        output_file,
-        config,
-        show_legend,
-        position_label,
-        tick_every,
-        x_label,
-        axes,
-        kwargs,
-    )
-
-
-@_scoped_style
-def _predictive_observations(
-    predictive: "Predictive",
-    observed_data: "list[ObservedDataPoint]",
-    output_file: str | None = None,
-    config: PlotConfig | None = None,
-    show_legend: bool = True,
-    position_label: PositionLabel | None = None,
-    tick_every: float | None = None,
-    x_label: str = "Step",
-    confidence_level: float = 0.95,
-    axes: Figure | None = None,
-    **kwargs: LineKeywords,
-) -> Figure:
-    """The figure of `PredictivePlot.observations`."""
-    return _observations_figure(
-        _panels.predictive_observation_panels(
-            predictive, confidence_level, observed_data
-        ),
-        predictive.source.simulation.model_definition,
-        output_file,
-        config,
-        show_legend,
-        position_label,
-        tick_every,
-        x_label,
-        axes,
-        kwargs,
-    )
-
-
-@_scoped_style
-def _prcc(
-    result: "PRCCResult",
-    output_file: str | None = None,
-    config: PlotConfig | None = None,
-    x_label: str = "Step",
-    axes: Figure | None = None,
-) -> Figure:
-    """The figure of `PRCCResult.plot`."""
-    config = config or PlotConfig()
-    _apply_style(config)
-    groups: dict[str, list[int]] = defaultdict(list)
-    for index, series in enumerate(result.series):
-        groups[series].append(index)
-    names = list(groups)
-    figure, panels = _axes_of(names, config, axes)
-    for ax, name in zip(panels, names, strict=True):
-        indices = groups[name]
-        positions = [
-            position
-            for position in (result.positions[i] for i in indices)
-            if position is not None
-        ]
-        if len(positions) == len(indices):
-            for j, input_name in enumerate(result.inputs):
-                ax.plot(
-                    positions,
-                    [result.coefficients[i][j] for i in indices],
-                    marker="o",
-                    label=input_name,
-                )
-            ax.set_xlabel(x_label)
-            ax.legend()
-        else:
-            ax.bar(result.inputs, result.coefficients[indices[0]])
-        ax.axhline(0.0, color="grey", linewidth=0.8)
-        ax.set_ylim(-1.05, 1.05)
-        ax.set_ylabel("PRCC")
-        ax.set_title(name)
-    _finish(figure, output_file, config, "PRCC")
-    return figure
-
-
-@_scoped_style
-def _morris(
-    result: "MorrisResult",
-    output_file: str | None = None,
-    config: PlotConfig | None = None,
-    axes: Figure | None = None,
-) -> Figure:
-    """The figure of `MorrisResult.plot`."""
-    config = config or PlotConfig()
-    _apply_style(config)
-    figure, panels = _axes_of(result.labels, config, axes)
-    for q, ax in enumerate(panels):
-        for j, input_name in enumerate(result.inputs):
-            mu_star, sigma = result.mu_star[q][j], result.sigma[q][j]
-            ax.scatter([mu_star], [sigma], label=input_name)
-            ax.annotate(input_name, (mu_star, sigma))
-        ax.set_xlabel("μ*")
-        ax.set_ylabel("σ")
-        ax.set_title(result.labels[q])
-        ax.legend()
-    _finish(figure, output_file, config, "Morris")
-    return figure
-
-
-@_scoped_style
-def _sobol(
-    result: "SobolResult | ChaosResult",
-    output_file: str | None = None,
-    config: PlotConfig | None = None,
-    axes: Figure | None = None,
-) -> Figure:
-    """The figure of `SobolResult.plot` and `ChaosResult.plot`."""
-    config = config or PlotConfig()
-    _apply_style(config)
-    inputs = result.inputs
-    figure, panels = _axes_of(result.labels, config, axes)
-    width = 0.4
-    places = list(range(len(inputs)))
-    for q, ax in enumerate(panels):
-        for offset, name, values in (
-            (-width / 2, "First order", result.first[q]),
-            (width / 2, "Total", result.total[q]),
-        ):
-            errors = None
-            if isinstance(result, SobolResult):
-                lower, upper = (
-                    (result.first_lower[q], result.first_upper[q])
-                    if name == "First order"
-                    else (result.total_lower[q], result.total_upper[q])
-                )
-                errors = [
-                    [max(v - low, 0.0) for v, low in zip(values, lower, strict=True)],
-                    [max(high - v, 0.0) for v, high in zip(values, upper, strict=True)],
-                ]
-            ax.bar(
-                [place + offset for place in places],
-                values,
-                width,
-                yerr=errors,
-                capsize=3,
-                label=name,
-            )
-        ax.set_xticks(places)
-        ax.set_xticklabels(inputs)
-        ax.set_ylabel("Sobol index")
-        ax.set_title(result.labels[q])
-        ax.legend()
-    _finish(figure, output_file, config, "Sobol")
-    return figure
-
-
-@_scoped_style
-def _profiles(
-    result: "ProfileResult",
-    output_file: str | None = None,
-    config: PlotConfig | None = None,
-    axes: Figure | None = None,
-) -> Figure:
-    """The figure of `ProfileResult.plot`."""
-    config = config or PlotConfig()
-    _apply_style(config)
-    names = list(result.profiles)
-    figure, panels = _axes_of(names, config, axes)
-    for ax, name in zip(panels, names, strict=True):
-        profile = result.profiles[name]
-        ax.plot(profile.values, profile.statistics, marker="o", markersize=3)
-        ax.axhline(profile.threshold, color="grey", linestyle="--", linewidth=1)
-        interval = result.intervals[name]
-        for end in (interval.lower, interval.upper):
-            if end is not None:
-                ax.axvline(end, color="grey", linestyle=":", linewidth=1)
-        ax.set_xlabel(name)
-        ax.set_ylabel("Profile statistic")
-        ax.set_title(name)
-    _finish(figure, output_file, config, "Profiles")
-    return figure
-
-
-def _series_figure(
+def series_figure(
     panels: list[Panel],
     model: "Model | None",
     output_file: str | None,
@@ -544,7 +143,7 @@ def _series_figure(
     position_label: PositionLabel | None,
     tick_every: float | None,
     x_label: str,
-    prediction_intervals: "PredictionIntervals | None",
+    prediction_intervals: "PredictionIntervalsData | None",
     axes: Figure | None,
     keywords: dict[str, LineKeywords],
 ) -> Figure:
@@ -562,7 +161,8 @@ def _series_figure(
     return figure
 
 
-def _cumulative_figure(
+@_scoped_style
+def cumulative_figure(
     panels: list[Panel],
     output_file: str | None,
     config: PlotConfig | None,
@@ -634,7 +234,8 @@ def _compared_observations_figure(
     return figure
 
 
-def _observations_figure(
+@_scoped_style
+def observations_figure(
     panels: list[ObservationPanel],
     model: "Model | None",
     output_file: str | None,
@@ -657,6 +258,69 @@ def _observations_figure(
             ax.legend()
     _finish(figure, output_file, config, "Observations")
     return figure
+
+
+@_scoped_style
+def chart_figure(
+    charts: list[Chart],
+    output_file: str | None,
+    config: PlotConfig | None,
+    axes: Figure | None,
+    name: str,
+) -> Figure:
+    """Draw the charts of a result, one panel each, as the figure `name`."""
+    config = config or PlotConfig()
+    _apply_style(config)
+    figure, grid = _axes_of([chart.name for chart in charts], config, axes)
+    for ax, chart in zip(grid, charts, strict=True):
+        _draw_chart(ax, chart)
+    _finish(figure, output_file, config, name)
+    return figure
+
+
+def _draw_chart(ax: Axes, chart: Chart) -> None:
+    """Draw the marks, the rules and the labels of one chart."""
+    for mark in chart.marks:
+        if isinstance(mark, Line):
+            ax.plot(
+                mark.positions,
+                mark.values,
+                marker="o",
+                label=mark.label,
+                markersize=mark.size,
+            )
+        elif isinstance(mark, Point):
+            ax.scatter([mark.position], [mark.value], label=mark.label)
+            ax.annotate(mark.label, (mark.position, mark.value))
+        else:
+            ax.bar(
+                mark.places,
+                mark.heights,
+                mark.width,
+                yerr=mark.errors,
+                capsize=3,
+                label=mark.label,
+            )
+    for rule in chart.rules:
+        if rule.vertical:
+            ax.axvline(
+                rule.at, color="grey", linestyle=rule.style, linewidth=rule.width
+            )
+        else:
+            ax.axhline(
+                rule.at, color="grey", linestyle=rule.style, linewidth=rule.width
+            )
+    if chart.ticks is not None:
+        ax.set_xticks(range(len(chart.ticks)))
+        ax.set_xticklabels(chart.ticks)
+    if chart.x_label is not None:
+        ax.set_xlabel(chart.x_label)
+    ax.set_ylabel(chart.y_label)
+    if chart.y_limits is not None:
+        ax.set_ylim(*chart.y_limits)
+    ax.set_title(chart.name)
+    if chart.legend:
+        ax.legend()
 
 
 def _draw_observation_panel(

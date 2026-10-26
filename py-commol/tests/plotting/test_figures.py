@@ -18,7 +18,9 @@ from matplotlib.figure import Figure
 from commol import ObservedDataPoint, Simulation
 from commol._simulation.results import SimulationResults
 from commol.plotting import PlotConfig, figures, plot_compared
-from commol.plotting.accessors import PredictivePlot, ReplicatesPlot, ResultsPlot
+from commol._simulation import plots as simulation_plots
+from commol._simulation.plots import ReplicatesPlot, ResultsPlot
+from commol.profiles import plots as profile_plots
 from commol.profiles.results import ProfileResult
 from commol.sensitivity.results import (
     ChaosResult,
@@ -26,6 +28,9 @@ from commol.sensitivity.results import (
     PRCCResult,
     SobolResult,
 )
+from commol.sensitivity import plots as sensitivity_plots
+from commol.uncertainty import plots as predictive_plots
+from commol.uncertainty.plots import PredictivePlot
 from tests.suite.public_surface import EXPORTS
 from tests.support import (
     a_to_b_builder,
@@ -156,20 +161,20 @@ def test_a_sensitivity_result_plots_itself(prcc_result: PRCCResult) -> None:
 
 
 ACCESSORS = [
-    (ResultsPlot.series, figures._run_series),
-    (ResultsPlot.cumulative, figures._run_cumulative),
-    (ReplicatesPlot.series, figures._replicates_series),
-    (ReplicatesPlot.cumulative, figures._replicates_cumulative),
-    (PredictivePlot.series, figures._predictive_series),
-    (PredictivePlot.cumulative, figures._predictive_cumulative),
-    (ResultsPlot.observations, figures._run_observations),
-    (ReplicatesPlot.observations, figures._replicates_observations),
-    (PredictivePlot.observations, figures._predictive_observations),
-    (PRCCResult.plot, figures._prcc),
-    (MorrisResult.plot, figures._morris),
-    (SobolResult.plot, figures._sobol),
-    (ChaosResult.plot, figures._sobol),
-    (ProfileResult.plot, figures._profiles),
+    (ResultsPlot.series, simulation_plots.run_series),
+    (ResultsPlot.cumulative, simulation_plots.run_cumulative),
+    (ReplicatesPlot.series, simulation_plots.replicates_series),
+    (ReplicatesPlot.cumulative, simulation_plots.replicates_cumulative),
+    (PredictivePlot.series, predictive_plots.predictive_series),
+    (PredictivePlot.cumulative, predictive_plots.predictive_cumulative),
+    (ResultsPlot.observations, simulation_plots.run_observations),
+    (ReplicatesPlot.observations, simulation_plots.replicates_observations),
+    (PredictivePlot.observations, predictive_plots.predictive_observations),
+    (PRCCResult.plot, sensitivity_plots.prcc_figure),
+    (MorrisResult.plot, sensitivity_plots.morris_figure),
+    (SobolResult.plot, sensitivity_plots.sobol_figure),
+    (ChaosResult.plot, sensitivity_plots.sobol_figure),
+    (ProfileResult.plot, profile_plots.profiles_figure),
     (plot_compared, figures._compared_series),
 ]
 

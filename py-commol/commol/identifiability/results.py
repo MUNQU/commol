@@ -1,15 +1,15 @@
 """The results of the methods of `commol.identifiability`."""
 
-from typing import TYPE_CHECKING, Literal, Self
+from typing import Literal, Self
 
 from pydantic import ConfigDict, Field, model_validator
 
 from commol._data.result_model import ResultModel
+from commol.identifiability.report import (
+    IdentifiabilityReportData,
+    identifiability_report,
+)
 from commol.profiles.results import ProfileVerdictName
-
-if TYPE_CHECKING:
-    from commol._simulation.reports import IdentifiabilityReportData
-
 
 StructuralVerdictName = Literal[
     "identifiable", "in_combination", "non_identifiable", "conflicting"
@@ -389,7 +389,7 @@ class IdentifiabilityReport(_FrozenResult):
             )
         return self
 
-    def report(self) -> "IdentifiabilityReportData":
+    def report(self) -> IdentifiabilityReportData:
         """
         Report the identifiability of each parameter as plain data.
 
@@ -400,9 +400,7 @@ class IdentifiabilityReport(_FrozenResult):
             structural and practical verdicts; ``sections``: the evidence of
             each method that ran.
         """
-        from commol._simulation.reports import _identifiability_report
-
-        return _identifiability_report(self)
+        return identifiability_report(self)
 
     def merge(self, *others: "IdentifiabilityReport") -> "IdentifiabilityReport":
         """

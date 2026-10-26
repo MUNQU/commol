@@ -2,8 +2,10 @@
 
 `plot_compared` is a function, not a method: a comparison describes no single
 result, and a method of one of them would give that result a special role. It
-passes its arguments to its drawing function (`commol.plotting.figures`);
-matplotlib is imported when the figure is drawn.
+passes its arguments to its drawing function (`commol.plotting.figures`),
+which reads each result through its `plot` accessor
+(`commol.plotting.panels.PanelSource`); matplotlib is imported when the
+figure is drawn.
 """
 
 from collections.abc import Callable, Mapping
@@ -13,13 +15,12 @@ if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
     from commol._problem.problem import ObservedDataPoint
-    from commol._simulation.results import SimulationReplicates, SimulationResults
     from commol.plotting.config import PlotConfig
-    from commol.uncertainty.predictive import Predictive
+    from commol.plotting.panels import Plotted
 
 
 def plot_compared(
-    results: "Mapping[str, SimulationResults | SimulationReplicates | Predictive]",
+    results: "Mapping[str, Plotted]",
     series: list[str] | None = None,
     window: float | None = None,
     observed_data: "list[ObservedDataPoint] | None" = None,

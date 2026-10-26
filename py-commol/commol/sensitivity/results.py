@@ -469,9 +469,9 @@ class PRCCResult(ResultModel):
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.plotting.figures import _prcc
+        from commol.sensitivity.plots import prcc_figure
 
-        return _prcc(
+        return prcc_figure(
             self, output_file=output_file, config=config, x_label=x_label, axes=axes
         )
 
@@ -547,9 +547,9 @@ class MorrisResult(ResultModel):
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.plotting.figures import _morris
+        from commol.sensitivity.plots import morris_figure
 
-        return _morris(self, output_file=output_file, config=config, axes=axes)
+        return morris_figure(self, output_file=output_file, config=config, axes=axes)
 
 
 class SobolResult(ResultModel):
@@ -629,9 +629,9 @@ class SobolResult(ResultModel):
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.plotting.figures import _sobol
+        from commol.sensitivity.plots import sobol_figure
 
-        return _sobol(self, output_file=output_file, config=config, axes=axes)
+        return sobol_figure(self, output_file=output_file, config=config, axes=axes)
 
 
 class ChaosResult(ResultModel):
@@ -727,9 +727,9 @@ class ChaosResult(ResultModel):
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.plotting.figures import _sobol
+        from commol.sensitivity.plots import sobol_figure
 
-        return _sobol(self, output_file=output_file, config=config, axes=axes)
+        return sobol_figure(self, output_file=output_file, config=config, axes=axes)
 
     def predict(self, values: Sequence[Sequence[float]]) -> list[list[float]]:
         """

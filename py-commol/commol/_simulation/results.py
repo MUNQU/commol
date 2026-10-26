@@ -13,14 +13,17 @@ import numpy as np
 
 from commol._data.result_model import ComparedByValue
 from commol._simulation.windows import _windowed_totals
+from commol._statistics.members import quantiles, spread
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.plotting.accessors import ReplicatesPlot, ResultsPlot
+from commol._model.outputs import series_names
+from commol._simulation.plots import ReplicatesPlot, ResultsPlot
+from commol._simulation.series import _sample, total_series
 
 if TYPE_CHECKING:
     from commol._model.model import Model
     from commol._problem.problem import ObservedDataPoint
     from commol._simulation.reports import SimulationReport
-    from commol.conformal.results import PredictionIntervals
+    from commol._data.intervals import PredictionIntervalsData
     from commol.quantities.quantities import QuantityBase
 
 
@@ -288,7 +291,7 @@ class SimulationResults(ComparedByValue, dict[str, list[float]]):
         windows: int,
         observed_data: "Iterable[ObservedDataPoint]" = (),
         accumulators: Iterable[str] = (),
-        prediction_intervals: "PredictionIntervals | None" = None,
+        prediction_intervals: "PredictionIntervalsData | None" = None,
     ) -> "SimulationReport":
         """
         Report the observed data, compartment series and accumulators of the run.
@@ -311,7 +314,7 @@ class SimulationResults(ComparedByValue, dict[str, list[float]]):
             The calibration targets to report alongside the run.
         accumulators : Iterable[str], optional
             Accumulator ids to report; their outputs come from `model`.
-        prediction_intervals : PredictionIntervals | None, optional
+        prediction_intervals : PredictionIntervalsData | None, optional
             Prediction intervals of a conformal method
             (``ConformalResult.intervals``), reported as they are.
 
@@ -353,100 +356,6 @@ class SimulationResults(ComparedByValue, dict[str, list[float]]):
             f"SimulationResults(positions={self.positions!r}, {seed}"
             f"{dict.__repr__(self)})"
         )
-
-
-def outputs_for(model: "Model", id: str) -> list[str]:
-    """
-    Names of the outputs a source id expands into.
-
-    The structure of the model groups its outputs by source
-    (`ModelStructure.outputs_by_source`): for an aggregate model, by bin and
-    accumulator.
-
-    Parameters
-    ----------
-    model : Model
-        The model whose outputs the results hold.
-    id : str
-        A source id, such as a bin id or an accumulator id.
-
-    Returns
-    -------
-    list[str]
-        Output names for that id, in the order the engine reports them.
-
-    Raises
-    ------
-    KeyError
-        If `id` is not a source of the model.
-    """
-    outputs = model.structure.outputs_by_source(model)
-    if id not in outputs:
-        raise KeyError(
-            f"'{id}' is not a bin or accumulator of model '{model.name}'. "
-            f"Available: {sorted(outputs)}"
-        )
-    return outputs[id]
-
-
-def series_names(model: "Model", ids: Iterable[str]) -> list[str]:
-    """
-    The outputs the ids stand for, in the order given.
-
-    A source id, such as a bin or accumulator id, stands for all its outputs
-    (`outputs_for`); an output name stands for itself.
-
-    Raises
-    ------
-    KeyError
-        If an id is neither a source nor an output of the model.
-    """
-    by_source = model.structure.outputs_by_source(model)
-    outputs = [name for names in by_source.values() for name in names]
-    names: list[str] = []
-    for id in ids:
-        if id in by_source:
-            names.extend(by_source[id])
-        elif id in outputs:
-            names.append(id)
-        else:
-            raise KeyError(
-                f"'{id}' is not a bin, accumulator or output of model "
-                f"'{model.name}'. Bins and accumulators: {sorted(by_source)}. "
-                f"Outputs: {outputs}"
-            )
-    return names
-
-
-def total_series(
-    results: Mapping[str, Sequence[float]], outputs: Sequence[str]
-) -> list[float]:
-    """
-    The sum of some outputs at each position.
-
-    Parameters
-    ----------
-    results : Mapping[str, Sequence[float]]
-        Simulation results, such as those of `Simulation.run`.
-    outputs : Sequence[str]
-        Output names.
-
-    Returns
-    -------
-    list[float]
-        One value per position, or no value without outputs.
-
-    Raises
-    ------
-    KeyError
-        If an output is missing from `results`.
-    """
-    missing = [name for name in outputs if name not in results]
-    if missing:
-        raise KeyError(f"Missing output series in results: {sorted(missing)}")
-    return [
-        sum(values) for values in zip(*(results[name] for name in outputs), strict=True)
-    ]
 
 
 def quantities_of_runs(
@@ -492,44 +401,6 @@ def quantities_of_runs(
         [run.rows() for run in runs],
     )
     return [dict(zip(labels, row, strict=True)) for row in values]
-
-
-def _sample(
-    series: Sequence[float], positions: Sequence[float], at: Iterable[float]
-) -> list[float]:
-    """
-    Read a series at the given positions.
-
-    Compartment counts are instantaneous, so they are read at the position
-    rather than averaged over the interval leading to it. Each position is
-    found with the tolerance of the axis, as an observation finds its row
-    (`index_at` of `crates/commol-calibration/src/observation.rs`), so ``0.1
-    + 0.2`` reads the value at ``0.3``.
-
-    Parameters
-    ----------
-    series : Sequence[float]
-        One value per position.
-    positions : Sequence[float]
-        Positions of the series, ascending.
-    at : Iterable[float]
-        Positions to read.
-
-    Returns
-    -------
-    list[float]
-        One value per position in `at`.
-
-    Raises
-    ------
-    ValueError
-        If a position in `at` is not one of `positions`.
-    """
-    rows = commol_rs.calibration.index_at(
-        [float(position) for position in positions],
-        [float(position) for position in at],
-    )
-    return [series[row] for row in rows]
 
 
 class SimulationReplicates(ComparedByValue, list[SimulationResults]):
@@ -661,13 +532,10 @@ class SimulationReplicates(ComparedByValue, list[SimulationResults]):
         commol_rs.inference.check_levels(list(levels))
         if not self:
             raise ValueError("There are no replicates.")
-        from commol.uncertainty.intervals import weighted_quantiles
-
         names = list(self[0])
         per_name = {
             name: [
-                weighted_quantiles(column.tolist(), levels)
-                for column in self._values(name).T
+                quantiles(column.tolist(), levels) for column in self._values(name).T
             ]
             for name in names
         }
@@ -749,14 +617,12 @@ class SimulationReplicates(ComparedByValue, list[SimulationResults]):
             If the confidence level is out of range or there are no
             replicates.
         """
-        from commol.uncertainty.intervals import member_statistics
-
         if self and output not in self[0]:
             raise KeyError(
                 f"'{output}' is not an output of the replicates. "
                 f"Outputs: {sorted(self[0])}"
             )
-        return member_statistics([run[output] for run in self], confidence_level)
+        return spread([run[output] for run in self], confidence_level)
 
     def report(
         self,
@@ -766,7 +632,7 @@ class SimulationReplicates(ComparedByValue, list[SimulationResults]):
         windows: int,
         observed_data: "Iterable[ObservedDataPoint]" = (),
         accumulators: Iterable[str] = (),
-        prediction_intervals: "PredictionIntervals | None" = None,
+        prediction_intervals: "PredictionIntervalsData | None" = None,
     ) -> "SimulationReport":
         """
         Report the replicates as `SimulationResults.report` reports one run.
@@ -791,7 +657,7 @@ class SimulationReplicates(ComparedByValue, list[SimulationResults]):
             The calibration targets to report alongside the replicates.
         accumulators : Iterable[str], optional
             Accumulator ids to report; their outputs come from `model`.
-        prediction_intervals : PredictionIntervals | None, optional
+        prediction_intervals : PredictionIntervalsData | None, optional
             Prediction intervals of a conformal method
             (``ConformalResult.intervals``), reported as they are.
 

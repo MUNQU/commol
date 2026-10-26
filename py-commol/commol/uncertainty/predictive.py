@@ -9,7 +9,7 @@ from commol._data.result_model import ResultModel
 from commol._problem.problem import ObservedDataPoint
 from commol._simulation.results import SimulationResults, quantities_of_runs
 from commol.observations.noise import _ObservationNoise
-from commol.plotting.accessors import PredictivePlot
+from commol.uncertainty.plots import PredictivePlot
 from commol.uncertainty.sample import ParameterSample
 
 if TYPE_CHECKING:
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
         ObservationDrawsProtocol,
         PredictiveProtocol,
     )
-    from commol.conformal.results import PredictionIntervals
+    from commol._data.intervals import PredictionIntervalsData
     from commol.quantities.quantities import QuantityBase
 
 
@@ -345,7 +345,7 @@ class Predictive:
         windows: int,
         observed_data: Iterable[ObservedDataPoint] = (),
         accumulators: Iterable[str] = (),
-        prediction_intervals: "PredictionIntervals | None" = None,
+        prediction_intervals: "PredictionIntervalsData | None" = None,
     ) -> "SimulationReport":
         """
         Report the runs of the draws as `SimulationResults.report` reports one.
@@ -372,7 +372,7 @@ class Predictive:
             The calibration targets to report alongside the draws.
         accumulators : Iterable[str], optional
             Accumulator ids to report.
-        prediction_intervals : PredictionIntervals | None, optional
+        prediction_intervals : PredictionIntervalsData | None, optional
             Prediction intervals of a conformal method
             (``ConformalResult.intervals``), reported as they are.
 
