@@ -52,7 +52,7 @@ and `kg/day` in the other. In such a model `total`, a subgroup total
 units, so they have none, and a rate that reads one fails the check; read the
 bins or the compartments instead. A rate that reads the
 [neighbors of a unit](building-models.md#neighbors) is checked as the sums
-they are. It raises `UnitConsistencyError` (from `commol.utils.equations`) and
+they are. It raises `UnitConsistencyError` (from `commol._model.unit_checks`) and
 lists every transition that fails.
 
 ### What needs a unit
@@ -82,7 +82,7 @@ unit converts to.
 
 The engine converts no value between units. So one step has one unit, and every
 rate must use it (`UnitChecker._step_unit` in
-`py-commol/commol/context/_model/units.py`).
+`py-commol/commol/_model/units.py`).
 
 The axis of a model is its independent variable: the quantity the model steps
 along or differentiates over. Time is one case; a length, a mass or any other
@@ -147,7 +147,7 @@ with `k` in `"1/day"` is a flow and fails with `expected '<bin unit>'`.
 ### What the check catches
 
 ```python
-from commol.utils.equations import UnitConsistencyError
+from commol._model.unit_checks import UnitConsistencyError
 
 wrong_units = (
     ModelBuilder(name="Wrong units", bin_unit="item", step_unit="day")

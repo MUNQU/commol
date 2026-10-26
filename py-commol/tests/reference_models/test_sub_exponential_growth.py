@@ -16,7 +16,7 @@ References
    outbreaks. *Epidemics*, 15, 27-37. https://doi.org/10.1016/j.epidem.2016.01.002
 """
 
-from commol.context.model import Model
+from commol._model.model import Model
 from tests.support import Flow, assert_threshold, flow_model
 
 N, GAMMA, ALPHA = 1e6, 0.2, 0.7

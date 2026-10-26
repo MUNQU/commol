@@ -8,15 +8,10 @@ exercises `Calibrator.uncertainty` and the registry.
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from commol import (
-    Calibrator,
-    ParameterSample,
-    SampleMethod,
-)
-from commol.context.inference.method import (
-    UncertaintyMethod,
-)
-from commol.api.inference.registry import register
+from commol import Calibrator
+from commol.uncertainty import ParameterSample, SampleMethod
+from commol._calibration.method import UncertaintyMethod
+from commol._calibration.registry import register
 
 
 class StartsResult(BaseModel):

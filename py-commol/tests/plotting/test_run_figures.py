@@ -9,16 +9,11 @@ import numpy as np
 import pytest
 from matplotlib.figure import Figure
 
-from commol import (
-    ObservedDataPoint,
-    PlotConfig,
-    Simulation,
-)
-from commol.api.results import (
-    SimulationResults,
-)
-from commol.api.plotting import figures
-from commol.api.plotting.panels import _group_observed
+from commol import ObservedDataPoint, Simulation
+from commol.plotting import PlotConfig
+from commol._simulation.results import SimulationResults
+from commol.plotting import figures
+from commol.plotting.panels import _group_observed
 from tests.support import (
     abc_builder,
     build,

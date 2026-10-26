@@ -11,8 +11,8 @@ from commol import (
     ParticleSwarmConfig,
     Simulation,
 )
-from commol.context.calibration import CalibrationResult
-from commol.context.model import Model
+from commol._fit.result import CalibrationResult
+from commol._model.model import Model
 from tests.support import a_to_b_builder, bounded, build, observed
 
 SEED = 7

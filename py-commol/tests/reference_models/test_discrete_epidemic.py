@@ -24,7 +24,7 @@ import math
 import pytest
 
 from commol import Simulation
-from commol.context.model import Model
+from commol._model.model import Model
 from tests.support import ENGINE_REL, Flow, assert_close, final_size, flow_model
 
 N, I0 = 1000.0, 10.0

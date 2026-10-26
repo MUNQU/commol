@@ -3,9 +3,9 @@
 import pytest
 
 from commol import Aggregate
-from commol.context._model.engine_state import transition_flows
-from commol.context._model.formula_tree import formula_text
-from commol.context.model import Model
+from commol._model.engine_state import transition_flows
+from commol._model.formula_tree import formula_text
+from commol._model.model import Model
 from tests.support import (
     FactoryBuilder,
     a_to_b_builder,

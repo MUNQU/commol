@@ -3,15 +3,15 @@ built from the tree of the engine."""
 
 import pytest
 
-from commol.context._model.engine_state import formula_tree
-from commol.context._model.equations import (
+from commol._model.engine_state import formula_tree
+from commol._model.equations import (
     _factors,
     are_complementary_factors,
     latex_rate_expression,
     latex_variable,
     simplify_complementary_terms,
 )
-from commol.context._model.formula_tree import formula_text
+from commol._model.formula_tree import formula_text
 from tests.support import abc_builder, build
 from tests.support.description import equation_forms
 

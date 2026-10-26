@@ -3,8 +3,8 @@
 import pytest
 from pydantic import ValidationError
 
-from commol.context.bin import Bin
-from commol.context.model import Model
+from commol._model.bin import Bin
+from commol._model.model import Model
 from tests.support import FactoryBuilder, a_to_b_builder, build, abc_builder
 from commol import Aggregate
 

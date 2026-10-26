@@ -8,24 +8,17 @@ from commol import (
     CalibrationProblem,
     Calibrator,
     NelderMeadConfig,
-    NormalObservations,
     ObservedDataPoint,
-    ProfileLikelihood,
-    ResidualBootstrap,
     Simulation,
-    StructuralRank,
-    Threshold,
 )
-from commol.context.calibration import (
-    CalibrationResult,
-)
-from commol.context.inference.profiles import (
-    Profile,
-    ProfileInterval,
-    ProfileResult,
-)
-from commol.context.inference.identifiability import ParameterVerdicts
-from commol.context.inference.profiles import ProfileStructure
+from commol.observations import NormalObservations
+from commol.profiles import ProfileLikelihood, Threshold
+from commol.resampling import ResidualBootstrap
+from commol.identifiability import StructuralRank
+from commol._fit.result import CalibrationResult
+from commol.profiles.methods import Profile, ProfileInterval, ProfileResult
+from commol.identifiability.methods import ParameterVerdicts
+from commol.profiles.methods import ProfileStructure
 from tests.support import (
     a_to_b_builder,
     abc_builder,

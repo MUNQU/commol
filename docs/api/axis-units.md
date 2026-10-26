@@ -7,4 +7,4 @@ engine reads from a mean span or a probability over a period, and gives the
 window grid of a width in a unit. Guide:
 [Units of the axis](../guide/core-concepts.md#units-of-the-axis).
 
-::: commol.context.axis_units.AxisUnits
+::: commol.AxisUnits

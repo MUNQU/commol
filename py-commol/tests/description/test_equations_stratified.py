@@ -2,7 +2,7 @@
 
 from commol import StratificationCondition, StratifiedRate
 from commol import ModelBuilder
-from commol.context.model import Model
+from commol._model.model import Model
 from tests.support.description import equation_forms
 from tests.support import build, build_ode, abc_builder
 

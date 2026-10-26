@@ -9,37 +9,36 @@ import numpy as np
 import pytest
 from pydantic import TypeAdapter
 
-from commol import (
+from commol.sensitivity import (
     PRCC,
-    Aggregate,
-    AxisPattern,
-    Gain,
-    Increments,
     InputSpace,
-    Level,
-    ModelBuilder,
     Morris,
-    ParameterSample,
-    Peak,
-    PeakPosition,
     PolynomialChaos,
     Propagation,
-    Ratio,
-    SampleMethod,
     SensitivityAnalysis,
-    Simulation,
     Sobol,
+)
+from commol import Aggregate, AxisPattern, ModelBuilder, Simulation
+from commol.quantities import (
+    Gain,
+    Increments,
+    Level,
+    Peak,
+    PeakPosition,
+    Ratio,
     Trajectory,
     ValueAt,
+)
+from commol.uncertainty import (
+    ParameterSample,
+    SampleMethod,
     member_statistics,
     weighted_quantiles,
 )
-from commol.context.inference.global_sensitivity import (
-    PropagationResult,
-)
+from commol.sensitivity.methods import PropagationResult
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context.engine_json import engine_json
-from commol.context.inference.quantities import _Quantity, quantity_labels
+from commol._data.engine_json import engine_json
+from commol.quantities.quantities import _Quantity, quantity_labels
 from tests.support import bounded, build
 from tests.support.models import a_to_b_builder
 

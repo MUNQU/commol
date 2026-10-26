@@ -14,15 +14,11 @@ from commol import (
     Calibrator,
     NelderMeadConfig,
     ObservedDataPoint,
-    ParameterSample,
-    Predictive,
-    SampleMethod,
     Simulation,
 )
-from commol.api.results import (
-    SimulationResults,
-)
-from commol.context.calibration import CalibrationResult
+from commol.uncertainty import ParameterSample, Predictive, SampleMethod
+from commol._simulation.results import SimulationResults
+from commol._fit.result import CalibrationResult
 
 from .models import a_to_b_builder, abc_builder, build
 from .problems import bounded

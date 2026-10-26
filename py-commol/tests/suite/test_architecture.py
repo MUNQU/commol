@@ -11,6 +11,7 @@ import tomllib
 import typing
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from types import ModuleType
 
 from pydantic import BaseModel
 
@@ -213,11 +214,16 @@ def test_the_check_of_conversions_names_each_one() -> None:
     assert sorted(public_rust_names(tree)) == ["rust_problem", "self.rust_value"]
 
 
+def public_modules() -> list[ModuleType]:
+    """Each public module of commol, imported."""
+    return [importlib.import_module(module) for module in public_surface.EXPORTS]
+
+
 def runner_functions() -> list[Callable[..., object]]:
     """The runner of each inference method of commol, without the methods
     that tests register."""
-    import commol.api.inference  # noqa: F401  (registers the runners)
-    from commol.api.inference.registry import _RUNNERS
+    public_modules()  # each module of a method registers its runners
+    from commol._calibration.registry import _RUNNERS
 
     runners = dict.fromkeys(_RUNNERS.values())
     return [runner for runner in runners if runner.__module__.startswith("commol.")]
@@ -318,8 +324,8 @@ def test_the_check_of_runners_names_each_fault() -> None:
 def method_classes() -> list[type[BaseModel]]:
     """Each class of an inference method of commol that has a runner, without
     the methods that tests register."""
-    import commol.api.inference  # noqa: F401  (registers the runners)
-    from commol.api.inference.registry import _RUNNERS
+    public_modules()  # each module of a method registers its runners
+    from commol._calibration.registry import _RUNNERS
 
     methods = [method for method in _RUNNERS if method.__module__.startswith("commol.")]
     return sorted(methods, key=lambda method: method.__name__)
@@ -399,6 +405,88 @@ def test_the_public_surface_is_the_table() -> None:
         module: set(names) for module, names in public_surface.EXPORTS.items()
     }
     assert private_inputs() == []
+
+
+def homes(exports: dict[str, list[str]]) -> dict[str, list[str]]:
+    """Each name that more than one module of ``exports`` exports, with those
+    modules."""
+    found: dict[str, list[str]] = {}
+    for module, names in exports.items():
+        for name in names:
+            found.setdefault(name, []).append(module)
+    return {name: where for name, where in found.items() if len(where) > 1}
+
+
+def test_each_public_name_has_one_home() -> None:
+    """Each public name is in the ``__all__`` of one module, and the root
+    holds no object of another module."""
+    modules = public_modules()
+    root = importlib.import_module("commol")
+    shared = homes({module.__name__: list(module.__all__) for module in modules})
+    shared.update(
+        {
+            f"commol.{name}": ["commol", module.__name__]
+            for module in modules
+            if module is not root
+            for name in module.__all__
+            if getattr(root, name, None) is getattr(module, name)
+        }
+    )
+
+    assert not shared, "Export each name from one module:\n" + "\n".join(
+        f"{name}: {where}" for name, where in sorted(shared.items())
+    )
+
+
+def test_the_check_of_homes_names_each_shared_name() -> None:
+    exports = {"commol": ["Model"], "commol.a": ["X", "Y"], "commol.b": ["Y"]}
+
+    assert homes(exports) == {"Y": ["commol.a", "commol.b"]}
+
+
+def package_faults(package: Path, public: set[str]) -> list[str]:
+    """What in ``package`` is neither a public module, the extension nor a
+    private package: a module outside a package, a public package that is not
+    a public module, and a public module that is not a package."""
+    faults = []
+    packages = set()
+    for entry in sorted(package.iterdir()):
+        if entry.suffix == ".py" and entry.name != "__init__.py":
+            faults.append(f"the module {entry.name} is outside a package")
+        elif (entry / "__init__.py").is_file():
+            packages.add(entry.name)
+            if not entry.name.startswith("_") and entry.name not in public:
+                faults.append(f"the package {entry.name} is not a public module")
+    faults += [
+        f"the module {name} is not a package" for name in sorted(public - packages)
+    ]
+    return faults
+
+
+def test_the_packages_are_the_modules() -> None:
+    """The packages of commol are its public modules, the extension
+    ``commol_rs`` and private packages (``_…``)."""
+    public = {
+        module.removeprefix("commol.")
+        for module in public_surface.EXPORTS
+        if module != "commol"
+    }
+
+    assert package_faults(PACKAGE, public | {"commol_rs"}) == []
+
+
+def test_the_check_of_packages_names_each_fault(tmp_path: Path) -> None:
+    for name in ("models", "_inner", "api"):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "helpers.py").write_text("", encoding="utf-8")
+    (tmp_path / "__init__.py").write_text("", encoding="utf-8")
+
+    assert package_faults(tmp_path, {"models", "plots"}) == [
+        "the package api is not a public module",
+        "the module helpers.py is outside a package",
+        "the module plots is not a package",
+    ]
 
 
 def test_a_choice_is_a_literal() -> None:

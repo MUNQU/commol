@@ -147,7 +147,7 @@ Both round each bin on its own: no unit goes from one bin to another, such as
 from a bin of a concentration to a bin of a count.
 
 ```python
-from commol import StochasticEventsSettings
+from commol.engines import StochasticEventsSettings
 
 groups = (
     ModelBuilder(name="Groups")

@@ -23,17 +23,14 @@ from commol import (
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
-    Laplace,
-    LaplaceMixture,
-    LikelihoodTarget,
     ModelBuilder,
     NelderMeadConfig,
-    NormalObservations,
     ObservedDataPoint,
-    Priors,
-    Sandwich,
     Simulation,
 )
+from commol.local import Laplace, LaplaceMixture, LikelihoodTarget, Sandwich
+from commol.observations import NormalObservations
+from commol.distributions import Priors
 
 
 def flow_model(rate: str):

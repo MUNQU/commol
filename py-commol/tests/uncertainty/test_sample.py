@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from commol import ParameterSample, SampleMethod, weighted_quantiles
+from commol.uncertainty import ParameterSample, SampleMethod, weighted_quantiles
 from commol import CalibrationProblem, NelderMeadConfig, ObservedDataPoint
 from tests.support import abc_builder, bounded, build
 

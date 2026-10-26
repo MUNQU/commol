@@ -4,8 +4,8 @@ import pytest
 
 from commol import StratificationCondition, StratifiedRate
 from commol import Aggregate, Complete
-from commol.context.model import Model
-from commol.utils.equations import UnitConsistencyError
+from commol._model.model import Model
+from commol._model.unit_checks import UnitConsistencyError
 from tests.support import (
     FactoryBuilder,
     abc_builder,

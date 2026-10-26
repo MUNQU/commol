@@ -10,8 +10,9 @@ import math
 
 import pytest
 
-from commol import Simulation, StochasticEventsSettings, StochasticStepsSettings
-from commol.context.engine import EngineName
+from commol import Simulation
+from commol.engines import StochasticEventsSettings, StochasticStepsSettings
+from commol.engines.engine import EngineName
 from tests.support import STOCHASTIC_ENGINES, a_to_b_builder, build_stochastic
 
 GROUPS = {"group": {f"g{index}": 0.1 for index in range(10)}}

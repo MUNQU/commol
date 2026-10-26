@@ -7,10 +7,10 @@ has, and how Python reads it.
 
 ## The parser of the engine is the only check of a formula
 
-Rate expressions (`context/transition.py`), formula parameters
-(`context/parameter.py`), axis patterns (`AxisPattern.combine` and
-`AxisPattern.from_formula`, `api/patterns.py`) and calibration constraints
-(`context/calibration.py`) call the check of the engine
+Rate expressions (`_model/transition.py`), formula parameters
+(`_model/parameter.py`), axis patterns (`AxisPattern.combine` and
+`AxisPattern.from_formula`, `_model/patterns.py`) and calibration constraints
+(`_problem/problem.py`) call the check of the engine
 (`commol_rs.core.MathExpression(formula).check()`) when their object is
 built. A formula that the parser rejects raises `ValueError` with the message
 of the parser. Python has no grammar, no limit and no tokenizer of a formula
@@ -37,19 +37,19 @@ read the tree that the parser of the engine reads, never the text:
 checks the formula and gives its tree (`Expr`, which derives `Serialize`) as
 JSON, the binding `commol_rs.core.MathExpression(formula).tree()` passes it to
 Python, and `engine_state.formula_tree` reads it into plain data
-(`context/_model/formula_tree.py`: one frozen dataclass per kind of node).
+(`_model/formula_tree.py`: one frozen dataclass per kind of node).
 `tree.rs` documents the shape: one object per node, keyed by its kind
 (`Constant`, `Variable`, `Chain` with its operators, `Power`, `UnaryOp`,
 `FunctionCall`, `Conditional`); a number keeps the value the parser read, and
 a value that is not finite is its text (`"Infinity"`), as in the JSON of the
 port ([A data object crosses as the JSON of its dump](python-models.md#a-data-object-crosses-as-the-json-of-its-dump)).
 
-- The check of units (`formula_unit` in `utils/equations.py`) walks the tree
+- The check of units (`formula_unit` in `_model/unit_checks.py`) walks the tree
   with a `pint` quantity for each variable: `pint` does the algebra of units,
   in the grouping of the parser, and a written number takes its unit as
   [One step unit in the unit check](time.md#one-step-unit-in-the-unit-check)
   says.
-- The description (`context/_model/equations.py`) writes each rate and each
+- The description (`_model/equations.py`) writes each rate and each
   flow from the tree: `FormulaWriter` writes the text, with one space around
   each operator and only the parentheses the tree needs, so the text reads
   back as the same tree; `_LatexWriter` writes LaTeX. The flow of a
@@ -65,7 +65,7 @@ case of the JSON of `tree.rs`, of `read_tree` and of the walks of
 | Alternative | Why not |
 |---|---|
 | A PyO3 class per node | A third shape of the tree (Rust, PyO3, Python) to keep in step, against one JSON port, as the model is. |
-| A LaTeX writer in Rust | Presentation in the core, with no Rust caller: the engine gives the structure, and the edge draws it, as `api/plotting/panels.py` and `figures.py` do. |
+| A LaTeX writer in Rust | Presentation in the core, with no Rust caller: the engine gives the structure, and the edge draws it, as `plotting/panels.py` and `figures.py` do. |
 | The text, read by the grammar of Python (`ast.parse` and `eval`) or split at `" * "` and `" / "` | A second grammar: Python reads `^`, `!` and names such as `lambda` in another way or not at all, and a split of the text depends on its spaces. |
 
 **Guard:** `crates/commol-core/src/math_expression/tree.rs::the_tree_keeps_the_grouping_of_the_parser`,
@@ -84,14 +84,14 @@ it compiles. It rejects a function that is not in `FUNCTIONS`, a call with the
 wrong number of arguments, `&&` and `||`, and a comparison or `!` outside the
 condition of an `if`, and it counts the nodes of the tree, which `MAX_NODES`
 limits. The JIT compiles the functions of `FUNCTIONS` and no other, and the
-unit check (`_FUNCTION_UNITS` in `utils/equations.py`) has one rule for each
+unit check (`_FUNCTION_UNITS` in `_model/unit_checks.py`) has one rule for each
 of them.
 
 The engine runs the same check again when it builds a model (`check_model` in
 `crates/commol-model/src/builder.rs`) and a calibration problem
 (`Feasibility::new`), and `check_model` also rejects a variable that the model
 does not define. Python keeps no list of functions, no parser of the
-variables and no copy of the engine variables (`commol/constants.py` reads
+variables and no copy of the engine variables (`commol/_model/constants.py` reads
 them from `commol_rs.model`).
 
 | Alternative | Why not |

@@ -15,33 +15,28 @@ import numpy as np
 import pytest
 from pydantic import BaseModel
 
+from commol.smc import InformationMatchingEta, GibbsPosterior
 from commol import (
-    InformationMatchingEta,
     CalibrationConstraint,
     CalibrationProblem,
     Calibrator,
-    GibbsPosterior,
+    NelderMeadConfig,
+    Simulation,
+)
+from commol.local import (
     GibbsTarget,
     Laplace,
     LaplaceMixture,
     LikelihoodTarget,
-    NelderMeadConfig,
-    NormalObservations,
-    Predictive,
-    Priors,
     Sandwich,
-    Simulation,
 )
-from commol.context.inference.local import (
-    ImportanceResult,
-    LaplaceResult,
-    SandwichResult,
-)
-from commol.context.inference.method import (
-    UncertaintyMethod,
-)
+from commol.observations import NormalObservations
+from commol.uncertainty import Predictive
+from commol.distributions import Priors
+from commol.local.methods import ImportanceResult, LaplaceResult, SandwichResult
+from commol._calibration.method import UncertaintyMethod
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context.engine import ODESolver
+from commol.engines.engine import ODESolver
 from tests.support import (
     a_to_b_builder,
     bounded,

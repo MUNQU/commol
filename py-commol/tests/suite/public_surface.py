@@ -136,23 +136,24 @@ PAGES = {
         "Sobol",
         "PolynomialChaos",
     },
+    "scores": {
+        "coverage",
+        "crps",
+        "interval_score",
+        "log_score",
+        "pit",
+        "weighted_interval_score",
+    },
 }
-"""The other public names, by the page of the guide that documents them."""
+"""The other public names, by the page of the guide that documents them: each
+page is the module ``commol.<page>``."""
 
 EXPORTS = {
-    "commol": ROOT.union(*PAGES.values()),
-    "commol.scores": frozenset(
-        {
-            "coverage",
-            "crps",
-            "interval_score",
-            "log_score",
-            "pit",
-            "weighted_interval_score",
-        }
-    ),
+    "commol": ROOT,
+    **{f"commol.{page}": frozenset(names) for page, names in PAGES.items()},
 }
-"""The ``__all__`` of each public module of commol."""
+"""The ``__all__`` of each public module of commol: the root, and one module
+per page of the guide."""
 
 RESULTS = frozenset(
     {

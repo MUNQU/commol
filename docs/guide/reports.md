@@ -185,7 +185,7 @@ members with their weights (equal for replicates).
 A predictive takes no point estimate: each number comes from the draws only.
 
 ```python
-from commol import ParameterSample, Predictive, SampleMethod
+from commol.uncertainty import ParameterSample, Predictive, SampleMethod
 
 sample = ParameterSample.equally_weighted(
     ["k1"], [(0.0, 1.0)], [[0.35], [0.4], [0.45]], SampleMethod(name="draws")

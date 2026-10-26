@@ -454,22 +454,21 @@ work of the bootstrap and of the draws runs on two threads:
 ```python
 import numpy as np
 
-import commol
+import commol.parallelism
 from commol import (
     Aggregate,
-    BayesianBootstrap,
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
     ModelBuilder,
     NelderMeadConfig,
     ObservedDataPoint,
-    Predictive,
-    Scenarios,
     Simulation,
-    ValueAt,
-    plot_compared,
 )
+from commol.resampling import BayesianBootstrap
+from commol.uncertainty import Predictive, Scenarios
+from commol.quantities import ValueAt
+from commol.plotting import plot_compared
 
 
 def basic_model(k1: float | None):
@@ -506,7 +505,7 @@ problem = CalibrationProblem(
 )
 calibrator = Calibrator(Simulation(basic_model(None)), problem)
 
-with commol.threads(2):
+with commol.parallelism.threads(2):
     fit = calibrator.run()
     bootstrap = calibrator.uncertainty(BayesianBootstrap(replicates=20, block_length=1))
     predictive = Predictive(calibrator, bootstrap.sample, positions=list(range(61)))

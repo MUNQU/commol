@@ -16,22 +16,23 @@ import numpy as np
 
 from commol import (
     Aggregate,
-    BayesianBootstrap,
-    BlockJackknife,
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
     ModelBuilder,
     NelderMeadConfig,
-    NoNoise,
     ObservedDataPoint,
-    Predictive,
-    ResidualBootstrap,
-    ResidualNoise,
     Simulation,
-    WildBootstrap,
     scores,
 )
+from commol.resampling import (
+    BayesianBootstrap,
+    BlockJackknife,
+    ResidualBootstrap,
+    WildBootstrap,
+)
+from commol.observations import NoNoise, ResidualNoise
+from commol.uncertainty import Predictive
 
 
 def ab_model(k: float | None):

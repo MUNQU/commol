@@ -16,7 +16,7 @@ therefore multiplies along the chain:
 `crates/commol-model/src/builder.rs`). `Aggregate.subgroup_total` sums the state
 the engine builds, overrides included, and
 `Aggregate.get_conditioning_categories` names the subgroup
-(`context/aggregate.py`).
+(`_model/aggregate.py`).
 
 **Guard:** `tests/simulation/test_outputs.py::TestSubgroupTotal` compares the
 result with the state the engine starts from.
@@ -67,7 +67,7 @@ writes every value through the engine (`ValueWriter` in
 and the write-back (`configured_engine`, then the binding
 `calibrated_initial_state`) agree by construction.
 `Aggregate.with_calibrated_values`
-(`context/_model/calibration_write_back.py`) writes back the amount of every bin
+(`_model/calibration_write_back.py`) writes back the amount of every bin
 whose every compartment a value or the remainder sets and the split of every
 calibrated category, and pins as per-compartment overrides every compartment
 that these cannot reproduce.

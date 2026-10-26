@@ -2,7 +2,7 @@
 
 import pytest
 
-from commol.context.model import Model
+from commol._model.model import Model
 from tests.support.description import equation_forms
 from tests.support import FactoryBuilder, build, build_ode, abc_builder
 from commol import Aggregate

@@ -19,7 +19,7 @@ References
 
 import numpy as np
 
-from commol.context.model import Model
+from commol._model.model import Model
 from tests.support import (
     ODE_REL,
     Flow,

@@ -2,10 +2,10 @@
 
 import pytest
 
-from commol import StochasticEventsSettings
-from commol.context.description import Table, Text
-from commol.context.engine import EngineName
-from commol.context.model import Model
+from commol.engines import StochasticEventsSettings
+from commol._model.description import Table, Text
+from commol.engines.engine import EngineName
+from commol._model.model import Model
 from tests.support import STOCHASTIC_ENGINES, abc_builder, build_stochastic
 
 

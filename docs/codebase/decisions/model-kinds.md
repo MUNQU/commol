@@ -9,10 +9,10 @@ How a model is composed, and what lets the generic layers run any model kind.
 The layers that do not depend on how a model is built (`Simulation`,
 `Calibrator`, the uncertainty methods, the reports and the figures)
 use only `Model` and the methods of `ModelStructure`
-(`py-commol/commol/context/structure.py`), and in Rust only the
+(`py-commol/commol/_model/structure.py`), and in Rust only the
 `SimulationEngine` trait (`crates/commol-core/src/simulation_engine.rs`). What
 only an aggregate model has (compartments, initial amounts) is behind them:
-`Aggregate` (`context/aggregate.py`), and in Rust `CompartmentalEngine` and
+`Aggregate` (`_model/aggregate.py`), and in Rust `CompartmentalEngine` and
 `InitialConditionPlan` (`crates/commol-model/`). A new kind, such as an agent
 network, is a new `ModelStructure` subclass with its engines in the list;
 nothing that exists changes.
@@ -22,7 +22,7 @@ nothing that exists changes.
 | `ModelStructure` | An abstract base class (Pydantic's metaclass derives from `ABCMeta`). A missing method fails when the object is made and names it; optional methods have a default. | A `typing.Protocol` shows a missing method only under `ty`, or mid-run as an `AttributeError`, and gives no defaults. |
 | Engine kinds | An engine names a method, not a kind: each entry of `EngineType` names the kinds it runs (`EngineType::kinds`). `Model` asks the list (`check_kind`) when it is made, and `Engine::build` asks it again and picks the implementation by the pair of the engine and the kind; the message of a mismatch lists the engines that run the kind (`EngineType::engines_of`). | Without the check, a model of one kind reaches the engine of another and fails deep in its compilation. One engine per kind would multiply the names: a stochastic engine runs every structure that implements it. |
 | Values calibration sets | `parameter`, `factor` and `noise` are generic. Each kind declares the types of value of its own it accepts (`ModelKind::value_types`, which `ModelStructure.calibration_value_types` asks); the aggregate kind accepts `initial_condition`. The engine resolves and writes them (`SimulationEngine::plan_values`, `apply_values`). | The calibration crate would know compartments, and a new kind could not calibrate values of its own without editing it. |
-| Report sections | `ModelStructure.report_sections` adds the sections of a kind to `Model.applied_parameters` (default: none); the aggregate kind adds `initial_amounts` and `category_splits` (`Aggregate.report_sections`). | A check of the kind in `reporting.py` brings back a branch per kind. |
+| Report sections | `ModelStructure.report_sections` adds the sections of a kind to `Model.applied_parameters` (default: none); the aggregate kind adds `initial_amounts` and `category_splits` (`Aggregate.report_sections`). | A check of the kind in `_simulation/reports.py` brings back a branch per kind. |
 | Expressions in constraints | The engine names the values of an output row: `output_names`, `state_outputs` (their sum is `total`) and `output_sums` (a bin total, for an engine of the aggregate kind). | The calibration would rebuild bin totals from compartment labels. |
 
 The test kind (`tests/support/kinds.py`, engine `TestEngine` in
@@ -41,7 +41,7 @@ an engine that is not of the aggregate kind: values through `plan_values` and
 
 ## A model is a header, a process, a structure and an engine
 
-`Model` (Python `context/model.py`, Rust `crates/commol-core/src/types/model.rs`)
+`Model` (Python `_model/model.py`, Rust `crates/commol-core/src/types/model.rs`)
 is one class for every kind: `name`, `description`, `version`, `parameters`,
 `engine` (`{type, settings}`), `process` and `structure`, and in Python only,
 `step_unit` and `origin` (the engines never read them). The

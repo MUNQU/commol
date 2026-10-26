@@ -10,28 +10,25 @@ import numpy as np
 import pytest
 
 import commol
-import commol.api
 from commol import (
     CalibrationProblem,
     Calibrator,
     NelderMeadConfig,
     ObservedDataPoint,
+    Simulation,
+)
+from commol.uncertainty import (
     ParameterSample,
     Predictive,
     SampleMethod,
-    Simulation,
     member_statistics,
 )
-from commol.context.inference.identifiability import (
-    IdentifiabilityReport,
-)
-from commol.api.results import (
-    SimulationResults,
-)
-from commol.api import reporting
-from commol.context.inference import identifiability
-from commol.api.reporting import _ReportLeaf, SimulationReport
-from commol.context.inference.identifiability import (
+from commol.identifiability.methods import IdentifiabilityReport
+from commol._simulation.results import SimulationResults
+from commol._simulation import reports as reporting
+from commol.identifiability import methods as identifiability
+from commol._simulation.reports import _ReportLeaf, SimulationReport
+from commol.identifiability.methods import (
     ParameterVerdicts,
     PracticalVerdict,
     ProfileSection,
@@ -325,7 +322,6 @@ def test_reports_are_only_methods() -> None:
     names = {"simulation_report", "applied_parameters_report", "identifiability_report"}
 
     assert names.isdisjoint(dir(commol))
-    assert names.isdisjoint(dir(commol.api))
 
 
 def test_the_results_know_the_outputs_of_their_accumulators() -> None:

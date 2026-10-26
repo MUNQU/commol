@@ -11,12 +11,10 @@ from commol import (
     Model,
     Simulation,
 )
-from commol.context.structure import (
-    ModelStructure,
-)
-from commol.context.engine import ModelEngine
-from commol.context.process import Process
-from commol.context.structure import SeriesLabel
+from commol._model.structure import ModelStructure
+from commol.engines.engine import ModelEngine
+from commol._model.process import Process
+from commol._model.structure import SeriesLabel
 from tests.support import a_to_b_builder, abc_builder, build
 from tests.support.kinds import DecayStructure, UnstratifiedVariant, decay_model
 

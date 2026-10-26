@@ -7,7 +7,7 @@ current state. The changes are the files that differ from the merge base with
 
 An item is a path, or a path and a symbol (``path::Symbol``); a path that ends in
 ``/`` is a directory, and a path may start below the root of the repository
-(``context/_model/engine_state.py``). An item with a symbol matches only when
+(``_model/engine_state.py``). An item with a symbol matches only when
 the changed lines of its file name the symbol (the last part of
 ``Class.method``). The indexes that every change
 edits (the changelog, ``AGENTS.md``, the navigation of the docs, the lock files

@@ -10,12 +10,9 @@ from commol import (
     Model,
     NelderMeadConfig,
     ObservedDataPoint,
-    ParameterSample,
-    SampleMethod,
 )
-from commol.context.calibration import (
-    CalibrationResult,
-)
+from commol.uncertainty import ParameterSample, SampleMethod
+from commol._fit.result import CalibrationResult
 from tests.support import (
     FactoryBuilder,
     a_to_b_builder,

@@ -83,7 +83,7 @@ model.update_parameters({"k1": 0.3})
 
 ## Results
 
-`run` and `run_at` return `SimulationResults` (`py-commol/commol/api/results.py`):
+`run` and `run_at` return `SimulationResults` (`py-commol/commol/_simulation/results.py`):
 a `dict` from output name to one value per position, so `results["A"]`,
 `json.dumps(results)` and `pandas.DataFrame(results)` work as for any mapping.
 The positions the values were read at are in `results.positions`.
@@ -150,7 +150,7 @@ the SplitMix64 of `seed` plus `i` (`replicate_seed` in
 `crates/commol-random/src/generator.rs`), so two seeds share no replicate, a
 replicate gives the same run however many replicates run, and
 `simulation.run(…, seed=replicates[i].seed)` repeats it. `SimulationReplicates`
-(`py-commol/commol/api/results.py`) is a list of `SimulationResults`:
+(`py-commol/commol/_simulation/results.py`) is a list of `SimulationResults`:
 
 | Member | Returns |
 |---|---|
@@ -348,7 +348,7 @@ calibration, reports and plots. Only the way the engine advances changes.
 ```python
 import math
 
-from commol import ODESolver
+from commol.engines import ODESolver
 
 ode_model = (
     ModelBuilder(name="Decay")
@@ -494,7 +494,7 @@ reads the name and the unit of each series from the model of the results
 only their outputs, and a bin or accumulator id raises `ValueError`.
 
 ```python
-from commol import PlotConfig
+from commol.plotting import PlotConfig
 
 results.plot.series(output_file="series.png")  # the results of the first run
 results.plot.cumulative(output_file="cumulative.png")
@@ -537,7 +537,7 @@ dpi and styles for each use.
 
 The style applies to the figure of one call only. Each figure draws in a copy
 of `matplotlib.rcParams` (`_scoped_style` in
-`py-commol/commol/api/plotting/figures.py`), so the figures that you draw with
+`py-commol/commol/plotting/figures.py`), so the figures that you draw with
 matplotlib after a figure of commol keep your own style.
 
 To compare with observations:
@@ -628,7 +628,7 @@ the same panels and returns the `Figure`. A value is a `SimulationResults`, a
 It is a function, not a method: a comparison describes no single result.
 
 ```python
-from commol import plot_compared
+from commol.plotting import plot_compared
 
 figure = plot_compared({"k1 = 0.3": results, "k1 = 0.5": faster}, series=["B", "C"])
 print([line.get_label() for line in figure.axes[0].lines])  # ['k1 = 0.3', 'k1 = 0.5']

@@ -11,8 +11,8 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from commol import Aggregate, SeriesValue
-from commol.context._model.engine_state import build_engine
-from commol.context.transition import Transition
+from commol._model.engine_state import build_engine
+from commol._model.transition import Transition
 from tests.support import a_to_b_builder, build
 
 type ModelJson = dict[str, dict]

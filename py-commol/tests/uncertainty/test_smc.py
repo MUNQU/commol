@@ -13,30 +13,28 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from commol import (
+from commol.smc import (
     BootstrapCoverageEta,
     InformationMatchingEta,
     ABCRejection,
     ABCSMC,
-    BayesianBootstrap,
+    GibbsPosterior,
+    LossDistance,
+    SeriesDistance,
+)
+from commol.resampling import BayesianBootstrap
+from commol import (
     CalibrationConstraint,
     CalibrationProblem,
     Calibrator,
-    GibbsPosterior,
-    LossDistance,
     NelderMeadConfig,
     ObservedDataPoint,
-    Priors,
-    Sandwich,
-    SeriesDistance,
     Simulation,
 )
-from commol.context.inference.local import (
-    SandwichResult,
-)
-from commol.context.inference.smc import (
-    SMCResult,
-)
+from commol.distributions import Priors
+from commol.local import Sandwich
+from commol.local.methods import SandwichResult
+from commol.smc.methods import SMCResult
 from tests.support import (
     a_to_b_builder,
     bounded,

@@ -28,8 +28,8 @@ with the better structure, also when it costs more work.
 4. **Decide in the core, act at the edge.** A function that decides does no
    input or output: a crate returns the information to its caller and never
    prints. A function that does input or output decides nothing:
-   `api/plotting/panels.py` gives the data of each panel, and
-   `api/plotting/figures.py` draws it. A test of a decision needs no fake.
+   `plotting/panels.py` gives the data of each panel, and
+   `plotting/figures.py` draws it. A test of a decision needs no fake.
 
 ## Each unit
 

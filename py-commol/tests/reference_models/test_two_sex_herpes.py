@@ -23,7 +23,7 @@ import math
 
 import pytest
 
-from commol.context.model import Model
+from commol._model.model import Model
 from tests.support import Flow, assert_threshold, flow_model, settled
 
 # Per month, without treatment; mu is a sexual life of 35 years.

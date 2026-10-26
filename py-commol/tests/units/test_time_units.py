@@ -4,10 +4,10 @@ position on the axis in a rate, and the units of the variables of a rate."""
 import pytest
 
 from commol import Aggregate
-from commol.context._model.engine_state import formula_tree
-from commol.context._model.helpers import ModelCompartmentHelper
-from commol.context.model import Model
-from commol.utils.equations import UnitConsistencyError
+from commol._model.engine_state import formula_tree
+from commol._model.helpers import ModelCompartmentHelper
+from commol._model.model import Model
+from commol._model.unit_checks import UnitConsistencyError
 from tests.support import (
     FactoryBuilder,
     a_to_b_builder,

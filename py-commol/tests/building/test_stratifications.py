@@ -4,7 +4,7 @@ import pytest
 
 from commol import StratificationCondition
 from commol import ModelBuilder, Simulation
-from commol.context.stratification import Stratification
+from commol._model.stratification import Stratification
 from tests.support import assert_total_conserved, build, abc_builder
 
 GROUP = {"g1": 0.8, "g2": 0.2}

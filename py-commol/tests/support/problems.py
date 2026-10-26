@@ -6,14 +6,14 @@ from commol import (
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
-    InputSpace,
     NelderMeadConfig,
-    NormalObservations,
     ObservedDataPoint,
     ParticleSwarmConfig,
     Simulation,
 )
-from commol.context.observation_models import _ObservationModel
+from commol.sensitivity import InputSpace
+from commol.observations import NormalObservations
+from commol.observations.models import _ObservationModel
 
 from .models import a_to_b_builder, abc_builder, build
 

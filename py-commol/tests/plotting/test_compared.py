@@ -1,20 +1,15 @@
-"""``commol.plot_compared``: runs, replicates and predictives on shared panels,
+"""``commol.plotting.plot_compared``: runs, replicates and predictives on shared panels,
 along the axis or one panel per observed series."""
 
 import numpy as np
 import pytest
 from matplotlib.colors import to_rgba
 
-import commol
-from commol import (
-    NoNoise,
-    ObservedDataPoint,
-    Simulation,
-)
-from commol.api.results import (
-    SimulationResults,
-)
-from commol.api.inference.intervals import member_statistics
+from commol.plotting import plot_compared
+from commol.observations import NoNoise
+from commol import ObservedDataPoint, Simulation
+from commol._simulation.results import SimulationResults
+from commol.uncertainty.intervals import member_statistics
 from tests.support import (
     a_to_b_builder,
     abc_builder,
@@ -52,7 +47,7 @@ def test_compared_runs_share_the_panels() -> None:
     """
     slow, fast = _abc_run(0.3), _abc_run(0.6)
 
-    fig = commol.plot_compared({"slow": slow, "fast": fast}, series=["A", "B"])
+    fig = plot_compared({"slow": slow, "fast": fast}, series=["A", "B"])
 
     axes = visible(fig)
     assert [ax.get_label() for ax in axes] == ["A", "B"]
@@ -91,12 +86,12 @@ def test_compared_runs_need_the_same_outputs(
     }
 
     with pytest.raises(ValueError, match=message):
-        commol.plot_compared({label: runs[label] for label in labels})
+        plot_compared({label: runs[label] for label in labels})
 
 
 def test_a_comparison_needs_a_result() -> None:
     with pytest.raises(ValueError, match="at least one result"):
-        commol.plot_compared({})
+        plot_compared({})
 
 
 def test_a_compared_predictive_shows_its_band() -> None:
@@ -111,7 +106,7 @@ def test_a_compared_predictive_shows_its_band() -> None:
     run = Simulation(model).run(40)
     observed = [ObservedDataPoint(at=at, output="B", value=50.0) for at in (10, 20)]
 
-    fig = commol.plot_compared(
+    fig = plot_compared(
         {"draws": predictive, "run": run},
         series=["B"],
         observed_data=observed,
@@ -140,7 +135,7 @@ def test_compared_replicates_show_their_band() -> None:
     replicates = Simulation(model).replicates(5, seed=2).run(20)
     run = Simulation(build(a_to_b_builder())).run(20)
 
-    fig = commol.plot_compared({"replicates": replicates, "run": run}, series=["B"])
+    fig = plot_compared({"replicates": replicates, "run": run}, series=["B"])
 
     (ax,) = fig.axes
     mean, line = ax.lines
@@ -162,7 +157,7 @@ def test_compared_runs_can_be_windowed() -> None:
     """Each line is the gain of the accumulator over each window of 7."""
     slow, fast = _abc_run(0.3, "moved"), _abc_run(0.6, "moved")
 
-    fig = commol.plot_compared({"slow": slow, "fast": fast}, series=["moved"], window=7)
+    fig = plot_compared({"slow": slow, "fast": fast}, series=["moved"], window=7)
 
     (ax,) = fig.axes
     for line, run in zip(ax.lines, (slow, fast), strict=True):
@@ -186,7 +181,7 @@ def test_compared_replicates_and_draws_can_be_windowed() -> None:
     replicates = Simulation(model).replicates(5, seed=2).run(40)
     predictive = predictive_of([0.02, 0.1])
 
-    fig = commol.plot_compared(
+    fig = plot_compared(
         {"replicates": replicates, "draws": predictive},
         series=["events"],
         window=10,
@@ -204,7 +199,7 @@ def test_compared_replicates_and_draws_can_be_windowed() -> None:
     points = [
         ObservedDataPoint(at=end, output="events", value=0.0, window=10) for end in ends
     ]
-    draws = predictive.at_observations(points, commol.NoNoise()).band(0.9)
+    draws = predictive.at_observations(points, NoNoise()).band(0.9)
     assert np.asarray(median.get_xdata(), dtype=float).tolist() == ends
     np.testing.assert_allclose(np.asarray(median.get_ydata()), draws.median)
     replicate_band, draws_band = ax.collections
@@ -228,7 +223,7 @@ def test_compared_results_draw_on_given_axes_with_dates() -> None:
     first = dated_run("day", 20)
     fig = first.plot.series(series=["B"])
 
-    again = commol.plot_compared(
+    again = plot_compared(
         {"first": first, "again": first},
         series=["B"],
         axes=fig,
@@ -281,7 +276,7 @@ def test_compared_results_draw_a_panel_per_observed_series() -> None:
         for at in (10, 20, 30)
     ]
 
-    fig = commol.plot_compared(
+    fig = plot_compared(
         {"slow": slow, "fast": fast}, observed_data=observed, panels="observations"
     )
 
@@ -335,7 +330,7 @@ def test_compared_observed_series_show_the_band_of_each_result() -> None:
         for at in (20, 30)
     ]
 
-    fig = commol.plot_compared(
+    fig = plot_compared(
         {"replicates": replicates, "draws": predictive},
         observed_data=observed,
         panels="observations",
@@ -377,7 +372,7 @@ def test_compared_observed_series_draw_on_given_axes() -> None:
     fig = slow.plot.series(series=["B_g1"], show_legend=False)
     observed = [ObservedDataPoint(at=at, output="B_g1", value=1.0) for at in (5, 12)]
 
-    again = commol.plot_compared(
+    again = plot_compared(
         {"slow": slow, "fast": fast},
         observed_data=observed,
         panels="observations",
@@ -412,4 +407,4 @@ def test_compared_observed_series_reject_what_they_cannot_draw(
     }
 
     with pytest.raises(ValueError, match=message):
-        commol.plot_compared({"run": run}, **arguments)
+        plot_compared({"run": run}, **arguments)

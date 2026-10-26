@@ -176,14 +176,24 @@ nav:
       - AxisPattern: api/axis-patterns.md
       - AxisUnits: api/axis-units.md
       - Simulation: api/simulation.md
-      - Plotting: api/plotting.md
       - Calibration: api/calibrator.md
       - Reports: api/reports.md
-      - Uncertainty: api/uncertainty.md
-      - Identifiability: api/identifiability.md
-      - Sensitivity: api/sensitivity.md
-      - Parallelism: api/parallelism.md
       - Package: api/package.md
+      - commol.engines: api/engines.md
+      - commol.plotting: api/plotting.md
+      - commol.parallelism: api/parallelism.md
+      - commol.distributions: api/distributions.md
+      - commol.quantities: api/quantities.md
+      - commol.observations: api/observations.md
+      - commol.uncertainty: api/uncertainty.md
+      - commol.scores: api/scores.md
+      - commol.resampling: api/resampling.md
+      - commol.profiles: api/profiles.md
+      - commol.local: api/local.md
+      - commol.smc: api/smc.md
+      - commol.conformal: api/conformal.md
+      - commol.identifiability: api/identifiability.md
+      - commol.sensitivity: api/sensitivity.md
   - Development:
       - Codebase Guide:
           - Codebase Guide: codebase/index.md

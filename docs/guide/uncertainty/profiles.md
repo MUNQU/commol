@@ -23,12 +23,14 @@ from commol import (
     Calibrator,
     ModelBuilder,
     NelderMeadConfig,
-    NormalObservations,
     ObservedDataPoint,
+    Simulation,
+)
+from commol.observations import NormalObservations
+from commol.profiles import (
     PredictionProfile,
     PredictionSpec,
     ProfileLikelihood,
-    Simulation,
     Threshold,
 )
 
@@ -155,7 +157,7 @@ replicate. Any bootstrap of [Resampling](resampling.md) works, and the
 with observation models.
 
 ```python
-from commol import ResidualBootstrap
+from commol.resampling import ResidualBootstrap
 
 loss_problem = CalibrationProblem(
     observed_data=observations,
@@ -309,7 +311,7 @@ merged verdict is then `conflicting`:
   be identifiable for the rank.
 
 ```python
-from commol import StructuralRank
+from commol.identifiability import StructuralRank
 
 
 def product_model(k1: float | None, s: float | None, k2: float | None):

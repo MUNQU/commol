@@ -3,27 +3,20 @@ results with the code of a propagation."""
 
 import pytest
 
-from commol import (
+from commol.quantities import (
     Gain,
     Increments,
-    InputSpace,
-    ParameterSample,
     Peak,
     PeakPosition,
-    Predictive,
-    Propagation,
-    SampleMethod,
-    SensitivityAnalysis,
-    Simulation,
     Trajectory,
     ValueAt,
     quantity_schedule,
 )
-from commol.api.results import (
-    SimulationResults,
-    SimulationReplicates,
-)
-from commol.context.inference.quantities import _Quantity
+from commol.sensitivity import InputSpace, Propagation, SensitivityAnalysis
+from commol.uncertainty import ParameterSample, Predictive, SampleMethod
+from commol import Simulation
+from commol._simulation.results import SimulationResults, SimulationReplicates
+from commol.quantities.quantities import _Quantity
 from tests.support import abc_builder, bounded, build, build_ode
 from tests.support.models import build_stochastic
 

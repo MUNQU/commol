@@ -15,8 +15,8 @@ from commol import (
     ObservedDataPoint,
     Simulation,
 )
-from commol.api.plotting.panels import compared_panels
-from commol.api.results import SimulationResults
+from commol.plotting.panels import compared_panels
+from commol._simulation.results import SimulationResults
 from commol.commol_rs import _commol_rs as commol_rs
 from tests.support import a_to_b_builder, bounded, build
 

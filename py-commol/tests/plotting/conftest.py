@@ -7,28 +7,13 @@ from collections.abc import Iterator
 import matplotlib
 import pytest
 
-from commol import (
-    Simulation,
-    ParameterSample,
-    SampleMethod,
-    Threshold,
-)
-from commol.context.calibration import (
-    CalibrationResult,
-)
-from commol.api.results import (
-    SimulationResults,
-)
-from commol.context.inference.global_sensitivity import (
-    MorrisResult,
-    PRCCResult,
-    SobolResult,
-)
-from commol.context.inference.profiles import (
-    Profile,
-    ProfileInterval,
-    ProfileResult,
-)
+from commol import Simulation
+from commol.uncertainty import ParameterSample, SampleMethod
+from commol.profiles import Threshold
+from commol._fit.result import CalibrationResult
+from commol._simulation.results import SimulationResults
+from commol.sensitivity.methods import MorrisResult, PRCCResult, SobolResult
+from commol.profiles.methods import Profile, ProfileInterval, ProfileResult
 
 INPUTS = ["k1", "k2", "k3"]
 

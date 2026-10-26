@@ -4,8 +4,8 @@ from collections.abc import Callable
 
 import pytest
 
-from commol.context.description import Matrix
-from commol.context.model import Model
+from commol._model.description import Matrix
+from commol._model.model import Model
 from tests.support.described import identity_groups, weighted_groups
 from tests.support.description import matches_snapshot
 

@@ -37,7 +37,7 @@ check some of these rules. The rest depend on the author and the reviewer.
   as written. Rust names follow the Rust guidelines, in which an acronym is
   one word (`OdeSolver`, `SmcSampler`).
   `tests/docs/test_reference.py::test_public_names_capitalize_acronyms`
-  checks the known acronyms of `commol.__all__`.
+  checks the known acronyms of every public name.
 - A family of configurations is one class per member, joined in a union:
   `ABCDistance` (`LossDistance`, `SeriesDistance`), `ObservationNoise`,
   `Eta` (`InformationMatchingEta`, `BootstrapCoverageEta`). The user builds
@@ -53,7 +53,7 @@ check some of these rules. The rest depend on the author and the reviewer.
 - The engine holds the range of every setting; a Python model declares only
   its type (no `ge`, `gt`, `le`, `lt`, constrained number type or
   `allow_inf_nan=False`), and a model of an object with ranges lists
-  `RangeChecked` (`py-commol/commol/context/ranges.py`) among its bases, whose
+  `RangeChecked` (`py-commol/commol/_data/ranges.py`) among its bases, whose
   validator calls the check of the engine for its object. The rules are in
   `crates/commol-core/src/range.rs`, `crates/commol-calibration/src/ranges.rs`
   and `crates/commol-inference/src/ranges.rs`. See
@@ -120,7 +120,7 @@ Design reasons and invariants that cross components go to
 
 | If the change… | Update |
 |---|---|
-| Adds or changes a public Python name, argument, default or error | Its docstring; for a new name in `commol.__all__`, the name in `py-commol/tests/suite/public_surface.py`, a `::: path` entry in `docs/api/` and a place in the table of `docs/api/index.md`; for a new result, the result in `RESULTS` of that file and its `::: path` entry on the page of the object that returns it; the guide page that uses it |
+| Adds or changes a public Python name, argument, default or error | Its docstring; for a new public name, the name in `ROOT` or in the module of its page in `PAGES` of `py-commol/tests/suite/public_surface.py`, its `__all__`, a `::: commol.<module>.<Name>` entry on the page of its module in `docs/api/` and a place in the tables of `docs/api/index.md`; for a new result, the result in `RESULTS` of that file and its `::: path` entry on the page of the object that returns it; the guide page that uses it |
 | Changes model behavior (expansion, rates, initial conditions, simulation) | The guide page in `docs/guide/`; [Model structure](../advanced/model-structure.md) if a type changes |
 | Changes calibration or uncertainty | `guide/calibration.md` and its sub-pages, or `guide/uncertainty/` |
 | Changes an expression function or variable | `guide/mathematical-expressions.md` |
@@ -188,8 +188,8 @@ every match.
 | The site builds with no broken internal link or anchor | `mkdocs build --strict` (with `validation:` in `mkdocs.yaml`) | CI (Documentation) |
 | External links answer | lychee (`.github/workflows/links.yaml`) | CI on documentation changes, weekly; not a required check |
 | The documentation examples run | `pytest -m docs` (from `py-commol/`) | CI (Python Coverage, and Test of Build) |
-| Every name in `commol.__all__` has an API entry (`::: …` under `docs/api/`) and is in the table of `docs/api/index.md`; each result has its entry on the page of the object that returns it | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Python Coverage, and Test of Build) |
-| The exports are the names of `tests/suite/public_surface.py`; a public signature names no enum, no public alias and no private type that a user passes in; every validator of a public class starts with `_` | `pytest` (`tests/suite/test_architecture.py`) | CI (Python Coverage, and Test of Build) |
+| Every public name has an API entry under its public path (`::: commol.<module>.<Name>` under `docs/api/`), each module has its page, and every name is in the tables of `docs/api/index.md`; each result has its entry on the page of the object that returns it | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Python Coverage, and Test of Build) |
+| The exports of each module are the names of `tests/suite/public_surface.py`, each public name has one module, and the packages of `commol` are its public modules and private packages; a public signature names no enum, no public alias and no private type that a user passes in; every validator of a public class starts with `_` | `pytest` (`tests/suite/test_architecture.py`) | CI (Python Coverage, and Test of Build) |
 | Every crate under `crates/` is named in [Architecture](architecture.md) | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Python Coverage, and Test of Build) |
 | Every test or definition a page names as `<file>::<name>` exists in that file | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Python Coverage, and Test of Build) |
 | Public Python modules, classes, functions and arguments have docstrings | `ruff check . ../.github/scripts` (rules `D1`, `D417`, NumPy convention) | pre-commit, CI |

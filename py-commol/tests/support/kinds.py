@@ -16,23 +16,15 @@ from commol import (
     Aggregate,
     Model,
 )
-from commol.context.structure import (
-    ModelStructure,
-)
+from commol._model.structure import ModelStructure
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context.description import (
-    Equation,
-    EquationGroup,
-    Equations,
-    Section,
-    Table,
-)
-from commol.context.structure import ReportSections, SeriesLabel
-from commol.context.parameter import Parameter
-from commol.context.engine import ModelEngine
+from commol._model.description import Equation, EquationGroup, Equations, Section, Table
+from commol._model.structure import ReportSections, SeriesLabel
+from commol._model.parameter import Parameter
+from commol.engines.engine import ModelEngine
 
 if TYPE_CHECKING:
-    from commol.context.inference.sample import ParameterSummary
+    from commol.uncertainty.sample import ParameterSummary
 
 TEST_ENGINE = "TestEngine"
 TEST_STOCHASTIC_ENGINE = "TestStochasticEngine"

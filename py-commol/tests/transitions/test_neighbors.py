@@ -10,8 +10,8 @@ from pydantic import ValidationError
 
 from commol import StratificationCondition, StratifiedRate
 from commol import Complete, Groups, Model, Simulation
-from commol.context._model.engine_state import transition_flows
-from commol.context.neighbors import _Neighbors
+from commol._model.engine_state import transition_flows
+from commol._model.neighbors import _Neighbors
 from tests.support import ENGINE_REL, FactoryBuilder, abc_builder, assert_close, build
 
 GROUPS = {"group": {"g1": 0.3, "g2": 0.7}}

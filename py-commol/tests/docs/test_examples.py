@@ -3,7 +3,7 @@
 Each page under ``docs/``, and ``README.md``, runs as one script: its ``python``
 blocks execute in order, in one namespace, from a temporary working directory,
 in a copy of the ``contextvars`` context, so a setting such as
-``commol.set_threads`` does not reach the next page.
+``commol.parallelism.set_threads`` does not reach the next page.
 A block preceded by
 ``<!-- doc-test: skip: <reason> -->`` is a fragment that cannot run alone; it is
 not executed, and the reason is required.

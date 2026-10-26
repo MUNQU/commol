@@ -15,21 +15,19 @@ from commol import (
     CalibrationProblem,
     Calibrator,
     NelderMeadConfig,
-    NormalObservations,
     ObservedDataPoint,
+    Simulation,
+)
+from commol.observations import NormalObservations
+from commol.profiles import (
     PredictionProfile,
     PredictionSpec,
     ProfileLikelihood,
-    ResidualBootstrap,
-    Simulation,
     Threshold,
 )
-from commol.context.inference.profiles import (
-    ProfileResult,
-)
-from commol.context.inference.method import (
-    UncertaintyMethod,
-)
+from commol.resampling import ResidualBootstrap
+from commol.profiles.methods import ProfileResult
+from commol._calibration.method import UncertaintyMethod
 from tests.support import a_to_b_builder, bounded, build
 from tests.support.coverage import Interval, coverage_study
 

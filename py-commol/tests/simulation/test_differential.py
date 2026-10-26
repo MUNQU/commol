@@ -5,8 +5,9 @@ import math
 import pytest
 from pydantic import ValidationError
 
-from commol import ODESolver, Simulation, AxisPattern
-from commol.context.model import Model
+from commol.engines import ODESolver
+from commol import Simulation, AxisPattern
+from commol._model.model import Model
 from tests.support import (
     a_to_b_builder,
     assert_close,

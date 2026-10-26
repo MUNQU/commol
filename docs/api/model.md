@@ -13,47 +13,47 @@ Guide: [Core Concepts](../guide/core-concepts.md),
 [Units](../guide/units-and-equations.md). The tree of types is in
 [Model Structure](../advanced/model-structure.md).
 
-::: commol.context.model.Model
+::: commol.Model
 
-::: commol.context.process.Process
+::: commol._model.process.Process
 
-::: commol.context.structure.ModelStructure
+::: commol._model.structure.ModelStructure
 
-::: commol.context.aggregate.Aggregate
+::: commol.Aggregate
 
-::: commol.context.neighbors.Complete
+::: commol.Complete
 
-::: commol.context.neighbors.Groups
+::: commol.Groups
 
-::: commol.context._model.engine_state.InitialCompartment
+::: commol._model.engine_state.InitialCompartment
 
-::: commol.context.parameter.SeriesValue
+::: commol.SeriesValue
 
-::: commol.utils.equations.UnitConsistencyError
+::: commol._model.unit_checks.UnitConsistencyError
 
 ## Descriptions
 
 `Model.describe` returns a `ModelDescription`; its blocks are in
-`commol.context.description`.
+`commol._model.description`.
 
-::: commol.context.description.ModelDescription
+::: commol._model.description.ModelDescription
 
-::: commol.context.description.Section
+::: commol._model.description.Section
 
-::: commol.context.description.Text
+::: commol._model.description.Text
 
-::: commol.context.description.Table
+::: commol._model.description.Table
 
-::: commol.context.description.Equations
+::: commol._model.description.Equations
 
-::: commol.context.description.EquationGroup
+::: commol._model.description.EquationGroup
 
-::: commol.context.description.Equation
+::: commol._model.description.Equation
 
-::: commol.context.description.StateGraph
+::: commol._model.description.StateGraph
 
-::: commol.context.description.GraphNode
+::: commol._model.description.GraphNode
 
-::: commol.context.description.GraphEdge
+::: commol._model.description.GraphEdge
 
-::: commol.context.description.Matrix
+::: commol._model.description.Matrix

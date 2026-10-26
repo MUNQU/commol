@@ -16,7 +16,7 @@ References
    Biology*, 27, 373-398. https://doi.org/10.1007/BF00290636
 """
 
-from commol.context.model import Model
+from commol._model.model import Model
 from tests.support import (
     ODE_REL,
     Flow,

@@ -6,10 +6,7 @@ import pytest
 from commol import (
     Simulation,
 )
-from commol.api.results import (
-    SimulationReplicates,
-    SimulationResults,
-)
+from commol._simulation.results import SimulationReplicates, SimulationResults
 from tests.support import abc_builder, build
 from tests.support.models import build_stochastic
 

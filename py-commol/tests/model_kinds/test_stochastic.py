@@ -19,7 +19,7 @@ from commol import (
     Quantile,
     Simulation,
 )
-from commol.api.results import SimulationReplicates
+from commol._simulation.results import SimulationReplicates
 from tests.support.kinds import TEST_STOCHASTIC_ENGINE, decay, decay_model
 from tests.support.problems import bounded
 

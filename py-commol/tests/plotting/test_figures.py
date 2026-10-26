@@ -15,26 +15,19 @@ import pytest
 from matplotlib.colors import to_rgba
 from matplotlib.figure import Figure
 
-import commol
-from commol import (
-    ObservedDataPoint,
-    PlotConfig,
-    Simulation,
-)
-from commol.context.inference.global_sensitivity import (
+from commol import ObservedDataPoint, Simulation
+from commol.plotting import PlotConfig, plot_compared
+from commol.sensitivity.methods import (
     ChaosResult,
     MorrisResult,
     PRCCResult,
     SobolResult,
 )
-from commol.context.inference.profiles import (
-    ProfileResult,
-)
-from commol.api.results import (
-    SimulationResults,
-)
-from commol.api.plotting import figures
-from commol.api.plotting.accessors import PredictivePlot, ReplicatesPlot, ResultsPlot
+from commol.profiles.methods import ProfileResult
+from commol._simulation.results import SimulationResults
+from commol.plotting import figures
+from commol.plotting.accessors import PredictivePlot, ReplicatesPlot, ResultsPlot
+from tests.suite.public_surface import EXPORTS
 from tests.support import (
     a_to_b_builder,
     abc_builder,
@@ -178,7 +171,7 @@ ACCESSORS = [
     (SobolResult.plot, figures._sobol),
     (ChaosResult.plot, figures._sobol),
     (ProfileResult.plot, figures._profiles),
-    (commol.plot_compared, figures._compared_series),
+    (plot_compared, figures._compared_series),
 ]
 
 
@@ -207,7 +200,8 @@ def test_import_commol_loads_no_plotting_library() -> None:
         [
             sys.executable,
             "-c",
-            "import sys, commol; "
+            "import importlib, sys; "
+            f"[importlib.import_module(m) for m in {sorted(EXPORTS)}]; "
             "print(sorted({m.split('.')[0] for m in sys.modules} "
             "& {'matplotlib', 'seaborn'}))",
         ],
@@ -223,7 +217,7 @@ def test_a_figure_without_matplotlib_says_how_to_install_it(
     run: SimulationResults, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setitem(sys.modules, "matplotlib", None)
-    monkeypatch.delitem(sys.modules, "commol.api.plotting.figures")
+    monkeypatch.delitem(sys.modules, "commol.plotting.figures")
 
     with pytest.raises(ImportError, match=r"pip install 'commol\[plot\]'"):
         run.plot.series()

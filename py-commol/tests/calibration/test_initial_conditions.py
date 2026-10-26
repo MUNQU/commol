@@ -10,13 +10,11 @@ from commol import (
     ModelBuilder,
     NelderMeadConfig,
     ObservedDataPoint,
-    ParameterSample,
     ParticleSwarmConfig,
-    Predictive,
-    SampleMethod,
     Simulation,
 )
-from commol.context.model import Model
+from commol.uncertainty import ParameterSample, Predictive, SampleMethod
+from commol._model.model import Model
 from tests.support import (
     a_to_b_builder,
     assert_accepted,

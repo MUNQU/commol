@@ -23,6 +23,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** each public name outside the main flow lives in the module of
+  its page of the guide, and the root `commol` holds only the main flow:
+  build (`ModelBuilder`, `Model`, `StratificationCondition`, `StratifiedRate`,
+  `SeriesValue`, `AxisUnits`, `AxisPattern`), the structures (`Aggregate`,
+  `Complete`, `Groups`), simulate (`Simulation`, `InfeasibleStateError`),
+  calibrate (`Calibrator`, `CalibrationProblem`, `CalibrationParameter`,
+  `CalibrationConstraint`, `ObservedDataPoint`, `NelderMeadConfig`,
+  `ParticleSwarmConfig`, `Quantile`) and `build_info`. The modules are
+  `commol.engines`, `commol.plotting`, `commol.parallelism`,
+  `commol.distributions`, `commol.quantities`, `commol.observations`,
+  `commol.uncertainty`, `commol.scores`, `commol.resampling`,
+  `commol.profiles`, `commol.local`, `commol.smc`, `commol.conformal`,
+  `commol.identifiability` and `commol.sensitivity`; the
+  [API Reference](../api/index.md) lists the names of each. The packages
+  `commol.api`, `commol.context` and `commol.utils` and the module
+  `commol.constants` are removed: the code is in the package of its module,
+  and the code of the root in private packages. Migration: `from commol
+  import BayesianBootstrap, Predictive` is `from commol.resampling import
+  BayesianBootstrap` and `from commol.uncertainty import Predictive`;
+  `commol.threads(2)` is `commol.parallelism.threads(2)`.
+- **Breaking:** each module logs as `commol.<module>`, such as
+  `commol.resampling`, and the main flow as `commol`; the loggers of the old
+  paths, such as `commol.api.calibrator`, are gone. Migration: a handler or a
+  level on `commol` still reaches every message; read one module with
+  `logging.getLogger("commol.resampling")`.
+- **Breaking:** a pickle of an object of commol 0.10 does not load: the path
+  of each class changed. Migration: save a model with `Model.to_json` and a
+  result with `model_dump_json`, which do not depend on the path.
 - **Breaking:** `ParticleSwarmConfig` is one class with plain fields, and
   its chained methods `.inertia`, `.acceleration`, `.velocity`, `.mutation`,
   `.improvement_stop` and `.radius_stop` and their `*_config` properties are

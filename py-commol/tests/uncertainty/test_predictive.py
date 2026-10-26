@@ -9,10 +9,12 @@ from commol import (
     InfeasibleStateError,
     CalibrationProblem,
     NelderMeadConfig,
-    NoNoise,
     ObservedDataPoint,
     Simulation,
     Calibrator,
+)
+from commol.observations import NoNoise
+from commol.uncertainty import (
     ParameterSample,
     Predictive,
     SampleMethod,

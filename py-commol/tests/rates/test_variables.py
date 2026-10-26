@@ -7,7 +7,7 @@ import pytest
 
 from commol import Simulation
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.constants import SUBGROUP_TOTAL_PREFIX, TOTAL_VARIABLE
+from commol._model.constants import SUBGROUP_TOTAL_PREFIX, TOTAL_VARIABLE
 from tests.support import (
     ENGINE_REL,
     assert_close,

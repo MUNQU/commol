@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from commol.context.description import Equation, Equations, Text
-from commol.context.model import Model
+from commol._model.description import Equation, Equations, Text
+from commol._model.model import Model
 
 BANNER = "=" * 40
 SNAPSHOTS = Path(__file__).parent.parent / "description" / "snapshots"

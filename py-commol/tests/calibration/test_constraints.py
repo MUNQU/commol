@@ -13,7 +13,7 @@ from commol import (
     ParticleSwarmConfig,
     Simulation,
 )
-from commol.context.model import Model
+from commol._model.model import Model
 from tests.support import assert_accepted, bounded, build, observed, abc_builder
 
 SEED = 42

@@ -3,9 +3,9 @@ sections and renderings."""
 
 from commol import StratificationCondition, StratifiedRate
 from commol import Aggregate, Complete, Groups
-from commol.context.engine import StochasticEventsSettings
-from commol.context.model import Model
-from commol.context.parameter import SeriesValue
+from commol.engines.engine import StochasticEventsSettings
+from commol._model.model import Model
+from commol._model.parameter import SeriesValue
 from tests.support.kinds import UnstratifiedVariant
 from tests.support.models import FactoryBuilder, abc_builder, build
 

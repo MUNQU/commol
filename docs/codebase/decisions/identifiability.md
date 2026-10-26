@@ -45,7 +45,7 @@ modelling judgments. Rust decides each verdict and gives its causes
 parameters it is collinear with; `SampleIdentifiability::verdicts`: the
 parameters it is correlated with, its number of modes;
 `StartsIdentifiability::flagged`). The runners of
-`api/inference/identifiability.py` write the reasons from the causes and
+`identifiability/runners.py` write the reasons from the causes and
 decide nothing.
 
 | Alternative | Why not |

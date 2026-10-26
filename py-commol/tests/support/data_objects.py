@@ -6,80 +6,97 @@ from collections.abc import Callable
 
 from pydantic import BaseModel
 
-from commol import (
+from commol.smc import (
     ABCSMC,
-    PRCC,
     ABCRejection,
-    AdaptiveConformal,
-    BayesianBootstrap,
     BayesianPosterior,
-    Beta,
-    BinomialObservations,
-    BlockJackknife,
     BootstrapCoverageEta,
+    GibbsPosterior,
+    InformationMatchingEta,
+    LossDistance,
+    SeriesDistance,
+)
+from commol.sensitivity import (
+    PRCC,
+    InputSpace,
+    Morris,
+    PolynomialChaos,
+    Propagation,
+    Sobol,
+)
+from commol.conformal import (
+    AdaptiveConformal,
+    EnbPI,
+    JackknifePlus,
+    RollingConformal,
+    SplitConformal,
+)
+from commol.resampling import (
+    BayesianBootstrap,
+    BlockJackknife,
+    ParametricBootstrap,
+    ResidualBootstrap,
+    WildBootstrap,
+)
+from commol.distributions import (
+    Beta,
+    Gamma,
+    LogNormal,
+    LogUniform,
+    Normal,
+    Priors,
+    Uniform,
+)
+from commol.observations import (
+    BinomialObservations,
+    DistributionNoise,
+    LogNormalObservations,
+    NegativeBinomialObservations,
+    NoNoise,
+    NormalObservations,
+    PoissonObservations,
+    ResidualNoise,
+    StudentTObservations,
+)
+from commol import (
     CalibrationConstraint,
     CalibrationParameter,
     CalibrationProblem,
+    NelderMeadConfig,
+    ObservedDataPoint,
+    ParticleSwarmConfig,
+    Quantile,
+)
+from commol.identifiability import (
     Collinearity,
-    DistributionNoise,
-    EnbPI,
+    SampleIdentifiability,
+    StartsIdentifiability,
+    StructuralRank,
+)
+from commol.quantities import (
     Gain,
-    Gamma,
-    GibbsPosterior,
-    GibbsTarget,
     Increments,
-    InformationMatchingEta,
-    InputSpace,
-    JackknifePlus,
+    Peak,
+    PeakPosition,
+    Ratio,
+    Trajectory,
+    ValueAt,
+)
+from commol.local import (
+    GibbsTarget,
     Laplace,
     LaplaceMixture,
     LikelihoodTarget,
-    LogNormal,
-    LogNormalObservations,
-    LogUniform,
-    LossDistance,
-    Morris,
-    NegativeBinomialObservations,
-    NelderMeadConfig,
-    NoNoise,
-    Normal,
-    NormalObservations,
-    ObservedDataPoint,
-    ParameterSample,
-    ParametricBootstrap,
-    ParticleSwarmConfig,
-    Peak,
-    PeakPosition,
-    PoissonObservations,
-    PolynomialChaos,
+    Sandwich,
+)
+from commol.uncertainty import ParameterSample, SampleMethod
+from commol.profiles import (
     PredictionProfile,
     PredictionSpec,
-    Priors,
     ProfileLikelihood,
-    Propagation,
-    Quantile,
-    Ratio,
-    ResidualBootstrap,
-    ResidualNoise,
-    RollingConformal,
-    SampleIdentifiability,
-    SampleMethod,
-    Sandwich,
-    SeriesDistance,
-    Sobol,
-    SplitConformal,
-    StartsIdentifiability,
-    StructuralRank,
-    StudentTObservations,
     Threshold,
-    Trajectory,
-    Uniform,
-    ValueAt,
-    WildBootstrap,
 )
-from commol.context.calibration import (
-    CalibrationResult,
-)
+from commol._fit.result import CalibrationResult
 
 PRIORS = Priors.uniform_on_bounds()
 FIT = CalibrationResult(

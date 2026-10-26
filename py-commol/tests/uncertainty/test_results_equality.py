@@ -9,31 +9,20 @@ from collections.abc import Iterator
 import pytest
 from pydantic import BaseModel
 
-from commol import (
-    ParameterSample,
-    PRCC,
-    SampleMethod,
-    SensitivityAnalysis,
-    Simulation,
-    ValueAt,
-)
-from commol.context.calibration import (
-    CalibrationResult,
-    StartSummary,
-)
-from commol.context.inference.conformal import (
+from commol.uncertainty import ParameterSample, SampleMethod
+from commol.sensitivity import PRCC, SensitivityAnalysis
+from commol import Simulation
+from commol.quantities import ValueAt
+from commol._fit.result import CalibrationResult, StartSummary
+from commol.conformal.methods import (
     ConformalResult,
     PredictionIntervals,
     SeriesIntervals,
 )
-from commol.context.inference.sample import (
-    ParameterSummary,
-)
-from commol.context.inference.global_sensitivity import (
-    PRCCResult,
-)
-from commol.api.inference.registry import _RUNNERS
-from commol.context.result_model import ResultModel
+from commol.uncertainty.sample import ParameterSummary
+from commol.sensitivity.methods import PRCCResult
+from commol._calibration.registry import _RUNNERS
+from commol._data.result_model import ResultModel
 from tests.support import abc_rates
 
 # With these 10 draws k2 orders B at 5 alone, so the PRCC of k1 is NaN.

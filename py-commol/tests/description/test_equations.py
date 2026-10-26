@@ -3,8 +3,8 @@
 import pytest
 
 from commol import Aggregate
-from commol.context._model.equations import DynamicsDescription
-from commol.context.model import Model
+from commol._model.equations import DynamicsDescription
+from commol._model.model import Model
 from tests.support.description import equation_forms
 from tests.support import (
     FactoryBuilder,

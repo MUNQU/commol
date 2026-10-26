@@ -2,39 +2,40 @@
 
 [Back to API Reference](index.md)
 
-The identifiability methods, the report they return, and its parts. Guide:
+The module `commol.identifiability`: the identifiability methods, the report
+they return, and its parts. Guide:
 [Identifiability](../guide/uncertainty/identifiability.md).
 
-::: commol.context.inference.identifiability.StructuralRank
+::: commol.identifiability.StructuralRank
 
-::: commol.context.inference.identifiability.Collinearity
+::: commol.identifiability.Collinearity
 
-::: commol.context.inference.identifiability.SampleIdentifiability
+::: commol.identifiability.SampleIdentifiability
 
-::: commol.context.inference.identifiability.StartsIdentifiability
+::: commol.identifiability.StartsIdentifiability
 
-::: commol.context.inference.identifiability.IdentifiabilityReport
+::: commol.identifiability.methods.IdentifiabilityReport
 
-::: commol.context.inference.identifiability.ParameterVerdicts
+::: commol.identifiability.methods.ParameterVerdicts
 
-::: commol.context.inference.identifiability.StructuralVerdict
+::: commol.identifiability.methods.StructuralVerdict
 
-::: commol.context.inference.identifiability.PracticalVerdict
+::: commol.identifiability.methods.PracticalVerdict
 
-::: commol.context.inference.identifiability.StructuralSection
+::: commol.identifiability.methods.StructuralSection
 
-::: commol.context.inference.identifiability.PointRank
+::: commol.identifiability.methods.PointRank
 
-::: commol.context.inference.identifiability.Combination
+::: commol.identifiability.methods.Combination
 
-::: commol.context.inference.identifiability.CollinearitySection
+::: commol.identifiability.methods.CollinearitySection
 
-::: commol.context.inference.identifiability.SubsetIndex
+::: commol.identifiability.methods.SubsetIndex
 
-::: commol.context.inference.identifiability.SampleSection
+::: commol.identifiability.methods.SampleSection
 
-::: commol.context.inference.identifiability.CorrelatedPair
+::: commol.identifiability.methods.CorrelatedPair
 
-::: commol.context.inference.identifiability.StartsSection
+::: commol.identifiability.methods.StartsSection
 
-::: commol.context.inference.identifiability.ProfileSection
+::: commol.identifiability.methods.ProfileSection

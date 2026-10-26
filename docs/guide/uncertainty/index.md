@@ -19,14 +19,12 @@ from commol import (
     Calibrator,
     ModelBuilder,
     NelderMeadConfig,
-    NoNoise,
     ObservedDataPoint,
-    ParameterSample,
-    Predictive,
-    SampleMethod,
     Simulation,
     scores,
 )
+from commol.observations import NoNoise
+from commol.uncertainty import ParameterSample, Predictive, SampleMethod
 
 
 def basic_model(k1: float | None, k2: float | None):
@@ -196,7 +194,7 @@ A draw of weight zero does not count. `weighted_quantiles` computes it for any
 values, and `member_statistics` reduces ensemble members with it.
 
 ```python
-from commol import weighted_quantiles
+from commol.uncertainty import weighted_quantiles
 
 print(weighted_quantiles([0.0, 1.0], levels=[0.5], weights=[1.0, 3.0]))  # [0.75]
 ```
@@ -261,7 +259,8 @@ across the runs with their weights. So the interval of a difference is the
 interval of the paired differences, not the difference of two intervals.
 
 ```python
-from commol import Peak, Scenarios, ValueAt
+from commol.quantities import Peak, ValueAt
+from commol.uncertainty import Scenarios
 
 # k1 is fitted; k2 is a value of the model that a scenario overrides.
 problem_k1 = CalibrationProblem(
@@ -370,7 +369,7 @@ methods, subclasses of `SensitivityMethod[R]`, run with no data through
 of the registry ([Sensitivity Analysis](sensitivity.md)).
 
 ```python
-from commol import BayesianBootstrap
+from commol.resampling import BayesianBootstrap
 
 result = calibrator.uncertainty(BayesianBootstrap(replicates=20, block_length=1))
 print(type(result).__name__, len(result.sample))  # BootstrapResult 20

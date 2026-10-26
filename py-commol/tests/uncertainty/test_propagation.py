@@ -6,30 +6,19 @@ import math
 import pytest
 from pydantic import BaseModel
 
-from commol import (
-    Calibrator,
-    DistributionNoise,
-    Gain,
+from commol import Calibrator, Simulation, scores
+from commol.observations import DistributionNoise, NoNoise, ResidualNoise
+from commol.quantities import Gain, Peak, PeakPosition, ValueAt
+from commol.sensitivity import (
     InputSpace,
     Morris,
-    NoNoise,
-    ParameterSample,
-    Peak,
-    PeakPosition,
     PolynomialChaos,
-    Predictive,
     Propagation,
-    ResidualNoise,
-    SampleMethod,
     SensitivityAnalysis,
-    Simulation,
     Sobol,
-    ValueAt,
-    scores,
 )
-from commol.context.inference.method import (
-    SensitivityMethod,
-)
+from commol.uncertainty import ParameterSample, Predictive, SampleMethod
+from commol._calibration.method import SensitivityMethod
 from tests.support import abc_builder, abc_rates, bounded
 from tests.support.kinds import decay, decay_model
 from tests.support.models import build_stochastic

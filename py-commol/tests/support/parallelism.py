@@ -12,8 +12,8 @@ from commol import (
     Simulation,
 )
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context.engine import ModelEngine
-from commol.context.parameter import Parameter
+from commol.engines.engine import ModelEngine
+from commol._model.parameter import Parameter
 
 from .kinds import TEST_ENGINE, DecayOutput, DecayStructure, decay, require_test_kind
 from .problems import bounded

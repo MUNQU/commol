@@ -229,7 +229,7 @@ from the problem's `seed`, so start 0 of `run(starts=n)` is the result of
 
 A particle swarm also scores the particles of each iteration in parallel, in
 the order of the particles, so the result does not depend on the number of
-threads. `commol.threads` chooses the threads and whether the particles run
+threads. `commol.parallelism.threads` chooses the threads and whether the particles run
 in parallel: see [Threads and Parallelism](parallelism.md).
 
 ```python
@@ -252,7 +252,7 @@ print({name: round(value, 2) for name, value in result.best_parameters.items()})
 | `CalibrationResult` field | Meaning |
 |---|---|
 | `starts` | One `StartSummary` per start that finished, in order: `start`, `end`, `loss`, `converged` |
-| `failed` | Each start that failed, `"Start <index> failed: <reason>"`; each is also logged as a warning (`logging`, logger `commol.api.calibrator`) |
+| `failed` | Each start that failed, `"Start <index> failed: <reason>"`; each is also logged as a warning (`logging`, logger `commol`) |
 
 The result is the start of least loss, the first of them on a tie; if every
 start fails, `run` raises a `RuntimeError` with the reason of each start. Starts that end at distinct points with equal
@@ -290,7 +290,7 @@ order. A point the objective penalizes is not kept.
 | Different results on each run | Set `seed`; use more particles or iterations |
 | A local minimum | `run(starts=n)` from several points |
 | A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations |
-| Slow | Fewer observation steps or particles; Nelder-Mead from a good start; check `commol.get_threads()` ([Threads and Parallelism](parallelism.md)) |
+| Slow | Fewer observation steps or particles; Nelder-Mead from a good start; check `commol.parallelism.get_threads()` ([Threads and Parallelism](parallelism.md)) |
 
 ## Next steps
 

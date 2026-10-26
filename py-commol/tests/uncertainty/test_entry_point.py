@@ -7,39 +7,27 @@ from typing import assert_type
 import pytest
 from pydantic import ValidationError
 
+from commol.resampling import BlockJackknife, ResidualBootstrap
+from commol.smc import BootstrapCoverageEta, GibbsPosterior
 from commol import (
-    BlockJackknife,
-    BootstrapCoverageEta,
     CalibrationConstraint,
     CalibrationProblem,
     Calibrator,
-    EnbPI,
-    GibbsPosterior,
-    InputSpace,
-    LogNormalObservations,
-    Laplace,
     NelderMeadConfig,
-    NormalObservations,
     ObservedDataPoint,
     ParticleSwarmConfig,
-    PolynomialChaos,
-    Priors,
-    ProfileLikelihood,
-    Ratio,
-    ResidualBootstrap,
-    SensitivityAnalysis,
     Simulation,
-    Sobol,
-    SplitConformal,
-    StructuralRank,
-    Threshold,
-    ValueAt,
 )
-from commol.context.inference.method import (
-    SensitivityMethod,
-    UncertaintyMethod,
-)
-from commol.api.inference.registry import register, registered
+from commol.conformal import EnbPI, SplitConformal
+from commol.sensitivity import InputSpace, PolynomialChaos, SensitivityAnalysis, Sobol
+from commol.observations import LogNormalObservations, NormalObservations
+from commol.local import Laplace
+from commol.distributions import Priors
+from commol.profiles import ProfileLikelihood, Threshold
+from commol.quantities import Ratio, ValueAt
+from commol.identifiability import StructuralRank
+from commol._calibration.method import SensitivityMethod, UncertaintyMethod
+from commol._calibration.registry import register, registered
 from tests.support import (
     a_to_b_builder,
     abc_builder,

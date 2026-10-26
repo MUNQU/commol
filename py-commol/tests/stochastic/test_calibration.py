@@ -15,10 +15,10 @@ from commol import (
     ObservedDataPoint,
     Quantile,
     Simulation,
-    weighted_quantiles,
 )
-from commol.context.calibration import CalibrationResult
-from commol.context.engine import EngineName
+from commol.uncertainty import weighted_quantiles
+from commol._fit.result import CalibrationResult
+from commol.engines.engine import EngineName
 from tests.support import STOCHASTIC_ENGINES, a_to_b_builder, bounded, build_stochastic
 
 RATE = 0.1

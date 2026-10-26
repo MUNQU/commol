@@ -6,7 +6,7 @@ import json
 import pytest
 
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context.engine_json import engine_json
+from commol._data.engine_json import engine_json
 from tests.support.data_objects import EXAMPLES
 from tests.suite.test_architecture import method_classes
 

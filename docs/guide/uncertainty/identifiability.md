@@ -19,17 +19,18 @@ from commol import (
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
-    Collinearity,
     ModelBuilder,
     NelderMeadConfig,
     ObservedDataPoint,
-    ParameterSample,
-    SampleIdentifiability,
-    SampleMethod,
     Simulation,
+)
+from commol.identifiability import (
+    Collinearity,
+    SampleIdentifiability,
     StartsIdentifiability,
     StructuralRank,
 )
+from commol.uncertainty import ParameterSample, SampleMethod
 
 
 def basic_model(k1: float | None, alpha: float | None, k2: float | None):
@@ -219,7 +220,7 @@ the data inform each parameter, and a sample drawn from the priors themselves
 has a contraction near 0.
 
 ```python
-from commol import Priors, Uniform
+from commol.distributions import Priors, Uniform
 
 against_priors = calibrator.identifiability(
     SampleIdentifiability(

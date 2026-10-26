@@ -69,13 +69,13 @@ structure, and loads back as its own class
 
 ## Bins and accumulators
 
-::: commol.context.bin.Bin
+::: commol._model.bin.Bin
 
-::: commol.context.bin.Accumulator
+::: commol._model.bin.Accumulator
 
 ## Stratifications
 
-::: commol.context.stratification.Stratification
+::: commol._model.stratification.Stratification
 
 A condition of a stratification or of a stratified rate,
 `StratificationCondition`, is documented in
@@ -83,14 +83,14 @@ A condition of a stratification or of a stratified rate,
 
 ## Parameters
 
-::: commol.context.parameter.Parameter
+::: commol._model.parameter.Parameter
 
 The value of a series parameter, `SeriesValue`, is documented in
 [Model API](../api/model.md).
 
 ## Transitions
 
-::: commol.context.transition.Transition
+::: commol._model.transition.Transition
 
 The rate of a transition in the compartments that match its conditions,
 `StratifiedRate`, is documented in [ModelBuilder API](../api/model-builder.md).
@@ -101,11 +101,11 @@ The engine's list of engines (`crates/commol-core/src/types/engine.rs`)
 validates the settings: settings of another engine raise an error that names
 both. `ODESolver` is documented in [Simulation API](../api/simulation.md).
 
-::: commol.context.engine.ModelEngine
+::: commol.engines.engine.ModelEngine
 
 ## Initial conditions
 
 `Aggregate` holds the fields and methods of `InitialConditions`, and checks
 them against the process when the model is built.
 
-::: commol.context.initial_conditions.InitialConditions
+::: commol._model.initial_conditions.InitialConditions

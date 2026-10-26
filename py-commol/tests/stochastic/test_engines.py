@@ -11,17 +11,10 @@ import math
 
 import pytest
 
-from commol import (
-    InfeasibleStateError,
-    InputSpace,
-    SensitivityAnalysis,
-    Simulation,
-)
-from commol.api.results import (
-    SimulationReplicates,
-    SimulationResults,
-)
-from commol.context.engine import EngineName
+from commol import InfeasibleStateError, Simulation
+from commol.sensitivity import InputSpace, SensitivityAnalysis
+from commol._simulation.results import SimulationReplicates, SimulationResults
+from commol.engines.engine import EngineName
 from tests.support import (
     MEAN_FIELD,
     STOCHASTIC_ENGINES,

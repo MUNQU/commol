@@ -23,7 +23,7 @@ Use this page before you make or review a change. It turns the
 ## Guardrails
 
 - **Do not duplicate an engine rule in Python.** Add a binding instead, and
-  call it from `context/_model/engine_state.py`.
+  call it from `_model/engine_state.py`.
 - **Do not identify compartments by name.** Use labels (see
   [Compartments are labels](decisions/model-structure.md#compartments-are-labels-with-a-name)).
 - **Do not drop invalid input silently.** Reject it with a message that names
@@ -38,7 +38,7 @@ Use this page before you make or review a change. It turns the
 ### Process (bins, stratifications, accumulators) and the aggregate structure
 
 - [ ] Change the Rust type in `crates/commol-core/src/types/` (`process.rs`,
-      `aggregate.rs`) and the Pydantic model in `py-commol/commol/context/`
+      `aggregate.rs`) and the Pydantic model in `py-commol/commol/_model/`
       (`process.py`, `aggregate.py`) together. A check of the process by
       itself goes in `Process`; a check against the structure goes in
       `Aggregate.check_model`.
@@ -70,17 +70,17 @@ Use this page before you make or review a change. It turns the
       `crates/commol-core/tests/expressions.rs::every_level_of_operators_at_the_limit_reads_on_a_worker_thread`.
 - [ ] Give a new function its value in
       `crates/commol-core/tests/expressions.rs::every_function_of_the_guide_has_its_value`
-      and its unit rule in `_FUNCTION_UNITS` (`utils/equations.py`).
+      and its unit rule in `_FUNCTION_UNITS` (`_model/unit_checks.py`).
 - [ ] Update [Mathematical expressions](../guide/mathematical-expressions.md).
 
 ### Initial conditions
 
 - [ ] Change the rule of an amount or a fraction in `rules.rs`
-      (`commol-model`), which `context/initial_conditions.py` and `initial_state` call.
+      (`commol-model`), which `_model/initial_conditions.py` and `initial_state` call.
 - [ ] Check that `Aggregate.initial_state(process)` reports the new state.
 - [ ] If calibration can set it, update
       `commol-model/src/initial_conditions.rs` (`InitialConditionPlan`) and the write-back
-      (`context/_model/calibration_write_back.py`).
+      (`_model/calibration_write_back.py`).
 - [ ] Check that `test_applied_model_reproduces_the_loss_the_optimizer_scored`
       still passes.
 
@@ -124,8 +124,9 @@ changing it ([Design decisions](decisions/uncertainty.md#methods-plug-into-one-e
       row in the table of `docs/guide/parallelism.md` and a case of `METHODS`
       in `tests/parallelism/test_threads.py`.
 - [ ] The configuration, a subclass of `UncertaintyMethod[YourResult]`, and
-      the result, a subclass of `ResultModel`, in `context/inference/`; a
-      result with draws holds a `ParameterSample`.
+      the result, a subclass of `ResultModel`, in the module of its family
+      (`resampling/methods.py`, …), which exports the configuration (`PAGES`
+      of `tests/suite/public_surface.py`); a result with draws holds a `ParameterSample`.
 - [ ] A method that fits several times fits its perturbations with
       `ReplicateRunner::fit_all` and checks them with `ReplicateFits::require`;
       its result has `failed` (the entries of `FitUnit::failed`, logged as
@@ -137,9 +138,8 @@ changing it ([Design decisions](decisions/uncertainty.md#methods-plug-into-one-e
       binding maps it with `method_error`, and the "Raises" section of its
       docstring lists `ValueError` and `RuntimeError` by that rule
       ([Design decisions](decisions/uncertainty.md#methods-raise-one-error-type)).
-- [ ] The Python runner in the module of its family under `api/inference/`,
-      which sends the method whole and calls `register(YourMethod, runner)` (`api/inference/registry.py`);
-      `api/inference/__init__.py` imports every such module.
+- [ ] The Python runner (`resampling/runners.py`, …), which sends the method whole and calls
+      `register(YourMethod, runner)` (`_calibration/registry.py`); the module of the family imports it.
 - [ ] A coverage study (`tests/support/coverage.py`, marker `coverage_study`)
       that shows its intervals cover at their level.
 - [ ] A guide page under `docs/guide/uncertainty/`, a row in the table
@@ -187,7 +187,7 @@ To add an engine to the list:
       `engine_type`, `dispatch!`, `plan_values` and `apply_values` (and
       `compartmental!` for an engine of the aggregate kind). Add the crate to
       `py-commol/Cargo.toml`.
-- [ ] Add the name to the `EngineName` `Literal` in `context/engine.py`; if the
+- [ ] Add the name to the `EngineName` `Literal` in `engines/engine.py`; if the
       engine has settings, add their Pydantic class to `EngineSettings`.
 - [ ] Run the tests of `crates/commol-core/src/types/engine.rs`,
       `py-commol/src/engine.rs` and `tests/building/test_engine.py`; they run
@@ -217,15 +217,15 @@ To add a kind of model, such as an agent network (see
       `apply_values` resolve and write the values of the kind, and
       `state_outputs` and `output_sums` name what an expression reads.
 - [ ] Add a variant to `EngineValuePlan` in `py-commol/src/engine.rs`.
-- [ ] Write a `ModelStructure` subclass in `py-commol/commol/context/`, with
+- [ ] Write a `ModelStructure` subclass in `py-commol/commol/_model/`, with
       `kind` as a `Literal` default. Implement `check_model` and
       `outputs_by_source`; override `series_label`, `uncalibrated_values`,
       `check_calibration_values`, `with_calibrated_values`,
       `report_sections`, `describe` and `check_unit_consistency` when the
       kind has them. Reject in
       `check_model` a feature of the process the kind cannot run, and name
-      the form that carries over. Import the module in `context/__init__.py`,
-      so `Model.from_json` reads the kind.
+      the form that carries over. Export it from the root (`ROOT` of
+      `tests/suite/public_surface.py`), so `Model.from_json` reads the kind.
 - [ ] Do not write a builder: `ModelBuilder.build(structure, engine)` builds
       every kind. Do not change `Simulation`, `Calibrator`, the reports or the
       figures: if one of them needs something of the kind, add a method to
@@ -236,7 +236,7 @@ To add a kind of model, such as an agent network (see
 - [ ] Give the description of the kind: override `ModelStructure.describe`
       with the sections it fills (`entities`, `dynamics`, `initialization`,
       `design_concepts`), built from the blocks of
-      `context/description.py`; the renderers need no change.
+      `_model/description.py`; the renderers need no change.
 - [ ] Copy the tests of `tests/model_kinds/` for the new kind, and run the
       Rust and Python suites.
 - [ ] Add the kind to [Model structure](../advanced/model-structure.md), the
@@ -259,10 +259,10 @@ To add a kind of model, such as an agent network (see
 ### Reports
 
 - [ ] Make a report a method of the object of results whose data it
-      describes; its block is a private function of `api/reporting.py`.
+      describes; its block is a private function of `_simulation/reports.py`.
 - [ ] Keep the key order of existing entries.
 - [ ] Put a section that only one model kind has in its
-      `ModelStructure.report_sections`, not in `api/reporting.py`.
+      `ModelStructure.report_sections`, not in `_simulation/reports.py`.
 - [ ] Use `member_statistics` (with the weights of a `Predictive`) for values
       across members, and `ParameterSample.summary` for parameters.
 - [ ] Update `tests/reporting/`.

@@ -16,34 +16,30 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from commol import (
-    ABCSMC,
-    BayesianPosterior,
+from commol.smc import ABCSMC, BayesianPosterior, GibbsPosterior, LossDistance
+from commol.observations import (
     BinomialObservations,
+    DistributionNoise,
+    LogNormalObservations,
+    NegativeBinomialObservations,
+    NormalObservations,
+    PoissonObservations,
+    StudentTObservations,
+)
+from commol import (
     CalibrationProblem,
     Calibrator,
-    DistributionNoise,
-    GibbsPosterior,
-    LogNormalObservations,
-    LossDistance,
-    NegativeBinomialObservations,
     NelderMeadConfig,
-    Normal,
-    NormalObservations,
     ObservedDataPoint,
-    ParameterSample,
-    ParametricBootstrap,
-    PoissonObservations,
-    Predictive,
-    Priors,
-    SampleMethod,
     Simulation,
-    StudentTObservations,
     scores,
 )
+from commol.distributions import Normal, Priors
+from commol.uncertainty import ParameterSample, Predictive, SampleMethod
+from commol.resampling import ParametricBootstrap
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context.engine_json import engine_json
-from commol.context.observation_models import _ObservationModel
+from commol._data.engine_json import engine_json
+from commol.observations.models import _ObservationModel
 from tests.support import (
     a_to_b_builder,
     bounded,
@@ -367,7 +363,7 @@ class TestMaximumLikelihood:
             observation_models={"B": PoissonObservations()},
         )
 
-        with caplog.at_level(logging.INFO, logger="commol.api.calibrator"):
+        with caplog.at_level(logging.INFO, logger="commol"):
             calibrator.run()
 
         assert "negative log-likelihood" in caplog.text

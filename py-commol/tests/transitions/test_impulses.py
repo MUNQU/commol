@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from commol import Aggregate, Simulation, AxisPattern
-from commol.context.model import Model
+from commol._model.model import Model
 from tests.support import FactoryBuilder, TIGHT, assert_close, build, build_ode
 
 

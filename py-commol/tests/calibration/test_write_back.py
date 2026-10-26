@@ -9,14 +9,13 @@ from commol import (
     Calibrator,
     NelderMeadConfig,
     ObservedDataPoint,
-    ParameterSample,
     ParticleSwarmConfig,
-    SampleMethod,
     Simulation,
 )
-from commol.api.model_builder import ModelBuilder
-from commol.context._model.engine_state import calibrated_initial_state
-from commol.context.model import Model
+from commol.uncertainty import ParameterSample, SampleMethod
+from commol._model.builder import ModelBuilder
+from commol._model.engine_state import calibrated_initial_state
+from commol._model.model import Model
 from tests.support import (
     FactoryBuilder,
     a_to_b_builder,

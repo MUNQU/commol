@@ -9,7 +9,7 @@ their ports and one sampler, and what a replicate may change.
 
 A method with draws returns its own result type, which holds a
 `ParameterSample` (`crates/commol-inference/src/sample.rs`,
-`py-commol/commol/context/inference/sample.py`): names, bounds, values, log
+`py-commol/commol/uncertainty/sample.py`): names, bounds, values, log
 weights normalized to sum to 1, optional groups and the method that made it.
 Plots, reports, the predictive and the scores read the sample, never the
 result of one method. Every statistic is weighted and computed in Rust; equal
@@ -29,15 +29,15 @@ weights give the unweighted statistic.
 uncertainty method, `Calibrator.identifiability(method:
 IdentifiabilityMethod[R]) -> R` every identifiability method, and
 `SensitivityAnalysis.run(method: SensitivityMethod[R]) -> R` every sensitivity
-method. The kinds subclass `InferenceMethod[R]` (`context/inference/method.py`)
+method. The kinds subclass `InferenceMethod[R]` (`_calibration/method.py`)
 and share one registry, which hands each runner the object of its entry
 point; each entry point refuses another kind with a `TypeError` that names the
 right one.
 A method is three parts: a configuration that subclasses `UncertaintyMethod`
-with its result type (`context/inference/`), a runner in Rust bound in
-`py-commol/src/`, in the module of its family, and a result
-(`context/inference/`). The module of its family under `api/inference/`
-registers its runner with `register` (`api/inference/registry.py`); the entry
+with its result type and a result, both in the module of its family
+(`resampling/methods.py`, …), and a runner in Rust bound in `py-commol/src/`.
+The Python runner (`resampling/runners.py`, …) registers itself with
+`register` (`_calibration/registry.py`) when the module is imported; the entry
 point looks the runner up
 by the configuration's type and knows no method. A static type checker infers
 `R` from the configuration's type.
@@ -46,7 +46,7 @@ by the configuration's type and knows no method. A static type checker infers
 |---|---|
 | One `Calibrator` method per technique | A class with thirty methods that every method edits. |
 | Free functions | Each repeats the simulation and problem arguments. |
-| `method.run(calibrator)` | The configuration, in `context/`, would import `api/`. |
+| `method.run(calibrator)` | The configuration would import the calibrator, and the calibrator the configurations. |
 
 Every random number of a method comes from the generator and the samplers
 of `commol-random`, seeded from the seed of its source ([Results](results.md#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts))
@@ -232,7 +232,7 @@ the same `ConformalResult` as every variant.
 
 ## Scenarios pair the draws of one sample
 
-`Scenarios` (`py-commol/commol/api/inference/scenarios.py`) holds one
+`Scenarios` (`py-commol/commol/uncertainty/scenarios.py`) holds one
 `Predictive` per scenario, each on a copy of the model with its overrides,
 from `source.with_model(model)` with the seed of the source. Run `k` of every
 scenario is then the same draw with the same seed, so `compare` takes each

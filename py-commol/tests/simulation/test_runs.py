@@ -12,11 +12,9 @@ from commol import (
     ObservedDataPoint,
     Simulation,
 )
-from commol.api.results import (
-    SimulationResults,
-)
-from commol.context.engine import EngineName
-from commol.context.model import Model
+from commol._simulation.results import SimulationResults
+from commol.engines.engine import EngineName
+from commol._model.model import Model
 from tests.support import (
     ENGINE_REL,
     ABC_START,

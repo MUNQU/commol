@@ -26,8 +26,8 @@ from commol import (
     NelderMeadConfig,
     ObservedDataPoint,
     Simulation,
-    SplitConformal,
 )
+from commol.conformal import SplitConformal
 
 
 def ab_model(k: float | None):
@@ -134,7 +134,7 @@ choice: a small series does not borrow the errors of a large one, but it needs
   rejects `"spread"`.
 
 ```python
-from commol import ParameterSample, SampleMethod
+from commol.uncertainty import ParameterSample, SampleMethod
 
 sample = ParameterSample.equally_weighted(
     names=["k"],
@@ -199,7 +199,7 @@ horizon `k`, so give positions spaced as the observations. A horizon with fewer
 than `1/α − 1` origins that reach it has an unbounded interval.
 
 ```python
-from commol import RollingConformal
+from commol.conformal import RollingConformal
 
 every_point = CalibrationProblem(
     observed_data=observations,
@@ -248,7 +248,7 @@ own. The theorem assumes blocks of `n/K` observations each.
 computes it, and `result.guarantee` states it.
 
 ```python
-from commol import JackknifePlus
+from commol.conformal import JackknifePlus
 
 jackknife = calibrator.uncertainty(
     JackknifePlus(block_length=4, score="absolute", by="series", confidence_level=0.9, positions=[45.0])
@@ -288,7 +288,7 @@ so their intervals are unbounded. `result.intervals` holds the interval given
 at each point before it was seen.
 
 ```python
-from commol import AdaptiveConformal
+from commol.conformal import AdaptiveConformal
 
 adaptive = calibrator.uncertainty(
     AdaptiveConformal(confidence_level=0.9, step=0.05, score="absolute", by="series", stream=held_out)
