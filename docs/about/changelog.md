@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the parser or of the compiler quotes the formula cut after its first 80
   characters. See
   [Limits of the parser](../guide/mathematical-expressions.md#limits-of-the-parser).
+- A rate gives the same description with or without spaces: the description
+  and its LaTeX are written from the tree that the parser of the engine
+  reads, so `k1*A*B/total` and `k1 * A * B / total` give one description. A
+  formula shows one space around each operator, only the parentheses that
+  its grouping needs, `^` for a power and each number as its value (`1e-5`
+  shows as `1e-05`, `2.0` as `2`). In LaTeX, a power raises its exponent
+  (`A^{2}`), `%` is `\bmod` and a comparison has its symbol (`\leq`). See
+  [The equations](../guide/describing-models.md#the-equations).
+- The unit check reads the tree of the engine: it reads `!` in a condition
+  and a variable named like a word of Python, such as `lambda`, and a formula
+  outside the language gives the message of the parser.
 
 ### Removed
 
@@ -34,6 +45,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   levels of nesting, within the limits of the parser. The
   build still rejects a variable that the model does not define. See
   [Limits of the parser](../guide/mathematical-expressions.md#limits-of-the-parser).
+
+### Fixed
+
+- The flow of a proportional rate is the whole rate times its source, in the
+  description and in the unit check: a rate `k1 + k2` from `B` is
+  `(k1 + k2) * B`; before, both read `k1 + k2 * B`, and the unit check of
+  such a model failed. In LaTeX, a division followed by a product is a
+  fraction times the product: the flow of a proportional rate `a / b` from
+  `B` is `\frac{a}{b} \cdot B`, no longer `\frac{a}{b \cdot B}`.
 
 ### Documentation
 

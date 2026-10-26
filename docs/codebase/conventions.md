@@ -69,9 +69,9 @@ check some of these rules. The rest depend on the author and the reviewer.
   (`tests/suite/test_engine_rules.py::test_only_the_engine_computes_a_window`).
 - The parser of the engine is the only check of a formula: the validator of
   each Python object that holds a formula calls
-  `commol_rs.core.MathExpression(formula).check()`, and no module tokenizes
-  or checks the text of a formula, but the readers that `FORMULA_READERS`
-  lists with their reasons; see
+  `commol_rs.core.MathExpression(formula).check()`, and no module tokenizes,
+  checks or parses the text of a formula (Python asks the engine for its
+  tree, `engine_state.formula_tree`); see
   [Design decisions](decisions/formulas.md#the-parser-of-the-engine-is-the-only-check-of-a-formula)
   (`tests/suite/test_engine_rules.py::test_only_the_engine_reads_a_formula`).
 - Context data structures are Pydantic v2 models.

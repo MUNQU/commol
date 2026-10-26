@@ -111,6 +111,15 @@ plans, after it has decided which rates are proportional (see
 | Events | For a stochastic engine, instead of the expanded form: one row per flow, with the change of the state of one event and its propensity (`StochasticEvents`) or its draw in a step (`StochasticSteps`). See [Stochastic Simulation](stochastic.md#how-a-rate-becomes-an-event). |
 | Impulses | Each impulse transition, the positions where it acts and the amounts it moves; an impulse is not part of the equations. |
 
+Each rate and each flow is written from the tree that the parser of the
+engine reads, not from the text of the rate, so `k1*A*B/total` and
+`k1 * A * B / total` give the same description. The text has one space around
+each operator, only the parentheses that its grouping needs, `^` for a power,
+and each number as its value: `1e-5` is `1e-05` and `2.0` is `2`. The flow
+of a proportional rate is the whole rate times its source: `(k1 + k2) * B`.
+In LaTeX, a product is `\cdot`, a division outside parentheses is a fraction
+and a power raises its exponent.
+
 For the model above, the text rendering holds:
 
 ```text

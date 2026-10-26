@@ -20,7 +20,7 @@ kind that is not aggregate through every generic layer.
 |---|---|---|
 | `building/` | The builder, parameters, stratifications, reserved names, save and load | [Building Models](../guide/building-models.md) |
 | `transitions/` | Flows, `$compartment`, stratified rates, impulses | [Transitions](../guide/transitions.md) |
-| `rates/` | Formulas, functions, variables, the rules and limits of a formula | [Mathematical Expressions](../guide/mathematical-expressions.md) |
+| `rates/` | Formulas, functions, variables, the rules and limits of a formula, the tree of a formula that Python reads from the engine | [Mathematical Expressions](../guide/mathematical-expressions.md) |
 | `axis_patterns/` | `AxisPattern` formulas, runs and schedules | [Axis Patterns](../guide/axis-patterns.md) |
 | `initial_conditions/` | Bin, stratification and compartment fractions; the initial state | [Building Models](../guide/building-models.md#the-structure-aggregate) |
 | `simulation/` | Runs, `run_at`, results and their positions, differential models, outputs, the window grid and windowed totals, `AxisUnits` | [Running Simulations](../guide/simulations.md) |

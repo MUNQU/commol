@@ -92,7 +92,7 @@ privilege that no other axis has. Without `step_unit`, a failed check says to
 declare it. The check reads the flows the engine plans (`transition_flows`,
 in `UnitChecker._collect_unit_errors`), so a proportional rate is checked as
 its flow, `rate × source`, and never by a rule of its own in Python.
-`check_equation_units` requires every flow to be **equal** to
+`check_formula_units` requires every flow to be **equal** to
 `<bin unit>/<step unit>`, and every impulse to `<bin unit>`, not only
 convertible to it (`utils/equations.py`, `same_unit`).
 
@@ -101,7 +101,7 @@ A unit means what `pint` defines; there is no list of aliases. A name that
 (`define_units`). In the check, `t` (a position) has the step unit and `step`
 (a count) is dimensionless. A number written in a rate and added to,
 subtracted from or compared with a quantity is read in its unit, as the engine
-reads it (`parse_equation_unit`); a computed number stays dimensionless.
+reads it (`formula_unit`); a computed number stays dimensionless.
 
 **Rule:** never accept a convertible unit as equal. `1/week` and `1/day` in one
 model would read a weekly rate as a daily one.
