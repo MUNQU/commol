@@ -93,6 +93,48 @@ pub enum RateMeaning {
     Continuous,
 }
 
+/// What a rate from a mean span keeps of the residence of a bin.
+///
+/// The two differ only for a per-step rate: a model that discretizes a
+/// continuous process keeps its survival, and a model whose step is the unit
+/// of its process keeps its mean.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum RateKeeps {
+    /// The survival of the exponential residence at every step.
+    Survival,
+    /// The mean of the residence.
+    Mean,
+}
+
+impl RateKeeps {
+    /// Every value.
+    pub const ALL: &'static [Self] = &[Self::Survival, Self::Mean];
+
+    /// Name of the value, as Python passes it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Survival => "survival",
+            Self::Mean => "mean",
+        }
+    }
+
+    /// The value with a name.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message with every name when no value has it.
+    pub fn from_name(name: &str) -> Result<Self, String> {
+        Self::ALL
+            .iter()
+            .copied()
+            .find(|keep| keep.name() == name)
+            .ok_or_else(|| {
+                let names: Vec<&str> = Self::ALL.iter().map(|keep| keep.name()).collect();
+                format!("Unknown value '{name}' of what a rate keeps; the values are {names:?}")
+            })
+    }
+}
+
 impl RateMeaning {
     /// Name of the meaning, as Python shows it.
     pub fn name(self) -> &'static str {
@@ -102,26 +144,35 @@ impl RateMeaning {
         }
     }
 
-    /// The rate of one outflow whose residence is exponential with a mean
-    /// span of `span` steps.
+    /// The rate of one outflow whose residence has a mean span of `span`
+    /// steps, which keeps `keep` of that residence.
     ///
-    /// Per step: `1 - e^(-1/span)`, the fraction an exponential process of
-    /// that mean moves in one step, so the bin keeps `e^(-n/span)` at each
-    /// step `n`; its mean residence is `1/rate` steps, a little more than
-    /// `span`. Continuous: `1/span`.
+    /// Per step, [`RateKeeps::Survival`]: `1 - e^(-1/span)`, the fraction an
+    /// exponential process of that mean moves in one step, so the bin keeps
+    /// `e^(-n/span)` at each step `n`; its mean residence is `1/rate` steps,
+    /// a little more than `span`. Per step, [`RateKeeps::Mean`]: `1/span`,
+    /// so the residence is geometric with a mean of `span` steps.
+    /// Continuous: `1/span` for both.
     ///
     /// # Errors
     ///
-    /// Returns a message when `span` is not positive and finite.
-    pub fn rate_from_mean_span(self, span: f64) -> Result<f64, String> {
+    /// Returns a message when `span` is not positive and finite, or when a
+    /// per-step rate keeps the mean of a span shorter than one step.
+    pub fn rate_from_mean_span(self, span: f64, keep: RateKeeps) -> Result<f64, String> {
         if !(span.is_finite() && span > 0.0) {
             return Err(format!(
                 "The mean span must be positive and finite, got {span} steps"
             ));
         }
-        Ok(match self {
-            Self::PerStep => -(-1.0 / span).exp_m1(),
-            Self::Continuous => 1.0 / span,
+        Ok(match (self, keep) {
+            (Self::PerStep, RateKeeps::Survival) => -(-1.0 / span).exp_m1(),
+            (Self::PerStep, RateKeeps::Mean) if span < 1.0 => {
+                return Err(format!(
+                    "A mean span of {span} steps has no per-step rate that keeps the \
+                     mean: the mean of a per-step residence is at least one step"
+                ));
+            }
+            (Self::PerStep, RateKeeps::Mean) | (Self::Continuous, _) => 1.0 / span,
         })
     }
 
@@ -905,14 +956,61 @@ mod tests {
     }
 
     #[test]
-    fn a_rate_from_a_mean_span_keeps_the_exponential_survival() {
-        let per_step = RateMeaning::PerStep.rate_from_mean_span(10.0).unwrap();
-        assert!((per_step - (1.0 - (-0.1_f64).exp())).abs() < 1e-15);
-        assert!((1.0 / per_step - 10.508).abs() < 1e-3);
-        assert_eq!(RateMeaning::Continuous.rate_from_mean_span(10.0), Ok(0.1));
-        for span in [0.0, -1.0, f64::INFINITY, f64::NAN] {
-            assert!(RateMeaning::PerStep.rate_from_mean_span(span).is_err());
+    fn a_rate_from_a_mean_span_keeps_what_the_caller_asks() {
+        let survival = RateMeaning::PerStep
+            .rate_from_mean_span(10.0, RateKeeps::Survival)
+            .unwrap();
+        assert!((survival - (1.0 - (-0.1_f64).exp())).abs() < 1e-15);
+        assert!((1.0 / survival - 10.508).abs() < 1e-3);
+        assert_eq!(
+            RateMeaning::PerStep.rate_from_mean_span(10.0, RateKeeps::Mean),
+            Ok(0.1)
+        );
+        for keep in RateKeeps::ALL.iter().copied() {
+            assert_eq!(
+                RateMeaning::Continuous.rate_from_mean_span(10.0, keep),
+                Ok(0.1)
+            );
+            assert_eq!(RateKeeps::from_name(keep.name()), Ok(keep));
+            for meaning in [RateMeaning::PerStep, RateMeaning::Continuous] {
+                for span in [0.0, -1.0, f64::INFINITY, f64::NAN] {
+                    assert!(meaning.rate_from_mean_span(span, keep).is_err());
+                }
+            }
         }
+        assert_eq!(
+            RateKeeps::from_name("median"),
+            Err(
+                "Unknown value 'median' of what a rate keeps; the values are \
+                 [\"survival\", \"mean\"]"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn a_mean_shorter_than_a_step_has_no_per_step_rate() {
+        assert_eq!(
+            RateMeaning::PerStep.rate_from_mean_span(0.5, RateKeeps::Mean),
+            Err(
+                "A mean span of 0.5 steps has no per-step rate that keeps the mean: \
+                 the mean of a per-step residence is at least one step"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            RateMeaning::PerStep.rate_from_mean_span(1.0, RateKeeps::Mean),
+            Ok(1.0)
+        );
+        assert!(
+            RateMeaning::PerStep
+                .rate_from_mean_span(0.5, RateKeeps::Survival)
+                .is_ok()
+        );
+        assert_eq!(
+            RateMeaning::Continuous.rate_from_mean_span(0.5, RateKeeps::Mean),
+            Ok(2.0)
+        );
     }
 
     #[test]

@@ -6,7 +6,7 @@
 
 use crate::parallelism::parallel;
 use commol_core::{
-    EngineType, ModelKind, ModelValue, SimulationEngine, SimulationError, ValuePlan,
+    EngineType, ModelKind, ModelValue, RateKeeps, SimulationEngine, SimulationError, ValuePlan,
 };
 use commol_difference::DifferenceEquations;
 use commol_differential::DifferentialEquations;
@@ -599,13 +599,17 @@ impl PyEngineType {
     ///
     /// Args:
     ///     span: Mean span of the residence, in steps
+    ///     keep: What the rate keeps of the residence: "survival" or "mean"
     ///
     /// Raises:
-    ///     ValueError: If the span is not positive and finite
-    fn rate_from_mean_span(&self, span: f64) -> PyResult<f64> {
+    ///     ValueError: If `keep` is another value, the span is not positive
+    ///         and finite, or a per-step rate keeps the mean of a span shorter
+    ///         than one step
+    fn rate_from_mean_span(&self, span: f64, keep: &str) -> PyResult<f64> {
+        let keep = RateKeeps::from_name(keep).map_err(PyValueError::new_err)?;
         self.inner
             .rate_meaning()
-            .rate_from_mean_span(span)
+            .rate_from_mean_span(span, keep)
             .map_err(PyValueError::new_err)
     }
 

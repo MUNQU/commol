@@ -57,8 +57,8 @@ pub use types::{
     Accumulator, Aggregate, AggregateVariant, Bin, DynamicsForm, EngineSettings, EngineType,
     EventMethod, InitialConditions, Model, ModelEngine, ModelKind, ModelStructure, ModelValueType,
     NEIGHBORS, NEIGHBORS_PREFIX, Neighbors, OdeMethod, OdeSolver, Parameter, ParameterValue,
-    Process, RateMeaning, Rounding, SeriesMode, StochasticEventsSettings, StochasticStepsSettings,
-    Stratification, StratificationCondition, StratifiedRate, Transition,
+    Process, RateKeeps, RateMeaning, Rounding, SeriesMode, StochasticEventsSettings,
+    StochasticStepsSettings, Stratification, StratificationCondition, StratifiedRate, Transition,
 };
 #[cfg(feature = "test-kind")]
 pub use types::{DecayOutput, TestStructure};

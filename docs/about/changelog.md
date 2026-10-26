@@ -89,6 +89,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The unit check reads the tree of the engine: it reads `!` in a condition
   and a variable named like a word of Python, such as `lambda`, and a formula
   outside the language gives the message of the parser.
+- **Breaking:** `AxisUnits.rate_from_mean_span` takes a required keyword
+  `keep`, with no default: `"survival"` gives the rate of today, which keeps
+  the exponential survival at every step (`1 - exp(-1/n)` on a per-step
+  engine), and `"mean"` gives `1/n`, whose mean residence is `n` steps on a
+  per-step engine. A continuous engine gives `1/n` with both. With
+  `keep="mean"`, a per-step engine rejects a span shorter than one step with
+  `ValueError`. Migration: add `keep="survival"` to keep each rate as it is.
+  See [Units of the axis](../guide/core-concepts.md#units-of-the-axis).
 
 ### Removed
 
