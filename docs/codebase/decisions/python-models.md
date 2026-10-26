@@ -44,6 +44,48 @@ compiler and the validator of its Python object call.
 **Guards:** `tests/building/test_value_rules.py`,
 `crates/commol-model/tests/value_rules.rs`.
 
+## A data object crosses as the JSON of its dump
+
+Every data object of the Python API that reaches the engine, the model, the
+calibration problem and each inference method included, crosses as the JSON
+of its `model_dump()` (`engine_json` of
+`py-commol/commol/context/engine_json.py`). The bridge reads it with one
+helper, `read` of `py-commol/src/json.rs`, into the type the engine owns,
+which takes the spelling of the Python API (`rename_all = "snake_case"`) and
+denies unknown fields. An error names the path of the field and gives the
+message of the engine (`optimization_config.inertia_factor: inertia_factor is
+a number greater than 0, got -1`). A number that is not finite crosses as
+`Infinity`, `-Infinity` or `NaN`, which the reader takes.
+
+Each union of classes carries one tag, `kind`, with a default, so a field is
+never read by the first variant that matches; `tagged!` of
+`commol_core::json` reads the tag, keeps the path and checks the range rules
+of the variant. A method crosses whole, into one settings type of
+`crates/commol-inference/src/settings/`, and the engine decides what the
+method needs: the fit with its starts, the calibration of `η`, the threshold
+of a profile and the checks of the names. A field that holds a result with
+behavior in the engine, such as a sample, crosses as its handle: the class
+names it in `_engine_handles`, and `engine_handles` gives it as a keyword
+argument. A `#[pyclass]` is a handle or a result, never data.
+
+| Alternative | Why not |
+|---|---|
+| A PyO3 class for each data class, filled field by field in Python | Three shapes of each value (the pydantic class, the conversion, the PyO3 class), four edits per field, and nothing checks that they agree. |
+| The fields of a method as positional arguments | A long signature per method, and a copy of its fields in the runner. |
+| An untagged union | No path in the error, and the first variant that matches wins. |
+| `pythonize` (Python objects to serde with no string) | A second mechanism next to the JSON of the model. |
+
+**Rule:** a new field of a data object gets the same name in its Rust type,
+and nothing else; a new data class gets its Rust type, an entry of
+`objects!` in `py-commol/src/json.rs` and a valid object in
+`tests/support/data_objects.py`.
+
+**Guards:** `tests/suite/test_bridge.py` (the engine reads back each dump),
+`tests/suite/test_architecture.py` (no data class in the bridge, no
+conversion in Python, each runner sends its method whole),
+`tests/calibration/test_settings.py` (the path of an error),
+`crates/commol-core/tests/json.rs`, `crates/commol-calibration/tests/test_json.rs`.
+
 ## Results compare by their values
 
 Every result of commol compares with one rule, `ComparedByValue`
