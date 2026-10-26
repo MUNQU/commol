@@ -86,7 +86,7 @@ def build_engine(model: "Model | str") -> "EngineProtocol":
     RuntimeError
         If the engine cannot compile the model.
     """
-    model_json = model if isinstance(model, str) else model.model_dump_json()
+    model_json = model if isinstance(model, str) else engine_json(model)
     return commol_rs.engine.Engine(model_json)
 
 
@@ -118,7 +118,7 @@ def initial_state(
     return [
         InitialCompartment(name, bin_id, dict(categories), amount)
         for name, bin_id, categories, amount in commol_rs.model.initial_state(
-            process.model_dump_json(), structure.model_dump_json()
+            engine_json(process), engine_json(structure)
         )
     ]
 
@@ -139,9 +139,7 @@ def expanded_outputs(
     tuple[list[ExpandedOutput], list[ExpandedOutput]]
         The expanded compartments and accumulator outputs, in engine order.
     """
-    compartments, accumulators = commol_rs.model.expanded_outputs(
-        process.model_dump_json()
-    )
+    compartments, accumulators = commol_rs.model.expanded_outputs(engine_json(process))
     return (
         [
             ExpandedOutput(name, source, dict(cats))
@@ -223,7 +221,7 @@ def transition_flows(
     return [
         TransitionFlow(*flow)
         for flow in commol_rs.model.transition_flows(
-            process.model_dump_json(), structure.model_dump_json()
+            engine_json(process), engine_json(structure)
         )
     ]
 
@@ -414,7 +412,7 @@ def check_model(model: "Model") -> None:
         model or reads a variable the model does not define, or a rate reads
         neighbors the model cannot resolve.
     """
-    commol_rs.model.check_model(model.model_dump_json())
+    commol_rs.model.check_model(engine_json(model))
 
 
 def subgroup_total_names(process: "Process") -> list[str]:
@@ -434,7 +432,7 @@ def subgroup_total_names(process: "Process") -> list[str]:
     list[str]
         The names, sorted. A process without stratifications has none.
     """
-    return commol_rs.model.subgroup_total_names(process.model_dump_json())
+    return commol_rs.model.subgroup_total_names(engine_json(process))
 
 
 @lru_cache(maxsize=1024)

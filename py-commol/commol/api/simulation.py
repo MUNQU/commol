@@ -19,6 +19,7 @@ from commol.api.results import (
 )
 from commol.api.windows import windowed_totals
 from commol.context._model.engine_state import build_engine
+from commol.context.engine_json import engine_json
 from commol.context.model import Model
 from commol.context.structure import ModelStructure
 
@@ -83,7 +84,7 @@ class Simulation:
             )
         logger.info(f"Initializing Simulation with model: '{model.name}'")
         self.model_definition: Model = model
-        self._build_engine(model.model_dump_json())
+        self._build_engine(engine_json(model))
 
     def _build_engine(self, model_json: str) -> None:
         """Build the engine and its output names from a model JSON."""
@@ -96,7 +97,7 @@ class Simulation:
 
     def _sync_engine(self) -> None:
         """Rebuild the engine when the model changed since it was built."""
-        model_json = self.model_definition.model_dump_json()
+        model_json = engine_json(self.model_definition)
         if model_json != self._model_json:
             logger.info("Model changed since the engine was built; rebuilding it.")
             self._build_engine(model_json)

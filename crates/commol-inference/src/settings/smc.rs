@@ -92,6 +92,10 @@ impl<'de> Deserialize<'de> for Eta {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         match Value::deserialize(deserializer)? {
             value @ (Value::Int(_) | Value::Float(_)) => json::from_value(value).map(Self::Value),
+            // A number that is not finite crosses as its text.
+            Value::String(text) if json::non_finite(&text).is_some() => {
+                json::from_value(Value::String(text)).map(Self::Value)
+            }
             value @ Value::Map(_) => json::from_value(value).map(Self::Calibrated),
             _ => Err(de::Error::custom(
                 "eta is a number or a calibration of eta, InformationMatchingEta or \

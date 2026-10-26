@@ -172,8 +172,12 @@ class TestBuild:
                 lambda: ODESolver(rtol=0.0),
                 "rtol is a finite number greater than 0, got 0",
             ),
+            (
+                lambda: ODESolver(atol=float("inf")),
+                "atol is a finite number greater than 0, got inf",
+            ),
         ],
-        ids=["epsilon", "rtol"],
+        ids=["epsilon", "rtol", "infinite atol"],
     )
     def test_the_engine_checks_the_settings(self, settings, message: str) -> None:
         with pytest.raises(ValidationError, match=message):

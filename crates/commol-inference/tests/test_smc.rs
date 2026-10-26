@@ -761,6 +761,8 @@ fn eta_is_a_number_or_a_calibration_of_it() {
 
     assert_eq!(eta, Eta::Value(0.5));
     assert_eq!(commol_core::json::write(&eta), "0.5");
+    let infinite: Eta = commol_core::json::read(r#""Infinity""#).unwrap();
+    assert_eq!(infinite, Eta::Value(f64::INFINITY));
     let message = commol_core::json::read::<Eta>(r#""auto""#).unwrap_err();
     assert!(
         message.starts_with("eta is a number or a calibration of eta"),

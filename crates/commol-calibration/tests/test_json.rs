@@ -93,8 +93,8 @@ fn what_a_problem_reads_writes_back() {
     let written = json::write(&settings);
 
     assert_eq!(json::read::<ProblemSettings>(&written).unwrap(), settings);
-    let back: json::Value = json5::from_str(&written).unwrap();
-    let original: json::Value = json5::from_str(&text).unwrap();
+    let back: json::Value = serde_json::from_str(&written).unwrap();
+    let original: json::Value = serde_json::from_str(&text).unwrap();
     assert_eq!(back, original);
 }
 

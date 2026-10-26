@@ -24,7 +24,8 @@ use crate::ranges::{DF, LOG_NORMAL_SIGMA, OVERDISPERSION, SD, STUDENT_T_SCALE};
 use crate::types::{CalibrationParameter, CalibrationParameterType, ObservedDataPoint};
 
 /// A noise argument of an observation model: a number, or the id of a noise
-/// parameter that is calibrated. JSON writes it as a number or a string.
+/// parameter that is calibrated. JSON writes it as a number or a string; a
+/// string is always an id, since no argument is a number that is not finite.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Argument {
     /// A fixed number.

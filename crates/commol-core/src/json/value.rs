@@ -7,9 +7,11 @@ use serde::de::value::{MapAccessDeserializer, MapDeserializer, SeqDeserializer};
 use serde::de::{self, IntoDeserializer, Visitor};
 use serde::ser::{SerializeMap, SerializeSeq};
 
-/// A JSON value. A number keeps whether it is whole, and a number that is
-/// not finite is a [`Value::Float`]. Two numbers are equal when their values
-/// are, `1` and `1.0` too, as JSON reads them.
+/// A JSON value. A number keeps whether it is whole. A number that is not
+/// finite is a [`Value::Float`] when serde writes it, and the text
+/// `"Infinity"`, `"-Infinity"` or `"NaN"` when JSON holds it; a reader reads
+/// such a text as a number where its type asks for one. Two numbers are
+/// equal when their values are, `1` and `1.0` too, as JSON reads them.
 #[derive(Clone, Debug)]
 pub enum Value {
     /// `null`.
@@ -57,9 +59,31 @@ impl Value {
     }
 }
 
-/// The JSON of a value, with no spaces: each key quoted, as every JSON
-/// reader reads it, and `Infinity`, `-Infinity` or `NaN` for a number that is
-/// not finite.
+/// The number that `text` names when it is `"Infinity"`, `"-Infinity"` or
+/// `"NaN"`, the text of a number that is not finite in the JSON of the port.
+pub fn non_finite(text: &str) -> Option<f64> {
+    match text {
+        "Infinity" => Some(f64::INFINITY),
+        "-Infinity" => Some(f64::NEG_INFINITY),
+        "NaN" => Some(f64::NAN),
+        _ => None,
+    }
+}
+
+/// The text of `value`, a number that is not finite: `"Infinity"`,
+/// `"-Infinity"` or `"NaN"`.
+pub fn non_finite_text(value: f64) -> &'static str {
+    if value.is_nan() {
+        "NaN"
+    } else if value > 0.0 {
+        "Infinity"
+    } else {
+        "-Infinity"
+    }
+}
+
+/// The JSON of a value, with no spaces: each key quoted, and the text
+/// `"Infinity"`, `"-Infinity"` or `"NaN"` for a number that is not finite.
 impl Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let quoted = |text: &str| serde_json::to_string(text).expect("JSON writes every string");
@@ -67,12 +91,9 @@ impl Display for Value {
             Self::Null => f.write_str("null"),
             Self::Bool(value) => write!(f, "{value}"),
             Self::Int(value) => write!(f, "{value}"),
-            Self::Float(value) if value.is_nan() => f.write_str("NaN"),
-            Self::Float(value) if value.is_infinite() => f.write_str(if *value > 0.0 {
-                "Infinity"
-            } else {
-                "-Infinity"
-            }),
+            Self::Float(value) if !value.is_finite() => {
+                f.write_str(&quoted(non_finite_text(*value)))
+            }
             Self::Float(value) => {
                 f.write_str(&serde_json::to_string(value).expect("JSON writes every finite number"))
             }
@@ -114,6 +135,12 @@ impl Display for Error {
 impl std::error::Error for Error {}
 
 impl de::Error for Error {
+    fn custom<T: Display>(message: T) -> Self {
+        Self(message.to_string())
+    }
+}
+
+impl serde::ser::Error for Error {
     fn custom<T: Display>(message: T) -> Self {
         Self(message.to_string())
     }
@@ -194,6 +221,9 @@ impl serde::Serialize for Value {
                 (_, Ok(value)) => serializer.serialize_i64(value),
                 _ => serializer.serialize_i128(*value),
             },
+            Self::Float(value) if !value.is_finite() => {
+                serializer.serialize_str(non_finite_text(*value))
+            }
             Self::Float(value) => serializer.serialize_f64(*value),
             Self::String(value) => serializer.serialize_str(value),
             Self::List(items) => {
@@ -251,6 +281,20 @@ impl<'de> de::Deserializer<'de> for Value {
         }
     }
 
+    fn deserialize_f64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Error> {
+        match self {
+            Self::String(text) => match non_finite(&text) {
+                Some(value) => visitor.visit_f64(value),
+                None => visitor.visit_string(text),
+            },
+            value => value.deserialize_any(visitor),
+        }
+    }
+
+    fn deserialize_f32<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Error> {
+        self.deserialize_f64(visitor)
+    }
+
     fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Error> {
         match self {
             Self::Null => visitor.visit_none(),
@@ -284,7 +328,7 @@ impl<'de> de::Deserializer<'de> for Value {
     }
 
     serde::forward_to_deserialize_any! {
-        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string bytes
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 char str string bytes
         byte_buf unit unit_struct seq tuple tuple_struct map struct identifier
         ignored_any
     }

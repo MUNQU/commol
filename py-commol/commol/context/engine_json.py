@@ -4,8 +4,12 @@ engine.
 Every data object crosses as the JSON of its ``model_dump()``, which the
 engine reads into the type it owns and checks, with the path of the field an
 error is about. JSON has no number that is not finite, so such a number
-crosses as one of the constants of JSON5, ``Infinity``, ``-Infinity`` or
-``NaN``, which the engine reads.
+crosses as the text ``"Infinity"``, ``"-Infinity"`` or ``"NaN"``: the serializer
+of pydantic writes it with ``inf_nan_mode="strings"``, the mode that the
+setting ``ser_json_inf_nan="strings"`` of a model selects, here once for every
+class that crosses. The engine reads such a text
+as a number only where its type asks for a number, and writes the same
+texts.
 
 A field that holds a result with behavior in the engine, such as the sample
 of a method, is not part of the JSON: the class names it in its class
@@ -41,15 +45,15 @@ def engine_json(value: BaseModel | Sequence[BaseModel]) -> str:
     -------
     str
         The JSON of its ``model_dump()``, without the fields that cross as
-        handles, with ``Infinity``, ``-Infinity`` and ``NaN`` for the numbers
-        that are not finite.
+        handles, with the texts ``"Infinity"``, ``"-Infinity"`` and ``"NaN"``
+        for the numbers that are not finite.
     """
     dumped = (
         _dump(value)
         if isinstance(value, BaseModel)
         else [_dump(item) for item in value]
     )
-    return to_json(dumped, inf_nan_mode="constants").decode()
+    return to_json(dumped, inf_nan_mode="strings").decode()
 
 
 def _handle(value: object) -> "EngineHandle":

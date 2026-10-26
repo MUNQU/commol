@@ -313,7 +313,7 @@ fn each_quantity_crosses_as_json_tagged_by_kind() {
     assert!(json.starts_with(
         r#"[{"kind":"value_at","series":{"kind":"level","outputs":["A","B"]},"at":1.5,"label":null}"#
     ));
-    assert!(json.contains(r#"{"kind":"increments","outputs":["A"],"window":7}"#));
+    assert!(json.contains(r#"{"kind":"increments","outputs":["A"],"window":7.0}"#));
     assert!(
         json.contains(r#""replicate_rule":"within_positive""#),
         "{json}"

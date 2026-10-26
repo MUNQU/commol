@@ -3,9 +3,11 @@
 //!
 //! A setting of the Python API crosses to the engine as the JSON that
 //! `model_dump()` of its pydantic model writes. JSON has no number that is
-//! not finite, so a number such as an infinite weight crosses as one of the
-//! constants of JSON5, `Infinity`, `-Infinity` or `NaN`; [`read`] reads
-//! JSON5, which is JSON with them. An error names the path of its field,
+//! not finite, so a number such as an infinite weight crosses as the text
+//! `"Infinity"`, `"-Infinity"` or `"NaN"`, as pydantic writes it with
+//! `ser_json_inf_nan="strings"`. A reader reads such a text as a number only
+//! where its type asks for a number, so a label `"NaN"` stays text, and
+//! [`write()`] writes the same three texts. An error names the path of its field,
 //! such as `optimization_config.inertia_factor: inertia_factor is a number
 //! greater than 0, got -1`.
 //!
@@ -22,11 +24,12 @@
 //! value with a path of its own; its error carries that path to the reader
 //! above it ([`nested`]), which joins the two.
 
+mod serializer;
 mod value;
 
 use serde::de::{self, DeserializeOwned};
 use serde_path_to_error::{Path, Segment, Track};
-pub use value::{Error, Value};
+pub use value::{Error, Value, non_finite, non_finite_text};
 
 use crate::range::{Ranges, Rule, Setting};
 
@@ -49,14 +52,14 @@ pub type Tracked<'a> = serde_path_to_error::Deserializer<'a, 'a, Value>;
 /// Returns the message of the first error, after the path of its field when
 /// it has one: `optimization_config.inertia_factor: <message>`.
 pub fn read<T: DeserializeOwned>(text: &str) -> Result<T, String> {
-    let value: Value = json5::from_str(text).map_err(|error| format!("Not JSON: {error}"))?;
+    let value: Value = serde_json::from_str(text).map_err(|error| format!("Not JSON: {error}"))?;
     let mut track = Track::new();
     T::deserialize(Tracked::new(value, &mut track))
         .map_err(|error| located(&track.path(), &error.to_string()))
 }
 
-/// The JSON of `value`, with `Infinity`, `-Infinity` and `NaN` for the
-/// numbers that are not finite, as [`read`] reads them.
+/// The JSON of `value`, with the texts `"Infinity"`, `"-Infinity"` and
+/// `"NaN"` for the numbers that are not finite, as [`read`] reads them.
 ///
 /// # Panics
 ///
@@ -72,8 +75,9 @@ pub fn write<T: serde::Serialize>(value: &T) -> String {
 ///
 /// Panics when `value` is not plain data, as [`write()`] does.
 pub fn to_value<T: serde::Serialize>(value: &T) -> Value {
-    let text = json5::to_string(value).expect("a setting is plain data that JSON writes");
-    json5::from_str(&text).expect("JSON reads what it writes")
+    value
+        .serialize(serializer::ValueSerializer)
+        .expect("a setting is plain data that JSON writes")
 }
 
 /// Read `value` into `T`, with an error that carries the path into `value`
@@ -153,6 +157,7 @@ fn setting(value: &Value) -> Setting {
     match value {
         Value::Int(value) => Setting::Whole(*value),
         Value::Float(value) => Setting::Number(*value),
+        Value::String(text) => non_finite(text).map_or(Setting::Other, Setting::Number),
         Value::List(items) => Setting::List(items.iter().map(setting).collect()),
         _ => Setting::Other,
     }

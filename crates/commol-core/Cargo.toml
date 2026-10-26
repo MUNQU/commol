@@ -20,7 +20,6 @@ test-kind = []
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_path_to_error = { workspace = true }
-json5 = { workspace = true }
 indexmap = { version = "2.12", features = ["serde"] }
 rayon = { workspace = true }
 thiserror = "2.0"

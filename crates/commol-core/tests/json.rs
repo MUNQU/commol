@@ -84,7 +84,7 @@ fn what_is_written_reads_back() {
     let text = json::write(&plan);
 
     assert_eq!(json::read::<Plan>(&text).unwrap(), plan);
-    let value: Value = json5::from_str(&text).unwrap();
+    let value: Value = serde_json::from_str(&text).unwrap();
     let Value::Map(fields) = value else {
         panic!("a plan is an object")
     };
@@ -98,7 +98,7 @@ fn a_rule_names_the_path_of_its_field_through_a_union() {
         "moves[1].steps: steps is a whole number of at least 1, got 0"
     );
     assert_eq!(
-        error(r#"{"moves": [{"kind": "walk", "steps": 1, "scale": NaN}]}"#),
+        error(r#"{"moves": [{"kind": "walk", "steps": 1, "scale": "NaN"}]}"#),
         "moves[0].scale: scale is a number greater than 0, got NaN"
     );
 }
@@ -152,7 +152,7 @@ fn a_text_that_is_not_json_is_named() {
 }
 
 #[test]
-fn the_json_written_quotes_each_key_and_names_each_number_that_is_not_finite() {
+fn the_json_written_quotes_each_key_and_writes_each_number_that_is_not_finite_as_its_text() {
     let value = Value::Map(vec![
         ("a \"b\"".to_owned(), Value::Null),
         ("c".to_owned(), Value::Bool(true)),
@@ -171,7 +171,7 @@ fn the_json_written_quotes_each_key_and_names_each_number_that_is_not_finite() {
 
     assert_eq!(
         json::write(&value),
-        r#"{"a \"b\"":null,"c":true,"d":[-3,0.5,NaN,Infinity,-Infinity],"e":"f"}"#
+        r#"{"a \"b\"":null,"c":true,"d":[-3,0.5,"NaN","Infinity","-Infinity"],"e":"f"}"#
     );
 }
 
@@ -292,4 +292,138 @@ fn pairs_are_an_object() {
     let error = json::read::<json::Pairs<f64>>("[1]").unwrap_err();
 
     assert!(error.contains("expected an object"), "{error}");
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct Reading {
+    label: String,
+    value: f64,
+    bound: Option<f64>,
+}
+
+#[test]
+fn a_number_that_is_not_finite_is_read_from_its_text_where_a_number_is_asked() {
+    for (text, value) in [
+        ("Infinity", f64::INFINITY),
+        ("-Infinity", f64::NEG_INFINITY),
+    ] {
+        let reading: Reading = json::read(&format!(
+            r#"{{"label": "a", "value": "{text}", "bound": "{text}"}}"#
+        ))
+        .unwrap();
+
+        assert_eq!(reading.value, value);
+        assert_eq!(reading.bound, Some(value));
+    }
+    let reading: Reading = json::read(r#"{"label": "a", "value": "NaN", "bound": null}"#).unwrap();
+    assert!(reading.value.is_nan());
+    let message =
+        json::read::<Reading>(r#"{"label": "a", "value": "x", "bound": null}"#).unwrap_err();
+    assert!(
+        message.starts_with("value: invalid type: string"),
+        "{message}"
+    );
+}
+
+#[derive(Debug, PartialEq, Deserialize)]
+struct Single {
+    value: f32,
+}
+
+#[test]
+fn a_single_precision_number_reads_the_text_of_a_number_that_is_not_finite() {
+    let single: Single = json::read(r#"{"value": "-Infinity"}"#).unwrap();
+
+    assert_eq!(single.value, f32::NEG_INFINITY);
+}
+
+#[test]
+fn the_text_of_a_number_that_is_not_finite_stays_text_where_a_string_is_asked() {
+    let reading: Reading = json::read(r#"{"label": "NaN", "value": 1.0, "bound": null}"#).unwrap();
+
+    assert_eq!(reading.label, "NaN");
+    let written = json::write(&Reading {
+        label: "NaN".to_string(),
+        value: f64::NAN,
+        bound: Some(f64::INFINITY),
+    });
+    assert_eq!(
+        written,
+        r#"{"label":"NaN","value":"NaN","bound":"Infinity"}"#
+    );
+}
+
+#[test]
+fn a_rule_reads_the_text_of_a_number_that_is_not_finite() {
+    let message = json::read::<Walk>(r#"{"steps": 1, "scale": "-Infinity"}"#).unwrap_err();
+
+    assert!(message.starts_with("scale: scale is"), "{message}");
+    assert!(message.ends_with("got -inf"), "{message}");
+}
+
+#[derive(Serialize)]
+struct Unit;
+
+#[derive(Serialize)]
+struct Pair(i8, u8);
+
+#[derive(Serialize)]
+struct Tag(char);
+
+#[derive(Serialize)]
+enum Shapes {
+    Point(i16, u16),
+    Box { width: f32 },
+}
+
+#[derive(Serialize)]
+struct Every {
+    small: (i32, u32, i64),
+    unit: Unit,
+    nothing: (),
+    pair: Pair,
+    tag: Tag,
+    shapes: Vec<Shapes>,
+    map: std::collections::BTreeMap<String, u64>,
+    whole: i128,
+}
+
+#[test]
+fn every_shape_of_serde_writes_its_json() {
+    let every = Every {
+        small: (-1, 2, -3),
+        unit: Unit,
+        nothing: (),
+        pair: Pair(-4, 5),
+        tag: Tag('x'),
+        shapes: vec![Shapes::Point(-6, 7), Shapes::Box { width: 0.5 }],
+        map: [("k".to_string(), 8)].into(),
+        whole: 9,
+    };
+
+    assert_eq!(
+        json::write(&every),
+        r#"{"small":[-1,2,-3],"unit":null,"nothing":null,"pair":[-4,5],"tag":"x","shapes":[{"Point":[-6,7]},{"Box":{"width":0.5}}],"map":{"k":8},"whole":9}"#
+    );
+}
+
+#[derive(Serialize)]
+struct Bytes(#[serde(with = "serde_bytes_like")] Vec<u8>);
+
+mod serde_bytes_like {
+    pub fn serialize<S: serde::Serializer>(value: &[u8], serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_bytes(value)
+    }
+}
+
+#[test]
+#[should_panic(expected = "JSON has no bytes")]
+fn bytes_are_not_json() {
+    json::write(&Bytes(vec![1]));
+}
+
+#[test]
+#[should_panic(expected = "a key of JSON is a string")]
+fn a_key_of_json_is_a_string() {
+    json::write(&std::collections::BTreeMap::from([(1, 2)]));
 }

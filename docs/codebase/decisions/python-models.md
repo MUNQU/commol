@@ -54,8 +54,18 @@ helper, `read` of `py-commol/src/json.rs`, into the type the engine owns,
 which takes the spelling of the Python API (`rename_all = "snake_case"`) and
 denies unknown fields. An error names the path of the field and gives the
 message of the engine (`optimization_config.inertia_factor: inertia_factor is
-a number greater than 0, got -1`). A number that is not finite crosses as
-`Infinity`, `-Infinity` or `NaN`, which the reader takes.
+a number greater than 0, got -1`).
+
+A number that is not finite crosses as standard JSON text, `"Infinity"`,
+`"-Infinity"` or `"NaN"`, in both directions. Python writes it with the
+serializer of pydantic in the mode `inf_nan_mode="strings"`, the mode that
+the setting `ser_json_inf_nan="strings"` of a model selects, once for every
+class in `engine_json`. The reader is `serde_json`, and its `Value` reads such
+a text as a number only where the type asks for a number (`deserialize_f64`),
+so a label `"NaN"` stays text; a range rule reads the text as its number, so
+an infinite setting gets the message of its rule. The writer of the engine,
+`commol_core::json::write`, and the tree of a formula write the same three
+texts.
 
 Each union of classes carries one tag, `kind`, with a default, so a field is
 never read by the first variant that matches; `tagged!` of
@@ -74,6 +84,8 @@ argument. A `#[pyclass]` is a handle or a result, never data.
 | The fields of a method as positional arguments | A long signature per method, and a copy of its fields in the runner. |
 | An untagged union | No path in the error, and the first variant that matches wins. |
 | `pythonize` (Python objects to serde with no string) | A second mechanism next to the JSON of the model. |
+| The crate `json5`, which reads `Infinity` and `NaN` as numbers | A grammar far wider than three values (comments, trailing commas, unquoted keys, hexadecimal numbers) at a port that must be small, and a second convention next to the tree of a formula. |
+| The constants `Infinity` and `NaN` without quotes | They are not JSON: a standard reader rejects them. |
 
 **Rule:** a new field of a data object gets the same name in its Rust type,
 and nothing else; a new data class gets its Rust type, an entry of
@@ -84,6 +96,7 @@ and nothing else; a new data class gets its Rust type, an entry of
 `tests/suite/test_architecture.py` (no data class in the bridge, no
 conversion in Python, each runner sends its method whole),
 `tests/calibration/test_settings.py` (the path of an error),
+`tests/uncertainty/test_ranges.py` (an infinite setting gets the message of its rule),
 `crates/commol-core/tests/json.rs`, `crates/commol-calibration/tests/test_json.rs`.
 
 ## Results compare by their values

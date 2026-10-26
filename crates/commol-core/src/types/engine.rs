@@ -520,20 +520,17 @@ impl EngineType {
             #[cfg(feature = "test-kind")]
             Self::TestStochasticEngine => no_settings(EngineSettings::TestStochasticEngine),
             Self::DifferentialEquations => {
-                let solver: OdeSolver =
-                    serde_json::from_value(value.clone()).map_err(|error| error.to_string())?;
+                let solver: OdeSolver = crate::json::read(&value.to_string())?;
                 solver.validate()?;
                 Ok(EngineSettings::DifferentialEquations(solver))
             }
             Self::StochasticEvents => {
-                let settings: StochasticEventsSettings =
-                    serde_json::from_value(value.clone()).map_err(|error| error.to_string())?;
+                let settings: StochasticEventsSettings = crate::json::read(&value.to_string())?;
                 settings.validate()?;
                 Ok(EngineSettings::StochasticEvents(settings))
             }
             Self::StochasticSteps => {
-                let settings: StochasticStepsSettings =
-                    serde_json::from_value(value.clone()).map_err(|error| error.to_string())?;
+                let settings: StochasticStepsSettings = crate::json::read(&value.to_string())?;
                 Ok(EngineSettings::StochasticSteps(settings))
             }
         }
