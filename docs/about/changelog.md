@@ -67,6 +67,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the tag of their union. The engine fits the problem for each method that
   needs a fit, and calibrates `η` and the threshold of a profile. The results
   are the same for the same settings and seed.
+- A method that fits the problem before it runs (the bootstraps, the
+  jackknife, the local approximations, the conformal methods, the profiles,
+  and the Gibbs posterior with a calibration of `η`) no longer logs `Starting calibration …` at info
+  level, since the engine runs that fit. A start of the fit that fails is
+  still logged as a warning, and `Calibrator.run` still logs its start.
 - A formula has at most 100 000 nodes (numbers, variables, operators and
   calls), next to its limit of 100 levels of nesting: a longer one raises
   `ValueError` when its object is built, before it compiles. A message of
@@ -104,6 +109,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A number that is not finite in a model or in the settings of an engine
+  reached the engine as `null`. An infinite tolerance of `ODESolver` raised
+  a message about the type of the setting, and an infinite parameter value
+  failed when the model ran, with a message about a parameter index. Such a
+  number now reaches the engine as its text, as every setting does:
+  `ODESolver(atol=float("inf"))` raises `atol is a finite number greater
+  than 0, got inf`, and the infinite parameter value is rejected when the
+  engine is built, with the name of the parameter.
 - The flow of a proportional rate is the whole rate times its source, in the
   description and in the unit check: a rate `k1 + k2` from `B` is
   `(k1 + k2) * B`; before, both read `k1 + k2 * B`, and the unit check of
