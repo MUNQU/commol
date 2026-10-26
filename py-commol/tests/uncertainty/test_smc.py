@@ -169,6 +169,7 @@ class TestGibbsPosterior:
         assert sd == pytest.approx(posterior_sd, rel=0.1)
         assert result.eta == 1 / (2 * NOISE**2)
         assert result.fit is None
+        assert result.block_length is None
         assert result.block_length_estimates is None
 
     def test_information_matching_recovers_eta(self) -> None:
@@ -183,6 +184,7 @@ class TestGibbsPosterior:
         )
         assert result.fit is not None
         assert result.coverage is None
+        assert result.block_length == 1
         assert result.block_length_estimates is None
         assert result.sample.method.settings["eta"] == {
             "kind": "information_matching",
@@ -309,14 +311,11 @@ def test_a_gibbs_posterior_gives_its_block_length_estimates(
     # Each calibration of η resolves "auto" on the residuals of the fit, as
     # the method of the same blocks does.
     blocks = calibrator.uncertainty(reference)
-    expected = (
-        blocks.block_length_estimates
-        if isinstance(blocks, SandwichResult)
-        else blocks.diagnostics.block_length_estimates
-    )
+    expected = blocks if isinstance(blocks, SandwichResult) else blocks.diagnostics
     estimates = result.block_length_estimates
     assert estimates is not None and list(estimates) == ["B"]
-    assert estimates == expected
+    assert estimates == expected.block_length_estimates
+    assert result.block_length == expected.block_length
 
 
 class TestABC:

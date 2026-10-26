@@ -150,9 +150,9 @@ pub(crate) fn reached_the_posterior(run: SmcRun, posterior: &str) -> Result<SmcR
 /// the gradients of the terms summed over blocks of `block_length`
 /// positions, or of the automatic length for `None`, so `I` holds under
 /// dependence inside blocks. The terms are those of the sum of squares or of
-/// `−log L`; with a correct observation model `I ≈ J` and `η ≈ 1`. With the
-/// automatic length, the outcome keeps the estimate of each series
-/// ([`BlockScheme::estimates`]).
+/// `−log L`; with a correct observation model `I ≈ J` and `η ≈ 1`. The
+/// outcome keeps the block length and, with the automatic length, the
+/// estimate of each series ([`BlockScheme::estimates`]).
 ///
 /// # Errors
 ///
@@ -210,6 +210,7 @@ where
     // and `η > 0`.
     Ok(InformationCalibration {
         eta: (&information * inverse * &information).trace() / information.trace(),
+        block_length: blocks.length(),
         estimates: blocks.estimates().map(<[_]>::to_vec),
     })
 }
@@ -219,6 +220,8 @@ where
 pub struct InformationCalibration {
     /// The calibrated `η`.
     pub eta: f64,
+    /// The positions per block of the scores.
+    pub block_length: usize,
     /// With the automatic length, the estimate of each series by label.
     pub estimates: Option<Estimates>,
 }

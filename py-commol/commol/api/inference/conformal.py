@@ -79,6 +79,12 @@ def _result(
         guarantee=guarantee,
         failed=log_failed(run.failed, logger),
         not_converged=run.not_converged,
+        block_length=run.block_length,
+        block_length_estimates=(
+            dict(run.block_length_estimates)
+            if run.block_length_estimates is not None
+            else None
+        ),
     )
 
 

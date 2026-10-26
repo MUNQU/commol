@@ -775,6 +775,8 @@ class EtaCoverageProtocol(Protocol):
     @property
     def failed(self) -> list[str]: ...
     @property
+    def block_length(self) -> int: ...
+    @property
     def block_length_estimates(self) -> list[tuple[str, float]] | None: ...
 
 _Priors = list[tuple[str, str, list[float]]] | None
@@ -1065,7 +1067,7 @@ class InferenceModule(Protocol):
         problem: CalibrationProblemProtocol,
         fit: list[float],
         block_length: int | None,
-    ) -> tuple[float, list[tuple[str, float]] | None]: ...
+    ) -> tuple[float, int, list[tuple[str, float]] | None]: ...
     def bootstrap_coverage_eta(
         self,
         problem: CalibrationProblemProtocol,

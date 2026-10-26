@@ -175,8 +175,8 @@ is the problem's loss with its weights and normalization. It returns a
 a calibration of `η` read (`fit`), the coverage of a bootstrap calibration
 (`coverage`), each replicate of a bootstrap calibration whose sampler
 failed, `"Replicate <index> failed: <reason>"`, also logged as a warning
-(`failed`), and the estimate of each series of the automatic block length of
-a calibration (`block_length_estimates`).
+(`failed`), and the block length of a calibration with the estimate of each
+series of the automatic length (`block_length`, `block_length_estimates`).
 
 ### What `η` means
 
@@ -196,9 +196,11 @@ Both calibrations read the fit `Calibrator.run(starts)`, the best of
 
 Both take `block_length="auto"`, the automatic length of
 [Blocks and their length](resampling.md#blocks-and-their-length) for
-non-overlapping blocks. `GibbsResult.block_length_estimates` then gives the
-estimate of each series, by label, as the bootstraps and the sandwich give
-it; it is `None` for an integer `block_length` and for a number `η`.
+non-overlapping blocks. `GibbsResult.block_length` gives the length used,
+and `block_length_estimates` the estimate of each series, by label, as the
+bootstraps, the sandwich and the conformal methods give them. Both are `None`
+for a number `η`, and `block_length_estimates` is `None` for an integer
+`block_length`.
 
 Information matching is cheap and local; it needs a sum of smooth terms, so
 `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic

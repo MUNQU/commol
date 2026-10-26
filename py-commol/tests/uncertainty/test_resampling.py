@@ -385,6 +385,7 @@ def _gibbs(monkeypatch: pytest.MonkeyPatch) -> _Result:
         eta=0.1,
         coverage=0.8,
         failed=[f"Replicate 2 failed: {_NO_WEIGHT}"],
+        block_length=1,
         block_length_estimates=None,
     )
     monkeypatch.setattr(

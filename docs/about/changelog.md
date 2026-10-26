@@ -11,11 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `GibbsResult.block_length_estimates`: with `InformationMatchingEta` or
-  `BootstrapCoverageEta` and `block_length="auto"`, the estimate of each
-  series of the automatic block length, by label, as the bootstraps, the
-  jackknife and the sandwich give it; `None` otherwise. See
-  [Sequential Monte Carlo](../guide/uncertainty/smc.md#what-means).
+- `GibbsResult` and `ConformalResult` give `block_length` and
+  `block_length_estimates`, as the bootstraps, the jackknife and the sandwich
+  do: the length a method ran with, and with `block_length="auto"` the
+  estimate of each series, by label. `GibbsResult` gives them for
+  `InformationMatchingEta` and `BootstrapCoverageEta`, and `None` for a
+  number `η`; `ConformalResult` for `JackknifePlus` and `EnbPI`, and `None`
+  for the variants without blocks. See
+  [Sequential Monte Carlo](../guide/uncertainty/smc.md#what-means) and
+  [Conformal Prediction Intervals](../guide/uncertainty/conformal.md#results-plots-and-reports).
 
 ## [0.10.2] - 2026-10-24
 
