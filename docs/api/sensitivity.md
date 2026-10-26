@@ -3,14 +3,12 @@
 [Back to API Reference](index.md)
 
 The sensitivity analysis, what it varies, the quantities of interest it
-reads from each run, and the base of its methods. Guide:
+reads from each run, and the result of each method. Guide:
 [Sensitivity analysis](../guide/uncertainty/sensitivity.md).
 
 ::: commol.api.sensitivity.SensitivityAnalysis
 
 ::: commol.context.inference.global_sensitivity.InputSpace
-
-::: commol.context.inference.method.SensitivityMethod
 
 ::: commol.context.inference.global_sensitivity.Propagation
 

@@ -96,5 +96,5 @@ class Groups(BaseModel):
         )
 
 
-type Neighbors = Annotated[Complete | Groups, Field(discriminator="kind")]
+type _Neighbors = Annotated[Complete | Groups, Field(discriminator="kind")]
 """Who the neighbors of a unit are: `Complete` or `Groups`."""

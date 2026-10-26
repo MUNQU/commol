@@ -6,19 +6,23 @@ import pytest
 
 from commol import (
     CalibrationProblem,
-    CalibrationResult,
     Calibrator,
     NelderMeadConfig,
     NormalObservations,
     ObservedDataPoint,
-    Profile,
-    ProfileInterval,
     ProfileLikelihood,
-    ProfileResult,
     ResidualBootstrap,
     Simulation,
     StructuralRank,
     Threshold,
+)
+from commol.context.calibration import (
+    CalibrationResult,
+)
+from commol.context.inference.profiles import (
+    Profile,
+    ProfileInterval,
+    ProfileResult,
 )
 from commol.context.inference.identifiability import ParameterVerdicts
 from commol.context.inference.profiles import ProfileStructure

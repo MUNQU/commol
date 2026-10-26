@@ -61,7 +61,7 @@ pub enum ModelValueType {
 }
 
 impl ModelValueType {
-    /// Name of the type, as Python's `CalibrationParameterType` names it.
+    /// Name of the type, as `CalibrationParameter.parameter_type` of Python names it.
     pub fn name(self) -> &'static str {
         match self {
             Self::InitialCondition => "initial_condition",

@@ -53,8 +53,6 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 | `outputs_for(id)` | `list[str]` | The outputs of one bin or accumulator. |
 | `group_outputs(ids)` | `dict[str, list[str]]` | The outputs of several bins or accumulators, keyed by id. |
 | `total_series(results, ids)` | `list[float]` | The sum of the given outputs at each position of the results. A bin or accumulator id stands for all its outputs; an output name stands for itself. |
-| `windowed_totals(results, ids, window, at=None)` | `list[float]` | What the given accumulators, or outputs of them, gained in each window. |
-| `sample(results, ids, at)` | `list[float]` | The sum of the given outputs at each position of `at`, such as a bin at the end of each window. |
 | `engine` | engine | The underlying Rust engine, for the model as it is now: the engine `model.engine.type` names (`engine.engine_type`). `engine.step()` advances it one step; `engine.reset()` returns it to the initial state. |
 
 Every `run` starts again from the initial state, so two calls with the same
@@ -96,6 +94,8 @@ The positions the values were read at are in `results.positions`.
 | `results.positions` | `[0.0, 1.0, …, n]` for `run(n)`; the requested positions for `run_at` | Reading a value at a position, windows, reports |
 | `results.rows()` | `[[every output at positions[0]], …]`, in `simulation_outputs` order | Matrix operations, export |
 | `results.model` | The `Model` of the run, which `run` and `run_at` set; `None` for results built by hand | The outputs of each bin and accumulator, read by reports |
+| `results.windowed_totals(ids, window, at=None)` | `[gain in each window]`: what the given accumulators, or outputs of them, gained in each window ([Windowed totals](#windowed-totals)) | Comparing a run with counts per period |
+| `results.sample(ids, at)` | `[sum at each position of at]`: the given outputs, such as a bin at the end of each window ([Values at positions](#values-at-positions)) | Reading a bin where an observation reads it |
 | `results.report(positions, window, windows, …)` | The report of the run, as plain data ([Reports](reports.md#the-report-of-a-run)) | JSON export next to the observations |
 | `results.quantities(quantities)` | `{label: value}`, the quantities of interest of the run, as a propagation reduces each run ([The quantities of one run](uncertainty/sensitivity.md#the-quantities-of-one-run)) | The numbers a run is judged on, such as the point estimate of a fit |
 | `results.plot.series(…)`, `results.plot.cumulative(…)`, `results.plot.observations(…)` | A matplotlib `Figure` ([Plotting](#plotting)) | Figures of the run |
@@ -276,37 +276,32 @@ print(round(total_g1[-1]))  # 500: g1 started with half of every bin
 
 ## Windowed totals
 
-`windowed_totals` turns a cumulative output into the amount it gained in each
-window of length `window` on the axis, the windows of the
+`results.windowed_totals` turns a cumulative output into the amount it gained
+in each window of length `window` on the axis, the windows of the
 [window grid](core-concepts.md#units-of-the-axis). Each value is the output at
 the end of the window minus the output at its start. Both must be positions of
 the results.
 
 ```python
-per_week = stratified_simulation.windowed_totals(
-    stratified_results, ["cum_ab"], window=7
-)
+per_week = stratified_results.windowed_totals(["cum_ab"], window=7)
 print(len(per_week))  # 7: the complete windows of a 50-step run
 ```
 
 | Argument | Meaning |
 |---|---|
-| `ids` | Accumulator ids, each for all its outputs, and output names, each for itself, such as some strata of an accumulator. Their outputs are summed first. An id that is neither raises `KeyError`, with the bins, accumulators and outputs of the model. |
+| `ids` | Accumulator ids, each for all its outputs, and output names, each for itself, such as some strata of an accumulator. Their outputs are summed first. An id that is neither raises `KeyError`, with the bins, accumulators and outputs of the model. Results without a model (`results.model` is `None`) read output names only. |
 | `window` | The window length on the axis: a finite number greater than 0. |
 | `at` | The positions where windows close. By default, every complete window of the results. Pass observation positions to get the values a calibration compares against. |
 
 The axis of a model gives the window grid of a width in a unit
-(`Model.axis_units()`; [Units of the axis](core-concepts.md#units-of-the-axis)),
-and `windowed_totals` of `py-commol/commol/api/windows.py` gives the same
-reduction for any series:
+(`Model.axis_units()`; [Units of the axis](core-concepts.md#units-of-the-axis)):
 
 ```python
-from commol import AxisUnits, windowed_totals
+from commol import AxisUnits
 
 daily = AxisUnits(step_unit="day")
 print(daily.window_ends(1, "week", 30))  # [7.0, 14.0, 21.0, 28.0]
 print(daily.window_end(0, 1, "week"), daily.window_index(7, 1, "week"))  # 7.0 0
-print(windowed_totals([0, 1, 3, 6, 10, 15, 21, 28], range(8), 3))  # [6.0, 15.0]
 ```
 
 A window of the grid is a whole number of steps. The `window` of
@@ -320,28 +315,22 @@ read the same windows.
 ## Values at positions
 
 A bin holds an amount at a position, so it is read at the position, not over
-the window before it. `sample` reads the given bins and accumulators at each
-position of `at`; the ids are the ones of `total_series`, and their outputs are
-summed first. Next to `windowed_totals`, it gives the amount in a bin at the
+the window before it. `results.sample` reads the given bins and accumulators at
+each position of `at`; the ids are the ones of `total_series`, and their
+outputs are summed first. Next to `windowed_totals`, it gives the amount in a bin at the
 end of each window and what an accumulator gained over that window:
 
 ```python
 ends = stratified.axis_units().window_ends(7, "step", 21)  # [7.0, 14.0, 21.0]
 
-in_a = stratified_simulation.sample(stratified_results, ["A"], ends)
-gained = stratified_simulation.windowed_totals(stratified_results, ["cum_ab"], 7, ends)
+in_a = stratified_results.sample(["A"], ends)
+gained = stratified_results.windowed_totals(["cum_ab"], 7, ends)
 print([round(value) for value in in_a])    # [478, 229, 109]
 print([round(value) for value in gained])  # [522, 250, 119]
 ```
 
-`sample(series, positions, at)` of `py-commol/commol/api/results.py` reads
-any series:
-
-```python
-from commol import sample
-
-print(sample([0, 1, 3, 6, 10], range(5), [1, 4]))  # [1, 10]
-```
+Both read a position of the results within the tolerance of the axis, and
+raise `ValueError` that names a position the results do not hold.
 
 Each position of `at` must be a position of the results, within a relative
 `1e-9`; otherwise `ValueError` asks you to run the simulation there with
@@ -475,7 +464,7 @@ window of `2.5` works once the results hold its ends:
 ```python
 ends = [2.5, 5.0, 7.5, 10.0]
 ode_windows = ode.run_at([0.0, *ends])
-gained = ode.windowed_totals(ode_windows, ["moved"], window=2.5)
+gained = ode_windows.windowed_totals(["moved"], window=2.5)
 print([round(value, 1) for value in gained])  # [221.2, 172.3, 134.2, 104.5]
 ```
 
@@ -651,7 +640,7 @@ print([line.get_label() for line in figure.axes[0].lines])  # ['k1 = 0.3', 'k1 =
 | Replicates | Their mean and the band of `confidence_level` of the replicates, in the color of their key. |
 | A predictive | The weighted median of its draws and their band of `confidence_level`, in the color of their key. The legend of a band starts with the key: `fit: 95% of the draws`. |
 | `observed_data` | Drawn once, as points on the panel of their label. Without `window`, they also set how each line is read, as in `plot.series`. |
-| `window` | Each line is the gain of the series over each complete window, at the end of the window, as `Simulation.windowed_totals` reads it. A band is the band of the gains of the replicates or of the draws. |
+| `window` | Each line is the gain of the series over each complete window, at the end of the window, as `SimulationResults.windowed_totals` reads it. A band is the band of the gains of the replicates or of the draws. |
 
 The first result names the series and gives the title and the unit of each
 panel. Every result has the outputs of the first; otherwise `plot_compared`

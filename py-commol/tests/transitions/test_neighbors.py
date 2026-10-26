@@ -8,9 +8,10 @@ its source, so the same process carries over to other structures. Under
 import pytest
 from pydantic import ValidationError
 
+from commol import StratificationCondition, StratifiedRate
 from commol import Complete, Groups, Model, Simulation
 from commol.context._model.engine_state import transition_flows
-from commol.context.neighbors import Neighbors
+from commol.context.neighbors import _Neighbors
 from tests.support import ENGINE_REL, FactoryBuilder, abc_builder, assert_close, build
 
 GROUPS = {"group": {"g1": 0.3, "g2": 0.7}}
@@ -19,7 +20,7 @@ WEIGHTS = {"g1": {"g1": 1.0, "g2": 0.4}, "g2": {"g1": 0.25, "g2": 1.0}}
 
 def _abc(
     rate: str,
-    neighbors: Neighbors | None,
+    neighbors: _Neighbors | None,
     *,
     stratifications: dict[str, dict[str, float]] | None = None,
 ) -> FactoryBuilder:
@@ -75,10 +76,14 @@ class TestGroups:
                 source=["A"],
                 target=["B"],
                 stratified_rates=[
-                    {
-                        "conditions": [{"stratification": "group", "category": own}],
-                        "rate": rate,
-                    }
+                    StratifiedRate(
+                        conditions=[
+                            StratificationCondition(
+                                stratification="group", category=own
+                            )
+                        ],
+                        rate=rate,
+                    )
                     for own, rate in by_hand_rate.items()
                 ],
             )

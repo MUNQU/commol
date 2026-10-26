@@ -1,5 +1,6 @@
 """The equations of the description of stratified models: one line per expanded flow."""
 
+from commol import StratificationCondition, StratifiedRate
 from commol import ModelBuilder
 from commol.context.model import Model
 from tests.support.description import equation_forms
@@ -52,13 +53,15 @@ def _move_to(
         source=["A"],
         target=["A"],
         stratified_rates=[
-            {
-                "conditions": [
-                    {"stratification": "group", "category": "g1", "to": "g2"},
-                    {"stratification": second, "to": category},
+            StratifiedRate(
+                conditions=[
+                    StratificationCondition(
+                        stratification="group", category="g1", to="g2"
+                    ),
+                    StratificationCondition(stratification=second, to=category),
                 ],
-                "rate": rate,
-            }
+                rate=rate,
+            )
         ],
     )
 
@@ -117,12 +120,12 @@ class TestText:
         fall back to the transition rate for an unlisted category.
         """
         g1, g2 = (
-            {"stratification": "group", "category": "g1"},
-            {"stratification": "group", "category": "g2"},
+            StratificationCondition(stratification="group", category="g1"),
+            StratificationCondition(stratification="group", category="g2"),
         )
         t1, t2 = (
-            {"stratification": "type", "category": "t1"},
-            {"stratification": "type", "category": "t2"},
+            StratificationCondition(stratification="type", category="t1"),
+            StratificationCondition(stratification="type", category="t2"),
         )
         model = build(
             abc_builder(
@@ -149,18 +152,18 @@ class TestText:
                 target=["B"],
                 rate="0.3 * A * B / total",
                 stratified_rates=[
-                    {
-                        "conditions": [g1, t1],
-                        "rate": "k1_g1_t1 * A * B / total_g1",
-                    },
-                    {
-                        "conditions": [g1, t2],
-                        "rate": "k1_g1_t2 * A * B / total_g1",
-                    },
-                    {
-                        "conditions": [g2, t1],
-                        "rate": "k1_g2_t1 * A * B / total_g2",
-                    },
+                    StratifiedRate(
+                        conditions=[g1, t1],
+                        rate="k1_g1_t1 * A * B / total_g1",
+                    ),
+                    StratifiedRate(
+                        conditions=[g1, t2],
+                        rate="k1_g1_t2 * A * B / total_g1",
+                    ),
+                    StratifiedRate(
+                        conditions=[g2, t1],
+                        rate="k1_g2_t1 * A * B / total_g2",
+                    ),
                 ],
             )
             .add_transition(
@@ -168,7 +171,7 @@ class TestText:
                 source=["B"],
                 target=["C"],
                 rate="0.1 * B",
-                stratified_rates=[{"conditions": [g1], "rate": "k2_g1 * B"}],
+                stratified_rates=[StratifiedRate(conditions=[g1], rate="k2_g1 * B")],
             )
             .add_transition(id="move", source=["g1"], target=["g2"], rate="k3")
             .add_transition(
@@ -177,8 +180,8 @@ class TestText:
                 target=["t2"],
                 rate="0.015",
                 stratified_rates=[
-                    {"conditions": [g1], "rate": "k4_g1"},
-                    {"conditions": [g2], "rate": "k4_g2"},
+                    StratifiedRate(conditions=[g1], rate="k4_g1"),
+                    StratifiedRate(conditions=[g2], rate="k4_g2"),
                 ],
             )
         )

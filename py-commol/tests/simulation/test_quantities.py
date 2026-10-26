@@ -15,17 +15,19 @@ from commol import (
     SampleMethod,
     SensitivityAnalysis,
     Simulation,
-    SimulationResults,
-    SimulationReplicates,
     Trajectory,
     ValueAt,
     quantity_schedule,
 )
-from commol.context.inference.quantities import Quantity
+from commol.api.results import (
+    SimulationResults,
+    SimulationReplicates,
+)
+from commol.context.inference.quantities import _Quantity
 from tests.support import abc_builder, bounded, build, build_ode
 from tests.support.models import build_stochastic
 
-QUANTITIES: list[Quantity] = [
+QUANTITIES: list[_Quantity] = [
     ValueAt(series="B", at=3),
     Gain(outputs="C", start=2, end=9),
     Peak(series=Increments("C", window=3), positions=[3, 6, 9]),

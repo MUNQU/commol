@@ -22,11 +22,13 @@ from commol import (
     ResidualNoise,
     SampleMethod,
     SensitivityAnalysis,
-    SensitivityMethod,
     Simulation,
     Sobol,
     ValueAt,
     scores,
+)
+from commol.context.inference.method import (
+    SensitivityMethod,
 )
 from tests.support import abc_builder, abc_rates, bounded
 from tests.support.kinds import decay, decay_model

@@ -1,6 +1,7 @@
 """Models of every branch of a description, for the snapshots of its
 sections and renderings."""
 
+from commol import StratificationCondition, StratifiedRate
 from commol import Aggregate, Complete, Groups
 from commol.context.engine import StochasticEventsSettings
 from commol.context.model import Model
@@ -47,10 +48,12 @@ def every_flow_builder() -> FactoryBuilder:
             target=["g2"],
             rate=None,
             stratified_rates=[
-                {
-                    "conditions": [{"stratification": "group", "category": "g1"}],
-                    "rate": "0.02",
-                }
+                StratifiedRate(
+                    conditions=[
+                        StratificationCondition(stratification="group", category="g1")
+                    ],
+                    rate="0.02",
+                )
             ],
         )
         .add_transition(id="pending", source=["A"], target=["C"], rate=None)
@@ -122,7 +125,7 @@ def weighted_groups() -> Model:
         .add_stratification(
             id="tier",
             categories=["t1", "t2"],
-            conditions=[{"stratification": "group", "category": "g1"}],
+            conditions=[StratificationCondition(stratification="group", category="g1")],
         )
         .add_parameter(id="k", value=0.1, description="rate | per step")
         .add_parameter(id="s", value=None)
@@ -161,14 +164,14 @@ def identity_groups() -> Model:
         .add_stratification(
             id="tier",
             categories=["t1", "t2"],
-            conditions=[{"stratification": "group", "category": "g1"}],
+            conditions=[StratificationCondition(stratification="group", category="g1")],
         )
         .add_stratification(
             id="deep",
             categories=["d1", "d2"],
             conditions=[
-                {"stratification": "group", "category": "g1"},
-                {"stratification": "tier", "category": "t1"},
+                StratificationCondition(stratification="group", category="g1"),
+                StratificationCondition(stratification="tier", category="t1"),
             ],
         )
         .add_parameter(id="k", value=0.1)

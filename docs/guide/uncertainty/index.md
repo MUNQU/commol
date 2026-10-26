@@ -392,14 +392,10 @@ one but the results of runs and replicates, `CalibrationResult` and
 hashes, so they can be keys of a `dict` or members of a `set`.
 
 ```python
-from commol import ParameterSummary
-
 again = calibrator.uncertainty(BayesianBootstrap(replicates=20, block_length=1))
 print(again == result, hash(again) == hash(result))  # True True
 
-first = ParameterSummary(
-    mean=0.5, median=0.5, std=float("nan"), lower=0.0, upper=1.0, min=0.0, max=1.0
-)
+first = result.sample.summary(0.95)["k1"].model_copy(update={"std": float("nan")})
 second = first.model_copy(update={"std": float("nan")})
 print(first == second, len({first, second}))  # True 1
 ```

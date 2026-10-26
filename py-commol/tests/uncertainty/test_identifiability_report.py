@@ -8,11 +8,13 @@ from pydantic import ValidationError
 from commol import (
     CalibrationProblem,
     Calibrator,
-    IdentifiabilityReport,
     NelderMeadConfig,
     ObservedDataPoint,
     Simulation,
     StructuralRank,
+)
+from commol.context.inference.identifiability import (
+    IdentifiabilityReport,
 )
 from commol.context.inference.identifiability import (
     CollinearitySection,

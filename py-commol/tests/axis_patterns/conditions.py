@@ -1,28 +1,26 @@
 """Conditions and stratified rates of axis-pattern schedules."""
 
-from commol import AxisPattern
-from commol.api.patterns import ConditionDict, StratifiedRateDict
+from commol import AxisPattern, StratificationCondition, StratifiedRate
 
 
 def condition(
     stratification: str, category: str, *, to: str | None = None
-) -> ConditionDict:
+) -> StratificationCondition:
     """A condition on one category, optionally moving to another one."""
-    result: ConditionDict = {"stratification": stratification, "category": category}
-    if to is not None:
-        result["to"] = to
-    return result
+    return StratificationCondition(
+        stratification=stratification, category=category, to=to
+    )
 
 
-def stratified_rates(rate: AxisPattern) -> list[StratifiedRateDict]:
+def stratified_rates(rate: AxisPattern) -> list[StratifiedRate]:
     """The stratified rates a schedule hands to ``add_transition``."""
     rates = rate._builder_stratified_rates()
     assert rates is not None
     return rates
 
 
-def rate_string(stratified_rate: StratifiedRateDict) -> str:
+def rate_string(stratified_rate: StratifiedRate) -> str:
     """The rate of a stratified rate, which a schedule always writes as text."""
-    rate = stratified_rate["rate"]
+    rate = stratified_rate.rate
     assert isinstance(rate, str)
     return rate

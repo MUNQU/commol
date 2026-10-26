@@ -14,11 +14,10 @@ from typing import TYPE_CHECKING, Literal, Self
 
 from pydantic import Field
 
-from commol.context.constants import CalibrationParameterType
 from commol.context._model import engine_state
 from commol.context._model.engine_state import InitialCompartment
 from commol.context.initial_conditions import InitialConditions
-from commol.context.neighbors import Neighbors
+from commol.context.neighbors import _Neighbors
 from commol.context.process import Process
 from commol.context.structure import ModelStructure, ReportSections, SeriesLabel
 
@@ -69,7 +68,7 @@ class Aggregate(ModelStructure, InitialConditions):
     """
 
     kind: Literal["aggregate"] = "aggregate"
-    neighbors: Neighbors | None = Field(
+    neighbors: _Neighbors | None = Field(
         default=None,
         description="Who the neighbors of a unit are; required when a rate reads them.",
     )
@@ -209,9 +208,7 @@ class Aggregate(ModelStructure, InitialConditions):
         if remainder is None:
             return
         initial_conditions = [
-            param
-            for param in parameters
-            if param.parameter_type == CalibrationParameterType.INITIAL_CONDITION
+            param for param in parameters if param.parameter_type == "initial_condition"
         ]
         covered, kept = engine_state.initial_condition_coverage(
             engine, initial_conditions, remainder

@@ -22,18 +22,22 @@ from commol import (
     Calibrator,
     GibbsPosterior,
     GibbsTarget,
-    ImportanceResult,
     Laplace,
     LaplaceMixture,
-    LaplaceResult,
     LikelihoodTarget,
     NelderMeadConfig,
     NormalObservations,
     Predictive,
     Priors,
     Sandwich,
-    SandwichResult,
     Simulation,
+)
+from commol.context.inference.local import (
+    ImportanceResult,
+    LaplaceResult,
+    SandwichResult,
+)
+from commol.context.inference.method import (
     UncertaintyMethod,
 )
 from commol.commol_rs import _commol_rs as commol_rs

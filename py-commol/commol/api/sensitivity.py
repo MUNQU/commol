@@ -13,7 +13,7 @@ from commol.context.engine_json import engine_handles, engine_json
 from commol.context.inference.global_sensitivity import InputSpace
 from commol.context.calibration import ObservedDataPoint
 from commol.context.inference.method import SensitivityMethod
-from commol.context.inference.noise import NoNoise, ObservationNoise
+from commol.context.inference.noise import NoNoise, _ObservationNoise
 from commol.context.inference.sample import ParameterSample
 
 if TYPE_CHECKING:
@@ -153,7 +153,7 @@ class SensitivityAnalysis:
         self,
         sample: ParameterSample,
         observed_data: list[ObservedDataPoint],
-        noise: ObservationNoise,
+        noise: _ObservationNoise,
     ) -> "ObservationDrawsProtocol":
         """
         Every draw's value of `observed_data`, for a `Predictive`.

@@ -144,7 +144,7 @@ argument: above 0 for `sd`, `sigma`, `scale` and `df`, at least 0 for
 | `normalize_observations` needs a loss: the models set the scale of each series | `ValueError` from `CalibrationProblem` |
 
 `Likelihood::new` in `crates/commol-calibration/src/likelihood/mod.rs` checks
-the models and values; `CalibrationProblem.validate_loss_or_models` checks
+the models and values; `CalibrationProblem._validate_loss_or_models` checks
 the first and the last rules.
 
 A stochastic engine is refused because the likelihood of a stochastic model

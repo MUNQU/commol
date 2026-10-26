@@ -11,8 +11,7 @@ Every interval is a weighted quantile: the inverse of the weighted empirical
 distribution, interpolated between the midpoints of the cumulative weights
 (`statistics::quantiles` in `crates/commol-statistics/src/statistics.rs`). With
 equal weights it equals NumPy's `method="hazen"`; a weight of zero removes a
-value. `ci_percentiles` (`api/inference/intervals.py`) turns a confidence level
-into the two percentile points of `statistics::interval_levels`. `member_statistics` reduces each member to the
+value. `member_statistics` reduces each member to the
 quantity of interest **first**, and then takes weighted quantiles across
 members; taking quantiles first gives a band that describes no member. The
 replicates of a stochastic run (`SimulationReplicates.quantiles`), a sample,
@@ -82,7 +81,7 @@ binding, which reads a count (`i64`) with its rule (`py-commol/src/counts.rs`).
 A caller checks a confidence level at its boundary, then computes the two
 quantiles of its interval with `statistics::interval_levels`, a pure function
 of `commol-statistics` that checks nothing: the crate of statistics depends on
-no crate of commol. `ci_percentiles`, `BootstrapResult.interval_error`,
+no crate of commol. `BootstrapResult.interval_error`,
 `PropagationResult.summary` and the scenario summaries call the binding
 `commol_rs.inference.interval_levels`, which checks, then computes.
 
@@ -224,7 +223,7 @@ function reports anything.
 | `Model.applied_parameters` is on the model | Most of the block is data of the model (one row per parameter, the sections of its structure); the values and the problem only add what calibration set. |
 
 - A single run and an ensemble (replicates or a `Predictive`) differ only at
-  the leaves (`ReportLeaf`); a predictive's members carry their weights.
+  the leaves (`_ReportLeaf`); a predictive's members carry their weights.
 - The key order of each entry is part of the contract, because it changes saved
   JSON files.
 - Labels and summary figures belong to the caller, because they carry domain

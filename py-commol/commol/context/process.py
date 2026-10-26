@@ -41,7 +41,7 @@ class Process(BaseModel):
     transitions: list[Transition] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_unique_ids(self) -> Self:
+    def _validate_unique_ids(self) -> Self:
         """Validate that bin, stratification and transition ids are unique."""
         for label, ids in (
             ("bin", [item.id for item in self.bins]),
@@ -54,7 +54,7 @@ class Process(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_stratified_rates(self) -> Self:
+    def _validate_stratified_rates(self) -> Self:
         """Validate that stratified rates name stratifications and categories."""
         strat_map = {strat.id: strat for strat in self.stratifications}
 
@@ -84,7 +84,7 @@ class Process(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_transition_ids(self) -> Self:
+    def _validate_transition_ids(self) -> Self:
         """
         Check that each transition moves between bins, or between the
         categories of one stratification.

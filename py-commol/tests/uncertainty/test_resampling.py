@@ -20,25 +20,33 @@ from commol import (
     BayesianBootstrap,
     BlockJackknife,
     BootstrapCoverageEta,
-    BootstrapResult,
     Calibrator,
-    ConformalResult,
     GibbsPosterior,
-    GibbsResult,
     JackknifePlus,
-    JackknifeResult,
     LogNormalObservations,
     NoNoise,
     ObservedDataPoint,
     Predictive,
     Priors,
     ProfileLikelihood,
-    ProfileResult,
     ResidualBootstrap,
     ResidualNoise,
     RollingConformal,
     Threshold,
     WildBootstrap,
+)
+from commol.context.inference.resampling import (
+    BootstrapResult,
+    JackknifeResult,
+)
+from commol.context.inference.conformal import (
+    ConformalResult,
+)
+from commol.context.inference.smc import (
+    GibbsResult,
+)
+from commol.context.inference.profiles import (
+    ProfileResult,
 )
 from commol.commol_rs import _commol_rs as commol_rs
 from tests.support import flow_calibrator, flow_observations, line_calibrator

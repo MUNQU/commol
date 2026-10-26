@@ -4,6 +4,7 @@ import math
 
 import pytest
 
+from commol import StratificationCondition, StratifiedRate
 from commol import ModelBuilder, Simulation, AxisPattern
 from commol.context.model import Model
 from commol.context.parameter import SeriesValue
@@ -147,7 +148,7 @@ class TestCombineIntegration:
         p = AxisPattern.combine(
             AxisPattern.periodic(period=2, value=0.1),
             AxisPattern.periodic(period=5, value=0.2),
-            mode=AxisPattern.SUM,
+            mode="sum",
         )
         result = _run_ab(str(p), steps=15)
         a = result["A"]
@@ -161,7 +162,7 @@ class TestCombineIntegration:
         p = AxisPattern.combine(
             AxisPattern.pulse(at=5, value=0.5),
             AxisPattern.pulse(at=5, value=0.3),
-            mode=AxisPattern.MAX,
+            mode="max",
         )
         result = _run_ab(str(p), steps=10)
         a = result["A"]
@@ -293,12 +294,21 @@ class TestAddTransitionAcceptsAxisPattern:
                     ["A"],
                     ["B"],
                     rate=AxisPattern.pulse(at=5, value=0.1),
-                    stratified_rates=[{"conditions": [], "rate": "0.0"}],
+                    stratified_rates=[
+                        StratifiedRate(
+                            conditions=[
+                                StratificationCondition(
+                                    stratification="group", category="g1"
+                                )
+                            ],
+                            rate="0.0",
+                        )
+                    ],
                 )
             )
 
     def test_a_series_of_a_group_is_named_by_its_flow(self):
-        cat1 = [{"stratification": "group", "category": "cat1"}]
+        cat1 = [StratificationCondition(stratification="group", category="cat1")]
         builder = (
             ModelBuilder("AB")
             .add_bin("A", "Source")
@@ -315,12 +325,16 @@ class TestAddTransitionAcceptsAxisPattern:
                 )
                 .add_group(
                     conditions=[
-                        {"stratification": "group", "category": "cat2", "to": "cat1"}
+                        StratificationCondition(
+                            stratification="group", category="cat2", to="cat1"
+                        )
                     ],
                     schedule=AxisPattern.pulses(at=[3, 4], value=0.2),
                 )
                 .add_group(
-                    conditions=[{"stratification": "group", "to": "cat2"}],
+                    conditions=[
+                        StratificationCondition(stratification="group", to="cat2")
+                    ],
                     schedule=AxisPattern.pulses(at=[5, 6], value=[0.3, 0.4]),
                 ),
             )
@@ -344,8 +358,8 @@ class TestAddTransitionAcceptsAxisPattern:
 
     def test_a_series_of_an_inflow_an_outflow_and_two_categories_is_named(self):
         both = [
-            {"stratification": "group", "category": "cat1"},
-            {"stratification": "age", "category": "young"},
+            StratificationCondition(stratification="group", category="cat1"),
+            StratificationCondition(stratification="age", category="young"),
         ]
 
         def schedule(value: float) -> AxisPattern:

@@ -2,6 +2,7 @@
 
 import pytest
 
+from commol import StratificationCondition, StratifiedRate
 from commol import (
     Aggregate,
     CalibrationProblem,
@@ -209,12 +210,14 @@ def _moving_split() -> Model:
             source=["A"],
             target=["A"],
             stratified_rates=[
-                {
-                    "conditions": [
-                        {"stratification": "g", "category": "g1", "to": "g2"}
+                StratifiedRate(
+                    conditions=[
+                        StratificationCondition(
+                            stratification="g", category="g1", to="g2"
+                        )
                     ],
-                    "rate": "k * A_g1",
-                }
+                    rate="k * A_g1",
+                )
             ],
         )
         .build(

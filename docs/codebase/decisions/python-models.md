@@ -3,7 +3,7 @@
 [Back to Design decisions](../design-decisions.md)
 
 How the Pydantic models of the Python package read their fields, check their
-values and compare.
+values and compare, and which names of the package are public.
 
 ## Public models forbid unknown fields
 
@@ -12,6 +12,34 @@ An unknown field, such as a misspelt or an old name (`window_steps`), raises a
 `ValidationError` that names it, instead of being dropped with no error.
 
 **Guard:** `tests/building/test_unknown_fields.py`.
+
+## The public surface holds only what a user writes
+
+`commol.__all__` holds the names a user writes: the builder and its
+conditions (`StratificationCondition`, `StratifiedRate`), the structures, the
+entry points, the settings and the methods. The data of the surface is
+`py-commol/tests/suite/public_surface.py`: `EXPORTS`, the names of each public
+module, and `RESULTS`, the results that public objects return.
+
+| Kind of name | Rule |
+|---|---|
+| A result | Not exported. The member that gives it has it as its return type, and its `::: path` entry is on the page of `docs/api/` of that object. |
+| A choice among names | A `Literal` in the signature, such as `loss_function: Literal["sse", "rmse", "mae"]`; no enum and no public alias of strings. |
+| A union of classes, a base, a part that the builder makes | Private: a union is a `type _Name = …` alias, and a base is not exported. |
+| A pydantic validator or serializer | A name that starts with `_`. |
+| An idea | One public path: `SimulationResults.sample` and `SimulationResults.windowed_totals` read a run by id; the functions on one series are private. |
+
+| Alternative | Why not |
+|---|---|
+| Export each class a signature names | About half the names are results, enums and unions a user never writes. |
+| An enum for each choice | A name to import and learn for each choice; a string is checked by pydantic with the same list of values. |
+| A dict for a condition | No type check of its keys, and a second shape of one idea next to the class. |
+
+**Guards:** `tests/suite/test_architecture.py::test_the_public_surface_is_the_table`,
+`tests/suite/test_architecture.py::test_a_choice_is_a_literal`,
+`tests/suite/test_architecture.py::test_no_public_member_is_internal`,
+`tests/docs/test_reference.py::test_each_result_is_on_the_page_of_its_object`
+and `tests/building/test_conditions.py::test_a_condition_is_one_class`.
 
 ## A value of a model has its rule in the engine
 

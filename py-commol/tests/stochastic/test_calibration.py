@@ -5,6 +5,7 @@ Each evaluation runs the same replicates (common random numbers, seeded by
 parameters and Nelder-Mead converges.
 """
 
+from typing import Literal
 import pytest
 
 from commol import (
@@ -16,7 +17,7 @@ from commol import (
     Simulation,
     weighted_quantiles,
 )
-from commol.context.calibration import CalibrationResult, ReplicateSummary
+from commol.context.calibration import CalibrationResult
 from commol.context.engine import EngineName
 from tests.support import STOCHASTIC_ENGINES, a_to_b_builder, bounded, build_stochastic
 
@@ -35,7 +36,9 @@ def _data(engine: EngineName) -> list[ObservedDataPoint]:
 
 
 def _calibrator(
-    engine: EngineName, summary: ReplicateSummary, max_iterations: int = 200
+    engine: EngineName,
+    summary: Literal["mean", "median", "crps"] | Quantile,
+    max_iterations: int = 200,
 ) -> Calibrator:
     builder = a_to_b_builder(parameters={"k": None})
     problem = CalibrationProblem(
@@ -53,7 +56,9 @@ def _calibrator(
     return Calibrator(simulation, problem)
 
 
-def _calibrate(engine: EngineName, summary: ReplicateSummary) -> CalibrationResult:
+def _calibrate(
+    engine: EngineName, summary: Literal["mean", "median", "crps"] | Quantile
+) -> CalibrationResult:
     return _calibrator(engine, summary).run()
 
 
@@ -61,7 +66,7 @@ def _calibrate(engine: EngineName, summary: ReplicateSummary) -> CalibrationResu
 class TestCalibration:
     @pytest.mark.parametrize("summary", ["mean", "crps"])
     def test_a_rate_is_recovered_from_the_runs(
-        self, engine: EngineName, summary: ReplicateSummary
+        self, engine: EngineName, summary: Literal["mean", "median", "crps"] | Quantile
     ) -> None:
         result = _calibrate(engine, summary)
 

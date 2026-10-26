@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Generic, Self, TypeVar
+from typing import TYPE_CHECKING, Generic, Self, TypeVar, Literal
 
 from pydantic import (
     JsonValue,
@@ -25,10 +25,9 @@ from commol.context.calibration import (
     CalibrationResult,
     calibrated_values,
 )
-from commol.context.constants import CalibrationParameterType
-from commol.context.description import Layout, ModelDescription
+from commol.context.description import ModelDescription
 from commol.context.engine import ModelEngine
-from commol.context.parameter import Parameter, ParameterUpdate
+from commol.context.parameter import Parameter, SeriesValue
 from commol.context.process import Process
 from commol.context.structure import ModelStructure
 
@@ -110,7 +109,7 @@ class Model(BaseModel, Generic[StructureT]):
     )
 
     @model_validator(mode="after")
-    def check_origin_unit(self) -> Self:
+    def _check_origin_unit(self) -> Self:
         """Check that an origin has a step unit of fixed calendar length."""
         if self.origin is not None:
             seconds_per_step(self.step_unit or DEFAULT_STEP_UNIT)
@@ -118,7 +117,7 @@ class Model(BaseModel, Generic[StructureT]):
 
     @field_validator("structure", mode="before")
     @classmethod
-    def read_structure_kind(cls, value: JsonValue) -> JsonValue | ModelStructure:
+    def _read_structure_kind(cls, value: JsonValue) -> JsonValue | ModelStructure:
         """Read a structure mapping as the class of its ``kind`` and ``variant``."""
         if not isinstance(value, Mapping):
             return value
@@ -183,7 +182,7 @@ class Model(BaseModel, Generic[StructureT]):
         )
 
     @model_validator(mode="after")
-    def validate_engine_runs_structure(self) -> Self:
+    def _validate_engine_runs_structure(self) -> Self:
         """Ask the engine whether it runs the kind of the structure."""
         commol_rs.engine.EngineType(engine_json(self.engine.type)).check_kind(
             engine_json(self.structure.kind)
@@ -191,7 +190,7 @@ class Model(BaseModel, Generic[StructureT]):
         return self
 
     @model_validator(mode="after")
-    def validate_unique_parameter_ids(self) -> Self:
+    def _validate_unique_parameter_ids(self) -> Self:
         """
         Validates that parameter IDs are unique.
         """
@@ -204,13 +203,16 @@ class Model(BaseModel, Generic[StructureT]):
         return self
 
     @model_validator(mode="after")
-    def validate_structure(self) -> Self:
+    def _validate_structure(self) -> Self:
         """Check the structure against the parameters and the engine."""
         self.structure.check_model(self)
         return self
 
     def update_parameters(
-        self, parameter_values: Mapping[str, ParameterUpdate]
+        self,
+        parameter_values: Mapping[
+            str, float | str | list[tuple[float, float]] | SeriesValue | None
+        ],
     ) -> None:
         """
         Update parameter values in the model.
@@ -221,7 +223,7 @@ class Model(BaseModel, Generic[StructureT]):
 
         Parameters
         ----------
-        parameter_values : Mapping[str, ParameterUpdate]
+        parameter_values : Mapping[str, value of a parameter]
             Each parameter id mapped to its new value: a number, a formula, a
             `SeriesValue`, or None to leave it for calibration. A list of
             (position, value) points replaces the points of a series parameter
@@ -305,7 +307,7 @@ class Model(BaseModel, Generic[StructureT]):
         parameters: dict[str, float | None] = {
             param_id: value
             for param_id, value in values.items()
-            if types[param_id] == CalibrationParameterType.PARAMETER
+            if types[param_id] == "parameter"
         }
         # Computed before any mutation, so a rejected value leaves the model
         # unchanged.
@@ -384,7 +386,9 @@ class Model(BaseModel, Generic[StructureT]):
             self, values, problem, sample, confidence_level
         )
 
-    def describe(self, layout: Layout = "default") -> ModelDescription:
+    def describe(
+        self, layout: Literal["default", "odd"] = "default"
+    ) -> ModelDescription:
         """
         A description of the model, as data.
 

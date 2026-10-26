@@ -28,14 +28,16 @@ from commol import (
     Ratio,
     ResidualBootstrap,
     SensitivityAnalysis,
-    SensitivityMethod,
     Simulation,
     Sobol,
     SplitConformal,
     StructuralRank,
     Threshold,
-    UncertaintyMethod,
     ValueAt,
+)
+from commol.context.inference.method import (
+    SensitivityMethod,
+    UncertaintyMethod,
 )
 from commol.api.inference.registry import register, registered
 from tests.support import (

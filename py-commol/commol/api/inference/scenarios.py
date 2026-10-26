@@ -8,11 +8,11 @@ from pydantic import ConfigDict
 from commol.api.inference.predictive import Predictive, PredictiveSource
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.inference.sample import ParameterSample
+from commol.context.parameter import SeriesValue
 from commol.context.result_model import ResultModel
 
 if TYPE_CHECKING:
     from commol.context.inference.quantities import QuantityBase
-    from commol.context.parameter import ParameterUpdate
 
 
 class ScenarioSummary(ResultModel):
@@ -66,7 +66,10 @@ class Scenarios(Mapping[str, Predictive]):
         self,
         source: PredictiveSource,
         sample: ParameterSample,
-        scenarios: Mapping[str, Mapping[str, "ParameterUpdate"]],
+        scenarios: Mapping[
+            str,
+            Mapping[str, float | str | list[tuple[float, float]] | SeriesValue | None],
+        ],
         positions: Sequence[float],
     ) -> None:
         """
@@ -79,7 +82,7 @@ class Scenarios(Mapping[str, Predictive]):
             or the sensitivity analysis of its inputs (`SensitivityAnalysis`).
         sample : ParameterSample
             Its parameters, in the order of the problem or the analysis.
-        scenarios : Mapping[str, Mapping[str, ParameterUpdate]]
+        scenarios : Mapping[str, Mapping[str, value of a parameter]]
             Each scenario by name: the value of each parameter it overrides,
             any value `Model.update_parameters` takes, such as a number, a
             formula or the points of a series. An empty mapping keeps the
@@ -176,7 +179,7 @@ class Scenarios(Mapping[str, Predictive]):
         ----------
         name : str
             The scenario.
-        quantities : Sequence[Quantity]
+        quantities : Sequence[quantity]
             The quantities; a `Trajectory` gives one scalar per position.
         confidence_level : float
             Strictly between 0 and 1.
@@ -222,7 +225,7 @@ class Scenarios(Mapping[str, Predictive]):
             The scenario compared.
         baseline : str
             The scenario subtracted.
-        quantities : Sequence[Quantity]
+        quantities : Sequence[quantity]
             The quantities; a `Trajectory` gives one scalar per position, each
             compared at its position.
         confidence_level : float

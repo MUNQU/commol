@@ -29,17 +29,19 @@ from collections.abc import Mapping
 from datetime import date
 from typing import Self
 
+from commol import StratifiedRate
 from commol import (
     Aggregate,
     ModelBuilder,
     ODESolver,
     StochasticEventsSettings,
     StochasticStepsSettings,
+    StratificationCondition,
 )
 from commol.context.engine import EngineName
 from commol.api.patterns import AxisPattern
 from commol.context.model import Model
-from commol.context.neighbors import Neighbors
+from commol.context.neighbors import _Neighbors
 
 TIGHT = ODESolver(rtol=1e-10, atol=1e-8)
 """Tolerances tight enough for closed-form checks."""
@@ -116,7 +118,7 @@ def stratify(
             id=stratification_id,
             categories=list(categories),
             conditions=[
-                {"stratification": parent, "category": category}
+                StratificationCondition(stratification=parent, category=category)
                 for parent, category in conditions.get(stratification_id, {}).items()
             ]
             or None,
@@ -134,7 +136,7 @@ def _finish(
     stratifications: Stratifications | None,
     conditions: Conditions | None,
     compartment_amounts: Mapping[str, float] | None,
-    neighbors: Neighbors | None = None,
+    neighbors: _Neighbors | None = None,
 ) -> FactoryBuilder:
     for parameter_id, value in parameters.items():
         builder.add_parameter(
@@ -367,10 +369,12 @@ def conditional_pathway_builder() -> FactoryBuilder:
         target=["B"],
         rate="0.0",
         stratified_rates=[
-            {
-                "conditions": [{"stratification": "group", "category": "g2"}],
-                "rate": "k1 * A",
-            }
+            StratifiedRate(
+                conditions=[
+                    StratificationCondition(stratification="group", category="g2")
+                ],
+                rate="k1 * A",
+            )
         ],
     )
     return _finish(

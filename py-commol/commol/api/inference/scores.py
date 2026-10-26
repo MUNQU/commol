@@ -15,7 +15,7 @@ from pydantic import ConfigDict, Field
 from commol.api.inference.predictive import ObservationDraws, Predictive
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import ObservedDataPoint
-from commol.context.inference.noise import DistributionNoise, ObservationNoise
+from commol.context.inference.noise import DistributionNoise, _ObservationNoise
 from commol.context.result_model import ResultModel
 
 
@@ -59,7 +59,7 @@ def _score_of(observations: Sequence[ObservedDataPoint], values: list[float]) ->
 def coverage(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
-    noise: ObservationNoise,
+    noise: _ObservationNoise,
     confidence_level: float,
 ) -> Score:
     """
@@ -89,7 +89,7 @@ def coverage(
 def interval_score(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
-    noise: ObservationNoise,
+    noise: _ObservationNoise,
     confidence_level: float,
 ) -> Score:
     """
@@ -118,7 +118,7 @@ def interval_score(
 def weighted_interval_score(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
-    noise: ObservationNoise,
+    noise: _ObservationNoise,
     confidence_levels: Sequence[float],
 ) -> Score:
     """
@@ -161,7 +161,7 @@ def weighted_interval_score(
 def crps(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
-    noise: ObservationNoise,
+    noise: _ObservationNoise,
 ) -> Score:
     """
     The continuous ranked probability score of the weighted draws.
@@ -190,7 +190,7 @@ def crps(
 def pit(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
-    noise: ObservationNoise,
+    noise: _ObservationNoise,
 ) -> Score:
     """
     The probability integral transform of each observation.

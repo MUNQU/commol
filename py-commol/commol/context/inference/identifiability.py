@@ -404,7 +404,7 @@ class IdentifiabilityReport(_FrozenResult):
     profile: list[ProfileSection] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def check_parameters(self) -> Self:
+    def _check_parameters(self) -> Self:
         """Check that the verdicts hold the parameters, in order."""
         if list(self.verdicts) != self.parameters:
             raise ValueError(
@@ -561,7 +561,7 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeC
         The absolute correlation above which a pair is listed and its
         parameters are poorly determined, strictly between 0 and 1. No
         default: it is a modelling judgment.
-    priors : Priors | dict[str, Distribution] | None
+    priors : Priors | dict[str, distribution] | None
         The prior of each parameter, with ``reference="prior"`` only.
     """
 
@@ -574,14 +574,14 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeC
 
     @model_validator(mode="before")
     @classmethod
-    def read_priors(cls, data: JsonValue) -> JsonValue:
+    def _read_priors(cls, data: JsonValue) -> JsonValue:
         """Read a mapping of parameter to distribution as `Priors`."""
         if isinstance(data, Mapping) and data.get("priors") is not None:
             return {**data, "priors": coerce_priors(data["priors"])}
         return data
 
     @model_validator(mode="after")
-    def check_priors(self) -> Self:
+    def _check_priors(self) -> Self:
         """The priors go with ``reference="prior"``, and only with it."""
         if self.reference == "prior" and self.priors is None:
             raise ValueError(

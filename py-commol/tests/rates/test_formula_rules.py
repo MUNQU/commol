@@ -6,6 +6,7 @@ import re
 
 import pytest
 
+from commol import StratificationCondition, StratifiedRate
 from commol import AxisPattern, CalibrationConstraint, ModelBuilder
 from commol.context._model.engine_state import formula_tree
 from commol.context._model.formula_tree import (
@@ -33,10 +34,10 @@ def a_stratified_rate(formula: str) -> None:
         target=["C"],
         rate="k1",
         stratified_rates=[
-            {
-                "conditions": [{"stratification": "s", "category": "g1"}],
-                "rate": formula,
-            }
+            StratifiedRate(
+                conditions=[StratificationCondition(stratification="s", category="g1")],
+                rate=formula,
+            )
         ],
     )
 

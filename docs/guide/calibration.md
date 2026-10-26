@@ -94,7 +94,7 @@ also when it was created while a parameter was `None`. See
 | `observed_data` | `list[ObservedDataPoint]` | required | What the model must reproduce. See [Observations](calibration-observations.md). |
 | `parameters` | `list[CalibrationParameter]` | required | The unknowns and their bounds. |
 | `loss_function` | `str \| None` | `None` | How the misfit is measured; see [Losses](#losses). A problem has `loss_function` or `observation_models`, exactly one. |
-| `observation_models` | `dict[str, ObservationModel] \| None` | `None` | One observation model per series label: the fit maximizes their likelihood. See [Observation Models](uncertainty/observation-models.md). |
+| `observation_models` | `dict[str, NormalObservations \| … \| BinomialObservations] \| None` | `None` | One observation model per series label: the fit maximizes their likelihood. See [Observation Models](uncertainty/observation-models.md). |
 | `optimization_config` | `NelderMeadConfig` or `ParticleSwarmConfig` | required | The optimizer and its settings. See [Optimizers](calibration-optimizers.md). |
 | `constraints` | `list[CalibrationConstraint]` | `[]` | Relations the result must respect. See [Constraints](calibration-constraints.md). |
 | `normalize_observations` | `bool` | `False` | Divides each residual by the RMS of its observation series, so series of very different size weigh the same. Needs a loss. |

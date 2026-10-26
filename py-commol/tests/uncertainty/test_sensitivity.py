@@ -9,29 +9,31 @@ import pytest
 
 from commol import (
     Calibrator,
-    ChaosResult,
     Gain,
     InputSpace,
     Morris,
-    MorrisResult,
     Normal,
     ParameterSample,
     Peak,
     PolynomialChaos,
     PRCC,
-    PRCCResult,
     Propagation,
-    PropagationResult,
     SampleMethod,
     SensitivityAnalysis,
     Simulation,
     Sobol,
-    SobolResult,
     Trajectory,
     Uniform,
     ValueAt,
 )
-from commol.context.inference.quantities import Quantity
+from commol.context.inference.global_sensitivity import (
+    ChaosResult,
+    MorrisResult,
+    PRCCResult,
+    PropagationResult,
+    SobolResult,
+)
+from commol.context.inference.quantities import _Quantity
 from tests.support import abc_builder, abc_rates, bounded, build
 from tests.support.models import a_to_b_builder, build_stochastic
 
@@ -356,7 +358,7 @@ class TestPolynomialChaos:
         self, simulation: Simulation
     ) -> None:
         analysis = SensitivityAnalysis(simulation, abc_rates(), seed=5)
-        quantities: list[Quantity] = [ValueAt(series="B", at=20)]
+        quantities: list[_Quantity] = [ValueAt(series="B", at=20)]
 
         result = analysis.run(
             PolynomialChaos(
@@ -440,7 +442,7 @@ class TestPolynomialChaos:
 class TestEntryPoint:
     def test_each_method_returns_its_result(self, simulation: Simulation) -> None:
         analysis = SensitivityAnalysis(simulation, abc_rates(), seed=3)
-        quantities: list[Quantity] = [ValueAt(series="B", at=10)]
+        quantities: list[_Quantity] = [ValueAt(series="B", at=10)]
 
         propagation = analysis.run(Propagation(draws=4, quantities=quantities))
         prcc = analysis.run(PRCC(draws=8, quantities=quantities))

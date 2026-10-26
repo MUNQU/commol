@@ -125,6 +125,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Another value of `keep` raises `ValueError` with the message of the
   engine, ``unknown variant `median`, expected `survival` or `mean` ``.
   See [Units of the axis](../guide/core-concepts.md#units-of-the-axis).
+- **Breaking:** the package root exports only the names a user writes: 99
+  names, down from 147. A result is reached from the object that returns it,
+  typed as the return of that member and documented on its page; it is not
+  an import. The names that leave `commol` are the results
+  (`SimulationResults`, `SimulationReplicates`, `ReplicateRuns`,
+  `CalibrationResult`, `CalibrationEvaluation`, `CalibrationHistory`,
+  `StartSummary`, `ModelDescription`, `Process`, `BuildInfo`, and the result
+  of every uncertainty, identifiability and sensitivity method with its
+  parts), the bases `ModelStructure`, `InferenceMethod`,
+  `UncertaintyMethod`, `IdentifiabilityMethod` and `SensitivityMethod`, the
+  union `ObservationModel`, and the functions `sample`, `windowed_totals`
+  and `ci_percentiles`. Migration: remove the import and annotate with the
+  class of its module, such as `commol.api.results.SimulationResults`, or
+  with no annotation. See [API Reference](../api/index.md).
+- **Breaking:** a condition is a `StratificationCondition` and a stratified
+  rate is a `StratifiedRate`, which the package root exports;
+  `ModelBuilder.add_stratification`, `ModelBuilder.add_transition` and
+  `AxisPattern` take them, not dicts, and `ConditionDict` and
+  `StratifiedRateDict` are removed. A `StratifiedRate` checks its rate with
+  the parser of the engine when it is built, with `$compartment` set to the
+  name of a compartment, and keeps a number as its string. Migration:
+  `{"stratification": "group", "category": "g1"}` is
+  `StratificationCondition(stratification="group", category="g1")`, and
+  `{"conditions": [...], "rate": "k1"}` is
+  `StratifiedRate(conditions=[...], rate="k1")`. See
+  [Stratified rates](../guide/transitions.md#stratified-rates).
+- **Breaking:** a choice among names is a string of a `Literal`, not an enum
+  or an alias: `CalibrationParameter.parameter_type` is one of
+  `"parameter"`, `"initial_condition"`, `"factor"` and `"noise"`,
+  `CalibrationProblem.loss_function` one of `"sse"`, `"rmse"` and `"mae"`, and
+  the `mode` of `AxisPattern.combine` one of `"sum"`, `"max"` and `"min"`.
+  `commol.context.constants` (`CalibrationParameterType`, `LossFunction`,
+  `OptimizationAlgorithm`), `CombineMode` and `AxisPattern.SUM`, `MAX` and
+  `MIN` are removed, with the aliases of strings of the signatures, such as
+  `DescriptionFormat` and `Pooling`. Another value raises the `ValidationError`
+  of pydantic, or `ValueError` for `combine`, which lists the values.
+  Migration: write the string, such as `mode="max"` for
+  `mode=AxisPattern.MAX`.
+- **Breaking:** `SimulationResults.sample(ids, at)` and
+  `SimulationResults.windowed_totals(ids, window, at=None)` read the bins,
+  the accumulators and the outputs of a run; `Simulation.sample` and
+  `Simulation.windowed_totals` are removed. Results without a model read
+  output names. Migration: `simulation.windowed_totals(results, ["cum"], 7)`
+  is `results.windowed_totals(["cum"], 7)`. See
+  [Windowed totals](../guide/simulations.md#windowed-totals).
+- **Breaking:** the pydantic validators of the public classes are private:
+  each name starts with `_`, such as `CalibrationProblem._validate_loss_or_models`.
 
 ### Removed
 

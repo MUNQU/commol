@@ -1,7 +1,15 @@
 """The results of the sensitivity methods draw their figures: one series or
 bar per input."""
 
-from commol import ChaosResult, InputSpace, MorrisResult, PRCCResult, SobolResult
+from commol import (
+    InputSpace,
+)
+from commol.context.inference.global_sensitivity import (
+    ChaosResult,
+    MorrisResult,
+    PRCCResult,
+    SobolResult,
+)
 
 from tests.support import bounded
 

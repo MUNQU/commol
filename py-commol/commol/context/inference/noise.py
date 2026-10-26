@@ -89,4 +89,4 @@ class DistributionNoise(BaseModel):
     )
 
 
-type ObservationNoise = NoNoise | ResidualNoise | DistributionNoise
+type _ObservationNoise = NoNoise | ResidualNoise | DistributionNoise

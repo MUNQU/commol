@@ -20,7 +20,6 @@ from commol import (
     CalibrationConstraint,
     CalibrationParameter,
     CalibrationProblem,
-    CalibrationResult,
     Collinearity,
     DistributionNoise,
     EnbPI,
@@ -77,6 +76,9 @@ from commol import (
     Uniform,
     ValueAt,
     WildBootstrap,
+)
+from commol.context.calibration import (
+    CalibrationResult,
 )
 
 PRIORS = Priors.uniform_on_bounds()

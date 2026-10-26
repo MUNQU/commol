@@ -14,8 +14,7 @@ returned instance. The user never instantiates or names any other class.
 
 from abc import abstractmethod
 from collections.abc import Iterable
-from enum import StrEnum
-from typing import ClassVar, NotRequired, Protocol, Self, TypedDict
+from typing import ClassVar, Literal, Protocol, Self
 
 from pydantic import (
     ConfigDict,
@@ -28,43 +27,20 @@ from pydantic import (
 
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.ranges import RangeChecked
+from commol.context.stratification_condition import StratificationCondition
+from commol.context.transition import StratifiedRate
 
 
-class ConditionDict(TypedDict):
-    """Shape of a single stratification condition used by ``AxisPattern``.
-
-    Also re-exported by :mod:`commol.api.model_builder` as
-    ``StratificationConditionDict``.
-
-    ``category`` is optional. When omitted the condition acts as a target-only
-    override: it does not filter source compartments and does not count toward
-    match specificity, but its ``to`` value is used when constructing the target
-    compartment name.
-    """
-
-    stratification: str
-    category: NotRequired[str]
-    to: NotRequired[str]
+_COMBINE_MODES = ("sum", "max", "min")
+"""How ``AxisPattern.combine`` can join its patterns."""
 
 
-class StratifiedRateDict(TypedDict):
-    """Shape of one entry in ``ModelBuilder.add_transition(stratified_rates=...)``.
-
-    ``rate`` may be either a formula string or a numeric literal; the builder
-    converts numeric values to strings before storing them.
-    """
-
-    conditions: list[ConditionDict]
-    rate: str | float
-    absolute: NotRequired[bool]
-
-
-class AddGroupFn(Protocol):
+class _AddGroupFn(Protocol):
     """Signature exposed by the ``AxisPattern.add_group`` descriptor."""
 
     def __call__(
         self,
-        conditions: list[ConditionDict],
+        conditions: list[StratificationCondition],
         schedule: "AxisPattern",
         *,
         source_compartment: str | None = None,
@@ -72,14 +48,6 @@ class AddGroupFn(Protocol):
     ) -> "AxisPattern":
         """Add a group to a schedule; see `AxisPattern.add_group`."""
         ...
-
-
-class CombineMode(StrEnum):
-    """Combination modes for ``AxisPattern.combine``."""
-
-    SUM = "sum"
-    MAX = "max"
-    MIN = "min"
 
 
 # ---------------------------------------------------------------------------
@@ -103,7 +71,7 @@ def _validate_value_string(value: float | str) -> None:
 
 def _require_consistent_group(
     patterns: "tuple[AxisPattern, ...]",
-) -> "tuple[list[ConditionDict] | None, str | None]":
+) -> "tuple[list[StratificationCondition] | None, str | None]":
     """Verify shared conditions/source_compartment; return the shared pair."""
     first = patterns[0]
     for p in patterns[1:]:
@@ -120,37 +88,26 @@ def _require_consistent_group(
     return first.conditions, first.source_compartment
 
 
-def _compose_formulas(sub_formulas: list[str], mode: "CombineMode") -> str:
-    if mode is CombineMode.SUM:
+def _compose_formulas(sub_formulas: list[str], mode: str) -> str:
+    if mode not in _COMBINE_MODES:
+        raise ValueError(
+            f"'{mode}' is not a mode of combine: {', '.join(_COMBINE_MODES)}"
+        )
+    if mode == "sum":
         return f"({' + '.join(sub_formulas)})"
     body = sub_formulas[0]
     for f in sub_formulas[1:]:
-        body = f"{mode.value}({body}, {f})"
+        body = f"{mode}({body}, {f})"
     return f"({body})"
 
 
-def _copy_condition(c: ConditionDict) -> ConditionDict:
-    """Shallow-copy a ConditionDict while preserving its TypedDict type."""
-    copy: ConditionDict = {"stratification": c["stratification"]}
-    if "category" in c:
-        copy["category"] = c["category"]
-    if "to" in c:
-        copy["to"] = c["to"]
-    return copy
-
-
 def _condition_key(
-    conditions: list[ConditionDict],
+    conditions: list[StratificationCondition],
 ) -> frozenset[tuple[str, str, str]]:
     """Return a hashable key for a conditions list, used for duplicate detection."""
-    keys: list[tuple[str, str, str]] = []
-    for c in conditions:
-        if "stratification" not in c:
-            raise ValueError(
-                f"Condition is missing required key 'stratification': {c!r}"
-            )
-        keys.append((c["stratification"], c.get("category", ""), c.get("to", "")))
-    return frozenset(keys)
+    return frozenset(
+        (c.stratification, c.category or "", c.to or "") for c in conditions
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -170,11 +127,11 @@ class _AddGroupDescriptor:
         self,
         instance: "AxisPattern | None",
         owner: type["AxisPattern"],
-    ) -> AddGroupFn:
+    ) -> _AddGroupFn:
         if instance is None:
 
             def factory(
-                conditions: list[ConditionDict],
+                conditions: list[StratificationCondition],
                 schedule: "AxisPattern",
                 *,
                 source_compartment: str | None = None,
@@ -193,7 +150,7 @@ class _AddGroupDescriptor:
         if not isinstance(instance, _ScheduleAxisPattern):
 
             def reject(
-                conditions: list[ConditionDict],  # noqa: ARG001
+                conditions: list[StratificationCondition],  # noqa: ARG001
                 schedule: "AxisPattern",  # noqa: ARG001
                 *,
                 source_compartment: str | None = None,  # noqa: ARG001
@@ -210,7 +167,7 @@ class _AddGroupDescriptor:
         schedule_instance: "_ScheduleAxisPattern" = instance
 
         def bound(
-            conditions: list[ConditionDict],
+            conditions: list[StratificationCondition],
             schedule: "AxisPattern",
             *,
             source_compartment: str | None = None,
@@ -250,7 +207,7 @@ class AxisPattern(BaseModel):
 
     Attributes
     ----------
-    conditions : list[ConditionDict] | None
+    conditions : list[StratificationCondition] | None
         The stratification conditions of the sub-group the pattern applies
         to, set by ``for_group``. None: every compartment of the transition.
     source_compartment : str | None
@@ -266,23 +223,23 @@ class AxisPattern(BaseModel):
     >>> str(rate)
     '(if(step == 10, 0.05, 0))'
     >>> # Multi-group schedule
+    >>> from commol import StratificationCondition
     >>> rate = AxisPattern.add_group(
-    ...     conditions=[{"stratification": "group", "category": "cat1"}],
+    ...     conditions=[
+    ...         StratificationCondition(stratification="group", category="cat1")
+    ...     ],
     ...     schedule=AxisPattern.pulse(at=10, value=0.05),
     ... ).add_group(
-    ...     conditions=[{"stratification": "group", "category": "cat2"}],
+    ...     conditions=[
+    ...         StratificationCondition(stratification="group", category="cat2")
+    ...     ],
     ...     schedule=AxisPattern.pulse(at=10, value=0.02),
     ... )
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    # Combine-mode constants — public; usable as AxisPattern.SUM, .MAX, .MIN
-    SUM: ClassVar[CombineMode] = CombineMode.SUM
-    MAX: ClassVar[CombineMode] = CombineMode.MAX
-    MIN: ClassVar[CombineMode] = CombineMode.MIN
-
-    conditions: list[ConditionDict] | None = None
+    conditions: list[StratificationCondition] | None = None
     source_compartment: str | None = None
 
     # `add_group` is a hybrid descriptor (see _AddGroupDescriptor above).
@@ -309,7 +266,7 @@ class AxisPattern(BaseModel):
 
     def for_group(
         self,
-        conditions: list[ConditionDict],
+        conditions: list[StratificationCondition],
         *,
         source_compartment: str | None = None,
     ) -> Self:
@@ -318,7 +275,7 @@ class AxisPattern(BaseModel):
 
         Parameters
         ----------
-        conditions : list[ConditionDict]
+        conditions : list[StratificationCondition]
             The stratification conditions of the sub-group, as in a
             stratified rate.
         source_compartment : str | None, default=None
@@ -330,31 +287,26 @@ class AxisPattern(BaseModel):
         AxisPattern
             The copy, with `conditions` and `source_compartment` set.
         """
-        copied: list[ConditionDict] = [_copy_condition(c) for c in conditions]
         return self.model_copy(
             update={
-                "conditions": copied,
+                "conditions": [c.model_copy() for c in conditions],
                 "source_compartment": source_compartment,
             }
         )
 
-    def to_stratified_rate(self) -> StratifiedRateDict:
+    def _rate(self) -> str:
         """
-        Convert this pattern to a stratified-rate dict.
-
-        If ``source_compartment`` is set, the rate is multiplied by that
-        compartment variable (absolute flow). Otherwise the rate is the
-        formula alone (proportional flow — the engine multiplies by the source
-        compartment automatically).
+        The rate of this pattern: its formula, times ``source_compartment``
+        when that is set (an absolute flow). Without it, the engine multiplies
+        the formula by the source compartment (a proportional flow).
         """
         if self.source_compartment is not None:
-            rate = f"{self.formula} * {self.source_compartment}"
-        else:
-            rate = self.formula
-        return StratifiedRateDict(
-            conditions=self.conditions if self.conditions is not None else [],
-            rate=rate,
-        )
+            return f"{self.formula} * {self.source_compartment}"
+        return self.formula
+
+    def _stratified_rate(self) -> StratifiedRate:
+        """This pattern as the stratified rate of its conditions."""
+        return StratifiedRate(conditions=self.conditions or [], rate=self._rate())
 
     # ------------------------------------------------------------------
     # Builder-consumption hooks
@@ -368,11 +320,11 @@ class AxisPattern(BaseModel):
             return self.formula
         return None
 
-    def _builder_stratified_rates(self) -> list[StratifiedRateDict] | None:
+    def _builder_stratified_rates(self) -> list[StratifiedRate] | None:
         """Stratified-rates list to pass to add_transition (or None)."""
         if self.conditions is None:
             return None
-        return [self.to_stratified_rate()]
+        return [self._stratified_rate()]
 
     # ------------------------------------------------------------------
     # Methods only meaningful on schedules — base raises by default.
@@ -519,7 +471,7 @@ class AxisPattern(BaseModel):
     def combine(
         cls,
         *patterns: "AxisPattern",
-        mode: CombineMode = CombineMode.SUM,
+        mode: Literal["sum", "max", "min"] = "sum",
     ) -> "AxisPattern":
         """
         Combine patterns into a single composed pattern.
@@ -527,8 +479,8 @@ class AxisPattern(BaseModel):
         - ``combine(p)`` is the identity (returns ``p`` unchanged).
         - All input patterns must share the same ``conditions`` and
           ``source_compartment`` (or have none); the result preserves them.
-        - ``mode`` is a `CombineMode` or its value (``"sum"``, ``"max"``,
-          ``"min"``).
+        - ``mode`` is ``"sum"``, ``"max"`` (the largest value at each
+          position) or ``"min"`` (the smallest).
         - Raises ``ValueError`` if no patterns are supplied, ``mode`` is not a
           mode, the inputs have inconsistent group bindings, or the parser of
           the engine rejects the combined formula, such as a ``"max"`` of
@@ -540,7 +492,7 @@ class AxisPattern(BaseModel):
             return patterns[0]
 
         shared_conditions, shared_source = _require_consistent_group(patterns)
-        result = _compose_formulas([p.formula for p in patterns], CombineMode(mode))
+        result = _compose_formulas([p.formula for p in patterns], mode)
         return _ComputedAxisPattern(
             computed_formula=result,
             conditions=shared_conditions,
@@ -584,7 +536,7 @@ class _PulsesAxisPattern(AxisPattern, RangeChecked):
 
     @field_validator("steps")
     @classmethod
-    def validate_steps(cls, v: list[int]) -> list[int]:
+    def _validate_steps(cls, v: list[int]) -> list[int]:
         if not v:
             raise ValueError("'at' must contain at least one step")
         if len(set(v)) != len(v):
@@ -592,7 +544,7 @@ class _PulsesAxisPattern(AxisPattern, RangeChecked):
         return v
 
     @model_validator(mode="after")
-    def validate_value_list(self) -> "_PulsesAxisPattern":
+    def _validate_value_list(self) -> "_PulsesAxisPattern":
         if isinstance(self.value, list):
             if len(self.value) != len(self.steps):
                 raise ValueError(
@@ -629,7 +581,7 @@ class _PeriodicAxisPattern(AxisPattern, RangeChecked):
     offset: int = 0
 
     @model_validator(mode="after")
-    def validate_offset_lt_period(self) -> "_PeriodicAxisPattern":
+    def _validate_offset_lt_period(self) -> "_PeriodicAxisPattern":
         if self.offset >= self.period:
             raise ValueError(
                 f"'offset' ({self.offset}) must be less than 'period' ({self.period})"
@@ -654,7 +606,7 @@ class _IntervalAxisPattern(AxisPattern, RangeChecked):
     value: float | str
 
     @model_validator(mode="after")
-    def validate_interval_bounds(self) -> "_IntervalAxisPattern":
+    def _validate_interval_bounds(self) -> "_IntervalAxisPattern":
         if self.start >= self.end:
             raise ValueError(
                 f"'start' ({self.start}) must be less than 'end' ({self.end})"
@@ -675,7 +627,7 @@ class _SinusoidAxisPattern(AxisPattern):
 
     @field_validator("period")
     @classmethod
-    def validate_period_nonzero(cls, v: float | str) -> float | str:
+    def _validate_period_nonzero(cls, v: float | str) -> float | str:
         if isinstance(v, (int, float)) and v == 0:
             raise ValueError("'period' must not be 0")
         if isinstance(v, str):
@@ -716,7 +668,7 @@ class _LinearRampAxisPattern(AxisPattern, RangeChecked):
     end_value: float
 
     @model_validator(mode="after")
-    def validate_ramp_bounds(self) -> "_LinearRampAxisPattern":
+    def _validate_ramp_bounds(self) -> "_LinearRampAxisPattern":
         if self.start >= self.end:
             raise ValueError(
                 f"'start' ({self.start}) must be less than 'end' ({self.end})"
@@ -740,7 +692,7 @@ class _ComputedAxisPattern(AxisPattern):
 
     @field_validator("computed_formula")
     @classmethod
-    def check_formula(cls, value: str) -> str:
+    def _check_formula(cls, value: str) -> str:
         """Check the formula with the parser of the engine."""
         commol_rs.core.MathExpression(value).check()
         return value
@@ -794,7 +746,7 @@ class _ScheduleAxisPattern(AxisPattern):
 
     def _append_group(
         self,
-        conditions: list[ConditionDict],
+        conditions: list[StratificationCondition],
         schedule: AxisPattern,
         *,
         source_compartment: str | None,
@@ -848,25 +800,20 @@ class _ScheduleAxisPattern(AxisPattern):
     def _builder_rate(self) -> str | float | None:
         for entry in self.patterns:
             if not entry.pattern.conditions:
-                return entry.pattern.to_stratified_rate()["rate"]
+                return entry.pattern._rate()
         return None
 
-    def _builder_stratified_rates(self) -> list[StratifiedRateDict] | None:
+    def _builder_stratified_rates(self) -> list[StratifiedRate] | None:
         # A schedule starts with add_group, so it has a group with conditions.
         result = []
         for entry in self.patterns:
             if entry.pattern.conditions:
-                d = entry.pattern.to_stratified_rate()
-                if entry.absolute is not None:
-                    d["absolute"] = entry.absolute
-                result.append(d)
+                result.append(
+                    entry.pattern._stratified_rate().model_copy(
+                        update={"absolute": entry.absolute}
+                    )
+                )
         return result
 
 
-__all__ = [
-    "AddGroupFn",
-    "CombineMode",
-    "ConditionDict",
-    "StratifiedRateDict",
-    "AxisPattern",
-]
+__all__ = ["AxisPattern"]

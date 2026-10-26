@@ -8,18 +8,26 @@ import matplotlib
 import pytest
 
 from commol import (
-    CalibrationResult,
     Simulation,
-    SimulationResults,
-    MorrisResult,
     ParameterSample,
+    SampleMethod,
+    Threshold,
+)
+from commol.context.calibration import (
+    CalibrationResult,
+)
+from commol.api.results import (
+    SimulationResults,
+)
+from commol.context.inference.global_sensitivity import (
+    MorrisResult,
     PRCCResult,
+    SobolResult,
+)
+from commol.context.inference.profiles import (
     Profile,
     ProfileInterval,
     ProfileResult,
-    SampleMethod,
-    SobolResult,
-    Threshold,
 )
 
 INPUTS = ["k1", "k2", "k3"]

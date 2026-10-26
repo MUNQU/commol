@@ -5,7 +5,8 @@ import math
 
 import pytest
 
-import commol
+from collections.abc import Iterable, Sequence
+
 from commol import (
     AxisUnits,
     CalibrationProblem,
@@ -13,16 +14,27 @@ from commol import (
     NelderMeadConfig,
     ObservedDataPoint,
     Simulation,
-    windowed_totals,
 )
 from commol.api.plotting.panels import compared_panels
-from commol.api.results import sample
+from commol.api.results import SimulationResults
 from commol.commol_rs import _commol_rs as commol_rs
 from tests.support import a_to_b_builder, bounded, build
 
 SEED = 42
 WINDOW = 5
 NUM_STEPS = 40
+
+
+def windowed_totals(
+    series: Sequence[float],
+    positions: Iterable[float],
+    window: float,
+    at: Iterable[float] | None = None,
+) -> list[float]:
+    """The windowed totals of one series, read by results without a model."""
+    return SimulationResults(positions, {"s": series}).windowed_totals(
+        ["s"], window, at
+    )
 
 
 def _model(k1: float | None = 0.05) -> Simulation:
@@ -116,15 +128,14 @@ class TestWindowedTotals:
         with pytest.raises(ValueError, match="no value at 9"):
             windowed_totals([0.0, 1.0, 2.0], range(3), 1, [9])
 
-    def test_simulation_windows_the_total_of_its_accumulators(self) -> None:
-        simulation = _model()
-        results = simulation.run(NUM_STEPS)
+    def test_results_window_the_total_of_their_accumulators(self) -> None:
+        results = _model().run(NUM_STEPS)
 
         by_hand = windowed_totals(results["events"], results.positions, WINDOW)
         at = [7, 12]
 
-        assert simulation.windowed_totals(results, ["events"], WINDOW) == by_hand
-        assert simulation.windowed_totals(results, ["events"], WINDOW, at) == (
+        assert results.windowed_totals(["events"], WINDOW) == by_hand
+        assert results.windowed_totals(["events"], WINDOW, at) == (
             windowed_totals(results["events"], results.positions, WINDOW, at)
         )
 
@@ -141,7 +152,7 @@ class TestAgreementWithTheCalibrationLoss:
     def _observations(self, simulation: Simulation) -> list[ObservedDataPoint]:
         results = simulation.run(NUM_STEPS)
         steps = AxisUnits().window_ends(WINDOW, "step", NUM_STEPS)
-        values = simulation.windowed_totals(results, ["events"], WINDOW, steps)
+        values = results.windowed_totals(["events"], WINDOW, steps)
         return [
             ObservedDataPoint(
                 at=step,
@@ -235,11 +246,10 @@ def test_windowed_totals_take_output_names() -> None:
         amounts={"A": 90, "B": 0},
         stratifications={"g": {"g1": 1 / 3, "g2": 1 / 3, "g3": 1 / 3}},
     )
-    simulation = Simulation(build(builder))
-    results = simulation.run(4)
+    results = Simulation(build(builder)).run(4)
 
-    some = simulation.windowed_totals(results, ["moved_g2", "moved_g3"], 2)
-    whole = simulation.windowed_totals(results, ["moved"], 2)
+    some = results.windowed_totals(["moved_g2", "moved_g3"], 2)
+    whole = results.windowed_totals(["moved"], 2)
     by_hand = windowed_totals(
         [
             g2 + g3
@@ -254,10 +264,11 @@ def test_windowed_totals_take_output_names() -> None:
     assert all(value > 0 for value in some)
 
 
-def test_a_series_is_read_at_positions_through_the_public_api() -> None:
+def test_results_read_bins_and_accumulators_at_positions() -> None:
     """
-    `commol.sample` reads a series at positions, and `Simulation.sample` reads
-    bins and accumulators by id at positions, next to `windowed_totals`.
+    `SimulationResults.sample` reads bins and accumulators by id at
+    positions, next to `windowed_totals`; results without a model read output
+    names.
 
     A bin id stands for all its strata, so A at the end of each window is the
     sum of its strata there; an accumulator read at the two ends of a window
@@ -271,24 +282,23 @@ def test_a_series_is_read_at_positions_through_the_public_api() -> None:
         amounts={"A": 90, "B": 0},
         stratifications={"g": {"g1": 1 / 3, "g2": 1 / 3, "g3": 1 / 3}},
     )
-    simulation = Simulation(build(builder))
-    results = simulation.run(6)
+    results = Simulation(build(builder)).run(6)
     ends = [2, 4, 6]
     strata = [f"A_{group}" for group in ("g1", "g2", "g3")]
+    by_hand = SimulationResults(results.positions, {"A_g1": results["A_g1"]})
 
-    a_at_ends = simulation.sample(results, ["A"], ends)
-    by_hand = [sum(results[name][int(end)] for name in strata) for end in ends]
-    moved_at = simulation.sample(results, ["moved"], [0, *ends])
-    gained = simulation.windowed_totals(results, ["moved"], 2, ends)
+    a_at_ends = results.sample(["A"], ends)
+    expected = [sum(results[name][int(end)] for name in strata) for end in ends]
+    moved_at = results.sample(["moved"], [0, *ends])
+    gained = results.windowed_totals(["moved"], 2, ends)
 
-    assert commol.sample is sample
-    assert commol.sample(results["A_g1"], results.positions, ends) == [
-        results["A_g1"][int(end)] for end in ends
-    ]
-    assert a_at_ends == pytest.approx(by_hand)
-    assert simulation.sample(results, strata, ends) == pytest.approx(by_hand)
+    assert by_hand.sample(["A_g1"], ends) == [results["A_g1"][end] for end in ends]
+    assert a_at_ends == pytest.approx(expected)
+    assert results.sample(strata, ends) == pytest.approx(expected)
     assert [end - start for start, end in zip(moved_at, moved_at[1:])] == (
         pytest.approx(gained)
     )
     with pytest.raises(ValueError, match="no value at 2.5"):
-        simulation.sample(results, ["A"], [2.5])
+        results.sample(["A"], [2.5])
+    with pytest.raises(KeyError, match="Missing output series in results: \\['A'\\]"):
+        by_hand.sample(["A"], ends)

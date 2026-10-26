@@ -2,6 +2,7 @@
 
 import pytest
 
+from commol import StratificationCondition, StratifiedRate
 from commol import Aggregate, Complete
 from commol.context.model import Model
 from commol.utils.equations import UnitConsistencyError
@@ -41,10 +42,14 @@ def _per_group_ab(*rates: str, **options) -> Model:
             source=["A"],
             target=["B"],
             stratified_rates=[
-                {
-                    "conditions": [{"stratification": "group", "category": category}],
-                    "rate": rate,
-                }
+                StratifiedRate(
+                    conditions=[
+                        StratificationCondition(
+                            stratification="group", category=category
+                        )
+                    ],
+                    rate=rate,
+                )
                 for category, rate in zip(categories, rates, strict=True)
             ],
         )
@@ -423,13 +428,17 @@ class TestInconsistentModels:
                 source=["A"],
                 target=["B"],
                 stratified_rates=[
-                    {
-                        "conditions": [
-                            {"stratification": "group", "category": group},
-                            {"stratification": "type", "category": kind},
+                    StratifiedRate(
+                        conditions=[
+                            StratificationCondition(
+                                stratification="group", category=group
+                            ),
+                            StratificationCondition(
+                                stratification="type", category=kind
+                            ),
                         ],
-                        "rate": rate,
-                    }
+                        rate=rate,
+                    )
                     for (group, kind), rate in rates.items()
                 ],
             )

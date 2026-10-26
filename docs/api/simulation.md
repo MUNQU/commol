@@ -8,9 +8,13 @@ Runs a model and reads its outputs. Guide: [Running Simulations](../guide/simula
 
 ::: commol.api.results.SimulationResults
 
+::: commol.api.plotting.accessors.ResultsPlot
+
 ::: commol.api.simulation.ReplicateRuns
 
 ::: commol.api.results.SimulationReplicates
+
+::: commol.api.plotting.accessors.ReplicatesPlot
 
 ::: commol.context.engine.ODESolver
 
@@ -19,9 +23,3 @@ Runs a model and reads its outputs. Guide: [Running Simulations](../guide/simula
 ::: commol.context.engine.StochasticStepsSettings
 
 ::: commol.InfeasibleStateError
-
-## Windows and positions
-
-::: commol.api.windows.windowed_totals
-
-::: commol.api.results.sample

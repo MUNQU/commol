@@ -3,7 +3,13 @@
 import numpy as np
 import pytest
 
-from commol import PredictionIntervals, SeriesIntervals, Simulation
+from commol import (
+    Simulation,
+)
+from commol.context.inference.conformal import (
+    PredictionIntervals,
+    SeriesIntervals,
+)
 
 
 def test_a_figure_draws_prediction_intervals(abc_simulation: Simulation) -> None:

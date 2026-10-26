@@ -74,13 +74,11 @@ def test_a_panel_per_observed_series_reads_the_observation_operator() -> None:
         _model_points(summed),
         [
             [10, 20, 30],
-            simulation.windowed_totals(
-                run, ["events_g2", "events_g3"], 5, [10, 20, 30]
-            ),
+            run.windowed_totals(["events_g2", "events_g3"], 5, [10, 20, 30]),
         ],
     )
     np.testing.assert_allclose(
-        _model_points(one), [[10, 20], simulation.sample(run, ["B_g1"], [10, 20])]
+        _model_points(one), [[10, 20], run.sample(["B_g1"], [10, 20])]
     )
     np.testing.assert_allclose(scatter(summed), [[10, 2.0], [20, 2.0], [30, 2.0]])
     assert legend_texts(summed) == {"Simulation", "Observed"}
@@ -97,7 +95,7 @@ def test_the_panel_of_an_observed_series_applies_its_factor() -> None:
     fig = run.plot.observations(observed, calibration_result=fit(share=0.5))
 
     (ax,) = fig.axes
-    unscaled = simulation.sample(run, ["B"], [10, 20])
+    unscaled = run.sample(["B"], [10, 20])
     np.testing.assert_allclose(_model_points(ax)[1], 0.5 * np.asarray(unscaled))
     np.testing.assert_allclose(scatter(ax)[:, 1], [1.0, 1.0])
 
@@ -159,8 +157,8 @@ def test_each_observed_point_is_read_through_its_own_window() -> None:
     fig = run.plot.observations(observed)
 
     steps = fig.axes[0].lines[0]
-    first = simulation.windowed_totals(run, ["events"], 7, [10])[0]
-    second = simulation.windowed_totals(run, ["events"], 14, [28])[0]
+    first = run.windowed_totals(["events"], 7, [10])[0]
+    second = run.windowed_totals(["events"], 14, [28])[0]
     np.testing.assert_allclose(
         steps.get_xdata(), [3, 10, np.nan, 14, 28, np.nan], equal_nan=True
     )
@@ -209,7 +207,7 @@ def test_a_value_with_no_window_is_a_marker_joined_as_a_guide() -> None:
     assert guide.get_label() == "Simulation"
     np.testing.assert_allclose(
         [guide.get_xdata(), guide.get_ydata()],
-        [[5, 12], simulation.sample(run, ["B"], [5, 12])],
+        [[5, 12], run.sample(["B"], [5, 12])],
     )
     np.testing.assert_allclose(
         _model_points(ax), [guide.get_xdata(), guide.get_ydata()]
@@ -236,8 +234,8 @@ def test_the_panel_of_replicates_shows_their_mean_and_band() -> None:
     (ax,) = fig.axes
     per_run = [
         [
-            simulation.windowed_totals(run, ["events"], 5, [10])[0],
-            simulation.sample(run, ["events"], [20])[0],
+            run.windowed_totals(["events"], 5, [10])[0],
+            run.sample(["events"], [20])[0],
         ]
         for run in replicates
     ]

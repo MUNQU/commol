@@ -14,19 +14,23 @@ import commol.api
 from commol import (
     CalibrationProblem,
     Calibrator,
-    IdentifiabilityReport,
     NelderMeadConfig,
     ObservedDataPoint,
     ParameterSample,
     Predictive,
     SampleMethod,
     Simulation,
-    SimulationResults,
     member_statistics,
+)
+from commol.context.inference.identifiability import (
+    IdentifiabilityReport,
+)
+from commol.api.results import (
+    SimulationResults,
 )
 from commol.api import reporting
 from commol.context.inference import identifiability
-from commol.api.reporting import ReportLeaf, SimulationReport
+from commol.api.reporting import _ReportLeaf, SimulationReport
 from commol.context.inference.identifiability import (
     ParameterVerdicts,
     PracticalVerdict,
@@ -49,7 +53,7 @@ OBSERVED_BLOCK = {
     "events": {"values": [1.0, None, 3.0, None], "weights": [1.0, None, 2.0, None]}
 }
 
-type Nested = dict[str, "Nested"] | ReportLeaf | list[float | None]
+type Nested = dict[str, "Nested"] | _ReportLeaf | list[float | None]
 
 
 def _builder(k: float | None = 0.1):

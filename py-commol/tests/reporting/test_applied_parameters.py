@@ -7,12 +7,14 @@ import pytest
 from commol import (
     Aggregate,
     CalibrationProblem,
-    CalibrationResult,
     Model,
     NelderMeadConfig,
     ObservedDataPoint,
     ParameterSample,
     SampleMethod,
+)
+from commol.context.calibration import (
+    CalibrationResult,
 )
 from tests.support import (
     FactoryBuilder,

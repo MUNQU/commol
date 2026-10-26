@@ -3,6 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
+from commol import StratificationCondition, StratifiedRate
 from commol import Aggregate, Simulation
 from tests.support import (
     FactoryBuilder,
@@ -39,10 +40,14 @@ class TestFallbackRate:
                 target=["B"],
                 rate="k1_default * A * B / total",
                 stratified_rates=[
-                    {
-                        "conditions": [{"stratification": "group", "category": "g1"}],
-                        "rate": "k1_g1 * A * B / total",
-                    }
+                    StratifiedRate(
+                        conditions=[
+                            StratificationCondition(
+                                stratification="group", category="g1"
+                            )
+                        ],
+                        rate="k1_g1 * A * B / total",
+                    )
                 ],
             )
         )
@@ -103,24 +108,36 @@ class TestConditionalCompartments:
                 source=["B"],
                 target=["C"],
                 stratified_rates=[
-                    {
-                        "conditions": [{"stratification": "group", "category": "g1"}],
-                        "rate": "k2_g1 * B_g1",
-                    },
-                    {
-                        "conditions": [
-                            {"stratification": "group", "category": "g2"},
-                            {"stratification": "type", "category": "t1"},
+                    StratifiedRate(
+                        conditions=[
+                            StratificationCondition(
+                                stratification="group", category="g1"
+                            )
                         ],
-                        "rate": "k2_g2_t1 * B_g2_t1",
-                    },
-                    {
-                        "conditions": [
-                            {"stratification": "group", "category": "g2"},
-                            {"stratification": "type", "category": "t2"},
+                        rate="k2_g1 * B_g1",
+                    ),
+                    StratifiedRate(
+                        conditions=[
+                            StratificationCondition(
+                                stratification="group", category="g2"
+                            ),
+                            StratificationCondition(
+                                stratification="type", category="t1"
+                            ),
                         ],
-                        "rate": "k2_g2_t2 * B_g2_t2",
-                    },
+                        rate="k2_g2_t1 * B_g2_t1",
+                    ),
+                    StratifiedRate(
+                        conditions=[
+                            StratificationCondition(
+                                stratification="group", category="g2"
+                            ),
+                            StratificationCondition(
+                                stratification="type", category="t2"
+                            ),
+                        ],
+                        rate="k2_g2_t2 * B_g2_t2",
+                    ),
                 ],
             )
         )
@@ -151,13 +168,17 @@ class TestStratifiedRateValidation:
                 source=["A"],
                 target=["A"],
                 stratified_rates=[
-                    {
-                        "conditions": [
-                            {"stratification": "group", "category": "g1", "to": "g2"},
-                            {"stratification": "type", "category": "t1"},
+                    StratifiedRate(
+                        conditions=[
+                            StratificationCondition(
+                                stratification="group", category="g1", to="g2"
+                            ),
+                            StratificationCondition(
+                                stratification="type", category="t1"
+                            ),
                         ],
-                        "rate": "a",
-                    }
+                        rate="a",
+                    )
                 ],
             )
         )
@@ -183,17 +204,17 @@ class TestConditions:
             ([], "at least one stratification condition"),
             (
                 [
-                    {"stratification": "g", "category": "g1"},
-                    {"stratification": "g", "category": "g2"},
+                    StratificationCondition(stratification="g", category="g1"),
+                    StratificationCondition(stratification="g", category="g2"),
                 ],
                 r"Duplicate stratifications found: \['g'\]",
             ),
             (
-                [{"stratification": "z", "category": "g1"}],
+                [StratificationCondition(stratification="z", category="g1")],
                 r"rate 0: Stratification 'z' not found. Available: \['g'\]",
             ),
             (
-                [{"stratification": "g", "category": "g9"}],
+                [StratificationCondition(stratification="g", category="g9")],
                 r"Category 'g9' not found in stratification 'g'",
             ),
         ],
@@ -210,6 +231,6 @@ class TestConditions:
                 source=["A"],
                 target=["B"],
                 rate="k",
-                stratified_rates=[{"conditions": conditions, "rate": "k"}],
+                stratified_rates=[StratifiedRate(conditions=conditions, rate="k")],
             )
             build(builder)

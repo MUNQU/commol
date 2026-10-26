@@ -12,18 +12,22 @@ from pydantic import ValidationError
 from commol import (
     BayesianBootstrap,
     Calibrator,
-    IdentifiabilityReport,
     LogNormalObservations,
     NelderMeadConfig,
     NormalObservations,
     ParametricBootstrap,
     PredictionProfile,
     PredictionSpec,
-    ProfileInterval,
     ProfileLikelihood,
     ResidualBootstrap,
     Threshold,
     WildBootstrap,
+)
+from commol.context.inference.identifiability import (
+    IdentifiabilityReport,
+)
+from commol.context.inference.profiles import (
+    ProfileInterval,
 )
 from commol.commol_rs import _commol_rs as commol_rs
 from tests.support import (

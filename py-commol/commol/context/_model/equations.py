@@ -35,8 +35,8 @@ from commol.context._model.formula_tree import (
 )
 from commol.context._model.helpers import ModelCompartmentHelper
 from commol.context.description import (
-    Block,
-    Cell,
+    _Block,
+    _Cell,
     Equation,
     EquationGroup,
     Equations,
@@ -178,20 +178,20 @@ class DynamicsDescription:
             )
         return self._flows
 
-    def blocks(self) -> list[Block]:
+    def blocks(self) -> list[_Block]:
         """
         The blocks of the dynamics: graphs, equations and impulses.
 
         Returns
         -------
-        list[Block]
+        list[_Block]
             The graph of the bins, the graph of the strata when the model
             moves amounts between categories, the graph of the compartments,
             the compact form, the expanded form when the engine has equations
             or the events when it draws them, and the impulses.
         """
         strata = self.strata_graph()
-        blocks: list[Block] = [
+        blocks: list[_Block] = [
             self.state_graph(),
             *([strata] if strata is not None else []),
             self.expanded_graph(),
@@ -407,7 +407,7 @@ class DynamicsDescription:
     # Compact form
     # ------------------------------------------------------------------
 
-    def compact_form(self) -> list[Block]:
+    def compact_form(self) -> list[_Block]:
         """
         Each transition, with the flows it creates between compartments.
 
@@ -417,7 +417,7 @@ class DynamicsDescription:
 
         Returns
         -------
-        list[Block]
+        list[_Block]
             One `Equations` block per group, then a `Text` with the size.
         """
         process = self._model.process
@@ -444,7 +444,7 @@ class DynamicsDescription:
             for strat_id, transitions in by_stratification.items()
         )
 
-        blocks: list[Block] = []
+        blocks: list[_Block] = []
         for title, transitions in groups:
             if not transitions:
                 continue
@@ -573,7 +573,7 @@ class DynamicsDescription:
     # Events
     # ------------------------------------------------------------------
 
-    def events(self, continuous: bool) -> list[Block]:
+    def events(self, continuous: bool) -> list[_Block]:
         """
         The event table: one row per flow, with the change of one event and
         its propensity (continuous time) or its draw (discrete time).
@@ -590,7 +590,7 @@ class DynamicsDescription:
 
         Returns
         -------
-        list[Block]
+        list[_Block]
             The table, and the rule of the draws of a step.
         """
         impulses = {t.id for t in self._model.process.transitions if t.is_impulse}
@@ -598,7 +598,7 @@ class DynamicsDescription:
         for flow in self._transition_flows():
             if flow.transition not in impulses:
                 flows.setdefault(flow.flow, []).append(flow)
-        rows: list[list[Cell]] = []
+        rows: list[list[_Cell]] = []
         for pieces in flows.values():
             first = pieces[0]
             change: dict[str, int] = {}
@@ -681,7 +681,7 @@ class DynamicsDescription:
 def _declared_rates(transition: "Transition") -> list[str]:
     """The rates a transition declares: its rate and its stratified rates."""
     rates = [] if transition.rate is None else [transition.rate]
-    rates.extend(rate.rate for rate in transition.stratified_rates or [])
+    rates.extend(str(rate.rate) for rate in transition.stratified_rates or [])
     return rates
 
 

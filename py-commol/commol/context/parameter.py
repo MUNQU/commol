@@ -41,7 +41,7 @@ class SeriesValue(BaseModel):
 
     @field_validator("data")
     @classmethod
-    def validate_data(
+    def _validate_data(
         cls, value: list[tuple[float, float]]
     ) -> list[tuple[float, float]]:
         """
@@ -51,10 +51,6 @@ class SeriesValue(BaseModel):
         """
         commol_rs.model.check_series(value)
         return value
-
-
-type ParameterUpdate = float | str | list[tuple[float, float]] | SeriesValue | None
-"""A new value of a parameter: a value it takes, or the points of its series."""
 
 
 class Parameter(BaseModel):
@@ -101,7 +97,7 @@ class Parameter(BaseModel):
 
     @field_validator("value")
     @classmethod
-    def validate_value(
+    def _validate_value(
         cls, value: float | str | SeriesValue | None
     ) -> float | str | SeriesValue | None:
         """Validate the parameter value."""
@@ -112,7 +108,7 @@ class Parameter(BaseModel):
         return value.strip()
 
     @model_validator(mode="after")
-    def validate_formula(self) -> Self:
+    def _validate_formula(self) -> Self:
         """Check a formula value as a rate is checked, with the parser of the
         engine."""
         if isinstance(self.value, str):
@@ -133,13 +129,15 @@ class Parameter(BaseModel):
         """
         return self.value is not None
 
-    def with_value(self, value: ParameterUpdate) -> "Parameter":
+    def with_value(
+        self, value: float | str | list[tuple[float, float]] | SeriesValue | None
+    ) -> "Parameter":
         """
         This parameter with another value.
 
         Parameters
         ----------
-        value : ParameterUpdate
+        value : float | str | list[tuple[float, float]] | SeriesValue | None
             The new value, as `Parameter.value` takes it. A list of
             (position, value) points replaces the points of a series and keeps
             its mode; a `SeriesValue` sets both.

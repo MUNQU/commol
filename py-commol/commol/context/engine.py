@@ -62,7 +62,7 @@ class ODESolver(BaseModel):
     )
 
     @model_validator(mode="after")
-    def check_with_the_engine(self) -> Self:
+    def _check_with_the_engine(self) -> Self:
         """Ask the engine's list whether it takes the settings."""
         return _checked(self)
 
@@ -119,7 +119,7 @@ class StochasticEventsSettings(BaseModel):
     )
 
     @model_validator(mode="after")
-    def check_with_the_engine(self) -> Self:
+    def _check_with_the_engine(self) -> Self:
         """Ask the engine's list whether it takes the settings."""
         return _checked(self)
 
@@ -142,7 +142,7 @@ class StochasticStepsSettings(BaseModel):
     )
 
     @model_validator(mode="after")
-    def check_with_the_engine(self) -> Self:
+    def _check_with_the_engine(self) -> Self:
         """Ask the engine's list whether it takes the settings."""
         return _checked(self)
 
@@ -203,7 +203,7 @@ class ModelEngine(BaseModel):
 
     @field_validator("settings", mode="before")
     @classmethod
-    def settings_of_the_engine(
+    def _settings_of_the_engine(
         cls,
         value: EngineSettings | Mapping[str, JsonValue] | None,
         info: ValidationInfo,
@@ -215,7 +215,7 @@ class ModelEngine(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def check_settings(self) -> Self:
+    def _check_settings(self) -> Self:
         """Ask the engine's list whether it has the engine and the settings."""
         settings_json = None if self.settings is None else engine_json(self.settings)
         commol_rs.engine.EngineType(engine_json(self.type)).check_settings(

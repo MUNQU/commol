@@ -17,8 +17,10 @@ from commol import (
     Predictive,
     ResidualBootstrap,
     ResidualNoise,
-    UncertaintyMethod,
     WildBootstrap,
+)
+from commol.context.inference.method import (
+    UncertaintyMethod,
 )
 from commol.context.inference.resampling import BootstrapResult
 from tests.support import flow_calibrator, flow_observations

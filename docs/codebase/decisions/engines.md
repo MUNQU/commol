@@ -26,7 +26,7 @@ the `Literal` `EngineName` (`context/engine.py`), for static typing and
 completion of `ModelBuilder.build`; a test checks that it equals the entries of
 the list (`test_the_python_names_equal_the_engines_of_the_list`). `ModelEngine.type` is a `str` that
 the list checks, so a model can name an engine of any kind; its settings are read
-with the class of that engine (`ModelEngine.settings_of_the_engine`), so a model
+with the class of that engine (`ModelEngine._settings_of_the_engine`), so a model
 loads back with the class it was saved with. Generating the `Literal` from Rust would need
 a code-generation step for four names; the test catches the same drift. An
 entry names the kinds it runs, so another kind (for example an agent network)

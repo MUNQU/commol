@@ -176,7 +176,7 @@ class AxisUnits(BaseModel):
     )
 
     @model_validator(mode="after")
-    def check_units_and_engine(self) -> Self:
+    def _check_units_and_engine(self) -> Self:
         """Check the step unit and the origin, and ask for the engine."""
         define_units(self.step_unit)
         check_step_unit(self.step_unit)

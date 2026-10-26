@@ -30,7 +30,7 @@ A compartment (a *bin*) holds an amount, in the unit of the bin. A model can hav
 any number of them, with any ids.
 
 ```python
-from commol import Aggregate, ModelBuilder, Simulation
+from commol import Aggregate, ModelBuilder, Simulation, StratificationCondition
 
 builder = (
     ModelBuilder(name="Concepts")
@@ -252,7 +252,7 @@ conditional = (
     .add_stratification(
         id="subtype",
         categories=["s1", "s2"],
-        conditions=[{"stratification": "group", "category": "g2"}],
+        conditions=[StratificationCondition(stratification="group", category="g2")],
     )
     .add_parameter(id="k1", value=0.1)
     .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")

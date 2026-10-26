@@ -2,6 +2,7 @@
 
 import pytest
 
+from commol import StratificationCondition
 from commol import ModelBuilder, Simulation
 from commol.context.stratification import Stratification
 from tests.support import assert_total_conserved, build, abc_builder
@@ -110,7 +111,9 @@ class TestConditionalStratification:
             builder.add_stratification(
                 id="status",
                 categories=["s1", "s2"],
-                conditions=[{"stratification": "group", "category": "g2"}],
+                conditions=[
+                    StratificationCondition(stratification="group", category="g2")
+                ],
             )
 
     def test_a_condition_without_a_category_is_rejected(self) -> None:
@@ -124,7 +127,7 @@ class TestConditionalStratification:
             builder.add_stratification(
                 id="subgroup",
                 categories=["sub0", "sub1"],
-                conditions=[{"stratification": "group"}],
+                conditions=[StratificationCondition(stratification="group")],
             )
 
 

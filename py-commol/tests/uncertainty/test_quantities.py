@@ -24,7 +24,6 @@ from commol import (
     PeakPosition,
     PolynomialChaos,
     Propagation,
-    PropagationResult,
     Ratio,
     SampleMethod,
     SensitivityAnalysis,
@@ -35,9 +34,12 @@ from commol import (
     member_statistics,
     weighted_quantiles,
 )
+from commol.context.inference.global_sensitivity import (
+    PropagationResult,
+)
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.engine_json import engine_json
-from commol.context.inference.quantities import Quantity, quantity_labels
+from commol.context.inference.quantities import _Quantity, quantity_labels
 from tests.support import bounded, build
 from tests.support.models import a_to_b_builder
 
@@ -75,7 +77,7 @@ def _inflow(gains: list[float]) -> SensitivityAnalysis:
     return SensitivityAnalysis(Simulation(model), inputs, seed=1)
 
 
-def _values(analysis: SensitivityAnalysis, quantities: list[Quantity]) -> list[float]:
+def _values(analysis: SensitivityAnalysis, quantities: list[_Quantity]) -> list[float]:
     """The value of each scalar of `quantities` in the one run."""
     return analysis.run(Propagation(quantities=quantities)).values[0]
 
@@ -304,7 +306,7 @@ class TestLabels:
 
 class TestBoundary:
     def test_each_quantity_crosses_to_rust_as_it_is(self) -> None:
-        quantities: list[Quantity] = [
+        quantities: list[_Quantity] = [
             ValueAt(series=["A", "B"], at=1.5),
             ValueAt(series=Increments("A", 2), at=3),
             Gain(outputs="A", start=0.1, end=0.4),
@@ -328,7 +330,7 @@ class TestBoundary:
             label="a over b",
         )
 
-        adapter: TypeAdapter[Quantity] = TypeAdapter(Quantity)
+        adapter: TypeAdapter[_Quantity] = TypeAdapter(_Quantity)
         assert [adapter.validate_json(text) for text in read] == quantities
         assert (
             json.loads(commol_rs.json.as_read("Ratio", engine_json(labelled)))["label"]

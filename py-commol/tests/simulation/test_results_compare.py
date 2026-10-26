@@ -3,7 +3,13 @@ seed and model, a NaN equal to a NaN; a plain dict or list is not a result."""
 
 import pytest
 
-from commol import Simulation, SimulationReplicates, SimulationResults
+from commol import (
+    Simulation,
+)
+from commol.api.results import (
+    SimulationReplicates,
+    SimulationResults,
+)
 from tests.support import abc_builder, build
 from tests.support.models import build_stochastic
 

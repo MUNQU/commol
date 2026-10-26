@@ -13,14 +13,13 @@ parameters, outputs), adds the sections of the kind
   submodels. An element commol cannot fill is marked `TO_BE_WRITTEN`.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.engine_json import engine_json
 
 from commol.context.description import (
-    Block,
-    Layout,
+    _Block,
     ModelDescription,
     Section,
     Table,
@@ -73,7 +72,9 @@ DESIGN_CONCEPTS: tuple[str, ...] = (
 """The elements of the design concepts of the ODD protocol (Grimm et al. 2020)."""
 
 
-def describe_model(model: "Model", layout: Layout) -> ModelDescription:
+def describe_model(
+    model: "Model", layout: Literal["default", "odd"]
+) -> ModelDescription:
     """
     The description of a model in a layout.
 
@@ -114,7 +115,7 @@ def describe_model(model: "Model", layout: Layout) -> ModelDescription:
 
 
 def _default_layout(model: "Model", kind: dict[str, Section]) -> list[Section]:
-    generic: dict[str, list[Block]] = {
+    generic: dict[str, list[_Block]] = {
         "overview": overview_blocks(model),
         "schedule": schedule_blocks(model),
         "parameters": parameter_blocks(model),
@@ -133,7 +134,7 @@ def _default_layout(model: "Model", kind: dict[str, Section]) -> list[Section]:
     ]
 
 
-def overview_blocks(model: "Model") -> list[Block]:
+def overview_blocks(model: "Model") -> list[_Block]:
     """The name, description, kind, engine, settings and axis of a model."""
     structure = model.structure
     kind = structure.kind
@@ -162,9 +163,9 @@ def overview_blocks(model: "Model") -> list[Block]:
     ]
 
 
-def schedule_blocks(model: "Model") -> list[Block]:
+def schedule_blocks(model: "Model") -> list[_Block]:
     """How the engine advances, and the settings it advances with."""
-    blocks: list[Block] = [Text(text=_engine(model).schedule)]
+    blocks: list[_Block] = [Text(text=_engine(model).schedule)]
     if model.engine.settings is not None:
         blocks.append(
             Table(
@@ -179,7 +180,7 @@ def schedule_blocks(model: "Model") -> list[Block]:
     return blocks
 
 
-def parameter_blocks(model: "Model") -> list[Block]:
+def parameter_blocks(model: "Model") -> list[_Block]:
     """Every parameter, with its value, unit, description and calibration."""
     if not model.parameters:
         return [Text(text="The model has no parameters.")]
@@ -206,7 +207,7 @@ def _parameter_value(value: float | str | SeriesValue | None) -> str | float | N
     return value
 
 
-def output_blocks(model: "Model") -> list[Block]:
+def output_blocks(model: "Model") -> list[_Block]:
     """The outputs a run returns, grouped by the id they come from."""
     outputs = model.structure.outputs_by_source(model)
     return [
@@ -223,10 +224,10 @@ def output_blocks(model: "Model") -> list[Block]:
 
 
 def _odd_layout(model: "Model", kind: dict[str, Section]) -> list[Section]:
-    def blocks_of(key: str) -> list[Block]:
+    def blocks_of(key: str) -> list[_Block]:
         return list(kind[key].blocks) if key in kind else []
 
-    elements: dict[str, list[Block]] = {
+    elements: dict[str, list[_Block]] = {
         "purpose": [Text(text=model.description or TO_BE_WRITTEN)],
         "entities": [*blocks_of("entities"), *_scales(model)],
         "process_overview": [*_process_overview(model), *_scheduling(model)],
@@ -251,13 +252,13 @@ def _odd_layout(model: "Model", kind: dict[str, Section]) -> list[Section]:
     ]
 
 
-def _scheduling(model: "Model") -> list[Block]:
+def _scheduling(model: "Model") -> list[_Block]:
     blocks = schedule_blocks(model)
     blocks[0] = blocks[0].model_copy(update={"heading": "Scheduling"})
     return blocks
 
 
-def _scales(model: "Model") -> list[Block]:
+def _scales(model: "Model") -> list[_Block]:
     continuous = _engine(model).rate_meaning == "continuous"
     time = "continuous" if continuous else "discrete steps"
     return [
@@ -272,7 +273,7 @@ def _scales(model: "Model") -> list[Block]:
     ]
 
 
-def _process_overview(model: "Model") -> list[Block]:
+def _process_overview(model: "Model") -> list[_Block]:
     transitions = model.process.transitions
     if not transitions:
         return []
@@ -293,7 +294,7 @@ def _process_overview(model: "Model") -> list[Block]:
     ]
 
 
-def _design_concepts(model: "Model", kind: Section | None) -> list[Block]:
+def _design_concepts(model: "Model", kind: Section | None) -> list[_Block]:
     """The elements of the design concepts; the kind fills what it knows."""
     filled: dict[str, str] = {}
     if kind is not None:
@@ -328,7 +329,7 @@ def _design_concepts(model: "Model", kind: Section | None) -> list[Block]:
     ]
 
 
-def _input_data(model: "Model") -> list[Block]:
+def _input_data(model: "Model") -> list[_Block]:
     series = [
         parameter
         for parameter in model.parameters

@@ -3,7 +3,9 @@ its threshold and its interval."""
 
 import numpy as np
 
-from commol import ProfileResult
+from commol.context.inference.profiles import (
+    ProfileResult,
+)
 
 
 def test_each_profile_is_drawn_with_its_threshold(

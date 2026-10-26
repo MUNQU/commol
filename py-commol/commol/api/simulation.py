@@ -14,10 +14,9 @@ from commol.api.results import (
     SimulationReplicates,
     SimulationResults,
     outputs_for,
-    sample,
+    series_names,
     total_series,
 )
-from commol.api.windows import windowed_totals
 from commol.context._model.engine_state import build_engine
 from commol.context.engine_json import engine_json
 from commol.context.model import Model
@@ -363,35 +362,6 @@ class Simulation:
         """
         return {id: self.outputs_for(id) for id in ids}
 
-    def _series_names(self, ids: Iterable[str]) -> list[str]:
-        """
-        The outputs the ids stand for, in the order given.
-
-        A source id, such as a bin or accumulator id, stands for all its
-        outputs (`outputs_for`); an output name stands for itself.
-
-        Raises
-        ------
-        KeyError
-            If an id is neither a source nor an output of the model.
-        """
-        model = self.model_definition
-        by_source = model.structure.outputs_by_source(model)
-        outputs = [name for names in by_source.values() for name in names]
-        names: list[str] = []
-        for id in ids:
-            if id in by_source:
-                names.extend(by_source[id])
-            elif id in outputs:
-                names.append(id)
-            else:
-                raise KeyError(
-                    f"'{id}' is not a bin, accumulator or output of model "
-                    f"'{model.name}'. Bins and accumulators: {sorted(by_source)}. "
-                    f"Outputs: {outputs}"
-                )
-        return names
-
     def total_series(
         self,
         results: Mapping[str, Sequence[float]],
@@ -420,88 +390,7 @@ class Simulation:
             If an id is not a bin, accumulator or output of the model, or an
             expected output is missing from `results`.
         """
-        return total_series(results, self._series_names(ids))
-
-    def windowed_totals(
-        self,
-        results: SimulationResults,
-        ids: Iterable[str],
-        window: float,
-        at: Iterable[float] | None = None,
-    ) -> list[float]:
-        """
-        Amount the given accumulators gained over each window.
-
-        Parameters
-        ----------
-        results : SimulationResults
-            Simulation results, with their positions.
-        ids : Iterable[str]
-            Accumulator ids, each for all its outputs, and output names, each
-            for itself. Their outputs are summed before windowing.
-        window : float
-            Length of one window on the axis.
-        at : Iterable[float] | None, optional
-            Positions at which windows close. Defaults to every complete
-            window of the results. Pass the observation positions to
-            reproduce exactly the values a calibration used.
-
-        Returns
-        -------
-        list[float]
-            One increment per window.
-
-        Raises
-        ------
-        KeyError
-            If an id is not a bin, accumulator or output of the model, or an
-            expected output is missing from `results`.
-        ValueError
-            If `window` is not positive, or the results have no value at the
-            end or the start of a requested window.
-        """
-        return windowed_totals(
-            self.total_series(results, ids), results.positions, window, at
-        )
-
-    def sample(
-        self,
-        results: SimulationResults,
-        ids: Iterable[str],
-        at: Iterable[float],
-    ) -> list[float]:
-        """
-        Value of the given bins and accumulators at each position of `at`.
-
-        A bin holds an amount at a position, so the value is read at that
-        position, not over the window before it; `windowed_totals` reads the
-        gain of an accumulator over a window.
-
-        Parameters
-        ----------
-        results : SimulationResults
-            Simulation results, with their positions.
-        ids : Iterable[str]
-            Bin and accumulator ids, each for all its outputs
-            (`outputs_for`), and output names, each for itself. Their outputs
-            are summed before they are read.
-        at : Iterable[float]
-            Positions to read, each a position of `results`.
-
-        Returns
-        -------
-        list[float]
-            One value per position in `at`.
-
-        Raises
-        ------
-        KeyError
-            If an id is not a bin, accumulator or output of the model, or an
-            expected output is missing from `results`.
-        ValueError
-            If the results have no value at a position in `at`.
-        """
-        return sample(self.total_series(results, ids), results.positions, at)
+        return total_series(results, series_names(self.model_definition, ids))
 
 
 class ReplicateRuns:

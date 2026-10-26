@@ -123,7 +123,7 @@ class ParameterSample(ResultModel):
 
     @field_validator("log_weights")
     @classmethod
-    def normalize_log_weights(
+    def _normalize_log_weights(
         cls, log_weights: list[float], info: ValidationInfo
     ) -> list[float]:
         """
@@ -139,7 +139,7 @@ class ParameterSample(ResultModel):
         return checked.log_weights
 
     @model_validator(mode="after")
-    def build_engine_sample(self) -> Self:
+    def _build_engine_sample(self) -> Self:
         """Keep the sample of the engine, which computes the statistics and
         which the engine reads as the handle of this sample."""
         self._rust = commol_rs.inference.ParameterSample(

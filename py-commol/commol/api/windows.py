@@ -10,7 +10,7 @@ from collections.abc import Iterable, Sequence
 from commol.commol_rs import _commol_rs as commol_rs
 
 
-def windowed_totals(
+def _windowed_totals(
     series: Sequence[float],
     positions: Sequence[float],
     window: float,
@@ -49,15 +49,10 @@ def windowed_totals(
     Raises
     ------
     ValueError
-        If `series` and `positions` differ in length, `window` is not a
-        finite, positive length (the message of the engine), a window starts
-        before position 0, or the series has no value at the end or the start
-        of a requested window.
+        If `window` is not a finite, positive length (the message of the
+        engine), a window starts before position 0, or the series has no value
+        at the end or the start of a requested window.
     """
-    if len(series) != len(positions):
-        raise ValueError(
-            f"The series has {len(series)} values for {len(positions)} positions."
-        )
     ends = (
         commol_rs.calibration.window_ends(window, positions[-1] if positions else 0.0)
         if at is None

@@ -9,7 +9,6 @@ from commol.context._model.engine_state import (
     calibrated_initial_state,
     initial_state,
 )
-from commol.context.constants import CalibrationParameterType
 from commol.context.initial_conditions import CATEGORY_SEPARATOR
 
 if TYPE_CHECKING:
@@ -65,8 +64,7 @@ def calibrated_structure[S: "Aggregate"](
     parameters = [
         param
         for param in problem.parameters
-        if param.parameter_type == CalibrationParameterType.INITIAL_CONDITION
-        and param.id in values
+        if param.parameter_type == "initial_condition" and param.id in values
     ]
     if not parameters:
         return structure.model_copy(deep=True)

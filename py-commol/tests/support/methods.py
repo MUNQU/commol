@@ -12,6 +12,8 @@ from commol import (
     Calibrator,
     ParameterSample,
     SampleMethod,
+)
+from commol.context.inference.method import (
     UncertaintyMethod,
 )
 from commol.api.inference.registry import register

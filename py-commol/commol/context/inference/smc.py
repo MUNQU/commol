@@ -15,7 +15,6 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 from commol.context.calibration import CalibrationResult
 from commol.context.inference.distributions import WithPriors
 from commol.context.inference.method import UncertaintyMethod
-from commol.context.inference.resampling import BlockLength
 from commol.context.inference.sample import ParameterSample
 from commol.context.ranges import RangeChecked
 from commol.context.result_model import ResultModel
@@ -53,7 +52,7 @@ class InformationMatchingEta(RangeChecked):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: Literal["information_matching"] = "information_matching"
-    block_length: BlockLength = Field(description="Positions per block.")
+    block_length: int | Literal["auto"] = Field(description="Positions per block.")
     starts: int = Field(default=1, description="Starts of the fit.")
 
 
@@ -83,12 +82,12 @@ class BootstrapCoverageEta(RangeChecked):
 
     kind: Literal["bootstrap_coverage"] = "bootstrap_coverage"
     replicates: int = Field(description="Number of bootstrap data sets.")
-    block_length: BlockLength = Field(description="Positions per block.")
+    block_length: int | Literal["auto"] = Field(description="Positions per block.")
     confidence_level: float = Field(description="The level of the intervals.")
     starts: int = Field(default=1, description="Starts of the fit.")
 
 
-type Eta = (
+type _Eta = (
     float
     | Annotated[
         InformationMatchingEta | BootstrapCoverageEta, Field(discriminator="kind")
@@ -129,7 +128,9 @@ class SeriesDistance(BaseModel):
     metric: Literal["rmse", "mae"] = Field(description="The metric of a series.")
 
 
-type ABCDistance = Annotated[LossDistance | SeriesDistance, Field(discriminator="kind")]
+type _ABCDistance = Annotated[
+    LossDistance | SeriesDistance, Field(discriminator="kind")
+]
 """How far a run is from the observations."""
 
 
@@ -256,7 +257,7 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult], RangeChecked):
 
     Attributes
     ----------
-    priors : Priors | dict[str, Distribution]
+    priors : Priors | dict[str, distribution]
         The prior of each calibrated parameter, or
         ``Priors.uniform_on_bounds()``.
     eta : float | InformationMatchingEta | BootstrapCoverageEta
@@ -277,7 +278,7 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult], RangeChecked):
         ``⌈log c / log(1 − a)⌉`` times.
     """
 
-    eta: Eta = Field(description="The scale of the loss, or its calibration.")
+    eta: _Eta = Field(description="The scale of the loss, or its calibration.")
     particles: int = Field(description="Number of particles.")
     target_cess: float = Field(description="Share kept per step.")
     resample_threshold: float = Field(description="Resample below this share.")
@@ -285,7 +286,7 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult], RangeChecked):
 
     @model_validator(mode="before")
     @classmethod
-    def require_eta(cls, data: JsonValue) -> JsonValue:
+    def _require_eta(cls, data: JsonValue) -> JsonValue:
         """Name the choices of `eta` when it is missing."""
         _require(data, "eta", f"give {ETA_CHOICES}")
         return data
@@ -303,7 +304,7 @@ class BayesianPosterior(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
 
     Attributes
     ----------
-    priors : Priors | dict[str, Distribution]
+    priors : Priors | dict[str, distribution]
         The prior of each calibrated parameter, or
         ``Priors.uniform_on_bounds()``.
     particles : int
@@ -342,7 +343,7 @@ class ABCSMC(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
 
     Attributes
     ----------
-    priors : Priors | dict[str, Distribution]
+    priors : Priors | dict[str, distribution]
         The prior of each calibrated parameter, or
         ``Priors.uniform_on_bounds()``.
     distance : LossDistance | SeriesDistance
@@ -360,7 +361,7 @@ class ABCSMC(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
         between 0 and 1.
     """
 
-    distance: ABCDistance = Field(description="The distance.")
+    distance: _ABCDistance = Field(description="The distance.")
     particles: int = Field(description="Number of particles.")
     target_cess: float = Field(description="Share kept per step.")
     min_acceptance: float = Field(
@@ -378,7 +379,7 @@ class ABCRejection(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
 
     Attributes
     ----------
-    priors : Priors | dict[str, Distribution]
+    priors : Priors | dict[str, distribution]
         The prior of each calibrated parameter, or
         ``Priors.uniform_on_bounds()``.
     distance : LossDistance | SeriesDistance
@@ -389,6 +390,6 @@ class ABCRejection(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
         The share of the draws kept, strictly between 0 and 1.
     """
 
-    distance: ABCDistance = Field(description="The distance.")
+    distance: _ABCDistance = Field(description="The distance.")
     draws: int = Field(description="Number of draws.")
     quantile: float = Field(description="The share of draws kept.")

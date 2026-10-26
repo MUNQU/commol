@@ -9,7 +9,6 @@ import pytest
 
 from commol import (
     CalibrationProblem,
-    CalibrationResult,
     Calibrator,
     InputSpace,
     NelderMeadConfig,
@@ -23,6 +22,9 @@ from commol import (
     Trajectory,
     ValueAt,
     weighted_quantiles,
+)
+from commol.context.calibration import (
+    CalibrationResult,
 )
 from commol.context.inference.quantities import quantity_labels
 from tests.support import (

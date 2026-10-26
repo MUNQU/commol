@@ -217,7 +217,7 @@ the parameter, and the model stays as it was
 (`tests/building/test_parameters.py::test_update_parameters_rejects_a_value_it_cannot_take`):
 
 ```python
-from commol import SeriesValue
+from commol import SeriesValue, StratificationCondition
 
 schedule = (
     ModelBuilder(name="Schedule")
@@ -250,7 +250,7 @@ builder = builder.add_stratification(
 builder = builder.add_stratification(
     id="subtype",
     categories=["s1", "s2"],
-    conditions=[{"stratification": "group", "category": "g2"}],
+    conditions=[StratificationCondition(stratification="group", category="g2")],
 )
 ```
 
@@ -259,10 +259,10 @@ builder = builder.add_stratification(
 | `id` | `str` | required | The identifier, used in initial conditions and conditions. |
 | `categories` | `list[str]` | required | The categories. They must be unique and not empty. |
 | `description` | `str \| None` | `None` | A free-text description. |
-| `conditions` | `list[dict] \| None` | `None` | Splits only the compartments whose earlier categories match **all** conditions. |
+| `conditions` | `list[StratificationCondition] \| None` | `None` | Splits only the compartments whose earlier categories match **all** conditions. |
 
-Each condition is `{"stratification": <id>, "category": <category>}`, and may
-only name a stratification declared before this one; otherwise the call raises
+Each condition is `StratificationCondition(stratification=<id>,
+category=<category>)`, and may only name a stratification declared before this one; otherwise the call raises
 `ValueError`.
 
 | Rule | Effect |
