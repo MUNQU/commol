@@ -5,14 +5,13 @@ their Python edge. No crate of ``crates/`` depends on PyO3 or on the bridge."""
 import ast
 import enum
 import importlib
-import inspect
 import re
 import tomllib
 import typing
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from pathlib import Path
+from types import ModuleType
 
-from pydantic import BaseModel
 
 from tests.suite import public_surface
 from tests.support.surface import (
@@ -213,129 +212,9 @@ def test_the_check_of_conversions_names_each_one() -> None:
     assert sorted(public_rust_names(tree)) == ["rust_problem", "self.rust_value"]
 
 
-def runner_functions() -> list[Callable[..., object]]:
-    """The runner of each inference method of commol, without the methods
-    that tests register."""
-    import commol.api.inference  # noqa: F401  (registers the runners)
-    from commol.api.inference.registry import _RUNNERS
-
-    runners = dict.fromkeys(_RUNNERS.values())
-    return [runner for runner in runners if runner.__module__.startswith("commol.")]
-
-
-def reached(function: Callable[..., object]) -> list[ast.FunctionDef]:
-    """``function`` and each function of its module that it calls, nested."""
-    module = ast.parse(inspect.getsource(inspect.getmodule(function)))
-    defined = {
-        node.name: node for node in module.body if isinstance(node, ast.FunctionDef)
-    }
-    found: dict[str, ast.FunctionDef] = {}
-    pending = [function.__name__]
-    while pending:
-        name = pending.pop()
-        if name in found or name not in defined:
-            continue
-        found[name] = defined[name]
-        pending.extend(
-            node.func.id
-            for node in ast.walk(defined[name])
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-        )
-    return list(found.values())
-
-
-def runner_faults(functions: list[ast.FunctionDef], method: str) -> list[str]:
-    """What keeps the runner of ``functions`` from sending its method whole:
-    a check of a type, a number of calls to the bridge other than one, and a
-    call that does not get ``engine_json(method)`` or gets a field of
-    ``method``."""
-    faults = []
-    calls = []
-    for function in functions:
-        for node in ast.walk(function):
-            if isinstance(node, ast.Call):
-                text = ast.unparse(node.func)
-                if text == "isinstance":
-                    faults.append(f"isinstance in {function.name}")
-                if text.startswith("commol_rs."):
-                    calls.append(node)
-    if len(calls) != 1:
-        faults.append(f"{len(calls)} calls to the bridge")
-    for call in calls:
-        arguments = [*call.args, *(keyword.value for keyword in call.keywords)]
-        if not any(f"engine_json({method})" == ast.unparse(a) for a in arguments):
-            faults.append("the bridge does not get engine_json(method)")
-        faults.extend(
-            f"the bridge gets {ast.unparse(node)}"
-            for argument in arguments
-            for node in ast.walk(argument)
-            if isinstance(node, ast.Attribute)
-            and isinstance(node.value, ast.Name)
-            and node.value.id == method
-        )
-    return list(dict.fromkeys(faults))
-
-
-def test_a_runner_sends_its_method_whole() -> None:
-    """Each runner calls one function of the bridge with the JSON of its
-    method and no field of it, and checks no type: the method decides in the
-    engine."""
-    wrong = []
-    for runner in runner_functions():
-        method = list(inspect.signature(runner).parameters)[1]
-        wrong.extend(
-            f"{runner.__module__}.{runner.__name__}: {fault}"
-            for fault in runner_faults(reached(runner), method)
-        )
-
-    assert not wrong, (
-        "Send the method whole, as engine_json(method), to one function of "
-        "the bridge:\n" + "\n".join(sorted(wrong))
-    )
-
-
-def test_the_check_of_runners_names_each_fault() -> None:
-    tree = ast.parse(
-        "def run(calibrator, method):\n"
-        "    if isinstance(method.eta, float):\n"
-        "        pass\n"
-        "    commol_rs.inference.laplace(problem, method.draws)\n"
-        "    commol_rs.inference.fit(problem)\n"
-        "def good(calibrator, method):\n"
-        "    return commol_rs.inference.laplace(problem, engine_json(method))\n"
-    )
-    run, good = (node for node in tree.body if isinstance(node, ast.FunctionDef))
-
-    assert runner_faults([run], "method") == [
-        "isinstance in run",
-        "2 calls to the bridge",
-        "the bridge does not get engine_json(method)",
-        "the bridge gets method.draws",
-    ]
-    assert runner_faults([good], "method") == []
-
-
-def method_classes() -> list[type[BaseModel]]:
-    """Each class of an inference method of commol that has a runner, without
-    the methods that tests register."""
-    import commol.api.inference  # noqa: F401  (registers the runners)
-    from commol.api.inference.registry import _RUNNERS
-
-    methods = [method for method in _RUNNERS if method.__module__.startswith("commol.")]
-    return sorted(methods, key=lambda method: method.__name__)
-
-
-def test_no_method_excludes_a_field() -> None:
-    """No method class leaves a field out of its dump: the dump is the one
-    shape of a method, which the engine reads and a sample records."""
-    wrong = sorted(
-        f"{method.__name__}.{name}"
-        for method in method_classes()
-        for name, field in method.model_fields.items()
-        if field.exclude
-    )
-
-    assert not wrong, "Keep every field of a method in its dump:\n" + "\n".join(wrong)
+def public_modules() -> list[ModuleType]:
+    """Each public module of commol, imported."""
+    return [importlib.import_module(module) for module in public_surface.EXPORTS]
 
 
 def enums_read_by_name(sources: Path) -> set[str]:
@@ -399,6 +278,206 @@ def test_the_public_surface_is_the_table() -> None:
         module: set(names) for module, names in public_surface.EXPORTS.items()
     }
     assert private_inputs() == []
+
+
+def homes(exports: dict[str, list[str]]) -> dict[str, list[str]]:
+    """Each name that more than one module of ``exports`` exports, with those
+    modules."""
+    found: dict[str, list[str]] = {}
+    for module, names in exports.items():
+        for name in names:
+            found.setdefault(name, []).append(module)
+    return {name: where for name, where in found.items() if len(where) > 1}
+
+
+def test_each_public_name_has_one_home() -> None:
+    """Each public name is in the ``__all__`` of one module, and the root
+    holds no object of another module."""
+    modules = public_modules()
+    root = importlib.import_module("commol")
+    shared = homes({module.__name__: list(module.__all__) for module in modules})
+    shared.update(
+        {
+            f"commol.{name}": ["commol", module.__name__]
+            for module in modules
+            if module is not root
+            for name in module.__all__
+            if getattr(root, name, None) is getattr(module, name)
+        }
+    )
+
+    assert not shared, "Export each name from one module:\n" + "\n".join(
+        f"{name}: {where}" for name, where in sorted(shared.items())
+    )
+
+
+def test_the_check_of_homes_names_each_shared_name() -> None:
+    exports = {"commol": ["Model"], "commol.a": ["X", "Y"], "commol.b": ["Y"]}
+
+    assert homes(exports) == {"Y": ["commol.a", "commol.b"]}
+
+
+def package_faults(package: Path, public: set[str]) -> list[str]:
+    """What in ``package`` is neither a public module, the extension nor a
+    private package: a module outside a package, a public package that is not
+    a public module, and a public module that is not a package."""
+    faults = []
+    packages = set()
+    for entry in sorted(package.iterdir()):
+        if entry.suffix == ".py" and entry.name != "__init__.py":
+            faults.append(f"the module {entry.name} is outside a package")
+        elif (entry / "__init__.py").is_file():
+            packages.add(entry.name)
+            if not entry.name.startswith("_") and entry.name not in public:
+                faults.append(f"the package {entry.name} is not a public module")
+    faults += [
+        f"the module {name} is not a package" for name in sorted(public - packages)
+    ]
+    return faults
+
+
+def test_the_packages_are_the_modules() -> None:
+    """The packages of commol are its public modules, the extension
+    ``commol_rs`` and private packages (``_…``)."""
+    public = {
+        module.removeprefix("commol.")
+        for module in public_surface.EXPORTS
+        if module != "commol"
+    }
+
+    assert package_faults(PACKAGE, public | {"commol_rs"}) == []
+
+
+def test_the_check_of_packages_names_each_fault(tmp_path: Path) -> None:
+    for name in ("models", "_inner", "api"):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "helpers.py").write_text("", encoding="utf-8")
+    (tmp_path / "__init__.py").write_text("", encoding="utf-8")
+
+    assert package_faults(tmp_path, {"models", "plots"}) == [
+        "the package api is not a public module",
+        "the module helpers.py is outside a package",
+        "the module plots is not a package",
+    ]
+
+
+LAYERS = (
+    "commol_rs",
+    "_build",
+    "_data",
+    "_statistics",
+    "parallelism",
+    "engines",
+    "distributions",
+    "quantities",
+    "_fit",
+    "observations",
+    "_problem",
+    "_model",
+    "plotting",
+    "_simulation",
+    "uncertainty",
+    "_calibration",
+    "scores",
+    "resampling",
+    "profiles",
+    "local",
+    "smc",
+    "conformal",
+    "identifiability",
+    "sensitivity",
+    "commol",
+)
+"""The packages of commol from the bottom up: a package imports only the
+packages below it. The root ``commol`` is at the top."""
+
+
+def package_of(module: str) -> str:
+    """The package of a dotted module of commol: ``commol`` for the root."""
+    parts = module.split(".")
+    return parts[1] if len(parts) > 1 else "commol"
+
+
+def imported_modules(
+    tree: ast.Module, module: str, packages: set[str]
+) -> Iterator[str]:
+    """Each module of commol that ``tree`` imports, wherever the import is: at
+    the top, in a function or under ``TYPE_CHECKING``; a name of the root that
+    is not one of ``packages`` is the root ``commol``."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            yield from (a.name for a in node.names if a.name.split(".")[0] == "commol")
+        elif isinstance(node, ast.ImportFrom):
+            base = node.module or ""
+            if node.level:
+                parts = module.split(".")[: -node.level]
+                base = ".".join([*parts, base] if base else parts)
+            if base.split(".")[0] != "commol":
+                continue
+            if base == "commol":
+                yield from (
+                    f"commol.{a.name}" if a.name in packages else "commol"
+                    for a in node.names
+                )
+            else:
+                yield base
+
+
+def upward_imports(package: Path, layers: tuple[str, ...]) -> list[str]:
+    """Each import of a module of ``package`` that points up ``layers``, or at
+    a package that ``layers`` does not order."""
+    names = {path.name for path in package.iterdir() if path.is_dir()}
+    found = []
+    for path, tree in modules(package):
+        module = "commol." + path.removesuffix(".py").replace("/", ".")
+        module = module.removesuffix(".__init__")
+        source = package_of(module) if module != "commol" else "commol"
+        for target in imported_modules(tree, module, names):
+            other = package_of(target)
+            if other == source:
+                continue
+            if source not in layers or other not in layers:
+                found.append(f"{path}: {source} or {other} is not in the layers")
+            elif layers.index(other) > layers.index(source):
+                found.append(f"{path}: {source} imports {target}, above it")
+    return sorted(set(found))
+
+
+def test_the_dependencies_point_one_way() -> None:
+    """Each package imports only the packages below it in ``LAYERS``, with no
+    exception: no import upward at the top of a module, in a function or under
+    ``TYPE_CHECKING``."""
+    wrong = upward_imports(PACKAGE, LAYERS)
+
+    assert not wrong, (
+        "Read what a package above gives through a protocol of the package "
+        "below, or move the code to the package it serves:\n" + "\n".join(wrong)
+    )
+
+
+def test_the_check_names_an_import_upward(tmp_path: Path) -> None:
+    for name in ("low", "high"):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "low" / "a.py").write_text(
+        "from typing import TYPE_CHECKING\n"
+        "import commol.low.b\n"
+        "if TYPE_CHECKING:\n"
+        "    from commol.high.c import C\n"
+        "def f():\n"
+        "    from commol import high\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "high" / "c.py").write_text(
+        "from commol.low import a\nfrom commol.odd import d\n", encoding="utf-8"
+    )
+
+    assert upward_imports(tmp_path, ("low", "high", "commol")) == [
+        "high/c.py: high or odd is not in the layers",
+        "low/a.py: low imports commol.high, above it",
+        "low/a.py: low imports commol.high.c, above it",
+    ]
 
 
 def test_a_choice_is_a_literal() -> None:

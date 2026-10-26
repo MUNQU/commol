@@ -12,20 +12,20 @@ from statistics import NormalDist
 import pytest
 
 from commol import (
-    DistributionNoise,
-    NoNoise,
     CalibrationProblem,
     Calibrator,
     NelderMeadConfig,
     ObservedDataPoint,
-    ParameterSample,
-    Predictive,
-    SampleMethod,
-    PoissonObservations,
-    ResidualNoise,
     Simulation,
     scores,
 )
+from commol.observations import (
+    DistributionNoise,
+    NoNoise,
+    PoissonObservations,
+    ResidualNoise,
+)
+from commol.uncertainty import ParameterSample, Predictive, SampleMethod
 from tests.support import (
     abc_builder,
     bounded,

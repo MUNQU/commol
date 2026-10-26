@@ -1,15 +1,20 @@
 """The rules of a formula: the parser of the engine checks every formula when
 its object is built, and the error gives the message of the parser."""
 
-from collections.abc import Callable
 import re
+from collections.abc import Callable
 
 import pytest
 
-from commol import StratificationCondition, StratifiedRate
-from commol import AxisPattern, CalibrationConstraint, ModelBuilder
-from commol.context._model.engine_state import formula_tree
-from commol.context._model.formula_tree import (
+from commol import (
+    AxisPattern,
+    CalibrationConstraint,
+    ModelBuilder,
+    StratificationCondition,
+    StratifiedRate,
+)
+from commol._model.engine_state import formula_tree
+from commol._model.formula_tree import (
     Chain,
     Conditional,
     Constant,

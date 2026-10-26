@@ -19,21 +19,20 @@ import numpy as np
 
 from commol import (
     Aggregate,
-    BayesianPosterior,
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
-    DistributionNoise,
     ModelBuilder,
-    NegativeBinomialObservations,
     NelderMeadConfig,
     ObservedDataPoint,
-    ParametricBootstrap,
-    Predictive,
-    Priors,
     Simulation,
     scores,
 )
+from commol.smc import BayesianPosterior
+from commol.observations import DistributionNoise, NegativeBinomialObservations
+from commol.resampling import ParametricBootstrap
+from commol.uncertainty import Predictive
+from commol.distributions import Priors
 
 
 def decay_model(k1: float | None):

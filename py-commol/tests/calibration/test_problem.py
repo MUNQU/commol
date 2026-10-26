@@ -4,7 +4,6 @@ import json
 import math
 
 import pytest
-
 from pydantic import ValidationError
 
 from commol import (
@@ -16,13 +15,11 @@ from commol import (
     ParticleSwarmConfig,
     Simulation,
 )
-from commol.context.calibration import (
-    CalibrationResult,
-)
+from commol._data.engine_json import engine_json
+from commol._fit.result import CalibrationResult
+from commol._model.model import Model
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context.engine_json import engine_json
-from commol.context.model import Model
-from tests.support import bounded, build, observed, abc_builder
+from tests.support import abc_builder, bounded, build, observed
 
 SEED = 42
 

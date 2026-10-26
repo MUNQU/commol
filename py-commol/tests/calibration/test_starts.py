@@ -12,7 +12,7 @@ from commol import (
     ParticleSwarmConfig,
     Simulation,
 )
-from commol.context.model import Model
+from commol._model.model import Model
 from tests.support import abc_builder, bounded, build, observed
 
 STEPS = range(10, 101, 10)
@@ -98,7 +98,7 @@ class TestStarts:
     ) -> None:
         calibrator = _calibrator(truth_run, seed=None)
 
-        with caplog.at_level(logging.INFO, logger="commol.api.calibrator"):
+        with caplog.at_level(logging.INFO, logger="commol"):
             calibrator.run(starts=2)
 
         assert f"drew the seed {calibrator.seed}" in caplog.text
@@ -162,7 +162,7 @@ class TestFailedStarts:
         best: int = 0,
     ) -> Calibrator:
         calibrator = _calibrator(truth_run)
-        calibrator._rust_problem = SimpleNamespace(  # type: ignore[assignment]
+        calibrator._engine_problem = SimpleNamespace(  # type: ignore[assignment]
             optimize=lambda *_: SimpleNamespace(outcomes=outcomes, best=best),
             seed=calibrator.seed,
         )
@@ -175,7 +175,7 @@ class TestFailedStarts:
             truth_run, [_outcome([0.2, 0.1], 4.0), _outcome([0.4, 0.2], None)]
         )
 
-        with caplog.at_level(logging.WARNING, logger="commol.api.calibrator"):
+        with caplog.at_level(logging.WARNING, logger="commol"):
             result = calibrator.run(starts=2)
 
         assert result.failed == ["Start 1 failed: Simulation failed: x"]

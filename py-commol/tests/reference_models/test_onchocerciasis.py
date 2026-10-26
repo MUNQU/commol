@@ -26,7 +26,7 @@ References
    Engineering*, 15, 841-862. https://doi.org/10.3934/mbe.2018038
 """
 
-from commol.context.model import Model
+from commol._model.model import Model
 from tests.support import (
     ENGINE_REL,
     Flow,

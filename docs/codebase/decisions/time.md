@@ -10,7 +10,7 @@ A `Model` records no step length: rates are per step and positions and periods
 are step counts. The axis of a model is its independent variable, whatever
 quantity it is (time is one case), so the engines never ask which dimension it
 has. `Model.step_unit` is optional; only the unit check and `AxisUnits` read
-it. `AxisUnits` (`context/axis_units.py`) converts a value in any unit of the
+it. `AxisUnits` (`_model/axis_units.py`) converts a value in any unit of the
 step dimension to steps on `pint`, and `Model.axis_units()` builds it from
 `step_unit` (or `step`) and the engine of the model. `steps` returns a `float`
 and snaps a result within `1e-9` of an integer to it; whether a position must
@@ -43,7 +43,7 @@ engine rejects the mean of a span below one step instead of clamping the rate to
 
 ## An origin puts the axis on the calendar
 
-`AxisUnits.origin` (`context/axis_units.py`) is the calendar moment of
+`AxisUnits.origin` (`_model/axis_units.py`) is the calendar moment of
 position 0. It belongs to the axis, so `ModelBuilder` declares it next to
 `step_unit`, `Model.origin` keeps it and `Model.axis_units()` passes it on. On
 a `Simulation`, two runs of one model could read one position as two dates.
@@ -83,7 +83,7 @@ an application keeps no origin of its own.
 ## One step unit in the unit check
 
 The engine converts no value between units. So `UnitChecker._step_unit`
-(`context/_model/units.py`) uses one step unit: the declared
+(`_model/units.py`) uses one step unit: the declared
 `Model.step_unit`, of any single dimension (`check_step_unit`), or else `step`,
 the default increment of any axis (dimension `[step]`). The check never infers
 the step unit from the parameters: a parameter in `1/meter` may be a density,
@@ -94,7 +94,7 @@ in `UnitChecker._collect_unit_errors`), so a proportional rate is checked as
 its flow, `rate × source`, and never by a rule of its own in Python.
 `check_formula_units` requires every flow to be **equal** to
 `<bin unit>/<step unit>`, and every impulse to `<bin unit>`, not only
-convertible to it (`utils/equations.py`, `same_unit`).
+convertible to it (`_model/unit_checks.py`, `same_unit`).
 
 A unit means what `pint` defines; there is no list of aliases. A name that
 `pint` does not define becomes the one unit of its own dimension
@@ -179,11 +179,11 @@ impulse step and restarts from the new state, so `diffsol` needs no event.
 
 An observation at `at` with `window = W` is compared with
 `output(at) - output(at - W)`, anchored at its own position. The Rust loss and
-`windowed_totals` (`api/windows.py`) give the same number from one rule
+`windowed_totals` (`_simulation/windows.py`) give the same number from one rule
 (`window_increments`), and the predictive reads windows through the observation operator
 ([One observation operator](calibration.md#one-observation-operator)). Window `w`
 covers `(w · W, (w + 1) · W]`; `window_index` places a position with
-`max(ceil(at / W) − 1, 0)`, and the `observed` block of a report (`_observed_report` in `api/reporting.py`) calls it.
+`max(ceil(at / W) − 1, 0)`, and the `observed` block of a report (`_observed_report` in `_simulation/reports.py`) calls it.
 `plot.series` of results reads the model of a windowed observation the
 same way, through its own window at its own position, never on a grid of
 windows from 0: an observation at 10.5 with a window of 7 falls on no window
@@ -235,7 +235,7 @@ checks whether a model type accepts a position.
 ## Results carry their positions
 
 `Simulation.run` and `run_at` return `SimulationResults`
-(`api/results.py`): a `dict` from output name to values, with the positions in
+(`_simulation/results.py`): a `dict` from output name to values, with the positions in
 `positions` and the rows in `rows()`. A `dict` keeps `results["A"]`,
 `json.dumps` and `pandas.DataFrame(results)` working; a reserved key could clash
 with an output name. Windows, reports and plots read a value at a position

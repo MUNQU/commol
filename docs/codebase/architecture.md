@@ -16,8 +16,8 @@ into numbers.
 ```mermaid
 flowchart TB
     U([User script])
-    API["Python: api/<br/>ModelBuilder, Simulation, Calibrator"]
-    CTX["Python: context/<br/>Model: validated data"]
+    API["Python: the root commol<br/>ModelBuilder, Simulation, Calibrator"]
+    CTX["Python: _model/ and the page modules<br/>Model, problem, methods: validated data"]
     BR["Bridge: py-commol/src<br/>PyO3 module commol_rs"]
     RS["Rust: crates/<br/>compiler, engines, calibration, inference"]
     U --> API
@@ -29,8 +29,8 @@ flowchart TB
 
 | Half | Folder | Job |
 |---|---|---|
-| Python | `py-commol/commol/` | The public API (`api/`) and the model as validated data (`context/`). |
-| Bridge | `py-commol/src/` | Exposes the Rust functions to Python (PyO3), and runs their parallel work in the thread pool of `commol.threads` (`parallel`). |
+| Python | `py-commol/commol/` | The public API as validated data: the root `commol` (the main flow, with its code in private packages such as `_model/` and `_simulation/`) and one module per page of the guide (`resampling/`, `plotting/`, …). |
+| Bridge | `py-commol/src/` | Exposes the Rust functions to Python (PyO3), and runs their parallel work in the thread pool of `commol.parallelism.threads` (`parallel`). |
 | Rust | `crates/` | Every rule about how a model becomes numbers, how it is calibrated, and how the uncertainty of a calibration is measured. |
 
 **Golden rule:** Python never computes how a model expands or runs. It asks
@@ -87,6 +87,26 @@ through the `SimulationEngine` trait, so it does not depend on a specific
 engine; inference reaches an engine only through the forward model of a
 calibration problem.
 
+## Inside Python
+
+The packages of `py-commol/commol/` form one order, from the root at the top
+to the extension at the bottom, and every import points down
+([The layers of the package](decisions/python-models.md#the-layers-of-the-package)).
+
+```mermaid
+flowchart TB
+    ROOT["commol (the root)"]
+    MET["method families<br/>scores, resampling, profiles, local, smc,<br/>conformal, identifiability, sensitivity"]
+    CAL["_calibration<br/>Calibrator, InferenceMethod, CalibrationPort"]
+    UNC["uncertainty<br/>ParameterSample, Predictive"]
+    SIM["_simulation<br/>Simulation, results, reports, panels"]
+    PLT["plotting<br/>panel and chart types, drawing"]
+    MOD["_model<br/>Model, structures"]
+    SET["settings and values<br/>_problem, observations, _fit, quantities,<br/>distributions, engines, parallelism"]
+    BASE["base<br/>_statistics, _data, _build, commol_rs"]
+    ROOT --> MET --> CAL --> UNC --> SIM --> PLT --> MOD --> SET --> BASE
+```
+
 ## The path of a simulation and a calibration
 
 ```mermaid
@@ -106,22 +126,22 @@ flowchart TB
     PS --> PR[Predictive: bands, scores]
 ```
 
-1. `ModelBuilder` (`api/model_builder.py`) collects the model, and `build`
-   returns a validated `Model` (`context/model.py`).
-2. `Simulation` (`api/simulation.py`) sends the model to Rust once, through
-   `build_engine` (`context/_model/engine_state.py`). Rust compiles it.
+1. `ModelBuilder` (`_model/builder.py`) collects the model, and `build`
+   returns a validated `Model` (`_model/model.py`).
+2. `Simulation` (`_simulation/simulation.py`) sends the model to Rust once, through
+   `build_engine` (`_model/engine_state.py`). Rust compiles it.
 3. Each `run` calls the Rust engine and returns `SimulationResults`
-   (`api/results.py`).
-4. `Calibrator` (`api/calibrator.py`) takes the compiled engine of a
+   (`_simulation/results.py`).
+4. `Calibrator` (`_calibration/calibrator.py`) takes the compiled engine of a
    `Simulation` and builds the calibration problem in Rust once
    (`commol_rs.inference.CalibrationProblem`, `py-commol/src/inference.rs`).
    `run(starts=n)` runs the optimizer loop in Rust from each start, the
    starts and the particles of a swarm in parallel in the pool of
-   `commol.threads`, and returns the best `CalibrationResult`.
+   `commol.parallelism.threads`, and returns the best `CalibrationResult`.
 5. `apply_calibration_parameters` writes the result back into the `Model`.
 6. `Calibrator.uncertainty(method)` runs a method on the same problem. A method
    with draws returns a result that holds a `ParameterSample`; a `Predictive`
-   (`api/inference/predictive.py`) runs its draws, and `commol.scores` checks
+   (`uncertainty/predictive.py`) runs its draws, and `commol.scores` checks
    them against observations.
 
 ## Checklist

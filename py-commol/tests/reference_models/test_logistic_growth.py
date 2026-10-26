@@ -19,7 +19,7 @@ import math
 import pytest
 
 from commol import Simulation
-from commol.context.model import Model
+from commol._model.model import Model
 from tests.support import ODE_REL, Flow, assert_close, flow_model, settled
 
 

@@ -4,22 +4,16 @@
 
 Runs a model and reads its outputs. Guide: [Running Simulations](../guide/simulations.md).
 
-::: commol.api.simulation.Simulation
+::: commol.Simulation
 
-::: commol.api.results.SimulationResults
+::: commol._simulation.results.SimulationResults
 
-::: commol.api.plotting.accessors.ResultsPlot
+::: commol._simulation.plots.ResultsPlot
 
-::: commol.api.simulation.ReplicateRuns
+::: commol._simulation.simulation.ReplicateRuns
 
-::: commol.api.results.SimulationReplicates
+::: commol._simulation.results.SimulationReplicates
 
-::: commol.api.plotting.accessors.ReplicatesPlot
-
-::: commol.context.engine.ODESolver
-
-::: commol.context.engine.StochasticEventsSettings
-
-::: commol.context.engine.StochasticStepsSettings
+::: commol._simulation.plots.ReplicatesPlot
 
 ::: commol.InfeasibleStateError

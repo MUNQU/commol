@@ -6,15 +6,15 @@ import re
 import pytest
 
 from commol import Simulation
+from commol._model.constants import SUBGROUP_TOTAL_PREFIX, TOTAL_VARIABLE
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.constants import SUBGROUP_TOTAL_PREFIX, TOTAL_VARIABLE
 from tests.support import (
     ENGINE_REL,
+    abc_builder,
     assert_close,
     assert_total_conserved,
     build,
     reference_run,
-    abc_builder,
     total,
 )
 from tests.support.reference import State

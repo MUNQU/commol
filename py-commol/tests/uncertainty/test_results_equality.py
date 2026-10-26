@@ -9,31 +9,20 @@ from collections.abc import Iterator
 import pytest
 from pydantic import BaseModel
 
-from commol import (
-    ParameterSample,
-    PRCC,
-    SampleMethod,
-    SensitivityAnalysis,
-    Simulation,
-    ValueAt,
-)
-from commol.context.calibration import (
-    CalibrationResult,
-    StartSummary,
-)
-from commol.context.inference.conformal import (
+from commol import Simulation
+from commol._data.result_model import ResultModel
+from commol._fit.result import CalibrationResult, StartSummary
+from commol.conformal.results import (
     ConformalResult,
     PredictionIntervals,
     SeriesIntervals,
 )
-from commol.context.inference.sample import (
-    ParameterSummary,
-)
-from commol.context.inference.global_sensitivity import (
-    PRCCResult,
-)
-from commol.api.inference.registry import _RUNNERS
-from commol.context.result_model import ResultModel
+from commol.quantities import ValueAt
+from commol.sensitivity import PRCC, SensitivityAnalysis
+from commol.sensitivity.results import PRCCResult
+from commol.uncertainty import ParameterSample, SampleMethod
+from commol.uncertainty.sample import ParameterSummary
+from tests.suite.test_methods import method_classes
 from tests.support import abc_rates
 
 # With these 10 draws k2 orders B at 5 alone, so the PRCC of k1 is NaN.
@@ -168,11 +157,7 @@ def _result_type(method_type: type) -> type:
 
 
 def test_every_method_of_commol_returns_a_result_model() -> None:
-    results = {
-        _result_type(method_type)
-        for method_type in _RUNNERS
-        if method_type.__module__.startswith("commol.")
-    }
+    results = {_result_type(method_type) for method_type in method_classes()}
 
     assert len(results) > 10
     assert [result for result in results if not issubclass(result, ResultModel)] == []

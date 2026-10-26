@@ -72,7 +72,7 @@ high)` for a number with an open or a closed bound (`Real::share`,
 value outside its range, a negative count included (`replicates is a whole
 number of at least 1, got -1`); `statistics::check_levels` checks a quantile
 level. Three paths read a rule: the Python model of an object, whose base
-`RangeChecked` (`py-commol/commol/context/ranges.py`) calls the one check of
+`RangeChecked` (`py-commol/commol/_data/ranges.py`) calls the one check of
 the engine for its object when it is built (`commol_rs.core.check_ranges`
 on the tables `RANGES`, each setting in its own type, so a parameter name
 `"NaN"` is no number); the engine function that takes the setting; and a
@@ -170,12 +170,12 @@ warnings, and, for fits of replicates, `not_converged`, at its top.
 ## A description is data, rendered apart
 
 `Model.describe(layout)` returns a `ModelDescription`
-(`context/description.py`): sections with a key, a title and blocks from a
+(`_model/description.py`): sections with a key, a title and blocks from a
 closed set of Pydantic models (`Text`, `Table`, `Equations`, `StateGraph`,
 `Matrix`). The sections every kind shares come from `Model`
-(`context/_model/describe.py`); a kind adds its own through
-`ModelStructure.describe` (`Aggregate`: `context/_model/aggregate_description.py`).
-The renderers (`api/description.py`) read only blocks, so a new kind renders
+(`_model/describe.py`); a kind adds its own through
+`ModelStructure.describe` (`Aggregate`: `_model/aggregate_description.py`).
+The renderers (`_model/render.py`) read only blocks, so a new kind renders
 in every format with no new renderer. The form of the dynamics and the
 schedule come from the engine's list (`EngineType::dynamics_form`), because
 one structure runs as equations or as events depending on its engine.
@@ -211,8 +211,11 @@ A report is a method of the object of results whose data it describes:
 replicates of a stochastic engine), `Predictive.report` (the draws of a
 sample), `Model.applied_parameters` (calibrated parameters, and the sections
 of the model kind: `initial_amounts` and `category_splits` for an aggregate
-model) and `IdentifiabilityReport.report`. The private functions of
-`api/reporting.py` build the blocks, which are data, not documents. No module
+model) and `IdentifiabilityReport.report`. Private functions in the package
+of each object build its block, which is data, not a document:
+`_simulation/reports.py` for a run and an ensemble,
+`_model/applied_parameters.py` for the applied parameters and
+`identifiability/report.py` for an identifiability analysis. No module
 function reports anything.
 
 | Rule | Why, against the alternative |
@@ -220,6 +223,7 @@ function reports anything.
 | The report of a run is on the results, not on `Simulation` | `Simulation.report(results, ...)` puts the report on the object that produces the data and takes the data as an argument; `results.report(simulation, ...)` takes two objects that must agree. |
 | `SimulationResults` and `SimulationReplicates` hold a reference to their `Model`, which `Simulation.run`, `run_at` and `replicates` set; `Predictive` reads it through `source.simulation` | A report reads the outputs of each bin and accumulator (`ModelStructure.outputs_by_source`); a copy of that map would be a second source of truth, and the figures also need `series_label`. A report reads only the structure, never the values of the parameters, so a later `update_parameters` does not change it. `Model` holds no Rust object, so results still pickle. Results built by hand have no model, and a report that needs one raises `ValueError` that names the bin or accumulator. |
 | `Predictive.report` takes no point estimate | Each leaf of an ensemble comes from its members only; the mean of the draws is not a run of the model. |
+| The block of a report lives in the package of its object | A module of every block imports every object it reports, against the order of the layers ([Python models](python-models.md#the-layers-of-the-package)); the block changes with its object. |
 | `Model.applied_parameters` is on the model | Most of the block is data of the model (one row per parameter, the sections of its structure); the values and the problem only add what calibration set. |
 
 - A single run and an ensemble (replicates or a `Predictive`) differ only at
@@ -237,7 +241,7 @@ gives the block of its definition, with its key order).
 `Model.to_json` writes every field, nulls included. Dropping nulls is not
 round-trip safe: an uncalibrated `Parameter.value` or a `None` in `bin_amounts`
 would lose a required key and fail to reload. `render_json`
-(`context/_model/serialization.py`) keeps files readable by writing long numeric
+(`_model/serialization.py`) keeps files readable by writing long numeric
 arrays on one line. It is internal on purpose: an output format in the public
 API becomes a compatibility promise.
 

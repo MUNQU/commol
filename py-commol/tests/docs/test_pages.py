@@ -21,9 +21,7 @@ FIELD_WORDS = re.compile(
 
 CITATIONS = {
     "docs/guide/describing-models.md": ["*Ecological Modelling*"],
-    "py-commol/commol/api/inference/scores.py": [
-        "epidemic forecasts in an interval format"
-    ],
+    "py-commol/commol/scores/rules.py": ["epidemic forecasts in an interval format"],
 }
 """The title of a cited work or journal, which a page quotes as published."""
 

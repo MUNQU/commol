@@ -15,26 +15,23 @@ import pytest
 from matplotlib.colors import to_rgba
 from matplotlib.figure import Figure
 
-import commol
-from commol import (
-    ObservedDataPoint,
-    PlotConfig,
-    Simulation,
-)
-from commol.context.inference.global_sensitivity import (
+from commol import ObservedDataPoint, Simulation
+from commol._simulation.results import SimulationResults
+from commol.plotting import PlotConfig, figures, plot_compared
+from commol._simulation import plots as simulation_plots
+from commol._simulation.plots import ReplicatesPlot, ResultsPlot
+from commol.profiles import plots as profile_plots
+from commol.profiles.results import ProfileResult
+from commol.sensitivity.results import (
     ChaosResult,
     MorrisResult,
     PRCCResult,
     SobolResult,
 )
-from commol.context.inference.profiles import (
-    ProfileResult,
-)
-from commol.api.results import (
-    SimulationResults,
-)
-from commol.api.plotting import figures
-from commol.api.plotting.accessors import PredictivePlot, ReplicatesPlot, ResultsPlot
+from commol.sensitivity import plots as sensitivity_plots
+from commol.uncertainty import plots as predictive_plots
+from commol.uncertainty.plots import PredictivePlot
+from tests.suite.public_surface import EXPORTS
 from tests.support import (
     a_to_b_builder,
     abc_builder,
@@ -164,21 +161,21 @@ def test_a_sensitivity_result_plots_itself(prcc_result: PRCCResult) -> None:
 
 
 ACCESSORS = [
-    (ResultsPlot.series, figures._run_series),
-    (ResultsPlot.cumulative, figures._run_cumulative),
-    (ReplicatesPlot.series, figures._replicates_series),
-    (ReplicatesPlot.cumulative, figures._replicates_cumulative),
-    (PredictivePlot.series, figures._predictive_series),
-    (PredictivePlot.cumulative, figures._predictive_cumulative),
-    (ResultsPlot.observations, figures._run_observations),
-    (ReplicatesPlot.observations, figures._replicates_observations),
-    (PredictivePlot.observations, figures._predictive_observations),
-    (PRCCResult.plot, figures._prcc),
-    (MorrisResult.plot, figures._morris),
-    (SobolResult.plot, figures._sobol),
-    (ChaosResult.plot, figures._sobol),
-    (ProfileResult.plot, figures._profiles),
-    (commol.plot_compared, figures._compared_series),
+    (ResultsPlot.series, simulation_plots.run_series),
+    (ResultsPlot.cumulative, simulation_plots.run_cumulative),
+    (ReplicatesPlot.series, simulation_plots.replicates_series),
+    (ReplicatesPlot.cumulative, simulation_plots.replicates_cumulative),
+    (PredictivePlot.series, predictive_plots.predictive_series),
+    (PredictivePlot.cumulative, predictive_plots.predictive_cumulative),
+    (ResultsPlot.observations, simulation_plots.run_observations),
+    (ReplicatesPlot.observations, simulation_plots.replicates_observations),
+    (PredictivePlot.observations, predictive_plots.predictive_observations),
+    (PRCCResult.plot, sensitivity_plots.prcc_figure),
+    (MorrisResult.plot, sensitivity_plots.morris_figure),
+    (SobolResult.plot, sensitivity_plots.sobol_figure),
+    (ChaosResult.plot, sensitivity_plots.sobol_figure),
+    (ProfileResult.plot, profile_plots.profiles_figure),
+    (plot_compared, figures._compared_series),
 ]
 
 
@@ -207,7 +204,8 @@ def test_import_commol_loads_no_plotting_library() -> None:
         [
             sys.executable,
             "-c",
-            "import sys, commol; "
+            "import importlib, sys; "
+            f"[importlib.import_module(m) for m in {sorted(EXPORTS)}]; "
             "print(sorted({m.split('.')[0] for m in sys.modules} "
             "& {'matplotlib', 'seaborn'}))",
         ],
@@ -223,7 +221,7 @@ def test_a_figure_without_matplotlib_says_how_to_install_it(
     run: SimulationResults, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setitem(sys.modules, "matplotlib", None)
-    monkeypatch.delitem(sys.modules, "commol.api.plotting.figures")
+    monkeypatch.delitem(sys.modules, "commol.plotting.figures")
 
     with pytest.raises(ImportError, match=r"pip install 'commol\[plot\]'"):
         run.plot.series()

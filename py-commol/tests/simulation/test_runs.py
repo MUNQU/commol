@@ -12,23 +12,21 @@ from commol import (
     ObservedDataPoint,
     Simulation,
 )
-from commol.api.results import (
-    SimulationResults,
-)
-from commol.context.engine import EngineName
-from commol.context.model import Model
+from commol._model.model import Model
+from commol._simulation.results import SimulationResults
+from commol.engines.engine import EngineName
 from tests.support import (
-    ENGINE_REL,
     ABC_START,
+    ENGINE_REL,
     a_to_b_builder,
+    abc_builder,
+    abc_flows,
     assert_close,
     assert_total_conserved,
     build,
     build_ode,
     build_stochastic,
     reference_run,
-    abc_builder,
-    abc_flows,
 )
 
 

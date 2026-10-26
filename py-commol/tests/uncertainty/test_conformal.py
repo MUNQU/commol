@@ -11,23 +11,22 @@ import numpy as np
 import pytest
 
 from commol import (
-    AdaptiveConformal,
-    BayesianBootstrap,
     CalibrationProblem,
     Calibrator,
-    EnbPI,
-    JackknifePlus,
     NelderMeadConfig,
     ObservedDataPoint,
-    ParameterSample,
-    RollingConformal,
-    SampleMethod,
     Simulation,
+)
+from commol.conformal import (
+    AdaptiveConformal,
+    EnbPI,
+    JackknifePlus,
+    RollingConformal,
     SplitConformal,
 )
-from commol.context.inference.conformal import (
-    ConformalResult,
-)
+from commol.conformal.results import ConformalResult
+from commol.resampling import BayesianBootstrap
+from commol.uncertainty import ParameterSample, SampleMethod
 from tests.support import (
     a_to_b_builder,
     bounded,

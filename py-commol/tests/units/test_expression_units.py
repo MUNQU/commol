@@ -3,9 +3,9 @@ each function of the engine."""
 
 import pytest
 
+from commol._model import unit_checks as equations
+from commol._model.unit_checks import define_units, parse_equation_unit, same_unit
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.utils import equations
-from commol.utils.equations import define_units, parse_equation_unit, same_unit
 
 UNITS = {"k1": "1/(item*day)", "A": "item", "total": "item"}
 

@@ -6,6 +6,7 @@ parameters and Nelder-Mead converges.
 """
 
 from typing import Literal
+
 import pytest
 
 from commol import (
@@ -15,10 +16,10 @@ from commol import (
     ObservedDataPoint,
     Quantile,
     Simulation,
-    weighted_quantiles,
 )
-from commol.context.calibration import CalibrationResult
-from commol.context.engine import EngineName
+from commol._fit.result import CalibrationResult
+from commol.engines.engine import EngineName
+from commol.uncertainty import weighted_quantiles
 from tests.support import STOCHASTIC_ENGINES, a_to_b_builder, bounded, build_stochastic
 
 RATE = 0.1
@@ -91,7 +92,7 @@ def test_a_quantile_summary_agrees_with_the_quantiles_of_the_replicates() -> Non
     assert history.evaluations
     for evaluation in history.evaluations:
         values = [evaluation.parameters[name] for name in names]
-        (replicates,) = calibrator._rust_problem.predict_observations([values])
+        (replicates,) = calibrator._engine_problem.predict_observations([values])
         summaries = [
             weighted_quantiles([replicate[i] for replicate in replicates], [0.25])[0]
             for i in range(len(observed))

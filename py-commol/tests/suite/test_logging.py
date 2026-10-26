@@ -6,9 +6,16 @@ interpreter. The script of a fresh interpreter cannot import ``tests``, whose
 ``__init__`` adds that handler, so it builds its model by hand.
 """
 
+import logging
 import subprocess
 import sys
 import textwrap
+
+import pytest
+
+from commol import Simulation
+from commol.sensitivity import SensitivityAnalysis
+from tests.support import abc_builder, abc_rates, build, flow_calibrator
 
 
 def _run_python(script: str) -> subprocess.CompletedProcess[str]:
@@ -60,6 +67,17 @@ def test_basic_config_shows_the_messages_of_commol() -> None:
         """
     )
 
-    assert "INFO:commol.api.simulation:Running simulation for 3 steps." in (
-        result.stderr.splitlines()
-    )
+    assert "INFO:commol:Running simulation for 3 steps." in (result.stderr.splitlines())
+
+
+def test_a_record_names_the_public_module(caplog: pytest.LogCaptureFixture) -> None:
+    """A calibration logs as ``commol``, the module of `Calibrator`, and a
+    sensitivity analysis as ``commol.sensitivity``, never as a private path."""
+    with caplog.at_level(logging.INFO, logger="commol"):
+        flow_calibrator([10.0, 11.0, 9.0], windowed=True).run()
+        SensitivityAnalysis(Simulation(build(abc_builder())), abc_rates())
+
+    assert {record.name for record in caplog.records} == {
+        "commol",
+        "commol.sensitivity",
+    }

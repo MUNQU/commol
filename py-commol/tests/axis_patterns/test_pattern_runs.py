@@ -4,10 +4,15 @@ import math
 
 import pytest
 
-from commol import StratificationCondition, StratifiedRate
-from commol import ModelBuilder, Simulation, AxisPattern
-from commol.context.model import Model
-from commol.context.parameter import SeriesValue
+from commol import (
+    AxisPattern,
+    ModelBuilder,
+    Simulation,
+    StratificationCondition,
+    StratifiedRate,
+)
+from commol._model.model import Model
+from commol._model.parameter import SeriesValue
 from tests.support import a_to_b_builder, assert_close, build, build_ode, run
 
 

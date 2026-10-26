@@ -19,17 +19,18 @@ from commol import (
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
-    Collinearity,
     ModelBuilder,
     NelderMeadConfig,
     ObservedDataPoint,
-    ParameterSample,
-    SampleIdentifiability,
-    SampleMethod,
     Simulation,
+)
+from commol.identifiability import (
+    Collinearity,
+    SampleIdentifiability,
     StartsIdentifiability,
     StructuralRank,
 )
+from commol.uncertainty import ParameterSample, SampleMethod
 
 
 def basic_model(k1: float | None, alpha: float | None, k2: float | None):
@@ -108,7 +109,7 @@ how it splits.
 | Kind | Question | Depends on | Methods |
 |---|---|---|---|
 | **Structural** | Can any data from this design determine the parameter? | The model and the positions and outputs observed, not the observed values | `StructuralRank` |
-| **Practical** | Do these data determine it? | The observed values, their noise and the fit | `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability`, the profiles of a `ProfileLikelihood` |
+| **Practical** | Do these data determine it? | The observed values, their noise and the fit | `Collinearity`, `SampleIdentifiability`, `StartsIdentifiability`, `ProfileIdentifiability` |
 
 A parameter that is not structurally identifiable is never practically
 identifiable: no amount of data of the same design fixes it. A parameter that
@@ -127,6 +128,7 @@ modelling judgment, and the table gives the range the literature uses.
 | `Collinearity(at, max_subset_size, threshold)` | A fit (`CalibrationResult`) or a sample | Which subsets of parameters can be fitted together; `threshold` from 5 to 20 | Deterministic |
 | `SampleIdentifiability(sample, reference, correlation_threshold, priors)` | Any `ParameterSample` | How much the sample contracts each parameter against its bounds or its prior, which pairs move together, which marginals have several modes; `correlation_threshold` from 0.8 to 0.95 | Any |
 | `StartsIdentifiability(result, parameter_tolerance, loss_tolerance)` | A result of `Calibrator.run(starts=n)` with two or more converged starts | Which parameters differ between starts of equal loss | Any |
+| `ProfileIdentifiability(result)` | A `ProfileResult` of the parameters of the problem, in problem order | The verdict of the shape of each profile ([Profile Likelihood](profiles.md#verdicts-and-the-identifiability-report)); it runs no model | Any |
 
 ### Structural rank
 
@@ -219,7 +221,7 @@ the data inform each parameter, and a sample drawn from the priors themselves
 has a contraction near 0.
 
 ```python
-from commol import Priors, Uniform
+from commol.distributions import Priors, Uniform
 
 against_priors = calibrator.identifiability(
     SampleIdentifiability(
@@ -249,7 +251,9 @@ within a relative tolerance but the best; use data with noise.
 An `IdentifiabilityReport` holds, for each parameter, a **structural** and a
 **practical** verdict, and the sections of the methods that ran
 (`structural`, `collinearity`, `sample`, `starts`, `profile`). The profiles of
-a `ProfileLikelihood` give their report with `ProfileResult.identifiability()`; a flat
+a `ProfileLikelihood` give their report with
+`calibrator.identifiability(ProfileIdentifiability(result=profiles))`, which
+runs no model; a flat
 profile gives the structural verdict `in_combination` when resetting the
 other parameters to their fitted values breaks it, and `non_identifiable`
 when nothing the data read depends on the parameter

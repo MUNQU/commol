@@ -2,10 +2,9 @@
 reading series at positions."""
 
 import math
+from collections.abc import Iterable, Sequence
 
 import pytest
-
-from collections.abc import Iterable, Sequence
 
 from commol import (
     AxisUnits,
@@ -15,9 +14,9 @@ from commol import (
     ObservedDataPoint,
     Simulation,
 )
-from commol.api.plotting.panels import compared_panels
-from commol.api.results import SimulationResults
+from commol._simulation.results import SimulationResults
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.plotting.panels import compared_panels
 from tests.support import a_to_b_builder, bounded, build
 
 SEED = 42
@@ -224,7 +223,7 @@ def test_windowed_totals_equal_the_prediction_of_a_windowed_observation() -> Non
     )
     calibrator = Calibrator(_model(None), problem)
 
-    [[predictions]] = calibrator._rust_problem.predict_observations([[truth]])
+    [[predictions]] = calibrator._engine_problem.predict_observations([[truth]])
 
     assert windowed_totals(results["events"], results.positions, 7, [7, 14]) == (
         predictions

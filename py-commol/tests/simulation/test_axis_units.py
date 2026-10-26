@@ -6,12 +6,11 @@ import pytest
 from pydantic import ValidationError
 
 from commol import Aggregate, AxisUnits, Simulation
+from commol._model.unit_checks import UnitConsistencyError
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.utils.equations import UnitConsistencyError
-
 from tests.support import (
-    FactoryBuilder,
     TIGHT,
+    FactoryBuilder,
     a_to_b_builder,
     assert_close,
     build,

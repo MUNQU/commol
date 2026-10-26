@@ -15,7 +15,7 @@ An unknown field, such as a misspelt or an old name (`window_steps`), raises a
 
 ## The public surface holds only what a user writes
 
-`commol.__all__` holds the names a user writes: the builder and its
+The public modules hold the names a user writes: the builder and its
 conditions (`StratificationCondition`, `StratifiedRate`), the structures, the
 entry points, the settings and the methods. The data of the surface is
 `py-commol/tests/suite/public_surface.py`: `EXPORTS`, the names of each public
@@ -40,6 +40,71 @@ module, and `RESULTS`, the results that public objects return.
 `tests/suite/test_architecture.py::test_no_public_member_is_internal`,
 `tests/docs/test_reference.py::test_each_result_is_on_the_page_of_its_object`
 and `tests/building/test_conditions.py::test_a_condition_is_one_class`.
+
+## One module per page of the guide
+
+The root `commol` holds the main flow: build, the structures, simulate and
+calibrate. Every other public name is in the module of its page of the guide
+(`commol.engines`, `commol.plotting`, `commol.parallelism`,
+`commol.distributions`, `commol.quantities`, `commol.observations`,
+`commol.uncertainty`, `commol.scores`, `commol.resampling`,
+`commol.profiles`, `commol.local`, `commol.smc`, `commol.conformal`,
+`commol.identifiability`, `commol.sensitivity`), and the root exports no name
+of a module. Each public module is a package that holds its code; the code of
+the root is in private packages (`_model`, `_simulation`, `_calibration`,
+`_problem`, `_fit`, `_data`, `_statistics`, `_build`). Each public module logs as
+`logging.getLogger("commol.<module>")`, and the code of the root as
+`commol`, so no record names a private path.
+
+| Alternative | Why not |
+|---|---|
+| Every name in the root | About a hundred flat names; a user meets the names of every page at once. |
+| One module per layer of the code (`api`, `context`) | The layers follow the code, not what a user reads, and their areas import each other. |
+| One `commol.uncertainty` for every family of methods | A module of about thirty-five names. |
+| `logging.getLogger(__name__)` | The name of a record would be a private path, which changes with the code. |
+
+**Guards:** `tests/suite/test_architecture.py::test_each_public_name_has_one_home`,
+`tests/suite/test_architecture.py::test_the_packages_are_the_modules`,
+`tests/docs/test_reference.py::test_each_module_has_its_page` and
+`tests/suite/test_logging.py::test_a_record_names_the_public_module`.
+
+## The layers of the package
+
+The packages form one order, and each imports only the packages below it:
+at the top of a module, in a function and under `TYPE_CHECKING` alike. From
+the bottom:
+
+| Layers | What they hold |
+|---|---|
+| `commol_rs`, `_build`, `_data`, `_statistics` | The extension, the build, the base of every data object with the port of the bridge, the weighted statistics |
+| `parallelism`, `engines`, `distributions`, `quantities`, `_fit`, `observations`, `_problem` | Settings and values that read no model |
+| `_model` | The model and its structure |
+| `plotting` | The one drawing layer: data types of panels and charts, and the drawing |
+| `_simulation` | Runs and replicates, their reports and the data of their figures |
+| `uncertainty` | A sample, its predictive and the data of its figures |
+| `_calibration` | The calibrator and the bases of the methods (`InferenceMethod`, `CalibrationPort`, `run_method`) |
+| `scores`, `resampling`, `profiles`, `local`, `smc`, `conformal`, `identifiability`, `sensitivity` | The method families, each with its methods, results and runners |
+| `commol` | The root, which imports what the main flow writes |
+
+A package that needs something of a package above it reads it through a
+protocol of its own: `_model` reads a sample through `SummarizedSample`
+(`_model/report_entry.py`), a report and a figure read prediction intervals
+through `PredictionIntervalsData` (`_data/intervals.py`), `plot_compared`
+reads a result through `PanelSource` (`plotting/panels.py`), and a runner
+reads a calibrator through `CalibrationPort` (`_calibration/method.py`).
+Code that serves one object lives with it: the block of
+`IdentifiabilityReport.report` in `identifiability/report.py`, the delta band
+of a local approximation in `LocalResult.delta_band`. Each method names its
+runner in the class variable `_runner`, so the calibrator imports no method.
+
+| Alternative | Why not |
+|---|---|
+| An order with listed exceptions | Each exception is a cycle that the next change makes longer; the test would guard less with each one. |
+| Imports upward in a function or under `TYPE_CHECKING` only | They hide the cycle from Python, not from the reader or the type checker: the lower package still depends on the upper one. |
+| A registry that each family of methods fills when it is imported | The result of an entry point depends on which modules were imported before; a method that names its runner works in any order of imports. |
+
+**Guards:** `tests/suite/test_architecture.py::test_the_dependencies_point_one_way`
+and `tests/suite/test_architecture.py::test_the_check_names_an_import_upward`.
 
 ## A value of a model has its rule in the engine
 
@@ -77,7 +142,7 @@ compiler and the validator of its Python object call.
 Every data object of the Python API that reaches the engine, the model, the
 calibration problem and each inference method included, crosses as the JSON
 of its `model_dump()` (`engine_json` of
-`py-commol/commol/context/engine_json.py`). The bridge reads it with one
+`py-commol/commol/_data/engine_json.py`). The bridge reads it with one
 helper, `read` of `py-commol/src/json.rs`, into the type the engine owns,
 which takes the spelling of the Python API (`rename_all = "snake_case"`) and
 denies unknown fields. An error names the path of the field and gives the
@@ -137,14 +202,14 @@ conversion in Python, each runner sends its method whole),
 ## Results compare by their values
 
 Every result of commol compares with one rule, `ComparedByValue`
-(`py-commol/commol/context/result_model.py`). Its subclass `ResultModel` is
+(`py-commol/commol/_data/result_model.py`). Its subclass `ResultModel` is
 the base of every result model: the result of a calibration
 (`CalibrationResult`, `CalibrationHistory`), of each uncertainty,
 identifiability and sensitivity method, the parameter sample, the bands of a
 predictive, the summary of a scenario, a score, and their parts
 (`StartSummary`, `SeriesIntervals`, …); it compares its public fields. The
 results of a run and of replicates (`SimulationResults`, a `dict`, and
-`SimulationReplicates`, a `list`, in `py-commol/commol/api/results.py`)
+`SimulationReplicates`, a `list`, in `py-commol/commol/_simulation/results.py`)
 compare their values or runs, positions, seed and model. Two results are equal
 when they are of one class and those values are the same. The comparison reads
 `canonical`, the values as nested tuples, also of a setting or a `Model`

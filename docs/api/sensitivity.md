@@ -2,50 +2,33 @@
 
 [Back to API Reference](index.md)
 
-The sensitivity analysis, what it varies, the quantities of interest it
-reads from each run, and the result of each method. Guide:
+The module `commol.sensitivity`: the sensitivity analysis, what it varies,
+and the result of each method. The quantities of interest it reads from each
+run are in [Quantities](quantities.md). Guide:
 [Sensitivity analysis](../guide/uncertainty/sensitivity.md).
 
-::: commol.api.sensitivity.SensitivityAnalysis
+::: commol.sensitivity.SensitivityAnalysis
 
-::: commol.context.inference.global_sensitivity.InputSpace
+::: commol.sensitivity.InputSpace
 
-::: commol.context.inference.global_sensitivity.Propagation
+::: commol.sensitivity.Propagation
 
-::: commol.context.inference.global_sensitivity.PropagationResult
+::: commol.sensitivity.results.PropagationResult
 
-::: commol.context.inference.global_sensitivity.QuantitySummary
+::: commol.sensitivity.results.QuantitySummary
 
-::: commol.context.inference.global_sensitivity.PRCC
+::: commol.sensitivity.PRCC
 
-::: commol.context.inference.global_sensitivity.PRCCResult
+::: commol.sensitivity.results.PRCCResult
 
-::: commol.context.inference.global_sensitivity.Morris
+::: commol.sensitivity.Morris
 
-::: commol.context.inference.global_sensitivity.MorrisResult
+::: commol.sensitivity.results.MorrisResult
 
-::: commol.context.inference.global_sensitivity.Sobol
+::: commol.sensitivity.Sobol
 
-::: commol.context.inference.global_sensitivity.SobolResult
+::: commol.sensitivity.results.SobolResult
 
-::: commol.context.inference.global_sensitivity.PolynomialChaos
+::: commol.sensitivity.PolynomialChaos
 
-::: commol.context.inference.global_sensitivity.ChaosResult
-
-::: commol.context.inference.quantities.Level
-
-::: commol.context.inference.quantities.Increments
-
-::: commol.context.inference.quantities.ValueAt
-
-::: commol.context.inference.quantities.Gain
-
-::: commol.context.inference.quantities.Peak
-
-::: commol.context.inference.quantities.PeakPosition
-
-::: commol.context.inference.quantities.Trajectory
-
-::: commol.context.inference.quantities.Ratio
-
-::: commol.context.inference.quantities.quantity_schedule
+::: commol.sensitivity.results.ChaosResult

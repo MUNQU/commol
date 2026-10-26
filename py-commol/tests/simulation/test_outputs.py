@@ -3,7 +3,7 @@
 import pytest
 
 from commol import Simulation
-from commol.api.plotting.panels import run_panels
+from commol._simulation.panels import run_panels
 from tests.support import a_to_b_builder, build, override_builder
 
 

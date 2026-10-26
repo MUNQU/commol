@@ -5,12 +5,12 @@
 Plain-dictionary reports, each a method of the object whose data it
 describes. Guide: [Reports](../guide/reports.md).
 
-::: commol.context.model.Model.applied_parameters
+::: commol.Model.applied_parameters
 
-::: commol.api.results.SimulationResults.report
+::: commol._simulation.results.SimulationResults.report
 
-::: commol.api.results.SimulationReplicates.report
+::: commol._simulation.results.SimulationReplicates.report
 
-::: commol.api.inference.predictive.Predictive.report
+::: commol.uncertainty.Predictive.report
 
-::: commol.context.inference.identifiability.IdentifiabilityReport.report
+::: commol.identifiability.results.IdentifiabilityReport.report

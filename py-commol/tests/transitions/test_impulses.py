@@ -5,9 +5,9 @@ import math
 import pytest
 from pydantic import ValidationError
 
-from commol import Aggregate, Simulation, AxisPattern
-from commol.context.model import Model
-from tests.support import FactoryBuilder, TIGHT, assert_close, build, build_ode
+from commol import Aggregate, AxisPattern, Simulation
+from commol._model.model import Model
+from tests.support import TIGHT, FactoryBuilder, assert_close, build, build_ode
 
 
 def _impulse_model(

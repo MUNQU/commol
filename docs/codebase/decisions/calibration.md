@@ -66,7 +66,7 @@ writes again at each evaluation, so a value set on it is lost. A calibration
 or any method on `ForwardModel` sets each parameter on a copy of the engine
 when it is built (`ValueWriter::new` in `crates/commol-calibration/src/values.rs`),
 so the engine's message reaches the user before any run, and Python checks no
-parameter id (`check_values` in `api/calibrator.py`). `ValueWriter::new` also
+parameter id (`check_values` in `_calibration/calibrator.py`). `ValueWriter::new` also
 checks that a factor has positive bounds, the observed outputs and positions
 are checked by `CalibrationProblem::new` alone, and Python passes each
 message with no prefix.
@@ -95,7 +95,7 @@ a sample: their windows, sums, factors, normalization, quantiles and scores
 come from Rust. `Calibrator` builds the Rust problem once
 (`commol_rs.inference.CalibrationProblem`) and every call reads it. The
 helpers that present results already computed, such as `windowed_totals`
-(`api/windows.py`) for a run or its replicates, are not predictions; they
+(`_simulation/windows.py`) for a run or its replicates, are not predictions; they
 read the rules of the operator through bindings (`index_at` and
 `window_increments` of `observation.rs`), which
 `tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss` and
@@ -198,7 +198,7 @@ logs. A particle swarm takes the seed of its start, drawn from it
 seed alone repeats a run. The
 result records it, so a result read from a file repeats too:
 `CalibrationResult.seed`, and `settings["seed"]` of the `SampleMethod` of every
-sample a runner makes (`sample_method` in `api/inference/resampling.py`) or
+sample a runner makes (`sample_method` in `resampling/runners.py`) or
 `Calibrator.point_sample` makes.
 
 **Guards:** `tests/calibration/test_problem.py`
@@ -213,11 +213,11 @@ sample a runner makes (`sample_method` in `api/inference/resampling.py`) or
 Every binding that runs parallel work calls `parallel` (`py-commol/src/parallelism.rs`),
 which releases the GIL and runs the job in `Parallelism::install`
 (`crates/commol-core/src/parallelism.rs`): a `rayon` pool of the number of
-threads of `commol.threads`, built at its first use and kept for the next job
+threads of `commol.parallelism.threads`, built at its first use and kept for the next job
 with the same setting. Every `par_iter` inside the job, of commol and of the
 argmin fork, nested levels included, runs in that pool. The setting is a
 `contextvars` variable that the extension owns, so each Python thread and
-each `commol.threads` block has its own. A pool is kept per number of
+each `commol.parallelism.threads` block has its own. A pool is kept per number of
 threads and levels: each thread of a pool holds the levels of its pool
 (`start_handler`), because a nested job can run on any thread of the pool.
 

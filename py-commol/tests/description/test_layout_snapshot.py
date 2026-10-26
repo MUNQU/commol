@@ -5,7 +5,7 @@ from collections.abc import Callable
 
 import pytest
 
-from commol.context.model import Model
+from commol._model.model import Model
 from tests.support.described import stochastic_with_settings, variant_with_a_series
 from tests.support.description import matches_snapshot
 from tests.support.kinds import decay_model

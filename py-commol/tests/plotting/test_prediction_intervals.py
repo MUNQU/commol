@@ -6,10 +6,7 @@ import pytest
 from commol import (
     Simulation,
 )
-from commol.context.inference.conformal import (
-    PredictionIntervals,
-    SeriesIntervals,
-)
+from commol.conformal.results import PredictionIntervals, SeriesIntervals
 
 
 def test_a_figure_draws_prediction_intervals(abc_simulation: Simulation) -> None:

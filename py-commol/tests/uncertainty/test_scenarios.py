@@ -10,23 +10,21 @@ import pytest
 from commol import (
     CalibrationProblem,
     Calibrator,
-    InputSpace,
     NelderMeadConfig,
     ObservedDataPoint,
+    Simulation,
+)
+from commol._fit.result import CalibrationResult
+from commol.quantities import Trajectory, ValueAt
+from commol.quantities.quantities import quantity_labels
+from commol.sensitivity import InputSpace, SensitivityAnalysis
+from commol.uncertainty import (
     ParameterSample,
     Predictive,
     SampleMethod,
     Scenarios,
-    SensitivityAnalysis,
-    Simulation,
-    Trajectory,
-    ValueAt,
     weighted_quantiles,
 )
-from commol.context.calibration import (
-    CalibrationResult,
-)
-from commol.context.inference.quantities import quantity_labels
 from tests.support import (
     a_to_b_builder,
     abc_builder,

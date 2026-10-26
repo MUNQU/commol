@@ -4,4 +4,4 @@
 
 Rates that change along the axis, and schedules per subgroup. Guide: [Axis Patterns](../guide/axis-patterns.md).
 
-::: commol.api.patterns.AxisPattern
+::: commol.AxisPattern

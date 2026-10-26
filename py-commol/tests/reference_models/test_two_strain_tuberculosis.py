@@ -17,7 +17,7 @@ References
 
 import pytest
 
-from commol.context.model import Model
+from commol._model.model import Model
 from tests.support import Flow, assert_threshold, flow_model
 
 # Per year, without treatment failure to the resistant strain (q = 0).

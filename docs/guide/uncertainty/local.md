@@ -23,17 +23,14 @@ from commol import (
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
-    Laplace,
-    LaplaceMixture,
-    LikelihoodTarget,
     ModelBuilder,
     NelderMeadConfig,
-    NormalObservations,
     ObservedDataPoint,
-    Priors,
-    Sandwich,
     Simulation,
 )
+from commol.local import Laplace, LaplaceMixture, LikelihoodTarget, Sandwich
+from commol.observations import NormalObservations
+from commol.distributions import Priors
 
 
 def flow_model(rate: str):
@@ -72,7 +69,7 @@ laplace = calibrator.uncertainty(Laplace(draws=2000))
 lower, upper = laplace.sample.interval(0.9)["c"]
 print(round(lower, 2), round(upper, 2))  # 9.64 10.25
 
-band = calibrator.delta_band(laplace, [10, 20, 30], 0.9)
+band = laplace.delta_band(calibrator, [10, 20, 30], 0.9)
 print([round(value, 1) for value in band.center["B"]])  # [99.3, 198.7, 298.0]
 
 sandwich = calibrator.uncertainty(Sandwich(block_length=1, draws=2000))
@@ -145,9 +142,8 @@ for `NormalObservations(sd="sd")`, `σ̂² = SSE/n`, not `SSE/(n − p)`. The
 Laplace intervals are then narrower than the classical ones by
 `√(n/(n − p))`, which is negligible when `n ≫ p`.
 
-`calibrator.delta_band(result, positions, confidence_level)` gives the band of
-every
-output by the delta method: the prediction at the fit plus and minus the
+`result.delta_band(calibrator, positions, confidence_level)` gives the band of
+every output by the delta method: the prediction at the fit plus and minus the
 quantile of the normal times `√(J Σ Jᵀ)`, with `J` the derivatives of the
 output on the unbounded scale. It runs the model a few times per parameter,
 not once per draw, and for a model linear in its parameters it equals the
@@ -187,7 +183,7 @@ rescaling the objective does not change the sandwich).
 - **A Student t with `G − 1` degrees of freedom.** With few blocks, `B` is a
   noisy estimate; the t widens the intervals by the right amount, instead of
   a warning at an arbitrary number of blocks. Intervals of the draws and
-  `Calibrator.delta_band` both read it.
+  `LocalResult.delta_band` both read it.
 - **`G ≤ p` is refused.** `B` sums `G` outer products whose sum has rank at
   most `G − 1` after the fit, so with no more blocks than parameters some
   directions would get zero variance. The `ValueError` suggests shorter
@@ -264,7 +260,7 @@ An unreliable sample calls for a method that samples the posterior itself:
 
 | Situation | Good enough? |
 |---|---|
-| A model near linear in its parameters around the fit, a correct noise model | Laplace, with `Calibrator.delta_band` for the outputs |
+| A model near linear in its parameters around the fit, a correct noise model | Laplace, with `LocalResult.delta_band` for the outputs |
 | A wrong or unknown noise model, dependent residuals, a right mean | Sandwich with `"gauss_newton"` and blocks longer than the dependence |
 | A mean that may be wrong, large residuals | Sandwich with `"hessian"` |
 | Several optima of equal or similar loss | Laplace mixture; check `k_hat` |

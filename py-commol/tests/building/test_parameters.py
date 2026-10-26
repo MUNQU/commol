@@ -4,19 +4,18 @@ import math
 import warnings
 
 import pytest
-
 from pydantic import ValidationError
 
 from commol import ModelBuilder, SeriesValue, Simulation
-from commol.context.engine import EngineName
-from commol.context.parameter import Parameter
+from commol._model.parameter import Parameter
+from commol.engines.engine import EngineName
 from tests.support import (
     ENGINE_REL,
     a_to_b_builder,
+    abc_builder,
     assert_close,
     build,
     build_ode,
-    abc_builder,
 )
 
 

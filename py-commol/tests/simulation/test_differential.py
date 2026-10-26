@@ -5,14 +5,15 @@ import math
 import pytest
 from pydantic import ValidationError
 
-from commol import ODESolver, Simulation, AxisPattern
-from commol.context.model import Model
+from commol import AxisPattern, Simulation
+from commol._model.model import Model
+from commol.engines import ODESolver
 from tests.support import (
     a_to_b_builder,
+    abc_builder,
     assert_close,
     build,
     build_ode,
-    abc_builder,
 )
 
 K = 0.1

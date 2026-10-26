@@ -2,39 +2,42 @@
 
 [Back to API Reference](index.md)
 
-The identifiability methods, the report they return, and its parts. Guide:
+The module `commol.identifiability`: the identifiability methods, the report
+they return, and its parts. Guide:
 [Identifiability](../guide/uncertainty/identifiability.md).
 
-::: commol.context.inference.identifiability.StructuralRank
+::: commol.identifiability.StructuralRank
 
-::: commol.context.inference.identifiability.Collinearity
+::: commol.identifiability.Collinearity
 
-::: commol.context.inference.identifiability.SampleIdentifiability
+::: commol.identifiability.SampleIdentifiability
 
-::: commol.context.inference.identifiability.StartsIdentifiability
+::: commol.identifiability.StartsIdentifiability
 
-::: commol.context.inference.identifiability.IdentifiabilityReport
+::: commol.identifiability.ProfileIdentifiability
 
-::: commol.context.inference.identifiability.ParameterVerdicts
+::: commol.identifiability.results.IdentifiabilityReport
 
-::: commol.context.inference.identifiability.StructuralVerdict
+::: commol.identifiability.results.ParameterVerdicts
 
-::: commol.context.inference.identifiability.PracticalVerdict
+::: commol.identifiability.results.StructuralVerdict
 
-::: commol.context.inference.identifiability.StructuralSection
+::: commol.identifiability.results.PracticalVerdict
 
-::: commol.context.inference.identifiability.PointRank
+::: commol.identifiability.results.StructuralSection
 
-::: commol.context.inference.identifiability.Combination
+::: commol.identifiability.results.PointRank
 
-::: commol.context.inference.identifiability.CollinearitySection
+::: commol.identifiability.results.Combination
 
-::: commol.context.inference.identifiability.SubsetIndex
+::: commol.identifiability.results.CollinearitySection
 
-::: commol.context.inference.identifiability.SampleSection
+::: commol.identifiability.results.SubsetIndex
 
-::: commol.context.inference.identifiability.CorrelatedPair
+::: commol.identifiability.results.SampleSection
 
-::: commol.context.inference.identifiability.StartsSection
+::: commol.identifiability.results.CorrelatedPair
 
-::: commol.context.inference.identifiability.ProfileSection
+::: commol.identifiability.results.StartsSection
+
+::: commol.identifiability.results.ProfileSection

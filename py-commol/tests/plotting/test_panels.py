@@ -7,13 +7,13 @@ import sys
 from pathlib import Path
 
 from commol import Simulation
-from commol.api.plotting.panels import run_panels
+from commol._simulation.panels import run_panels
 from tests.support import abc_builder, build
 
 PANELS = """
 import json, sys
 from commol import Simulation
-from commol.api.plotting.panels import run_panels
+from commol._simulation.panels import run_panels
 from tests.support import abc_builder, build
 
 run = Simulation(build(abc_builder(bin_unit="item"))).run(5)

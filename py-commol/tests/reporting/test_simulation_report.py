@@ -9,16 +9,10 @@ from commol import (
     ObservedDataPoint,
     Simulation,
 )
-from commol.context.inference.conformal import (
-    PredictionIntervals,
-    SeriesIntervals,
-)
-from commol.api.results import (
-    SimulationReplicates,
-    SimulationResults,
-)
-from commol.api.reporting import ObservedSeries
+from commol._simulation.reports import ObservedSeries
+from commol._simulation.results import SimulationReplicates, SimulationResults
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.conformal.results import PredictionIntervals, SeriesIntervals
 from tests.support import a_to_b_builder, build, build_ode
 
 

@@ -19,14 +19,12 @@ from commol import (
     Calibrator,
     ModelBuilder,
     NelderMeadConfig,
-    NoNoise,
     ObservedDataPoint,
-    ParameterSample,
-    Predictive,
-    SampleMethod,
     Simulation,
     scores,
 )
+from commol.observations import NoNoise
+from commol.uncertainty import ParameterSample, Predictive, SampleMethod
 
 
 def basic_model(k1: float | None, k2: float | None):
@@ -196,7 +194,7 @@ A draw of weight zero does not count. `weighted_quantiles` computes it for any
 values, and `member_statistics` reduces ensemble members with it.
 
 ```python
-from commol import weighted_quantiles
+from commol.uncertainty import weighted_quantiles
 
 print(weighted_quantiles([0.0, 1.0], levels=[0.5], weights=[1.0, 3.0]))  # [0.75]
 ```
@@ -261,7 +259,8 @@ across the runs with their weights. So the interval of a difference is the
 interval of the paired differences, not the difference of two intervals.
 
 ```python
-from commol import Peak, Scenarios, ValueAt
+from commol.quantities import Peak, ValueAt
+from commol.uncertainty import Scenarios
 
 # k1 is fitted; k2 is a value of the model that a scenario overrides.
 problem_k1 = CalibrationProblem(
@@ -356,21 +355,21 @@ held-out positions above, and say whether you score a band of the model
 Every method runs through `Calibrator.uncertainty(method)`. A method is a
 configuration, a subclass of `UncertaintyMethod[R]` whose type parameter `R` is
 its result; the call returns an `R`, which a static type checker infers from
-the configuration's type. A configuration with no registered runner raises a
-`ValueError` that names the registered ones.
+the configuration's type. Each configuration names the function that runs
+it; one that names none raises a `ValueError`.
 
 The identifiability methods run through their own entry point,
 `Calibrator.identifiability(method)`, with a subclass of
 `IdentifiabilityMethod[R]`: they answer another question
 ([Identifiability](identifiability.md)). Both kinds subclass
-`InferenceMethod[R]` and share one registry; each entry point refuses the
+`InferenceMethod[R]`; each entry point refuses the
 other kind with a `TypeError` that names the right one. The sensitivity
 methods, subclasses of `SensitivityMethod[R]`, run with no data through
 `SensitivityAnalysis(simulation, inputs).run(method)`, the third entry point
-of the registry ([Sensitivity Analysis](sensitivity.md)).
+([Sensitivity Analysis](sensitivity.md)).
 
 ```python
-from commol import BayesianBootstrap
+from commol.resampling import BayesianBootstrap
 
 result = calibrator.uncertainty(BayesianBootstrap(replicates=20, block_length=1))
 print(type(result).__name__, len(result.sample))  # BootstrapResult 20

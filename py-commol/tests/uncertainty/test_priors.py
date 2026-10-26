@@ -9,22 +9,15 @@ import pytest
 from pydantic import ValidationError
 
 from commol import (
-    ABCSMC,
-    Beta,
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
-    GibbsPosterior,
-    LogNormal,
-    LogUniform,
-    LossDistance,
     NelderMeadConfig,
-    Normal,
-    Priors,
     Simulation,
-    Uniform,
 )
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.distributions import Beta, LogNormal, LogUniform, Normal, Priors, Uniform
+from commol.smc import ABCSMC, GibbsPosterior, LossDistance
 from tests.support import a_to_b_builder, build, flow_calibrator, flow_observations
 
 DATA = [9.0, 11.0, 10.5, 8.5, 10.0]

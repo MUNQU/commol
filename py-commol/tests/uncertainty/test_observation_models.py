@@ -17,33 +17,29 @@ import pytest
 from pydantic import ValidationError
 
 from commol import (
-    ABCSMC,
-    BayesianPosterior,
-    BinomialObservations,
     CalibrationProblem,
     Calibrator,
-    DistributionNoise,
-    GibbsPosterior,
-    LogNormalObservations,
-    LossDistance,
-    NegativeBinomialObservations,
     NelderMeadConfig,
-    Normal,
-    NormalObservations,
     ObservedDataPoint,
-    ParameterSample,
-    ParametricBootstrap,
-    PoissonObservations,
-    Predictive,
-    Priors,
-    SampleMethod,
     Simulation,
-    StudentTObservations,
     scores,
 )
+from commol._data.engine_json import engine_json
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context.engine_json import engine_json
-from commol.context.observation_models import _ObservationModel
+from commol.distributions import Normal, Priors
+from commol.observations import (
+    BinomialObservations,
+    DistributionNoise,
+    LogNormalObservations,
+    NegativeBinomialObservations,
+    NormalObservations,
+    PoissonObservations,
+    StudentTObservations,
+)
+from commol.observations.models import _ObservationModel
+from commol.resampling import ParametricBootstrap
+from commol.smc import ABCSMC, BayesianPosterior, GibbsPosterior, LossDistance
+from commol.uncertainty import ParameterSample, Predictive, SampleMethod
 from tests.support import (
     a_to_b_builder,
     bounded,
@@ -220,7 +216,7 @@ class TestModels:
         fit = calibrator.run()
 
         values = [fit.best_parameters[name] for name in calibrator.parameter_names]
-        pointwise = calibrator._rust_problem.pointwise_log_likelihood(values)
+        pointwise = calibrator._engine_problem.pointwise_log_likelihood(values)
         assert len(pointwise) == len(observed)
         assert math.fsum(pointwise) == pytest.approx(-fit.final_loss, rel=1e-12)
         assert fit.best_parameters["c"] == pytest.approx(FLOW, rel=0.2)
@@ -233,7 +229,7 @@ class TestModels:
             values, windowed=True, observation_models={"B": PoissonObservations()}
         )
 
-        pointwise = calibrator._rust_problem.pointwise_log_likelihood([9.0])
+        pointwise = calibrator._engine_problem.pointwise_log_likelihood([9.0])
 
         expected = [y * math.log(9.0) - 9.0 - math.lgamma(y + 1) for y in values]
         assert pointwise == pytest.approx(expected, rel=1e-12)
@@ -282,7 +278,7 @@ class TestModels:
         observed = engine_json(flow_observations([1.0], windowed=True))
 
         with pytest.raises(ValueError, match="kind"):
-            calibrator._rust_problem.observation_draws(
+            calibrator._engine_problem.observation_draws(
                 sample._rust, observed, '{"kind": "both"}'
             )
 
@@ -290,7 +286,7 @@ class TestModels:
         calibrator = flow_calibrator([1.0], windowed=True)
 
         with pytest.raises(ValueError, match="needs observation models"):
-            calibrator._rust_problem.pointwise_log_likelihood([1.0])
+            calibrator._engine_problem.pointwise_log_likelihood([1.0])
 
 
 class TestMaximumLikelihood:
@@ -313,7 +309,7 @@ class TestMaximumLikelihood:
         # The standard error of φ from the curvature of the log-likelihood.
         def log_likelihood(phi: float) -> float:
             return math.fsum(
-                calibrator._rust_problem.pointwise_log_likelihood([fit["c"], phi])
+                calibrator._engine_problem.pointwise_log_likelihood([fit["c"], phi])
             )
 
         h = 1e-4
@@ -367,7 +363,7 @@ class TestMaximumLikelihood:
             observation_models={"B": PoissonObservations()},
         )
 
-        with caplog.at_level(logging.INFO, logger="commol.api.calibrator"):
+        with caplog.at_level(logging.INFO, logger="commol"):
             calibrator.run()
 
         assert "negative log-likelihood" in caplog.text

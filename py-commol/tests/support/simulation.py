@@ -1,7 +1,7 @@
 """Run a model in one call."""
 
 from commol import Aggregate, Simulation
-from commol.context.model import Model
+from commol._model.model import Model
 
 from .models import FactoryBuilder, build
 

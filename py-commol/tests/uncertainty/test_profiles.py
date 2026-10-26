@@ -4,32 +4,27 @@ and intervals; the verdicts are in test_profile_verdicts.py."""
 import json
 from statistics import NormalDist
 
-
 import pytest
-
 from pydantic import ValidationError
 
-from commol import (
-    BayesianBootstrap,
-    Calibrator,
-    LogNormalObservations,
-    NelderMeadConfig,
-    NormalObservations,
-    ParametricBootstrap,
+from commol import Calibrator, NelderMeadConfig
+from commol.commol_rs import _commol_rs as commol_rs
+from commol.identifiability import ProfileIdentifiability
+from commol.identifiability.results import IdentifiabilityReport
+from commol.observations import LogNormalObservations, NormalObservations
+from commol.profiles import (
     PredictionProfile,
     PredictionSpec,
     ProfileLikelihood,
-    ResidualBootstrap,
     Threshold,
+)
+from commol.profiles.results import ProfileInterval
+from commol.resampling import (
+    BayesianBootstrap,
+    ParametricBootstrap,
+    ResidualBootstrap,
     WildBootstrap,
 )
-from commol.context.inference.identifiability import (
-    IdentifiabilityReport,
-)
-from commol.context.inference.profiles import (
-    ProfileInterval,
-)
-from commol.commol_rs import _commol_rs as commol_rs
 from tests.support import (
     line_calibrator,
 )
@@ -394,7 +389,7 @@ def test_the_identifiability_of_a_profile_is_a_report() -> None:
         )
     )
 
-    report = result.identifiability()
+    report = calibrator.identifiability(ProfileIdentifiability(result=result))
 
     assert isinstance(report, IdentifiabilityReport)
     assert [section.confidence_level for section in report.profile] == [0.9]
@@ -423,4 +418,4 @@ def test_a_prediction_profile_has_no_identifiability() -> None:
 
     assert result.structure == {}
     with pytest.raises(ValueError, match="predictions have no verdict on a parameter"):
-        result.identifiability()
+        ProfileIdentifiability(result=result)

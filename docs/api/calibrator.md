@@ -4,46 +4,28 @@
 
 Fits a model to observations. Guide: [Model Calibration](../guide/calibration.md).
 
-::: commol.api.calibrator.Calibrator
+::: commol.Calibrator
 
-::: commol.context.inference.local.DeltaBand
+::: commol.CalibrationProblem
 
-::: commol.context.calibration.CalibrationProblem
+::: commol.Quantile
 
-::: commol.context.calibration.Quantile
-
-::: commol.context.calibration.ObservedDataPoint
-
-## Observation models
-
-Guide: [Observation Models](../guide/uncertainty/observation-models.md).
-
-::: commol.context.observation_models.NormalObservations
-
-::: commol.context.observation_models.LogNormalObservations
-
-::: commol.context.observation_models.StudentTObservations
-
-::: commol.context.observation_models.PoissonObservations
-
-::: commol.context.observation_models.NegativeBinomialObservations
-
-::: commol.context.observation_models.BinomialObservations
+::: commol.ObservedDataPoint
 
 ## Unknowns, optimizers and results
 
-::: commol.context.calibration.CalibrationParameter
+::: commol.CalibrationParameter
 
-::: commol.context.calibration.CalibrationConstraint
+::: commol.CalibrationConstraint
 
-::: commol.context.calibration.NelderMeadConfig
+::: commol.NelderMeadConfig
 
-::: commol.context.calibration.ParticleSwarmConfig
+::: commol.ParticleSwarmConfig
 
-::: commol.context.calibration.CalibrationResult
+::: commol._fit.result.CalibrationResult
 
-::: commol.context.calibration.StartSummary
+::: commol._fit.result.StartSummary
 
-::: commol.context.calibration.CalibrationHistory
+::: commol._fit.result.CalibrationHistory
 
-::: commol.context.calibration.CalibrationEvaluation
+::: commol._fit.result.CalibrationEvaluation

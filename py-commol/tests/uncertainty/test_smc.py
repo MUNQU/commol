@@ -14,37 +14,35 @@ import pytest
 from pydantic import ValidationError
 
 from commol import (
-    BootstrapCoverageEta,
-    InformationMatchingEta,
-    ABCRejection,
-    ABCSMC,
-    BayesianBootstrap,
     CalibrationConstraint,
     CalibrationProblem,
     Calibrator,
-    GibbsPosterior,
-    LossDistance,
     NelderMeadConfig,
     ObservedDataPoint,
-    Priors,
-    Sandwich,
-    SeriesDistance,
     Simulation,
 )
-from commol.context.inference.local import (
-    SandwichResult,
+from commol.distributions import Priors
+from commol.local import Sandwich
+from commol.local.results import SandwichResult
+from commol.resampling import BayesianBootstrap
+from commol.smc import (
+    ABCSMC,
+    ABCRejection,
+    BootstrapCoverageEta,
+    GibbsPosterior,
+    InformationMatchingEta,
+    LossDistance,
+    SeriesDistance,
 )
-from commol.context.inference.smc import (
-    SMCResult,
-)
+from commol.smc.results import SMCResult
 from tests.support import (
+    TWO_WELLS_FIT,
     a_to_b_builder,
     bounded,
     build,
     build_stochastic,
     flow_calibrator,
     flow_observations,
-    TWO_WELLS_FIT,
     two_wells_calibrator,
 )
 

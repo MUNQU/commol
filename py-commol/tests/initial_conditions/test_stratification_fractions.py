@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from commol import Aggregate
-from commol.context.model import Model
+from commol._model.model import Model
 from tests.support import (
     a_to_b_builder,
     build,

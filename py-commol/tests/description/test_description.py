@@ -3,7 +3,7 @@
 import pytest
 
 from commol import Complete, Groups
-from commol.context.description import (
+from commol._model.description import (
     Equations,
     Matrix,
     ModelDescription,
@@ -11,7 +11,7 @@ from commol.context.description import (
     Table,
     Text,
 )
-from commol.context.model import Model
+from commol._model.model import Model
 from tests.support import abc_builder, build, build_ode
 from tests.support.kinds import DecayStructure, decay_model
 

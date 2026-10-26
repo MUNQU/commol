@@ -26,10 +26,9 @@ Rust engine builds and runs it.
 User code
   |
   v
-py-commol/commol/api/        ModelBuilder, Simulation, Calibrator, reports
-  |
-  v
-py-commol/commol/context/    Pydantic model: validation and serialization
+py-commol/commol/            the root commol (build, simulate, calibrate) and one
+                             module per page of the guide (commol.resampling, ...):
+                             Pydantic models for validation and serialization
   |
   |  the JSON of model_dump(): the model, a calibration problem, each method
   v
@@ -51,8 +50,8 @@ crates/commol-inference/     parameter sample, predictive, scores
 
 | It is | Evidence |
 |---|---|
-| A Python library with a fluent builder of the process | `py-commol/commol/api/model_builder.py` |
-| A validated, serializable model definition: a header, a process, a structure and an engine | `py-commol/commol/context/` (Pydantic): `model.py`, `process.py`, `structure.py`, `aggregate.py` |
+| A Python library with a fluent builder of the process | `py-commol/commol/_model/builder.py` |
+| A validated, serializable model definition: a header, a process, a structure and an engine | `py-commol/commol/_model/` (Pydantic): `model.py`, `process.py`, `structure.py`, `aggregate.py` |
 | Generic layers that work with any model kind | `Simulation`, `Calibrator`, reports and figures use only `ModelStructure`; Rust calibration uses only `SimulationEngine` (see [Design decisions](decisions/model-kinds.md#one-interface-for-every-model-kind)) |
 | One model compiler for every engine: expansion, flows, rates, the change of one event of each flow, the right-hand side | `crates/commol-model/` |
 | A Rust difference-equations engine | `crates/commol-difference/` |
@@ -61,8 +60,8 @@ crates/commol-inference/     parameter sample, predictive, scores
 | Reproducible random numbers for stochastic engines and inference methods: the generator, replicate seeds, samplers, and a sum tree of rates that the stochastic engine of the test kind uses | `crates/commol-random/` |
 | A JIT compiler for rate expressions | `crates/commol-core/src/math_expression/jit/` (Cranelift) |
 | One copy of each numerical helper, log density and weighted statistic that calibration and inference share: `log Σ exp`, the special functions, the normal, log-normal and Student t densities, the one quantile, the weighted summary | `crates/commol-statistics/` |
-| A calibration problem in layers: the forward model, the observation operator, feasibility, the discrepancy and the optimization objective; optimizers from one or several starts | `crates/commol-calibration/`, `py-commol/commol/api/calibrator.py` |
-| What every uncertainty method returns or reads: a weighted parameter sample, its predictive, scores, one entry point | `crates/commol-inference/`, `py-commol/commol/api/inference/`, `py-commol/commol/context/inference/` |
+| A calibration problem in layers: the forward model, the observation operator, feasibility, the discrepancy and the optimization objective; optimizers from one or several starts | `crates/commol-calibration/`, `py-commol/commol/_calibration/calibrator.py` |
+| What every uncertainty method returns or reads: a weighted parameter sample, its predictive, scores, one entry point | `crates/commol-inference/`, `py-commol/commol/uncertainty/`, `py-commol/commol/scores/`, one module per family of methods (`py-commol/commol/resampling/`, …) |
 
 ## What Commol is not
 
@@ -77,7 +76,7 @@ crates/commol-inference/     parameter sample, predictive, scores
 
 | Term | What it is | Where |
 |---|---|---|
-| Process | What changes and how, written once for every kind: bins, accumulators, stratifications, transitions. | `Process` (`crates/commol-core/src/types/process.rs`, `context/process.py`); `Model.process` |
+| Process | What changes and how, written once for every kind: bins, accumulators, stratifications, transitions. | `Process` (`crates/commol-core/src/types/process.rs`, `_model/process.py`); `Model.process` |
 | Model kind | How the process is laid out: the kind of its `structure`. `aggregate`: the bins expanded over the stratifications into compartments, each holding an amount. A **variant** is a narrower form of a structure with the same kind and engines. | `ModelKind` (`crates/commol-core/src/types/engine.rs`); `ModelStructure` and its subclasses in Python |
 | Engine | A method: how a model advances along the axis, and what a rate means: `DifferenceEquations`, `DifferentialEquations`, `StochasticEvents`, `StochasticSteps`. | `EngineType`, the one list (`commol-core/src/types/engine.rs`); `Model.engine` |
 
@@ -89,7 +88,7 @@ of its kind.
 
 ```text
 ModelBuilder ... .build(Aggregate(...), engine)
-                                   -> commol.context.Model[Aggregate]
+                                   -> commol._model.model.Model[Aggregate]
                                       (Pydantic validation; the engine's list
                                       checks model.engine and its kind; the
                                       structure checks itself against the process)
@@ -110,7 +109,7 @@ Simulation.run(n) / run_at(at)     -> difference: X += derivatives, once per ste
                                       (a stochastic engine: set_seed, then reset)
 Simulation.replicates(count).run(…) -> Engine.run_replicates: one seed per replicate,
                                       run in parallel (run_replicates, in the rayon
-                                      pool of commol.threads: parallel, Parallelism)
+                                      pool of commol.parallelism.threads: parallel, Parallelism)
 Calibrator(simulation, problem)    -> commol_rs.inference.CalibrationProblem(engine, ...),
                                       built once; run() calls its optimize(...):
                                       parameters by id; values of the kind, such as
@@ -121,7 +120,7 @@ The same model functions also answer questions about a process and its
 aggregate structure without a simulation:
 `Aggregate.initial_state(process)`, `Model.describe` and the unit checker call
 `initial_state`, `transition_flows` and `expanded_outputs` of `commol_rs.model`
-through `py-commol/commol/context/_model/engine_state.py`.
+through `py-commol/commol/_model/engine_state.py`.
 
 ## Invariants
 

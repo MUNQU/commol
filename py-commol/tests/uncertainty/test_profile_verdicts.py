@@ -8,24 +8,21 @@ from commol import (
     CalibrationProblem,
     Calibrator,
     NelderMeadConfig,
-    NormalObservations,
     ObservedDataPoint,
-    ProfileLikelihood,
-    ResidualBootstrap,
     Simulation,
-    StructuralRank,
-    Threshold,
 )
-from commol.context.calibration import (
-    CalibrationResult,
-)
-from commol.context.inference.profiles import (
+from commol._fit.result import CalibrationResult
+from commol.identifiability import ProfileIdentifiability, StructuralRank
+from commol.identifiability.results import IdentifiabilityReport, ParameterVerdicts
+from commol.observations import NormalObservations
+from commol.profiles import ProfileLikelihood, Threshold
+from commol.profiles.results import (
     Profile,
     ProfileInterval,
     ProfileResult,
+    ProfileStructure,
 )
-from commol.context.inference.identifiability import ParameterVerdicts
-from commol.context.inference.profiles import ProfileStructure
+from commol.resampling import ResidualBootstrap
 from tests.support import (
     a_to_b_builder,
     abc_builder,
@@ -150,7 +147,7 @@ def _result(structure: ProfileStructure) -> ProfileResult:
     """A result whose profile of ``k1`` is flat, with `structure`."""
     return ProfileResult(
         fit=CalibrationResult(
-            best_parameters={"k1": 1.0, "s": 1.0},
+            best_parameters={"k1": 1.0, "s": 1.0, "k2": 0.1},
             final_loss=2.0,
             iterations=10,
             converged=True,
@@ -165,6 +162,11 @@ def _result(structure: ProfileStructure) -> ProfileResult:
         structure={"k1": structure},
         tolerance=1e-6,
     )
+
+
+def _profiled(calibrator: Calibrator, result: ProfileResult) -> IdentifiabilityReport:
+    """The identifiability report of the profiles of `result`."""
+    return calibrator.identifiability(ProfileIdentifiability(result=result))
 
 
 class TestShapes:
@@ -205,7 +207,7 @@ class TestShapes:
         assert result.verdicts["k1"] == "structurally_non_identifiable"
         assert result.structure["k1"].verdict == "in_combination"
         assert result.structure["k1"].compensated_by == ["s"]
-        report = result.identifiability()
+        report = _profiled(calibrator, result)
         assert report.parameters == ["k1", "s", "k2"]
         structural = report.verdicts["k1"].structural
         assert structural is not None
@@ -241,7 +243,7 @@ class TestShapes:
         assert lower is not None and 9.0 < lower < 10.0
         assert result.verdicts["tau"] == "practically_non_identifiable"
         assert result.structure["tau"].undetermined == "not_flat"
-        practical = result.identifiability().verdicts["tau"].practical
+        practical = _profiled(calibrator, result).verdicts["tau"].practical
         assert practical is not None
         assert practical.verdict == "poorly_determined"
 
@@ -262,7 +264,7 @@ class TestShapes:
             "'c'" in note and "below the numerical tolerance" in note
             for note in result.notes
         )
-        assert result.identifiability().verdicts["c"].practical is None
+        assert _profiled(calibrator, result).verdicts["c"].practical is None
 
     def test_a_refit_below_the_fit_is_noted(self) -> None:
         # Three iterations of Nelder-Mead leave the fit far from the optimum;
@@ -307,7 +309,7 @@ class TestStructure:
         rank = calibrator.identifiability(
             StructuralRank(points=5, design="observations")
         )
-        merged = rank.merge(result.identifiability())
+        merged = rank.merge(_profiled(calibrator, result))
         for name in ("k1", "s"):
             structural = merged.verdicts[name].structural
             assert structural is not None
@@ -333,7 +335,7 @@ class TestStructure:
         rank = calibrator.identifiability(
             StructuralRank(points=5, design="observations")
         )
-        merged = rank.merge(result.identifiability())
+        merged = rank.merge(_profiled(calibrator, result))
         structural = merged.verdicts["k3"].structural
         assert structural is not None
         assert structural.verdict == "non_identifiable"
@@ -385,7 +387,7 @@ class TestStructure:
         assert result.structure["k2"].compensated_by == ["k1"]
         rank_verdict = rank.verdicts["k2"].structural
         assert rank_verdict is not None and rank_verdict.verdict == "non_identifiable"
-        merged = rank.merge(result.identifiability()).verdicts["k2"].structural
+        merged = rank.merge(_profiled(calibrator, result)).verdicts["k2"].structural
         assert merged is not None and merged.verdict == "conflicting"
 
     def test_a_stochastic_engine_gives_no_structural_verdict(self) -> None:
@@ -421,7 +423,7 @@ class TestStructure:
         assert result.verdicts["u"] == "practically_non_identifiable"
         assert result.structure["u"].verdict is None
         assert any("'u'" in note and "stochastic" in note for note in result.notes)
-        report = result.identifiability()
+        report = _profiled(calibrator, result)
         assert report.verdicts["u"].structural is None
 
 
@@ -469,7 +471,7 @@ class TestDefaults:
         assert result.verdicts["k1"] == "practically_non_identifiable"
         assert result.structure["k1"].verdict is None
         assert (
-            result.identifiability().verdicts["k1"].practical.verdict
+            _profiled(calibrator, result).verdicts["k1"].practical.verdict
             == "poorly_determined"
         )
 
@@ -529,7 +531,7 @@ class TestReport:
             )
         )
 
-        verdicts = result.identifiability().verdicts["k1"]
+        verdicts = _profiled(_guide_calibrator(), result).verdicts["k1"]
 
         assert verdicts.structural is None
         assert verdicts.practical is not None
@@ -548,7 +550,7 @@ class TestReport:
             )
         )
 
-        structural = result.identifiability().verdicts["k1"].structural
+        structural = _profiled(_guide_calibrator(), result).verdicts["k1"].structural
 
         assert structural is not None
         assert structural.verdict == "in_combination"
@@ -565,7 +567,23 @@ class TestReport:
             )
         )
 
-        reason = result.identifiability().verdicts["k1"].structural.reasons[0]
+        reason = (
+            _profiled(_guide_calibrator(), result).verdicts["k1"].structural.reasons[0]
+        )
 
         assert "compensated by" not in reason
         assert RESET in reason
+
+    def test_the_profiles_of_another_problem_are_refused(self) -> None:
+        result = _result(
+            ProfileStructure(
+                verdict=None,
+                largest_rise=None,
+                compensated_by=[],
+                joint_rise=None,
+                undetermined="undecided",
+            )
+        )
+
+        with pytest.raises(ValueError, match=r"the problem has \['c', 'B'\]"):
+            _profiled(line_calibrator(VALUES), result)

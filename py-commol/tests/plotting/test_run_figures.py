@@ -9,16 +9,10 @@ import numpy as np
 import pytest
 from matplotlib.figure import Figure
 
-from commol import (
-    ObservedDataPoint,
-    PlotConfig,
-    Simulation,
-)
-from commol.api.results import (
-    SimulationResults,
-)
-from commol.api.plotting import figures
-from commol.api.plotting.panels import _group_observed
+from commol import ObservedDataPoint, Simulation
+from commol._simulation.results import SimulationResults
+from commol.plotting import PlotConfig, figures
+from commol.plotting.panels import group_observed
 from tests.support import (
     abc_builder,
     build,
@@ -240,7 +234,7 @@ class TestRunFigures:
             ObservedDataPoint(at=10, output="C", value=10.0),
         ]
 
-        grouped = _group_observed(observed)
+        grouped = group_observed(observed)
 
         assert {name: [p.at for p in points] for name, points in grouped.items()} == {
             "B": [10, 20],

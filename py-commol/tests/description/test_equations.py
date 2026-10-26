@@ -3,9 +3,8 @@
 import pytest
 
 from commol import Aggregate
-from commol.context._model.equations import DynamicsDescription
-from commol.context.model import Model
-from tests.support.description import equation_forms
+from commol._model.equations import DynamicsDescription
+from commol._model.model import Model
 from tests.support import (
     FactoryBuilder,
     abc_builder,
@@ -13,6 +12,7 @@ from tests.support import (
     build_ode,
     build_stochastic,
 )
+from tests.support.description import equation_forms
 
 
 def _without_ab_rate() -> Model:

@@ -11,10 +11,10 @@ them with a result to name the code that made it. Guide:
 version with the commit as a local version (`0.1.0+g<first 7 characters of
 the commit>`) for a build that is not a release.
 
-Commol logs to the logger `commol` and its children, and adds only a
-`logging.NullHandler`. Your application chooses where the messages go. Guide:
+Commol logs to the logger `commol` and to one child per module, such as
+`commol.resampling`, and adds only a `logging.NullHandler`. Your application chooses where the messages go. Guide:
 [Log messages](../getting-started/quickstart.md#log-messages).
 
-::: commol.api.build_info.build_info
+::: commol.build_info
 
-::: commol.api.build_info.BuildInfo
+::: commol._build.info.BuildInfo

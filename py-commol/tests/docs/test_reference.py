@@ -2,6 +2,7 @@
 API entry, every public class writes its acronyms in capitals, and every site
 link, crate, named test and cited path exists."""
 
+import importlib
 import inspect
 import re
 import subprocess
@@ -9,8 +10,7 @@ from pathlib import Path
 
 import pytest
 
-import commol
-from tests.suite.public_surface import RESULTS
+from tests.suite.public_surface import EXPORTS, RESULTS
 from tests.support.surface import results
 
 API_DIR = Path(__file__).resolve().parents[3] / "docs" / "api"
@@ -26,15 +26,47 @@ def documented_targets() -> set[str]:
     }
 
 
+PUBLIC_NAMES = sorted(
+    (module, name) for module, names in EXPORTS.items() for name in names
+)
+"""Each public name, with the module that exports it."""
+
+
 @pytest.mark.docs
-@pytest.mark.parametrize("name", sorted(commol.__all__))
-def test_public_name_has_an_api_entry(name: str) -> None:
-    """Every name in ``commol.__all__`` has a ``:::`` entry in the API reference."""
-    obj = getattr(commol, name)
-    path = f"{obj.__module__}.{getattr(obj, '__qualname__', name)}"
+@pytest.mark.parametrize(("module", "name"), PUBLIC_NAMES)
+def test_public_name_has_an_api_entry(module: str, name: str) -> None:
+    """Every public name has a ``:::`` entry under its public path."""
+    path = f"{module}.{name}"
     assert path in documented_targets(), (
-        f"commol.{name} ({path}) has no '::: {path}' entry under docs/api/"
+        f"{path} has no '::: {path}' entry under docs/api/"
     )
+
+
+@pytest.mark.docs
+@pytest.mark.parametrize("module", sorted(set(EXPORTS) - {"commol"}))
+def test_each_module_has_its_page(module: str) -> None:
+    """Each module of a page of the guide has its page in ``docs/api/``, with
+    the entry of each of its names under the public path."""
+    page = API_DIR / f"{module.removeprefix('commol.')}.md"
+    assert page.is_file(), f"{module} has no page {page.name} in docs/api/"
+    targets = {
+        match.group("target")
+        for match in DIRECTIVE.finditer(page.read_text(encoding="utf-8"))
+    }
+    missing = sorted(
+        path
+        for path in (f"{module}.{name}" for name in EXPORTS[module])
+        if path not in targets
+    )
+    assert not missing, f"docs/api/{page.name} has no entry for {missing}"
+
+
+def public_paths() -> dict[int, str]:
+    """The public path of each exported object, by its identity."""
+    return {
+        id(getattr(importlib.import_module(module), name)): f"{module}.{name}"
+        for module, name in PUBLIC_NAMES
+    }
 
 
 def pages_of_targets() -> dict[str, set[str]]:
@@ -47,10 +79,12 @@ def pages_of_targets() -> dict[str, set[str]]:
 
 
 def pages_of(item: object, pages: dict[str, set[str]]) -> set[str]:
-    """The pages that document ``item``, by its path or by its module."""
+    """The pages that document ``item``, by its public path, its path or its
+    module."""
     module = getattr(item, "__module__", "")
     path = f"{module}.{getattr(item, '__qualname__', '')}"
-    return pages.get(path, set()) | pages.get(module, set())
+    public = public_paths().get(id(item), path)
+    return pages.get(public, set()) | pages.get(path, set()) | pages.get(module, set())
 
 
 @pytest.mark.docs
@@ -75,17 +109,19 @@ def test_each_result_is_on_the_page_of_its_object() -> None:
 
 @pytest.mark.docs
 def test_every_public_name_is_on_the_api_index() -> None:
-    """The table of ``docs/api/index.md`` names every name in ``commol.__all__``."""
+    """The tables of ``docs/api/index.md`` name every public name."""
     index = (API_DIR / "index.md").read_text(encoding="utf-8")
-    missing = [name for name in commol.__all__ if f"`{name}`" not in index]
+    missing = [name for _, name in PUBLIC_NAMES if f"`{name}`" not in index]
     assert not missing, f"docs/api/index.md does not name: {missing}"
 
 
 @pytest.mark.docs
 def test_no_public_name_is_private() -> None:
-    """No name of ``commol.__all__`` starts with ``_``."""
-    private = [name for name in commol.__all__ if name.startswith("_")]
-    assert not private, f"commol.__all__ exports private names: {private}"
+    """No public name starts with ``_``."""
+    private = [
+        f"{module}.{name}" for module, name in PUBLIC_NAMES if name.startswith("_")
+    ]
+    assert not private, f"The modules export private names: {private}"
 
 
 ACRONYMS = ("ABC", "SMC", "ODE", "PRCC", "PSO")
@@ -100,8 +136,8 @@ def test_public_names_capitalize_acronyms() -> None:
         name: [
             mixed[word] for word in re.findall(r"[A-Z][a-z0-9]+", name) if word in mixed
         ]
-        for name in commol.__all__
-        if inspect.isclass(getattr(commol, name))
+        for module, name in PUBLIC_NAMES
+        if inspect.isclass(getattr(importlib.import_module(module), name))
     }
     offending = {name: words for name, words in found.items() if words}
     assert not offending, (

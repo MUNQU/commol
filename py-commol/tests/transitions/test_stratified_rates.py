@@ -3,16 +3,15 @@
 import pytest
 from pydantic import ValidationError
 
-from commol import StratificationCondition, StratifiedRate
-from commol import Aggregate, Simulation
+from commol import Aggregate, Simulation, StratificationCondition, StratifiedRate
 from tests.support import (
+    ENGINE_REL,
     FactoryBuilder,
     a_to_b_builder,
-    ENGINE_REL,
+    abc_builder,
     assert_close,
     build,
     reference_run,
-    abc_builder,
     stratify,
     total,
 )

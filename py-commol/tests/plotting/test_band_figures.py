@@ -9,11 +9,9 @@ from commol import (
     Calibrator,
     NelderMeadConfig,
     ObservedDataPoint,
-    ParameterSample,
-    Predictive,
-    SampleMethod,
     Simulation,
 )
+from commol.uncertainty import ParameterSample, Predictive, SampleMethod
 from tests.support import (
     a_to_b_builder,
     bounded,

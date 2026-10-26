@@ -10,8 +10,9 @@ one state, so a test can compare it with the equations of its source.
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 
-from commol import Aggregate, ODESolver, Simulation
-from commol.context.model import Model
+from commol import Aggregate, Simulation
+from commol._model.model import Model
+from commol.engines import ODESolver
 
 from .models import TIGHT, FactoryBuilder, build, build_ode
 

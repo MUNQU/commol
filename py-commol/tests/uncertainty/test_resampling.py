@@ -16,39 +16,24 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from commol import (
+from commol import Calibrator, ObservedDataPoint
+from commol.commol_rs import _commol_rs as commol_rs
+from commol.conformal import JackknifePlus, RollingConformal
+from commol.conformal.results import ConformalResult
+from commol.distributions import Priors
+from commol.observations import LogNormalObservations, NoNoise, ResidualNoise
+from commol.profiles import ProfileLikelihood, Threshold
+from commol.profiles.results import ProfileResult
+from commol.resampling import (
     BayesianBootstrap,
     BlockJackknife,
-    BootstrapCoverageEta,
-    Calibrator,
-    GibbsPosterior,
-    JackknifePlus,
-    LogNormalObservations,
-    NoNoise,
-    ObservedDataPoint,
-    Predictive,
-    Priors,
-    ProfileLikelihood,
     ResidualBootstrap,
-    ResidualNoise,
-    RollingConformal,
-    Threshold,
     WildBootstrap,
 )
-from commol.context.inference.resampling import (
-    BootstrapResult,
-    JackknifeResult,
-)
-from commol.context.inference.conformal import (
-    ConformalResult,
-)
-from commol.context.inference.smc import (
-    GibbsResult,
-)
-from commol.context.inference.profiles import (
-    ProfileResult,
-)
-from commol.commol_rs import _commol_rs as commol_rs
+from commol.resampling.results import BootstrapResult, JackknifeResult
+from commol.smc import BootstrapCoverageEta, GibbsPosterior
+from commol.smc.results import GibbsResult
+from commol.uncertainty import Predictive
 from tests.support import flow_calibrator, flow_observations, line_calibrator
 
 
@@ -415,7 +400,7 @@ def test_every_method_lists_its_failed_replicates_in_failed(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    with caplog.at_level(logging.WARNING, logger="commol.api.inference"):
+    with caplog.at_level(logging.WARNING, logger="commol"):
         result = run(monkeypatch)
 
     failed = result.failed

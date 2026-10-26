@@ -4,8 +4,8 @@ import math
 
 import pytest
 
-from commol.context._model import engine_state
-from commol.context.model import Model
+from commol._model import engine_state
+from commol._model.model import Model
 from tests.support import a_to_b_builder, build, run
 
 GROUP_AND_TYPE = {

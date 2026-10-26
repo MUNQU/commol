@@ -22,7 +22,7 @@ Python asks the list (`commol_rs.engine.EngineType`): it builds the engine,
 writes the left-hand side of an equation and the schedule of a description,
 and checks settings through it, and
 never branches on an engine name. It keeps the names of the engines only as
-the `Literal` `EngineName` (`context/engine.py`), for static typing and
+the `Literal` `EngineName` (`engines/engine.py`), for static typing and
 completion of `ModelBuilder.build`; a test checks that it equals the entries of
 the list (`test_the_python_names_equal_the_engines_of_the_list`). `ModelEngine.type` is a `str` that
 the list checks, so a model can name an engine of any kind; its settings are read

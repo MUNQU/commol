@@ -6,23 +6,15 @@ from collections.abc import Callable
 
 import pytest
 
-import commol
-from commol import (
-    BayesianBootstrap,
-    BlockJackknife,
-    Calibrator,
-    GibbsPosterior,
-    InputSpace,
-    Predictive,
-    Priors,
-    ProfileLikelihood,
-    SensitivityAnalysis,
-    Simulation,
-    Sobol,
-    Threshold,
-    ValueAt,
-)
-from commol.api.parallelism import Levels
+from commol import Calibrator, Simulation, parallelism
+from commol.distributions import Priors
+from commol.parallelism.threads import Levels
+from commol.profiles import ProfileLikelihood, Threshold
+from commol.quantities import ValueAt
+from commol.resampling import BayesianBootstrap, BlockJackknife
+from commol.sensitivity import InputSpace, SensitivityAnalysis, Sobol
+from commol.smc import GibbsPosterior
+from commol.uncertainty import Predictive
 from tests.support import (
     abc_swarm_calibrator,
     assert_on_threads_of_setting,
@@ -40,25 +32,28 @@ LEVELS: tuple[Levels, ...] = ("all", "outer")
 def test_a_thread_limit_below_one_is_rejected() -> None:
     for value in (0, -2):
         with pytest.raises(ValueError, match=f"at least 1, got {value}"):
-            commol.set_threads(value)
+            parallelism.set_threads(value)
         with pytest.raises(ValueError, match=f"at least 1, got {value}"):
-            with commol.threads(value):
+            with parallelism.threads(value):
                 pass
     with pytest.raises(
         ValueError, match="unknown variant `inner`, expected `all` or `outer`"
     ):
-        commol.set_threads(2, levels="inner")  # type: ignore[arg-type]
+        parallelism.set_threads(2, levels="inner")  # type: ignore[arg-type]
 
 
 def test_a_setting_holds_in_its_block_and_its_context() -> None:
-    cores_of_machine = commol.get_threads()
-    with commol.threads(3, levels="outer"):
-        assert (commol.get_threads(), commol.get_levels()) == (3, "outer")
-        with commol.threads(levels="all"):
-            assert (commol.get_threads(), commol.get_levels()) == (3, "all")
-        commol.set_threads(5)
-        assert (commol.get_threads(), commol.get_levels()) == (5, "outer")
-    assert (commol.get_threads(), commol.get_levels()) == (cores_of_machine, "all")
+    cores_of_machine = parallelism.get_threads()
+    with parallelism.threads(3, levels="outer"):
+        assert (parallelism.get_threads(), parallelism.get_levels()) == (3, "outer")
+        with parallelism.threads(levels="all"):
+            assert (parallelism.get_threads(), parallelism.get_levels()) == (3, "all")
+        parallelism.set_threads(5)
+        assert (parallelism.get_threads(), parallelism.get_levels()) == (5, "outer")
+    assert (parallelism.get_threads(), parallelism.get_levels()) == (
+        cores_of_machine,
+        "all",
+    )
 
 
 def _bootstrap_predictive(calibrator: Calibrator) -> object:
@@ -122,7 +117,7 @@ def test_every_parallel_method_runs_on_the_threads_of_the_setting(
 ) -> None:
     calibrator = decay_swarm_calibrator(swarm(8, 10))
 
-    with commol.threads(limit, levels=levels):
+    with parallelism.threads(limit, levels=levels):
         threads = threads_of_runs(lambda: method(calibrator))
 
     # A parallel loop outside the pool of the setting runs on the threads
@@ -133,7 +128,7 @@ def test_every_parallel_method_runs_on_the_threads_of_the_setting(
 def test_a_parallel_swarm_keeps_every_evaluation() -> None:
     calibrator = abc_swarm_calibrator(swarm(10, 8, mutation=False))
 
-    with commol.threads(4, levels="all"):
+    with parallelism.threads(4, levels="all"):
         history = calibrator.run_with_history()
 
     # Every point is feasible: 10 particles at the start and in each of 8
@@ -145,9 +140,9 @@ def test_a_parallel_swarm_keeps_every_evaluation() -> None:
 def test_a_parallel_swarm_records_in_the_order_of_the_particles() -> None:
     calibrator = abc_swarm_calibrator(swarm())
 
-    with commol.threads(4, levels="outer"):
+    with parallelism.threads(4, levels="outer"):
         sequential = calibrator.run_with_history()
-    with commol.threads(4, levels="all"):
+    with parallelism.threads(4, levels="all"):
         parallel = calibrator.run_with_history()
 
     assert parallel.evaluations == sequential.evaluations
@@ -175,9 +170,9 @@ def test_a_seed_gives_one_result_whatever_the_threads_and_the_level() -> None:
             calibrator.uncertainty(gibbs),
         )
 
-    with commol.threads(1, levels="outer"):
+    with parallelism.threads(1, levels="outer"):
         first = results()
     for threads in (1, 2, 3, 8):
         for levels in LEVELS:
-            with commol.threads(threads, levels=levels):
+            with parallelism.threads(threads, levels=levels):
                 assert results() == first, (threads, levels)

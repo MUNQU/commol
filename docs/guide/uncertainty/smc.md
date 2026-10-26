@@ -18,20 +18,17 @@ how the observations scatter.
 import numpy as np
 
 from commol import (
-    ABCSMC,
     Aggregate,
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
-    GibbsPosterior,
-    InformationMatchingEta,
-    LossDistance,
     ModelBuilder,
     NelderMeadConfig,
     ObservedDataPoint,
-    Priors,
     Simulation,
 )
+from commol.smc import ABCSMC, GibbsPosterior, InformationMatchingEta, LossDistance
+from commol.distributions import Priors
 
 
 def flow_model(engine: str):
@@ -124,7 +121,7 @@ distribution function of a number of the commol generator, so a seed gives
 the same draws on every platform.
 
 ```python
-from commol import Gamma, Normal
+from commol.distributions import Gamma, Normal
 
 bounds = (0.0, 30.0)
 print(round(Normal(mean=10.0, sd=2.0).cdf(10.0, bounds), 3))  # 0.5
@@ -263,7 +260,7 @@ code with no move: it draws from the priors and keeps the closest share
 `quantile` of the draws.
 
 ```python
-from commol import ABCRejection
+from commol.smc import ABCRejection
 
 rejection = calibrator.uncertainty(
     ABCRejection(

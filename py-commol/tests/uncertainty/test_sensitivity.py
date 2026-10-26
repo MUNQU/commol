@@ -7,33 +7,27 @@ from typing import assert_type
 
 import pytest
 
-from commol import (
-    Calibrator,
-    Gain,
+from commol import Calibrator, Simulation
+from commol.distributions import Normal, Uniform
+from commol.quantities import Gain, Peak, Trajectory, ValueAt
+from commol.quantities.quantities import _Quantity
+from commol.sensitivity import (
+    PRCC,
     InputSpace,
     Morris,
-    Normal,
-    ParameterSample,
-    Peak,
     PolynomialChaos,
-    PRCC,
     Propagation,
-    SampleMethod,
     SensitivityAnalysis,
-    Simulation,
     Sobol,
-    Trajectory,
-    Uniform,
-    ValueAt,
 )
-from commol.context.inference.global_sensitivity import (
+from commol.sensitivity.results import (
     ChaosResult,
     MorrisResult,
     PRCCResult,
     PropagationResult,
     SobolResult,
 )
-from commol.context.inference.quantities import _Quantity
+from commol.uncertainty import ParameterSample, SampleMethod
 from tests.support import abc_builder, abc_rates, bounded, build
 from tests.support.models import a_to_b_builder, build_stochastic
 
@@ -124,7 +118,7 @@ class TestAnalysis:
     def test_with_no_seed_one_is_drawn_and_logged(
         self, simulation: Simulation, caplog: pytest.LogCaptureFixture
     ) -> None:
-        with caplog.at_level(logging.INFO, logger="commol.api.sensitivity"):
+        with caplog.at_level(logging.INFO, logger="commol.sensitivity"):
             analysis = SensitivityAnalysis(simulation, abc_rates())
         method = PRCC(draws=10, quantities=[ValueAt(series="B", at=5)])
 

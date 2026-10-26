@@ -1,24 +1,24 @@
-"""Compartment models with a Rust engine: build, simulate and calibrate them."""
+"""Compartment models with a Rust engine: build, simulate and calibrate them.
+
+The root holds the main flow: build a model, choose its structure, simulate
+it and calibrate it. Every other public name lives in the module of its page
+of the guide, such as `commol.resampling` or `commol.plotting`.
+"""
 
 import logging
 
-from commol.api import (
-    AxisPattern,
-    Calibrator,
-    ModelBuilder,
-    SensitivityAnalysis,
-    Simulation,
-    member_statistics,
-    weighted_quantiles,
-)
-from commol.api.build_info import build_info
-from commol.api.inference import Predictive, Scenarios
-from commol.api.parallelism import get_levels, get_threads, set_threads, threads
-from commol.api.plotting.compared import plot_compared
-from commol.commol_rs._commol_rs import engine as _engine
-from commol.context import Aggregate, Complete, Groups, Model
-from commol.context.axis_units import AxisUnits
-from commol.context.calibration import (
+from commol._build.info import build_info
+from commol._calibration.calibrator import Calibrator
+from commol._model.aggregate import Aggregate
+from commol._model.axis_units import AxisUnits
+from commol._model.builder import ModelBuilder
+from commol._model.model import Model
+from commol._model.neighbors import Complete, Groups
+from commol._model.parameter import SeriesValue
+from commol._model.patterns import AxisPattern
+from commol._model.stratification_condition import StratificationCondition
+from commol._model.transition import StratifiedRate
+from commol._problem.problem import (
     CalibrationConstraint,
     CalibrationParameter,
     CalibrationProblem,
@@ -27,83 +27,8 @@ from commol.context.calibration import (
     ParticleSwarmConfig,
     Quantile,
 )
-from commol.context.engine import (
-    ODESolver,
-    StochasticEventsSettings,
-    StochasticStepsSettings,
-)
-from commol.context.inference import (
-    ABCRejection,
-    ABCSMC,
-    AdaptiveConformal,
-    BayesianBootstrap,
-    BayesianPosterior,
-    Beta,
-    BlockJackknife,
-    BootstrapCoverageEta,
-    Collinearity,
-    DistributionNoise,
-    EnbPI,
-    Gain,
-    Gamma,
-    GibbsPosterior,
-    GibbsTarget,
-    Increments,
-    InformationMatchingEta,
-    InputSpace,
-    JackknifePlus,
-    Laplace,
-    LaplaceMixture,
-    Level,
-    LikelihoodTarget,
-    LogNormal,
-    LogUniform,
-    LossDistance,
-    Morris,
-    NoNoise,
-    Normal,
-    ParameterSample,
-    ParametricBootstrap,
-    Peak,
-    PeakPosition,
-    PolynomialChaos,
-    PRCC,
-    PredictionProfile,
-    PredictionSpec,
-    Priors,
-    ProfileLikelihood,
-    Propagation,
-    Ratio,
-    ResidualBootstrap,
-    ResidualNoise,
-    RollingConformal,
-    SampleIdentifiability,
-    SampleMethod,
-    Sandwich,
-    SeriesDistance,
-    Sobol,
-    SplitConformal,
-    StartsIdentifiability,
-    StructuralRank,
-    Threshold,
-    Trajectory,
-    Uniform,
-    ValueAt,
-    WildBootstrap,
-    quantity_schedule,
-)
-from commol.context.observation_models import (
-    BinomialObservations,
-    LogNormalObservations,
-    NegativeBinomialObservations,
-    NormalObservations,
-    PoissonObservations,
-    StudentTObservations,
-)
-from commol.context.parameter import SeriesValue
-from commol.context.stratification_condition import StratificationCondition
-from commol.context.transition import StratifiedRate
-from commol.context.visualization import PlotConfig
+from commol._simulation.simulation import Simulation
+from commol.commol_rs._commol_rs import engine as _engine
 
 InfeasibleStateError = _engine.InfeasibleStateError
 """A run left the values its model allows, such as an amount below zero.
@@ -118,7 +43,7 @@ treats such a run as infeasible.
 __version__: str = build_info().version
 """The PEP 440 version of the installed commol; `build_info` adds its commit."""
 
-logging.getLogger(__name__).addHandler(logging.NullHandler())
+logging.getLogger("commol").addHandler(logging.NullHandler())
 
 
 __all__ = [
@@ -148,96 +73,4 @@ __all__ = [
     "Quantile",
     # Package
     "build_info",
-    # Engines
-    "ODESolver",
-    "StochasticEventsSettings",
-    "StochasticStepsSettings",
-    # Plotting
-    "plot_compared",
-    "PlotConfig",
-    # Parallelism
-    "set_threads",
-    "threads",
-    "get_threads",
-    "get_levels",
-    # Distributions
-    "Uniform",
-    "LogUniform",
-    "Normal",
-    "LogNormal",
-    "Beta",
-    "Gamma",
-    "Priors",
-    # Quantities of interest
-    "Level",
-    "Increments",
-    "ValueAt",
-    "Gain",
-    "Peak",
-    "PeakPosition",
-    "Trajectory",
-    "Ratio",
-    "quantity_schedule",
-    # Observation models and noise
-    "NormalObservations",
-    "LogNormalObservations",
-    "StudentTObservations",
-    "PoissonObservations",
-    "NegativeBinomialObservations",
-    "BinomialObservations",
-    "NoNoise",
-    "ResidualNoise",
-    "DistributionNoise",
-    # Uncertainty
-    "ParameterSample",
-    "SampleMethod",
-    "Predictive",
-    "Scenarios",
-    "weighted_quantiles",
-    "member_statistics",
-    # Resampling
-    "BayesianBootstrap",
-    "ParametricBootstrap",
-    "ResidualBootstrap",
-    "WildBootstrap",
-    "BlockJackknife",
-    # Profiles
-    "ProfileLikelihood",
-    "PredictionProfile",
-    "PredictionSpec",
-    "Threshold",
-    # Local approximations
-    "Laplace",
-    "Sandwich",
-    "LaplaceMixture",
-    "LikelihoodTarget",
-    "GibbsTarget",
-    # Sequential Monte Carlo
-    "GibbsPosterior",
-    "BayesianPosterior",
-    "ABCSMC",
-    "ABCRejection",
-    "InformationMatchingEta",
-    "BootstrapCoverageEta",
-    "LossDistance",
-    "SeriesDistance",
-    # Conformal prediction
-    "SplitConformal",
-    "RollingConformal",
-    "JackknifePlus",
-    "EnbPI",
-    "AdaptiveConformal",
-    # Identifiability
-    "StructuralRank",
-    "Collinearity",
-    "SampleIdentifiability",
-    "StartsIdentifiability",
-    # Sensitivity
-    "SensitivityAnalysis",
-    "InputSpace",
-    "Propagation",
-    "PRCC",
-    "Morris",
-    "Sobol",
-    "PolynomialChaos",
 ]

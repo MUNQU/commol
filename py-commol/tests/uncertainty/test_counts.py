@@ -11,11 +11,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from commol import CalibrationProblem, SensitivityAnalysis, Simulation
-from commol.api.calibrator import Calibrator
-from commol import Uniform
+from commol import CalibrationProblem, Simulation
+from commol._calibration.calibrator import Calibrator
+from commol._data.engine_json import engine_json
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context.engine_json import engine_json
+from commol.distributions import Uniform
+from commol.sensitivity import SensitivityAnalysis
 from tests.support import (
     a_to_b_builder,
     abc_builder,
@@ -50,7 +51,7 @@ def bindings() -> Bindings:
 
 
 def _problem(b: Bindings):
-    return b.calibrator._rust_problem
+    return b.calibrator._engine_problem
 
 
 def _inputs() -> str:

@@ -20,9 +20,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for the variants without blocks. See
   [Sequential Monte Carlo](../guide/uncertainty/smc.md#what-means) and
   [Conformal Prediction Intervals](../guide/uncertainty/conformal.md#results-plots-and-reports).
+- `ProfileIdentifiability(result=profiles)` in `commol.identifiability`: the
+  identifiability report of the verdicts of a `ProfileResult`, run through
+  `Calibrator.identifiability` as every identifiability method. It runs no
+  model, and it refuses the profiles of another problem with a `ValueError`
+  that names the parameters of both. See
+  [Profile Likelihood](../guide/uncertainty/profiles.md#verdicts-and-the-identifiability-report).
 
 ### Changed
 
+- **Breaking:** `Calibrator.delta_band(result, positions, confidence_level)`
+  is `LocalResult.delta_band(calibrator, positions, confidence_level)`, a
+  method of the result of `Laplace` and of `Sandwich`. `DeltaBand`
+  is documented with `commol.local`. Migration:
+  `calibrator.delta_band(laplace, [10, 20], 0.9)` is
+  `laplace.delta_band(calibrator, [10, 20], 0.9)`. See
+  [Local Approximations](../guide/uncertainty/local.md).
+- **Breaking:** `ProfileResult.identifiability()` is removed. Migration:
+  `profiles.identifiability()` is
+  `calibrator.identifiability(ProfileIdentifiability(result=profiles))`.
+
+- **Breaking:** each public name outside the main flow lives in the module of
+  its page of the guide, and the root `commol` holds only the main flow:
+  build (`ModelBuilder`, `Model`, `StratificationCondition`, `StratifiedRate`,
+  `SeriesValue`, `AxisUnits`, `AxisPattern`), the structures (`Aggregate`,
+  `Complete`, `Groups`), simulate (`Simulation`, `InfeasibleStateError`),
+  calibrate (`Calibrator`, `CalibrationProblem`, `CalibrationParameter`,
+  `CalibrationConstraint`, `ObservedDataPoint`, `NelderMeadConfig`,
+  `ParticleSwarmConfig`, `Quantile`) and `build_info`. The modules are
+  `commol.engines`, `commol.plotting`, `commol.parallelism`,
+  `commol.distributions`, `commol.quantities`, `commol.observations`,
+  `commol.uncertainty`, `commol.scores`, `commol.resampling`,
+  `commol.profiles`, `commol.local`, `commol.smc`, `commol.conformal`,
+  `commol.identifiability` and `commol.sensitivity`; the
+  [API Reference](../api/index.md) lists the names of each. The packages
+  `commol.api`, `commol.context` and `commol.utils` and the module
+  `commol.constants` are removed: the code is in the package of its module,
+  and the code of the root in private packages. Migration: `from commol
+  import BayesianBootstrap, Predictive` is `from commol.resampling import
+  BayesianBootstrap` and `from commol.uncertainty import Predictive`;
+  `commol.threads(2)` is `commol.parallelism.threads(2)`.
+- **Breaking:** each module logs as `commol.<module>`, such as
+  `commol.resampling`, and the main flow as `commol`; the loggers of the old
+  paths, such as `commol.api.calibrator`, are gone. Migration: a handler or a
+  level on `commol` still reaches every message; read one module with
+  `logging.getLogger("commol.resampling")`.
+- **Breaking:** a pickle of an object of commol 0.10 does not load: the path
+  of each class changed. Migration: save a model with `Model.to_json` and a
+  result with `model_dump_json`, which do not depend on the path.
 - **Breaking:** `ParticleSwarmConfig` is one class with plain fields, and
   its chained methods `.inertia`, `.acceleration`, `.velocity`, `.mutation`,
   `.improvement_stop` and `.radius_stop` and their `*_config` properties are

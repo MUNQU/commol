@@ -8,8 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from commol import AxisUnits
-from commol.context.model import Model
-
+from commol._model.model import Model
 from tests.support import abc_builder, build
 
 HOURS_FROM_2020 = AxisUnits(step_unit="hour", origin=date(2020, 1, 1))

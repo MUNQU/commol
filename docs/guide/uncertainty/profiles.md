@@ -23,12 +23,14 @@ from commol import (
     Calibrator,
     ModelBuilder,
     NelderMeadConfig,
-    NormalObservations,
     ObservedDataPoint,
+    Simulation,
+)
+from commol.observations import NormalObservations
+from commol.profiles import (
     PredictionProfile,
     PredictionSpec,
     ProfileLikelihood,
-    Simulation,
     Threshold,
 )
 
@@ -155,7 +157,7 @@ replicate. Any bootstrap of [Resampling](resampling.md) works, and the
 with observation models.
 
 ```python
-from commol import ResidualBootstrap
+from commol.resampling import ResidualBootstrap
 
 loss_problem = CalibrationProblem(
     observed_data=observations,
@@ -290,7 +292,8 @@ about `1e-6` from its minimum, and the profile reads practically
 non-identifiable. Its `in_combination` needs an `sd_tolerance` near `ν`, as
 the example below uses.
 
-`ProfileResult.identifiability()` turns the verdicts into an
+`ProfileIdentifiability(result=profiles)` (`commol.identifiability`), run
+through `Calibrator.identifiability`, turns the verdicts into an
 [identifiability report](identifiability.md#the-report) with a `profile`
 section, which `merge` joins with the other methods. A rate that reads
 `k1 * s` cannot tell `k1` from `s`: their profiles are flat on the ridge
@@ -309,7 +312,7 @@ merged verdict is then `conflicting`:
   be identifiable for the rank.
 
 ```python
-from commol import StructuralRank
+from commol.identifiability import ProfileIdentifiability, StructuralRank
 
 
 def product_model(k1: float | None, s: float | None, k2: float | None):
@@ -353,7 +356,9 @@ print(profiles.notes[0])
 # the bounds, not the data.
 print(profiles.structure["k1"].compensated_by)  # ['s']
 report = product.identifiability(StructuralRank(points=5, design="observations"))
-merged = report.merge(profiles.identifiability())
+merged = report.merge(
+    product.identifiability(ProfileIdentifiability(result=profiles))
+)
 print(merged.verdicts["k1"].structural.verdict, merged.verdicts["s"].structural.verdict)
 # in_combination in_combination
 ```

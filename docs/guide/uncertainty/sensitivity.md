@@ -16,18 +16,10 @@ estimator (`global_sensitivity/`), joined by `ForwardAnalysis`
 ## Quick path
 
 ```python
-from commol import (
-    Aggregate,
-    CalibrationParameter,
-    InputSpace,
-    ModelBuilder,
-    Normal,
-    Peak,
-    PRCC,
-    SensitivityAnalysis,
-    Simulation,
-    Uniform,
-)
+from commol import Aggregate, CalibrationParameter, ModelBuilder, Simulation
+from commol.sensitivity import InputSpace, PRCC, SensitivityAnalysis
+from commol.distributions import Normal, Uniform
+from commol.quantities import Peak
 
 
 def abc_model(k1: float, k2: float):
@@ -114,7 +106,7 @@ A quantity reads a series of each run and reduces it to a scalar, in Rust,
 through the observation operator of the calibration
 (`crates/commol-inference/src/quantity.rs`), so a design of thousands of runs
 never returns to Python. The quantities live in
-`commol/context/inference/quantities.py`.
+`commol/quantities/quantities.py`.
 
 | Series | Value at a position |
 |---|---|
@@ -136,7 +128,8 @@ value at the last position. The peak of `Increments` is the largest gain over
 one window, and `PeakPosition` gives the end of that window:
 
 ```python
-from commol import Increments, PeakPosition, Propagation
+from commol.quantities import Increments, PeakPosition
+from commol.sensitivity import Propagation
 
 ends = list(range(10, 101, 10))
 inflow = Increments("C", window=10)
@@ -202,7 +195,7 @@ methods too. A `PeakPosition` or a `Trajectory` as an operand is a
 position 50 has a denominator that depends on both inputs:
 
 ```python
-from commol import Gain, Ratio
+from commol.quantities import Gain, Ratio
 
 early = Ratio(
     numerator=Gain(outputs="C", start=0, end=50),
@@ -272,7 +265,7 @@ a relative tolerance of `1e-9`, as `index_at` finds it, so a window that starts
 at `0.3 - 0.1` reads the row of `0.2`.
 
 ```python
-from commol import quantity_schedule
+from commol.quantities import quantity_schedule
 
 one_run = simulation.run_at(quantity_schedule(quantities))
 for label, value in one_run.quantities(quantities).items():
@@ -314,7 +307,9 @@ a `ParameterSample`, so `Predictive(analysis, result.sample, positions)` gives
 the bands and plots of a calibration.
 
 ```python
-from commol import Predictive, Propagation, ValueAt
+from commol.uncertainty import Predictive
+from commol.sensitivity import Propagation
+from commol.quantities import ValueAt
 
 result = analysis.run(
     Propagation(draws=100, quantities=[peak, ValueAt(series="C", at=100)])
@@ -351,7 +346,7 @@ A NaN has no rank, so a quantity that is NaN at a draw raises a `ValueError`
 before PRCC ranks any value ([A quantity that is NaN](#a-quantity-that-is-nan)).
 
 ```python
-from commol import Trajectory
+from commol.quantities import Trajectory
 
 over_axis = analysis.run(
     PRCC(draws=100, quantities=[Trajectory(series="C", positions=[10, 50, 100])])
@@ -373,7 +368,7 @@ near or above `mu_star` says the effect depends on the other inputs or is not
 linear.
 
 ```python
-from commol import Morris
+from commol.sensitivity import Morris
 
 screening = analysis.run(Morris(trajectories=20, levels=4, quantities=[peak]))
 print([round(value) for value in screening.mu_star[0]], screening.runs)  # [385, 279] 60
@@ -396,7 +391,7 @@ input space from a sample raises a `ValueError` that names PRCC and
 propagation, which take it.
 
 ```python
-from commol import Sobol
+from commol.sensitivity import Sobol
 
 indices = analysis.run(
     Sobol(draws=1024, replicates=200, confidence_level=0.9, quantities=[peak])
@@ -422,7 +417,7 @@ of the model only as far as the expansion predicts it. `predict` gives the
 quantities at any input values, as a surrogate.
 
 ```python
-from commol import PolynomialChaos
+from commol.sensitivity import PolynomialChaos
 
 chaos = analysis.run(PolynomialChaos(degree=4, draws=60, quantities=[peak]))
 print(round(chaos.loo_error[0], 4), [round(s, 2) for s in chaos.total[0]])  # 0.0036 [0.61, 0.39]

@@ -108,7 +108,7 @@ command leaves those mutants out, and `--timeout` stops the others. Run
 `cargo-mutants` and `mutmut` one at a time.
 
 For Python, `mutmut` (`uv pip install mutmut`) with `[tool.mutmut]`
-`paths_to_mutate = ["commol/context/", "commol/api/"]` in a copy of
+`paths_to_mutate = ["commol/"]` in a copy of
 `py-commol/`. A missed mutant gets a test that fails on it, or a reason: an
 equivalent mutant changes no behavior. The Python suite also runs the Rust
 code, so check a Rust mutant that the Rust tests miss against `pytest`

@@ -7,79 +7,96 @@ from collections.abc import Callable
 from pydantic import BaseModel
 
 from commol import (
-    ABCSMC,
-    PRCC,
-    ABCRejection,
-    AdaptiveConformal,
-    BayesianBootstrap,
-    BayesianPosterior,
-    Beta,
-    BinomialObservations,
-    BlockJackknife,
-    BootstrapCoverageEta,
     CalibrationConstraint,
     CalibrationParameter,
     CalibrationProblem,
-    Collinearity,
-    DistributionNoise,
+    NelderMeadConfig,
+    ObservedDataPoint,
+    ParticleSwarmConfig,
+    Quantile,
+)
+from commol._fit.result import CalibrationResult
+from commol.conformal import (
+    AdaptiveConformal,
     EnbPI,
-    Gain,
-    Gamma,
-    GibbsPosterior,
-    GibbsTarget,
-    Increments,
-    InformationMatchingEta,
-    InputSpace,
     JackknifePlus,
+    RollingConformal,
+    SplitConformal,
+)
+from commol.distributions import (
+    Beta,
+    Gamma,
+    LogNormal,
+    LogUniform,
+    Normal,
+    Priors,
+    Uniform,
+)
+from commol.identifiability import (
+    Collinearity,
+    SampleIdentifiability,
+    StartsIdentifiability,
+    StructuralRank,
+)
+from commol.local import (
+    GibbsTarget,
     Laplace,
     LaplaceMixture,
     LikelihoodTarget,
-    LogNormal,
+    Sandwich,
+)
+from commol.observations import (
+    BinomialObservations,
+    DistributionNoise,
     LogNormalObservations,
-    LogUniform,
-    LossDistance,
-    Morris,
     NegativeBinomialObservations,
-    NelderMeadConfig,
     NoNoise,
-    Normal,
     NormalObservations,
-    ObservedDataPoint,
-    ParameterSample,
-    ParametricBootstrap,
-    ParticleSwarmConfig,
-    Peak,
-    PeakPosition,
     PoissonObservations,
-    PolynomialChaos,
+    ResidualNoise,
+    StudentTObservations,
+)
+from commol.profiles import (
     PredictionProfile,
     PredictionSpec,
-    Priors,
     ProfileLikelihood,
-    Propagation,
-    Quantile,
-    Ratio,
-    ResidualBootstrap,
-    ResidualNoise,
-    RollingConformal,
-    SampleIdentifiability,
-    SampleMethod,
-    Sandwich,
-    SeriesDistance,
-    Sobol,
-    SplitConformal,
-    StartsIdentifiability,
-    StructuralRank,
-    StudentTObservations,
     Threshold,
+)
+from commol.quantities import (
+    Gain,
+    Increments,
+    Peak,
+    PeakPosition,
+    Ratio,
     Trajectory,
-    Uniform,
     ValueAt,
+)
+from commol.resampling import (
+    BayesianBootstrap,
+    BlockJackknife,
+    ParametricBootstrap,
+    ResidualBootstrap,
     WildBootstrap,
 )
-from commol.context.calibration import (
-    CalibrationResult,
+from commol.sensitivity import (
+    PRCC,
+    InputSpace,
+    Morris,
+    PolynomialChaos,
+    Propagation,
+    Sobol,
 )
+from commol.smc import (
+    ABCSMC,
+    ABCRejection,
+    BayesianPosterior,
+    BootstrapCoverageEta,
+    GibbsPosterior,
+    InformationMatchingEta,
+    LossDistance,
+    SeriesDistance,
+)
+from commol.uncertainty import ParameterSample, SampleMethod
 
 PRIORS = Priors.uniform_on_bounds()
 FIT = CalibrationResult(

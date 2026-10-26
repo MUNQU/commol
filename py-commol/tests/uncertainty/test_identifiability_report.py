@@ -11,13 +11,11 @@ from commol import (
     NelderMeadConfig,
     ObservedDataPoint,
     Simulation,
-    StructuralRank,
 )
-from commol.context.inference.identifiability import (
-    IdentifiabilityReport,
-)
-from commol.context.inference.identifiability import (
+from commol.identifiability import StructuralRank
+from commol.identifiability.results import (
     CollinearitySection,
+    IdentifiabilityReport,
     ParameterVerdicts,
     PracticalVerdict,
     PracticalVerdictName,

@@ -7,28 +7,21 @@ from collections.abc import Callable
 import numpy as np
 import pytest
 
-from commol import (
-    BayesianBootstrap,
-    BootstrapCoverageEta,
-    InputSpace,
-    ObservedDataPoint,
+from commol import ObservedDataPoint, Simulation
+from commol.conformal import SplitConformal
+from commol.profiles import Threshold
+from commol.quantities import ValueAt
+from commol.resampling import BayesianBootstrap
+from commol.resampling.results import BootstrapResult
+from commol.sensitivity import InputSpace, SensitivityAnalysis, Sobol
+from commol.sensitivity.results import PropagationResult
+from commol.smc import BootstrapCoverageEta
+from commol.uncertainty import (
     ParameterSample,
     SampleMethod,
     Scenarios,
-    SensitivityAnalysis,
-    Simulation,
-    Sobol,
-    SplitConformal,
-    Threshold,
-    ValueAt,
     member_statistics,
     weighted_quantiles,
-)
-from commol.context.inference.resampling import (
-    BootstrapResult,
-)
-from commol.context.inference.global_sensitivity import (
-    PropagationResult,
 )
 from tests.support import abc_builder, bounded, build
 

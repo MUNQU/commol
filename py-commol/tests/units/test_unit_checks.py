@@ -3,8 +3,8 @@
 import pint
 import pytest
 
-from commol.context.parameter import Parameter
-from commol.utils.equations import (
+from commol._model.parameter import Parameter
+from commol._model.unit_checks import (
     check_all_parameters_have_units,
     check_equation_units,
     get_predefined_variable_units,

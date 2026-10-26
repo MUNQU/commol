@@ -1,12 +1,12 @@
 """Per-compartment initial conditions: the type, the builder and the model."""
 
+from collections.abc import Mapping
+
 import pytest
 from pydantic import ValidationError
 
-from collections.abc import Mapping
-
 from commol import Aggregate, Simulation
-from commol.context.model import Model
+from commol._model.model import Model
 from tests.support import (
     FactoryBuilder,
     a_to_b_builder,

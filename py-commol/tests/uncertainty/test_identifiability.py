@@ -5,29 +5,22 @@ import pytest
 from pydantic import ValidationError
 
 from commol import (
-    Beta,
     CalibrationProblem,
     Calibrator,
-    Collinearity,
-    Gamma,
     NelderMeadConfig,
-    Normal,
     ObservedDataPoint,
-    ParameterSample,
-    Priors,
-    SampleIdentifiability,
-    SampleMethod,
     Simulation,
+)
+from commol._fit.result import CalibrationResult, StartSummary
+from commol.distributions import Beta, Gamma, Normal, Priors
+from commol.identifiability import (
+    Collinearity,
+    SampleIdentifiability,
     StartsIdentifiability,
     StructuralRank,
 )
-from commol.context.calibration import (
-    CalibrationResult,
-    StartSummary,
-)
-from commol.context.inference.identifiability import (
-    PracticalVerdict,
-)
+from commol.identifiability.results import PracticalVerdict
+from commol.uncertainty import ParameterSample, SampleMethod
 from tests.support import (
     abc_builder,
     bounded,

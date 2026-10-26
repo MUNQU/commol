@@ -8,38 +8,25 @@ import pytest
 from pydantic import ValidationError
 
 from commol import (
-    BlockJackknife,
-    BootstrapCoverageEta,
     CalibrationConstraint,
     CalibrationProblem,
     Calibrator,
-    EnbPI,
-    GibbsPosterior,
-    InputSpace,
-    LogNormalObservations,
-    Laplace,
     NelderMeadConfig,
-    NormalObservations,
     ObservedDataPoint,
     ParticleSwarmConfig,
-    PolynomialChaos,
-    Priors,
-    ProfileLikelihood,
-    Ratio,
-    ResidualBootstrap,
-    SensitivityAnalysis,
     Simulation,
-    Sobol,
-    SplitConformal,
-    StructuralRank,
-    Threshold,
-    ValueAt,
 )
-from commol.context.inference.method import (
-    SensitivityMethod,
-    UncertaintyMethod,
-)
-from commol.api.inference.registry import register, registered
+from commol._calibration.method import SensitivityMethod, UncertaintyMethod
+from commol.conformal import EnbPI, SplitConformal
+from commol.distributions import Priors
+from commol.identifiability import StructuralRank
+from commol.local import Laplace
+from commol.observations import LogNormalObservations, NormalObservations
+from commol.profiles import ProfileLikelihood, Threshold
+from commol.quantities import Ratio, ValueAt
+from commol.resampling import BlockJackknife, ResidualBootstrap
+from commol.sensitivity import InputSpace, PolynomialChaos, SensitivityAnalysis, Sobol
+from commol.smc import BootstrapCoverageEta, GibbsPosterior
 from tests.support import (
     a_to_b_builder,
     abc_builder,
@@ -51,14 +38,14 @@ from tests.support import (
     line_calibrator,
     rate_calibrator,
 )
-from tests.support.methods import StartsResult, StartsSample, run_starts_sample
+from tests.support.methods import StartsResult, StartsSample
 
 
-class Unregistered(UncertaintyMethod[StartsResult]):
+class NoRunner(UncertaintyMethod[StartsResult]):
     """A method with no runner."""
 
 
-class UnregisteredSensitivity(SensitivityMethod[StartsResult]):
+class NoRunnerSensitivity(SensitivityMethod[StartsResult]):
     """A sensitivity method with no runner."""
 
 
@@ -74,18 +61,11 @@ class TestEntryPoint:
         assert result.sample.method.settings == {"starts": 3}
         assert result.sample.names == ["k1", "k2"]
 
-    def test_an_unregistered_configuration_names_the_registered_ones(
+    def test_a_configuration_with_no_runner_says_so(
         self, calibrator: Calibrator
     ) -> None:
-        with pytest.raises(ValueError, match=r"Unregistered.*StartsSample"):
-            calibrator.uncertainty(Unregistered())
-
-    def test_a_type_has_one_runner(self) -> None:
-        with pytest.raises(ValueError, match="already has a runner"):
-            register(StartsSample, run_starts_sample)
-
-    def test_the_registry_lists_its_types(self) -> None:
-        assert "StartsSample" in registered()
+        with pytest.raises(ValueError, match=r"NoRunner declares no runner"):
+            calibrator.uncertainty(NoRunner())
 
     def test_each_entry_point_refuses_the_other_kinds(
         self, calibrator: Calibrator
@@ -102,11 +82,11 @@ class TestEntryPoint:
                 StructuralRank(points=2, design="observations")  # ty: ignore[invalid-argument-type]
             )
         with pytest.raises(TypeError, match=r"SensitivityAnalysis\.run"):
-            calibrator.uncertainty(UnregisteredSensitivity())  # ty: ignore[invalid-argument-type]
+            calibrator.uncertainty(NoRunnerSensitivity())  # ty: ignore[invalid-argument-type]
         with pytest.raises(TypeError, match=r"Calibrator\.uncertainty"):
             analysis.run(StartsSample(starts=2))  # ty: ignore[invalid-argument-type]
-        with pytest.raises(ValueError, match=r"No method is registered"):
-            analysis.run(UnregisteredSensitivity())
+        with pytest.raises(ValueError, match=r"NoRunnerSensitivity declares no runner"):
+            analysis.run(NoRunnerSensitivity())
 
 
 VALUE = ValueAt(series="B", at=5)

@@ -10,33 +10,30 @@ import numpy as np
 import pytest
 
 import commol
-import commol.api
 from commol import (
     CalibrationProblem,
     Calibrator,
     NelderMeadConfig,
     ObservedDataPoint,
-    ParameterSample,
-    Predictive,
-    SampleMethod,
     Simulation,
-    member_statistics,
 )
-from commol.context.inference.identifiability import (
+from commol._simulation.reports import SimulationReport, _ReportLeaf
+from commol._simulation.results import SimulationResults
+from commol.identifiability import report as identifiability_report
+from commol.identifiability import results as identifiability
+from commol.identifiability.results import (
     IdentifiabilityReport,
-)
-from commol.api.results import (
-    SimulationResults,
-)
-from commol.api import reporting
-from commol.context.inference import identifiability
-from commol.api.reporting import _ReportLeaf, SimulationReport
-from commol.context.inference.identifiability import (
     ParameterVerdicts,
     PracticalVerdict,
     ProfileSection,
     StartsSection,
     StructuralVerdict,
+)
+from commol.uncertainty import (
+    ParameterSample,
+    Predictive,
+    SampleMethod,
+    member_statistics,
 )
 from tests.support import a_to_b_builder, bounded, build, build_stochastic
 
@@ -316,7 +313,7 @@ def test_an_identifiability_report_has_a_section_of_each_method() -> None:
 )
 def test_the_data_of_a_section_has_the_fields_of_its_model(model: str) -> None:
     fields = getattr(identifiability, model).model_fields
-    data = getattr(reporting, f"{model}Data")
+    data = getattr(identifiability_report, f"{model}Data")
 
     assert list(data.__annotations__) == list(fields)
 
@@ -325,7 +322,6 @@ def test_reports_are_only_methods() -> None:
     names = {"simulation_report", "applied_parameters_report", "identifiability_report"}
 
     assert names.isdisjoint(dir(commol))
-    assert names.isdisjoint(dir(commol.api))
 
 
 def test_the_results_know_the_outputs_of_their_accumulators() -> None:

@@ -11,7 +11,7 @@ import math
 from collections.abc import Callable, Sequence
 
 from commol import Simulation
-from commol.context.model import Model
+from commol._model.model import Model
 
 
 def bisect(
