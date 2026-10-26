@@ -11,6 +11,8 @@
 //! - `language` - The functions of the language and the check of a formula
 //! - `jit` - The tree of a formula (`jit::ast`), its parser (`jit::parser`)
 //!   and its compiler
+//! - `tree` - The tree of a formula as JSON, the port through which an edge
+//!   reads it
 //! - `variables` - The engine variables
 //! - `context` - Evaluation context with parameters and compartments
 //! - `error` - Error types for expression evaluation
@@ -46,6 +48,7 @@ pub mod context;
 pub mod error;
 pub mod jit;
 pub mod language;
+pub mod tree;
 pub mod variables;
 
 // Re-export main types

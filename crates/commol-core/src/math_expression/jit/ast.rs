@@ -6,14 +6,20 @@
 //! of a sum or the factors of a product, and every walk of a tree recurses
 //! only as deep as the formula nests
 //! ([`MAX_NESTING`](super::parser::MAX_NESTING)).
+//!
+//! The tree serializes to the JSON that
+//! [`MathExpression::tree_json`](crate::MathExpression::tree_json) gives an
+//! edge ([`tree`](crate::math_expression::tree) documents its shape).
 
 use std::fmt;
 
+use serde::Serialize;
+
 /// A node of the tree of a formula.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Expr {
     /// A number.
-    Constant(f64),
+    Constant(#[serde(serialize_with = "crate::math_expression::tree::number")] f64),
 
     /// A variable: a parameter, a bin, a compartment or an engine variable.
     Variable(String),
@@ -65,7 +71,7 @@ pub enum Expr {
 }
 
 /// An operator of a [`Expr::Chain`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum BinaryOperator {
     /// `+`
     Add,
@@ -130,7 +136,7 @@ impl BinaryOperator {
 }
 
 /// A unary operator.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum UnaryOperator {
     /// The sign: `-x`.
     Neg,

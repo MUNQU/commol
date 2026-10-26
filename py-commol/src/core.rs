@@ -109,6 +109,22 @@ impl PyMathExpression {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
     }
 
+    /// The tree of the formula, the one the JIT compiles, as JSON: an object
+    /// per node, keyed by its kind (`Constant`, `Variable`, `Chain`, `Power`,
+    /// `UnaryOp`, `FunctionCall`, `Conditional`); the module `tree` of
+    /// `commol_core::math_expression` documents the shape
+    ///
+    /// Returns:
+    ///     The JSON of the tree
+    ///
+    /// Raises:
+    ///     ValueError: If the formula is not in the language, as `check`
+    fn tree(&self) -> PyResult<String> {
+        self.inner
+            .tree_json()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
+    }
+
     /// The variables the formula reads, in the order it first reads them,
     /// without the engine variables: the names a model must define
     #[getter]
