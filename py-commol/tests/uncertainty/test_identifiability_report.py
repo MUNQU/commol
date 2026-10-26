@@ -13,9 +13,9 @@ from commol import (
     Simulation,
 )
 from commol.identifiability import StructuralRank
-from commol.identifiability.methods import IdentifiabilityReport
-from commol.identifiability.methods import (
+from commol.identifiability.results import (
     CollinearitySection,
+    IdentifiabilityReport,
     ParameterVerdicts,
     PracticalVerdict,
     PracticalVerdictName,

@@ -11,8 +11,8 @@ from commol import (
     NelderMeadConfig,
     ObservedDataPoint,
 )
-from commol.uncertainty import ParameterSample, SampleMethod
 from commol._fit.result import CalibrationResult
+from commol.uncertainty import ParameterSample, SampleMethod
 from tests.support import (
     FactoryBuilder,
     a_to_b_builder,

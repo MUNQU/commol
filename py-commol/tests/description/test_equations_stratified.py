@@ -1,10 +1,9 @@
 """The equations of the description of stratified models: one line per expanded flow."""
 
-from commol import StratificationCondition, StratifiedRate
-from commol import ModelBuilder
+from commol import ModelBuilder, StratificationCondition, StratifiedRate
 from commol._model.model import Model
+from tests.support import abc_builder, build, build_ode
 from tests.support.description import equation_forms
-from tests.support import build, build_ode, abc_builder
 
 
 def _move(name: str) -> ModelBuilder:

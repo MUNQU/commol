@@ -31,27 +31,27 @@ except ModuleNotFoundError as error:
         "pip install 'commol[plot]'"
     ) from error
 
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.plotting import panels as _panels
+from commol.plotting.config import PlotConfig
 from commol.plotting.panels import (
     Compared,
     ComparedObservationPanel,
     ObservationPanel,
     Panel,
 )
-from commol.commol_rs import _commol_rs as commol_rs
-from commol.sensitivity.methods import SobolResult
-from commol.plotting.config import PlotConfig
+from commol.sensitivity.results import SobolResult
 
 if TYPE_CHECKING:
-    from commol.uncertainty.predictive import Predictive
-    from commol._simulation.results import SimulationReplicates, SimulationResults
-    from commol._model.axis_units import AxisUnits
     from commol._fit.result import CalibrationResult
-    from commol._problem.problem import ObservedDataPoint
-    from commol.conformal.methods import PredictionIntervals
-    from commol.sensitivity.methods import ChaosResult, MorrisResult, PRCCResult
-    from commol.profiles.methods import ProfileResult
+    from commol._model.axis_units import AxisUnits
     from commol._model.model import Model
+    from commol._problem.problem import ObservedDataPoint
+    from commol._simulation.results import SimulationReplicates, SimulationResults
+    from commol.conformal.results import PredictionIntervals
+    from commol.profiles.results import ProfileResult
+    from commol.sensitivity.results import ChaosResult, MorrisResult, PRCCResult
+    from commol.uncertainty.predictive import Predictive
 
 logger = logging.getLogger("commol.plotting")
 

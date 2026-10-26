@@ -8,26 +8,26 @@ from typing import assert_type
 import pytest
 
 from commol import Calibrator, Simulation
+from commol.distributions import Normal, Uniform
 from commol.quantities import Gain, Peak, Trajectory, ValueAt
+from commol.quantities.quantities import _Quantity
 from commol.sensitivity import (
+    PRCC,
     InputSpace,
     Morris,
     PolynomialChaos,
-    PRCC,
     Propagation,
     SensitivityAnalysis,
     Sobol,
 )
-from commol.distributions import Normal, Uniform
-from commol.uncertainty import ParameterSample, SampleMethod
-from commol.sensitivity.methods import (
+from commol.sensitivity.results import (
     ChaosResult,
     MorrisResult,
     PRCCResult,
     PropagationResult,
     SobolResult,
 )
-from commol.quantities.quantities import _Quantity
+from commol.uncertainty import ParameterSample, SampleMethod
 from tests.support import abc_builder, abc_rates, bounded, build
 from tests.support.models import a_to_b_builder, build_stochastic
 

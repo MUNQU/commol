@@ -7,7 +7,6 @@ from commol.conformal.methods import (
     RollingConformal,
     SplitConformal,
 )
-from commol.conformal import runners as _runners  # noqa: F401  (registers the runners)
 
 __all__ = [
     "AdaptiveConformal",

@@ -5,10 +5,10 @@ import numpy as np
 import pytest
 from matplotlib.colors import to_rgba
 
-from commol.plotting import plot_compared
-from commol.observations import NoNoise
 from commol import ObservedDataPoint, Simulation
 from commol._simulation.results import SimulationResults
+from commol.observations import NoNoise
+from commol.plotting import plot_compared
 from commol.uncertainty.intervals import member_statistics
 from tests.support import (
     a_to_b_builder,

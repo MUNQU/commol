@@ -2,31 +2,30 @@
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Generic, Self, TypeVar, Literal
+from typing import TYPE_CHECKING, Generic, Literal, Self, TypeVar
 
 from pydantic import (
-    JsonValue,
     BaseModel,
     ConfigDict,
     Field,
+    JsonValue,
     SerializeAsAny,
     field_validator,
     model_validator,
 )
 
-from commol.commol_rs import _commol_rs as commol_rs
 from commol._data.engine_json import engine_json
-
-from commol._model.serialization import render_json
-from commol._model.units import DEFAULT_STEP_UNIT
-from commol._model.axis_units import AxisUnits, Origin, seconds_per_step
-from commol._problem.problem import CalibrationProblem, calibrated_values
 from commol._fit.result import CalibrationResult
+from commol._model.axis_units import AxisUnits, Origin, seconds_per_step
 from commol._model.description import ModelDescription
-from commol.engines.engine import ModelEngine
 from commol._model.parameter import Parameter, SeriesValue
 from commol._model.process import Process
+from commol._model.serialization import render_json
 from commol._model.structure import ModelStructure
+from commol._model.units import DEFAULT_STEP_UNIT
+from commol._problem.problem import CalibrationProblem, calibrated_values
+from commol.commol_rs import _commol_rs as commol_rs
+from commol.engines.engine import ModelEngine
 
 if TYPE_CHECKING:
     from commol._simulation.reports import AppliedParametersReport

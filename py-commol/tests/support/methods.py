@@ -1,17 +1,17 @@
-"""The test uncertainty method, registered so that the entry point is tested
-with no real method.
+"""The test uncertainty method, which declares its runner so that the entry
+point is tested with no real method.
 
 `StartsSample` runs a multi-start calibration and returns the ends of its
 starts as a sample of equal weights. It is not a statistical method: it only
-exercises `Calibrator.uncertainty` and the registry.
+exercises `Calibrator.uncertainty` and `run_method`.
 """
+
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from commol import Calibrator
+from commol._calibration.method import CalibrationPort, UncertaintyMethod
 from commol.uncertainty import ParameterSample, SampleMethod
-from commol._calibration.method import UncertaintyMethod
-from commol._calibration.registry import register
 
 
 class StartsResult(BaseModel):
@@ -22,15 +22,11 @@ class StartsResult(BaseModel):
     sample: ParameterSample
 
 
-class StartsSample(UncertaintyMethod[StartsResult]):
-    """The ends of `starts` starts of the calibration."""
-
-    starts: int = Field(default=3, ge=1)
-
-
-def run_starts_sample(calibrator: Calibrator, method: StartsSample) -> StartsResult:
+def run_starts_sample(
+    calibrator: CalibrationPort, method: "StartsSample"
+) -> StartsResult:
     """Run `method` on `calibrator`."""
-    result = calibrator.run(starts=method.starts)
+    result = calibrator.run(starts=method.starts)  # type: ignore[attr-defined]
     parameters = calibrator.problem.parameters
     return StartsResult(
         sample=ParameterSample.equally_weighted(
@@ -42,4 +38,9 @@ def run_starts_sample(calibrator: Calibrator, method: StartsSample) -> StartsRes
     )
 
 
-register(StartsSample, run_starts_sample)
+class StartsSample(UncertaintyMethod[StartsResult]):
+    """The ends of `starts` starts of the calibration."""
+
+    _runner: ClassVar = staticmethod(run_starts_sample)
+
+    starts: int = Field(default=3, ge=1)

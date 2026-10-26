@@ -8,7 +8,6 @@ from commol.local.methods import (
     LikelihoodTarget,
     Sandwich,
 )
-from commol.local import runners as _runners  # noqa: F401  (registers the runners)
 
 __all__ = [
     "GibbsTarget",

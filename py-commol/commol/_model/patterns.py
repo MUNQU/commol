@@ -17,19 +17,18 @@ from collections.abc import Iterable
 from typing import ClassVar, Literal, Protocol, Self
 
 from pydantic import (
-    ConfigDict,
     BaseModel,
+    ConfigDict,
     Field,
     PrivateAttr,
     field_validator,
     model_validator,
 )
 
-from commol.commol_rs import _commol_rs as commol_rs
 from commol._data.ranges import RangeChecked
 from commol._model.stratification_condition import StratificationCondition
 from commol._model.transition import StratifiedRate
-
+from commol.commol_rs import _commol_rs as commol_rs
 
 _COMBINE_MODES = ("sum", "max", "min")
 """How ``AxisPattern.combine`` can join its patterns."""

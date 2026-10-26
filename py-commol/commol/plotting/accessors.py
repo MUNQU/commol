@@ -13,12 +13,12 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
-    from commol.uncertainty.predictive import Predictive
-    from commol._simulation.results import SimulationReplicates, SimulationResults
     from commol._fit.result import CalibrationResult
     from commol._problem.problem import ObservedDataPoint
-    from commol.conformal.methods import PredictionIntervals
+    from commol._simulation.results import SimulationReplicates, SimulationResults
+    from commol.conformal.results import PredictionIntervals
     from commol.plotting.config import PlotConfig
+    from commol.uncertainty.predictive import Predictive
 
 
 class ResultsPlot:

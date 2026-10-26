@@ -14,10 +14,10 @@ predictions, and its result. Guide:
 
 ::: commol.profiles.Threshold
 
-::: commol.profiles.methods.ProfileResult
+::: commol.profiles.results.ProfileResult
 
-::: commol.profiles.methods.Profile
+::: commol.profiles.results.Profile
 
-::: commol.profiles.methods.ProfileInterval
+::: commol.profiles.results.ProfileInterval
 
-::: commol.profiles.methods.ProfileStructure
+::: commol.profiles.results.ProfileStructure

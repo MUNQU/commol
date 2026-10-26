@@ -10,17 +10,16 @@ from collections.abc import Sequence
 from functools import lru_cache
 from typing import TYPE_CHECKING, NamedTuple
 
+from commol._data.engine_json import engine_json
+from commol._model.formula_tree import Node, Variable, product, read_tree
 from commol.commol_rs import _commol_rs as commol_rs
 
-from commol._model.formula_tree import Node, Variable, product, read_tree
-from commol._data.engine_json import engine_json
-
 if TYPE_CHECKING:
-    from commol.commol_rs._commol_rs import EngineProtocol
-    from commol._problem.problem import CalibrationParameter
     from commol._model.aggregate import Aggregate
     from commol._model.model import Model
     from commol._model.process import Process
+    from commol._problem.problem import CalibrationParameter
+    from commol.commol_rs._commol_rs import EngineProtocol
 
 
 class InitialCompartment(NamedTuple):

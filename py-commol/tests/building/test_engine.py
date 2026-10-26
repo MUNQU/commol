@@ -7,12 +7,12 @@ import pytest
 from pydantic import ValidationError
 
 from commol import Model, Simulation
-from commol.engines import ODESolver, StochasticEventsSettings, StochasticStepsSettings
-from commol.commol_rs import _commol_rs as commol_rs
 from commol._data.engine_json import engine_json
+from commol.commol_rs import _commol_rs as commol_rs
+from commol.engines import ODESolver, StochasticEventsSettings, StochasticStepsSettings
 from commol.engines.engine import EngineName
-from tests.support.kinds import TEST_ENGINE, TEST_STOCHASTIC_ENGINE
 from tests.support import a_to_b_builder, assert_close, build, build_ode
+from tests.support.kinds import TEST_ENGINE, TEST_STOCHASTIC_ENGINE
 
 
 class TestEngineList:

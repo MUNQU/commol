@@ -9,8 +9,8 @@ from commol._model.report_entry import Interval, entry_interval
 
 if TYPE_CHECKING:
     from commol._model.aggregate import Aggregate
-    from commol.uncertainty.sample import ParameterSummary
     from commol._model.process import Process
+    from commol.uncertainty.sample import ParameterSummary
 
 
 class InitialAmountEntry(TypedDict):

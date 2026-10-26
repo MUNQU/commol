@@ -11,17 +11,17 @@ from typing import TYPE_CHECKING, override
 
 import numpy as np
 
-from commol.plotting.accessors import ReplicatesPlot, ResultsPlot
+from commol._data.result_model import ComparedByValue
 from commol._simulation.windows import _windowed_totals
 from commol.commol_rs import _commol_rs as commol_rs
-from commol._data.result_model import ComparedByValue
+from commol.plotting.accessors import ReplicatesPlot, ResultsPlot
 
 if TYPE_CHECKING:
-    from commol._simulation.reports import SimulationReport
-    from commol._problem.problem import ObservedDataPoint
-    from commol.conformal.methods import PredictionIntervals
-    from commol.quantities.quantities import QuantityBase
     from commol._model.model import Model
+    from commol._problem.problem import ObservedDataPoint
+    from commol._simulation.reports import SimulationReport
+    from commol.conformal.results import PredictionIntervals
+    from commol.quantities.quantities import QuantityBase
 
 
 class SimulationResults(ComparedByValue, dict[str, list[float]]):

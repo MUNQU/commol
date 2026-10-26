@@ -30,14 +30,6 @@ import math
 import numpy as np
 import pytest
 
-from commol.smc import (
-    BootstrapCoverageEta,
-    InformationMatchingEta,
-    ABCSMC,
-    BayesianPosterior,
-    GibbsPosterior,
-    LossDistance,
-)
 from commol import (
     CalibrationProblem,
     Calibrator,
@@ -45,10 +37,18 @@ from commol import (
     ObservedDataPoint,
     Simulation,
 )
-from commol.observations import DistributionNoise, NormalObservations
 from commol.conformal import EnbPI, JackknifePlus, SplitConformal
-from commol.local import Laplace, LaplaceMixture, LikelihoodTarget, Sandwich
 from commol.distributions import LogUniform, Priors, Uniform
+from commol.local import Laplace, LaplaceMixture, LikelihoodTarget, Sandwich
+from commol.observations import DistributionNoise, NormalObservations
+from commol.smc import (
+    ABCSMC,
+    BayesianPosterior,
+    BootstrapCoverageEta,
+    GibbsPosterior,
+    InformationMatchingEta,
+    LossDistance,
+)
 from commol.uncertainty import Predictive, weighted_quantiles
 from tests.support import (
     a_to_b_builder,

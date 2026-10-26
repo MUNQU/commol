@@ -1,6 +1,6 @@
 """Conditions on stratification categories."""
 
-from pydantic import ConfigDict, BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class StratificationCondition(BaseModel):

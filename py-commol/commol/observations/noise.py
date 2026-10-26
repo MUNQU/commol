@@ -5,8 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from commol._fit.result import CalibrationResult
 from commol._data.ranges import RangeChecked
+from commol._fit.result import CalibrationResult
 
 
 class NoNoise(BaseModel):

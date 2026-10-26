@@ -16,12 +16,12 @@ Laplace mixture, and their results. Guide:
 
 ::: commol.local.GibbsTarget
 
-::: commol.local.methods.LocalResult
+::: commol.local.results.LocalResult
 
-::: commol.local.methods.LaplaceResult
+::: commol.local.results.LaplaceResult
 
-::: commol.local.methods.SandwichResult
+::: commol.local.results.SandwichResult
 
-::: commol.local.methods.ImportanceResult
+::: commol.local.results.ImportanceResult
 
-::: commol.local.methods.MixtureComponent
+::: commol.local.results.MixtureComponent

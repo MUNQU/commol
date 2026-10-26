@@ -3,8 +3,8 @@
 from typing import TYPE_CHECKING
 
 from commol._model import engine_state
+from commol._model.description import Matrix, Section, Table, Text, _Block
 from commol._model.equations import DynamicsDescription
-from commol._model.description import _Block, Matrix, Section, Table, Text
 from commol._model.neighbors import Complete, Groups
 
 if TYPE_CHECKING:

@@ -13,4 +13,4 @@ describes. Guide: [Reports](../guide/reports.md).
 
 ::: commol.uncertainty.Predictive.report
 
-::: commol.identifiability.methods.IdentifiabilityReport.report
+::: commol.identifiability.results.IdentifiabilityReport.report

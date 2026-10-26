@@ -4,7 +4,6 @@ starts. The report that joins them is in ``test_identifiability_report.py``."""
 import pytest
 from pydantic import ValidationError
 
-from commol.distributions import Beta, Gamma, Normal, Priors
 from commol import (
     CalibrationProblem,
     Calibrator,
@@ -12,15 +11,16 @@ from commol import (
     ObservedDataPoint,
     Simulation,
 )
+from commol._fit.result import CalibrationResult, StartSummary
+from commol.distributions import Beta, Gamma, Normal, Priors
 from commol.identifiability import (
     Collinearity,
     SampleIdentifiability,
     StartsIdentifiability,
     StructuralRank,
 )
+from commol.identifiability.results import PracticalVerdict
 from commol.uncertainty import ParameterSample, SampleMethod
-from commol._fit.result import CalibrationResult, StartSummary
-from commol.identifiability.methods import PracticalVerdict
 from tests.support import (
     abc_builder,
     bounded,

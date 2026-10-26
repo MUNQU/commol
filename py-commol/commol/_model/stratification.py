@@ -1,8 +1,8 @@
 """Stratifications that split compartments into categories."""
 
-from typing import override, Self
+from typing import Self, override
 
-from pydantic import ConfigDict, BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from commol._model.stratification_condition import StratificationCondition
 

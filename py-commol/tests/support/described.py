@@ -1,11 +1,10 @@
 """Models of every branch of a description, for the snapshots of its
 sections and renderings."""
 
-from commol import StratificationCondition, StratifiedRate
-from commol import Aggregate, Complete, Groups
-from commol.engines.engine import StochasticEventsSettings
+from commol import Aggregate, Complete, Groups, StratificationCondition, StratifiedRate
 from commol._model.model import Model
 from commol._model.parameter import SeriesValue
+from commol.engines.engine import StochasticEventsSettings
 from tests.support.kinds import UnstratifiedVariant
 from tests.support.models import FactoryBuilder, abc_builder, build
 

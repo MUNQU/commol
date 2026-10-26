@@ -2,10 +2,9 @@
 
 import pytest
 
-from commol import StratificationCondition
-from commol import ModelBuilder, Simulation
+from commol import ModelBuilder, Simulation, StratificationCondition
 from commol._model.stratification import Stratification
-from tests.support import assert_total_conserved, build, abc_builder
+from tests.support import abc_builder, assert_total_conserved, build
 
 GROUP = {"g1": 0.8, "g2": 0.2}
 STATUS = {"s1": 0.7, "s2": 0.3}

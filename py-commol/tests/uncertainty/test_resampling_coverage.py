@@ -11,11 +11,11 @@ from collections.abc import Callable
 import numpy as np
 import pytest
 
-from commol.resampling import BayesianBootstrap, ResidualBootstrap, WildBootstrap
-from commol.observations import NoNoise, ResidualNoise
-from commol.uncertainty import Predictive
 from commol._calibration.method import UncertaintyMethod
-from commol.resampling.methods import BootstrapResult
+from commol.observations import NoNoise, ResidualNoise
+from commol.resampling import BayesianBootstrap, ResidualBootstrap, WildBootstrap
+from commol.resampling.results import BootstrapResult
+from commol.uncertainty import Predictive
 from tests.support import flow_calibrator, flow_observations
 from tests.support.coverage import Interval, coverage_study
 

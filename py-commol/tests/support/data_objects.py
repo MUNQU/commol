@@ -6,37 +6,22 @@ from collections.abc import Callable
 
 from pydantic import BaseModel
 
-from commol.smc import (
-    ABCSMC,
-    ABCRejection,
-    BayesianPosterior,
-    BootstrapCoverageEta,
-    GibbsPosterior,
-    InformationMatchingEta,
-    LossDistance,
-    SeriesDistance,
+from commol import (
+    CalibrationConstraint,
+    CalibrationParameter,
+    CalibrationProblem,
+    NelderMeadConfig,
+    ObservedDataPoint,
+    ParticleSwarmConfig,
+    Quantile,
 )
-from commol.sensitivity import (
-    PRCC,
-    InputSpace,
-    Morris,
-    PolynomialChaos,
-    Propagation,
-    Sobol,
-)
+from commol._fit.result import CalibrationResult
 from commol.conformal import (
     AdaptiveConformal,
     EnbPI,
     JackknifePlus,
     RollingConformal,
     SplitConformal,
-)
-from commol.resampling import (
-    BayesianBootstrap,
-    BlockJackknife,
-    ParametricBootstrap,
-    ResidualBootstrap,
-    WildBootstrap,
 )
 from commol.distributions import (
     Beta,
@@ -46,6 +31,19 @@ from commol.distributions import (
     Normal,
     Priors,
     Uniform,
+)
+from commol.identifiability import (
+    Collinearity,
+    SampleIdentifiability,
+    StartsIdentifiability,
+    StructuralRank,
+)
+from commol.local import (
+    GibbsTarget,
+    Laplace,
+    LaplaceMixture,
+    LikelihoodTarget,
+    Sandwich,
 )
 from commol.observations import (
     BinomialObservations,
@@ -58,20 +56,11 @@ from commol.observations import (
     ResidualNoise,
     StudentTObservations,
 )
-from commol import (
-    CalibrationConstraint,
-    CalibrationParameter,
-    CalibrationProblem,
-    NelderMeadConfig,
-    ObservedDataPoint,
-    ParticleSwarmConfig,
-    Quantile,
-)
-from commol.identifiability import (
-    Collinearity,
-    SampleIdentifiability,
-    StartsIdentifiability,
-    StructuralRank,
+from commol.profiles import (
+    PredictionProfile,
+    PredictionSpec,
+    ProfileLikelihood,
+    Threshold,
 )
 from commol.quantities import (
     Gain,
@@ -82,21 +71,32 @@ from commol.quantities import (
     Trajectory,
     ValueAt,
 )
-from commol.local import (
-    GibbsTarget,
-    Laplace,
-    LaplaceMixture,
-    LikelihoodTarget,
-    Sandwich,
+from commol.resampling import (
+    BayesianBootstrap,
+    BlockJackknife,
+    ParametricBootstrap,
+    ResidualBootstrap,
+    WildBootstrap,
+)
+from commol.sensitivity import (
+    PRCC,
+    InputSpace,
+    Morris,
+    PolynomialChaos,
+    Propagation,
+    Sobol,
+)
+from commol.smc import (
+    ABCSMC,
+    ABCRejection,
+    BayesianPosterior,
+    BootstrapCoverageEta,
+    GibbsPosterior,
+    InformationMatchingEta,
+    LossDistance,
+    SeriesDistance,
 )
 from commol.uncertainty import ParameterSample, SampleMethod
-from commol.profiles import (
-    PredictionProfile,
-    PredictionSpec,
-    ProfileLikelihood,
-    Threshold,
-)
-from commol._fit.result import CalibrationResult
 
 PRIORS = Priors.uniform_on_bounds()
 FIT = CalibrationResult(

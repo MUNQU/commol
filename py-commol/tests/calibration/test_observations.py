@@ -15,11 +15,11 @@ from commol import (
 from commol._model.model import Model
 from tests.support import (
     a_to_b_builder,
+    abc_builder,
     bounded,
     build,
     build_ode,
     observed,
-    abc_builder,
 )
 
 SEED = 42
@@ -196,7 +196,7 @@ class TestPositionsAndEngines:
 
         calibrator = Calibrator(Simulation(model), problem)
 
-        [[[prediction]]] = calibrator._rust_problem.predict_observations([[0.0]])
+        [[[prediction]]] = calibrator._engine_problem.predict_observations([[0.0]])
         assert prediction == 0.0
 
     def test_a_difference_model_rejects_a_non_integer_observation(self) -> None:

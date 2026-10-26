@@ -6,10 +6,10 @@ from commol import Simulation
 from commol.commol_rs import _commol_rs as commol_rs
 from tests.support import (
     a_to_b_builder,
+    abc_builder,
     build,
     conditional_pathway_builder,
     initial_state,
-    abc_builder,
 )
 
 GROUP = {"g1": 0.8, "g2": 0.2}

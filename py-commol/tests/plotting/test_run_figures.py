@@ -10,9 +10,8 @@ import pytest
 from matplotlib.figure import Figure
 
 from commol import ObservedDataPoint, Simulation
-from commol.plotting import PlotConfig
 from commol._simulation.results import SimulationResults
-from commol.plotting import figures
+from commol.plotting import PlotConfig, figures
 from commol.plotting.panels import _group_observed
 from tests.support import (
     abc_builder,

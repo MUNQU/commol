@@ -162,7 +162,7 @@ class TestFailedStarts:
         best: int = 0,
     ) -> Calibrator:
         calibrator = _calibrator(truth_run)
-        calibrator._rust_problem = SimpleNamespace(  # type: ignore[assignment]
+        calibrator._engine_problem = SimpleNamespace(  # type: ignore[assignment]
             optimize=lambda *_: SimpleNamespace(outcomes=outcomes, best=best),
             seed=calibrator.seed,
         )

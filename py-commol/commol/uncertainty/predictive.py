@@ -5,23 +5,23 @@ from typing import TYPE_CHECKING, Protocol
 
 from pydantic import ConfigDict, Field
 
-from commol.plotting.accessors import PredictivePlot
-from commol._simulation.results import SimulationResults, quantities_of_runs
-from commol._problem.problem import ObservedDataPoint
-from commol.observations.noise import _ObservationNoise
-from commol.uncertainty.sample import ParameterSample
 from commol._data.result_model import ResultModel
+from commol._problem.problem import ObservedDataPoint
+from commol._simulation.results import SimulationResults, quantities_of_runs
+from commol.observations.noise import _ObservationNoise
+from commol.plotting.accessors import PredictivePlot
+from commol.uncertainty.sample import ParameterSample
 
 if TYPE_CHECKING:
+    from commol._model.model import Model
     from commol._simulation.reports import SimulationReport
     from commol._simulation.simulation import Simulation
-    from commol.conformal.methods import PredictionIntervals
-    from commol.quantities.quantities import QuantityBase
-    from commol._model.model import Model
     from commol.commol_rs._commol_rs import (
         ObservationDrawsProtocol,
         PredictiveProtocol,
     )
+    from commol.conformal.results import PredictionIntervals
+    from commol.quantities.quantities import QuantityBase
 
 
 class PredictiveSource(Protocol):

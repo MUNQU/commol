@@ -9,7 +9,7 @@ from collections.abc import Callable, Iterable, Mapping
 import pint
 from pint.facets.plain import PlainQuantity
 
-from commol.commol_rs import _commol_rs as commol_rs
+from commol._model.constants import SUBGROUP_TOTAL_PREFIX, TOTAL_VARIABLE
 from commol._model.engine_state import formula_tree
 from commol._model.formula_tree import (
     Chain,
@@ -23,7 +23,7 @@ from commol._model.formula_tree import (
     formula_text,
 )
 from commol._model.parameter import Parameter
-from commol._model.constants import SUBGROUP_TOTAL_PREFIX, TOTAL_VARIABLE
+from commol.commol_rs import _commol_rs as commol_rs
 
 DEFAULT_STEP_UNIT = "step"
 """Step unit of a model that declares none: the default increment of any axis."""

@@ -10,32 +10,37 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
-from commol._fit.starts import fit_result
-from commol._calibration.registry import register
-from commol.commol_rs import _commol_rs as commol_rs
-from commol._fit.result import CalibrationResult
+from commol._calibration.method import CalibrationPort
 from commol._data.engine_json import engine_json
-from commol.resampling.methods import (
-    BayesianBootstrap,
-    BlockJackknife,
+from commol._fit.result import CalibrationResult
+from commol._fit.starts import fit_result
+from commol.commol_rs import _commol_rs as commol_rs
+from commol.resampling.results import (
     BootstrapResult,
     JackknifeResult,
-    ParametricBootstrap,
     ResamplingDiagnostics,
-    ResidualBootstrap,
-    WildBootstrap,
 )
 from commol.uncertainty.sample import ParameterSample, SampleMethod
 
 if TYPE_CHECKING:
-    from commol._calibration.calibrator import Calibrator
     from commol.commol_rs._commol_rs import BootstrapRunProtocol
+    from commol.resampling.methods import (
+        BayesianBootstrap,
+        BlockJackknife,
+        ParametricBootstrap,
+        ResidualBootstrap,
+        WildBootstrap,
+    )
+
+    type _Bootstrap = (
+        BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap
+    )
 
 logger = logging.getLogger("commol.resampling")
 
 
 def sample_method(
-    calibrator: "Calibrator", name: str, method: BaseModel
+    calibrator: CalibrationPort, name: str, method: BaseModel
 ) -> SampleMethod:
     """
     What made the sample of a method: its name, its settings and the seed.
@@ -114,7 +119,7 @@ def _diagnostics(
 
 
 def _bootstrap_result(
-    calibrator: "Calibrator",
+    calibrator: CalibrationPort,
     fit: CalibrationResult,
     run: "BootstrapRunProtocol",
     method: SampleMethod,
@@ -138,8 +143,8 @@ def _bootstrap_result(
 
 
 def run_bootstrap(
-    calibrator: "Calibrator",
-    method: BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap,
+    calibrator: CalibrationPort,
+    method: "_Bootstrap",
 ) -> BootstrapResult:
     """
     Run a bootstrap: Bayesian, parametric, residual or wild, by its ``kind``.
@@ -158,7 +163,7 @@ def run_bootstrap(
         The fit, one draw per replicate and the diagnostics.
     """
     starts, run = commol_rs.inference.bootstrap(
-        calibrator._rust_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method)
     )
     return _bootstrap_result(
         calibrator,
@@ -169,7 +174,7 @@ def run_bootstrap(
 
 
 def run_block_jackknife(
-    calibrator: "Calibrator", method: BlockJackknife
+    calibrator: CalibrationPort, method: "BlockJackknife"
 ) -> JackknifeResult:
     """
     Run a block jackknife.
@@ -187,7 +192,7 @@ def run_block_jackknife(
         The fit, the jackknife statistics and the diagnostics.
     """
     starts, run = commol_rs.inference.block_jackknife(
-        calibrator._rust_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method)
     )
     names = calibrator.parameter_names
     fit = fit_result(starts, names, calibrator.seed, logger)
@@ -207,10 +212,3 @@ def run_block_jackknife(
         not_converged=run.not_converged,
         diagnostics=_diagnostics(run.block_length, run.block_length_estimates, 0),
     )
-
-
-register(BayesianBootstrap, run_bootstrap)
-register(ParametricBootstrap, run_bootstrap)
-register(ResidualBootstrap, run_bootstrap)
-register(WildBootstrap, run_bootstrap)
-register(BlockJackknife, run_block_jackknife)

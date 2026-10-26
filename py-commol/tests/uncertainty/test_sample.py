@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from commol.uncertainty import ParameterSample, SampleMethod, weighted_quantiles
 from commol import CalibrationProblem, NelderMeadConfig, ObservedDataPoint
+from commol.uncertainty import ParameterSample, SampleMethod, weighted_quantiles
 from tests.support import abc_builder, bounded, build
 
 METHOD = SampleMethod(name="test", settings={"draws": 3})

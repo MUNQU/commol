@@ -5,21 +5,21 @@ import logging
 from datetime import date
 from typing import Self, TypeVar
 
+from commol._model.bin import Accumulator, Bin
+from commol._model.model import Model
+from commol._model.parameter import Parameter, SeriesValue
 from commol._model.patterns import (
     AxisPattern,
     _ComputedAxisPattern,
     _GroupEntry,
     _ScheduleAxisPattern,
 )
-from commol._model.bin import Accumulator, Bin
-from commol.engines.engine import EngineName, EngineSettings, ModelEngine
-from commol._model.model import Model
-from commol._model.parameter import Parameter, SeriesValue
 from commol._model.process import Process
 from commol._model.stratification import Stratification
 from commol._model.stratification_condition import StratificationCondition
 from commol._model.structure import ModelStructure
 from commol._model.transition import StratifiedRate, Transition
+from commol.engines.engine import EngineName, EngineSettings, ModelEngine
 
 logger = logging.getLogger("commol")
 

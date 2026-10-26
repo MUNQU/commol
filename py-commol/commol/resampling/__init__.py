@@ -8,7 +8,6 @@ from commol.resampling.methods import (
     ResidualBootstrap,
     WildBootstrap,
 )
-from commol.resampling import runners as _runners  # noqa: F401  (registers the runners)
 
 __all__ = [
     "BayesianBootstrap",

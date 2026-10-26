@@ -12,10 +12,10 @@ from typing import TYPE_CHECKING, Literal
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
-    from commol.uncertainty.predictive import Predictive
-    from commol._simulation.results import SimulationReplicates, SimulationResults
     from commol._problem.problem import ObservedDataPoint
+    from commol._simulation.results import SimulationReplicates, SimulationResults
     from commol.plotting.config import PlotConfig
+    from commol.uncertainty.predictive import Predictive
 
 
 def plot_compared(

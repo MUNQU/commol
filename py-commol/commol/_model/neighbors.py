@@ -15,7 +15,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from commol.commol_rs import _commol_rs as commol_rs
 
-
 NEIGHBORS_VARIABLE: str = commol_rs.model.NEIGHBORS
 """The rate variable that reads the total of the neighbors of a unit."""
 

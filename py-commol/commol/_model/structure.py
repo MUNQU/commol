@@ -19,16 +19,15 @@ from typing import TYPE_CHECKING, ClassVar, NamedTuple, Self, TypedDict
 
 from pydantic import BaseModel, ConfigDict
 
-from commol.commol_rs import _commol_rs as commol_rs
 from commol._data.engine_json import engine_json
-
+from commol.commol_rs import _commol_rs as commol_rs
 
 if TYPE_CHECKING:
-    from commol._model.report import CategorySplitEntry, InitialAmountEntry
-    from commol.commol_rs._commol_rs import EngineProtocol
-    from commol._problem.problem import CalibrationParameter, CalibrationProblem
     from commol._model.description import Section
     from commol._model.model import Model
+    from commol._model.report import CategorySplitEntry, InitialAmountEntry
+    from commol._problem.problem import CalibrationParameter, CalibrationProblem
+    from commol.commol_rs._commol_rs import EngineProtocol
     from commol.uncertainty.sample import ParameterSummary
 
 

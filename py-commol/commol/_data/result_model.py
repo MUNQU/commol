@@ -7,7 +7,6 @@ from typing import override
 
 from pydantic import BaseModel, ConfigDict
 
-
 _NAN = object()
 """The canonical form of every NaN: one object, so a NaN equals a NaN."""
 

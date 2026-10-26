@@ -16,10 +16,20 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from commol.commol_rs import _commol_rs as commol_rs
 from commol._data.engine_json import engine_json
-
 from commol._model import engine_state
+from commol._model.description import (
+    Equation,
+    EquationGroup,
+    Equations,
+    GraphEdge,
+    GraphNode,
+    StateGraph,
+    Table,
+    Text,
+    _Block,
+    _Cell,
+)
 from commol._model.engine_state import ExpandedOutput, TransitionFlow
 from commol._model.formula_tree import (
     PRIMARY,
@@ -34,18 +44,7 @@ from commol._model.formula_tree import (
     variables,
 )
 from commol._model.helpers import ModelCompartmentHelper
-from commol._model.description import (
-    _Block,
-    _Cell,
-    Equation,
-    EquationGroup,
-    Equations,
-    GraphEdge,
-    GraphNode,
-    StateGraph,
-    Table,
-    Text,
-)
+from commol.commol_rs import _commol_rs as commol_rs
 
 if TYPE_CHECKING:
     from commol._model.model import Model

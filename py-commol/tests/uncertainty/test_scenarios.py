@@ -14,6 +14,9 @@ from commol import (
     ObservedDataPoint,
     Simulation,
 )
+from commol._fit.result import CalibrationResult
+from commol.quantities import Trajectory, ValueAt
+from commol.quantities.quantities import quantity_labels
 from commol.sensitivity import InputSpace, SensitivityAnalysis
 from commol.uncertainty import (
     ParameterSample,
@@ -22,9 +25,6 @@ from commol.uncertainty import (
     Scenarios,
     weighted_quantiles,
 )
-from commol.quantities import Trajectory, ValueAt
-from commol._fit.result import CalibrationResult
-from commol.quantities.quantities import quantity_labels
 from tests.support import (
     a_to_b_builder,
     abc_builder,

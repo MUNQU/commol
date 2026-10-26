@@ -10,28 +10,26 @@ import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from commol._fit.starts import fit_result
-from commol._calibration.registry import register
-from commol.resampling.runners import log_failed
-from commol.commol_rs import _commol_rs as commol_rs
-from commol._fit.result import CalibrationResult
+from commol._calibration.method import CalibrationPort
 from commol._data.engine_json import engine_json
-from commol.profiles.methods import (
-    PredictionProfile,
+from commol._fit.result import CalibrationResult
+from commol._fit.starts import fit_result
+from commol.commol_rs import _commol_rs as commol_rs
+from commol.profiles.results import (
     Profile,
     ProfileInterval,
-    ProfileLikelihood,
     ProfileResult,
     ProfileStructure,
     Threshold,
 )
+from commol.resampling.runners import log_failed
 
 if TYPE_CHECKING:
-    from commol._calibration.calibrator import Calibrator
     from commol.commol_rs._commol_rs import (
         ProfileRunProtocol,
         ProfileStructureProtocol,
     )
+    from commol.profiles.methods import PredictionProfile, ProfileLikelihood
 
 logger = logging.getLogger("commol.profiles")
 
@@ -76,7 +74,7 @@ def _structure_notes(
 
 
 def _result(
-    calibrator: "Calibrator",
+    calibrator: CalibrationPort,
     fit: CalibrationResult,
     quantity: str,
     names: Sequence[str],
@@ -180,7 +178,7 @@ def _result(
 
 
 def run_profile_likelihood(
-    calibrator: "Calibrator", method: ProfileLikelihood
+    calibrator: CalibrationPort, method: "ProfileLikelihood"
 ) -> ProfileResult:
     """
     Run the profile likelihood of parameters.
@@ -204,7 +202,7 @@ def run_profile_likelihood(
         fit the problem.
     """
     starts, run = commol_rs.inference.profile_likelihood(
-        calibrator._rust_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method)
     )
     fit = fit_result(starts, calibrator.parameter_names, calibrator.seed, logger)
     return _result(
@@ -213,7 +211,7 @@ def run_profile_likelihood(
 
 
 def run_prediction_profile(
-    calibrator: "Calibrator", method: PredictionProfile
+    calibrator: CalibrationPort, method: "PredictionProfile"
 ) -> ProfileResult:
     """
     Run the profile likelihood of predictions.
@@ -237,7 +235,7 @@ def run_prediction_profile(
         the problem.
     """
     starts, run = commol_rs.inference.prediction_profile(
-        calibrator._rust_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method)
     )
     fit = fit_result(starts, calibrator.parameter_names, calibrator.seed, logger)
     return _result(
@@ -248,7 +246,3 @@ def run_prediction_profile(
         method.threshold,
         run,
     )
-
-
-register(ProfileLikelihood, run_profile_likelihood)
-register(PredictionProfile, run_prediction_profile)

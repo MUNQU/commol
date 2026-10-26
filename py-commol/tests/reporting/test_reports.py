@@ -17,23 +17,23 @@ from commol import (
     ObservedDataPoint,
     Simulation,
 )
-from commol.uncertainty import (
-    ParameterSample,
-    Predictive,
-    SampleMethod,
-    member_statistics,
-)
-from commol.identifiability.methods import IdentifiabilityReport
-from commol._simulation.results import SimulationResults
 from commol._simulation import reports as reporting
-from commol.identifiability import methods as identifiability
-from commol._simulation.reports import _ReportLeaf, SimulationReport
-from commol.identifiability.methods import (
+from commol._simulation.reports import SimulationReport, _ReportLeaf
+from commol._simulation.results import SimulationResults
+from commol.identifiability import results as identifiability
+from commol.identifiability.results import (
+    IdentifiabilityReport,
     ParameterVerdicts,
     PracticalVerdict,
     ProfileSection,
     StartsSection,
     StructuralVerdict,
+)
+from commol.uncertainty import (
+    ParameterSample,
+    Predictive,
+    SampleMethod,
+    member_statistics,
 )
 from tests.support import a_to_b_builder, bounded, build, build_stochastic
 

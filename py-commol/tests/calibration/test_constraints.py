@@ -14,7 +14,7 @@ from commol import (
     Simulation,
 )
 from commol._model.model import Model
-from tests.support import assert_accepted, bounded, build, observed, abc_builder
+from tests.support import abc_builder, assert_accepted, bounded, build, observed
 
 SEED = 42
 

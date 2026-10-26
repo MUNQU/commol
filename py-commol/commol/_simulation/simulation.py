@@ -10,6 +10,10 @@ from commol.commol_rs import _commol_rs as commol_rs
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import EngineProtocol
 
+from commol._data.engine_json import engine_json
+from commol._model.engine_state import build_engine
+from commol._model.model import Model
+from commol._model.structure import ModelStructure
 from commol._simulation.results import (
     SimulationReplicates,
     SimulationResults,
@@ -17,10 +21,6 @@ from commol._simulation.results import (
     series_names,
     total_series,
 )
-from commol._model.engine_state import build_engine
-from commol._data.engine_json import engine_json
-from commol._model.model import Model
-from commol._model.structure import ModelStructure
 
 logger = logging.getLogger("commol")
 

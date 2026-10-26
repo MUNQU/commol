@@ -9,100 +9,17 @@ bounds.
 
 from typing import Annotated, Literal
 
-from pydantic import ConfigDict, Field
+from pydantic import Field
 
-from commol._fit.result import CalibrationResult
-from commol.distributions.distributions import WithPriors
 from commol._calibration.method import UncertaintyMethod
-from commol.uncertainty.sample import ParameterSample
 from commol._data.ranges import RangeChecked
-from commol._data.result_model import ResultModel
-
-
-class DeltaBand(ResultModel):
-    """
-    The band of every output by the delta method (``Calibrator.delta_band``):
-    the prediction at the fit
-    plus and minus a quantile times the standard deviation of the
-    linearized model, ``J Σ Jᵀ``, with no run of the draws.
-
-    Attributes
-    ----------
-    confidence_level : float
-        The level of the central interval.
-    positions : list[float]
-        Where the values are.
-    center, lower, upper : dict[str, list[float]]
-        For each output, one value per position: the prediction at the fit
-        and the ends of the interval.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    confidence_level: float
-    positions: list[float]
-    center: dict[str, list[float]] = Field(description="Prediction at the fit")
-    lower: dict[str, list[float]] = Field(description="Lower end")
-    upper: dict[str, list[float]] = Field(description="Upper end")
-
-
-class LocalResult(ResultModel):
-    """
-    What every local approximation returns: a distribution on the unbounded
-    scale of the parameters, centred on the fit.
-
-    Attributes
-    ----------
-    fit : CalibrationResult
-        The fit the approximation is centred on: ``Calibrator.run(starts)``.
-    covariance : list[list[float]]
-        The covariance of the distribution on the unbounded scale of the
-        parameters, in the order of the problem's parameters.
-    sample : ParameterSample
-        Draws of the distribution, mapped back to the parameters, with equal
-        weights.
-    notes : list[str]
-        The entries of the curvature whose estimated error is not small
-        against their scale; each is also logged as a warning.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    fit: CalibrationResult
-    covariance: list[list[float]]
-    sample: ParameterSample
-    notes: list[str]
-
-    def degrees_of_freedom(self) -> float | None:
-        """
-        The degrees of freedom of the distribution.
-
-        Returns
-        -------
-        float | None
-            Those of a Student t, or None for a normal.
-        """
-        return None
-
-
-class LaplaceResult(LocalResult):
-    """
-    The result of a Laplace approximation: the normal ``N(θ̂, Σ)`` on the
-    unbounded scale, ``Σ = H⁻¹``.
-
-    Attributes
-    ----------
-    fit : CalibrationResult
-        The fit the approximation is centred on: ``Calibrator.run(starts)``.
-    covariance : list[list[float]]
-        ``Σ = H⁻¹`` on the unbounded scale of the parameters.
-    sample : ParameterSample
-        Draws of the normal, mapped back to the parameters, with equal
-        weights.
-    notes : list[str]
-        The entries of the curvature whose estimated error is not small
-        against their scale.
-    """
+from commol.distributions.distributions import WithPriors
+from commol.local.results import (
+    ImportanceResult,
+    LaplaceResult,
+    SandwichResult,
+)
+from commol.local.runners import run_laplace, run_laplace_mixture, run_sandwich
 
 
 class Laplace(UncertaintyMethod[LaplaceResult], RangeChecked):
@@ -127,55 +44,13 @@ class Laplace(UncertaintyMethod[LaplaceResult], RangeChecked):
         hypercube over the bounds.
     """
 
+    _runner = staticmethod(run_laplace)
+
     draws: int = Field(description="Number of draws.")
     curvature: Literal["gauss_newton", "hessian"] = Field(
         default="gauss_newton", description="The curvature."
     )
     starts: int = Field(default=1, description="Starts of the fit.")
-
-
-class SandwichResult(LocalResult):
-    """
-    The result of a sandwich: a Student t on the unbounded scale of the
-    parameters, centred on the fit, of covariance ``H⁻¹ B H⁻¹`` and
-    ``blocks − 1`` degrees of freedom.
-
-    Attributes
-    ----------
-    fit : CalibrationResult
-        The fit the sandwich is centred on: ``Calibrator.run(starts)``.
-    covariance : list[list[float]]
-        ``H⁻¹ B H⁻¹`` on the unbounded scale of the parameters.
-    sample : ParameterSample
-        Draws of the Student t, mapped back to the parameters, with equal
-        weights.
-    notes : list[str]
-        The entries of the curvature whose estimated error is not small
-        against their scale.
-    blocks : int
-        The number of blocks ``G``; intervals read a Student t with
-        ``G − 1`` degrees of freedom.
-    block_length : int
-        The positions per block.
-    block_length_estimates : dict[str, float] | None
-        With ``block_length="auto"``, the estimate of each series, by label;
-        otherwise None.
-    """
-
-    blocks: int
-    block_length: int
-    block_length_estimates: dict[str, float] | None
-
-    def degrees_of_freedom(self) -> float | None:
-        """
-        The degrees of freedom of the Student t.
-
-        Returns
-        -------
-        float | None
-            ``blocks − 1``.
-        """
-        return float(self.blocks - 1)
 
 
 class Sandwich(UncertaintyMethod[SandwichResult], RangeChecked):
@@ -208,6 +83,8 @@ class Sandwich(UncertaintyMethod[SandwichResult], RangeChecked):
         Starts of the fit (default 1): the initial guess, then rows of a Latin
         hypercube over the bounds.
     """
+
+    _runner = staticmethod(run_sandwich)
 
     block_length: int | Literal["auto"] = Field(description="Positions per block.")
     draws: int = Field(description="Number of draws.")
@@ -257,70 +134,6 @@ type _MixtureTarget = Annotated[
 """The posterior a `LaplaceMixture` samples."""
 
 
-class MixtureComponent(ResultModel):
-    """
-    One component of a Laplace mixture: the Laplace approximation at one
-    optimum of the starts.
-
-    Attributes
-    ----------
-    center : dict[str, float]
-        The optimum, by parameter.
-    weight : float
-        Its weight in the mixture: its Laplace evidence over the sum.
-    covariance : list[list[float]]
-        Its covariance on the unbounded scale of the parameters.
-    log_evidence : float
-        The log of its Laplace evidence,
-        ``log p(θ̂) + log |dθ/du| + (d/2) log 2π + ½ log |Σ|``.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    center: dict[str, float]
-    weight: float
-    covariance: list[list[float]]
-    log_evidence: float
-
-
-class ImportanceResult(ResultModel):
-    """
-    The result of a Laplace mixture: draws of the mixture weighted by the
-    target over the mixture, smoothed by Pareto-smoothed importance
-    sampling.
-
-    Attributes
-    ----------
-    fit : CalibrationResult
-        The multi-start fit whose ends made the components:
-        ``Calibrator.run(starts)``.
-    sample : ParameterSample
-        The draws with their smoothed weights.
-    components : list[MixtureComponent]
-        The components, in order of their objective.
-    k_hat : float
-        The Pareto shape of the tail of the weights. Up to 0.5 the weights
-        have a finite variance; above 0.7 the estimate is unreliable.
-    effective_size : float
-        Kish's effective size of the smoothed weights.
-    reliable : bool
-        Whether ``k_hat`` is at most 0.7. An unreliable sample is also
-        logged as a warning.
-    notes : list[str]
-        Ends that gave no component, and an unreliable sample, in words.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    fit: CalibrationResult
-    sample: ParameterSample
-    components: list[MixtureComponent]
-    k_hat: float
-    effective_size: float
-    reliable: bool
-    notes: list[str]
-
-
 class LaplaceMixture(UncertaintyMethod[ImportanceResult], RangeChecked):
     """
     The Laplace mixture: a Laplace approximation at each distinct optimum of
@@ -347,6 +160,8 @@ class LaplaceMixture(UncertaintyMethod[ImportanceResult], RangeChecked):
     curvature : {"gauss_newton", "hessian"}
         The curvature of each component (default ``"gauss_newton"``).
     """
+
+    _runner = staticmethod(run_laplace_mixture)
 
     starts: int = Field(default=1, description="Starts of the fit.")
     draws: int = Field(description="Number of draws.")

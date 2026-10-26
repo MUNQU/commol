@@ -4,8 +4,8 @@ read through the operator of each observation."""
 import numpy as np
 import pytest
 
-from commol.observations import NoNoise
 from commol import ObservedDataPoint, Simulation
+from commol.observations import NoNoise
 from commol.uncertainty.intervals import member_statistics
 from tests.support import (
     a_to_b_builder,

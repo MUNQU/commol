@@ -11,9 +11,9 @@ from commol import (
     ParticleSwarmConfig,
     Simulation,
 )
-from commol.sensitivity import InputSpace
 from commol.observations import NormalObservations
 from commol.observations.models import _ObservationModel
+from commol.sensitivity import InputSpace
 
 from .models import a_to_b_builder, abc_builder, build
 

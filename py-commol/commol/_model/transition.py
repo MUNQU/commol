@@ -2,10 +2,10 @@
 
 from typing import Self
 
-from pydantic import ConfigDict, BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from commol.commol_rs import _commol_rs as commol_rs
 from commol._model.stratification_condition import StratificationCondition
+from commol.commol_rs import _commol_rs as commol_rs
 
 
 def _checked_rate(value: str) -> str:

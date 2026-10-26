@@ -11,12 +11,6 @@ from statistics import NormalDist
 
 import pytest
 
-from commol.observations import (
-    DistributionNoise,
-    NoNoise,
-    PoissonObservations,
-    ResidualNoise,
-)
 from commol import (
     CalibrationProblem,
     Calibrator,
@@ -24,6 +18,12 @@ from commol import (
     ObservedDataPoint,
     Simulation,
     scores,
+)
+from commol.observations import (
+    DistributionNoise,
+    NoNoise,
+    PoissonObservations,
+    ResidualNoise,
 )
 from commol.uncertainty import ParameterSample, Predictive, SampleMethod
 from tests.support import (

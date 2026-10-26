@@ -9,26 +9,27 @@ builds the result from the values it returns.
 
 from typing import TYPE_CHECKING
 
-from commol._calibration.registry import register
-from commol.sensitivity.methods import (
-    PRCC,
+from commol._data.engine_json import engine_json
+from commol.commol_rs import _commol_rs as commol_rs
+from commol.quantities.quantities import quantity_labels
+from commol.sensitivity.results import (
     ChaosResult,
-    Morris,
     MorrisResult,
-    PolynomialChaos,
     PRCCResult,
-    Propagation,
     PropagationResult,
-    Sobol,
     SobolResult,
 )
-from commol.commol_rs import _commol_rs as commol_rs
-from commol._data.engine_json import engine_json
-from commol.quantities.quantities import quantity_labels
 from commol.uncertainty.sample import ParameterSample, SampleMethod
 
 if TYPE_CHECKING:
     from commol.sensitivity.analysis import SensitivityAnalysis
+    from commol.sensitivity.methods import (
+        PRCC,
+        Morris,
+        PolynomialChaos,
+        Propagation,
+        Sobol,
+    )
 
 
 def _sample(
@@ -56,7 +57,7 @@ def _sample(
 
 
 def run_propagation(
-    analysis: "SensitivityAnalysis", method: Propagation
+    analysis: "SensitivityAnalysis", method: "Propagation"
 ) -> PropagationResult:
     """
     Run `method` on the inputs of `analysis`.
@@ -92,7 +93,7 @@ def run_propagation(
     )
 
 
-def run_prcc(analysis: "SensitivityAnalysis", method: PRCC) -> PRCCResult:
+def run_prcc(analysis: "SensitivityAnalysis", method: "PRCC") -> PRCCResult:
     """
     Run `method` on the inputs of `analysis`.
 
@@ -132,7 +133,7 @@ def run_prcc(analysis: "SensitivityAnalysis", method: PRCC) -> PRCCResult:
     )
 
 
-def run_morris(analysis: "SensitivityAnalysis", method: Morris) -> MorrisResult:
+def run_morris(analysis: "SensitivityAnalysis", method: "Morris") -> MorrisResult:
     """
     Run `method` on the inputs of `analysis`.
 
@@ -168,7 +169,7 @@ def run_morris(analysis: "SensitivityAnalysis", method: Morris) -> MorrisResult:
     )
 
 
-def run_sobol(analysis: "SensitivityAnalysis", method: Sobol) -> SobolResult:
+def run_sobol(analysis: "SensitivityAnalysis", method: "Sobol") -> SobolResult:
     """
     Run `method` on the inputs of `analysis`.
 
@@ -206,7 +207,9 @@ def run_sobol(analysis: "SensitivityAnalysis", method: Sobol) -> SobolResult:
     )
 
 
-def run_chaos(analysis: "SensitivityAnalysis", method: PolynomialChaos) -> ChaosResult:
+def run_chaos(
+    analysis: "SensitivityAnalysis", method: "PolynomialChaos"
+) -> ChaosResult:
     """
     Run `method` on the inputs of `analysis`.
 
@@ -247,10 +250,3 @@ def run_chaos(analysis: "SensitivityAnalysis", method: PolynomialChaos) -> Chaos
         total=run.total,
         runs=run.runs,
     )
-
-
-register(Propagation, run_propagation)
-register(PRCC, run_prcc)
-register(Morris, run_morris)
-register(Sobol, run_sobol)
-register(PolynomialChaos, run_chaos)

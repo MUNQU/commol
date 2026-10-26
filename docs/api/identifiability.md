@@ -14,28 +14,28 @@ they return, and its parts. Guide:
 
 ::: commol.identifiability.StartsIdentifiability
 
-::: commol.identifiability.methods.IdentifiabilityReport
+::: commol.identifiability.results.IdentifiabilityReport
 
-::: commol.identifiability.methods.ParameterVerdicts
+::: commol.identifiability.results.ParameterVerdicts
 
-::: commol.identifiability.methods.StructuralVerdict
+::: commol.identifiability.results.StructuralVerdict
 
-::: commol.identifiability.methods.PracticalVerdict
+::: commol.identifiability.results.PracticalVerdict
 
-::: commol.identifiability.methods.StructuralSection
+::: commol.identifiability.results.StructuralSection
 
-::: commol.identifiability.methods.PointRank
+::: commol.identifiability.results.PointRank
 
-::: commol.identifiability.methods.Combination
+::: commol.identifiability.results.Combination
 
-::: commol.identifiability.methods.CollinearitySection
+::: commol.identifiability.results.CollinearitySection
 
-::: commol.identifiability.methods.SubsetIndex
+::: commol.identifiability.results.SubsetIndex
 
-::: commol.identifiability.methods.SampleSection
+::: commol.identifiability.results.SampleSection
 
-::: commol.identifiability.methods.CorrelatedPair
+::: commol.identifiability.results.CorrelatedPair
 
-::: commol.identifiability.methods.StartsSection
+::: commol.identifiability.results.StartsSection
 
-::: commol.identifiability.methods.ProfileSection
+::: commol.identifiability.results.ProfileSection

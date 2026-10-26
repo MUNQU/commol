@@ -9,25 +9,22 @@ particle in parallel; the runner builds the result from the run.
 import logging
 from typing import TYPE_CHECKING
 
-from commol._fit.starts import fit_result
-from commol._calibration.registry import register
-from commol.resampling.runners import block_length_estimates, log_failed, sample_method
-from commol.commol_rs import _commol_rs as commol_rs
+from commol._calibration.method import CalibrationPort
 from commol._data.engine_json import engine_json
+from commol._fit.starts import fit_result
+from commol.commol_rs import _commol_rs as commol_rs
+from commol.resampling.runners import block_length_estimates, log_failed, sample_method
+from commol.smc.results import GibbsResult, SMCDiagnostics, SMCResult
 from commol.uncertainty.sample import ParameterSample, SampleMethod
-from commol.smc.methods import (
-    ABCRejection,
-    ABCSMC,
-    BayesianPosterior,
-    GibbsPosterior,
-    GibbsResult,
-    SMCDiagnostics,
-    SMCResult,
-)
 
 if TYPE_CHECKING:
-    from commol._calibration.calibrator import Calibrator
     from commol.commol_rs._commol_rs import SMCRunProtocol
+    from commol.smc.methods import (
+        ABCSMC,
+        ABCRejection,
+        BayesianPosterior,
+        GibbsPosterior,
+    )
 
 logger = logging.getLogger("commol.smc")
 
@@ -39,7 +36,7 @@ ONE_REPLICATE = (
 
 
 def _sample(
-    calibrator: "Calibrator", run: "SMCRunProtocol", method: SampleMethod
+    calibrator: CalibrationPort, run: "SMCRunProtocol", method: SampleMethod
 ) -> ParameterSample:
     parameters = calibrator.problem.parameters
     return ParameterSample(
@@ -66,7 +63,7 @@ def _diagnostics(run: "SMCRunProtocol", notes: list[str]) -> SMCDiagnostics:
 
 
 def run_gibbs_posterior(
-    calibrator: "Calibrator", method: GibbsPosterior
+    calibrator: CalibrationPort, method: "GibbsPosterior"
 ) -> GibbsResult:
     """
     Sample a Gibbs posterior, after calibrating its `η` if asked.
@@ -86,7 +83,7 @@ def run_gibbs_posterior(
         of the automatic length.
     """
     starts, run, eta = commol_rs.inference.gibbs_posterior(
-        calibrator._rust_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method)
     )
     fit = (
         None
@@ -113,7 +110,7 @@ def run_gibbs_posterior(
 
 
 def run_bayesian_posterior(
-    calibrator: "Calibrator", method: BayesianPosterior
+    calibrator: CalibrationPort, method: "BayesianPosterior"
 ) -> SMCResult:
     """
     Sample the posterior of the problem's observation models.
@@ -131,7 +128,7 @@ def run_bayesian_posterior(
         The sample, the temperatures, the log evidence and the diagnostics.
     """
     run = commol_rs.inference.bayesian_posterior(
-        calibrator._rust_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method)
     )
     return SMCResult(
         sample=_sample(
@@ -146,7 +143,7 @@ def run_bayesian_posterior(
     )
 
 
-def run_abc_smc(calibrator: "Calibrator", method: ABCSMC) -> SMCResult:
+def run_abc_smc(calibrator: CalibrationPort, method: "ABCSMC") -> SMCResult:
     """
     Sample ABC by sequential Monte Carlo.
 
@@ -163,7 +160,7 @@ def run_abc_smc(calibrator: "Calibrator", method: ABCSMC) -> SMCResult:
         The sample, the tolerances, the log evidence and the diagnostics.
     """
     run, stochastic = commol_rs.inference.abc_smc(
-        calibrator._rust_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method)
     )
     return SMCResult(
         sample=_sample(
@@ -178,7 +175,7 @@ def run_abc_smc(calibrator: "Calibrator", method: ABCSMC) -> SMCResult:
     )
 
 
-def run_abc_rejection(calibrator: "Calibrator", method: ABCRejection) -> SMCResult:
+def run_abc_rejection(calibrator: CalibrationPort, method: "ABCRejection") -> SMCResult:
     """
     Run ABC rejection.
 
@@ -195,7 +192,7 @@ def run_abc_rejection(calibrator: "Calibrator", method: ABCRejection) -> SMCResu
         The kept draws, the tolerance, the log evidence and the diagnostics.
     """
     run, stochastic = commol_rs.inference.abc_rejection(
-        calibrator._rust_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method)
     )
     return SMCResult(
         sample=_sample(
@@ -208,9 +205,3 @@ def run_abc_rejection(calibrator: "Calibrator", method: ABCRejection) -> SMCResu
         log_evidence=run.log_evidence,
         diagnostics=_diagnostics(run, [ONE_REPLICATE] if stochastic else []),
     )
-
-
-register(GibbsPosterior, run_gibbs_posterior)
-register(BayesianPosterior, run_bayesian_posterior)
-register(ABCSMC, run_abc_smc)
-register(ABCRejection, run_abc_rejection)

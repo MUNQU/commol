@@ -11,8 +11,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 
 from commol import Aggregate, Simulation
-from commol.engines import ODESolver
 from commol._model.model import Model
+from commol.engines import ODESolver
 
 from .models import TIGHT, FactoryBuilder, build, build_ode
 

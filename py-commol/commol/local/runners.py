@@ -9,31 +9,28 @@ unbounded scale.
 import logging
 from typing import TYPE_CHECKING
 
-from commol._fit.starts import fit_result
-from commol._calibration.registry import register
-from commol.resampling.runners import block_length_estimates, sample_method
-from commol.commol_rs import _commol_rs as commol_rs
+from commol._calibration.method import CalibrationPort
 from commol._data.engine_json import engine_json
-from commol.local.methods import (
+from commol._fit.starts import fit_result
+from commol.commol_rs import _commol_rs as commol_rs
+from commol.local.results import (
     ImportanceResult,
-    Laplace,
-    LaplaceMixture,
     LaplaceResult,
     MixtureComponent,
-    Sandwich,
     SandwichResult,
 )
+from commol.resampling.runners import block_length_estimates, sample_method
 from commol.uncertainty.sample import ParameterSample, SampleMethod
 
 if TYPE_CHECKING:
-    from commol._calibration.calibrator import Calibrator
     from commol.commol_rs._commol_rs import LocalRunProtocol
+    from commol.local.methods import Laplace, LaplaceMixture, Sandwich
 
 logger = logging.getLogger("commol.local")
 
 
 def _sample(
-    calibrator: "Calibrator", run: "LocalRunProtocol", method: SampleMethod
+    calibrator: CalibrationPort, run: "LocalRunProtocol", method: SampleMethod
 ) -> ParameterSample:
     parameters = calibrator.problem.parameters
     return ParameterSample.equally_weighted(
@@ -50,7 +47,7 @@ def _notes(run: "LocalRunProtocol") -> list[str]:
     return list(run.notes)
 
 
-def run_laplace(calibrator: "Calibrator", method: Laplace) -> LaplaceResult:
+def run_laplace(calibrator: CalibrationPort, method: "Laplace") -> LaplaceResult:
     """
     Run the Laplace approximation at the fit.
 
@@ -67,7 +64,7 @@ def run_laplace(calibrator: "Calibrator", method: Laplace) -> LaplaceResult:
         The fit, the covariance on the unbounded scale and the draws.
     """
     starts, run = commol_rs.inference.laplace(
-        calibrator._rust_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method)
     )
     return LaplaceResult(
         fit=fit_result(starts, calibrator.parameter_names, calibrator.seed, logger),
@@ -81,7 +78,7 @@ def run_laplace(calibrator: "Calibrator", method: Laplace) -> LaplaceResult:
     )
 
 
-def run_sandwich(calibrator: "Calibrator", method: Sandwich) -> SandwichResult:
+def run_sandwich(calibrator: CalibrationPort, method: "Sandwich") -> SandwichResult:
     """
     Run the sandwich at the fit.
 
@@ -99,7 +96,7 @@ def run_sandwich(calibrator: "Calibrator", method: Sandwich) -> SandwichResult:
         and the blocks.
     """
     starts, run, blocks, block_length, estimates = commol_rs.inference.sandwich(
-        calibrator._rust_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method)
     )
     return SandwichResult(
         fit=fit_result(starts, calibrator.parameter_names, calibrator.seed, logger),
@@ -117,7 +114,7 @@ def run_sandwich(calibrator: "Calibrator", method: Sandwich) -> SandwichResult:
 
 
 def run_laplace_mixture(
-    calibrator: "Calibrator", method: LaplaceMixture
+    calibrator: CalibrationPort, method: "LaplaceMixture"
 ) -> ImportanceResult:
     """
     Fit from several starts and sample the target with the Laplace mixture of
@@ -137,7 +134,7 @@ def run_laplace_mixture(
         effective size.
     """
     starts, run = commol_rs.inference.laplace_mixture(
-        calibrator._rust_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method)
     )
     names = calibrator.parameter_names
     fit = fit_result(starts, names, calibrator.seed, logger)
@@ -173,8 +170,3 @@ def run_laplace_mixture(
         reliable=run.reliable,
         notes=list(run.notes),
     )
-
-
-register(Laplace, run_laplace)
-register(LaplaceMixture, run_laplace_mixture)
-register(Sandwich, run_sandwich)

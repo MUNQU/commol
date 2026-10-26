@@ -14,24 +14,24 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
-from commol.uncertainty.intervals import member_statistics
+from commol._fit.result import CalibrationResult
+from commol._problem.problem import ObservedDataPoint
 from commol._simulation.results import (
     SimulationReplicates,
     SimulationResults,
-    outputs_for,
     _sample,
+    outputs_for,
     total_series,
 )
 from commol._simulation.windows import _windowed_totals
 from commol.commol_rs import _commol_rs as commol_rs
-from commol._fit.result import CalibrationResult
-from commol._problem.problem import ObservedDataPoint
 from commol.observations.noise import NoNoise
+from commol.uncertainty.intervals import member_statistics
 
 if TYPE_CHECKING:
-    from commol.uncertainty.predictive import Predictive, SeriesBand
-    from commol.conformal.methods import PredictionIntervals
     from commol._model.model import Model
+    from commol.conformal.results import PredictionIntervals
+    from commol.uncertainty.predictive import Predictive, SeriesBand
 
 logger = logging.getLogger("commol.plotting")
 

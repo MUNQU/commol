@@ -17,8 +17,8 @@ result. Guide: [Conformal Prediction Intervals](../guide/uncertainty/conformal.m
 
 ::: commol.conformal.AdaptiveConformal
 
-::: commol.conformal.methods.ConformalResult
+::: commol.conformal.results.ConformalResult
 
-::: commol.conformal.methods.PredictionIntervals
+::: commol.conformal.results.PredictionIntervals
 
-::: commol.conformal.methods.SeriesIntervals
+::: commol.conformal.results.SeriesIntervals

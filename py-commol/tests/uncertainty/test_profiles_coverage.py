@@ -18,6 +18,7 @@ from commol import (
     ObservedDataPoint,
     Simulation,
 )
+from commol._calibration.method import UncertaintyMethod
 from commol.observations import NormalObservations
 from commol.profiles import (
     PredictionProfile,
@@ -25,9 +26,8 @@ from commol.profiles import (
     ProfileLikelihood,
     Threshold,
 )
+from commol.profiles.results import ProfileResult
 from commol.resampling import ResidualBootstrap
-from commol.profiles.methods import ProfileResult
-from commol._calibration.method import UncertaintyMethod
 from tests.support import a_to_b_builder, bounded, build
 from tests.support.coverage import Interval, coverage_study
 

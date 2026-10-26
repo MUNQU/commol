@@ -1,13 +1,8 @@
 """The profile likelihood of parameters and predictions (guide: Profile
 Likelihood)."""
 
-from commol.profiles.methods import (
-    PredictionProfile,
-    PredictionSpec,
-    ProfileLikelihood,
-    Threshold,
-)
-from commol.profiles import runners as _runners  # noqa: F401  (registers the runners)
+from commol.profiles.methods import PredictionProfile, PredictionSpec, ProfileLikelihood
+from commol.profiles.results import Threshold
 
 __all__ = [
     "PredictionProfile",

@@ -13,7 +13,15 @@ from typing import NotRequired, TypedDict, cast
 
 import numpy as np
 
-from commol.uncertainty.intervals import member_statistics
+from commol._fit.result import CalibrationResult
+from commol._model.model import Model
+from commol._model.report_entry import Interval, entry_interval
+from commol._model.structure import ReportSections
+from commol._problem.problem import (
+    CalibrationProblem,
+    ObservedDataPoint,
+    calibrated_values,
+)
 from commol._simulation.results import (
     SimulationResults,
     _sample,
@@ -22,25 +30,17 @@ from commol._simulation.results import (
 )
 from commol._simulation.windows import _windowed_totals
 from commol.commol_rs import _commol_rs as commol_rs
-from commol._problem.problem import (
-    CalibrationProblem,
-    ObservedDataPoint,
-    calibrated_values,
-)
-from commol._fit.result import CalibrationResult
-from commol._model.model import Model
-from commol.conformal.methods import PredictionIntervals
-from commol.identifiability.methods import (
+from commol.conformal.results import PredictionIntervals
+from commol.identifiability.results import (
     IdentifiabilityReport,
     ProfileThresholdName,
-    ProfileVerdictName,
     SampleReference,
     StructuralDesign,
     StructuralVerdictName,
 )
+from commol.profiles.results import ProfileVerdictName
+from commol.uncertainty.intervals import member_statistics
 from commol.uncertainty.sample import ParameterSample, ParameterSummary
-from commol._model.report_entry import Interval, entry_interval
-from commol._model.structure import ReportSections
 
 
 class ParameterEntry(TypedDict):

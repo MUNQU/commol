@@ -16,9 +16,9 @@ from commol import (
     ObservedDataPoint,
     Simulation,
 )
-from commol.uncertainty import ParameterSample, Predictive, SampleMethod
-from commol._simulation.results import SimulationResults
 from commol._fit.result import CalibrationResult
+from commol._simulation.results import SimulationResults
+from commol.uncertainty import ParameterSample, Predictive, SampleMethod
 
 from .models import a_to_b_builder, abc_builder, build
 from .problems import bounded

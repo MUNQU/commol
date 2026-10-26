@@ -1,6 +1,7 @@
 """Nelder-Mead and particle swarm recover known parameters and report convergence."""
 
 import re
+
 import pytest
 from pydantic import ValidationError
 

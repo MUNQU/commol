@@ -6,12 +6,12 @@ import numpy as np
 import pytest
 
 from commol import (
-    InfeasibleStateError,
     CalibrationProblem,
+    Calibrator,
+    InfeasibleStateError,
     NelderMeadConfig,
     ObservedDataPoint,
     Simulation,
-    Calibrator,
 )
 from commol.observations import NoNoise
 from commol.uncertainty import (
@@ -237,7 +237,7 @@ class TestObservations:
         predictive = Predictive(calibrator, sample, POSITIONS)
 
         draws = predictive.at_observations(calibrator.problem.observed_data, NoNoise())
-        expected = calibrator._rust_problem.predict_observations(sample.values)
+        expected = calibrator._engine_problem.predict_observations(sample.values)
 
         np.testing.assert_allclose(draws.values, [per_set[0] for per_set in expected])
 

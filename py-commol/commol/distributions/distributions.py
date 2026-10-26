@@ -13,9 +13,9 @@ from typing import TYPE_CHECKING, Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
-from commol.commol_rs import _commol_rs as commol_rs
 from commol._data.engine_json import engine_json
 from commol._data.ranges import RangeChecked
+from commol.commol_rs import _commol_rs as commol_rs
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import DistributionProtocol

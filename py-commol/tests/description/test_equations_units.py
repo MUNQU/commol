@@ -2,10 +2,10 @@
 
 import pytest
 
-from commol._model.model import Model
-from tests.support.description import equation_forms
-from tests.support import FactoryBuilder, build, build_ode, abc_builder
 from commol import Aggregate
+from commol._model.model import Model
+from tests.support import FactoryBuilder, abc_builder, build, build_ode
+from tests.support.description import equation_forms
 
 DAILY = {"k1": "1/day", "k2": "1/day"}
 

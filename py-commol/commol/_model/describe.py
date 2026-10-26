@@ -15,15 +15,14 @@ parameters, outputs), adds the sections of the kind
 
 from typing import TYPE_CHECKING, Literal
 
-from commol.commol_rs import _commol_rs as commol_rs
 from commol._data.engine_json import engine_json
-
-from commol._model.description import _Block, ModelDescription, Section, Table, Text
+from commol._model.description import ModelDescription, Section, Table, Text, _Block
 from commol._model.parameter import SeriesValue
+from commol.commol_rs import _commol_rs as commol_rs
 
 if TYPE_CHECKING:
-    from commol.commol_rs._commol_rs import EngineTypeProtocol
     from commol._model.model import Model
+    from commol.commol_rs._commol_rs import EngineTypeProtocol
 
 TO_BE_WRITTEN = "To be written by the modeller."
 """The marker of an element of the ODD protocol that commol cannot fill."""

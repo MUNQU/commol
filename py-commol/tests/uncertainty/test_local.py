@@ -15,7 +15,6 @@ import numpy as np
 import pytest
 from pydantic import BaseModel
 
-from commol.smc import InformationMatchingEta, GibbsPosterior
 from commol import (
     CalibrationConstraint,
     CalibrationProblem,
@@ -23,6 +22,10 @@ from commol import (
     NelderMeadConfig,
     Simulation,
 )
+from commol._calibration.method import UncertaintyMethod
+from commol.commol_rs import _commol_rs as commol_rs
+from commol.distributions import Priors
+from commol.engines.engine import ODESolver
 from commol.local import (
     GibbsTarget,
     Laplace,
@@ -30,21 +33,24 @@ from commol.local import (
     LikelihoodTarget,
     Sandwich,
 )
+from commol.local.results import (
+    DeltaBand,
+    ImportanceResult,
+    LaplaceResult,
+    SandwichResult,
+)
 from commol.observations import NormalObservations
+from commol.smc import GibbsPosterior, InformationMatchingEta
 from commol.uncertainty import Predictive
-from commol.distributions import Priors
-from commol.local.methods import ImportanceResult, LaplaceResult, SandwichResult
-from commol._calibration.method import UncertaintyMethod
-from commol.commol_rs import _commol_rs as commol_rs
-from commol.engines.engine import ODESolver
+from commol.uncertainty.predictive import by_output
 from tests.support import (
+    TWO_WELLS_FIT,
     a_to_b_builder,
     bounded,
     build,
     build_ode,
     flow_calibrator,
     flow_observations,
-    TWO_WELLS_FIT,
     two_wells_calibrator,
 )
 
@@ -176,7 +182,7 @@ class TestLaplace:
         result = calibrator.uncertainty(Laplace(draws=draws))
         positions = [float(t) for t in range(13)]
 
-        band = calibrator.delta_band(result, positions, level)
+        band = result.delta_band(calibrator, positions, level)
         drawn = Predictive(calibrator, result.sample, positions).band(level)
 
         # The error of a quantile at 0.05 of n normal draws, in standard
@@ -210,9 +216,9 @@ class TestLaplace:
         result = calibrator.uncertainty(Laplace(draws=10))
         read = LaplaceResult.model_validate_json(result.model_dump_json())
 
-        band = calibrator.delta_band(read, [1.0, 2.0], 0.9)
+        band = read.delta_band(calibrator, [1.0, 2.0], 0.9)
 
-        assert band == calibrator.delta_band(result, [1.0, 2.0], 0.9)
+        assert band == result.delta_band(calibrator, [1.0, 2.0], 0.9)
         assert band.lower["B"][1] < band.center["B"][1] < band.upper["B"][1]
 
     def test_a_band_needs_a_result_of_its_problem(self) -> None:
@@ -229,7 +235,7 @@ class TestLaplace:
         )
 
         with pytest.raises(ValueError, match=r"parameters \['c', 'sd'\]"):
-            calibrator.delta_band(result, [1.0], 0.9)
+            result.delta_band(calibrator, [1.0], 0.9)
 
     def test_a_band_takes_the_positions_of_the_engine(self) -> None:
         calibrator = flow_calibrator(
@@ -240,10 +246,10 @@ class TestLaplace:
         result = calibrator.uncertainty(Laplace(draws=10))
 
         with pytest.raises(ValueError, match="only at integer steps"):
-            calibrator.delta_band(result, [0.5], 0.9)
+            result.delta_band(calibrator, [0.5], 0.9)
         with pytest.raises(ValueError, match="1 rows of 1 values"):
             commol_rs.inference.delta_band(
-                calibrator._rust_problem, [10.0], [[1.0, 0.0]], None, [1.0], 0.9
+                calibrator._engine_problem, [10.0], [[1.0, 0.0]], None, [1.0], 0.9
             )
 
     def test_laplace_refuses_a_loss(self) -> None:
@@ -254,6 +260,34 @@ class TestLaplace:
             match=r"NormalObservations\(sd=\"sd\"\) with a noise parameter.*Sandwich",
         ):
             calibrator.uncertainty(Laplace(draws=10))
+
+
+def test_a_delta_band_comes_from_the_local_module() -> None:
+    calibrator = flow_calibrator(
+        [9.0, 11.0, 10.0],
+        windowed=True,
+        observation_models={"B": NormalObservations(sd=1.0)},
+    )
+    result = calibrator.uncertainty(Sandwich(draws=10, block_length=1))
+
+    band = result.delta_band(calibrator, [1.0, 2.0], 0.9)
+
+    outputs, center, lower, upper = commol_rs.inference.delta_band(
+        calibrator._engine_problem,
+        [result.fit.best_parameters["c"]],
+        result.covariance,
+        result.degrees_of_freedom(),
+        [1.0, 2.0],
+        0.9,
+    )
+    assert not hasattr(calibrator, "delta_band")
+    assert band == DeltaBand(
+        confidence_level=0.9,
+        positions=[1.0, 2.0],
+        center=by_output(outputs, center),
+        lower=by_output(outputs, lower),
+        upper=by_output(outputs, upper),
+    )
 
 
 class TestSandwich:
@@ -283,7 +317,7 @@ class TestSandwich:
         c = result.fit.best_parameters["c"]
         derivative = c * (50.0 - c) / 50.0
 
-        band = calibrator.delta_band(result, [3.0], 0.9)
+        band = result.delta_band(calibrator, [3.0], 0.9)
 
         t_quantile = 2.353363434801823
         half = t_quantile * 3.0 * derivative * math.sqrt(result.covariance[0][0])

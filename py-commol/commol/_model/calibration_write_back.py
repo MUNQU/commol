@@ -13,8 +13,8 @@ from commol._model.initial_conditions import CATEGORY_SEPARATOR
 
 if TYPE_CHECKING:
     from commol._model.aggregate import Aggregate
-    from commol._problem.problem import CalibrationProblem
     from commol._model.model import Model
+    from commol._problem.problem import CalibrationProblem
 
 # Relative tolerance under which a rebuilt amount matches the scored one.
 _MATCH_TOLERANCE = 1e-9

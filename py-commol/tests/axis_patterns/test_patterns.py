@@ -3,8 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from commol import StratificationCondition, StratifiedRate
-from commol import ModelBuilder, AxisPattern
+from commol import AxisPattern, ModelBuilder, StratificationCondition, StratifiedRate
 from tests.axis_patterns.conditions import condition
 from tests.support import abc_builder, assert_accepted
 

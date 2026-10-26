@@ -2,8 +2,8 @@
 ABC (guide: Sequential Monte Carlo)."""
 
 from commol.smc.methods import (
-    ABCRejection,
     ABCSMC,
+    ABCRejection,
     BayesianPosterior,
     BootstrapCoverageEta,
     GibbsPosterior,
@@ -11,7 +11,6 @@ from commol.smc.methods import (
     LossDistance,
     SeriesDistance,
 )
-from commol.smc import runners as _runners  # noqa: F401  (registers the runners)
 
 __all__ = [
     "ABCRejection",

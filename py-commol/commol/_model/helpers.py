@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
-from commol._model.constants import SUBGROUP_TOTAL_PREFIX, TOTAL_VARIABLE
 from commol._model import engine_state
+from commol._model.constants import SUBGROUP_TOTAL_PREFIX, TOTAL_VARIABLE
 from commol._model.formula_tree import Node, formula_text, variables
 from commol._model.neighbors import NEIGHBORS_PREFIX, NEIGHBORS_VARIABLE
 from commol._model.unit_checks import (

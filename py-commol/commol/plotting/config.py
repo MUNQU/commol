@@ -2,7 +2,7 @@
 
 from typing import Self
 
-from pydantic import ConfigDict, BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PlotConfig(BaseModel):

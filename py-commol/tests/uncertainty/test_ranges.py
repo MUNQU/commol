@@ -13,12 +13,12 @@ from collections.abc import Callable
 import pytest
 from pydantic import BaseModel
 
-from commol.quantities import Increments
 from commol import AxisPattern, Simulation
-from commol.observations import NormalObservations, StudentTObservations
-from commol.resampling import ParametricBootstrap
 from commol._simulation.simulation import ReplicateRuns
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.observations import NormalObservations, StudentTObservations
+from commol.quantities import Increments
+from commol.resampling import ParametricBootstrap
 from tests.support import a_to_b_builder, build_stochastic
 from tests.support.data_objects import EXAMPLES
 

@@ -6,14 +6,13 @@ from typing import TYPE_CHECKING, TypeVar
 from pydantic import BaseModel
 
 from commol._calibration.calibrator import check_values
-from commol._calibration.registry import run_method
+from commol._calibration.method import SensitivityMethod, run_method
+from commol._data.engine_json import engine_handles, engine_json
+from commol._problem.problem import ObservedDataPoint
 from commol._simulation.simulation import Simulation, check_seed
 from commol.commol_rs import _commol_rs as commol_rs
-from commol._data.engine_json import engine_handles, engine_json
-from commol.sensitivity.methods import InputSpace
-from commol._problem.problem import ObservedDataPoint
-from commol._calibration.method import SensitivityMethod
 from commol.observations.noise import NoNoise, _ObservationNoise
+from commol.sensitivity.results import InputSpace
 from commol.uncertainty.sample import ParameterSample
 
 if TYPE_CHECKING:

@@ -9,11 +9,10 @@ runner computes a derivative, a rank or a statistic.
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from commol._calibration.registry import register
-from commol.commol_rs import _commol_rs as commol_rs
+from commol._calibration.method import CalibrationPort
 from commol._data.engine_json import engine_handles, engine_json
-from commol.identifiability.methods import (
-    Collinearity,
+from commol.commol_rs import _commol_rs as commol_rs
+from commol.identifiability.results import (
     CollinearitySection,
     Combination,
     CorrelatedPair,
@@ -21,18 +20,23 @@ from commol.identifiability.methods import (
     ParameterVerdicts,
     PointRank,
     PracticalVerdict,
-    SampleIdentifiability,
+    ProfileSection,
     SampleSection,
-    StartsIdentifiability,
     StartsSection,
-    StructuralRank,
     StructuralSection,
     StructuralVerdict,
     SubsetIndex,
 )
+from commol.profiles.results import RESET_REASON
 
 if TYPE_CHECKING:
-    from commol._calibration.calibrator import Calibrator
+    from commol.identifiability.methods import (
+        Collinearity,
+        ProfileIdentifiability,
+        SampleIdentifiability,
+        StartsIdentifiability,
+        StructuralRank,
+    )
 
 
 def _power(name: str, exponent: float) -> str:
@@ -53,7 +57,7 @@ def _combination_text(exponents: dict[str, float], negative: set[str]) -> str:
 
 
 def _report(
-    calibrator: "Calibrator",
+    calibrator: CalibrationPort,
     *,
     structural_verdicts: dict[str, StructuralVerdict] | None = None,
     practical_verdicts: dict[str, PracticalVerdict] | None = None,
@@ -74,12 +78,12 @@ def _report(
 
 
 def run_structural_rank(
-    calibrator: "Calibrator", method: StructuralRank
+    calibrator: CalibrationPort, method: "StructuralRank"
 ) -> IdentifiabilityReport:
     """Run `StructuralRank` on `calibrator`."""
     names = calibrator.parameter_names
     analysis = commol_rs.inference.structural_rank(
-        calibrator._rust_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method)
     )
     negative = {p.id for p in calibrator.problem.parameters if p.min_bound < 0}
     combinations = []
@@ -127,12 +131,12 @@ def run_structural_rank(
 
 
 def run_collinearity(
-    calibrator: "Calibrator", method: Collinearity
+    calibrator: CalibrationPort, method: "Collinearity"
 ) -> IdentifiabilityReport:
     """Run `Collinearity` on `calibrator`."""
     names = calibrator.parameter_names
     analysis = commol_rs.inference.collinearity(
-        calibrator._rust_problem, engine_json(method), **engine_handles(method)
+        calibrator._engine_problem, engine_json(method), **engine_handles(method)
     )
 
     def subsets(entries: Sequence[tuple[list[int], float, float]]) -> list[SubsetIndex]:
@@ -178,12 +182,12 @@ def run_collinearity(
 
 
 def run_sample_identifiability(
-    calibrator: "Calibrator", method: SampleIdentifiability
+    calibrator: CalibrationPort, method: "SampleIdentifiability"
 ) -> IdentifiabilityReport:
     """Run `SampleIdentifiability` on `calibrator`."""
     names = calibrator.parameter_names
     analysis = commol_rs.inference.sample_identifiability(
-        calibrator._rust_problem, engine_json(method), **engine_handles(method)
+        calibrator._engine_problem, engine_json(method), **engine_handles(method)
     )
     pairs = [
         CorrelatedPair(first=names[j], second=names[k], correlation=r)
@@ -216,12 +220,12 @@ def run_sample_identifiability(
 
 
 def run_starts_identifiability(
-    calibrator: "Calibrator", method: StartsIdentifiability
+    calibrator: CalibrationPort, method: "StartsIdentifiability"
 ) -> IdentifiabilityReport:
     """Run `StartsIdentifiability` on `calibrator`."""
     names = calibrator.parameter_names
     analysis = commol_rs.inference.starts_identifiability(
-        calibrator._rust_problem, engine_json(method), **engine_handles(method)
+        calibrator._engine_problem, engine_json(method), **engine_handles(method)
     )
     flagged = [name for name, flag in zip(names, analysis.flagged, strict=True) if flag]
     spread = dict(zip(names, analysis.spread, strict=True))
@@ -253,7 +257,58 @@ def run_starts_identifiability(
     return _report(calibrator, practical_verdicts=practical, starts=[section])
 
 
-register(StructuralRank, run_structural_rank)
-register(Collinearity, run_collinearity)
-register(SampleIdentifiability, run_sample_identifiability)
-register(StartsIdentifiability, run_starts_identifiability)
+def run_profile_identifiability(
+    calibrator: CalibrationPort, method: "ProfileIdentifiability"
+) -> IdentifiabilityReport:
+    """Run `ProfileIdentifiability` on `calibrator`: the verdicts of the
+    profiles, which the engine computed when it profiled."""
+    result = method.result
+    names = calibrator.parameter_names
+    if list(result.fit.best_parameters) != names:
+        raise ValueError(
+            f"The profiles are of the parameters {list(result.fit.best_parameters)}; "
+            f"the problem has {names}."
+        )
+    structural: dict[str, StructuralVerdict] = {}
+    practical: dict[str, PracticalVerdict] = {}
+    for name in names:
+        verdict = result.verdicts.get(name)
+        if verdict is None:
+            continue
+        reason = f"profile likelihood: {verdict}. {RESET_REASON}"
+        if verdict == "structurally_non_identifiable":
+            structure = result.structure[name]
+            reason = structure.reason(
+                name, result.profiles[name].threshold, result.evaluation_floor
+            )
+            if structure.verdict is None:
+                practical[name] = PracticalVerdict(
+                    verdict="poorly_determined", reasons=[reason]
+                )
+            else:
+                structural[name] = StructuralVerdict(
+                    verdict=structure.verdict, reasons=[reason]
+                )
+        else:
+            practical[name] = PracticalVerdict(
+                verdict=(
+                    "determined" if verdict == "identifiable" else "poorly_determined"
+                ),
+                reasons=[reason],
+            )
+    section = ProfileSection(
+        threshold=result.threshold.kind,
+        confidence_level=result.threshold.confidence_level,
+        tolerance=result.tolerance,
+        verdicts=result.verdicts,
+        intervals={
+            name: (interval.lower, interval.upper)
+            for name, interval in result.intervals.items()
+        },
+    )
+    return _report(
+        calibrator,
+        structural_verdicts=structural,
+        practical_verdicts=practical,
+        profile=[section],
+    )

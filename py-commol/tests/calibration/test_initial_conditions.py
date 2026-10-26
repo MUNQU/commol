@@ -2,7 +2,6 @@
 
 import pytest
 
-from commol import StratificationCondition, StratifiedRate
 from commol import (
     Aggregate,
     CalibrationProblem,
@@ -12,17 +11,19 @@ from commol import (
     ObservedDataPoint,
     ParticleSwarmConfig,
     Simulation,
+    StratificationCondition,
+    StratifiedRate,
 )
-from commol.uncertainty import ParameterSample, Predictive, SampleMethod
 from commol._model.model import Model
+from commol.uncertainty import ParameterSample, Predictive, SampleMethod
 from tests.support import (
     a_to_b_builder,
+    abc_builder,
     assert_accepted,
     bounded,
     build,
     mixed_units_builder,
     observed,
-    abc_builder,
 )
 
 SEED = 42

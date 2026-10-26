@@ -16,11 +16,10 @@ from commol import (
     Aggregate,
     Model,
 )
-from commol._model.structure import ModelStructure
-from commol.commol_rs import _commol_rs as commol_rs
 from commol._model.description import Equation, EquationGroup, Equations, Section, Table
-from commol._model.structure import ReportSections, SeriesLabel
 from commol._model.parameter import Parameter
+from commol._model.structure import ModelStructure, ReportSections, SeriesLabel
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.engines.engine import ModelEngine
 
 if TYPE_CHECKING:

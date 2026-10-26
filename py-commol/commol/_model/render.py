@@ -8,13 +8,11 @@ in a ``.dot`` file (every graph). The text, LaTeX and JSON renderings draw no
 diagram; the JSON holds the graphs as data.
 """
 
-from typing import Literal
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Literal
 
 from commol._model.description import (
-    _Block,
-    _Cell,
     Equation,
     Equations,
     Matrix,
@@ -22,6 +20,8 @@ from commol._model.description import (
     StateGraph,
     Table,
     Text,
+    _Block,
+    _Cell,
 )
 
 SUFFIXES: dict[str, Literal["text", "markdown", "latex", "json", "dot"]] = {

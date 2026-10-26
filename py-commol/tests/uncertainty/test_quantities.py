@@ -9,16 +9,9 @@ import numpy as np
 import pytest
 from pydantic import TypeAdapter
 
-from commol.sensitivity import (
-    PRCC,
-    InputSpace,
-    Morris,
-    PolynomialChaos,
-    Propagation,
-    SensitivityAnalysis,
-    Sobol,
-)
 from commol import Aggregate, AxisPattern, ModelBuilder, Simulation
+from commol._data.engine_json import engine_json
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.quantities import (
     Gain,
     Increments,
@@ -29,16 +22,23 @@ from commol.quantities import (
     Trajectory,
     ValueAt,
 )
+from commol.quantities.quantities import _Quantity, quantity_labels
+from commol.sensitivity import (
+    PRCC,
+    InputSpace,
+    Morris,
+    PolynomialChaos,
+    Propagation,
+    SensitivityAnalysis,
+    Sobol,
+)
+from commol.sensitivity.results import PropagationResult
 from commol.uncertainty import (
     ParameterSample,
     SampleMethod,
     member_statistics,
     weighted_quantiles,
 )
-from commol.sensitivity.methods import PropagationResult
-from commol.commol_rs import _commol_rs as commol_rs
-from commol._data.engine_json import engine_json
-from commol.quantities.quantities import _Quantity, quantity_labels
 from tests.support import bounded, build
 from tests.support.models import a_to_b_builder
 

@@ -29,13 +29,12 @@ from collections.abc import Mapping
 from datetime import date
 from typing import Self
 
-from commol import StratifiedRate
-from commol import Aggregate, ModelBuilder, StratificationCondition
-from commol.engines import ODESolver, StochasticEventsSettings, StochasticStepsSettings
-from commol.engines.engine import EngineName
-from commol._model.patterns import AxisPattern
+from commol import Aggregate, ModelBuilder, StratificationCondition, StratifiedRate
 from commol._model.model import Model
 from commol._model.neighbors import _Neighbors
+from commol._model.patterns import AxisPattern
+from commol.engines import ODESolver, StochasticEventsSettings, StochasticStepsSettings
+from commol.engines.engine import EngineName
 
 TIGHT = ODESolver(rtol=1e-10, atol=1e-8)
 """Tolerances tight enough for closed-form checks."""

@@ -20,9 +20,8 @@ from pydantic import (
     model_validator,
 )
 
-from commol.commol_rs import _commol_rs as commol_rs
 from commol._data.engine_json import engine_json
-
+from commol.commol_rs import _commol_rs as commol_rs
 
 EngineName: TypeAlias = Literal[
     "DifferenceEquations",

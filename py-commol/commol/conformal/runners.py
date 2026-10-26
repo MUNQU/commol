@@ -9,25 +9,26 @@ method needs a fit, predicts, scores, refits and takes the quantiles.
 import logging
 from typing import TYPE_CHECKING
 
-from commol._fit.starts import failed_starts
-from commol._calibration.registry import register
-from commol.resampling.runners import block_length_estimates, log_failed
-from commol.commol_rs import _commol_rs as commol_rs
+from commol._calibration.method import CalibrationPort
 from commol._data.engine_json import engine_handles, engine_json
-from commol.conformal.methods import (
-    AdaptiveConformal,
+from commol._fit.starts import failed_starts
+from commol.commol_rs import _commol_rs as commol_rs
+from commol.conformal.results import (
     ConformalResult,
-    EnbPI,
-    JackknifePlus,
     PredictionIntervals,
-    RollingConformal,
     SeriesIntervals,
-    SplitConformal,
 )
+from commol.resampling.runners import block_length_estimates, log_failed
 
 if TYPE_CHECKING:
-    from commol._calibration.calibrator import Calibrator
     from commol.commol_rs._commol_rs import ConformalRunProtocol, StartsProtocol
+    from commol.conformal.methods import (
+        AdaptiveConformal,
+        EnbPI,
+        JackknifePlus,
+        RollingConformal,
+        SplitConformal,
+    )
 
 logger = logging.getLogger("commol.conformal")
 
@@ -75,7 +76,7 @@ def _result(
 
 
 def run_split_conformal(
-    calibrator: "Calibrator", method: SplitConformal
+    calibrator: CalibrationPort, method: "SplitConformal"
 ) -> ConformalResult:
     """
     Run split conformal prediction.
@@ -94,7 +95,7 @@ def run_split_conformal(
         observations and the guarantee.
     """
     starts, run = commol_rs.inference.split_conformal(
-        calibrator._rust_problem, engine_json(method), **engine_handles(method)
+        calibrator._engine_problem, engine_json(method), **engine_handles(method)
     )
     return _result(
         starts,
@@ -107,7 +108,7 @@ def run_split_conformal(
 
 
 def run_rolling_conformal(
-    calibrator: "Calibrator", method: RollingConformal
+    calibrator: CalibrationPort, method: "RollingConformal"
 ) -> ConformalResult:
     """
     Run rolling-origin conformal prediction.
@@ -126,7 +127,7 @@ def run_rolling_conformal(
         the scores of every origin and horizon; and the guarantee.
     """
     starts, run = commol_rs.inference.rolling_conformal(
-        calibrator._rust_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method)
     )
     return _result(
         starts,
@@ -139,7 +140,7 @@ def run_rolling_conformal(
 
 
 def run_jackknife_plus(
-    calibrator: "Calibrator", method: JackknifePlus
+    calibrator: CalibrationPort, method: "JackknifePlus"
 ) -> ConformalResult:
     """
     Run jackknife+ with blocks.
@@ -158,7 +159,7 @@ def run_jackknife_plus(
         guarantee, with the CV+ bound of its blocks.
     """
     starts, run = commol_rs.inference.jackknife_plus(
-        calibrator._rust_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method)
     )
     return _result(
         starts,
@@ -172,7 +173,7 @@ def run_jackknife_plus(
     )
 
 
-def run_enbpi(calibrator: "Calibrator", method: EnbPI) -> ConformalResult:
+def run_enbpi(calibrator: CalibrationPort, method: "EnbPI") -> ConformalResult:
     """
     Run ensemble batch prediction intervals.
 
@@ -190,7 +191,7 @@ def run_enbpi(calibrator: "Calibrator", method: EnbPI) -> ConformalResult:
         guarantee.
     """
     starts, run = commol_rs.inference.enbpi(
-        calibrator._rust_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method)
     )
     return _result(
         starts,
@@ -204,7 +205,7 @@ def run_enbpi(calibrator: "Calibrator", method: EnbPI) -> ConformalResult:
 
 
 def run_adaptive_conformal(
-    calibrator: "Calibrator", method: AdaptiveConformal
+    calibrator: CalibrationPort, method: "AdaptiveConformal"
 ) -> ConformalResult:
     """
     Run adaptive conformal inference over the stream.
@@ -223,7 +224,7 @@ def run_adaptive_conformal(
         the scores of the stream and the guarantee.
     """
     starts, run = commol_rs.inference.adaptive_conformal(
-        calibrator._rust_problem, engine_json(method), **engine_handles(method)
+        calibrator._engine_problem, engine_json(method), **engine_handles(method)
     )
     return _result(
         starts,
@@ -233,10 +234,3 @@ def run_adaptive_conformal(
         f"{1 - method.confidence_level:.4g}, with no assumption on the data (Gibbs and "
         f"Candès 2021); it says nothing about one interval.",
     )
-
-
-register(SplitConformal, run_split_conformal)
-register(RollingConformal, run_rolling_conformal)
-register(JackknifePlus, run_jackknife_plus)
-register(EnbPI, run_enbpi)
-register(AdaptiveConformal, run_adaptive_conformal)

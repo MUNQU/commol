@@ -30,17 +30,17 @@ from collections.abc import Sequence
 from typing import Annotated, Literal, Self
 
 from pydantic import (
-    JsonValue,
     BaseModel,
     ConfigDict,
     Field,
+    JsonValue,
     field_validator,
     model_validator,
 )
 
-from commol.commol_rs import _commol_rs as commol_rs
 from commol._data.engine_json import engine_json
 from commol._data.ranges import RangeChecked
+from commol.commol_rs import _commol_rs as commol_rs
 
 
 def _position_text(at: float) -> str:

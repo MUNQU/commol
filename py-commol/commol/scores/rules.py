@@ -12,11 +12,11 @@ from collections.abc import Sequence
 
 from pydantic import ConfigDict, Field
 
-from commol.uncertainty.predictive import ObservationDraws, Predictive
-from commol.commol_rs import _commol_rs as commol_rs
-from commol._problem.problem import ObservedDataPoint
-from commol.observations.noise import DistributionNoise, _ObservationNoise
 from commol._data.result_model import ResultModel
+from commol._problem.problem import ObservedDataPoint
+from commol.commol_rs import _commol_rs as commol_rs
+from commol.observations.noise import DistributionNoise, _ObservationNoise
+from commol.uncertainty.predictive import ObservationDraws, Predictive
 
 
 class Score(ResultModel):

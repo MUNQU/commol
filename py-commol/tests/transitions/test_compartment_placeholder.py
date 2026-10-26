@@ -2,14 +2,19 @@
 
 import pytest
 
-from commol import StratificationCondition, StratifiedRate
-from commol import Aggregate, ModelBuilder, Simulation
+from commol import (
+    Aggregate,
+    ModelBuilder,
+    Simulation,
+    StratificationCondition,
+    StratifiedRate,
+)
 from tests.support import (
-    FactoryBuilder,
     ENGINE_REL,
+    FactoryBuilder,
+    abc_builder,
     assert_close,
     build,
-    abc_builder,
 )
 
 

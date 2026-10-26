@@ -5,7 +5,7 @@ import re
 import pytest
 
 from commol import Aggregate, ModelBuilder, Simulation
-from tests.support import FactoryBuilder, a_to_b_builder, build, abc_builder
+from tests.support import FactoryBuilder, a_to_b_builder, abc_builder, build
 
 
 def _builder(parameter_id: str, stratifications: int = 1) -> ModelBuilder:

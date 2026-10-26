@@ -6,11 +6,10 @@ from typing import TYPE_CHECKING, Annotated, Literal, Self
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
-from commol.commol_rs import _commol_rs as commol_rs
 from commol._data.engine_json import engine_json
-
-from commol._model.units import DEFAULT_STEP_UNIT, check_step_unit
 from commol._model.unit_checks import define_units, ureg
+from commol._model.units import DEFAULT_STEP_UNIT, check_step_unit
+from commol.commol_rs import _commol_rs as commol_rs
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import EngineTypeProtocol

@@ -12,10 +12,10 @@ from commol import (
     ParticleSwarmConfig,
     Simulation,
 )
-from commol.uncertainty import ParameterSample, SampleMethod
 from commol._model.builder import ModelBuilder
 from commol._model.engine_state import calibrated_initial_state
 from commol._model.model import Model
+from commol.uncertainty import ParameterSample, SampleMethod
 from tests.support import (
     FactoryBuilder,
     a_to_b_builder,

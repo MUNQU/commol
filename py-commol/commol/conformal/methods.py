@@ -11,106 +11,24 @@ sets the width of every interval.
 from collections.abc import Mapping
 from typing import ClassVar, Literal, Self
 
-from pydantic import ConfigDict, Field, JsonValue, model_validator
+from pydantic import Field, JsonValue, model_validator
 
-from commol.commol_rs import _commol_rs as commol_rs
-from commol._data.engine_json import engine_json
-from commol._problem.problem import ObservedDataPoint
 from commol._calibration.method import UncertaintyMethod
-from commol.uncertainty.sample import ParameterSample
+from commol._data.engine_json import engine_json
 from commol._data.ranges import RangeChecked
-from commol._data.result_model import ResultModel
-
-
-class SeriesIntervals(ResultModel):
-    """
-    The prediction intervals of one series.
-
-    Attributes
-    ----------
-    positions : list[float]
-        Where the intervals are.
-    prediction : list[float]
-        The point prediction at each position.
-    lower : list[float]
-        The lower end of each interval; ``-inf`` when unbounded.
-    upper : list[float]
-        The upper end of each interval; ``inf`` when unbounded.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    positions: list[float]
-    prediction: list[float]
-    lower: list[float]
-    upper: list[float]
-
-
-class PredictionIntervals(ResultModel):
-    """
-    Prediction intervals for observations: where new observations of each
-    series fall, at a confidence level.
-
-    Attributes
-    ----------
-    confidence_level : float
-        The level of the intervals, ``1 − α``.
-    series : dict[str, SeriesIntervals]
-        The intervals of each series, by label.
-    unbounded : dict[str, list[float]]
-        The positions of each series whose interval is unbounded, because
-        its quantile had fewer than ``1/α − 1`` scores. A series with none
-        is not a key.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    confidence_level: float
-    series: dict[str, SeriesIntervals]
-    unbounded: dict[str, list[float]]
-
-
-class ConformalResult(ResultModel):
-    """
-    The result of a conformal method.
-
-    Attributes
-    ----------
-    intervals : PredictionIntervals
-        The intervals at the positions the method was given.
-    scores : dict[str, list[float]]
-        The scores of each series, by label, in the order the method took
-        them.
-    guarantee : str
-        The coverage the method guarantees, and what the guarantee assumes.
-    failed : list[str]
-        Each refit that failed, which gives no score: ``"Origin <index>
-        failed: <reason>"`` for `RollingConformal`, ``"Block <index> failed:
-        <reason>"`` for `JackknifePlus`, ``"Replicate <index> failed:
-        <reason>"`` for `EnbPI`; also logged as a warning. Empty for a method
-        that does not refit.
-    not_converged : int
-        Refits kept although their optimizer did not converge; 0 for a
-        method that does not refit.
-    block_length : int | None
-        With `JackknifePlus` and `EnbPI`, the positions per block they ran
-        with; None for a method without blocks.
-    block_length_estimates : dict[str, float] | None
-        With ``block_length="auto"``, the estimate of each series, by label;
-        otherwise None.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    intervals: PredictionIntervals
-    scores: dict[str, list[float]]
-    guarantee: str
-    failed: list[str] = Field(description="Each refit that failed.")
-    not_converged: int = Field(description="Refits that did not converge.")
-    block_length: int | None = Field(description="The block length used.")
-    block_length_estimates: dict[str, float] | None = Field(
-        description="The estimate of each series with the automatic length."
-    )
+from commol._problem.problem import ObservedDataPoint
+from commol.commol_rs import _commol_rs as commol_rs
+from commol.conformal.results import (
+    ConformalResult,
+)
+from commol.conformal.runners import (
+    run_adaptive_conformal,
+    run_enbpi,
+    run_jackknife_plus,
+    run_rolling_conformal,
+    run_split_conformal,
+)
+from commol.uncertainty.sample import ParameterSample
 
 
 class ConformalMethod(UncertaintyMethod[ConformalResult]):
@@ -183,6 +101,8 @@ class SplitConformal(ConformalMethod, RangeChecked):
         Starts of the fit (default 1).
     """
 
+    _runner = staticmethod(run_split_conformal)
+
     _engine_handles: ClassVar[tuple[str, ...]] = ("sample",)
 
     calibration_data: list[ObservedDataPoint] = Field(
@@ -223,6 +143,8 @@ class RollingConformal(ConformalMethod, RangeChecked):
         Starts of each fit (default 1).
     """
 
+    _runner = staticmethod(run_rolling_conformal)
+
     origins: list[float] = Field(min_length=1, description="The origins.")
     positions: list[float] = Field(min_length=1, description="Where the intervals are.")
     starts: int = Field(default=1, description="Starts of each fit.")
@@ -258,6 +180,8 @@ class JackknifePlus(ConformalMethod, RangeChecked):
         Starts of the fit and of each refit (default 1).
     """
 
+    _runner = staticmethod(run_jackknife_plus)
+
     block_length: int | Literal["auto"] = Field(description="Positions per block.")
     positions: list[float] = Field(min_length=1, description="Where the intervals are.")
     starts: int = Field(default=1, description="Starts per fit.")
@@ -285,6 +209,8 @@ class EnbPI(ConformalMethod, RangeChecked):
     starts : int
         Starts of the fit and of each replicate (default 1).
     """
+
+    _runner = staticmethod(run_enbpi)
 
     replicates: int = Field(description="Number of replicates.")
     block_length: int | Literal["auto"] = Field(description="Positions per block.")
@@ -315,6 +241,8 @@ class AdaptiveConformal(ConformalMethod, RangeChecked):
     starts : int
         Starts of the fit (default 1).
     """
+
+    _runner = staticmethod(run_adaptive_conformal)
 
     step: float = Field(description="The step of the working level.")
     stream: list[ObservedDataPoint] = Field(

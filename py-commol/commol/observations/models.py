@@ -12,6 +12,7 @@ engine.
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
 from commol._data.ranges import RangeChecked
 
 

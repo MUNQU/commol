@@ -126,6 +126,7 @@ PAGES = {
         "Collinearity",
         "SampleIdentifiability",
         "StartsIdentifiability",
+        "ProfileIdentifiability",
     },
     "sensitivity": {
         "SensitivityAnalysis",

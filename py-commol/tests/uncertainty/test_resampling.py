@@ -16,24 +16,24 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
+from commol import Calibrator, ObservedDataPoint
+from commol.commol_rs import _commol_rs as commol_rs
+from commol.conformal import JackknifePlus, RollingConformal
+from commol.conformal.results import ConformalResult
+from commol.distributions import Priors
+from commol.observations import LogNormalObservations, NoNoise, ResidualNoise
+from commol.profiles import ProfileLikelihood, Threshold
+from commol.profiles.results import ProfileResult
 from commol.resampling import (
     BayesianBootstrap,
     BlockJackknife,
     ResidualBootstrap,
     WildBootstrap,
 )
+from commol.resampling.results import BootstrapResult, JackknifeResult
 from commol.smc import BootstrapCoverageEta, GibbsPosterior
-from commol import Calibrator, ObservedDataPoint
-from commol.conformal import JackknifePlus, RollingConformal
-from commol.observations import LogNormalObservations, NoNoise, ResidualNoise
+from commol.smc.results import GibbsResult
 from commol.uncertainty import Predictive
-from commol.distributions import Priors
-from commol.profiles import ProfileLikelihood, Threshold
-from commol.resampling.methods import BootstrapResult, JackknifeResult
-from commol.conformal.methods import ConformalResult
-from commol.smc.methods import GibbsResult
-from commol.profiles.methods import ProfileResult
-from commol.commol_rs import _commol_rs as commol_rs
 from tests.support import flow_calibrator, flow_observations, line_calibrator
 
 

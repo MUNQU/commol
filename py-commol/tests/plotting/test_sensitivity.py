@@ -2,13 +2,12 @@
 bar per input."""
 
 from commol.sensitivity import InputSpace
-from commol.sensitivity.methods import (
+from commol.sensitivity.results import (
     ChaosResult,
     MorrisResult,
     PRCCResult,
     SobolResult,
 )
-
 from tests.support import bounded
 
 INPUTS = ["k1", "k2", "k3"]

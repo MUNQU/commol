@@ -2,10 +2,9 @@
 
 import pytest
 
-from commol import StratificationCondition, StratifiedRate
-from commol import Aggregate, AxisPattern
-from tests.support import FactoryBuilder, a_to_b_builder, run
+from commol import Aggregate, AxisPattern, StratificationCondition, StratifiedRate
 from tests.axis_patterns.conditions import condition, rate_string, stratified_rates
+from tests.support import FactoryBuilder, a_to_b_builder, run
 
 
 def _make_schedule_ab(

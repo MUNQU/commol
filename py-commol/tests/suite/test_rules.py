@@ -18,7 +18,6 @@ from pathlib import Path
 import coverage
 import pytest
 
-
 from tests.suite.durations import DURATIONS
 
 REPO_ROOT = Path(__file__).resolve().parents[3]

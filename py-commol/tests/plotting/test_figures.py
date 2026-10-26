@@ -16,17 +16,16 @@ from matplotlib.colors import to_rgba
 from matplotlib.figure import Figure
 
 from commol import ObservedDataPoint, Simulation
-from commol.plotting import PlotConfig, plot_compared
-from commol.sensitivity.methods import (
+from commol._simulation.results import SimulationResults
+from commol.plotting import PlotConfig, figures, plot_compared
+from commol.plotting.accessors import PredictivePlot, ReplicatesPlot, ResultsPlot
+from commol.profiles.results import ProfileResult
+from commol.sensitivity.results import (
     ChaosResult,
     MorrisResult,
     PRCCResult,
     SobolResult,
 )
-from commol.profiles.methods import ProfileResult
-from commol._simulation.results import SimulationResults
-from commol.plotting import figures
-from commol.plotting.accessors import PredictivePlot, ReplicatesPlot, ResultsPlot
 from tests.suite.public_surface import EXPORTS
 from tests.support import (
     a_to_b_builder,

@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING
 
 from pydantic import ConfigDict
 
-from commol.uncertainty.predictive import Predictive, PredictiveSource
-from commol.commol_rs import _commol_rs as commol_rs
-from commol.uncertainty.sample import ParameterSample
-from commol._model.parameter import SeriesValue
 from commol._data.result_model import ResultModel
+from commol._model.parameter import SeriesValue
+from commol.commol_rs import _commol_rs as commol_rs
+from commol.uncertainty.predictive import Predictive, PredictiveSource
+from commol.uncertainty.sample import ParameterSample
 
 if TYPE_CHECKING:
     from commol.quantities.quantities import QuantityBase

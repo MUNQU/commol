@@ -3,7 +3,7 @@ its threshold and its interval."""
 
 import numpy as np
 
-from commol.profiles.methods import ProfileResult
+from commol.profiles.results import ProfileResult
 
 
 def test_each_profile_is_drawn_with_its_threshold(

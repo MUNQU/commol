@@ -8,8 +8,14 @@ its source, so the same process carries over to other structures. Under
 import pytest
 from pydantic import ValidationError
 
-from commol import StratificationCondition, StratifiedRate
-from commol import Complete, Groups, Model, Simulation
+from commol import (
+    Complete,
+    Groups,
+    Model,
+    Simulation,
+    StratificationCondition,
+    StratifiedRate,
+)
 from commol._model.engine_state import transition_flows
 from commol._model.neighbors import _Neighbors
 from tests.support import ENGINE_REL, FactoryBuilder, abc_builder, assert_close, build

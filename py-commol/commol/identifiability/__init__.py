@@ -2,14 +2,15 @@
 
 from commol.identifiability.methods import (
     Collinearity,
+    ProfileIdentifiability,
     SampleIdentifiability,
     StartsIdentifiability,
     StructuralRank,
 )
-from commol.identifiability import runners as _runners  # noqa: F401  (registers the runners)
 
 __all__ = [
     "Collinearity",
+    "ProfileIdentifiability",
     "SampleIdentifiability",
     "StartsIdentifiability",
     "StructuralRank",

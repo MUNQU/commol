@@ -3,9 +3,9 @@ the path of its field, through a union tagged by ``kind`` too."""
 
 import pytest
 
-from commol.smc import BootstrapCoverageEta, GibbsPosterior
 from commol import Calibrator, ParticleSwarmConfig
 from commol.distributions import Priors
+from commol.smc import BootstrapCoverageEta, GibbsPosterior
 from tests.support import line_calibrator
 
 VALUES = [7.4, 8.6, 11.3, 12.8]

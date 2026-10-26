@@ -6,16 +6,15 @@ from collections.abc import Callable
 
 import pytest
 
-from commol import parallelism
-from commol.resampling import BayesianBootstrap, BlockJackknife
-from commol import Calibrator, Simulation
-from commol.smc import GibbsPosterior
-from commol.sensitivity import InputSpace, SensitivityAnalysis, Sobol
-from commol.uncertainty import Predictive
+from commol import Calibrator, Simulation, parallelism
 from commol.distributions import Priors
+from commol.parallelism.threads import Levels
 from commol.profiles import ProfileLikelihood, Threshold
 from commol.quantities import ValueAt
-from commol.parallelism.threads import Levels
+from commol.resampling import BayesianBootstrap, BlockJackknife
+from commol.sensitivity import InputSpace, SensitivityAnalysis, Sobol
+from commol.smc import GibbsPosterior
+from commol.uncertainty import Predictive
 from tests.support import (
     abc_swarm_calibrator,
     assert_on_threads_of_setting,

@@ -7,32 +7,34 @@ from typing import TYPE_CHECKING, TypeVar
 from pydantic import BaseModel
 
 if TYPE_CHECKING:
+    from commol._model.model import Model
     from commol.commol_rs._commol_rs import (
         CalibrationProblemProtocol,
         EngineProtocol,
         ObservationDrawsProtocol,
         PredictiveProtocol,
     )
-    from commol._model.model import Model
 
-from commol._fit.starts import fit_result
-from commol.uncertainty.predictive import by_output
-from commol._simulation.simulation import Simulation
-from commol.commol_rs import _commol_rs as commol_rs
-from commol._model import engine_state
+from commol._calibration.method import (
+    IdentifiabilityMethod,
+    UncertaintyMethod,
+    run_method,
+)
+from commol._data.engine_json import engine_json
 from commol._fit.result import (
     CalibrationEvaluation,
     CalibrationHistory,
     CalibrationResult,
 )
+from commol._fit.starts import fit_result
+from commol._model import engine_state
 from commol._problem.problem import (
     CalibrationParameter,
     CalibrationProblem,
     ObservedDataPoint,
 )
-from commol._data.engine_json import engine_json
-from commol.local.methods import DeltaBand, LocalResult
-from commol._calibration.method import IdentifiabilityMethod, UncertaintyMethod
+from commol._simulation.simulation import Simulation
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.observations.noise import _ObservationNoise
 from commol.uncertainty.sample import ParameterSample, SampleMethod
 
@@ -89,13 +91,13 @@ class Calibrator:
 
         self._validate_calibration_parameters()
         self._warn_constraint_positions_beyond_observations()
-        self._rust_problem: "CalibrationProblemProtocol" = (
+        self._engine_problem: "CalibrationProblemProtocol" = (
             commol_rs.inference.CalibrationProblem(self._engine, engine_json(problem))
         )
         if problem.seed is None:
             logger.info(
                 "No seed set; drew the seed %d, which repeats this calibration.",
-                self._rust_problem.seed,
+                self._engine_problem.seed,
             )
 
     def _predictive(
@@ -118,7 +120,7 @@ class Calibrator:
         PredictiveProtocol
             The runs, computed in Rust.
         """
-        return self._rust_problem.predictive(sample._rust, positions)
+        return self._engine_problem.predictive(sample._rust, positions)
 
     def with_model(self, model: "Model") -> "Calibrator":
         """
@@ -188,66 +190,6 @@ class Calibrator:
             SampleMethod(name="point", settings={"seed": result.seed}),
         )
 
-    def delta_band(
-        self, result: LocalResult, positions: Sequence[float], confidence_level: float
-    ) -> DeltaBand:
-        """
-        The band of every output of a local approximation by the delta method.
-
-        The model is linearized at the fit of `result`: the variance of an
-        output is ``J Σ Jᵀ``, with ``J`` its derivatives on the unbounded
-        scale and ``Σ`` the covariance of `result`. The band is the
-        prediction at the fit plus and minus the quantile of a normal, or of
-        the Student t of a `SandwichResult`, times its standard deviation. It
-        runs the model a few times per parameter, not once per draw, and reads
-        only the fields of `result`, so a result read back from JSON works.
-
-        Parameters
-        ----------
-        result : LaplaceResult | SandwichResult
-            A local approximation of this calibration problem.
-        positions : Sequence[float]
-            Positions to report at.
-        confidence_level : float
-            Strictly between 0 and 1.
-
-        Returns
-        -------
-        DeltaBand
-            The prediction at the fit and the ends of the interval of each
-            output at each position.
-
-        Raises
-        ------
-        ValueError
-            If the result's parameters are not the problem's, the level is not
-            strictly between 0 and 1, the engine is stochastic, or the engine
-            rejects a position.
-        RuntimeError
-            If the derivatives fail at the fit.
-        """
-        if result.sample.names != self.parameter_names:
-            raise ValueError(
-                f"The result has the parameters {result.sample.names}; the problem "
-                f"has {self.parameter_names}."
-            )
-        points = [float(position) for position in positions]
-        outputs, center, lower, upper = commol_rs.inference.delta_band(
-            self._rust_problem,
-            [result.fit.best_parameters[name] for name in self.parameter_names],
-            result.covariance,
-            result.degrees_of_freedom(),
-            points,
-            confidence_level,
-        )
-        return DeltaBand(
-            confidence_level=confidence_level,
-            positions=points,
-            center=by_output(outputs, center),
-            lower=by_output(outputs, lower),
-            upper=by_output(outputs, upper),
-        )
-
     def _observation_draws(
         self,
         sample: ParameterSample,
@@ -271,7 +213,7 @@ class Calibrator:
         ObservationDrawsProtocol
             The draws, computed in Rust.
         """
-        return self._rust_problem.observation_draws(
+        return self._engine_problem.observation_draws(
             sample._rust, engine_json(observed_data), engine_json(noise)
         )
 
@@ -294,7 +236,7 @@ class Calibrator:
         list[float]
             One log score per observation, computed in Rust.
         """
-        return self._rust_problem.log_score(sample._rust, engine_json(observed_data))
+        return self._engine_problem.log_score(sample._rust, engine_json(observed_data))
 
     @property
     def seed(self) -> int:
@@ -307,7 +249,7 @@ class Calibrator:
             ``problem.seed``, or the seed the engine drew when the
             calibrator was built, which it logs.
         """
-        return self._rust_problem.seed
+        return self._engine_problem.seed
 
     def run(self, starts: int = 1) -> CalibrationResult:
         """
@@ -354,7 +296,10 @@ class Calibrator:
             f"algorithm, {measure} and {starts} start(s)."
         )
         result = fit_result(
-            self._rust_problem.optimize(starts), self.parameter_names, self.seed, logger
+            self._engine_problem.optimize(starts),
+            self.parameter_names,
+            self.seed,
+            logger,
         )
         logger.info(
             (
@@ -381,7 +326,7 @@ class Calibrator:
             If optimization fails.
         """
         logger.info("Starting calibration with history tracking")
-        history = self._rust_problem.optimize_with_history()
+        history = self._engine_problem.optimize_with_history()
         names = self.parameter_names
         best = history.result
         result = CalibrationResult(
@@ -411,8 +356,8 @@ class Calibrator:
         Run an uncertainty method on this calibration problem.
 
         Each method is a configuration (a subclass of `UncertaintyMethod`)
-        whose type sets the result type; its runner is registered in
-        `commol._calibration.registry`. The guide's table "Which method
+        whose type sets the result type and declares its runner. The guide's
+        table "Which method
         answers which question" lists them.
 
         Parameters
@@ -431,8 +376,7 @@ class Calibrator:
             If `method` is an identifiability method; the message names
             ``Calibrator.identifiability``.
         ValueError
-            If no runner is registered for the configuration's type (the
-            message names the registered ones), or
+            If the configuration's type declares no runner, or
             a setting, an input, the data or the model does not fit the
             method; the message says why.
         RuntimeError
@@ -442,8 +386,6 @@ class Calibrator:
         InfeasibleStateError
             If a draw of a prediction leaves the values its model allows.
         """
-        from commol._calibration.registry import run_method
-
         return run_method(self, method, UncertaintyMethod)
 
     def identifiability(self, method: IdentifiabilityMethod[ResultT]) -> ResultT:
@@ -472,15 +414,13 @@ class Calibrator:
             If `method` is an uncertainty method; the message names
             ``Calibrator.uncertainty``.
         ValueError
-            If no runner is registered for the configuration's type, or
+            If the configuration's type declares no runner, or
             a setting, an input, the data or the model does not fit the
             method; the message says why.
         RuntimeError
             If a computation of the method that could start fails: an engine
             run or an optimizer.
         """
-        from commol._calibration.registry import run_method
-
         return run_method(self, method, IdentifiabilityMethod)
 
     @property
