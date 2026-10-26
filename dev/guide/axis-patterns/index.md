@@ -7,7 +7,13 @@
 ## Quick path
 
 ```python
-from commol import Aggregate, AxisPattern, ModelBuilder, Simulation
+from commol import (
+    Aggregate,
+    AxisPattern,
+    ModelBuilder,
+    Simulation,
+    StratificationCondition,
+)
 
 def flow_per_step(rate: AxisPattern, num_steps: int = 10) -> list[float]:
     """The flow into B at each step, for a transition with no source."""
@@ -75,19 +81,19 @@ The parentheses make composition safe: the `2 *` applies to the whole expression
 
 ## Combining patterns
 
-`AxisPattern.combine(*patterns, mode=AxisPattern.SUM)` merges patterns:
+`AxisPattern.combine(*patterns, mode="sum")` merges patterns:
 
-| `mode`                      | Value                               |
-| --------------------------- | ----------------------------------- |
-| `AxisPattern.SUM` (default) | The sum of the patterns             |
-| `AxisPattern.MAX`           | The largest value at each position  |
-| `AxisPattern.MIN`           | The smallest value at each position |
+| `mode`            | Value                               |
+| ----------------- | ----------------------------------- |
+| `"sum"` (default) | The sum of the patterns             |
+| `"max"`           | The largest value at each position  |
+| `"min"`           | The smallest value at each position |
 
 ```python
 peak_or_interval = AxisPattern.combine(
     AxisPattern.pulse(at=3, value=2.0),
     AxisPattern.interval(start=2, end=5, value=1.0),
-    mode=AxisPattern.MAX,
+    mode="max",
 )
 print(flow_per_step(peak_or_interval))
 # [0.0, 0.0, 1.0, 2.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
@@ -129,15 +135,13 @@ def stratified_flows(rate: AxisPattern, num_steps: int = 7) -> dict[str, list[fl
         if name.startswith("B")
     }
 
-schedule = (
-    AxisPattern.add_group(
-        conditions=[{"stratification": "group", "category": "cat1"}],
-        schedule=AxisPattern.periodic(period=3, value=0.1),
-    )
-    .add_group(
-        conditions=[{"stratification": "group", "category": "cat2"}],
-        schedule=AxisPattern.interval(start=2, end=4, value=0.2),
-    )
+
+schedule = AxisPattern.add_group(
+    conditions=[StratificationCondition(stratification="group", category="cat1")],
+    schedule=AxisPattern.periodic(period=3, value=0.1),
+).add_group(
+    conditions=[StratificationCondition(stratification="group", category="cat2")],
+    schedule=AxisPattern.interval(start=2, end=4, value=0.2),
 )
 print(stratified_flows(schedule))
 # {'B_cat1': [50.0, 0.0, 0.0, 45.0, 0.0, 0.0, 40.5],
@@ -150,25 +154,30 @@ print(stratified_flows(schedule))
 | `schedule.set_default(pattern)`                                                          | The pattern for compartments that match no group. At most once; the pattern may not have conditions or a `source_compartment`. |
 | `pattern.for_group(conditions, *, source_compartment=None)`                              | A single pattern for one subgroup only.                                                                                        |
 
-| Rule                                                 | Behavior                                                                     |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------- |
-| A compartment that matches no group, with no default | No flow                                                                      |
-| A compartment that matches several groups            | The group with the most conditions wins                                      |
-| `conditions`                                         | Not empty; each entry has `stratification` and `category`, and may have `to` |
-| Two groups with the same conditions                  | `ValueError`                                                                 |
+| Rule                                                 | Behavior                                                                                                     |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| A compartment that matches no group, with no default | No flow                                                                                                      |
+| A compartment that matches several groups            | The group with the most conditions wins                                                                      |
+| `conditions`                                         | Not empty; each entry is a `StratificationCondition` with `stratification` and `category`, and may have `to` |
+| Two groups with the same conditions                  | `ValueError`                                                                                                 |
 
 ```python
 only_cat1 = AxisPattern.add_group(
-    conditions=[{"stratification": "group", "category": "cat1"}],
+    conditions=[StratificationCondition(stratification="group", category="cat1")],
     schedule=AxisPattern.pulse(at=1, value=0.1),
 )
 with_default = only_cat1.set_default(AxisPattern.from_formula("0.01"))
 print(stratified_flows(with_default, num_steps=3))
 # {'B_cat1': [0.0, 50.0, 0.0], 'B_cat2': [5.0, 4.95, 4.9]}
 
-print(stratified_flows(AxisPattern.pulse(at=1, value=0.1).for_group(
-    [{"stratification": "group", "category": "cat1"}]
-), num_steps=3))
+print(
+    stratified_flows(
+        AxisPattern.pulse(at=1, value=0.1).for_group(
+            [StratificationCondition(stratification="group", category="cat1")]
+        ),
+        num_steps=3,
+    )
+)
 # {'B_cat1': [0.0, 50.0, 0.0], 'B_cat2': [0.0, 0.0, 0.0]}
 ```
 
@@ -182,17 +191,14 @@ print(stratified_flows(AxisPattern.pulse(at=1, value=0.1).for_group(
 | `source_compartment="A_cat1"` | Multiplies the pattern by that compartment, which makes it absolute              |
 
 ```python
-mixed = (
-    AxisPattern.add_group(
-        conditions=[{"stratification": "group", "category": "cat1"}],
-        schedule=AxisPattern.pulse(at=1, value=0.1),
-        absolute=False,
-    )
-    .add_group(
-        conditions=[{"stratification": "group", "category": "cat2"}],
-        schedule=AxisPattern.pulse(at=1, value=100.0),
-        absolute=True,
-    )
+mixed = AxisPattern.add_group(
+    conditions=[StratificationCondition(stratification="group", category="cat1")],
+    schedule=AxisPattern.pulse(at=1, value=0.1),
+    absolute=False,
+).add_group(
+    conditions=[StratificationCondition(stratification="group", category="cat2")],
+    schedule=AxisPattern.pulse(at=1, value=100.0),
+    absolute=True,
 )
 print(stratified_flows(mixed, num_steps=3))
 # {'B_cat1': [0.0, 50.0, 0.0], 'B_cat2': [0.0, 100.0, 0.0]}
@@ -212,7 +218,9 @@ routing = (
         source=["A"],
         target=["A"],
         rate=AxisPattern.add_group(
-            conditions=[{"stratification": "status", "category": "s0", "to": "s1"}],
+            conditions=[
+                StratificationCondition(stratification="status", category="s0", to="s1")
+            ],
             schedule=AxisPattern.pulse(at=1, value=0.5),
         ),
     )

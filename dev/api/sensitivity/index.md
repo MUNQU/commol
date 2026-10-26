@@ -2,7 +2,7 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-The sensitivity analysis, what it varies, the quantities of interest it reads from each run, and the base of its methods. Guide: [Sensitivity analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md).
+The sensitivity analysis, what it varies, the quantities of interest it reads from each run, and the result of each method. Guide: [Sensitivity analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md).
 
 ## SensitivityAnalysis
 
@@ -137,7 +137,7 @@ class SensitivityAnalysis:
         self,
         sample: ParameterSample,
         observed_data: list[ObservedDataPoint],
-        noise: ObservationNoise,
+        noise: _ObservationNoise,
     ) -> "ObservationDrawsProtocol":
         """
         Every draw's value of `observed_data`, for a `Predictive`.
@@ -482,7 +482,7 @@ Attributes:
 | Name                          | Type                         | Description                                                                                                                 |
 | ----------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `parameters`                  | `list[CalibrationParameter]` | The inputs, in order. A factor or a noise parameter is not an input: both belong to observations, and an analysis has none. |
-| `distributions`               | \`dict[str, Distribution]    | None\`                                                                                                                      |
+| `distributions`               | \`dict[str, distribution]    | None\`                                                                                                                      |
 | `sample`                      | \`ParameterSample            | None\`                                                                                                                      |
 | `initial_condition_remainder` | \`str                        | None\`                                                                                                                      |
 
@@ -505,7 +505,7 @@ class InputSpace(BaseModel):
     parameters : list[CalibrationParameter]
         The inputs, in order. A factor or a noise parameter is not an input:
         both belong to observations, and an analysis has none.
-    distributions : dict[str, Distribution] | None
+    distributions : dict[str, distribution] | None
         The distribution of each input, for independent inputs.
     sample : ParameterSample | None
         The draws of the inputs, for inputs from a sample.
@@ -521,7 +521,7 @@ class InputSpace(BaseModel):
     parameters: list[CalibrationParameter] = Field(
         min_length=1, description="The inputs, in order."
     )
-    distributions: dict[str, Distribution] | None = Field(
+    distributions: dict[str, _Distribution] | None = Field(
         default=None, description="The distribution of each independent input."
     )
     sample: ParameterSample | None = Field(
@@ -533,22 +533,18 @@ class InputSpace(BaseModel):
     )
 
     @model_validator(mode="after")
-    def check_inputs(self) -> Self:
+    def _check_inputs(self) -> Self:
         """Check the inputs against the distributions or the sample."""
         ids = [parameter.id for parameter in self.parameters]
         repeated = sorted({i for i in ids if ids.count(i) > 1})
         if repeated:
             raise ValueError(f"Inputs repeat the ids {repeated}.")
         observed = {
-            CalibrationParameterType.FACTOR: (
-                "a factor, which multiplies an observation"
-            ),
-            CalibrationParameterType.NOISE: (
-                "a noise parameter, which belongs to an observation model"
-            ),
+            "factor": ("a factor, which multiplies an observation"),
+            "noise": ("a noise parameter, which belongs to an observation model"),
         }
         for parameter in self.parameters:
-            what = observed.get(CalibrationParameterType(parameter.parameter_type))
+            what = observed.get(parameter.parameter_type)
             if what is not None:
                 raise ValueError(
                     f"'{parameter.id}' is {what}; a sensitivity analysis has no "
@@ -580,7 +576,7 @@ class InputSpace(BaseModel):
     def independent(
         cls,
         parameters: Sequence[CalibrationParameter],
-        distributions: Mapping[str, Distribution],
+        distributions: Mapping[str, _Distribution],
         *,
         initial_condition_remainder: str | None = None,
     ) -> Self:
@@ -591,7 +587,7 @@ class InputSpace(BaseModel):
         ----------
         parameters : Sequence[CalibrationParameter]
             The inputs, in order.
-        distributions : Mapping[str, Distribution]
+        distributions : Mapping[str, distribution]
             The distribution of each input, truncated to its bounds.
         initial_condition_remainder : str | None, optional
             The bin or compartment that takes what the initial conditions
@@ -702,66 +698,10 @@ The ids of the inputs, in order.
 
 ### Methods:
 
-#### check_inputs
-
-```python
-check_inputs() -> Self
-```
-
-Check the inputs against the distributions or the sample.
-
-Source code in `commol/context/inference/global_sensitivity.py`
-
-```python
-@model_validator(mode="after")
-def check_inputs(self) -> Self:
-    """Check the inputs against the distributions or the sample."""
-    ids = [parameter.id for parameter in self.parameters]
-    repeated = sorted({i for i in ids if ids.count(i) > 1})
-    if repeated:
-        raise ValueError(f"Inputs repeat the ids {repeated}.")
-    observed = {
-        CalibrationParameterType.FACTOR: (
-            "a factor, which multiplies an observation"
-        ),
-        CalibrationParameterType.NOISE: (
-            "a noise parameter, which belongs to an observation model"
-        ),
-    }
-    for parameter in self.parameters:
-        what = observed.get(CalibrationParameterType(parameter.parameter_type))
-        if what is not None:
-            raise ValueError(
-                f"'{parameter.id}' is {what}; a sensitivity analysis has no "
-                "observations."
-            )
-    if (self.distributions is None) == (self.sample is None):
-        raise ValueError("Give distributions or a sample, not both.")
-    if self.distributions is not None:
-        missing = [i for i in ids if i not in self.distributions]
-        extra = sorted(set(self.distributions) - set(ids))
-        if missing:
-            raise ValueError(
-                f"The inputs {missing} have no distribution: give one per "
-                "input, or InputSpace.uniform_on_bounds(parameters)."
-            )
-        if extra:
-            raise ValueError(f"The distributions of {extra} name no input.")
-    if self.sample is not None:
-        bounds = [(p.min_bound, p.max_bound) for p in self.parameters]
-        if self.sample.names != ids or list(self.sample.bounds) != bounds:
-            raise ValueError(
-                f"The sample has the inputs {self.sample.names} with the bounds "
-                f"{list(self.sample.bounds)}; the parameters are {ids} with the "
-                f"bounds {bounds}, in this order."
-            )
-    return self
-```
-
 #### independent
 
 ```python
-independent(parameters: Sequence[CalibrationParameter], distributions: Mapping[str, Distribution], *, initial_condition_remainder: str | None = None) -> Self
+independent(parameters: Sequence[CalibrationParameter], distributions: Mapping[str, _Distribution], *, initial_condition_remainder: str | None = None) -> Self
 ```
 
 Independent inputs, each with its distribution.
@@ -771,7 +711,7 @@ Parameters:
 | Name                          | Type                             | Description                                              | Default                                                              |
 | ----------------------------- | -------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------- |
 | `parameters`                  | `Sequence[CalibrationParameter]` | The inputs, in order.                                    | *required*                                                           |
-| `distributions`               | `Mapping[str, Distribution]`     | The distribution of each input, truncated to its bounds. | *required*                                                           |
+| `distributions`               | `Mapping[str, distribution]`     | The distribution of each input, truncated to its bounds. | *required*                                                           |
 | `initial_condition_remainder` | \`str                            | None\`                                                   | The bin or compartment that takes what the initial conditions leave. |
 
 Returns:
@@ -793,7 +733,7 @@ Source code in `commol/context/inference/global_sensitivity.py`
 def independent(
     cls,
     parameters: Sequence[CalibrationParameter],
-    distributions: Mapping[str, Distribution],
+    distributions: Mapping[str, _Distribution],
     *,
     initial_condition_remainder: str | None = None,
 ) -> Self:
@@ -804,7 +744,7 @@ def independent(
     ----------
     parameters : Sequence[CalibrationParameter]
         The inputs, in order.
-    distributions : Mapping[str, Distribution]
+    distributions : Mapping[str, distribution]
         The distribution of each input, truncated to its bounds.
     initial_condition_remainder : str | None, optional
         The bin or compartment that takes what the initial conditions
@@ -957,26 +897,6 @@ def from_sample(
     )
 ```
 
-## SensitivityMethod
-
-Bases: `InferenceMethod[ResultT]`, `Generic[ResultT]`
-
-The configuration of a sensitivity method, whose result is `ResultT`.
-
-`SensitivityAnalysis.run(method)` runs it on the inputs of the analysis, with no data, and returns its result type.
-
-Source code in `commol/context/inference/method.py`
-
-```python
-class SensitivityMethod(InferenceMethod[ResultT], Generic[ResultT]):
-    """
-    The configuration of a sensitivity method, whose result is `ResultT`.
-
-    ``SensitivityAnalysis.run(method)`` runs it on the inputs of the
-    analysis, with no data, and returns its result type.
-    """
-```
-
 ## Propagation
 
 Bases: `SensitivityMethod[PropagationResult]`, `RangeChecked`
@@ -990,7 +910,7 @@ Attributes:
 | Name         | Type             | Description                                                                |
 | ------------ | ---------------- | -------------------------------------------------------------------------- |
 | `draws`      | \`int            | None\`                                                                     |
-| `quantities` | `list[Quantity]` | What each run is reduced to; none gives only the sample, for a Predictive. |
+| `quantities` | `list[quantity]` | What each run is reduced to; none gives only the sample, for a Predictive. |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -1009,7 +929,7 @@ class Propagation(SensitivityMethod[PropagationResult], RangeChecked):
     draws : int | None
         The number of points of the Latin hypercube; required with
         independent inputs, and left unset with inputs from a sample.
-    quantities : list[Quantity]
+    quantities : list[quantity]
         What each run is reduced to; none gives only the sample, for a
         `Predictive`.
     """
@@ -1017,7 +937,7 @@ class Propagation(SensitivityMethod[PropagationResult], RangeChecked):
     draws: int | None = Field(
         default=None, description="Points of the Latin hypercube."
     )
-    quantities: list[Quantity] = Field(
+    quantities: list[_Quantity] = Field(
         default_factory=list, description="What each run is reduced to."
     )
 ```
@@ -1419,7 +1339,7 @@ Attributes:
 | Name         | Type             | Description                  |
 | ------------ | ---------------- | ---------------------------- |
 | `draws`      | \`int            | None\`                       |
-| `quantities` | `list[Quantity]` | What each run is reduced to. |
+| `quantities` | `list[quantity]` | What each run is reduced to. |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -1440,14 +1360,14 @@ class PRCC(SensitivityMethod[PRCCResult], RangeChecked):
     draws : int | None
         The number of points of the Latin hypercube; required with
         independent inputs, and left unset with inputs from a sample.
-    quantities : list[Quantity]
+    quantities : list[quantity]
         What each run is reduced to.
     """
 
     draws: int | None = Field(
         default=None, description="Points of the Latin hypercube."
     )
-    quantities: list[Quantity] = Field(
+    quantities: list[_Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
 ```
@@ -1657,7 +1577,7 @@ Attributes:
 | -------------- | ---------------- | --------------------------------------------------------------------------- |
 | `trajectories` | `int`            | The number of trajectories; each runs one more point than there are inputs. |
 | `levels`       | `int`            | The number of levels of each input; even, at least 2.                       |
-| `quantities`   | `list[Quantity]` | What each run is reduced to.                                                |
+| `quantities`   | `list[quantity]` | What each run is reduced to.                                                |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -1679,13 +1599,13 @@ class Morris(SensitivityMethod[MorrisResult], RangeChecked):
         inputs.
     levels : int
         The number of levels of each input; even, at least 2.
-    quantities : list[Quantity]
+    quantities : list[quantity]
         What each run is reduced to.
     """
 
     trajectories: int = Field(description="The number of trajectories.")
     levels: int = Field(description="The number of levels; even.")
-    quantities: list[Quantity] = Field(
+    quantities: list[_Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
 ```
@@ -1879,7 +1799,7 @@ Attributes:
 | `draws`            | `int`            | The rows of each base matrix; the analysis runs draws · (inputs + 2) points. |
 | `replicates`       | `int`            | The bootstrap replicates of the intervals, at least 2.                       |
 | `confidence_level` | `float`          | The level of the intervals, strictly between 0 and 1.                        |
-| `quantities`       | `list[Quantity]` | What each run is reduced to.                                                 |
+| `quantities`       | `list[quantity]` | What each run is reduced to.                                                 |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -1904,14 +1824,14 @@ class Sobol(SensitivityMethod[SobolResult], RangeChecked):
         The bootstrap replicates of the intervals, at least 2.
     confidence_level : float
         The level of the intervals, strictly between 0 and 1.
-    quantities : list[Quantity]
+    quantities : list[quantity]
         What each run is reduced to.
     """
 
     draws: int = Field(description="Rows of each base matrix.")
     replicates: int = Field(description="Bootstrap replicates.")
     confidence_level: float = Field(description="Level of the intervals.")
-    quantities: list[Quantity] = Field(
+    quantities: list[_Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
 ```
@@ -2110,7 +2030,7 @@ Attributes:
 | `q_norm`          | `float`          | The q of the hyperbolic truncation, in (0, 1\]: below 1, a term of several inputs keeps a lower total degree than a term of one. |
 | `max_interaction` | \`int            | None\`                                                                                                                           |
 | `draws`           | `int`            | The points of the Latin hypercube; more than the terms, and two or three times as many is the usual choice.                      |
-| `quantities`      | `list[Quantity]` | What each run is reduced to.                                                                                                     |
+| `quantities`      | `list[quantity]` | What each run is reduced to.                                                                                                     |
 
 Source code in `commol/context/inference/global_sensitivity.py`
 
@@ -2148,7 +2068,7 @@ class PolynomialChaos(SensitivityMethod[ChaosResult], RangeChecked):
     draws : int
         The points of the Latin hypercube; more than the terms, and two or
         three times as many is the usual choice.
-    quantities : list[Quantity]
+    quantities : list[quantity]
         What each run is reduced to.
     """
 
@@ -2158,7 +2078,7 @@ class PolynomialChaos(SensitivityMethod[ChaosResult], RangeChecked):
         default=None, description="The largest number of inputs of a term."
     )
     draws: int = Field(description="Points of the Latin hypercube.")
-    quantities: list[Quantity] = Field(
+    quantities: list[_Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
 ```
@@ -2672,7 +2592,7 @@ class ValueAt(_OfSeries, _OneScalar, RangeChecked):
     at: float = Field(description="The position.")
 
     @model_validator(mode="after")
-    def window_after_zero(self) -> Self:
+    def _window_after_zero(self) -> Self:
         """The window of increments ends at least its width after 0."""
         self.series.check_ends([self.at])
         return self
@@ -2683,24 +2603,6 @@ class ValueAt(_OfSeries, _OneScalar, RangeChecked):
 ```
 
 ### Methods:
-
-#### window_after_zero
-
-```python
-window_after_zero() -> Self
-```
-
-The window of increments ends at least its width after 0.
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-@model_validator(mode="after")
-def window_after_zero(self) -> Self:
-    """The window of increments ends at least its width after 0."""
-    self.series.check_ends([self.at])
-    return self
-```
 
 #### default_label
 
@@ -2760,7 +2662,7 @@ class Gain(_Outputs, _OneScalar, RangeChecked):
     end: float = Field(description="The end of the window.")
 
     @model_validator(mode="after")
-    def end_after_start(self) -> Self:
+    def _end_after_start(self) -> Self:
         """A window ends after it starts."""
         if self.end <= self.start:
             raise ValueError(
@@ -2776,28 +2678,6 @@ class Gain(_Outputs, _OneScalar, RangeChecked):
 ```
 
 ### Methods:
-
-#### end_after_start
-
-```python
-end_after_start() -> Self
-```
-
-A window ends after it starts.
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-@model_validator(mode="after")
-def end_after_start(self) -> Self:
-    """A window ends after it starts."""
-    if self.end <= self.start:
-        raise ValueError(
-            f"A gain ends after it starts, got start {self.start} and end "
-            f"{self.end}"
-        )
-    return self
-```
 
 #### default_label
 
@@ -3074,13 +2954,13 @@ class Ratio(_OneScalar):
     kind: Literal["ratio"] = "ratio"
     numerator: _Operand = Field(description="The quantity divided.")
     denominator: _Operand = Field(description="The quantity it is divided by.")
-    replicate_rule: ReplicateRule = Field(
+    replicate_rule: Literal["within", "within_positive", "pooled"] = Field(
         description="How the replicates of a stochastic run combine."
     )
 
     @field_validator("numerator", "denominator")
     @classmethod
-    def one_value(cls, value: QuantityBase) -> QuantityBase:
+    def _one_value(cls, value: QuantityBase) -> QuantityBase:
         """An operand gives one value per run."""
         if isinstance(value, PeakPosition | Trajectory):
             raise ValueError(
@@ -3097,29 +2977,6 @@ class Ratio(_OneScalar):
 ```
 
 ### Methods:
-
-#### one_value
-
-```python
-one_value(value: QuantityBase) -> QuantityBase
-```
-
-An operand gives one value per run.
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-@field_validator("numerator", "denominator")
-@classmethod
-def one_value(cls, value: QuantityBase) -> QuantityBase:
-    """An operand gives one value per run."""
-    if isinstance(value, PeakPosition | Trajectory):
-        raise ValueError(
-            f"A Ratio divides quantities of one value each (ValueAt, Gain, "
-            f"Peak), got the {type(value).__name__} '{value.labels()[0]}'"
-        )
-    return value
-```
 
 #### default_label
 
@@ -3153,7 +3010,7 @@ Parameters:
 
 | Name         | Type                 | Description     | Default    |
 | ------------ | -------------------- | --------------- | ---------- |
-| `quantities` | `Sequence[Quantity]` | The quantities. | *required* |
+| `quantities` | `Sequence[quantity]` | The quantities. | *required* |
 
 Returns:
 
@@ -3182,7 +3039,7 @@ def quantity_schedule(quantities: Sequence[QuantityBase]) -> list[float]:
 
     Parameters
     ----------
-    quantities : Sequence[Quantity]
+    quantities : Sequence[quantity]
         The quantities.
 
     Returns

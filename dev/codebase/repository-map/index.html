@@ -3844,7 +3844,7 @@
 </tr>
 <tr>
 <td><code>api/results.py</code></td>
-<td><code>SimulationResults</code> (values with their positions, seed and model, its <code>report</code>, its <code>plot</code> and its <code>quantities</code>), <code>SimulationReplicates</code> (runs with one seed each, their statistics, their <code>report</code>, their <code>plot</code> and their <code>quantities</code>); <code>outputs_for</code> and <code>total_series</code>, the outputs of a source and their sum, which a simulation, a report and a figure share; <code>sample</code>, which reads positions with <code>index_at</code> of Rust.</td>
+<td><code>SimulationResults</code> (values with their positions, seed and model, its <code>sample</code> and <code>windowed_totals</code> by id, its <code>report</code>, its <code>plot</code> and its <code>quantities</code>), <code>SimulationReplicates</code> (runs with one seed each, their statistics, their <code>report</code>, their <code>plot</code> and their <code>quantities</code>); <code>outputs_for</code>, <code>series_names</code> and <code>total_series</code>, the outputs of a source and their sum, which a simulation, a report and a figure share; <code>_sample</code>, which reads positions with <code>index_at</code> of Rust.</td>
 <td>Engine rules.</td>
 </tr>
 <tr>
@@ -3864,7 +3864,7 @@
 </tr>
 <tr>
 <td><code>api/inference/</code></td>
-<td>What reads a sample: <code>Predictive</code> (<code>predictive.py</code>), <code>Scenarios</code>, the predictive of each scenario and their paired comparison (<code>scenarios.py</code>), the scores (<code>api/inference/scores.py</code>, exposed as <code>commol.scores</code>), the one interval convention (<code>intervals.py</code>: <code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code>), the registry of method runners (<code>registry.py</code>), the <code>CalibrationResult</code> of the starts of a fit that the engine ran (<code>fit.py</code>), the runners of the identifiability methods (<code>api/inference/identifiability.py</code>), which build the report, the runners of the resampling methods (<code>api/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>api/inference/smc.py</code>), of the local approximations (<code>api/inference/local.py</code>), of the conformal methods (<code>api/inference/conformal.py</code>), which build <code>ConformalResult</code>, of the sensitivity methods (<code>api/inference/global_sensitivity.py</code>), and of the profiles (<code>api/inference/profiles.py</code>), which build <code>ProfileResult</code>.</td>
+<td>What reads a sample: <code>Predictive</code> (<code>predictive.py</code>), <code>Scenarios</code>, the predictive of each scenario and their paired comparison (<code>scenarios.py</code>), the scores (<code>api/inference/scores.py</code>, exposed as <code>commol.scores</code>), the one interval convention (<code>intervals.py</code>: <code>weighted_quantiles</code> and <code>member_statistics</code>), the registry of method runners (<code>registry.py</code>), the <code>CalibrationResult</code> of the starts of a fit that the engine ran (<code>fit.py</code>), the runners of the identifiability methods (<code>api/inference/identifiability.py</code>), which build the report, the runners of the resampling methods (<code>api/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>api/inference/smc.py</code>), of the local approximations (<code>api/inference/local.py</code>), of the conformal methods (<code>api/inference/conformal.py</code>), which build <code>ConformalResult</code>, of the sensitivity methods (<code>api/inference/global_sensitivity.py</code>), and of the profiles (<code>api/inference/profiles.py</code>), which build <code>ProfileResult</code>.</td>
 <td>Transforms of predictions; quantile formulas.</td>
 </tr>
 <tr>
@@ -3879,7 +3879,7 @@
 </tr>
 <tr>
 <td><code>api/patterns.py</code>, <code>api/windows.py</code></td>
-<td>Rates that change along the axis (<code>AxisPattern</code>), and windowed totals.</td>
+<td>Rates that change along the axis (<code>AxisPattern</code>), and <code>_windowed_totals</code>, the windowed totals of one series that <code>SimulationResults.windowed_totals</code> reads.</td>
 <td>Physical units inside the model; window arithmetic (the engine's).</td>
 </tr>
 <tr>
@@ -3889,7 +3889,7 @@
 </tr>
 <tr>
 <td><code>context/inference/</code></td>
-<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code>, <code>IdentifiabilityMethod</code> and <code>SensitivityMethod</code> (<code>method.py</code>), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, the identifiability methods and <code>IdentifiabilityReport</code> (<code>context/inference/identifiability.py</code>), the observation noise (<code>noise.py</code>: <code>NoNoise</code>, <code>ResidualNoise</code>, <code>DistributionNoise</code>), the distributions and <code>Priors</code> (<code>distributions.py</code>), and the settings and results of the resampling methods (<code>context/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>context/inference/smc.py</code>: <code>GibbsPosterior</code>, <code>BayesianPosterior</code>, <code>InformationMatchingEta</code>, <code>BootstrapCoverageEta</code>, <code>ABCSMC</code>, <code>ABCRejection</code>, the distances, <code>SMCResult</code>, <code>GibbsResult</code>), of the local approximations (<code>context/inference/local.py</code>: <code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>, its targets, <code>LaplaceResult</code>, <code>SandwichResult</code>, <code>DeltaBand</code>, <code>ImportanceResult</code>), of the conformal methods (<code>context/inference/conformal.py</code>), of the sensitivity methods with <code>InputSpace</code> (<code>context/inference/global_sensitivity.py</code>), the quantities of interest (<code>quantities.py</code>: a series, <code>Level</code> or <code>Increments</code>, and its reduction), and of the profiles (<code>context/inference/profiles.py</code>: <code>ProfileLikelihood</code>, <code>PredictionProfile</code>, <code>PredictionSpec</code>, <code>Threshold</code>, <code>ProfileResult</code>).</td>
+<td><code>InferenceMethod</code> and its kinds <code>UncertaintyMethod</code>, <code>IdentifiabilityMethod</code> and <code>SensitivityMethod</code> (<code>method.py</code>, the private bases of the methods), <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, the identifiability methods and <code>IdentifiabilityReport</code> (<code>context/inference/identifiability.py</code>), the observation noise (<code>noise.py</code>: <code>NoNoise</code>, <code>ResidualNoise</code>, <code>DistributionNoise</code>), the distributions and <code>Priors</code> (<code>distributions.py</code>), and the settings and results of the resampling methods (<code>context/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>context/inference/smc.py</code>: <code>GibbsPosterior</code>, <code>BayesianPosterior</code>, <code>InformationMatchingEta</code>, <code>BootstrapCoverageEta</code>, <code>ABCSMC</code>, <code>ABCRejection</code>, the distances, <code>SMCResult</code>, <code>GibbsResult</code>), of the local approximations (<code>context/inference/local.py</code>: <code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>, its targets, <code>LaplaceResult</code>, <code>SandwichResult</code>, <code>DeltaBand</code>, <code>ImportanceResult</code>), of the conformal methods (<code>context/inference/conformal.py</code>), of the sensitivity methods with <code>InputSpace</code> (<code>context/inference/global_sensitivity.py</code>), the quantities of interest (<code>quantities.py</code>: a series, <code>Level</code> or <code>Increments</code>, and its reduction), and of the profiles (<code>context/inference/profiles.py</code>: <code>ProfileLikelihood</code>, <code>PredictionProfile</code>, <code>PredictionSpec</code>, <code>Threshold</code>, <code>ProfileResult</code>).</td>
 <td>Runners.</td>
 </tr>
 <tr>
@@ -3953,11 +3953,6 @@
 <td>An <code>__eq__</code> or a <code>__hash__</code> of one result; the base of a setting.</td>
 </tr>
 <tr>
-<td><code>context/constants.py</code></td>
-<td>The enumerations of the calibration settings: <code>CalibrationParameterType</code>, <code>LossFunction</code>, <code>OptimizationAlgorithm</code>.</td>
-<td>—</td>
-</tr>
-<tr>
 <td><code>context/visualization.py</code></td>
 <td><code>PlotConfig</code>, the settings of a figure, and its presets.</td>
 <td>Drawing (<code>api/plotting/</code>).</td>
@@ -3974,12 +3969,12 @@
 </tr>
 <tr>
 <td><code>context/transition.py</code></td>
-<td><code>Transition</code> and <code>StratifiedRate</code>; each rate is checked by the parser of the engine (<code>commol_rs.core.MathExpression.check</code>) when it is built.</td>
+<td><code>Transition</code> and <code>StratifiedRate</code>; each rate is checked by the parser of the engine (<code>commol_rs.core.MathExpression.check</code>) when it is built, the rate of a <code>StratifiedRate</code> with <code>$compartment</code> set to the name of a compartment.</td>
 <td>A check of a formula of its own.</td>
 </tr>
 <tr>
 <td><code>context/observation_models.py</code></td>
-<td>The observation models of a calibration problem (<code>NormalObservations</code>, …, <code>BinomialObservations</code>, the union <code>ObservationModel</code>), as settings.</td>
+<td>The observation models of a calibration problem (<code>NormalObservations</code>, …, <code>BinomialObservations</code>, the private union <code>_ObservationModel</code>), as settings.</td>
 <td>Densities and checks (the engine's).</td>
 </tr>
 <tr>

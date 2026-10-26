@@ -224,7 +224,7 @@ class Calibrator:
         self,
         sample: ParameterSample,
         observed_data: list[ObservedDataPoint],
-        noise: ObservationNoise,
+        noise: _ObservationNoise,
     ) -> "ObservationDrawsProtocol":
         """
         Every draw's value of `observed_data` with `noise`, for a `Predictive`.
@@ -1141,6 +1141,50 @@ def identifiability(self, method: IdentifiabilityMethod[ResultT]) -> ResultT:
     return run_method(self, method, IdentifiabilityMethod)
 ```
 
+## DeltaBand
+
+Bases: `ResultModel`
+
+The band of every output by the delta method (`Calibrator.delta_band`): the prediction at the fit plus and minus a quantile times the standard deviation of the linearized model, `J Σ Jᵀ`, with no run of the draws.
+
+Attributes:
+
+| Name                   | Type                     | Description                                                                                      |
+| ---------------------- | ------------------------ | ------------------------------------------------------------------------------------------------ |
+| `confidence_level`     | `float`                  | The level of the central interval.                                                               |
+| `positions`            | `list[float]`            | Where the values are.                                                                            |
+| `center, lower, upper` | `dict[str, list[float]]` | For each output, one value per position: the prediction at the fit and the ends of the interval. |
+
+Source code in `commol/context/inference/local.py`
+
+```python
+class DeltaBand(ResultModel):
+    """
+    The band of every output by the delta method (``Calibrator.delta_band``):
+    the prediction at the fit
+    plus and minus a quantile times the standard deviation of the
+    linearized model, ``J Σ Jᵀ``, with no run of the draws.
+
+    Attributes
+    ----------
+    confidence_level : float
+        The level of the central interval.
+    positions : list[float]
+        Where the values are.
+    center, lower, upper : dict[str, list[float]]
+        For each output, one value per position: the prediction at the fit
+        and the ends of the interval.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    confidence_level: float
+    positions: list[float]
+    center: dict[str, list[float]] = Field(description="Prediction at the fit")
+    lower: dict[str, list[float]] = Field(description="Lower end")
+    upper: dict[str, list[float]] = Field(description="Upper end")
+```
+
 ## CalibrationProblem
 
 Bases: `RangeChecked`
@@ -1151,19 +1195,19 @@ This class encapsulates all the information needed to calibrate model parameters
 
 Attributes:
 
-| Name                          | Type                          | Description                                                                                                                                                                                               |
-| ----------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `observed_data`               | `list[ObservedDataPoint]`     | List of observed data points to fit against                                                                                                                                                               |
-| `parameters`                  | `list[CalibrationParameter]`  | List of parameters to calibrate with their bounds                                                                                                                                                         |
-| `constraints`                 | `list[CalibrationConstraint]` | List of constraints on calibration parameters (optional, default: empty list)                                                                                                                             |
-| `loss_function`               | \`{sse, rmse, mae}            | None\`                                                                                                                                                                                                    |
-| `observation_models`          | \`dict[str, ObservationModel] | None\`                                                                                                                                                                                                    |
-| `normalize_observations`      | `bool`                        | When True, divide each residual by the RMS of its observation series before applying the loss metric (default: False). It needs a loss: observation models set the scale of each series with their noise. |
-| `optimization_config`         | \`NelderMeadConfig            | ParticleSwarmConfig\`                                                                                                                                                                                     |
-| `initial_condition_remainder` | \`str                         | None\`                                                                                                                                                                                                    |
-| `replicates`                  | \`int                         | None\`                                                                                                                                                                                                    |
-| `replicate_summary`           | \`{mean, median, crps}        | Quantile                                                                                                                                                                                                  |
-| `seed`                        | \`int                         | None\`                                                                                                                                                                                                    |
+| Name                          | Type                           | Description                                                                                                                                                                                               |
+| ----------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `observed_data`               | `list[ObservedDataPoint]`      | List of observed data points to fit against                                                                                                                                                               |
+| `parameters`                  | `list[CalibrationParameter]`   | List of parameters to calibrate with their bounds                                                                                                                                                         |
+| `constraints`                 | `list[CalibrationConstraint]`  | List of constraints on calibration parameters (optional, default: empty list)                                                                                                                             |
+| `loss_function`               | \`{sse, rmse, mae}             | None\`                                                                                                                                                                                                    |
+| `observation_models`          | \`dict[str, observation model] | None\`                                                                                                                                                                                                    |
+| `normalize_observations`      | `bool`                         | When True, divide each residual by the RMS of its observation series before applying the loss metric (default: False). It needs a loss: observation models set the scale of each series with their noise. |
+| `optimization_config`         | \`NelderMeadConfig             | ParticleSwarmConfig\`                                                                                                                                                                                     |
+| `initial_condition_remainder` | \`str                          | None\`                                                                                                                                                                                                    |
+| `replicates`                  | \`int                          | None\`                                                                                                                                                                                                    |
+| `replicate_summary`           | \`{mean, median, crps}         | Quantile                                                                                                                                                                                                  |
+| `seed`                        | \`int                          | None\`                                                                                                                                                                                                    |
 
 Source code in `commol/context/calibration.py`
 
@@ -1188,7 +1232,7 @@ class CalibrationProblem(RangeChecked):
         The loss that measures the fit, with the observation weights. A
         problem has a loss or ``observation_models``, exactly one, with no
         default: what to fit is a modelling choice.
-    observation_models : dict[str, ObservationModel] | None
+    observation_models : dict[str, observation model] | None
         One observation model per series label (`NormalObservations`,
         `LogNormalObservations`, `StudentTObservations`,
         `PoissonObservations`, `NegativeBinomialObservations`,
@@ -1244,11 +1288,11 @@ class CalibrationProblem(RangeChecked):
         default_factory=list,
         description="Constraints on calibration parameters",
     )
-    loss_function: str | None = Field(
+    loss_function: Literal["sse", "rmse", "mae"] | None = Field(
         default=None,
         description="Loss function to use for measuring fit quality",
     )
-    observation_models: dict[str, ObservationModel] | None = Field(
+    observation_models: dict[str, _ObservationModel] | None = Field(
         default=None,
         description="One observation model per series label",
     )
@@ -1274,7 +1318,7 @@ class CalibrationProblem(RangeChecked):
         default=None,
         description="Replicates per evaluation of a stochastic engine.",
     )
-    replicate_summary: ReplicateSummary | None = Field(
+    replicate_summary: Literal["mean", "median", "crps"] | Quantile | None = Field(
         default=None,
         description="What the observations are compared with, for a stochastic engine.",
     )
@@ -1286,17 +1330,8 @@ class CalibrationProblem(RangeChecked):
         ),
     )
 
-    @field_validator("loss_function")
-    @classmethod
-    def validate_loss_function(cls, v: str | None) -> str | None:
-        if v is not None and v not in LossFunction:
-            raise ValueError(
-                f"Invalid loss_function: {v}. Must be one of {list(LossFunction)}"
-            )
-        return v
-
     @model_validator(mode="after")
-    def validate_loss_or_models(self) -> Self:
+    def _validate_loss_or_models(self) -> Self:
         """Require a loss or observation models, exactly one."""
         if self.loss_function is not None and self.observation_models is not None:
             raise ValueError(
@@ -1305,9 +1340,9 @@ class CalibrationProblem(RangeChecked):
             )
         if self.loss_function is None and self.observation_models is None:
             raise ValueError(
-                "A problem needs a loss_function (one of "
-                f"{', '.join(LossFunction)}) or observation_models. There is no "
-                "default: what to fit is a modelling choice."
+                "A problem needs a loss_function (sse, rmse or mae) or "
+                "observation_models. There is no default: what to fit is a "
+                "modelling choice."
             )
         if self.observation_models is not None and self.normalize_observations:
             raise ValueError(
@@ -1317,69 +1352,13 @@ class CalibrationProblem(RangeChecked):
         return self
 
     @model_validator(mode="after")
-    def validate_unique_parameter_ids(self) -> Self:
+    def _validate_unique_parameter_ids(self) -> Self:
         """Ensure parameter IDs are unique."""
         param_ids = [p.id for p in self.parameters]
         if len(param_ids) != len(set(param_ids)):
             duplicates = [id for id in set(param_ids) if param_ids.count(id) > 1]
             raise ValueError(f"Duplicate parameter IDs found: {duplicates}")
         return self
-```
-
-### Methods:
-
-#### validate_loss_or_models
-
-```python
-validate_loss_or_models() -> Self
-```
-
-Require a loss or observation models, exactly one.
-
-Source code in `commol/context/calibration.py`
-
-```python
-@model_validator(mode="after")
-def validate_loss_or_models(self) -> Self:
-    """Require a loss or observation models, exactly one."""
-    if self.loss_function is not None and self.observation_models is not None:
-        raise ValueError(
-            "A problem has a loss_function or observation_models, not both: "
-            "the fit and the posterior would answer different questions."
-        )
-    if self.loss_function is None and self.observation_models is None:
-        raise ValueError(
-            "A problem needs a loss_function (one of "
-            f"{', '.join(LossFunction)}) or observation_models. There is no "
-            "default: what to fit is a modelling choice."
-        )
-    if self.observation_models is not None and self.normalize_observations:
-        raise ValueError(
-            "normalize_observations needs a loss_function: the observation "
-            "models set the scale of each series with their noise."
-        )
-    return self
-```
-
-#### validate_unique_parameter_ids
-
-```python
-validate_unique_parameter_ids() -> Self
-```
-
-Ensure parameter IDs are unique.
-
-Source code in `commol/context/calibration.py`
-
-```python
-@model_validator(mode="after")
-def validate_unique_parameter_ids(self) -> Self:
-    """Ensure parameter IDs are unique."""
-    param_ids = [p.id for p in self.parameters]
-    if len(param_ids) != len(set(param_ids)):
-        duplicates = [id for id in set(param_ids) if param_ids.count(id) > 1]
-        raise ValueError(f"Duplicate parameter IDs found: {duplicates}")
-    return self
 ```
 
 ## Quantile
@@ -1417,7 +1396,9 @@ class Quantile(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    level: QuantileLevel = Field(..., description="Level of the quantile.")
+    level: Annotated[float, AfterValidator(check_quantile_level)] = Field(
+        ..., description="Level of the quantile."
+    )
 
     def __init__(self, level: float) -> None:
         """
@@ -1565,7 +1546,7 @@ class ObservedDataPoint(RangeChecked):
     )
 
     @model_validator(mode="after")
-    def validate_observed_outputs(self) -> Self:
+    def _validate_observed_outputs(self) -> Self:
         """Require one of `output` and `outputs`; name the series."""
         if (self.output is None) == (self.outputs is None):
             raise ValueError("Give exactly one of 'output' and 'outputs'.")
@@ -1582,7 +1563,7 @@ class ObservedDataPoint(RangeChecked):
         return self
 
     @model_validator(mode="after")
-    def validate_window(self) -> Self:
+    def _validate_window(self) -> Self:
         """
         A window must not start before position 0, with the rule of the
         engine (`check_window_end` of
@@ -1608,71 +1589,9 @@ observed_outputs: list[str]
 
 The outputs whose sum is compared: `outputs`, or `output` alone.
 
-### Methods:
-
-#### validate_observed_outputs
-
-```python
-validate_observed_outputs() -> Self
-```
-
-Require one of `output` and `outputs`; name the series.
-
-Source code in `commol/context/calibration.py`
-
-```python
-@model_validator(mode="after")
-def validate_observed_outputs(self) -> Self:
-    """Require one of `output` and `outputs`; name the series."""
-    if (self.output is None) == (self.outputs is None):
-        raise ValueError("Give exactly one of 'output' and 'outputs'.")
-    if self.outputs is not None:
-        if not self.outputs:
-            raise ValueError("outputs must be non-empty when provided")
-        if not self.label:
-            raise ValueError(
-                "An observation of several outputs needs a 'label' that names "
-                "their sum."
-            )
-    elif not self.label:
-        self.label = self.output or ""
-    return self
-```
-
-#### validate_window
-
-```python
-validate_window() -> Self
-```
-
-A window must not start before position 0, with the rule of the engine (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
-
-Source code in `commol/context/calibration.py`
-
-```python
-@model_validator(mode="after")
-def validate_window(self) -> Self:
-    """
-    A window must not start before position 0, with the rule of the
-    engine (`check_window_end` of
-    `crates/commol-calibration/src/observation.rs`).
-    """
-    if self.window is not None:
-        commol_rs.calibration.check_window_end(self.at, self.window)
-    return self
-```
-
 ## Observation models
 
 Guide: [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md).
-
-## ObservationModel
-
-```python
-ObservationModel = Annotated[NormalObservations | LogNormalObservations | StudentTObservations | PoissonObservations | NegativeBinomialObservations | BinomialObservations, Field(discriminator=kind)]
-```
-
-One observation model of a series.
 
 ## NormalObservations
 
@@ -1705,7 +1624,7 @@ class NormalObservations(_ObservationModel, RangeChecked):
     """
 
     kind: Literal["normal"] = "normal"
-    sd: NoiseArgument = Field(description="The standard deviation.")
+    sd: float | str = Field(description="The standard deviation.")
 ```
 
 ## LogNormalObservations
@@ -1746,7 +1665,7 @@ class LogNormalObservations(_ObservationModel, RangeChecked):
     """
 
     kind: Literal["log_normal"] = "log_normal"
-    sigma: NoiseArgument = Field(description="The standard deviation of log y.")
+    sigma: float | str = Field(description="The standard deviation of log y.")
     center: Literal["mean", "median"] = Field(description="What the prediction is.")
 ```
 
@@ -1781,8 +1700,8 @@ class StudentTObservations(_ObservationModel, RangeChecked):
     """
 
     kind: Literal["student_t"] = "student_t"
-    df: NoiseArgument = Field(description="The degrees of freedom.")
-    scale: NoiseArgument = Field(description="The scale.")
+    df: float | str = Field(description="The degrees of freedom.")
+    scale: float | str = Field(description="The scale.")
 ```
 
 ## PoissonObservations
@@ -1839,7 +1758,7 @@ class NegativeBinomialObservations(_ObservationModel, RangeChecked):
     """
 
     kind: Literal["negative_binomial"] = "negative_binomial"
-    overdispersion: NoiseArgument = Field(description="The overdispersion φ.")
+    overdispersion: float | str = Field(description="The overdispersion φ.")
 ```
 
 ## BinomialObservations
@@ -1892,13 +1811,13 @@ Defines a parameter or initial condition to be calibrated with its bounds.
 
 Attributes:
 
-| Name             | Type    | Description                                                             |
-| ---------------- | ------- | ----------------------------------------------------------------------- |
-| `id`             | `str`   | Identifier (parameter ID for parameters, bin ID for initial conditions) |
-| `parameter_type` | `str`   | Type of value being calibrated                                          |
-| `min_bound`      | `float` | Minimum allowed value for this parameter                                |
-| `max_bound`      | `float` | Maximum allowed value for this parameter                                |
-| `initial_guess`  | \`float | None\`                                                                  |
+| Name             | Type                                            | Description                                                                                                                                                                                                                                                                |
+| ---------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`             | `str`                                           | Identifier (parameter ID for parameters, bin ID for initial conditions)                                                                                                                                                                                                    |
+| `parameter_type` | `{parameter, initial_condition, factor, noise}` | What the value is: a parameter of the model; the initial amount of a compartment, a bin or a category; a factor that multiplies the model output of an observation; or an argument of an observation model, such as its standard deviation, which never reaches the engine |
+| `min_bound`      | `float`                                         | Minimum allowed value for this parameter                                                                                                                                                                                                                                   |
+| `max_bound`      | `float`                                         | Maximum allowed value for this parameter                                                                                                                                                                                                                                   |
+| `initial_guess`  | \`float                                         | None\`                                                                                                                                                                                                                                                                     |
 
 Source code in `commol/context/calibration.py`
 
@@ -1911,8 +1830,11 @@ class CalibrationParameter(BaseModel):
     ----------
     id : str
         Identifier (parameter ID for parameters, bin ID for initial conditions)
-    parameter_type : str
-        Type of value being calibrated
+    parameter_type : {"parameter", "initial_condition", "factor", "noise"}
+        What the value is: a parameter of the model; the initial amount of a
+        compartment, a bin or a category; a factor that multiplies the model
+        output of an observation; or an argument of an observation model, such
+        as its standard deviation, which never reaches the engine
     min_bound : float
         Minimum allowed value for this parameter
     max_bound : float
@@ -1926,9 +1848,11 @@ class CalibrationParameter(BaseModel):
     id: str = Field(
         default=..., min_length=1, description="Parameter or bin identifier"
     )
-    parameter_type: str = Field(
-        default=...,
-        description="Type of value being calibrated",
+    parameter_type: Literal["parameter", "initial_condition", "factor", "noise"] = (
+        Field(
+            default=...,
+            description="Type of value being calibrated",
+        )
     )
     min_bound: float = Field(default=..., description="Minimum allowed value")
     max_bound: float = Field(default=..., description="Maximum allowed value")
@@ -1936,18 +1860,8 @@ class CalibrationParameter(BaseModel):
         default=None, description="Optional starting value for optimization"
     )
 
-    @field_validator("parameter_type")
-    @classmethod
-    def validate_parameter_type(cls, v: str) -> str:
-        if v not in CalibrationParameterType:
-            raise ValueError(
-                f"Invalid parameter_type: {v}. "
-                f"Must be one of {list(CalibrationParameterType)}"
-            )
-        return v
-
     @model_validator(mode="after")
-    def validate_bounds(self) -> Self:
+    def _validate_bounds(self) -> Self:
         """Validate that max_bound > min_bound and initial_guess is within bounds."""
         if self.max_bound <= self.min_bound:
             raise ValueError(
@@ -1967,42 +1881,6 @@ class CalibrationParameter(BaseModel):
                 )
 
         return self
-```
-
-### Methods:
-
-#### validate_bounds
-
-```python
-validate_bounds() -> Self
-```
-
-Validate that max_bound > min_bound and initial_guess is within bounds.
-
-Source code in `commol/context/calibration.py`
-
-```python
-@model_validator(mode="after")
-def validate_bounds(self) -> Self:
-    """Validate that max_bound > min_bound and initial_guess is within bounds."""
-    if self.max_bound <= self.min_bound:
-        raise ValueError(
-            (
-                f"max_bound ({self.max_bound}) must be greater than "
-                f"min_bound ({self.min_bound}) for parameter '{self.id}'"
-            )
-        )
-    if self.initial_guess is not None:
-        if not (self.min_bound <= self.initial_guess <= self.max_bound):
-            raise ValueError(
-                (
-                    f"initial_guess ({self.initial_guess}) must be between "
-                    f"min_bound ({self.min_bound}) and max_bound "
-                    f"({self.max_bound}) for parameter '{self.id}'"
-                )
-            )
-
-    return self
 ```
 
 ## CalibrationConstraint
@@ -2154,61 +2032,19 @@ class CalibrationConstraint(RangeChecked):
 
     @field_validator("expression")
     @classmethod
-    def validate_expression(cls, value: str) -> str:
+    def _validate_expression(cls, value: str) -> str:
         """Check the expression with the parser of the engine."""
         commol_rs.core.MathExpression(value).check()
         return value
 
     @model_validator(mode="after")
-    def validate_positions(self) -> Self:
+    def _validate_positions(self) -> Self:
         """Validate that the positions, when given, are not empty."""
         if self.at is not None and len(self.at) == 0:
             raise ValueError(
                 f"at for constraint '{self.id}' must not be empty if specified"
             )
         return self
-```
-
-### Methods:
-
-#### validate_expression
-
-```python
-validate_expression(value: str) -> str
-```
-
-Check the expression with the parser of the engine.
-
-Source code in `commol/context/calibration.py`
-
-```python
-@field_validator("expression")
-@classmethod
-def validate_expression(cls, value: str) -> str:
-    """Check the expression with the parser of the engine."""
-    commol_rs.core.MathExpression(value).check()
-    return value
-```
-
-#### validate_positions
-
-```python
-validate_positions() -> Self
-```
-
-Validate that the positions, when given, are not empty.
-
-Source code in `commol/context/calibration.py`
-
-```python
-@model_validator(mode="after")
-def validate_positions(self) -> Self:
-    """Validate that the positions, when given, are not empty."""
-    if self.at is not None and len(self.at) == 0:
-        raise ValueError(
-            f"at for constraint '{self.id}' must not be empty if specified"
-        )
-    return self
 ```
 
 ## NelderMeadConfig
@@ -2562,7 +2398,7 @@ class ParticleSwarmConfig(RangeChecked):
     )
 
     @model_validator(mode="after")
-    def check_strategies(self) -> Self:
+    def _check_strategies(self) -> Self:
         """
         Check each number against its strategy, as the engine reads them.
 
@@ -2580,52 +2416,6 @@ class ParticleSwarmConfig(RangeChecked):
         """
         commol_rs.json.as_read("ParticleSwarmConfig", engine_json(self))
         return self
-```
-
-### Methods:
-
-#### check_strategies
-
-```python
-check_strategies() -> Self
-```
-
-Check each number against its strategy, as the engine reads them.
-
-Returns:
-
-| Type   | Description        |
-| ------ | ------------------ |
-| `Self` | The configuration. |
-
-Raises:
-
-| Type         | Description                                                                                                                                                                  |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If a strategy lacks a number it needs, a number is set without its strategy or with another one, or the chaotic weights are not in order; the message is that of the engine. |
-
-Source code in `commol/context/calibration.py`
-
-```python
-@model_validator(mode="after")
-def check_strategies(self) -> Self:
-    """
-    Check each number against its strategy, as the engine reads them.
-
-    Returns
-    -------
-    Self
-        The configuration.
-
-    Raises
-    ------
-    ValueError
-        If a strategy lacks a number it needs, a number is set without
-        its strategy or with another one, or the chaotic weights are not
-        in order; the message is that of the engine.
-    """
-    commol_rs.json.as_read("ParticleSwarmConfig", engine_json(self))
-    return self
 ```
 
 ## CalibrationResult
@@ -2862,37 +2652,4 @@ class CalibrationEvaluation(ResultModel):
 
     parameters: dict[str, float] = Field(description="Values the objective scored")
     loss: float = Field(description="Loss at these values")
-```
-
-## LossFunction
-
-Bases: `StrEnum`
-
-Available loss functions for calibration.
-
-Values
-
-SSE Sum of Squared Errors RMSE Root Mean Squared Error MAE Mean Absolute Error
-
-Source code in `commol/context/constants.py`
-
-```python
-@unique
-class LossFunction(StrEnum):
-    """
-    Available loss functions for calibration.
-
-    Values
-    ------
-    SSE
-        Sum of Squared Errors
-    RMSE
-        Root Mean Squared Error
-    MAE
-        Mean Absolute Error
-    """
-
-    SSE = "sse"
-    RMSE = "rmse"
-    MAE = "mae"
 ```

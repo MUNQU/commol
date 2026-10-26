@@ -114,7 +114,7 @@ class AxisUnits(BaseModel):
     )
 
     @model_validator(mode="after")
-    def check_units_and_engine(self) -> Self:
+    def _check_units_and_engine(self) -> Self:
         """Check the step unit and the origin, and ask for the engine."""
         define_units(self.step_unit)
         check_step_unit(self.step_unit)
@@ -571,29 +571,6 @@ Raises:
 | `ValueError` | If there is no engine. |
 
 ### Methods:
-
-#### check_units_and_engine
-
-```python
-check_units_and_engine() -> Self
-```
-
-Check the step unit and the origin, and ask for the engine.
-
-Source code in `commol/context/axis_units.py`
-
-```python
-@model_validator(mode="after")
-def check_units_and_engine(self) -> Self:
-    """Check the step unit and the origin, and ask for the engine."""
-    define_units(self.step_unit)
-    check_step_unit(self.step_unit)
-    if self.origin is not None:
-        seconds_per_step(self.step_unit)
-    if self.engine is not None:
-        commol_rs.engine.EngineType(engine_json(self.engine))
-    return self
-```
 
 #### position_of
 

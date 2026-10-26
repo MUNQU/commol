@@ -124,7 +124,7 @@ A noise argument is a number, or the id of a calibration parameter of type `"noi
 | A stochastic engine needs a loss                                                                            | `ValueError` from `Calibrator`                       |
 | `normalize_observations` needs a loss: the models set the scale of each series                              | `ValueError` from `CalibrationProblem`               |
 
-`Likelihood::new` in `crates/commol-calibration/src/likelihood/mod.rs` checks the models and values; `CalibrationProblem.validate_loss_or_models` checks the first and the last rules.
+`Likelihood::new` in `crates/commol-calibration/src/likelihood/mod.rs` checks the models and values; `CalibrationProblem._validate_loss_or_models` checks the first and the last rules.
 
 A stochastic engine is refused because the likelihood of a stochastic model integrates its hidden path, which the observations of one run do not do. Fit a stochastic model with a loss and its replicates ([Stochastic engines](https://munqu.github.io/commol/latest/guide/calibration/#stochastic-engines)).
 

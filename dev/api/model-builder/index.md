@@ -2,7 +2,7 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-Builds a `Model`. Guide: [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md), [Transitions](https://munqu.github.io/commol/latest/guide/transitions/index.md).
+Builds a `Model`. A `StratificationCondition` selects the compartments of a category, and a `StratifiedRate` gives a transition its rate in the compartments that match its conditions. Guide: [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md), [Transitions](https://munqu.github.io/commol/latest/guide/transitions/index.md).
 
 ## ModelBuilder
 
@@ -140,7 +140,7 @@ class ModelBuilder:
         id: str,
         categories: list[str],
         description: str | None = None,
-        conditions: list[StratificationConditionDict] | None = None,
+        conditions: list[StratificationCondition] | None = None,
     ) -> Self:
         """
         Add a stratification to the model.
@@ -153,15 +153,16 @@ class ModelBuilder:
             list of category identifiers within this stratification.
         description : str | None, default=None
             Human-readable description of the stratification.
-        conditions : list[dict] | None, default=None
+        conditions : list[StratificationCondition] | None, default=None
             When set, this stratification only expands compartments whose
-            already-applied categories satisfy ALL conditions. Each dict must
-            contain "stratification" and "category" keys referencing a
-            stratification declared before this one.
+            already-applied categories satisfy ALL conditions. Each condition
+            names a stratification declared before this one and its category.
 
             Example: only apply the `sub` stratification to `group1`::
 
-                conditions = [{"stratification": "group", "category": "group1"}]
+                conditions = [
+                    StratificationCondition(stratification="group", category="group1")
+                ]
 
         Returns
         -------
@@ -176,23 +177,20 @@ class ModelBuilder:
         if conditions:
             declared_ids = {s.id for s in self._stratifications}
             for cond in conditions:
-                if cond["stratification"] not in declared_ids:
+                if cond.stratification not in declared_ids:
                     raise ValueError(
                         f"Stratification '{id}': condition references "
-                        f"'{cond['stratification']}' which has not been declared yet. "
+                        f"'{cond.stratification}' which has not been declared yet. "
                         "Conditions may only reference stratifications declared before "
                         "this one."
                     )
 
-        condition_objects = (
-            [StratificationCondition(**c) for c in conditions] if conditions else None
-        )
         self._stratifications.append(
             Stratification(
                 id=id,
                 categories=categories,
                 description=description,
-                conditions=condition_objects,
+                conditions=list(conditions) if conditions else None,
             )
         )
         logger.info(f"Added stratification: id='{id}', categories={categories}")
@@ -294,11 +292,9 @@ class ModelBuilder:
             return pattern
         conditions = pattern.conditions
         if transition_id and conditions:
-            src_cats = "_".join(c["category"] for c in conditions if "category" in c)
+            src_cats = "_".join(c.category for c in conditions if c.category)
             tgt_cats = "_".join(
-                c["to"] if "to" in c else c["category"]
-                for c in conditions
-                if "to" in c or "category" in c
+                target for c in conditions if (target := c.to or c.category)
             )
             src = f"{source_bin}_{src_cats}" if source_bin else src_cats
             tgt = f"{target_bin}_{tgt_cats}" if target_bin else tgt_cats
@@ -325,7 +321,7 @@ class ModelBuilder:
         source: list[str],
         target: list[str],
         rate: "str | float | AxisPattern | None" = None,
-        stratified_rates: list[StratifiedRateDict] | None = None,
+        stratified_rates: list[StratifiedRate] | None = None,
         per_compartment: bool | None = None,
         accumulators: list[str] | None = None,
         impulse_at: list[float] | None = None,
@@ -399,10 +395,9 @@ class ModelBuilder:
             - $compartment: Expands to each source compartment name (only with
               multiple sources)
 
-        stratified_rates : list[dict] | None, default=None
-            List of stratification-specific rates. Each dict must contain:
-            - "conditions": List of dicts with "stratification" and "category" keys
-            - "rate": Rate expression string
+        stratified_rates : list[StratifiedRate] | None, default=None
+            The rates of the compartments that match some categories. A
+            compartment that no stratified rate matches takes ``rate``.
 
         per_compartment : bool | None, default=None
             When True, each id of a source or target bin in a rate reads the
@@ -545,7 +540,7 @@ class ModelBuilder:
             Target compartments
         rate : str
             Rate formula
-        stratified_rates : list[StratifiedRateDict] | None
+        stratified_rates : list[StratifiedRate] | None
             Stratified rates
 
         Raises
@@ -586,7 +581,7 @@ class ModelBuilder:
         source: list[str],
         target: list[str],
         rate: str,
-        stratified_rates: list[StratifiedRateDict] | None,
+        stratified_rates: list[StratifiedRate] | None,
         per_compartment: bool | None,
         accumulators: list[str] | None,
         impulse_at: list[float] | None,
@@ -607,7 +602,7 @@ class ModelBuilder:
             (will create one transition per target if multiple targets)
         rate : str
             Rate formula containing $compartment
-        stratified_rates : list[StratifiedRateDict] | None
+        stratified_rates : list[StratifiedRate] | None
             Stratified rates (can contain $compartment which will be expanded)
         per_compartment, accumulators, impulse_at, impulse_every : optional
             The arguments of `add_transition` that every expanded transition
@@ -1020,19 +1015,19 @@ def add_accumulator(self, id: str, name: str) -> Self:
 #### add_stratification
 
 ```python
-add_stratification(id: str, categories: list[str], description: str | None = None, conditions: list[ConditionDict] | None = None) -> Self
+add_stratification(id: str, categories: list[str], description: str | None = None, conditions: list[StratificationCondition] | None = None) -> Self
 ```
 
 Add a stratification to the model.
 
 Parameters:
 
-| Name          | Type         | Description                                              | Default                                                                                                                                                                                                                                                                                                                                                     |
-| ------------- | ------------ | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`          | `str`        | Unique identifier for the stratification.                | *required*                                                                                                                                                                                                                                                                                                                                                  |
-| `categories`  | `list[str]`  | list of category identifiers within this stratification. | *required*                                                                                                                                                                                                                                                                                                                                                  |
-| `description` | \`str        | None\`                                                   | Human-readable description of the stratification.                                                                                                                                                                                                                                                                                                           |
-| `conditions`  | \`list[dict] | None\`                                                   | When set, this stratification only expands compartments whose already-applied categories satisfy ALL conditions. Each dict must contain "stratification" and "category" keys referencing a stratification declared before this one. Example: only apply the sub stratification to group1:: conditions = [{"stratification": "group", "category": "group1"}] |
+| Name          | Type                            | Description                                              | Default                                                                                                                                                                                                                                                                                                                                      |
+| ------------- | ------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`          | `str`                           | Unique identifier for the stratification.                | *required*                                                                                                                                                                                                                                                                                                                                   |
+| `categories`  | `list[str]`                     | list of category identifiers within this stratification. | *required*                                                                                                                                                                                                                                                                                                                                   |
+| `description` | \`str                           | None\`                                                   | Human-readable description of the stratification.                                                                                                                                                                                                                                                                                            |
+| `conditions`  | \`list[StratificationCondition] | None\`                                                   | When set, this stratification only expands compartments whose already-applied categories satisfy ALL conditions. Each condition names a stratification declared before this one and its category. Example: only apply the sub stratification to group1:: conditions = [ StratificationCondition(stratification="group", category="group1") ] |
 
 Returns:
 
@@ -1054,7 +1049,7 @@ def add_stratification(
     id: str,
     categories: list[str],
     description: str | None = None,
-    conditions: list[StratificationConditionDict] | None = None,
+    conditions: list[StratificationCondition] | None = None,
 ) -> Self:
     """
     Add a stratification to the model.
@@ -1067,15 +1062,16 @@ def add_stratification(
         list of category identifiers within this stratification.
     description : str | None, default=None
         Human-readable description of the stratification.
-    conditions : list[dict] | None, default=None
+    conditions : list[StratificationCondition] | None, default=None
         When set, this stratification only expands compartments whose
-        already-applied categories satisfy ALL conditions. Each dict must
-        contain "stratification" and "category" keys referencing a
-        stratification declared before this one.
+        already-applied categories satisfy ALL conditions. Each condition
+        names a stratification declared before this one and its category.
 
         Example: only apply the `sub` stratification to `group1`::
 
-            conditions = [{"stratification": "group", "category": "group1"}]
+            conditions = [
+                StratificationCondition(stratification="group", category="group1")
+            ]
 
     Returns
     -------
@@ -1090,23 +1086,20 @@ def add_stratification(
     if conditions:
         declared_ids = {s.id for s in self._stratifications}
         for cond in conditions:
-            if cond["stratification"] not in declared_ids:
+            if cond.stratification not in declared_ids:
                 raise ValueError(
                     f"Stratification '{id}': condition references "
-                    f"'{cond['stratification']}' which has not been declared yet. "
+                    f"'{cond.stratification}' which has not been declared yet. "
                     "Conditions may only reference stratifications declared before "
                     "this one."
                 )
 
-    condition_objects = (
-        [StratificationCondition(**c) for c in conditions] if conditions else None
-    )
     self._stratifications.append(
         Stratification(
             id=id,
             categories=categories,
             description=description,
-            conditions=condition_objects,
+            conditions=list(conditions) if conditions else None,
         )
     )
     logger.info(f"Added stratification: id='{id}', categories={categories}")
@@ -1223,7 +1216,7 @@ def add_parameter(
 #### add_transition
 
 ```python
-add_transition(id: str, source: list[str], target: list[str], rate: str | float | AxisPattern | None = None, stratified_rates: list[StratifiedRateDict] | None = None, per_compartment: bool | None = None, accumulators: list[str] | None = None, impulse_at: list[float] | None = None, impulse_every: tuple[float, float] | None = None) -> Self
+add_transition(id: str, source: list[str], target: list[str], rate: str | float | AxisPattern | None = None, stratified_rates: list[StratifiedRate] | None = None, per_compartment: bool | None = None, accumulators: list[str] | None = None, impulse_at: list[float] | None = None, impulse_every: tuple[float, float] | None = None) -> Self
 ```
 
 Add a transition between states to the model.
@@ -1249,17 +1242,17 @@ Each transition's rate is evaluated independently, giving per-compartment dynami
 
 Parameters:
 
-| Name               | Type                  | Description                                                                                                                                                                              | Default                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ------------------ | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`               | `str`                 | Unique identifier for the transition. When using $compartment expansion, the system will append "\_\_" to create unique IDs for each expanded transition (e.g., "out\_\_A", "out\_\_B"). | *required*                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `source`           | `list[str]`           | List of source state/category identifiers. When using $compartment in the rate, each source will generate a separate transition.                                                         | *required*                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `target`           | `list[str]`           | List of target state/category identifiers. When using $compartment with several targets, each target generates a separate transition.                                                    | *required*                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `rate`             | \`str                 | float                                                                                                                                                                                    | AxisPattern                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `stratified_rates` | \`list[dict]          | None\`                                                                                                                                                                                   | List of stratification-specific rates. Each dict must contain: - "conditions": List of dicts with "stratification" and "category" keys - "rate": Rate expression string                                                                                                                                                                                                                                                                                                      |
-| `per_compartment`  | \`bool                | None\`                                                                                                                                                                                   | When True, each id of a source or target bin in a rate reads the compartment of the flow (A_g1) instead of the total of the bin. Any other bin keeps its total: in a transition from A to B, k * A * (C + D) / total reads A_g1 and the totals of C and D. It applies to the fallback rate, to every stratified rate, and to every transition that $compartment expands to, where $compartment reads the compartment that flows. A transition between categories ignores it. |
-| `accumulators`     | \`list[str]           | None\`                                                                                                                                                                                   | Ids of accumulators that add up the flow of this transition.                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `impulse_at`       | \`list[float]         | None\`                                                                                                                                                                                   | Make the transition an impulse at these positions on the axis. At each one, rate is the fraction of the source (proportional) or the amount (absolute) moved at once, before the flows of that step. A DifferenceEquations or StochasticSteps model needs integer positions.                                                                                                                                                                                                 |
-| `impulse_every`    | \`tuple[float, float] | None\`                                                                                                                                                                                   | (period, offset): make the transition an impulse at offset, offset + period, offset + 2 * period, ...                                                                                                                                                                                                                                                                                                                                                                        |
+| Name               | Type                   | Description                                                                                                                                                                              | Default                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------ | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`               | `str`                  | Unique identifier for the transition. When using $compartment expansion, the system will append "\_\_" to create unique IDs for each expanded transition (e.g., "out\_\_A", "out\_\_B"). | *required*                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `source`           | `list[str]`            | List of source state/category identifiers. When using $compartment in the rate, each source will generate a separate transition.                                                         | *required*                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `target`           | `list[str]`            | List of target state/category identifiers. When using $compartment with several targets, each target generates a separate transition.                                                    | *required*                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `rate`             | \`str                  | float                                                                                                                                                                                    | AxisPattern                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `stratified_rates` | \`list[StratifiedRate] | None\`                                                                                                                                                                                   | The rates of the compartments that match some categories. A compartment that no stratified rate matches takes rate.                                                                                                                                                                                                                                                                                                                                                          |
+| `per_compartment`  | \`bool                 | None\`                                                                                                                                                                                   | When True, each id of a source or target bin in a rate reads the compartment of the flow (A_g1) instead of the total of the bin. Any other bin keeps its total: in a transition from A to B, k * A * (C + D) / total reads A_g1 and the totals of C and D. It applies to the fallback rate, to every stratified rate, and to every transition that $compartment expands to, where $compartment reads the compartment that flows. A transition between categories ignores it. |
+| `accumulators`     | \`list[str]            | None\`                                                                                                                                                                                   | Ids of accumulators that add up the flow of this transition.                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `impulse_at`       | \`list[float]          | None\`                                                                                                                                                                                   | Make the transition an impulse at these positions on the axis. At each one, rate is the fraction of the source (proportional) or the amount (absolute) moved at once, before the flows of that step. A DifferenceEquations or StochasticSteps model needs integer positions.                                                                                                                                                                                                 |
+| `impulse_every`    | \`tuple[float, float]  | None\`                                                                                                                                                                                   | (period, offset): make the transition an impulse at offset, offset + period, offset + 2 * period, ...                                                                                                                                                                                                                                                                                                                                                                        |
 
 Returns:
 
@@ -1282,7 +1275,7 @@ def add_transition(
     source: list[str],
     target: list[str],
     rate: "str | float | AxisPattern | None" = None,
-    stratified_rates: list[StratifiedRateDict] | None = None,
+    stratified_rates: list[StratifiedRate] | None = None,
     per_compartment: bool | None = None,
     accumulators: list[str] | None = None,
     impulse_at: list[float] | None = None,
@@ -1356,10 +1349,9 @@ def add_transition(
         - $compartment: Expands to each source compartment name (only with
           multiple sources)
 
-    stratified_rates : list[dict] | None, default=None
-        List of stratification-specific rates. Each dict must contain:
-        - "conditions": List of dicts with "stratification" and "category" keys
-        - "rate": Rate expression string
+    stratified_rates : list[StratifiedRate] | None, default=None
+        The rates of the compartments that match some categories. A
+        compartment that no stratified rate matches takes ``rate``.
 
     per_compartment : bool | None, default=None
         When True, each id of a source or target bin in a rate reads the
@@ -1743,4 +1735,161 @@ def build(
     logger.info(f"Model '{self._name}' successfully built for the {engine} engine.")
 
     return model
+```
+
+## StratificationCondition
+
+Bases: `BaseModel`
+
+Specifies a category within a stratification for rate matching.
+
+When `to` is set, the matched category in the source compartment is replaced with the `to` category in the target compartment name. This enables cross-category transitions within the same bin (e.g., from `g1` to `g2`).
+
+Attributes:
+
+| Name             | Type  | Description                                                |
+| ---------------- | ----- | ---------------------------------------------------------- |
+| `stratification` | `str` | The ID of the stratification (e.g., "group", "type")       |
+| `category`       | `str` | The category within that stratification (e.g., "g1", "t1") |
+| `to`             | \`str | None\`                                                     |
+
+Source code in `commol/context/stratification_condition.py`
+
+```python
+class StratificationCondition(BaseModel):
+    """
+    Specifies a category within a stratification for rate matching.
+
+    When ``to`` is set, the matched category in the source compartment is
+    replaced with the ``to`` category in the target compartment name. This
+    enables cross-category transitions within the same bin (e.g., from ``g1``
+    to ``g2``).
+
+    Attributes
+    ----------
+    stratification : str
+        The ID of the stratification (e.g., "group", "type")
+    category : str
+        The category within that stratification (e.g., "g1", "t1")
+    to : str | None
+        Target category override. When set, the target compartment will use
+        this category instead of the source compartment's category for this
+        stratification.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    stratification: str = Field(default=..., description="ID of the stratification")
+    category: str | None = Field(
+        default=None,
+        description=(
+            "Category within the stratification. When None, the condition acts as a "
+            "target-only override: it does not filter source compartments but still "
+            "contributes a 'to' category to the computed target compartment name."
+        ),
+    )
+    to: str | None = Field(
+        default=None,
+        description=(
+            "Target category override. When set, the target compartment uses "
+            "this category instead of the source's for this stratification."
+        ),
+    )
+```
+
+## StratifiedRate
+
+Bases: `BaseModel`
+
+The rate of the compartments of a transition that match some categories.
+
+`ModelBuilder.add_transition` takes a list of them as `stratified_rates`. A compartment takes the rate of the stratified rate whose conditions it matches; the most specific match wins.
+
+Attributes:
+
+| Name         | Type                            | Description                                                                                   |
+| ------------ | ------------------------------- | --------------------------------------------------------------------------------------------- |
+| `conditions` | `list[StratificationCondition]` | The categories that a compartment must match, at least one, each stratification at most once. |
+| `rate`       | \`str                           | float\`                                                                                       |
+| `absolute`   | \`bool                          | None\`                                                                                        |
+
+Source code in `commol/context/transition.py`
+
+```python
+class StratifiedRate(BaseModel):
+    """
+    The rate of the compartments of a transition that match some categories.
+
+    ``ModelBuilder.add_transition`` takes a list of them as
+    ``stratified_rates``. A compartment takes the rate of the stratified rate
+    whose conditions it matches; the most specific match wins.
+
+    Attributes
+    ----------
+    conditions : list[StratificationCondition]
+        The categories that a compartment must match, at least one, each
+        stratification at most once.
+    rate : str | float
+        The rate of the matching compartments: a formula, a parameter or a
+        number, which is kept as its string. It can read ``$compartment``
+        when the transition expands over its compartments.
+    absolute : bool | None
+        True: the flow is the rate, not multiplied by the source amount.
+        False: the flow is the rate times the source amount. None: the rate
+        is absolute when it reads a compartment, a bin total or a
+        ``total_…`` variable.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    conditions: list[StratificationCondition] = Field(
+        default=..., description="Stratification conditions that must match"
+    )
+    rate: str | float = Field(
+        default=..., description="Rate expression for matching compartments"
+    )
+    absolute: bool | None = Field(
+        default=None,
+        description=(
+            "When True, the flow is treated as absolute (not multiplied by the "
+            "source amount). When None, inferred from whether the rate references "
+            "any compartment variable."
+        ),
+    )
+
+    @field_validator("conditions")
+    @classmethod
+    def _validate_not_empty(
+        cls, v: list[StratificationCondition]
+    ) -> list[StratificationCondition]:
+        """Ensure at least one stratification condition is specified."""
+        if not v:
+            raise ValueError(
+                "conditions must contain at least one stratification condition"
+            )
+        return v
+
+    @model_validator(mode="after")
+    def _validate_unique_stratifications(self) -> Self:
+        """Ensure no duplicate stratification IDs."""
+        strat_ids = [sc.stratification for sc in self.conditions]
+        if len(strat_ids) != len(set(strat_ids)):
+            duplicates = [s for s in strat_ids if strat_ids.count(s) > 1]
+            raise ValueError(
+                (
+                    f"Duplicate stratifications found: {list(set(duplicates))}. "
+                    f"Each stratification can only be specified once per rate."
+                )
+            )
+        return self
+
+    @field_validator("rate")
+    @classmethod
+    def _validate_rate(cls, value: str | float) -> str:
+        """The rate as its string, once the parser of the engine accepts it as
+        the builder writes it: with ``$compartment`` set to the name of a
+        compartment."""
+        text = str(value)
+        _checked_rate(text.replace("$compartment", "compartment"))
+        return text
 ```

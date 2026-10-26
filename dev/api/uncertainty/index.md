@@ -2,60 +2,7 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-What every uncertainty method takes and returns: the configuration bases, the weighted parameter sample, the predictive and its observation noise, and the scenarios. Then the methods of each family with their results (resampling, profile likelihood, sequential Monte Carlo, local approximations and conformal prediction), the scores and the one quantile. Guide: [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
-
-## InferenceMethod
-
-Bases: `BaseModel`, `Generic[ResultT]`
-
-The configuration of a method that reads a calibration problem or a sensitivity analysis, whose result is `ResultT`.
-
-A method subclasses one of its kinds, `UncertaintyMethod`, `IdentifiabilityMethod` or `SensitivityMethod`, with its result type, and registers its runner (`commol.api.inference.registry.register`). The runner sends it whole to the engine, as the JSON of its dump (`commol.context.engine_json.engine_json`); a field that holds a result with behavior in the engine, such as a sample, is named in `_engine_handles` and crosses as its handle.
-
-Source code in `commol/context/inference/method.py`
-
-```python
-class InferenceMethod(BaseModel, Generic[ResultT]):
-    """
-    The configuration of a method that reads a calibration problem or a
-    sensitivity analysis, whose result is `ResultT`.
-
-    A method subclasses one of its kinds, `UncertaintyMethod`,
-    `IdentifiabilityMethod` or `SensitivityMethod`, with its result type, and
-    registers its runner (`commol.api.inference.registry.register`). The
-    runner sends it whole to the engine, as the JSON of its dump
-    (`commol.context.engine_json.engine_json`); a field that holds a result
-    with behavior in the engine, such as a sample, is named in
-    ``_engine_handles`` and crosses as its handle.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    _engine_handles: ClassVar[tuple[str, ...]] = ()
-```
-
-## UncertaintyMethod
-
-Bases: `InferenceMethod[ResultT]`, `Generic[ResultT]`
-
-The configuration of an uncertainty method, whose result is `ResultT`.
-
-A method subclasses it with its result type, for example `class BayesianBootstrap(UncertaintyMethod[BootstrapResult])`, and registers its runner (`commol.api.inference.registry.register`). `Calibrator.uncertainty(method)` returns that result type, so a static type checker infers it from the configuration's type.
-
-Source code in `commol/context/inference/method.py`
-
-```python
-class UncertaintyMethod(InferenceMethod[ResultT], Generic[ResultT]):
-    """
-    The configuration of an uncertainty method, whose result is `ResultT`.
-
-    A method subclasses it with its result type, for example
-    ``class BayesianBootstrap(UncertaintyMethod[BootstrapResult])``, and
-    registers its runner (`commol.api.inference.registry.register`).
-    ``Calibrator.uncertainty(method)`` returns that result type, so a static
-    type checker infers it from the configuration's type.
-    """
-```
+What every uncertainty method returns: the weighted parameter sample, the predictive with its observation noise and its figures, and the scenarios. Then the methods of each family with their results (resampling, profile likelihood, sequential Monte Carlo, local approximations and conformal prediction), the scores and the one quantile. Guide: [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md).
 
 ## ParameterSample
 
@@ -137,7 +84,7 @@ class ParameterSample(ResultModel):
 
     @field_validator("log_weights")
     @classmethod
-    def normalize_log_weights(
+    def _normalize_log_weights(
         cls, log_weights: list[float], info: ValidationInfo
     ) -> list[float]:
         """
@@ -153,7 +100,7 @@ class ParameterSample(ResultModel):
         return checked.log_weights
 
     @model_validator(mode="after")
-    def build_engine_sample(self) -> Self:
+    def _build_engine_sample(self) -> Self:
         """Keep the sample of the engine, which computes the statistics and
         which the engine reads as the handle of this sample."""
         self._rust = commol_rs.inference.ParameterSample(
@@ -404,56 +351,6 @@ effective_size: float
 Kish's effective sample size, `1 / Σ wᵢ²`: between 1 and the number of draws; equal weights give the number of draws.
 
 ### Methods:
-
-#### normalize_log_weights
-
-```python
-normalize_log_weights(log_weights: list[float], info: ValidationInfo) -> list[float]
-```
-
-Check the invariants in Rust and normalize the log weights; with a field before them that is not valid, pydantic reports that field.
-
-Source code in `commol/context/inference/sample.py`
-
-```python
-@field_validator("log_weights")
-@classmethod
-def normalize_log_weights(
-    cls, log_weights: list[float], info: ValidationInfo
-) -> list[float]:
-    """
-    Check the invariants in Rust and normalize the log weights; with a
-    field before them that is not valid, pydantic reports that field.
-    """
-    data = info.data
-    if not {"names", "bounds", "values"} <= data.keys():
-        return log_weights
-    checked = commol_rs.inference.ParameterSample(
-        data["names"], data["bounds"], data["values"], log_weights, None
-    )
-    return checked.log_weights
-```
-
-#### build_engine_sample
-
-```python
-build_engine_sample() -> Self
-```
-
-Keep the sample of the engine, which computes the statistics and which the engine reads as the handle of this sample.
-
-Source code in `commol/context/inference/sample.py`
-
-```python
-@model_validator(mode="after")
-def build_engine_sample(self) -> Self:
-    """Keep the sample of the engine, which computes the statistics and
-    which the engine reads as the handle of this sample."""
-    self._rust = commol_rs.inference.ParameterSample(
-        self.names, self.bounds, self.values, self.log_weights, self.groups
-    )
-    return self
-```
 
 #### equally_weighted
 
@@ -1097,7 +994,7 @@ class Predictive:
 
         Parameters
         ----------
-        quantities : Sequence[Quantity]
+        quantities : Sequence[quantity]
             The quantities; a `Trajectory` gives one scalar per position.
 
         Returns
@@ -1269,7 +1166,7 @@ class Predictive:
     def at_observations(
         self,
         observed_data: Sequence[ObservedDataPoint],
-        noise: ObservationNoise,
+        noise: _ObservationNoise,
     ) -> ObservationDraws:
         """
         Every draw's value of each observation, with observation noise.
@@ -1455,7 +1352,7 @@ Parameters:
 
 | Name         | Type                 | Description                                                 | Default    |
 | ------------ | -------------------- | ----------------------------------------------------------- | ---------- |
-| `quantities` | `Sequence[Quantity]` | The quantities; a Trajectory gives one scalar per position. | *required* |
+| `quantities` | `Sequence[quantity]` | The quantities; a Trajectory gives one scalar per position. | *required* |
 
 Returns:
 
@@ -1484,7 +1381,7 @@ def quantities(
 
     Parameters
     ----------
-    quantities : Sequence[Quantity]
+    quantities : Sequence[quantity]
         The quantities; a `Trajectory` gives one scalar per position.
 
     Returns
@@ -1760,7 +1657,7 @@ def series_band(
 #### at_observations
 
 ```python
-at_observations(observed_data: Sequence[ObservedDataPoint], noise: ObservationNoise) -> ObservationDraws
+at_observations(observed_data: Sequence[ObservedDataPoint], noise: _ObservationNoise) -> ObservationDraws
 ```
 
 Every draw's value of each observation, with observation noise.
@@ -1793,7 +1690,7 @@ Source code in `commol/api/inference/predictive.py`
 def at_observations(
     self,
     observed_data: Sequence[ObservedDataPoint],
-    noise: ObservationNoise,
+    noise: _ObservationNoise,
 ) -> ObservationDraws:
     """
     Every draw's value of each observation, with observation noise.
@@ -2134,6 +2031,655 @@ def band(self, confidence_level: float) -> SeriesBand:
     )
 ```
 
+## PredictivePlot
+
+The figures of a predictive, read from `predictive.plot`.
+
+Each panel shows the weighted median of the draws and their band, with no other run; the model of the source names the series.
+
+Source code in `commol/api/plotting/accessors.py`
+
+```python
+class PredictivePlot:
+    """
+    The figures of a predictive, read from ``predictive.plot``.
+
+    Each panel shows the weighted median of the draws and their band, with no
+    other run; the model of the source names the series.
+    """
+
+    def __init__(self, predictive: "Predictive") -> None:
+        """
+        The figures of `predictive`.
+
+        Parameters
+        ----------
+        predictive : Predictive
+            The predictive.
+        """
+        self._predictive = predictive
+
+    def series(
+        self,
+        output_file: str | None = None,
+        observed_data: "list[ObservedDataPoint] | None" = None,
+        config: "PlotConfig | None" = None,
+        series: list[str] | None = None,
+        show_legend: bool = True,
+        position_label: Callable[[float], str] | None = None,
+        tick_every: float | None = None,
+        x_label: str = "Step",
+        prediction_intervals: "PredictionIntervals | None" = None,
+        confidence_level: float = 0.95,
+        axes: "Figure | None" = None,
+        **kwargs: str | int | float | bool | None,
+    ) -> "Figure":
+        """
+        Draw the weighted median of the draws of each series and their band,
+        one panel per series.
+
+        Each draw is read through the observation operator of the problem
+        (the sums, windows and factors of the observations of the series,
+        each at its own position when they do not share one operator with no
+        window), then the draws are reduced with their weights.
+
+        Parameters
+        ----------
+        output_file : str | None
+            Path to save the figure to. If None, the figure is only returned.
+        observed_data : list[ObservedDataPoint] | None
+            Observations, each drawn as a point on the panel of its label;
+            they set the operator each draw is read through.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+        series : list[str] | None
+            What to draw, as in `ResultsPlot.series`.
+        show_legend : bool
+            Whether each panel shows its legend.
+        position_label : Callable[[float], str] | None
+            Turns a position into a tick label, as in `ResultsPlot.series`.
+        tick_every : float | None
+            The distance between labelled positions, as in
+            `ResultsPlot.series`.
+        x_label : str
+            The label of the x axis.
+        prediction_intervals : PredictionIntervals | None
+            Prediction intervals of a conformal method, as in
+            `ResultsPlot.series`.
+        confidence_level : float
+            The level of the band, strictly between 0 and 1.
+        axes : Figure | None
+            A figure of commol to draw on, as in `ResultsPlot.series`.
+        **kwargs : str | int | float | bool | None
+            Passed to ``Axes.plot`` for the line of the median.
+
+        Returns
+        -------
+        Figure
+            The matplotlib figure.
+
+        Raises
+        ------
+        ValueError
+            If an observation names an unknown output or factor, the
+            confidence level is out of range, or ``axes`` has no panel of a
+            series.
+        KeyError
+            If an entry of ``series`` is neither an output nor a bin or
+            accumulator id of the model.
+        ImportError
+            If matplotlib is not installed (``pip install 'commol[plot]'``).
+        """
+        from commol.api.plotting.figures import _predictive_series
+
+        return _predictive_series(
+            self._predictive,
+            output_file=output_file,
+            observed_data=observed_data,
+            config=config,
+            series=series,
+            show_legend=show_legend,
+            position_label=position_label,
+            tick_every=tick_every,
+            x_label=x_label,
+            prediction_intervals=prediction_intervals,
+            confidence_level=confidence_level,
+            axes=axes,
+            **kwargs,
+        )
+
+    def cumulative(
+        self,
+        output_file: str | None = None,
+        observed_data: "list[ObservedDataPoint] | None" = None,
+        config: "PlotConfig | None" = None,
+        series: list[str] | None = None,
+        confidence_level: float = 0.95,
+        axes: "Figure | None" = None,
+        **kwargs: str | int | float | bool | None,
+    ) -> "Figure":
+        """
+        Draw the weighted median and the band of the running total of each
+        series across the draws, one panel per series.
+
+        Parameters
+        ----------
+        output_file : str | None
+            Path to save the figure to. If None, the figure is only returned.
+        observed_data : list[ObservedDataPoint] | None
+            Observations, drawn as their running total on the panel of their
+            label. An observation with a factor is divided by the weighted
+            median of that factor in the sample.
+        config : PlotConfig | None
+            Layout, size and style. If None, the defaults.
+        series : list[str] | None
+            What to draw, as in `ResultsPlot.series`.
+        confidence_level : float
+            The level of the band, strictly between 0 and 1.
+        axes : Figure | None
+            A figure of commol to draw on, as in `ResultsPlot.series`.
+        **kwargs : str | int | float | bool | None
+            Passed to ``Axes.plot`` for the line of the median.
+
+        Returns
+        -------
+        Figure
+            The matplotlib figure.
+
+        Raises
+        ------
+        ValueError
+            If the confidence level is out of range, or ``axes`` has no panel
+            of a series.
+        KeyError
+            If an entry of ``series`` is neither an output nor a bin or
+            accumulator id of the model.
+        ImportError
+            If matplotlib is not installed (``pip install 'commol[plot]'``).
+        """
+        from commol.api.plotting.figures import _predictive_cumulative
+
+        return _predictive_cumulative(
+            self._predictive,
+            output_file=output_file,
+            observed_data=observed_data,
+            config=config,
+            series=series,
+            confidence_level=confidence_level,
+            axes=axes,
+            **kwargs,
+        )
+
+    def observations(
+        self,
+        observed_data: "list[ObservedDataPoint]",
+        output_file: str | None = None,
+        config: "PlotConfig | None" = None,
+        show_legend: bool = True,
+        position_label: Callable[[float], str] | None = None,
+        tick_every: float | None = None,
+        x_label: str = "Step",
+        confidence_level: float = 0.95,
+        axes: "Figure | None" = None,
+        **kwargs: str | int | float | bool | None,
+    ) -> "Figure":
+        """
+        Draw each observed series with the weighted median of the draws and
+        their band, read through its observation operator, one panel per
+        label.
+
+        The values are those of ``at_observations(observed_data, NoNoise())``:
+        each draw's value of each observation through its own operator (the
+        sum of its outputs, its window and the draw's value of its factor),
+        the values the loss compares. A value with a window is drawn as a
+        step over its window with a marker at ``at``, and its band as a
+        rectangle over the same window; a value with no window is a marker,
+        joined only as a guide. The band is a band of the model, with no
+        observation noise, not a prediction interval, and its legend says so.
+
+        Parameters
+        ----------
+        observed_data : list[ObservedDataPoint]
+            The observations, as in `ResultsPlot.observations`.
+        output_file : str | None
+            Path to save the figure to. If None, the figure is only returned.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+        show_legend : bool
+            Whether each panel shows its legend.
+        position_label : Callable[[float], str] | None
+            Turns a position into a tick label, as in `ResultsPlot.series`.
+        tick_every : float | None
+            The distance between labelled positions, as in
+            `ResultsPlot.series`.
+        x_label : str
+            The label of the x axis.
+        confidence_level : float
+            The level of the band, strictly between 0 and 1.
+        axes : Figure | None
+            A figure of commol to draw on, as in `ResultsPlot.observations`.
+        **kwargs : str | int | float | bool | None
+            Passed to ``Axes.plot`` for the steps and the guide of the median.
+
+        Returns
+        -------
+        Figure
+            The matplotlib figure.
+
+        Raises
+        ------
+        ValueError
+            If there are no observations, an observation names an unknown
+            output or factor, the confidence level is out of range, or
+            ``axes`` has no panel of a label.
+        ImportError
+            If matplotlib is not installed (``pip install 'commol[plot]'``).
+        """
+        from commol.api.plotting.figures import _predictive_observations
+
+        return _predictive_observations(
+            self._predictive,
+            observed_data,
+            output_file=output_file,
+            config=config,
+            show_legend=show_legend,
+            position_label=position_label,
+            tick_every=tick_every,
+            x_label=x_label,
+            confidence_level=confidence_level,
+            axes=axes,
+            **kwargs,
+        )
+```
+
+### Methods:
+
+#### __init__
+
+```python
+__init__(predictive: Predictive) -> None
+```
+
+The figures of `predictive`.
+
+Parameters:
+
+| Name         | Type         | Description     | Default    |
+| ------------ | ------------ | --------------- | ---------- |
+| `predictive` | `Predictive` | The predictive. | *required* |
+
+Source code in `commol/api/plotting/accessors.py`
+
+```python
+def __init__(self, predictive: "Predictive") -> None:
+    """
+    The figures of `predictive`.
+
+    Parameters
+    ----------
+    predictive : Predictive
+        The predictive.
+    """
+    self._predictive = predictive
+```
+
+#### series
+
+```python
+series(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, config: PlotConfig | None = None, series: list[str] | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', prediction_intervals: PredictionIntervals | None = None, confidence_level: float = 0.95, axes: Figure | None = None, **kwargs: str | int | float | bool | None) -> Figure
+```
+
+Draw the weighted median of the draws of each series and their band, one panel per series.
+
+Each draw is read through the observation operator of the problem (the sums, windows and factors of the observations of the series, each at its own position when they do not share one operator with no window), then the draws are reduced with their weights.
+
+Parameters:
+
+| Name                   | Type                       | Description                                      | Default                                                                                                         |
+| ---------------------- | -------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `output_file`          | \`str                      | None\`                                           | Path to save the figure to. If None, the figure is only returned.                                               |
+| `observed_data`        | \`list[ObservedDataPoint]  | None\`                                           | Observations, each drawn as a point on the panel of its label; they set the operator each draw is read through. |
+| `config`               | \`PlotConfig               | None\`                                           | Layout and style. If None, the defaults.                                                                        |
+| `series`               | \`list[str]                | None\`                                           | What to draw, as in ResultsPlot.series.                                                                         |
+| `show_legend`          | `bool`                     | Whether each panel shows its legend.             | `True`                                                                                                          |
+| `position_label`       | \`Callable\[[float], str\] | None\`                                           | Turns a position into a tick label, as in ResultsPlot.series.                                                   |
+| `tick_every`           | \`float                    | None\`                                           | The distance between labelled positions, as in ResultsPlot.series.                                              |
+| `x_label`              | `str`                      | The label of the x axis.                         | `'Step'`                                                                                                        |
+| `prediction_intervals` | \`PredictionIntervals      | None\`                                           | Prediction intervals of a conformal method, as in ResultsPlot.series.                                           |
+| `confidence_level`     | `float`                    | The level of the band, strictly between 0 and 1. | `0.95`                                                                                                          |
+| `axes`                 | \`Figure                   | None\`                                           | A figure of commol to draw on, as in ResultsPlot.series.                                                        |
+| `**kwargs`             | \`str                      | int                                              | float                                                                                                           |
+
+Returns:
+
+| Type     | Description            |
+| -------- | ---------------------- |
+| `Figure` | The matplotlib figure. |
+
+Raises:
+
+| Type          | Description                                                                                                                  |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError`  | If an observation names an unknown output or factor, the confidence level is out of range, or axes has no panel of a series. |
+| `KeyError`    | If an entry of series is neither an output nor a bin or accumulator id of the model.                                         |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                                                 |
+
+Source code in `commol/api/plotting/accessors.py`
+
+```python
+def series(
+    self,
+    output_file: str | None = None,
+    observed_data: "list[ObservedDataPoint] | None" = None,
+    config: "PlotConfig | None" = None,
+    series: list[str] | None = None,
+    show_legend: bool = True,
+    position_label: Callable[[float], str] | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    prediction_intervals: "PredictionIntervals | None" = None,
+    confidence_level: float = 0.95,
+    axes: "Figure | None" = None,
+    **kwargs: str | int | float | bool | None,
+) -> "Figure":
+    """
+    Draw the weighted median of the draws of each series and their band,
+    one panel per series.
+
+    Each draw is read through the observation operator of the problem
+    (the sums, windows and factors of the observations of the series,
+    each at its own position when they do not share one operator with no
+    window), then the draws are reduced with their weights.
+
+    Parameters
+    ----------
+    output_file : str | None
+        Path to save the figure to. If None, the figure is only returned.
+    observed_data : list[ObservedDataPoint] | None
+        Observations, each drawn as a point on the panel of its label;
+        they set the operator each draw is read through.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+    series : list[str] | None
+        What to draw, as in `ResultsPlot.series`.
+    show_legend : bool
+        Whether each panel shows its legend.
+    position_label : Callable[[float], str] | None
+        Turns a position into a tick label, as in `ResultsPlot.series`.
+    tick_every : float | None
+        The distance between labelled positions, as in
+        `ResultsPlot.series`.
+    x_label : str
+        The label of the x axis.
+    prediction_intervals : PredictionIntervals | None
+        Prediction intervals of a conformal method, as in
+        `ResultsPlot.series`.
+    confidence_level : float
+        The level of the band, strictly between 0 and 1.
+    axes : Figure | None
+        A figure of commol to draw on, as in `ResultsPlot.series`.
+    **kwargs : str | int | float | bool | None
+        Passed to ``Axes.plot`` for the line of the median.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+
+    Raises
+    ------
+    ValueError
+        If an observation names an unknown output or factor, the
+        confidence level is out of range, or ``axes`` has no panel of a
+        series.
+    KeyError
+        If an entry of ``series`` is neither an output nor a bin or
+        accumulator id of the model.
+    ImportError
+        If matplotlib is not installed (``pip install 'commol[plot]'``).
+    """
+    from commol.api.plotting.figures import _predictive_series
+
+    return _predictive_series(
+        self._predictive,
+        output_file=output_file,
+        observed_data=observed_data,
+        config=config,
+        series=series,
+        show_legend=show_legend,
+        position_label=position_label,
+        tick_every=tick_every,
+        x_label=x_label,
+        prediction_intervals=prediction_intervals,
+        confidence_level=confidence_level,
+        axes=axes,
+        **kwargs,
+    )
+```
+
+#### cumulative
+
+```python
+cumulative(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, config: PlotConfig | None = None, series: list[str] | None = None, confidence_level: float = 0.95, axes: Figure | None = None, **kwargs: str | int | float | bool | None) -> Figure
+```
+
+Draw the weighted median and the band of the running total of each series across the draws, one panel per series.
+
+Parameters:
+
+| Name               | Type                      | Description                                      | Default                                                                                                                                                              |
+| ------------------ | ------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `output_file`      | \`str                     | None\`                                           | Path to save the figure to. If None, the figure is only returned.                                                                                                    |
+| `observed_data`    | \`list[ObservedDataPoint] | None\`                                           | Observations, drawn as their running total on the panel of their label. An observation with a factor is divided by the weighted median of that factor in the sample. |
+| `config`           | \`PlotConfig              | None\`                                           | Layout, size and style. If None, the defaults.                                                                                                                       |
+| `series`           | \`list[str]               | None\`                                           | What to draw, as in ResultsPlot.series.                                                                                                                              |
+| `confidence_level` | `float`                   | The level of the band, strictly between 0 and 1. | `0.95`                                                                                                                                                               |
+| `axes`             | \`Figure                  | None\`                                           | A figure of commol to draw on, as in ResultsPlot.series.                                                                                                             |
+| `**kwargs`         | \`str                     | int                                              | float                                                                                                                                                                |
+
+Returns:
+
+| Type     | Description            |
+| -------- | ---------------------- |
+| `Figure` | The matplotlib figure. |
+
+Raises:
+
+| Type          | Description                                                                          |
+| ------------- | ------------------------------------------------------------------------------------ |
+| `ValueError`  | If the confidence level is out of range, or axes has no panel of a series.           |
+| `KeyError`    | If an entry of series is neither an output nor a bin or accumulator id of the model. |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                         |
+
+Source code in `commol/api/plotting/accessors.py`
+
+```python
+def cumulative(
+    self,
+    output_file: str | None = None,
+    observed_data: "list[ObservedDataPoint] | None" = None,
+    config: "PlotConfig | None" = None,
+    series: list[str] | None = None,
+    confidence_level: float = 0.95,
+    axes: "Figure | None" = None,
+    **kwargs: str | int | float | bool | None,
+) -> "Figure":
+    """
+    Draw the weighted median and the band of the running total of each
+    series across the draws, one panel per series.
+
+    Parameters
+    ----------
+    output_file : str | None
+        Path to save the figure to. If None, the figure is only returned.
+    observed_data : list[ObservedDataPoint] | None
+        Observations, drawn as their running total on the panel of their
+        label. An observation with a factor is divided by the weighted
+        median of that factor in the sample.
+    config : PlotConfig | None
+        Layout, size and style. If None, the defaults.
+    series : list[str] | None
+        What to draw, as in `ResultsPlot.series`.
+    confidence_level : float
+        The level of the band, strictly between 0 and 1.
+    axes : Figure | None
+        A figure of commol to draw on, as in `ResultsPlot.series`.
+    **kwargs : str | int | float | bool | None
+        Passed to ``Axes.plot`` for the line of the median.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+
+    Raises
+    ------
+    ValueError
+        If the confidence level is out of range, or ``axes`` has no panel
+        of a series.
+    KeyError
+        If an entry of ``series`` is neither an output nor a bin or
+        accumulator id of the model.
+    ImportError
+        If matplotlib is not installed (``pip install 'commol[plot]'``).
+    """
+    from commol.api.plotting.figures import _predictive_cumulative
+
+    return _predictive_cumulative(
+        self._predictive,
+        output_file=output_file,
+        observed_data=observed_data,
+        config=config,
+        series=series,
+        confidence_level=confidence_level,
+        axes=axes,
+        **kwargs,
+    )
+```
+
+#### observations
+
+```python
+observations(observed_data: list[ObservedDataPoint], output_file: str | None = None, config: PlotConfig | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', confidence_level: float = 0.95, axes: Figure | None = None, **kwargs: str | int | float | bool | None) -> Figure
+```
+
+Draw each observed series with the weighted median of the draws and their band, read through its observation operator, one panel per label.
+
+The values are those of `at_observations(observed_data, NoNoise())`: each draw's value of each observation through its own operator (the sum of its outputs, its window and the draw's value of its factor), the values the loss compares. A value with a window is drawn as a step over its window with a marker at `at`, and its band as a rectangle over the same window; a value with no window is a marker, joined only as a guide. The band is a band of the model, with no observation noise, not a prediction interval, and its legend says so.
+
+Parameters:
+
+| Name               | Type                       | Description                                       | Default                                                            |
+| ------------------ | -------------------------- | ------------------------------------------------- | ------------------------------------------------------------------ |
+| `observed_data`    | `list[ObservedDataPoint]`  | The observations, as in ResultsPlot.observations. | *required*                                                         |
+| `output_file`      | \`str                      | None\`                                            | Path to save the figure to. If None, the figure is only returned.  |
+| `config`           | \`PlotConfig               | None\`                                            | Layout and style. If None, the defaults.                           |
+| `show_legend`      | `bool`                     | Whether each panel shows its legend.              | `True`                                                             |
+| `position_label`   | \`Callable\[[float], str\] | None\`                                            | Turns a position into a tick label, as in ResultsPlot.series.      |
+| `tick_every`       | \`float                    | None\`                                            | The distance between labelled positions, as in ResultsPlot.series. |
+| `x_label`          | `str`                      | The label of the x axis.                          | `'Step'`                                                           |
+| `confidence_level` | `float`                    | The level of the band, strictly between 0 and 1.  | `0.95`                                                             |
+| `axes`             | \`Figure                   | None\`                                            | A figure of commol to draw on, as in ResultsPlot.observations.     |
+| `**kwargs`         | \`str                      | int                                               | float                                                              |
+
+Returns:
+
+| Type     | Description            |
+| -------- | ---------------------- |
+| `Figure` | The matplotlib figure. |
+
+Raises:
+
+| Type          | Description                                                                                                                                            |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ValueError`  | If there are no observations, an observation names an unknown output or factor, the confidence level is out of range, or axes has no panel of a label. |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                                                                           |
+
+Source code in `commol/api/plotting/accessors.py`
+
+```python
+def observations(
+    self,
+    observed_data: "list[ObservedDataPoint]",
+    output_file: str | None = None,
+    config: "PlotConfig | None" = None,
+    show_legend: bool = True,
+    position_label: Callable[[float], str] | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    confidence_level: float = 0.95,
+    axes: "Figure | None" = None,
+    **kwargs: str | int | float | bool | None,
+) -> "Figure":
+    """
+    Draw each observed series with the weighted median of the draws and
+    their band, read through its observation operator, one panel per
+    label.
+
+    The values are those of ``at_observations(observed_data, NoNoise())``:
+    each draw's value of each observation through its own operator (the
+    sum of its outputs, its window and the draw's value of its factor),
+    the values the loss compares. A value with a window is drawn as a
+    step over its window with a marker at ``at``, and its band as a
+    rectangle over the same window; a value with no window is a marker,
+    joined only as a guide. The band is a band of the model, with no
+    observation noise, not a prediction interval, and its legend says so.
+
+    Parameters
+    ----------
+    observed_data : list[ObservedDataPoint]
+        The observations, as in `ResultsPlot.observations`.
+    output_file : str | None
+        Path to save the figure to. If None, the figure is only returned.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+    show_legend : bool
+        Whether each panel shows its legend.
+    position_label : Callable[[float], str] | None
+        Turns a position into a tick label, as in `ResultsPlot.series`.
+    tick_every : float | None
+        The distance between labelled positions, as in
+        `ResultsPlot.series`.
+    x_label : str
+        The label of the x axis.
+    confidence_level : float
+        The level of the band, strictly between 0 and 1.
+    axes : Figure | None
+        A figure of commol to draw on, as in `ResultsPlot.observations`.
+    **kwargs : str | int | float | bool | None
+        Passed to ``Axes.plot`` for the steps and the guide of the median.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+
+    Raises
+    ------
+    ValueError
+        If there are no observations, an observation names an unknown
+        output or factor, the confidence level is out of range, or
+        ``axes`` has no panel of a label.
+    ImportError
+        If matplotlib is not installed (``pip install 'commol[plot]'``).
+    """
+    from commol.api.plotting.figures import _predictive_observations
+
+    return _predictive_observations(
+        self._predictive,
+        observed_data,
+        output_file=output_file,
+        config=config,
+        show_legend=show_legend,
+        position_label=position_label,
+        tick_every=tick_every,
+        x_label=x_label,
+        confidence_level=confidence_level,
+        axes=axes,
+        **kwargs,
+    )
+```
+
 ## Scenarios
 
 Bases: `Mapping[str, Predictive]`
@@ -2167,7 +2713,10 @@ class Scenarios(Mapping[str, Predictive]):
         self,
         source: PredictiveSource,
         sample: ParameterSample,
-        scenarios: Mapping[str, Mapping[str, "ParameterUpdate"]],
+        scenarios: Mapping[
+            str,
+            Mapping[str, float | str | list[tuple[float, float]] | SeriesValue | None],
+        ],
         positions: Sequence[float],
     ) -> None:
         """
@@ -2180,7 +2729,7 @@ class Scenarios(Mapping[str, Predictive]):
             or the sensitivity analysis of its inputs (`SensitivityAnalysis`).
         sample : ParameterSample
             Its parameters, in the order of the problem or the analysis.
-        scenarios : Mapping[str, Mapping[str, ParameterUpdate]]
+        scenarios : Mapping[str, Mapping[str, value of a parameter]]
             Each scenario by name: the value of each parameter it overrides,
             any value `Model.update_parameters` takes, such as a number, a
             formula or the points of a series. An empty mapping keeps the
@@ -2277,7 +2826,7 @@ class Scenarios(Mapping[str, Predictive]):
         ----------
         name : str
             The scenario.
-        quantities : Sequence[Quantity]
+        quantities : Sequence[quantity]
             The quantities; a `Trajectory` gives one scalar per position.
         confidence_level : float
             Strictly between 0 and 1.
@@ -2323,7 +2872,7 @@ class Scenarios(Mapping[str, Predictive]):
             The scenario compared.
         baseline : str
             The scenario subtracted.
-        quantities : Sequence[Quantity]
+        quantities : Sequence[quantity]
             The quantities; a `Trajectory` gives one scalar per position, each
             compared at its position.
         confidence_level : float
@@ -2368,19 +2917,19 @@ The weight of each run, the same in every scenario; they sum to 1.
 #### __init__
 
 ```python
-__init__(source: PredictiveSource, sample: ParameterSample, scenarios: Mapping[str, Mapping[str, ParameterUpdate]], positions: Sequence[float]) -> None
+__init__(source: PredictiveSource, sample: ParameterSample, scenarios: Mapping[str, Mapping[str, float | str | list[tuple[float, float]] | SeriesValue | None]], positions: Sequence[float]) -> None
 ```
 
 Run every draw of `sample` under each scenario, at `positions`.
 
 Parameters:
 
-| Name        | Type                                          | Description                                                                                                                                                                                                 | Default    |
-| ----------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `source`    | `PredictiveSource`                            | The calibration problem the sample is a sample of (Calibrator), or the sensitivity analysis of its inputs (SensitivityAnalysis).                                                                            | *required* |
-| `sample`    | `ParameterSample`                             | Its parameters, in the order of the problem or the analysis.                                                                                                                                                | *required* |
-| `scenarios` | `Mapping[str, Mapping[str, ParameterUpdate]]` | Each scenario by name: the value of each parameter it overrides, any value Model.update_parameters takes, such as a number, a formula or the points of a series. An empty mapping keeps the model as it is. | *required* |
-| `positions` | `Sequence[float]`                             | Positions to report at, sorted and unique. A comparison reads the runs here, so they hold quantity_schedule(quantities).                                                                                    | *required* |
+| Name        | Type                                               | Description                                                                                                                                                                                                 | Default    |
+| ----------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `source`    | `PredictiveSource`                                 | The calibration problem the sample is a sample of (Calibrator), or the sensitivity analysis of its inputs (SensitivityAnalysis).                                                                            | *required* |
+| `sample`    | `ParameterSample`                                  | Its parameters, in the order of the problem or the analysis.                                                                                                                                                | *required* |
+| `scenarios` | `Mapping[str, Mapping[str, value of a parameter]]` | Each scenario by name: the value of each parameter it overrides, any value Model.update_parameters takes, such as a number, a formula or the points of a series. An empty mapping keeps the model as it is. | *required* |
+| `positions` | `Sequence[float]`                                  | Positions to report at, sorted and unique. A comparison reads the runs here, so they hold quantity_schedule(quantities).                                                                                    | *required* |
 
 Raises:
 
@@ -2396,7 +2945,10 @@ def __init__(
     self,
     source: PredictiveSource,
     sample: ParameterSample,
-    scenarios: Mapping[str, Mapping[str, "ParameterUpdate"]],
+    scenarios: Mapping[
+        str,
+        Mapping[str, float | str | list[tuple[float, float]] | SeriesValue | None],
+    ],
     positions: Sequence[float],
 ) -> None:
     """
@@ -2409,7 +2961,7 @@ def __init__(
         or the sensitivity analysis of its inputs (`SensitivityAnalysis`).
     sample : ParameterSample
         Its parameters, in the order of the problem or the analysis.
-    scenarios : Mapping[str, Mapping[str, ParameterUpdate]]
+    scenarios : Mapping[str, Mapping[str, value of a parameter]]
         Each scenario by name: the value of each parameter it overrides,
         any value `Model.update_parameters` takes, such as a number, a
         formula or the points of a series. An empty mapping keeps the
@@ -2555,7 +3107,7 @@ Parameters:
 | Name               | Type                 | Description                                                 | Default    |
 | ------------------ | -------------------- | ----------------------------------------------------------- | ---------- |
 | `name`             | `str`                | The scenario.                                               | *required* |
-| `quantities`       | `Sequence[Quantity]` | The quantities; a Trajectory gives one scalar per position. | *required* |
+| `quantities`       | `Sequence[quantity]` | The quantities; a Trajectory gives one scalar per position. | *required* |
 | `confidence_level` | `float`              | Strictly between 0 and 1.                                   | *required* |
 
 Returns:
@@ -2588,7 +3140,7 @@ def summary(
     ----------
     name : str
         The scenario.
-    quantities : Sequence[Quantity]
+    quantities : Sequence[quantity]
         The quantities; a `Trajectory` gives one scalar per position.
     confidence_level : float
         Strictly between 0 and 1.
@@ -2629,7 +3181,7 @@ Parameters:
 | ------------------ | -------------------- | ------------------------------------------------------------------------------------------ | ---------- |
 | `name`             | `str`                | The scenario compared.                                                                     | *required* |
 | `baseline`         | `str`                | The scenario subtracted.                                                                   | *required* |
-| `quantities`       | `Sequence[Quantity]` | The quantities; a Trajectory gives one scalar per position, each compared at its position. | *required* |
+| `quantities`       | `Sequence[quantity]` | The quantities; a Trajectory gives one scalar per position, each compared at its position. | *required* |
 | `confidence_level` | `float`              | Strictly between 0 and 1.                                                                  | *required* |
 
 Returns:
@@ -2670,7 +3222,7 @@ def compare(
         The scenario compared.
     baseline : str
         The scenario subtracted.
-    quantities : Sequence[Quantity]
+    quantities : Sequence[quantity]
         The quantities; a `Trajectory` gives one scalar per position, each
         compared at its position.
     confidence_level : float
@@ -2935,7 +3487,7 @@ class BayesianBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     kind: Literal["bayesian"] = Field(default="bayesian", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
-    block_length: BlockLength = Field(description="Positions per block.")
+    block_length: int | Literal["auto"] = Field(description="Positions per block.")
     starts: int = Field(default=1, description="Starts per fit.")
 ```
 
@@ -2991,7 +3543,7 @@ class ResidualBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     kind: Literal["residual"] = Field(default="residual", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
-    block_length: BlockLength = Field(description="Positions per block.")
+    block_length: int | Literal["auto"] = Field(description="Positions per block.")
     residual_scale: Literal["additive", "multiplicative"] = Field(
         description="The scale of the residuals."
     )
@@ -3049,7 +3601,7 @@ class WildBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     kind: Literal["wild"] = Field(default="wild", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
-    block_length: BlockLength = Field(description="Positions per block.")
+    block_length: int | Literal["auto"] = Field(description="Positions per block.")
     multipliers: Literal["rademacher", "mammen"] = Field(
         description="The distribution of the multipliers."
     )
@@ -3090,7 +3642,7 @@ class BlockJackknife(UncertaintyMethod[JackknifeResult], RangeChecked):
         Starts of the fit and of each leave-out fit (default 1).
     """
 
-    block_length: BlockLength = Field(description="Positions per block.")
+    block_length: int | Literal["auto"] = Field(description="Positions per block.")
     starts: int = Field(default=1, description="Starts per fit.")
 ```
 
@@ -3503,32 +4055,11 @@ class ProfileLikelihood(UncertaintyMethod["ProfileResult"], RangeChecked):
     )
 
     @model_validator(mode="after")
-    def check_unique(self) -> Self:
+    def _check_unique(self) -> Self:
         """Each parameter is profiled once."""
         if len(set(self.parameters)) != len(self.parameters):
             raise ValueError(f"A parameter is listed twice: {self.parameters}.")
         return self
-```
-
-### Methods:
-
-#### check_unique
-
-```python
-check_unique() -> Self
-```
-
-Each parameter is profiled once.
-
-Source code in `commol/context/inference/profiles.py`
-
-```python
-@model_validator(mode="after")
-def check_unique(self) -> Self:
-    """Each parameter is profiled once."""
-    if len(set(self.parameters)) != len(self.parameters):
-        raise ValueError(f"A parameter is listed twice: {self.parameters}.")
-    return self
 ```
 
 ## PredictionProfile
@@ -3583,7 +4114,7 @@ class PredictionProfile(UncertaintyMethod["ProfileResult"], RangeChecked):
     )
 
     @model_validator(mode="after")
-    def check_labels(self) -> Self:
+    def _check_labels(self) -> Self:
         """Each prediction has a label of its own."""
         labels = [spec.as_observation().label for spec in self.specs]
         if len(set(labels)) != len(labels):
@@ -3591,30 +4122,6 @@ class PredictionProfile(UncertaintyMethod["ProfileResult"], RangeChecked):
                 f"Each prediction needs a label of its own, got {labels}; set label."
             )
         return self
-```
-
-### Methods:
-
-#### check_labels
-
-```python
-check_labels() -> Self
-```
-
-Each prediction has a label of its own.
-
-Source code in `commol/context/inference/profiles.py`
-
-```python
-@model_validator(mode="after")
-def check_labels(self) -> Self:
-    """Each prediction has a label of its own."""
-    labels = [spec.as_observation().label for spec in self.specs]
-    if len(set(labels)) != len(labels):
-        raise ValueError(
-            f"Each prediction needs a label of its own, got {labels}; set label."
-        )
-    return self
 ```
 
 ## PredictionSpec
@@ -3785,10 +4292,10 @@ class Threshold(RangeChecked):
 
     kind: Literal["chi_square", "beale", "bootstrap_calibrated"]
     confidence_level: float
-    bootstrap: ProfileBootstrap | None = None
+    bootstrap: _ProfileBootstrap | None = None
 
     @model_validator(mode="after")
-    def check_bootstrap(self) -> Self:
+    def _check_bootstrap(self) -> Self:
         """A bootstrap goes with ``"bootstrap_calibrated"``, and only with it."""
         if (self.kind == "bootstrap_calibrated") != (self.bootstrap is not None):
             raise ValueError(
@@ -3853,7 +4360,7 @@ class Threshold(RangeChecked):
 
     @classmethod
     def bootstrap_calibrated(
-        cls, bootstrap: ProfileBootstrap, confidence_level: float
+        cls, bootstrap: _ProfileBootstrap, confidence_level: float
     ) -> Self:
         """
         The threshold of each quantity calibrated by `bootstrap`
@@ -3892,29 +4399,6 @@ class Threshold(RangeChecked):
 ```
 
 ### Methods:
-
-#### check_bootstrap
-
-```python
-check_bootstrap() -> Self
-```
-
-A bootstrap goes with `"bootstrap_calibrated"`, and only with it.
-
-Source code in `commol/context/inference/profiles.py`
-
-```python
-@model_validator(mode="after")
-def check_bootstrap(self) -> Self:
-    """A bootstrap goes with ``"bootstrap_calibrated"``, and only with it."""
-    if (self.kind == "bootstrap_calibrated") != (self.bootstrap is not None):
-        raise ValueError(
-            "A bootstrap calibrates the threshold 'bootstrap_calibrated' and no "
-            "other; build thresholds with Threshold.chi_square, Threshold.beale "
-            "or Threshold.bootstrap_calibrated."
-        )
-    return self
-```
 
 #### chi_square
 
@@ -4036,7 +4520,7 @@ def beale(cls, confidence_level: float) -> Self:
 #### bootstrap_calibrated
 
 ```python
-bootstrap_calibrated(bootstrap: ProfileBootstrap, confidence_level: float) -> Self
+bootstrap_calibrated(bootstrap: _ProfileBootstrap, confidence_level: float) -> Self
 ```
 
 The threshold of each quantity calibrated by `bootstrap` (prepivoting, Beran 1988), for any loss.
@@ -4067,7 +4551,7 @@ Source code in `commol/context/inference/profiles.py`
 ```python
 @classmethod
 def bootstrap_calibrated(
-    cls, bootstrap: ProfileBootstrap, confidence_level: float
+    cls, bootstrap: _ProfileBootstrap, confidence_level: float
 ) -> Self:
     """
     The threshold of each quantity calibrated by `bootstrap`
@@ -4830,7 +5314,7 @@ Attributes:
 
 | Name            | Type                      | Description |
 | --------------- | ------------------------- | ----------- |
-| `distributions` | \`dict[str, Distribution] | None\`      |
+| `distributions` | \`dict[str, distribution] | None\`      |
 
 Source code in `commol/context/inference/distributions.py`
 
@@ -4846,14 +5330,14 @@ class Priors(BaseModel):
 
     Attributes
     ----------
-    distributions : dict[str, Distribution] | None
+    distributions : dict[str, distribution] | None
         The prior of each parameter; None gives ``Uniform()`` to every
         parameter (`uniform_on_bounds`).
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    distributions: dict[str, Distribution] | None = Field(
+    distributions: dict[str, _Distribution] | None = Field(
         description="The prior of each parameter, or None for uniform on the bounds."
     )
 
@@ -5084,7 +5568,7 @@ Attributes:
 
 | Name                 | Type     | Description                                                                                                                                                   |
 | -------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `priors`             | \`Priors | dict[str, Distribution]\`                                                                                                                                     |
+| `priors`             | \`Priors | dict[str, distribution]\`                                                                                                                                     |
 | `eta`                | \`float  | InformationMatchingEta                                                                                                                                        |
 | `particles`          | `int`    | Number of particles, at least 2.                                                                                                                              |
 | `target_cess`        | `float`  | The conditional effective sample size of each step, as a share of the particles, strictly between 0 and 1: the next temperature is the highest that keeps it. |
@@ -5106,7 +5590,7 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult], RangeChecked):
 
     Attributes
     ----------
-    priors : Priors | dict[str, Distribution]
+    priors : Priors | dict[str, distribution]
         The prior of each calibrated parameter, or
         ``Priors.uniform_on_bounds()``.
     eta : float | InformationMatchingEta | BootstrapCoverageEta
@@ -5127,7 +5611,7 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult], RangeChecked):
         ``⌈log c / log(1 − a)⌉`` times.
     """
 
-    eta: Eta = Field(description="The scale of the loss, or its calibration.")
+    eta: _Eta = Field(description="The scale of the loss, or its calibration.")
     particles: int = Field(description="Number of particles.")
     target_cess: float = Field(description="Share kept per step.")
     resample_threshold: float = Field(description="Resample below this share.")
@@ -5135,31 +5619,10 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult], RangeChecked):
 
     @model_validator(mode="before")
     @classmethod
-    def require_eta(cls, data: JsonValue) -> JsonValue:
+    def _require_eta(cls, data: JsonValue) -> JsonValue:
         """Name the choices of `eta` when it is missing."""
         _require(data, "eta", f"give {ETA_CHOICES}")
         return data
-```
-
-### Methods:
-
-#### require_eta
-
-```python
-require_eta(data: JsonValue) -> JsonValue
-```
-
-Name the choices of `eta` when it is missing.
-
-Source code in `commol/context/inference/smc.py`
-
-```python
-@model_validator(mode="before")
-@classmethod
-def require_eta(cls, data: JsonValue) -> JsonValue:
-    """Name the choices of `eta` when it is missing."""
-    _require(data, "eta", f"give {ETA_CHOICES}")
-    return data
 ```
 
 ## BayesianPosterior
@@ -5174,7 +5637,7 @@ Attributes:
 
 | Name                 | Type     | Description                                                                                                                                                   |
 | -------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `priors`             | \`Priors | dict[str, Distribution]\`                                                                                                                                     |
+| `priors`             | \`Priors | dict[str, distribution]\`                                                                                                                                     |
 | `particles`          | `int`    | Number of particles, at least 2.                                                                                                                              |
 | `target_cess`        | `float`  | The conditional effective sample size of each step, as a share of the particles, strictly between 0 and 1: the next temperature is the highest that keeps it. |
 | `resample_threshold` | `float`  | Resample when the effective size falls below this share of the particles, in (0, 1\].                                                                         |
@@ -5195,7 +5658,7 @@ class BayesianPosterior(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
 
     Attributes
     ----------
-    priors : Priors | dict[str, Distribution]
+    priors : Priors | dict[str, distribution]
         The prior of each calibrated parameter, or
         ``Priors.uniform_on_bounds()``.
     particles : int
@@ -5264,7 +5727,7 @@ class InformationMatchingEta(RangeChecked):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: Literal["information_matching"] = "information_matching"
-    block_length: BlockLength = Field(description="Positions per block.")
+    block_length: int | Literal["auto"] = Field(description="Positions per block.")
     starts: int = Field(default=1, description="Starts of the fit.")
 ```
 
@@ -5314,7 +5777,7 @@ class BootstrapCoverageEta(RangeChecked):
 
     kind: Literal["bootstrap_coverage"] = "bootstrap_coverage"
     replicates: int = Field(description="Number of bootstrap data sets.")
-    block_length: BlockLength = Field(description="Positions per block.")
+    block_length: int | Literal["auto"] = Field(description="Positions per block.")
     confidence_level: float = Field(description="The level of the intervals.")
     starts: int = Field(default=1, description="Starts of the fit.")
 ```
@@ -5331,7 +5794,7 @@ Attributes:
 
 | Name               | Type           | Description                                                                         |
 | ------------------ | -------------- | ----------------------------------------------------------------------------------- |
-| `priors`           | \`Priors       | dict[str, Distribution]\`                                                           |
+| `priors`           | \`Priors       | dict[str, distribution]\`                                                           |
 | `distance`         | \`LossDistance | SeriesDistance\`                                                                    |
 | `particles`        | `int`          | Number of particles, at least 2.                                                    |
 | `target_cess`      | `float`        | The weighted share of the particles each tolerance keeps, strictly between 0 and 1. |
@@ -5356,7 +5819,7 @@ class ABCSMC(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
 
     Attributes
     ----------
-    priors : Priors | dict[str, Distribution]
+    priors : Priors | dict[str, distribution]
         The prior of each calibrated parameter, or
         ``Priors.uniform_on_bounds()``.
     distance : LossDistance | SeriesDistance
@@ -5374,7 +5837,7 @@ class ABCSMC(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
         between 0 and 1.
     """
 
-    distance: ABCDistance = Field(description="The distance.")
+    distance: _ABCDistance = Field(description="The distance.")
     particles: int = Field(description="Number of particles.")
     target_cess: float = Field(description="Share kept per step.")
     min_acceptance: float = Field(
@@ -5393,7 +5856,7 @@ Attributes:
 
 | Name       | Type           | Description                                            |
 | ---------- | -------------- | ------------------------------------------------------ |
-| `priors`   | \`Priors       | dict[str, Distribution]\`                              |
+| `priors`   | \`Priors       | dict[str, distribution]\`                              |
 | `distance` | \`LossDistance | SeriesDistance\`                                       |
 | `draws`    | `int`          | Number of draws of the priors, at least 2.             |
 | `quantile` | `float`        | The share of the draws kept, strictly between 0 and 1. |
@@ -5410,7 +5873,7 @@ class ABCRejection(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
 
     Attributes
     ----------
-    priors : Priors | dict[str, Distribution]
+    priors : Priors | dict[str, distribution]
         The prior of each calibrated parameter, or
         ``Priors.uniform_on_bounds()``.
     distance : LossDistance | SeriesDistance
@@ -5421,7 +5884,7 @@ class ABCRejection(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
         The share of the draws kept, strictly between 0 and 1.
     """
 
-    distance: ABCDistance = Field(description="The distance.")
+    distance: _ABCDistance = Field(description="The distance.")
     draws: int = Field(description="Number of draws.")
     quantile: float = Field(description="The share of draws kept.")
 ```
@@ -5694,7 +6157,7 @@ class Laplace(UncertaintyMethod[LaplaceResult], RangeChecked):
     """
 
     draws: int = Field(description="Number of draws.")
-    curvature: CurvatureName = Field(
+    curvature: Literal["gauss_newton", "hessian"] = Field(
         default="gauss_newton", description="The curvature."
     )
     starts: int = Field(default=1, description="Starts of the fit.")
@@ -5751,9 +6214,9 @@ class Sandwich(UncertaintyMethod[SandwichResult], RangeChecked):
         hypercube over the bounds.
     """
 
-    block_length: BlockLength = Field(description="Positions per block.")
+    block_length: int | Literal["auto"] = Field(description="Positions per block.")
     draws: int = Field(description="Number of draws.")
-    curvature: CurvatureName = Field(
+    curvature: Literal["gauss_newton", "hessian"] = Field(
         default="gauss_newton", description="The curvature."
     )
     starts: int = Field(default=1, description="Starts of the fit.")
@@ -5808,8 +6271,8 @@ class LaplaceMixture(UncertaintyMethod[ImportanceResult], RangeChecked):
 
     starts: int = Field(default=1, description="Starts of the fit.")
     draws: int = Field(description="Number of draws.")
-    target: MixtureTarget = Field(description="The posterior to sample.")
-    curvature: CurvatureName = Field(
+    target: _MixtureTarget = Field(description="The posterior to sample.")
+    curvature: Literal["gauss_newton", "hessian"] = Field(
         default="gauss_newton", description="The curvature."
     )
 ```
@@ -5824,7 +6287,7 @@ Attributes:
 
 | Name     | Type     | Description               |
 | -------- | -------- | ------------------------- |
-| `priors` | \`Priors | dict[str, Distribution]\` |
+| `priors` | \`Priors | dict[str, distribution]\` |
 
 Source code in `commol/context/inference/local.py`
 
@@ -5836,7 +6299,7 @@ class LikelihoodTarget(WithPriors):
 
     Attributes
     ----------
-    priors : Priors | dict[str, Distribution]
+    priors : Priors | dict[str, distribution]
         The prior of each calibrated parameter, or
         ``Priors.uniform_on_bounds()``.
     """
@@ -5854,7 +6317,7 @@ Attributes:
 
 | Name     | Type     | Description                     |
 | -------- | -------- | ------------------------------- |
-| `priors` | \`Priors | dict[str, Distribution]\`       |
+| `priors` | \`Priors | dict[str, distribution]\`       |
 | `eta`    | `float`  | The scale of the loss, above 0. |
 
 Source code in `commol/context/inference/local.py`
@@ -5868,7 +6331,7 @@ class GibbsTarget(WithPriors, RangeChecked):
 
     Attributes
     ----------
-    priors : Priors | dict[str, Distribution]
+    priors : Priors | dict[str, distribution]
         The prior of each calibrated parameter, or
         ``Priors.uniform_on_bounds()``.
     eta : float
@@ -6101,50 +6564,6 @@ def degrees_of_freedom(self) -> float | None:
     return float(self.blocks - 1)
 ```
 
-## DeltaBand
-
-Bases: `ResultModel`
-
-The band of every output by the delta method (`Calibrator.delta_band`): the prediction at the fit plus and minus a quantile times the standard deviation of the linearized model, `J Σ Jᵀ`, with no run of the draws.
-
-Attributes:
-
-| Name                   | Type                     | Description                                                                                      |
-| ---------------------- | ------------------------ | ------------------------------------------------------------------------------------------------ |
-| `confidence_level`     | `float`                  | The level of the central interval.                                                               |
-| `positions`            | `list[float]`            | Where the values are.                                                                            |
-| `center, lower, upper` | `dict[str, list[float]]` | For each output, one value per position: the prediction at the fit and the ends of the interval. |
-
-Source code in `commol/context/inference/local.py`
-
-```python
-class DeltaBand(ResultModel):
-    """
-    The band of every output by the delta method (``Calibrator.delta_band``):
-    the prediction at the fit
-    plus and minus a quantile times the standard deviation of the
-    linearized model, ``J Σ Jᵀ``, with no run of the draws.
-
-    Attributes
-    ----------
-    confidence_level : float
-        The level of the central interval.
-    positions : list[float]
-        Where the values are.
-    center, lower, upper : dict[str, list[float]]
-        For each output, one value per position: the prediction at the fit
-        and the ends of the interval.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    confidence_level: float
-    positions: list[float]
-    center: dict[str, list[float]] = Field(description="Prediction at the fit")
-    lower: dict[str, list[float]] = Field(description="Lower end")
-    upper: dict[str, list[float]] = Field(description="Upper end")
-```
-
 ## ImportanceResult
 
 Bases: `ResultModel`
@@ -6286,13 +6705,17 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
         The level of the intervals, strictly between 0 and 1.
     """
 
-    score: ConformalScore = Field(description="The nonconformity score.")
-    by: Pooling = Field(description="Which scores each quantile reads.")
+    score: Literal["absolute", "normalized", "spread"] = Field(
+        description="The nonconformity score."
+    )
+    by: Literal["series", "all"] = Field(
+        description="Which scores each quantile reads."
+    )
     confidence_level: float = Field(description="The level of the intervals.")
 
     @model_validator(mode="before")
     @classmethod
-    def check_score_and_by(cls, data: JsonValue) -> JsonValue:
+    def _check_score_and_by(cls, data: JsonValue) -> JsonValue:
         """Check, in Rust, that `score` and `by` are given and fit together."""
         if isinstance(data, Mapping):
             given = {
@@ -6300,31 +6723,6 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
             }
             commol_rs.inference.check_conformal_settings(engine_json(given))
         return data
-```
-
-### Methods:
-
-#### check_score_and_by
-
-```python
-check_score_and_by(data: JsonValue) -> JsonValue
-```
-
-Check, in Rust, that `score` and `by` are given and fit together.
-
-Source code in `commol/context/inference/conformal.py`
-
-```python
-@model_validator(mode="before")
-@classmethod
-def check_score_and_by(cls, data: JsonValue) -> JsonValue:
-    """Check, in Rust, that `score` and `by` are given and fit together."""
-    if isinstance(data, Mapping):
-        given = {
-            key: data[key] for key in ("score", "by") if data.get(key) is not None
-        }
-        commol_rs.inference.check_conformal_settings(engine_json(given))
-    return data
 ```
 
 ## SplitConformal
@@ -6386,30 +6784,10 @@ class SplitConformal(ConformalMethod, RangeChecked):
     starts: int = Field(default=1, description="Starts of the fit.")
 
     @model_validator(mode="after")
-    def check_spread(self) -> Self:
+    def _check_spread(self) -> Self:
         """Reject ``score="spread"`` without a sample."""
         _no_spread_without_sample(self)
         return self
-```
-
-### Methods:
-
-#### check_spread
-
-```python
-check_spread() -> Self
-```
-
-Reject `score="spread"` without a sample.
-
-Source code in `commol/context/inference/conformal.py`
-
-```python
-@model_validator(mode="after")
-def check_spread(self) -> Self:
-    """Reject ``score="spread"`` without a sample."""
-    _no_spread_without_sample(self)
-    return self
 ```
 
 ## RollingConformal
@@ -6460,7 +6838,7 @@ class RollingConformal(ConformalMethod, RangeChecked):
     starts: int = Field(default=1, description="Starts of each fit.")
 
     @model_validator(mode="after")
-    def check_spread(self) -> Self:
+    def _check_spread(self) -> Self:
         """Reject ``score="spread"``: one fit per origin has no spread."""
         if self.score == "spread":
             raise ValueError(
@@ -6468,30 +6846,6 @@ class RollingConformal(ConformalMethod, RangeChecked):
                 'spread for score="spread"; use "absolute" or "normalized"'
             )
         return self
-```
-
-### Methods:
-
-#### check_spread
-
-```python
-check_spread() -> Self
-```
-
-Reject `score="spread"`: one fit per origin has no spread.
-
-Source code in `commol/context/inference/conformal.py`
-
-```python
-@model_validator(mode="after")
-def check_spread(self) -> Self:
-    """Reject ``score="spread"``: one fit per origin has no spread."""
-    if self.score == "spread":
-        raise ValueError(
-            "RollingConformal fits once per origin, so its predictions have no "
-            'spread for score="spread"; use "absolute" or "normalized"'
-        )
-    return self
 ```
 
 ## JackknifePlus
@@ -6535,7 +6889,7 @@ class JackknifePlus(ConformalMethod, RangeChecked):
         Starts of the fit and of each refit (default 1).
     """
 
-    block_length: BlockLength = Field(description="Positions per block.")
+    block_length: int | Literal["auto"] = Field(description="Positions per block.")
     positions: list[float] = Field(min_length=1, description="Where the intervals are.")
     starts: int = Field(default=1, description="Starts per fit.")
 ```
@@ -6586,7 +6940,7 @@ class EnbPI(ConformalMethod, RangeChecked):
     """
 
     replicates: int = Field(description="Number of replicates.")
-    block_length: BlockLength = Field(description="Positions per block.")
+    block_length: int | Literal["auto"] = Field(description="Positions per block.")
     positions: list[float] = Field(min_length=1, description="Where the intervals are.")
     starts: int = Field(default=1, description="Starts per fit.")
 ```
@@ -6649,30 +7003,10 @@ class AdaptiveConformal(ConformalMethod, RangeChecked):
     starts: int = Field(default=1, description="Starts of the fit.")
 
     @model_validator(mode="after")
-    def check_spread(self) -> Self:
+    def _check_spread(self) -> Self:
         """Reject ``score="spread"`` without a sample."""
         _no_spread_without_sample(self)
         return self
-```
-
-### Methods:
-
-#### check_spread
-
-```python
-check_spread() -> Self
-```
-
-Reject `score="spread"` without a sample.
-
-Source code in `commol/context/inference/conformal.py`
-
-```python
-@model_validator(mode="after")
-def check_spread(self) -> Self:
-    """Reject ``score="spread"`` without a sample."""
-    _no_spread_without_sample(self)
-    return self
 ```
 
 ## ConformalResult
@@ -6876,7 +7210,7 @@ class Score(ResultModel):
 #### coverage
 
 ```python
-coverage(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: ObservationNoise, confidence_level: float) -> Score
+coverage(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: _ObservationNoise, confidence_level: float) -> Score
 ```
 
 The empirical coverage of the central interval of `confidence_level`.
@@ -6902,7 +7236,7 @@ Source code in `commol/api/inference/scores.py`
 def coverage(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
-    noise: ObservationNoise,
+    noise: _ObservationNoise,
     confidence_level: float,
 ) -> Score:
     """
@@ -6932,7 +7266,7 @@ def coverage(
 #### interval_score
 
 ```python
-interval_score(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: ObservationNoise, confidence_level: float) -> Score
+interval_score(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: _ObservationNoise, confidence_level: float) -> Score
 ```
 
 The interval score: `(u − l) + (2/α)(l − y)₊ + (2/α)(y − u)₊`.
@@ -6958,7 +7292,7 @@ Source code in `commol/api/inference/scores.py`
 def interval_score(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
-    noise: ObservationNoise,
+    noise: _ObservationNoise,
     confidence_level: float,
 ) -> Score:
     """
@@ -6987,7 +7321,7 @@ def interval_score(
 #### weighted_interval_score
 
 ```python
-weighted_interval_score(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: ObservationNoise, confidence_levels: Sequence[float]) -> Score
+weighted_interval_score(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: _ObservationNoise, confidence_levels: Sequence[float]) -> Score
 ```
 
 The weighted interval score of Bracher et al. (2021).
@@ -7019,7 +7353,7 @@ Source code in `commol/api/inference/scores.py`
 def weighted_interval_score(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
-    noise: ObservationNoise,
+    noise: _ObservationNoise,
     confidence_levels: Sequence[float],
 ) -> Score:
     """
@@ -7062,7 +7396,7 @@ def weighted_interval_score(
 #### crps
 
 ```python
-crps(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: ObservationNoise) -> Score
+crps(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: _ObservationNoise) -> Score
 ```
 
 The continuous ranked probability score of the weighted draws.
@@ -7089,7 +7423,7 @@ Source code in `commol/api/inference/scores.py`
 def crps(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
-    noise: ObservationNoise,
+    noise: _ObservationNoise,
 ) -> Score:
     """
     The continuous ranked probability score of the weighted draws.
@@ -7118,7 +7452,7 @@ def crps(
 #### pit
 
 ```python
-pit(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: ObservationNoise) -> Score
+pit(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: _ObservationNoise) -> Score
 ```
 
 The probability integral transform of each observation.
@@ -7145,7 +7479,7 @@ Source code in `commol/api/inference/scores.py`
 def pit(
     predictive: Predictive,
     observations: Sequence[ObservedDataPoint],
-    noise: ObservationNoise,
+    noise: _ObservationNoise,
 ) -> Score:
     """
     The probability integral transform of each observation.
@@ -7345,7 +7679,7 @@ member_statistics(per_member: NDArray[float64], confidence_level: float, weights
 ```
 
 ```python
-member_statistics(per_member: EnsembleValues, confidence_level: float, weights: Sequence[float] | None = None) -> dict[str, float] | dict[str, list[float]] | dict[str, float | list[float]]
+member_statistics(per_member: Sequence[float] | Sequence[Sequence[float]] | NDArray[float64], confidence_level: float, weights: Sequence[float] | None = None) -> dict[str, float] | dict[str, list[float]] | dict[str, float | list[float]]
 ```
 
 Spread of one quantity across the members of an ensemble.
@@ -7376,7 +7710,7 @@ Source code in `commol/api/inference/intervals.py`
 
 ```python
 def member_statistics(
-    per_member: EnsembleValues,
+    per_member: Sequence[float] | Sequence[Sequence[float]] | NDArray[np.float64],
     confidence_level: float,
     weights: Sequence[float] | None = None,
 ) -> dict[str, float] | dict[str, list[float]] | dict[str, float | list[float]]:
@@ -7447,56 +7781,4 @@ def member_statistics(
         "min": shaped([summary.minimum for summary in summaries]),
         "max": shaped([summary.maximum for summary in summaries]),
     }
-```
-
-## ci_percentiles
-
-```python
-ci_percentiles(confidence_level: float) -> tuple[float, float]
-```
-
-Lower and upper percentile points of a two-sided confidence interval.
-
-Parameters:
-
-| Name               | Type    | Description                                                 | Default    |
-| ------------------ | ------- | ----------------------------------------------------------- | ---------- |
-| `confidence_level` | `float` | Confidence level of the interval, strictly between 0 and 1. | *required* |
-
-Returns:
-
-| Type                  | Description                                            |
-| --------------------- | ------------------------------------------------------ |
-| `tuple[float, float]` | Lower and upper percentile points, on the 0-100 scale. |
-
-Raises:
-
-| Type         | Description                                          |
-| ------------ | ---------------------------------------------------- |
-| `ValueError` | If confidence_level is not strictly between 0 and 1. |
-
-Source code in `commol/api/inference/intervals.py`
-
-```python
-def ci_percentiles(confidence_level: float) -> tuple[float, float]:
-    """
-    Lower and upper percentile points of a two-sided confidence interval.
-
-    Parameters
-    ----------
-    confidence_level : float
-        Confidence level of the interval, strictly between 0 and 1.
-
-    Returns
-    -------
-    tuple[float, float]
-        Lower and upper percentile points, on the 0-100 scale.
-
-    Raises
-    ------
-    ValueError
-        If ``confidence_level`` is not strictly between 0 and 1.
-    """
-    lower, upper = commol_rs.inference.interval_levels(confidence_level)
-    return lower * 100.0, upper * 100.0
 ```

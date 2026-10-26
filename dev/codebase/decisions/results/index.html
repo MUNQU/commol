@@ -3406,8 +3406,7 @@ its runs. Figures have <a href="../figures/">a page of their own</a>.</p>
 distribution, interpolated between the midpoints of the cumulative weights
 (<code>statistics::quantiles</code> in <code>crates/commol-statistics/src/statistics.rs</code>). With
 equal weights it equals NumPy's <code>method="hazen"</code>; a weight of zero removes a
-value. <code>ci_percentiles</code> (<code>api/inference/intervals.py</code>) turns a confidence level
-into the two percentile points of <code>statistics::interval_levels</code>. <code>member_statistics</code> reduces each member to the
+value. <code>member_statistics</code> reduces each member to the
 quantity of interest <strong>first</strong>, and then takes weighted quantiles across
 members; taking quantiles first gives a band that describes no member. The
 replicates of a stochastic run (<code>SimulationReplicates.quantiles</code>), a sample,
@@ -3492,7 +3491,7 @@ binding, which reads a count (<code>i64</code>) with its rule (<code>py-commol/s
 <p>A caller checks a confidence level at its boundary, then computes the two
 quantiles of its interval with <code>statistics::interval_levels</code>, a pure function
 of <code>commol-statistics</code> that checks nothing: the crate of statistics depends on
-no crate of commol. <code>ci_percentiles</code>, <code>BootstrapResult.interval_error</code>,
+no crate of commol. <code>BootstrapResult.interval_error</code>,
 <code>PropagationResult.summary</code> and the scenario summaries call the binding
 <code>commol_rs.inference.interval_levels</code>, which checks, then computes.</p>
 <table>
@@ -3736,7 +3735,7 @@ function reports anything.</p>
 </table>
 <ul>
 <li>A single run and an ensemble (replicates or a <code>Predictive</code>) differ only at
-  the leaves (<code>ReportLeaf</code>); a predictive's members carry their weights.</li>
+  the leaves (<code>_ReportLeaf</code>); a predictive's members carry their weights.</li>
 <li>The key order of each entry is part of the contract, because it changes saved
   JSON files.</li>
 <li>Labels and summary figures belong to the caller, because they carry domain

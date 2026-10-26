@@ -4898,6 +4898,53 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   Another value of <code>keep</code> raises <code>ValueError</code> with the message of the
   engine, <code>unknown variant `median`, expected `survival` or `mean`</code>.
   See <a href="../../guide/core-concepts/#units-of-the-axis">Units of the axis</a>.</li>
+<li><strong>Breaking:</strong> the package root exports only the names a user writes: 99
+  names, down from 147. A result is reached from the object that returns it,
+  typed as the return of that member and documented on its page; it is not
+  an import. The names that leave <code>commol</code> are the results
+  (<code>SimulationResults</code>, <code>SimulationReplicates</code>, <code>ReplicateRuns</code>,
+  <code>CalibrationResult</code>, <code>CalibrationEvaluation</code>, <code>CalibrationHistory</code>,
+  <code>StartSummary</code>, <code>ModelDescription</code>, <code>Process</code>, <code>BuildInfo</code>, and the result
+  of every uncertainty, identifiability and sensitivity method with its
+  parts), the bases <code>ModelStructure</code>, <code>InferenceMethod</code>,
+  <code>UncertaintyMethod</code>, <code>IdentifiabilityMethod</code> and <code>SensitivityMethod</code>, the
+  union <code>ObservationModel</code>, and the functions <code>sample</code>, <code>windowed_totals</code>
+  and <code>ci_percentiles</code>. Migration: remove the import and annotate with the
+  class of its module, such as <code>commol.api.results.SimulationResults</code>, or
+  with no annotation. See <a href="../../api/">API Reference</a>.</li>
+<li><strong>Breaking:</strong> a condition is a <code>StratificationCondition</code> and a stratified
+  rate is a <code>StratifiedRate</code>, which the package root exports;
+  <code>ModelBuilder.add_stratification</code>, <code>ModelBuilder.add_transition</code> and
+  <code>AxisPattern</code> take them, not dicts, and <code>ConditionDict</code> and
+  <code>StratifiedRateDict</code> are removed. A <code>StratifiedRate</code> checks its rate with
+  the parser of the engine when it is built, with <code>$compartment</code> set to the
+  name of a compartment, and keeps a number as its string. Migration:
+  <code>{"stratification": "group", "category": "g1"}</code> is
+  <code>StratificationCondition(stratification="group", category="g1")</code>, and
+  <code>{"conditions": [...], "rate": "k1"}</code> is
+  <code>StratifiedRate(conditions=[...], rate="k1")</code>. See
+  <a href="../../guide/transitions/#stratified-rates">Stratified rates</a>.</li>
+<li><strong>Breaking:</strong> a choice among names is a string of a <code>Literal</code>, not an enum
+  or an alias: <code>CalibrationParameter.parameter_type</code> is one of
+  <code>"parameter"</code>, <code>"initial_condition"</code>, <code>"factor"</code> and <code>"noise"</code>,
+  <code>CalibrationProblem.loss_function</code> one of <code>"sse"</code>, <code>"rmse"</code> and <code>"mae"</code>, and
+  the <code>mode</code> of <code>AxisPattern.combine</code> one of <code>"sum"</code>, <code>"max"</code> and <code>"min"</code>.
+  <code>commol.context.constants</code> (<code>CalibrationParameterType</code>, <code>LossFunction</code>,
+  <code>OptimizationAlgorithm</code>), <code>CombineMode</code> and <code>AxisPattern.SUM</code>, <code>MAX</code> and
+  <code>MIN</code> are removed, with the aliases of strings of the signatures, such as
+  <code>DescriptionFormat</code> and <code>Pooling</code>. Another value raises the <code>ValidationError</code>
+  of pydantic, or <code>ValueError</code> for <code>combine</code>, which lists the values.
+  Migration: write the string, such as <code>mode="max"</code> for
+  <code>mode=AxisPattern.MAX</code>.</li>
+<li><strong>Breaking:</strong> <code>SimulationResults.sample(ids, at)</code> and
+  <code>SimulationResults.windowed_totals(ids, window, at=None)</code> read the bins,
+  the accumulators and the outputs of a run; <code>Simulation.sample</code> and
+  <code>Simulation.windowed_totals</code> are removed. Results without a model read
+  output names. Migration: <code>simulation.windowed_totals(results, ["cum"], 7)</code>
+  is <code>results.windowed_totals(["cum"], 7)</code>. See
+  <a href="../../guide/simulations/#windowed-totals">Windowed totals</a>.</li>
+<li><strong>Breaking:</strong> the pydantic validators of the public classes are private:
+  each name starts with <code>_</code>, such as <code>CalibrationProblem._validate_loss_or_models</code>.</li>
 </ul>
 <h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
 <ul>

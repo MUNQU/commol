@@ -3620,7 +3620,7 @@ argument: above 0 for <code>sd</code>, <code>sigma</code>, <code>scale</code> an
 </tbody>
 </table>
 <p><code>Likelihood::new</code> in <code>crates/commol-calibration/src/likelihood/mod.rs</code> checks
-the models and values; <code>CalibrationProblem.validate_loss_or_models</code> checks
+the models and values; <code>CalibrationProblem._validate_loss_or_models</code> checks
 the first and the last rules.</p>
 <p>A stochastic engine is refused because the likelihood of a stochastic model
 integrates its hidden path, which the observations of one run do not do. Fit

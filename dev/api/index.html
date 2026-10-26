@@ -3195,7 +3195,10 @@
 explain how to use them; these pages list every argument, attribute and error.</p>
 <p>The table lists each name that the package root exports (<code>commol.__all__</code>),
 on the page that documents it. Import these names from the package root, as
-in <code>from commol import Simulation</code>.</p>
+in <code>from commol import Simulation</code>. A name you only read is not exported: a
+result is typed as the return of the member that gives it, and it is on the
+page of that object, as <code>SimulationResults</code> is on the Simulation page. A
+choice among names is a string, such as <code>loss_function="sse"</code>.</p>
 <table>
 <thead>
 <tr>
@@ -3206,11 +3209,11 @@ in <code>from commol import Simulation</code>.</p>
 <tbody>
 <tr>
 <td><a href="model-builder/">ModelBuilder</a></td>
-<td><code>ModelBuilder</code></td>
+<td><code>ModelBuilder</code>, <code>StratificationCondition</code>, <code>StratifiedRate</code></td>
 </tr>
 <tr>
 <td><a href="model/">Model</a></td>
-<td><code>Model</code>, <code>Process</code>, <code>ModelStructure</code>, <code>Aggregate</code>, <code>Complete</code>, <code>Groups</code>, <code>SeriesValue</code>, <code>ModelDescription</code></td>
+<td><code>Model</code>, <code>Aggregate</code>, <code>Complete</code>, <code>Groups</code>, <code>SeriesValue</code>; the results <code>Process</code>, <code>ModelDescription</code> and its blocks</td>
 </tr>
 <tr>
 <td><a href="axis-patterns/">AxisPattern</a></td>
@@ -3222,19 +3225,19 @@ in <code>from commol import Simulation</code>.</p>
 </tr>
 <tr>
 <td><a href="simulation/">Simulation</a></td>
-<td><code>Simulation</code>, <code>SimulationResults</code>, <code>ReplicateRuns</code>, <code>SimulationReplicates</code>, <code>ODESolver</code>, <code>StochasticEventsSettings</code>, <code>StochasticStepsSettings</code>, <code>InfeasibleStateError</code>, <code>windowed_totals</code>, <code>sample</code></td>
+<td><code>Simulation</code>, <code>ODESolver</code>, <code>StochasticEventsSettings</code>, <code>StochasticStepsSettings</code>, <code>InfeasibleStateError</code>; the results <code>SimulationResults</code>, <code>ReplicateRuns</code>, <code>SimulationReplicates</code> and their figures</td>
 </tr>
 <tr>
 <td><a href="plotting/">Plotting</a></td>
-<td><code>plot_compared</code>, <code>PlotConfig</code>; the methods <code>SimulationResults.plot</code>, <code>SimulationReplicates.plot</code>, <code>Predictive.plot</code>, <code>PRCCResult.plot</code>, <code>MorrisResult.plot</code>, <code>SobolResult.plot</code>, <code>ChaosResult.plot</code>, <code>ProfileResult.plot</code></td>
+<td><code>plot_compared</code>, <code>PlotConfig</code>; the methods <code>PRCCResult.plot</code>, <code>MorrisResult.plot</code>, <code>SobolResult.plot</code>, <code>ChaosResult.plot</code>, <code>ProfileResult.plot</code></td>
 </tr>
 <tr>
 <td><a href="calibrator/">Calibration</a></td>
-<td><code>Calibrator</code>, <code>CalibrationProblem</code>, <code>Quantile</code>, <code>ObservedDataPoint</code>, <code>CalibrationParameter</code>, <code>CalibrationConstraint</code>, <code>NelderMeadConfig</code>, <code>ParticleSwarmConfig</code>, <code>CalibrationResult</code>, <code>StartSummary</code>, <code>CalibrationHistory</code>, <code>CalibrationEvaluation</code></td>
+<td><code>Calibrator</code>, <code>CalibrationProblem</code>, <code>Quantile</code>, <code>ObservedDataPoint</code>, <code>CalibrationParameter</code>, <code>CalibrationConstraint</code>, <code>NelderMeadConfig</code>, <code>ParticleSwarmConfig</code>; the results <code>CalibrationResult</code>, <code>StartSummary</code>, <code>CalibrationHistory</code>, <code>CalibrationEvaluation</code>, <code>DeltaBand</code></td>
 </tr>
 <tr>
 <td><a href="calibrator/#observation-models">Observation models</a></td>
-<td><code>ObservationModel</code>, <code>NormalObservations</code>, <code>LogNormalObservations</code>, <code>StudentTObservations</code>, <code>PoissonObservations</code>, <code>NegativeBinomialObservations</code>, <code>BinomialObservations</code></td>
+<td><code>NormalObservations</code>, <code>LogNormalObservations</code>, <code>StudentTObservations</code>, <code>PoissonObservations</code>, <code>NegativeBinomialObservations</code>, <code>BinomialObservations</code></td>
 </tr>
 <tr>
 <td><a href="reports/">Reports</a></td>
@@ -3242,39 +3245,39 @@ in <code>from commol import Simulation</code>.</p>
 </tr>
 <tr>
 <td><a href="uncertainty/">Uncertainty</a></td>
-<td><code>InferenceMethod</code>, <code>UncertaintyMethod</code>, <code>ParameterSample</code>, <code>SampleMethod</code>, <code>ParameterSummary</code>, <code>Predictive</code>, <code>PredictiveBand</code>, <code>SeriesBand</code>, <code>ObservationDraws</code>, <code>Scenarios</code>, <code>ScenarioSummary</code>, <code>NoNoise</code>, <code>ResidualNoise</code>, <code>DistributionNoise</code></td>
+<td><code>ParameterSample</code>, <code>SampleMethod</code>, <code>Predictive</code>, <code>Scenarios</code>, <code>NoNoise</code>, <code>ResidualNoise</code>, <code>DistributionNoise</code>; the results <code>ParameterSummary</code>, <code>PredictiveBand</code>, <code>SeriesBand</code>, <code>ObservationDraws</code>, <code>ScenarioSummary</code> and the figures of a predictive</td>
 </tr>
 <tr>
 <td><a href="uncertainty/#resampling">Resampling</a></td>
-<td><code>BayesianBootstrap</code>, <code>ResidualBootstrap</code>, <code>WildBootstrap</code>, <code>BlockJackknife</code>, <code>ParametricBootstrap</code>, <code>BootstrapResult</code>, <code>JackknifeResult</code>, <code>ResamplingDiagnostics</code>, <code>BoundError</code></td>
+<td><code>BayesianBootstrap</code>, <code>ResidualBootstrap</code>, <code>WildBootstrap</code>, <code>BlockJackknife</code>, <code>ParametricBootstrap</code>; the results <code>BootstrapResult</code>, <code>JackknifeResult</code>, <code>ResamplingDiagnostics</code>, <code>BoundError</code></td>
 </tr>
 <tr>
 <td><a href="uncertainty/#profile-likelihood">Profile likelihood</a></td>
-<td><code>ProfileLikelihood</code>, <code>PredictionProfile</code>, <code>PredictionSpec</code>, <code>Threshold</code>, <code>ProfileResult</code>, <code>Profile</code>, <code>ProfileInterval</code></td>
+<td><code>ProfileLikelihood</code>, <code>PredictionProfile</code>, <code>PredictionSpec</code>, <code>Threshold</code>; the results <code>ProfileResult</code>, <code>Profile</code>, <code>ProfileInterval</code>, <code>ProfileStructure</code></td>
 </tr>
 <tr>
 <td><a href="uncertainty/#sequential-monte-carlo">Sequential Monte Carlo</a></td>
-<td><code>Priors</code>, <code>Uniform</code>, <code>LogUniform</code>, <code>Beta</code>, <code>Normal</code>, <code>LogNormal</code>, <code>Gamma</code>, <code>GibbsPosterior</code>, <code>BayesianPosterior</code>, <code>InformationMatchingEta</code>, <code>BootstrapCoverageEta</code>, <code>ABCSMC</code>, <code>ABCRejection</code>, <code>LossDistance</code>, <code>SeriesDistance</code>, <code>SMCResult</code>, <code>GibbsResult</code>, <code>SMCDiagnostics</code></td>
+<td><code>Priors</code>, <code>Uniform</code>, <code>LogUniform</code>, <code>Beta</code>, <code>Normal</code>, <code>LogNormal</code>, <code>Gamma</code>, <code>GibbsPosterior</code>, <code>BayesianPosterior</code>, <code>InformationMatchingEta</code>, <code>BootstrapCoverageEta</code>, <code>ABCSMC</code>, <code>ABCRejection</code>, <code>LossDistance</code>, <code>SeriesDistance</code>; the results <code>SMCResult</code>, <code>GibbsResult</code>, <code>SMCDiagnostics</code></td>
 </tr>
 <tr>
 <td><a href="uncertainty/#local-approximations">Local approximations</a></td>
-<td><code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>, <code>LikelihoodTarget</code>, <code>GibbsTarget</code>, <code>LocalResult</code>, <code>LaplaceResult</code>, <code>SandwichResult</code>, <code>DeltaBand</code>, <code>ImportanceResult</code>, <code>MixtureComponent</code></td>
+<td><code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>, <code>LikelihoodTarget</code>, <code>GibbsTarget</code>; the results <code>LocalResult</code>, <code>LaplaceResult</code>, <code>SandwichResult</code>, <code>ImportanceResult</code>, <code>MixtureComponent</code></td>
 </tr>
 <tr>
 <td><a href="uncertainty/#conformal-prediction">Conformal prediction</a></td>
-<td><code>SplitConformal</code>, <code>RollingConformal</code>, <code>JackknifePlus</code>, <code>EnbPI</code>, <code>AdaptiveConformal</code>, <code>ConformalResult</code>, <code>PredictionIntervals</code>, <code>SeriesIntervals</code></td>
+<td><code>SplitConformal</code>, <code>RollingConformal</code>, <code>JackknifePlus</code>, <code>EnbPI</code>, <code>AdaptiveConformal</code>; the results <code>ConformalResult</code>, <code>PredictionIntervals</code>, <code>SeriesIntervals</code></td>
 </tr>
 <tr>
 <td><a href="uncertainty/#scores-and-intervals">Scores and intervals</a></td>
-<td><code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code></td>
+<td><code>weighted_quantiles</code>, <code>member_statistics</code></td>
 </tr>
 <tr>
 <td><a href="identifiability/">Identifiability</a></td>
-<td><code>IdentifiabilityMethod</code>, <code>StructuralRank</code>, <code>Collinearity</code>, <code>SampleIdentifiability</code>, <code>StartsIdentifiability</code>, <code>IdentifiabilityReport</code></td>
+<td><code>StructuralRank</code>, <code>Collinearity</code>, <code>SampleIdentifiability</code>, <code>StartsIdentifiability</code>; the result <code>IdentifiabilityReport</code> and its parts</td>
 </tr>
 <tr>
 <td><a href="sensitivity/">Sensitivity</a></td>
-<td><code>SensitivityAnalysis</code>, <code>InputSpace</code>, <code>SensitivityMethod</code>, <code>Propagation</code>, <code>PropagationResult</code>, <code>QuantitySummary</code>, <code>PRCC</code>, <code>PRCCResult</code>, <code>Morris</code>, <code>MorrisResult</code>, <code>Sobol</code>, <code>SobolResult</code>, <code>PolynomialChaos</code>, <code>ChaosResult</code>, <code>Level</code>, <code>Increments</code>, <code>ValueAt</code>, <code>Gain</code>, <code>Peak</code>, <code>PeakPosition</code>, <code>Trajectory</code>, <code>Ratio</code>, <code>quantity_schedule</code></td>
+<td><code>SensitivityAnalysis</code>, <code>InputSpace</code>, <code>Propagation</code>, <code>PRCC</code>, <code>Morris</code>, <code>Sobol</code>, <code>PolynomialChaos</code>, <code>Level</code>, <code>Increments</code>, <code>ValueAt</code>, <code>Gain</code>, <code>Peak</code>, <code>PeakPosition</code>, <code>Trajectory</code>, <code>Ratio</code>, <code>quantity_schedule</code>; the results <code>PropagationResult</code>, <code>QuantitySummary</code>, <code>PRCCResult</code>, <code>MorrisResult</code>, <code>SobolResult</code>, <code>ChaosResult</code></td>
 </tr>
 <tr>
 <td><a href="parallelism/">Parallelism</a></td>
@@ -3282,7 +3285,7 @@ in <code>from commol import Simulation</code>.</p>
 </tr>
 <tr>
 <td><a href="package/">Package</a></td>
-<td><code>__version__</code>, <code>build_info</code>, <code>BuildInfo</code></td>
+<td><code>__version__</code>, <code>build_info</code>; the result <code>BuildInfo</code></td>
 </tr>
 </tbody>
 </table>
@@ -3290,13 +3293,9 @@ in <code>from commol import Simulation</code>.</p>
 <ul>
 <li>The scores are the module <code>commol.scores</code> (<code>from commol import scores</code>),
   on the <a href="uncertainty/#scores-and-intervals">Uncertainty</a> page.</li>
-<li><code>LossFunction</code>, the values of <code>CalibrationProblem.loss_function</code>, is in
-  <code>commol.context.constants</code>.</li>
 <li><code>UnitConsistencyError</code> is in <code>commol.utils.equations</code>.</li>
-<li>Some types are only read from what a method returns, and you do not import
-  them: <code>InitialCompartment</code> (an entry of <code>Aggregate.initial_state()</code>), the
-  blocks of a <code>ModelDescription</code>, the parts of an <code>IdentifiabilityReport</code>, and
-  the types of a model in <a href="../advanced/model-structure/">Model Structure</a>.</li>
+<li>The types of a model, such as <code>ModelStructure</code>, the type of
+  <code>Model.structure</code>, are in <a href="../advanced/model-structure/">Model Structure</a>.</li>
 </ul>
 
 

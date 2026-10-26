@@ -290,14 +290,10 @@ print(type(result).__name__, len(result.sample))  # BootstrapResult 20
 Two results of commol are equal (`==`) when they are of one class and their fields hold the same values, whatever the objects that hold them: a NaN equals a NaN, `0.0` equals `-0.0`, and the order of the keys of a dict does not count. This holds for the result of a run and of replicates (`SimulationResults` and `SimulationReplicates`, which also compare their positions, seed and model), of a calibration, of every method, of a sample, a band, a scenario summary and a score; a plain `dict` or `list` is not a result. So two runs with one seed give equal results, also when they hold a NaN, such as the PRCC of an input that the other inputs explain entirely. A frozen result, every one but the results of runs and replicates, `CalibrationResult` and `CalibrationHistory`, has a hash that agrees: equal results have equal hashes, so they can be keys of a `dict` or members of a `set`.
 
 ```python
-from commol import ParameterSummary
-
 again = calibrator.uncertainty(BayesianBootstrap(replicates=20, block_length=1))
 print(again == result, hash(again) == hash(result))  # True True
 
-first = ParameterSummary(
-    mean=0.5, median=0.5, std=float("nan"), lower=0.0, upper=1.0, min=0.0, max=1.0
-)
+first = result.sample.summary(0.95)["k1"].model_copy(update={"std": float("nan")})
 second = first.model_copy(update={"std": float("nan")})
 print(first == second, len({first, second}))  # True 1
 ```

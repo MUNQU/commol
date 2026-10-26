@@ -2782,6 +2782,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-public-surface-holds-only-what-a-user-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The public surface holds only what a user writes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-value-of-a-model-has-its-rule-in-the-engine" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3279,6 +3290,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-public-surface-holds-only-what-a-user-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The public surface holds only what a user writes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-value-of-a-model-has-its-rule-in-the-engine" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3334,12 +3356,75 @@
 <h1 id="python-models">Python Models<a class="headerlink" href="#python-models" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
 <p>How the Pydantic models of the Python package read their fields, check their
-values and compare.</p>
+values and compare, and which names of the package are public.</p>
 <h2 id="public-models-forbid-unknown-fields">Public models forbid unknown fields<a class="headerlink" href="#public-models-forbid-unknown-fields" title="Permanent link">&para;</a></h2>
 <p>Every public Pydantic class sets <code>model_config = ConfigDict(extra="forbid")</code>.
 An unknown field, such as a misspelt or an old name (<code>window_steps</code>), raises a
 <code>ValidationError</code> that names it, instead of being dropped with no error.</p>
 <p><strong>Guard:</strong> <code>tests/building/test_unknown_fields.py</code>.</p>
+<h2 id="the-public-surface-holds-only-what-a-user-writes">The public surface holds only what a user writes<a class="headerlink" href="#the-public-surface-holds-only-what-a-user-writes" title="Permanent link">&para;</a></h2>
+<p><code>commol.__all__</code> holds the names a user writes: the builder and its
+conditions (<code>StratificationCondition</code>, <code>StratifiedRate</code>), the structures, the
+entry points, the settings and the methods. The data of the surface is
+<code>py-commol/tests/suite/public_surface.py</code>: <code>EXPORTS</code>, the names of each public
+module, and <code>RESULTS</code>, the results that public objects return.</p>
+<table>
+<thead>
+<tr>
+<th>Kind of name</th>
+<th>Rule</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A result</td>
+<td>Not exported. The member that gives it has it as its return type, and its <code>path</code> entry is on the page of <code>docs/api/</code> of that object.</td>
+</tr>
+<tr>
+<td>A choice among names</td>
+<td>A <code>Literal</code> in the signature, such as <code>loss_function: Literal["sse", "rmse", "mae"]</code>; no enum and no public alias of strings.</td>
+</tr>
+<tr>
+<td>A union of classes, a base, a part that the builder makes</td>
+<td>Private: a union is a <code>type _Name = …</code> alias, and a base is not exported.</td>
+</tr>
+<tr>
+<td>A pydantic validator or serializer</td>
+<td>A name that starts with <code>_</code>.</td>
+</tr>
+<tr>
+<td>An idea</td>
+<td>One public path: <code>SimulationResults.sample</code> and <code>SimulationResults.windowed_totals</code> read a run by id; the functions on one series are private.</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Export each class a signature names</td>
+<td>About half the names are results, enums and unions a user never writes.</td>
+</tr>
+<tr>
+<td>An enum for each choice</td>
+<td>A name to import and learn for each choice; a string is checked by pydantic with the same list of values.</td>
+</tr>
+<tr>
+<td>A dict for a condition</td>
+<td>No type check of its keys, and a second shape of one idea next to the class.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>tests/suite/test_architecture.py::test_the_public_surface_is_the_table</code>,
+<code>tests/suite/test_architecture.py::test_a_choice_is_a_literal</code>,
+<code>tests/suite/test_architecture.py::test_no_public_member_is_internal</code>,
+<code>tests/docs/test_reference.py::test_each_result_is_on_the_page_of_its_object</code>
+and <code>tests/building/test_conditions.py::test_a_condition_is_one_class</code>.</p>
 <h2 id="a-value-of-a-model-has-its-rule-in-the-engine">A value of a model has its rule in the engine<a class="headerlink" href="#a-value-of-a-model-has-its-rule-in-the-engine" title="Permanent link">&para;</a></h2>
 <p>An initial amount, the fractions of a stratification, an impulse and the
 points of a series have their rule once, in <code>crates/commol-model/src/rules.rs</code>

@@ -3700,7 +3700,7 @@ agents, to features, fixes, refactors, dependency updates and CI changes.</p>
 <tbody>
 <tr>
 <td>Adds or changes a public Python name, argument, default or error</td>
-<td>Its docstring; for a new name in <code>commol.__all__</code>, a <code>path</code> entry in <code>docs/api/</code> and a place in the table of <code>docs/api/index.md</code>; the guide page that uses it</td>
+<td>Its docstring; for a new name in <code>commol.__all__</code>, the name in <code>py-commol/tests/suite/public_surface.py</code>, a <code>path</code> entry in <code>docs/api/</code> and a place in the table of <code>docs/api/index.md</code>; for a new result, the result in <code>RESULTS</code> of that file and its <code>path</code> entry on the page of the object that returns it; the guide page that uses it</td>
 </tr>
 <tr>
 <td>Changes model behavior (expansion, rates, initial conditions, simulation)</td>
@@ -3816,8 +3816,13 @@ every match.</p>
 <td>CI (Python Coverage, and Test of Build)</td>
 </tr>
 <tr>
-<td>Every name in <code>commol.__all__</code> has an API entry (<code>…</code> under <code>docs/api/</code>) and is in the table of <code>docs/api/index.md</code></td>
+<td>Every name in <code>commol.__all__</code> has an API entry (<code>…</code> under <code>docs/api/</code>) and is in the table of <code>docs/api/index.md</code>; each result has its entry on the page of the object that returns it</td>
 <td><code>pytest -m docs</code> (<code>tests/docs/test_reference.py</code>)</td>
+<td>CI (Python Coverage, and Test of Build)</td>
+</tr>
+<tr>
+<td>The exports are the names of <code>tests/suite/public_surface.py</code>; a public signature names no enum, no public alias and no private type that a user passes in; every validator of a public class starts with <code>_</code></td>
+<td><code>pytest</code> (<code>tests/suite/test_architecture.py</code>)</td>
 <td>CI (Python Coverage, and Test of Build)</td>
 </tr>
 <tr>

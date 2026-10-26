@@ -4,27 +4,6 @@
 
 The identifiability methods, the report they return, and its parts. Guide: [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md).
 
-## IdentifiabilityMethod
-
-Bases: `InferenceMethod[ResultT]`, `Generic[ResultT]`
-
-The configuration of an identifiability method, whose result is `ResultT`.
-
-`Calibrator.identifiability(method)` runs it, and returns its result type. The methods of commol return an `IdentifiabilityReport`.
-
-Source code in `commol/context/inference/method.py`
-
-```python
-class IdentifiabilityMethod(InferenceMethod[ResultT], Generic[ResultT]):
-    """
-    The configuration of an identifiability method, whose result is
-    `ResultT`.
-
-    ``Calibrator.identifiability(method)`` runs it, and returns its result
-    type. The methods of commol return an `IdentifiabilityReport`.
-    """
-```
-
 ## StructuralRank
 
 Bases: `IdentifiabilityMethod[IdentifiabilityReport]`, `RangeChecked`
@@ -130,7 +109,7 @@ Attributes:
 | `sample`                | `ParameterSample` | The sample, such as the draws of an uncertainty method.                                                                                                                                            |
 | `reference`             | `{bounds, prior}` | The distribution the contraction compares with: "bounds", the uniform distribution on the bounds, or "prior", the prior of each parameter in priors, such as the priors the sample was drawn with. |
 | `correlation_threshold` | `float`           | The absolute correlation above which a pair is listed and its parameters are poorly determined, strictly between 0 and 1. No default: it is a modelling judgment.                                  |
-| `priors`                | \`Priors          | dict[str, Distribution]                                                                                                                                                                            |
+| `priors`                | \`Priors          | dict[str, distribution]                                                                                                                                                                            |
 
 Source code in `commol/context/inference/identifiability.py`
 
@@ -153,7 +132,7 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeC
         The absolute correlation above which a pair is listed and its
         parameters are poorly determined, strictly between 0 and 1. No
         default: it is a modelling judgment.
-    priors : Priors | dict[str, Distribution] | None
+    priors : Priors | dict[str, distribution] | None
         The prior of each parameter, with ``reference="prior"`` only.
     """
 
@@ -166,14 +145,14 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeC
 
     @model_validator(mode="before")
     @classmethod
-    def read_priors(cls, data: JsonValue) -> JsonValue:
+    def _read_priors(cls, data: JsonValue) -> JsonValue:
         """Read a mapping of parameter to distribution as `Priors`."""
         if isinstance(data, Mapping) and data.get("priors") is not None:
             return {**data, "priors": coerce_priors(data["priors"])}
         return data
 
     @model_validator(mode="after")
-    def check_priors(self) -> Self:
+    def _check_priors(self) -> Self:
         """The priors go with ``reference="prior"``, and only with it."""
         if self.reference == "prior" and self.priors is None:
             raise ValueError(
@@ -185,54 +164,6 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeC
                 "reference='bounds' leave them out."
             )
         return self
-```
-
-### Methods:
-
-#### read_priors
-
-```python
-read_priors(data: JsonValue) -> JsonValue
-```
-
-Read a mapping of parameter to distribution as `Priors`.
-
-Source code in `commol/context/inference/identifiability.py`
-
-```python
-@model_validator(mode="before")
-@classmethod
-def read_priors(cls, data: JsonValue) -> JsonValue:
-    """Read a mapping of parameter to distribution as `Priors`."""
-    if isinstance(data, Mapping) and data.get("priors") is not None:
-        return {**data, "priors": coerce_priors(data["priors"])}
-    return data
-```
-
-#### check_priors
-
-```python
-check_priors() -> Self
-```
-
-The priors go with `reference="prior"`, and only with it.
-
-Source code in `commol/context/inference/identifiability.py`
-
-```python
-@model_validator(mode="after")
-def check_priors(self) -> Self:
-    """The priors go with ``reference="prior"``, and only with it."""
-    if self.reference == "prior" and self.priors is None:
-        raise ValueError(
-            "reference='prior' needs priors: the prior of each parameter."
-        )
-    if self.reference == "bounds" and self.priors is not None:
-        raise ValueError(
-            "priors are read only with reference='prior'; with "
-            "reference='bounds' leave them out."
-        )
-    return self
 ```
 
 ## StartsIdentifiability
@@ -324,7 +255,7 @@ class IdentifiabilityReport(_FrozenResult):
     profile: list[ProfileSection] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def check_parameters(self) -> Self:
+    def _check_parameters(self) -> Self:
         """Check that the verdicts hold the parameters, in order."""
         if list(self.verdicts) != self.parameters:
             raise ValueError(
@@ -409,28 +340,6 @@ class IdentifiabilityReport(_FrozenResult):
 ```
 
 ### Methods:
-
-#### check_parameters
-
-```python
-check_parameters() -> Self
-```
-
-Check that the verdicts hold the parameters, in order.
-
-Source code in `commol/context/inference/identifiability.py`
-
-```python
-@model_validator(mode="after")
-def check_parameters(self) -> Self:
-    """Check that the verdicts hold the parameters, in order."""
-    if list(self.verdicts) != self.parameters:
-        raise ValueError(
-            f"The verdicts must hold the parameters {self.parameters} in "
-            f"order, got {list(self.verdicts)}."
-        )
-    return self
-```
 
 #### report
 

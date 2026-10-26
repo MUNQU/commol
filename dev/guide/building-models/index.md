@@ -185,7 +185,7 @@ print(inflow_per_step("linear"))         # [0.0, 0.0, 1.0, 2.0, 3.0, 4.0, 0.0]
 `Model.update_parameters` changes a series of a built model, such as a schedule of a scenario. A list of points keeps the mode of the series; a `SeriesValue` sets the points and the mode. The model takes every value or none: a value it cannot take raises `ValueError` at the call, with the id of the parameter, and the model stays as it was (`tests/building/test_parameters.py::test_update_parameters_rejects_a_value_it_cannot_take`):
 
 ```python
-from commol import SeriesValue
+from commol import SeriesValue, StratificationCondition
 
 schedule = (
     ModelBuilder(name="Schedule")
@@ -218,18 +218,18 @@ builder = builder.add_stratification(
 builder = builder.add_stratification(
     id="subtype",
     categories=["s1", "s2"],
-    conditions=[{"stratification": "group", "category": "g2"}],
+    conditions=[StratificationCondition(stratification="group", category="g2")],
 )
 ```
 
-| Argument      | Type                 | Default  | Meaning                                                                         |
-| ------------- | -------------------- | -------- | ------------------------------------------------------------------------------- |
-| `id`          | `str`                | required | The identifier, used in initial conditions and conditions.                      |
-| `categories`  | `list[str]`          | required | The categories. They must be unique and not empty.                              |
-| `description` | `str \| None`        | `None`   | A free-text description.                                                        |
-| `conditions`  | `list[dict] \| None` | `None`   | Splits only the compartments whose earlier categories match **all** conditions. |
+| Argument      | Type                                    | Default  | Meaning                                                                         |
+| ------------- | --------------------------------------- | -------- | ------------------------------------------------------------------------------- |
+| `id`          | `str`                                   | required | The identifier, used in initial conditions and conditions.                      |
+| `categories`  | `list[str]`                             | required | The categories. They must be unique and not empty.                              |
+| `description` | `str \| None`                           | `None`   | A free-text description.                                                        |
+| `conditions`  | `list[StratificationCondition] \| None` | `None`   | Splits only the compartments whose earlier categories match **all** conditions. |
 
-Each condition is `{"stratification": <id>, "category": <category>}`, and may only name a stratification declared before this one; otherwise the call raises `ValueError`.
+Each condition is `StratificationCondition(stratification=<id>, category=<category>)`, and may only name a stratification declared before this one; otherwise the call raises `ValueError`.
 
 | Rule                       | Effect                                                                                     |
 | -------------------------- | ------------------------------------------------------------------------------------------ |

@@ -212,7 +212,7 @@ class Stratification(BaseModel):
         return isinstance(other, Stratification) and self.id == other.id
 
     @model_validator(mode="after")
-    def validate_categories_length(self) -> Self:
+    def _validate_categories_length(self) -> Self:
         """
         Enforces that categories are not empty.
         """
@@ -223,7 +223,7 @@ class Stratification(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_categories_uniqueness(self) -> Self:
+    def _validate_categories_uniqueness(self) -> Self:
         """
         Enforces that categories are not repeated.
         """
@@ -243,7 +243,7 @@ class Stratification(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_conditions_have_categories(self) -> Self:
+    def _validate_conditions_have_categories(self) -> Self:
         """
         Enforces that stratification expansion conditions filter by category.
         """
@@ -264,155 +264,7 @@ class Stratification(BaseModel):
         return self
 ```
 
-### Methods:
-
-#### validate_categories_length
-
-```python
-validate_categories_length() -> Self
-```
-
-Enforces that categories are not empty.
-
-Source code in `commol/context/stratification.py`
-
-```python
-@model_validator(mode="after")
-def validate_categories_length(self) -> Self:
-    """
-    Enforces that categories are not empty.
-    """
-    if not self.categories:
-        raise ValueError(
-            (f"Stratification '{self.id}' must have at least one category.")
-        )
-    return self
-```
-
-#### validate_categories_uniqueness
-
-```python
-validate_categories_uniqueness() -> Self
-```
-
-Enforces that categories are not repeated.
-
-Source code in `commol/context/stratification.py`
-
-```python
-@model_validator(mode="after")
-def validate_categories_uniqueness(self) -> Self:
-    """
-    Enforces that categories are not repeated.
-    """
-    categories_set = set(self.categories)
-
-    if len(categories_set) != len(self.categories):
-        duplicates = [
-            item for item in categories_set if self.categories.count(item) > 1
-        ]
-        raise ValueError(
-            (
-                f"Categories for stratification '{self.id}' must not be repeated. "
-                f"Found duplicates: {list(set(duplicates))}."
-            )
-        )
-
-    return self
-```
-
-#### validate_conditions_have_categories
-
-```python
-validate_conditions_have_categories() -> Self
-```
-
-Enforces that stratification expansion conditions filter by category.
-
-Source code in `commol/context/stratification.py`
-
-```python
-@model_validator(mode="after")
-def validate_conditions_have_categories(self) -> Self:
-    """
-    Enforces that stratification expansion conditions filter by category.
-    """
-    if self.conditions is None:
-        return self
-
-    for condition in self.conditions:
-        if condition.category is None:
-            raise ValueError(
-                (
-                    f"Condition for stratification '{self.id}' referencing "
-                    f"'{condition.stratification}' must include a category. "
-                    "Category-less conditions are only valid for transition "
-                    "target overrides."
-                )
-            )
-
-    return self
-```
-
-## StratificationCondition
-
-Bases: `BaseModel`
-
-Specifies a category within a stratification for rate matching.
-
-When `to` is set, the matched category in the source compartment is replaced with the `to` category in the target compartment name. This enables cross-category transitions within the same bin (e.g., from `g1` to `g2`).
-
-Attributes:
-
-| Name             | Type  | Description                                                |
-| ---------------- | ----- | ---------------------------------------------------------- |
-| `stratification` | `str` | The ID of the stratification (e.g., "group", "type")       |
-| `category`       | `str` | The category within that stratification (e.g., "g1", "t1") |
-| `to`             | \`str | None\`                                                     |
-
-Source code in `commol/context/stratification_condition.py`
-
-```python
-class StratificationCondition(BaseModel):
-    """
-    Specifies a category within a stratification for rate matching.
-
-    When ``to`` is set, the matched category in the source compartment is
-    replaced with the ``to`` category in the target compartment name. This
-    enables cross-category transitions within the same bin (e.g., from ``g1``
-    to ``g2``).
-
-    Attributes
-    ----------
-    stratification : str
-        The ID of the stratification (e.g., "group", "type")
-    category : str
-        The category within that stratification (e.g., "g1", "t1")
-    to : str | None
-        Target category override. When set, the target compartment will use
-        this category instead of the source compartment's category for this
-        stratification.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    stratification: str = Field(default=..., description="ID of the stratification")
-    category: str | None = Field(
-        default=None,
-        description=(
-            "Category within the stratification. When None, the condition acts as a "
-            "target-only override: it does not filter source compartments but still "
-            "contributes a 'to' category to the computed target compartment name."
-        ),
-    )
-    to: str | None = Field(
-        default=None,
-        description=(
-            "Target category override. When set, the target compartment uses "
-            "this category instead of the source's for this stratification."
-        ),
-    )
-```
+A condition of a stratification or of a stratified rate, `StratificationCondition`, is documented in [ModelBuilder API](https://munqu.github.io/commol/latest/api/model-builder/index.md).
 
 ## Parameters
 
@@ -478,7 +330,7 @@ class Parameter(BaseModel):
 
     @field_validator("value")
     @classmethod
-    def validate_value(
+    def _validate_value(
         cls, value: float | str | SeriesValue | None
     ) -> float | str | SeriesValue | None:
         """Validate the parameter value."""
@@ -489,7 +341,7 @@ class Parameter(BaseModel):
         return value.strip()
 
     @model_validator(mode="after")
-    def validate_formula(self) -> Self:
+    def _validate_formula(self) -> Self:
         """Check a formula value as a rate is checked, with the parser of the
         engine."""
         if isinstance(self.value, str):
@@ -510,13 +362,15 @@ class Parameter(BaseModel):
         """
         return self.value is not None
 
-    def with_value(self, value: ParameterUpdate) -> "Parameter":
+    def with_value(
+        self, value: float | str | list[tuple[float, float]] | SeriesValue | None
+    ) -> "Parameter":
         """
         This parameter with another value.
 
         Parameters
         ----------
-        value : ParameterUpdate
+        value : float | str | list[tuple[float, float]] | SeriesValue | None
             The new value, as `Parameter.value` takes it. A list of
             (position, value) points replaces the points of a series and keeps
             its mode; a `SeriesValue` sets both.
@@ -552,53 +406,6 @@ class Parameter(BaseModel):
 
 ### Methods:
 
-#### validate_value
-
-```python
-validate_value(value: float | str | SeriesValue | None) -> float | str | SeriesValue | None
-```
-
-Validate the parameter value.
-
-Source code in `commol/context/parameter.py`
-
-```python
-@field_validator("value")
-@classmethod
-def validate_value(
-    cls, value: float | str | SeriesValue | None
-) -> float | str | SeriesValue | None:
-    """Validate the parameter value."""
-    if value is None or isinstance(value, SeriesValue):
-        return value
-    if isinstance(value, (int, float)):
-        return float(value)
-    return value.strip()
-```
-
-#### validate_formula
-
-```python
-validate_formula() -> Self
-```
-
-Check a formula value as a rate is checked, with the parser of the engine.
-
-Source code in `commol/context/parameter.py`
-
-```python
-@model_validator(mode="after")
-def validate_formula(self) -> Self:
-    """Check a formula value as a rate is checked, with the parser of the
-    engine."""
-    if isinstance(self.value, str):
-        try:
-            commol_rs.core.MathExpression(self.value).check()
-        except ValueError as error:
-            raise ValueError(f"Parameter '{self.id}': {error}")
-    return self
-```
-
 #### is_calibrated
 
 ```python
@@ -631,16 +438,16 @@ def is_calibrated(self) -> bool:
 #### with_value
 
 ```python
-with_value(value: ParameterUpdate) -> Parameter
+with_value(value: float | str | list[tuple[float, float]] | SeriesValue | None) -> Parameter
 ```
 
 This parameter with another value.
 
 Parameters:
 
-| Name    | Type              | Description                                                                                                                                                 | Default    |
-| ------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `value` | `ParameterUpdate` | The new value, as Parameter.value takes it. A list of (position, value) points replaces the points of a series and keeps its mode; a SeriesValue sets both. | *required* |
+| Name    | Type    | Description | Default                     |
+| ------- | ------- | ----------- | --------------------------- |
+| `value` | \`float | str         | list\[tuple[float, float]\] |
 
 Returns:
 
@@ -657,13 +464,15 @@ Raises:
 Source code in `commol/context/parameter.py`
 
 ```python
-def with_value(self, value: ParameterUpdate) -> "Parameter":
+def with_value(
+    self, value: float | str | list[tuple[float, float]] | SeriesValue | None
+) -> "Parameter":
     """
     This parameter with another value.
 
     Parameters
     ----------
-    value : ParameterUpdate
+    value : float | str | list[tuple[float, float]] | SeriesValue | None
         The new value, as `Parameter.value` takes it. A list of
         (position, value) points replaces the points of a series and keeps
         its mode; a `SeriesValue` sets both.
@@ -827,7 +636,7 @@ class Transition(BaseModel):
         return self.impulse_at is not None or self.impulse_every is not None
 
     @model_validator(mode="after")
-    def validate_impulse(self) -> Self:
+    def _validate_impulse(self) -> Self:
         """
         Check the impulse with the rule of the engine (`check_impulse` of
         `crates/commol-model/src/values.rs`): one of `impulse_at` and
@@ -839,7 +648,7 @@ class Transition(BaseModel):
 
     @field_validator("rate")
     @classmethod
-    def validate_rate(cls, value: str | None) -> str | None:
+    def _validate_rate(cls, value: str | None) -> str | None:
         """Check the rate, when there is one, with the parser of the engine."""
         if value is None:
             return value
@@ -856,204 +665,7 @@ is_impulse: bool
 
 Whether the transition is an impulse rather than a continuous flow.
 
-### Methods:
-
-#### validate_impulse
-
-```python
-validate_impulse() -> Self
-```
-
-Check the impulse with the rule of the engine (`check_impulse` of `crates/commol-model/src/values.rs`): one of `impulse_at` and `impulse_every`, at least one position on the axis, a positive period and an offset that is not negative.
-
-Source code in `commol/context/transition.py`
-
-```python
-@model_validator(mode="after")
-def validate_impulse(self) -> Self:
-    """
-    Check the impulse with the rule of the engine (`check_impulse` of
-    `crates/commol-model/src/values.rs`): one of `impulse_at` and
-    `impulse_every`, at least one position on the axis, a positive period
-    and an offset that is not negative.
-    """
-    commol_rs.model.check_impulse(self.id, self.impulse_at, self.impulse_every)
-    return self
-```
-
-#### validate_rate
-
-```python
-validate_rate(value: str | None) -> str | None
-```
-
-Check the rate, when there is one, with the parser of the engine.
-
-Source code in `commol/context/transition.py`
-
-```python
-@field_validator("rate")
-@classmethod
-def validate_rate(cls, value: str | None) -> str | None:
-    """Check the rate, when there is one, with the parser of the engine."""
-    if value is None:
-        return value
-    return _checked_rate(value)
-```
-
-## StratifiedRate
-
-Bases: `BaseModel`
-
-Defines a rate for specific stratification categories.
-
-Attributes:
-
-| Name         | Type                            | Description                                                |
-| ------------ | ------------------------------- | ---------------------------------------------------------- |
-| `conditions` | `list[StratificationCondition]` | List of stratification-category pairs that must match      |
-| `rate`       | `str`                           | Rate expression for compartments matching these conditions |
-| `absolute`   | \`bool                          | None\`                                                     |
-
-Source code in `commol/context/transition.py`
-
-```python
-class StratifiedRate(BaseModel):
-    """
-    Defines a rate for specific stratification categories.
-
-    Attributes
-    ----------
-    conditions : list[StratificationCondition]
-        List of stratification-category pairs that must match
-    rate : str
-        Rate expression for compartments matching these conditions
-    absolute : bool | None
-        True: the flow is the rate, not multiplied by the source amount.
-        False: the flow is the rate times the source amount. None: the rate
-        is absolute when it reads a compartment, a bin total or a
-        ``total_…`` variable.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    conditions: list[StratificationCondition] = Field(
-        default=..., description="Stratification conditions that must match"
-    )
-    rate: str = Field(
-        default=..., description="Rate expression for matching compartments"
-    )
-    absolute: bool | None = Field(
-        default=None,
-        description=(
-            "When True, the flow is treated as absolute (not multiplied by the "
-            "source amount). When None, inferred from whether the rate references "
-            "any compartment variable."
-        ),
-    )
-
-    @field_validator("conditions")
-    @classmethod
-    def validate_not_empty(
-        cls, v: list[StratificationCondition]
-    ) -> list[StratificationCondition]:
-        """Ensure at least one stratification condition is specified."""
-        if not v:
-            raise ValueError(
-                "conditions must contain at least one stratification condition"
-            )
-        return v
-
-    @model_validator(mode="after")
-    def validate_unique_stratifications(self) -> Self:
-        """Ensure no duplicate stratification IDs."""
-        strat_ids = [sc.stratification for sc in self.conditions]
-        if len(strat_ids) != len(set(strat_ids)):
-            duplicates = [s for s in strat_ids if strat_ids.count(s) > 1]
-            raise ValueError(
-                (
-                    f"Duplicate stratifications found: {list(set(duplicates))}. "
-                    f"Each stratification can only be specified once per rate."
-                )
-            )
-        return self
-
-    @field_validator("rate")
-    @classmethod
-    def validate_rate(cls, value: str) -> str:
-        """Check the rate with the parser of the engine."""
-        return _checked_rate(value)
-```
-
-### Methods:
-
-#### validate_not_empty
-
-```python
-validate_not_empty(v: list[StratificationCondition]) -> list[StratificationCondition]
-```
-
-Ensure at least one stratification condition is specified.
-
-Source code in `commol/context/transition.py`
-
-```python
-@field_validator("conditions")
-@classmethod
-def validate_not_empty(
-    cls, v: list[StratificationCondition]
-) -> list[StratificationCondition]:
-    """Ensure at least one stratification condition is specified."""
-    if not v:
-        raise ValueError(
-            "conditions must contain at least one stratification condition"
-        )
-    return v
-```
-
-#### validate_unique_stratifications
-
-```python
-validate_unique_stratifications() -> Self
-```
-
-Ensure no duplicate stratification IDs.
-
-Source code in `commol/context/transition.py`
-
-```python
-@model_validator(mode="after")
-def validate_unique_stratifications(self) -> Self:
-    """Ensure no duplicate stratification IDs."""
-    strat_ids = [sc.stratification for sc in self.conditions]
-    if len(strat_ids) != len(set(strat_ids)):
-        duplicates = [s for s in strat_ids if strat_ids.count(s) > 1]
-        raise ValueError(
-            (
-                f"Duplicate stratifications found: {list(set(duplicates))}. "
-                f"Each stratification can only be specified once per rate."
-            )
-        )
-    return self
-```
-
-#### validate_rate
-
-```python
-validate_rate(value: str) -> str
-```
-
-Check the rate with the parser of the engine.
-
-Source code in `commol/context/transition.py`
-
-```python
-@field_validator("rate")
-@classmethod
-def validate_rate(cls, value: str) -> str:
-    """Check the rate with the parser of the engine."""
-    return _checked_rate(value)
-```
+The rate of a transition in the compartments that match its conditions, `StratifiedRate`, is documented in [ModelBuilder API](https://munqu.github.io/commol/latest/api/model-builder/index.md).
 
 ## Engine
 
@@ -1102,7 +714,7 @@ class ModelEngine(BaseModel):
 
     @field_validator("settings", mode="before")
     @classmethod
-    def settings_of_the_engine(
+    def _settings_of_the_engine(
         cls,
         value: EngineSettings | Mapping[str, JsonValue] | None,
         info: ValidationInfo,
@@ -1114,61 +726,13 @@ class ModelEngine(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def check_settings(self) -> Self:
+    def _check_settings(self) -> Self:
         """Ask the engine's list whether it has the engine and the settings."""
         settings_json = None if self.settings is None else engine_json(self.settings)
         commol_rs.engine.EngineType(engine_json(self.type)).check_settings(
             settings_json
         )
         return self
-```
-
-### Methods:
-
-#### settings_of_the_engine
-
-```python
-settings_of_the_engine(value: EngineSettings | Mapping[str, JsonValue] | None, info: ValidationInfo) -> EngineSettings | Mapping[str, JsonValue] | None
-```
-
-Read settings given as a mapping with the class of their engine.
-
-Source code in `commol/context/engine.py`
-
-```python
-@field_validator("settings", mode="before")
-@classmethod
-def settings_of_the_engine(
-    cls,
-    value: EngineSettings | Mapping[str, JsonValue] | None,
-    info: ValidationInfo,
-) -> EngineSettings | Mapping[str, JsonValue] | None:
-    """Read settings given as a mapping with the class of their engine."""
-    settings_class = _SETTINGS.get(info.data.get("type", ""))
-    if isinstance(value, Mapping) and settings_class is not None:
-        return settings_class.model_validate(value)
-    return value
-```
-
-#### check_settings
-
-```python
-check_settings() -> Self
-```
-
-Ask the engine's list whether it has the engine and the settings.
-
-Source code in `commol/context/engine.py`
-
-```python
-@model_validator(mode="after")
-def check_settings(self) -> Self:
-    """Ask the engine's list whether it has the engine and the settings."""
-    settings_json = None if self.settings is None else engine_json(self.settings)
-    commol_rs.engine.EngineType(engine_json(self.type)).check_settings(
-        settings_json
-    )
-    return self
 ```
 
 ## Initial conditions
@@ -1241,7 +805,7 @@ class InitialConditions(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def reject_fractions_of_a_total(cls, data: JsonValue) -> JsonValue:
+    def _reject_fractions_of_a_total(cls, data: JsonValue) -> JsonValue:
         """Name the field of amounts that replaces a field of fractions.
 
         A total over bins of different units has no meaning, so the initial
@@ -1263,7 +827,7 @@ class InitialConditions(BaseModel):
 
     @field_validator("bin_amounts")
     @classmethod
-    def validate_bin_amounts(
+    def _validate_bin_amounts(
         cls, value: dict[str, float | None]
     ) -> dict[str, float | None]:
         """Check every bin amount with the rule of the engine."""
@@ -1272,7 +836,7 @@ class InitialConditions(BaseModel):
 
     @field_validator("stratification_fractions")
     @classmethod
-    def validate_stratification_fractions(
+    def _validate_stratification_fractions(
         cls, value: dict[str, dict[str, float]]
     ) -> dict[str, dict[str, float]]:
         """Check the fractions of every stratification with the rule of the
@@ -1282,7 +846,7 @@ class InitialConditions(BaseModel):
 
     @field_validator("compartment_amounts")
     @classmethod
-    def validate_compartment_amounts(cls, value: dict[str, float]) -> dict[str, float]:
+    def _validate_compartment_amounts(cls, value: dict[str, float]) -> dict[str, float]:
         """Check every compartment amount with the rule of the engine."""
         commol_rs.model.check_compartment_amounts(list(value.items()))
         return value
@@ -1513,104 +1077,6 @@ class InitialConditions(BaseModel):
 ```
 
 ### Methods:
-
-#### reject_fractions_of_a_total
-
-```python
-reject_fractions_of_a_total(data: JsonValue) -> JsonValue
-```
-
-Name the field of amounts that replaces a field of fractions.
-
-A total over bins of different units has no meaning, so the initial state is stated as amounts, and a structure with `total`, `bin_fractions` or `compartment_fractions` is rejected with the field to use.
-
-Source code in `commol/context/initial_conditions.py`
-
-```python
-@model_validator(mode="before")
-@classmethod
-def reject_fractions_of_a_total(cls, data: JsonValue) -> JsonValue:
-    """Name the field of amounts that replaces a field of fractions.
-
-    A total over bins of different units has no meaning, so the initial
-    state is stated as amounts, and a structure with ``total``,
-    ``bin_fractions`` or ``compartment_fractions`` is rejected with the
-    field to use.
-    """
-    if isinstance(data, Mapping):
-        stated = [field for field in _FRACTION_FIELDS if field in data]
-        if stated:
-            replacements = sorted({_FRACTION_FIELDS[field] for field in stated})
-            raise ValueError(
-                f"An aggregate structure states the amount of each bin in "
-                f"the unit of the bin, not fractions of a total: replace "
-                f"{', '.join(stated)} with {' and '.join(replacements)}, "
-                f'such as bin_amounts={{"A": 990, "B": 10, "C": 0}}.'
-            )
-    return data
-```
-
-#### validate_bin_amounts
-
-```python
-validate_bin_amounts(value: dict[str, float | None]) -> dict[str, float | None]
-```
-
-Check every bin amount with the rule of the engine.
-
-Source code in `commol/context/initial_conditions.py`
-
-```python
-@field_validator("bin_amounts")
-@classmethod
-def validate_bin_amounts(
-    cls, value: dict[str, float | None]
-) -> dict[str, float | None]:
-    """Check every bin amount with the rule of the engine."""
-    commol_rs.model.check_bin_amounts(list(value.items()))
-    return value
-```
-
-#### validate_stratification_fractions
-
-```python
-validate_stratification_fractions(value: dict[str, dict[str, float]]) -> dict[str, dict[str, float]]
-```
-
-Check the fractions of every stratification with the rule of the engine.
-
-Source code in `commol/context/initial_conditions.py`
-
-```python
-@field_validator("stratification_fractions")
-@classmethod
-def validate_stratification_fractions(
-    cls, value: dict[str, dict[str, float]]
-) -> dict[str, dict[str, float]]:
-    """Check the fractions of every stratification with the rule of the
-    engine."""
-    _check_fractions(value)
-    return value
-```
-
-#### validate_compartment_amounts
-
-```python
-validate_compartment_amounts(value: dict[str, float]) -> dict[str, float]
-```
-
-Check every compartment amount with the rule of the engine.
-
-Source code in `commol/context/initial_conditions.py`
-
-```python
-@field_validator("compartment_amounts")
-@classmethod
-def validate_compartment_amounts(cls, value: dict[str, float]) -> dict[str, float]:
-    """Check every compartment amount with the rule of the engine."""
-    commol_rs.model.check_compartment_amounts(list(value.items()))
-    return value
-```
 
 #### get_uncalibrated_bins
 

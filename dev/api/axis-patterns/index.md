@@ -18,10 +18,10 @@ A `AxisPattern` is accepted directly by :meth:`commol.api.model_builder.ModelBui
 
 Attributes:
 
-| Name                 | Type                  | Description |
-| -------------------- | --------------------- | ----------- |
-| `conditions`         | \`list[ConditionDict] | None\`      |
-| `source_compartment` | \`str                 | None\`      |
+| Name                 | Type                            | Description |
+| -------------------- | ------------------------------- | ----------- |
+| `conditions`         | \`list[StratificationCondition] | None\`      |
+| `source_compartment` | \`str                           | None\`      |
 
 Examples:
 
@@ -32,11 +32,16 @@ Examples:
 >>> str(rate)
 '(if(step == 10, 0.05, 0))'
 >>> # Multi-group schedule
+>>> from commol import StratificationCondition
 >>> rate = AxisPattern.add_group(
-...     conditions=[{"stratification": "group", "category": "cat1"}],
+...     conditions=[
+...         StratificationCondition(stratification="group", category="cat1")
+...     ],
 ...     schedule=AxisPattern.pulse(at=10, value=0.05),
 ... ).add_group(
-...     conditions=[{"stratification": "group", "category": "cat2"}],
+...     conditions=[
+...         StratificationCondition(stratification="group", category="cat2")
+...     ],
 ...     schedule=AxisPattern.pulse(at=10, value=0.02),
 ... )
 ```
@@ -63,7 +68,7 @@ class AxisPattern(BaseModel):
 
     Attributes
     ----------
-    conditions : list[ConditionDict] | None
+    conditions : list[StratificationCondition] | None
         The stratification conditions of the sub-group the pattern applies
         to, set by ``for_group``. None: every compartment of the transition.
     source_compartment : str | None
@@ -79,23 +84,23 @@ class AxisPattern(BaseModel):
     >>> str(rate)
     '(if(step == 10, 0.05, 0))'
     >>> # Multi-group schedule
+    >>> from commol import StratificationCondition
     >>> rate = AxisPattern.add_group(
-    ...     conditions=[{"stratification": "group", "category": "cat1"}],
+    ...     conditions=[
+    ...         StratificationCondition(stratification="group", category="cat1")
+    ...     ],
     ...     schedule=AxisPattern.pulse(at=10, value=0.05),
     ... ).add_group(
-    ...     conditions=[{"stratification": "group", "category": "cat2"}],
+    ...     conditions=[
+    ...         StratificationCondition(stratification="group", category="cat2")
+    ...     ],
     ...     schedule=AxisPattern.pulse(at=10, value=0.02),
     ... )
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    # Combine-mode constants — public; usable as AxisPattern.SUM, .MAX, .MIN
-    SUM: ClassVar[CombineMode] = CombineMode.SUM
-    MAX: ClassVar[CombineMode] = CombineMode.MAX
-    MIN: ClassVar[CombineMode] = CombineMode.MIN
-
-    conditions: list[ConditionDict] | None = None
+    conditions: list[StratificationCondition] | None = None
     source_compartment: str | None = None
 
     # `add_group` is a hybrid descriptor (see _AddGroupDescriptor above).
@@ -122,7 +127,7 @@ class AxisPattern(BaseModel):
 
     def for_group(
         self,
-        conditions: list[ConditionDict],
+        conditions: list[StratificationCondition],
         *,
         source_compartment: str | None = None,
     ) -> Self:
@@ -131,7 +136,7 @@ class AxisPattern(BaseModel):
 
         Parameters
         ----------
-        conditions : list[ConditionDict]
+        conditions : list[StratificationCondition]
             The stratification conditions of the sub-group, as in a
             stratified rate.
         source_compartment : str | None, default=None
@@ -143,31 +148,26 @@ class AxisPattern(BaseModel):
         AxisPattern
             The copy, with `conditions` and `source_compartment` set.
         """
-        copied: list[ConditionDict] = [_copy_condition(c) for c in conditions]
         return self.model_copy(
             update={
-                "conditions": copied,
+                "conditions": [c.model_copy() for c in conditions],
                 "source_compartment": source_compartment,
             }
         )
 
-    def to_stratified_rate(self) -> StratifiedRateDict:
+    def _rate(self) -> str:
         """
-        Convert this pattern to a stratified-rate dict.
-
-        If ``source_compartment`` is set, the rate is multiplied by that
-        compartment variable (absolute flow). Otherwise the rate is the
-        formula alone (proportional flow — the engine multiplies by the source
-        compartment automatically).
+        The rate of this pattern: its formula, times ``source_compartment``
+        when that is set (an absolute flow). Without it, the engine multiplies
+        the formula by the source compartment (a proportional flow).
         """
         if self.source_compartment is not None:
-            rate = f"{self.formula} * {self.source_compartment}"
-        else:
-            rate = self.formula
-        return StratifiedRateDict(
-            conditions=self.conditions if self.conditions is not None else [],
-            rate=rate,
-        )
+            return f"{self.formula} * {self.source_compartment}"
+        return self.formula
+
+    def _stratified_rate(self) -> StratifiedRate:
+        """This pattern as the stratified rate of its conditions."""
+        return StratifiedRate(conditions=self.conditions or [], rate=self._rate())
 
     # ------------------------------------------------------------------
     # Builder-consumption hooks
@@ -181,11 +181,11 @@ class AxisPattern(BaseModel):
             return self.formula
         return None
 
-    def _builder_stratified_rates(self) -> list[StratifiedRateDict] | None:
+    def _builder_stratified_rates(self) -> list[StratifiedRate] | None:
         """Stratified-rates list to pass to add_transition (or None)."""
         if self.conditions is None:
             return None
-        return [self.to_stratified_rate()]
+        return [self._stratified_rate()]
 
     # ------------------------------------------------------------------
     # Methods only meaningful on schedules — base raises by default.
@@ -332,7 +332,7 @@ class AxisPattern(BaseModel):
     def combine(
         cls,
         *patterns: "AxisPattern",
-        mode: CombineMode = CombineMode.SUM,
+        mode: Literal["sum", "max", "min"] = "sum",
     ) -> "AxisPattern":
         """
         Combine patterns into a single composed pattern.
@@ -340,8 +340,8 @@ class AxisPattern(BaseModel):
         - ``combine(p)`` is the identity (returns ``p`` unchanged).
         - All input patterns must share the same ``conditions`` and
           ``source_compartment`` (or have none); the result preserves them.
-        - ``mode`` is a `CombineMode` or its value (``"sum"``, ``"max"``,
-          ``"min"``).
+        - ``mode`` is ``"sum"``, ``"max"`` (the largest value at each
+          position) or ``"min"`` (the smallest).
         - Raises ``ValueError`` if no patterns are supplied, ``mode`` is not a
           mode, the inputs have inconsistent group bindings, or the parser of
           the engine rejects the combined formula, such as a ``"max"`` of
@@ -353,7 +353,7 @@ class AxisPattern(BaseModel):
             return patterns[0]
 
         shared_conditions, shared_source = _require_consistent_group(patterns)
-        result = _compose_formulas([p.formula for p in patterns], CombineMode(mode))
+        result = _compose_formulas([p.formula for p in patterns], mode)
         return _ComputedAxisPattern(
             computed_formula=result,
             conditions=shared_conditions,
@@ -403,17 +403,17 @@ def __str__(self) -> str:
 #### for_group
 
 ```python
-for_group(conditions: list[ConditionDict], *, source_compartment: str | None = None) -> Self
+for_group(conditions: list[StratificationCondition], *, source_compartment: str | None = None) -> Self
 ```
 
 Return a copy of this pattern restricted to a stratification sub-group.
 
 Parameters:
 
-| Name                 | Type                  | Description                                                              | Default                                                                                                                |
-| -------------------- | --------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| `conditions`         | `list[ConditionDict]` | The stratification conditions of the sub-group, as in a stratified rate. | *required*                                                                                                             |
-| `source_compartment` | \`str                 | None\`                                                                   | A compartment to multiply the rate by, which makes the flow absolute. If None, the flow is proportional to its source. |
+| Name                 | Type                            | Description                                                              | Default                                                                                                                |
+| -------------------- | ------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `conditions`         | `list[StratificationCondition]` | The stratification conditions of the sub-group, as in a stratified rate. | *required*                                                                                                             |
+| `source_compartment` | \`str                           | None\`                                                                   | A compartment to multiply the rate by, which makes the flow absolute. If None, the flow is proportional to its source. |
 
 Returns:
 
@@ -426,7 +426,7 @@ Source code in `commol/api/patterns.py`
 ```python
 def for_group(
     self,
-    conditions: list[ConditionDict],
+    conditions: list[StratificationCondition],
     *,
     source_compartment: str | None = None,
 ) -> Self:
@@ -435,7 +435,7 @@ def for_group(
 
     Parameters
     ----------
-    conditions : list[ConditionDict]
+    conditions : list[StratificationCondition]
         The stratification conditions of the sub-group, as in a
         stratified rate.
     source_compartment : str | None, default=None
@@ -447,44 +447,11 @@ def for_group(
     AxisPattern
         The copy, with `conditions` and `source_compartment` set.
     """
-    copied: list[ConditionDict] = [_copy_condition(c) for c in conditions]
     return self.model_copy(
         update={
-            "conditions": copied,
+            "conditions": [c.model_copy() for c in conditions],
             "source_compartment": source_compartment,
         }
-    )
-```
-
-#### to_stratified_rate
-
-```python
-to_stratified_rate() -> StratifiedRateDict
-```
-
-Convert this pattern to a stratified-rate dict.
-
-If `source_compartment` is set, the rate is multiplied by that compartment variable (absolute flow). Otherwise the rate is the formula alone (proportional flow — the engine multiplies by the source compartment automatically).
-
-Source code in `commol/api/patterns.py`
-
-```python
-def to_stratified_rate(self) -> StratifiedRateDict:
-    """
-    Convert this pattern to a stratified-rate dict.
-
-    If ``source_compartment`` is set, the rate is multiplied by that
-    compartment variable (absolute flow). Otherwise the rate is the
-    formula alone (proportional flow — the engine multiplies by the source
-    compartment automatically).
-    """
-    if self.source_compartment is not None:
-        rate = f"{self.formula} * {self.source_compartment}"
-    else:
-        rate = self.formula
-    return StratifiedRateDict(
-        conditions=self.conditions if self.conditions is not None else [],
-        rate=rate,
     )
 ```
 
@@ -750,14 +717,14 @@ def linear_ramp(
 #### combine
 
 ```python
-combine(*patterns: AxisPattern, mode: CombineMode = SUM) -> AxisPattern
+combine(*patterns: AxisPattern, mode: Literal['sum', 'max', 'min'] = 'sum') -> AxisPattern
 ```
 
 Combine patterns into a single composed pattern.
 
 - `combine(p)` is the identity (returns `p` unchanged).
 - All input patterns must share the same `conditions` and `source_compartment` (or have none); the result preserves them.
-- `mode` is a `CombineMode` or its value (`"sum"`, `"max"`, `"min"`).
+- `mode` is `"sum"`, `"max"` (the largest value at each position) or `"min"` (the smallest).
 - Raises `ValueError` if no patterns are supplied, `mode` is not a mode, the inputs have inconsistent group bindings, or the parser of the engine rejects the combined formula, such as a `"max"` of more patterns than the nesting limit of a formula.
 
 Source code in `commol/api/patterns.py`
@@ -767,7 +734,7 @@ Source code in `commol/api/patterns.py`
 def combine(
     cls,
     *patterns: "AxisPattern",
-    mode: CombineMode = CombineMode.SUM,
+    mode: Literal["sum", "max", "min"] = "sum",
 ) -> "AxisPattern":
     """
     Combine patterns into a single composed pattern.
@@ -775,8 +742,8 @@ def combine(
     - ``combine(p)`` is the identity (returns ``p`` unchanged).
     - All input patterns must share the same ``conditions`` and
       ``source_compartment`` (or have none); the result preserves them.
-    - ``mode`` is a `CombineMode` or its value (``"sum"``, ``"max"``,
-      ``"min"``).
+    - ``mode`` is ``"sum"``, ``"max"`` (the largest value at each
+      position) or ``"min"`` (the smallest).
     - Raises ``ValueError`` if no patterns are supplied, ``mode`` is not a
       mode, the inputs have inconsistent group bindings, or the parser of
       the engine rejects the combined formula, such as a ``"max"`` of
@@ -788,7 +755,7 @@ def combine(
         return patterns[0]
 
     shared_conditions, shared_source = _require_consistent_group(patterns)
-    result = _compose_formulas([p.formula for p in patterns], CombineMode(mode))
+    result = _compose_formulas([p.formula for p in patterns], mode)
     return _ComputedAxisPattern(
         computed_formula=result,
         conditions=shared_conditions,

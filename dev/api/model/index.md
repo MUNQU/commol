@@ -99,7 +99,7 @@ class Model(BaseModel, Generic[StructureT]):
     )
 
     @model_validator(mode="after")
-    def check_origin_unit(self) -> Self:
+    def _check_origin_unit(self) -> Self:
         """Check that an origin has a step unit of fixed calendar length."""
         if self.origin is not None:
             seconds_per_step(self.step_unit or DEFAULT_STEP_UNIT)
@@ -107,7 +107,7 @@ class Model(BaseModel, Generic[StructureT]):
 
     @field_validator("structure", mode="before")
     @classmethod
-    def read_structure_kind(cls, value: JsonValue) -> JsonValue | ModelStructure:
+    def _read_structure_kind(cls, value: JsonValue) -> JsonValue | ModelStructure:
         """Read a structure mapping as the class of its ``kind`` and ``variant``."""
         if not isinstance(value, Mapping):
             return value
@@ -172,7 +172,7 @@ class Model(BaseModel, Generic[StructureT]):
         )
 
     @model_validator(mode="after")
-    def validate_engine_runs_structure(self) -> Self:
+    def _validate_engine_runs_structure(self) -> Self:
         """Ask the engine whether it runs the kind of the structure."""
         commol_rs.engine.EngineType(engine_json(self.engine.type)).check_kind(
             engine_json(self.structure.kind)
@@ -180,7 +180,7 @@ class Model(BaseModel, Generic[StructureT]):
         return self
 
     @model_validator(mode="after")
-    def validate_unique_parameter_ids(self) -> Self:
+    def _validate_unique_parameter_ids(self) -> Self:
         """
         Validates that parameter IDs are unique.
         """
@@ -193,13 +193,16 @@ class Model(BaseModel, Generic[StructureT]):
         return self
 
     @model_validator(mode="after")
-    def validate_structure(self) -> Self:
+    def _validate_structure(self) -> Self:
         """Check the structure against the parameters and the engine."""
         self.structure.check_model(self)
         return self
 
     def update_parameters(
-        self, parameter_values: Mapping[str, ParameterUpdate]
+        self,
+        parameter_values: Mapping[
+            str, float | str | list[tuple[float, float]] | SeriesValue | None
+        ],
     ) -> None:
         """
         Update parameter values in the model.
@@ -210,7 +213,7 @@ class Model(BaseModel, Generic[StructureT]):
 
         Parameters
         ----------
-        parameter_values : Mapping[str, ParameterUpdate]
+        parameter_values : Mapping[str, value of a parameter]
             Each parameter id mapped to its new value: a number, a formula, a
             `SeriesValue`, or None to leave it for calibration. A list of
             (position, value) points replaces the points of a series parameter
@@ -294,7 +297,7 @@ class Model(BaseModel, Generic[StructureT]):
         parameters: dict[str, float | None] = {
             param_id: value
             for param_id, value in values.items()
-            if types[param_id] == CalibrationParameterType.PARAMETER
+            if types[param_id] == "parameter"
         }
         # Computed before any mutation, so a rejected value leaves the model
         # unchanged.
@@ -373,7 +376,9 @@ class Model(BaseModel, Generic[StructureT]):
             self, values, problem, sample, confidence_level
         )
 
-    def describe(self, layout: Layout = "default") -> ModelDescription:
+    def describe(
+        self, layout: Literal["default", "odd"] = "default"
+    ) -> ModelDescription:
         """
         A description of the model, as data.
 
@@ -483,54 +488,6 @@ class Model(BaseModel, Generic[StructureT]):
 
 ### Methods:
 
-#### check_origin_unit
-
-```python
-check_origin_unit() -> Self
-```
-
-Check that an origin has a step unit of fixed calendar length.
-
-Source code in `commol/context/model.py`
-
-```python
-@model_validator(mode="after")
-def check_origin_unit(self) -> Self:
-    """Check that an origin has a step unit of fixed calendar length."""
-    if self.origin is not None:
-        seconds_per_step(self.step_unit or DEFAULT_STEP_UNIT)
-    return self
-```
-
-#### read_structure_kind
-
-```python
-read_structure_kind(value: JsonValue) -> JsonValue | ModelStructure
-```
-
-Read a structure mapping as the class of its `kind` and `variant`.
-
-Source code in `commol/context/model.py`
-
-```python
-@field_validator("structure", mode="before")
-@classmethod
-def read_structure_kind(cls, value: JsonValue) -> JsonValue | ModelStructure:
-    """Read a structure mapping as the class of its ``kind`` and ``variant``."""
-    if not isinstance(value, Mapping):
-        return value
-    kind = value.get("kind")
-    variant = value.get("variant")
-    if not isinstance(kind, str):
-        raise ValueError(
-            "A model structure needs a 'kind'. Known kinds: "
-            f"{sorted({known for known, _ in ModelStructure._kinds})}"
-        )
-    if variant is not None and not isinstance(variant, str):
-        raise ValueError(f"The variant of a structure is a name, got {variant!r}")
-    return ModelStructure.of_kind(kind, variant).model_validate(value)
-```
-
 #### from_json
 
 ```python
@@ -636,73 +593,10 @@ def to_json(self, file_path: str | Path, indent: int = 2) -> None:
     )
 ```
 
-#### validate_engine_runs_structure
-
-```python
-validate_engine_runs_structure() -> Self
-```
-
-Ask the engine whether it runs the kind of the structure.
-
-Source code in `commol/context/model.py`
-
-```python
-@model_validator(mode="after")
-def validate_engine_runs_structure(self) -> Self:
-    """Ask the engine whether it runs the kind of the structure."""
-    commol_rs.engine.EngineType(engine_json(self.engine.type)).check_kind(
-        engine_json(self.structure.kind)
-    )
-    return self
-```
-
-#### validate_unique_parameter_ids
-
-```python
-validate_unique_parameter_ids() -> Self
-```
-
-Validates that parameter IDs are unique.
-
-Source code in `commol/context/model.py`
-
-```python
-@model_validator(mode="after")
-def validate_unique_parameter_ids(self) -> Self:
-    """
-    Validates that parameter IDs are unique.
-    """
-    parameter_ids = [p.id for p in self.parameters]
-    if len(parameter_ids) != len(set(parameter_ids)):
-        duplicates = [
-            item for item in set(parameter_ids) if parameter_ids.count(item) > 1
-        ]
-        raise ValueError(f"Duplicate parameter IDs found: {duplicates}")
-    return self
-```
-
-#### validate_structure
-
-```python
-validate_structure() -> Self
-```
-
-Check the structure against the parameters and the engine.
-
-Source code in `commol/context/model.py`
-
-```python
-@model_validator(mode="after")
-def validate_structure(self) -> Self:
-    """Check the structure against the parameters and the engine."""
-    self.structure.check_model(self)
-    return self
-```
-
 #### update_parameters
 
 ```python
-update_parameters(parameter_values: Mapping[str, ParameterUpdate]) -> None
+update_parameters(parameter_values: Mapping[str, float | str | list[tuple[float, float]] | SeriesValue | None]) -> None
 ```
 
 Update parameter values in the model.
@@ -711,9 +605,9 @@ The model takes every value or none: the values pass the checks of `Parameter` a
 
 Parameters:
 
-| Name               | Type                            | Description                                                                                                                                                                                                                                                      | Default    |
-| ------------------ | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `parameter_values` | `Mapping[str, ParameterUpdate]` | Each parameter id mapped to its new value: a number, a formula, a SeriesValue, or None to leave it for calibration. A list of (position, value) points replaces the points of a series parameter and keeps its mode; a SeriesValue sets the points and the mode. | *required* |
+| Name               | Type                                 | Description                                                                                                                                                                                                                                                      | Default    |
+| ------------------ | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `parameter_values` | `Mapping[str, value of a parameter]` | Each parameter id mapped to its new value: a number, a formula, a SeriesValue, or None to leave it for calibration. A list of (position, value) points replaces the points of a series parameter and keeps its mode; a SeriesValue sets the points and the mode. | *required* |
 
 Raises:
 
@@ -725,7 +619,10 @@ Source code in `commol/context/model.py`
 
 ```python
 def update_parameters(
-    self, parameter_values: Mapping[str, ParameterUpdate]
+    self,
+    parameter_values: Mapping[
+        str, float | str | list[tuple[float, float]] | SeriesValue | None
+    ],
 ) -> None:
     """
     Update parameter values in the model.
@@ -736,7 +633,7 @@ def update_parameters(
 
     Parameters
     ----------
-    parameter_values : Mapping[str, ParameterUpdate]
+    parameter_values : Mapping[str, value of a parameter]
         Each parameter id mapped to its new value: a number, a formula, a
         `SeriesValue`, or None to leave it for calibration. A list of
         (position, value) points replaces the points of a series parameter
@@ -866,7 +763,7 @@ def apply_calibration_parameters(
     parameters: dict[str, float | None] = {
         param_id: value
         for param_id, value in values.items()
-        if types[param_id] == CalibrationParameterType.PARAMETER
+        if types[param_id] == "parameter"
     }
     # Computed before any mutation, so a rejected value leaves the model
     # unchanged.
@@ -990,7 +887,7 @@ def applied_parameters(
 #### describe
 
 ```python
-describe(layout: Layout = 'default') -> ModelDescription
+describe(layout: Literal['default', 'odd'] = 'default') -> ModelDescription
 ```
 
 A description of the model, as data.
@@ -1027,7 +924,9 @@ Examples:
 Source code in `commol/context/model.py`
 
 ```python
-def describe(self, layout: Layout = "default") -> ModelDescription:
+def describe(
+    self, layout: Literal["default", "odd"] = "default"
+) -> ModelDescription:
     """
     A description of the model, as data.
 
@@ -1242,7 +1141,7 @@ class Process(BaseModel):
     transitions: list[Transition] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_unique_ids(self) -> Self:
+    def _validate_unique_ids(self) -> Self:
         """Validate that bin, stratification and transition ids are unique."""
         for label, ids in (
             ("bin", [item.id for item in self.bins]),
@@ -1255,7 +1154,7 @@ class Process(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_stratified_rates(self) -> Self:
+    def _validate_stratified_rates(self) -> Self:
         """Validate that stratified rates name stratifications and categories."""
         strat_map = {strat.id: strat for strat in self.stratifications}
 
@@ -1285,7 +1184,7 @@ class Process(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_transition_ids(self) -> Self:
+    def _validate_transition_ids(self) -> Self:
         """
         Check that each transition moves between bins, or between the
         categories of one stratification.
@@ -1367,136 +1266,6 @@ class Process(BaseModel):
 ```
 
 ### Methods:
-
-#### validate_unique_ids
-
-```python
-validate_unique_ids() -> Self
-```
-
-Validate that bin, stratification and transition ids are unique.
-
-Source code in `commol/context/process.py`
-
-```python
-@model_validator(mode="after")
-def validate_unique_ids(self) -> Self:
-    """Validate that bin, stratification and transition ids are unique."""
-    for label, ids in (
-        ("bin", [item.id for item in self.bins]),
-        ("stratification", [item.id for item in self.stratifications]),
-        ("transition", [item.id for item in self.transitions]),
-    ):
-        if len(ids) != len(set(ids)):
-            duplicates = [item for item in set(ids) if ids.count(item) > 1]
-            raise ValueError(f"Duplicate {label} IDs found: {duplicates}")
-    return self
-```
-
-#### validate_stratified_rates
-
-```python
-validate_stratified_rates() -> Self
-```
-
-Validate that stratified rates name stratifications and categories.
-
-Source code in `commol/context/process.py`
-
-```python
-@model_validator(mode="after")
-def validate_stratified_rates(self) -> Self:
-    """Validate that stratified rates name stratifications and categories."""
-    strat_map = {strat.id: strat for strat in self.stratifications}
-
-    for transition in self.transitions:
-        for idx, stratified_rate in enumerate(transition.stratified_rates or []):
-            for condition in stratified_rate.conditions:
-                if condition.stratification not in strat_map:
-                    raise ValueError(
-                        f"In transition '{transition.id}', stratified rate "
-                        f"{idx}: Stratification "
-                        f"'{condition.stratification}' not found. "
-                        f"Available: {list(strat_map.keys())}"
-                    )
-
-                # A condition without a category only redirects the target.
-                strat = strat_map[condition.stratification]
-                if (
-                    condition.category is not None
-                    and condition.category not in strat.categories
-                ):
-                    raise ValueError(
-                        f"In transition '{transition.id}', stratified rate "
-                        f"{idx}: Category '{condition.category}' not found "
-                        f"in stratification '{condition.stratification}'. "
-                        f"Available: {strat.categories}"
-                    )
-    return self
-```
-
-#### validate_transition_ids
-
-```python
-validate_transition_ids() -> Self
-```
-
-Check that each transition moves between bins, or between the categories of one stratification.
-
-Source code in `commol/context/process.py`
-
-```python
-@model_validator(mode="after")
-def validate_transition_ids(self) -> Self:
-    """
-    Check that each transition moves between bins, or between the
-    categories of one stratification.
-    """
-    bin_ids = {bin_item.id for bin_item in self.bins}
-    category_to_stratification = {
-        cat: strat.id for strat in self.stratifications for cat in strat.categories
-    }
-    categories_ids = set(category_to_stratification)
-    bin_and_categories_ids = bin_ids | categories_ids
-
-    for transition in self.transitions:
-        transition_ids = set(transition.source) | set(transition.target)
-
-        if not transition_ids.issubset(bin_and_categories_ids):
-            invalid_ids = transition_ids - bin_and_categories_ids
-            raise ValueError(
-                f"Transition '{transition.id}' contains invalid ids: "
-                f"{invalid_ids}. Ids must be defined in Bin ids "
-                f"or Stratification Categories."
-            )
-
-        is_bin_flow = transition_ids.issubset(bin_ids)
-        is_stratification_flow = transition_ids.issubset(categories_ids)
-
-        if not is_bin_flow and not is_stratification_flow:
-            raise ValueError(
-                f"Transition '{transition.id}' mixes id types. "
-                f"Found Bin ids ({transition_ids & bin_ids}) and "
-                f"Stratification Categories ids "
-                f"({transition_ids & categories_ids}). "
-                "Transitions must be purely Bin flow or purely "
-                f"Stratification flow."
-            )
-
-        if is_stratification_flow:
-            parent_stratification_ids = {
-                category_to_stratification[cat_id] for cat_id in transition_ids
-            }
-            if len(parent_stratification_ids) > 1:
-                raise ValueError(
-                    f"Transition '{transition.id}' is a Stratification flow "
-                    f"but involves categories from multiple stratifications: "
-                    f"{', '.join(sorted(parent_stratification_ids))}. A single "
-                    f"transition must only move between categories belonging "
-                    f"to the same parent stratification."
-                )
-    return self
-```
 
 #### is_empty
 
@@ -1730,7 +1499,7 @@ class ModelStructure(BaseModel, ABC):
         """
         return SeriesLabel(series_id, None)
 
-    def calibration_value_types(self) -> frozenset[CalibrationParameterType]:
+    def calibration_value_types(self) -> frozenset[str]:
         """
         Types of value of this kind that calibration may set.
 
@@ -1739,11 +1508,11 @@ class ModelStructure(BaseModel, ABC):
 
         Returns
         -------
-        frozenset[CalibrationParameterType]
+        frozenset[str]
             For example ``{"initial_condition"}`` for an aggregate model.
         """
         return frozenset(
-            CalibrationParameterType(name)
+            name
             for name in commol_rs.engine.ModelKind(engine_json(self.kind)).value_types()
         )
 
@@ -2116,7 +1885,7 @@ def series_label(
 #### calibration_value_types
 
 ```python
-calibration_value_types() -> frozenset[CalibrationParameterType]
+calibration_value_types() -> frozenset[str]
 ```
 
 Types of value of this kind that calibration may set.
@@ -2125,14 +1894,14 @@ Types of value of this kind that calibration may set.
 
 Returns:
 
-| Type                                  | Description                                               |
-| ------------------------------------- | --------------------------------------------------------- |
-| `frozenset[CalibrationParameterType]` | For example {"initial_condition"} for an aggregate model. |
+| Type             | Description                                               |
+| ---------------- | --------------------------------------------------------- |
+| `frozenset[str]` | For example {"initial_condition"} for an aggregate model. |
 
 Source code in `commol/context/structure.py`
 
 ```python
-def calibration_value_types(self) -> frozenset[CalibrationParameterType]:
+def calibration_value_types(self) -> frozenset[str]:
     """
     Types of value of this kind that calibration may set.
 
@@ -2141,11 +1910,11 @@ def calibration_value_types(self) -> frozenset[CalibrationParameterType]:
 
     Returns
     -------
-    frozenset[CalibrationParameterType]
+    frozenset[str]
         For example ``{"initial_condition"}`` for an aggregate model.
     """
     return frozenset(
-        CalibrationParameterType(name)
+        name
         for name in commol_rs.engine.ModelKind(engine_json(self.kind)).value_types()
     )
 ```
@@ -2474,7 +2243,7 @@ class Aggregate(ModelStructure, InitialConditions):
     """
 
     kind: Literal["aggregate"] = "aggregate"
-    neighbors: Neighbors | None = Field(
+    neighbors: _Neighbors | None = Field(
         default=None,
         description="Who the neighbors of a unit are; required when a rate reads them.",
     )
@@ -2614,9 +2383,7 @@ class Aggregate(ModelStructure, InitialConditions):
         if remainder is None:
             return
         initial_conditions = [
-            param
-            for param in parameters
-            if param.parameter_type == CalibrationParameterType.INITIAL_CONDITION
+            param for param in parameters if param.parameter_type == "initial_condition"
         ]
         covered, kept = engine_state.initial_condition_coverage(
             engine, initial_conditions, remainder
@@ -3192,9 +2959,7 @@ def check_calibration_values(
     if remainder is None:
         return
     initial_conditions = [
-        param
-        for param in parameters
-        if param.parameter_type == CalibrationParameterType.INITIAL_CONDITION
+        param for param in parameters if param.parameter_type == "initial_condition"
     ]
     covered, kept = engine_state.initial_condition_coverage(
         engine, initial_conditions, remainder
@@ -3936,7 +3701,7 @@ class SeriesValue(BaseModel):
 
     @field_validator("data")
     @classmethod
-    def validate_data(
+    def _validate_data(
         cls, value: list[tuple[float, float]]
     ) -> list[tuple[float, float]]:
         """
@@ -3946,33 +3711,6 @@ class SeriesValue(BaseModel):
         """
         commol_rs.model.check_series(value)
         return value
-```
-
-### Methods:
-
-#### validate_data
-
-```python
-validate_data(value: list[tuple[float, float]]) -> list[tuple[float, float]]
-```
-
-Check the points with the rule of the engine (`check_series` of `crates/commol-model/src/values.rs`): at least one point, each position finite, not negative and once, each value finite.
-
-Source code in `commol/context/parameter.py`
-
-```python
-@field_validator("data")
-@classmethod
-def validate_data(
-    cls, value: list[tuple[float, float]]
-) -> list[tuple[float, float]]:
-    """
-    Check the points with the rule of the engine (`check_series` of
-    `crates/commol-model/src/values.rs`): at least one point, each
-    position finite, not negative and once, each value finite.
-    """
-    commol_rs.model.check_series(value)
-    return value
 ```
 
 ## UnitConsistencyError
@@ -4080,7 +3818,9 @@ class ModelDescription(BaseModel):
             if isinstance(block, StateGraph)
         ]
 
-    def render(self, format: DescriptionFormat = "text") -> str:
+    def render(
+        self, format: Literal["text", "markdown", "latex", "json", "dot"] = "text"
+    ) -> str:
         """
         The description as a string.
 
@@ -4107,7 +3847,11 @@ class ModelDescription(BaseModel):
 
         return render(self, format)
 
-    def save(self, path: str | Path, format: DescriptionFormat | None = None) -> Path:
+    def save(
+        self,
+        path: str | Path,
+        format: Literal["text", "markdown", "latex", "json", "dot"] | None = None,
+    ) -> Path:
         """
         Write the description to a file.
 
@@ -4236,7 +3980,7 @@ def graphs(self) -> list[StateGraph]:
 #### render
 
 ```python
-render(format: DescriptionFormat = 'text') -> str
+render(format: Literal['text', 'markdown', 'latex', 'json', 'dot'] = 'text') -> str
 ```
 
 The description as a string.
@@ -4262,7 +4006,9 @@ Raises:
 Source code in `commol/context/description.py`
 
 ```python
-def render(self, format: DescriptionFormat = "text") -> str:
+def render(
+    self, format: Literal["text", "markdown", "latex", "json", "dot"] = "text"
+) -> str:
     """
     The description as a string.
 
@@ -4293,7 +4039,7 @@ def render(self, format: DescriptionFormat = "text") -> str:
 #### save
 
 ```python
-save(path: str | Path, format: DescriptionFormat | None = None) -> Path
+save(path: str | Path, format: Literal['text', 'markdown', 'latex', 'json', 'dot'] | None = None) -> Path
 ```
 
 Write the description to a file.
@@ -4320,7 +4066,11 @@ Raises:
 Source code in `commol/context/description.py`
 
 ```python
-def save(self, path: str | Path, format: DescriptionFormat | None = None) -> Path:
+def save(
+    self,
+    path: str | Path,
+    format: Literal["text", "markdown", "latex", "json", "dot"] | None = None,
+) -> Path:
     """
     Write the description to a file.
 
@@ -4356,11 +4106,11 @@ One section of a description.
 
 Attributes:
 
-| Name     | Type          | Description                                                                    |
-| -------- | ------------- | ------------------------------------------------------------------------------ |
-| `key`    | `str`         | The key of the section, such as "dynamics".                                    |
-| `title`  | `str`         | The title a rendering shows.                                                   |
-| `blocks` | `list[Block]` | The blocks, in order. A section with no blocks is left out of every rendering. |
+| Name     | Type           | Description                                                                    |
+| -------- | -------------- | ------------------------------------------------------------------------------ |
+| `key`    | `str`          | The key of the section, such as "dynamics".                                    |
+| `title`  | `str`          | The title a rendering shows.                                                   |
+| `blocks` | `list[_Block]` | The blocks, in order. A section with no blocks is left out of every rendering. |
 
 Source code in `commol/context/description.py`
 
@@ -4375,7 +4125,7 @@ class Section(BaseModel):
         The key of the section, such as ``"dynamics"``.
     title : str
         The title a rendering shows.
-    blocks : list[Block]
+    blocks : list[_Block]
         The blocks, in order. A section with no blocks is left out of every
         rendering.
     """
@@ -4384,7 +4134,7 @@ class Section(BaseModel):
 
     key: str
     title: str
-    blocks: list[Block] = Field(default_factory=list)
+    blocks: list[_Block] = Field(default_factory=list)
 ```
 
 ## Text
@@ -4433,12 +4183,12 @@ A table: named columns and rows of cells.
 
 Attributes:
 
-| Name      | Type               | Description                              |
-| --------- | ------------------ | ---------------------------------------- |
-| `type`    | `Literal['table']` | The tag of the block.                    |
-| `heading` | \`str              | None\`                                   |
-| `columns` | `list[str]`        | The column names.                        |
-| `rows`    | `list[list[Cell]]` | The rows, each with one cell per column. |
+| Name      | Type                | Description                              |
+| --------- | ------------------- | ---------------------------------------- |
+| `type`    | `Literal['table']`  | The tag of the block.                    |
+| `heading` | \`str               | None\`                                   |
+| `columns` | `list[str]`         | The column names.                        |
+| `rows`    | `list[list[_Cell]]` | The rows, each with one cell per column. |
 
 Source code in `commol/context/description.py`
 
@@ -4455,7 +4205,7 @@ class Table(BaseModel):
         A heading above the block.
     columns : list[str]
         The column names.
-    rows : list[list[Cell]]
+    rows : list[list[_Cell]]
         The rows, each with one cell per column.
     """
 
@@ -4464,10 +4214,10 @@ class Table(BaseModel):
     type: Literal["table"] = "table"
     heading: str | None = None
     columns: list[str]
-    rows: list[list[Cell]]
+    rows: list[list[_Cell]]
 
     @model_validator(mode="after")
-    def check_row_lengths(self) -> Self:
+    def _check_row_lengths(self) -> Self:
         """Each row has one cell per column."""
         for index, row in enumerate(self.rows):
             if len(row) != len(self.columns):
@@ -4476,31 +4226,6 @@ class Table(BaseModel):
                     f"has {len(self.columns)} columns: {self.columns}"
                 )
         return self
-```
-
-### Methods:
-
-#### check_row_lengths
-
-```python
-check_row_lengths() -> Self
-```
-
-Each row has one cell per column.
-
-Source code in `commol/context/description.py`
-
-```python
-@model_validator(mode="after")
-def check_row_lengths(self) -> Self:
-    """Each row has one cell per column."""
-    for index, row in enumerate(self.rows):
-        if len(row) != len(self.columns):
-            raise ValueError(
-                f"Row {index} of the table has {len(row)} cells; the table "
-                f"has {len(self.columns)} columns: {self.columns}"
-            )
-    return self
 ```
 
 ## Equations
@@ -4802,7 +4527,7 @@ class Matrix(BaseModel):
     values: list[list[float]]
 
     @model_validator(mode="after")
-    def check_shape(self) -> Self:
+    def _check_shape(self) -> Self:
         """One row of values per row label, one value per column label."""
         shape = [len(row) for row in self.values]
         if shape != [len(self.column_labels)] * len(self.row_labels):
@@ -4811,29 +4536,4 @@ class Matrix(BaseModel):
                 f"{len(self.column_labels)} columns has rows of {shape} values"
             )
         return self
-```
-
-### Methods:
-
-#### check_shape
-
-```python
-check_shape() -> Self
-```
-
-One row of values per row label, one value per column label.
-
-Source code in `commol/context/description.py`
-
-```python
-@model_validator(mode="after")
-def check_shape(self) -> Self:
-    """One row of values per row label, one value per column label."""
-    shape = [len(row) for row in self.values]
-    if shape != [len(self.column_labels)] * len(self.row_labels):
-        raise ValueError(
-            f"A matrix of {len(self.row_labels)} rows and "
-            f"{len(self.column_labels)} columns has rows of {shape} values"
-        )
-    return self
 ```

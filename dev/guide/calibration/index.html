@@ -3621,7 +3621,7 @@ also when it was created while a parameter was <code>None</code>. See
 </tr>
 <tr>
 <td><code>observation_models</code></td>
-<td><code>dict[str, ObservationModel] \| None</code></td>
+<td><code>dict[str, NormalObservations \| … \| BinomialObservations] \| None</code></td>
 <td><code>None</code></td>
 <td>One observation model per series label: the fit maximizes their likelihood. See <a href="../uncertainty/observation-models/">Observation Models</a>.</td>
 </tr>

@@ -325,35 +325,6 @@ class Simulation:
         """
         return {id: self.outputs_for(id) for id in ids}
 
-    def _series_names(self, ids: Iterable[str]) -> list[str]:
-        """
-        The outputs the ids stand for, in the order given.
-
-        A source id, such as a bin or accumulator id, stands for all its
-        outputs (`outputs_for`); an output name stands for itself.
-
-        Raises
-        ------
-        KeyError
-            If an id is neither a source nor an output of the model.
-        """
-        model = self.model_definition
-        by_source = model.structure.outputs_by_source(model)
-        outputs = [name for names in by_source.values() for name in names]
-        names: list[str] = []
-        for id in ids:
-            if id in by_source:
-                names.extend(by_source[id])
-            elif id in outputs:
-                names.append(id)
-            else:
-                raise KeyError(
-                    f"'{id}' is not a bin, accumulator or output of model "
-                    f"'{model.name}'. Bins and accumulators: {sorted(by_source)}. "
-                    f"Outputs: {outputs}"
-                )
-        return names
-
     def total_series(
         self,
         results: Mapping[str, Sequence[float]],
@@ -382,88 +353,7 @@ class Simulation:
             If an id is not a bin, accumulator or output of the model, or an
             expected output is missing from `results`.
         """
-        return total_series(results, self._series_names(ids))
-
-    def windowed_totals(
-        self,
-        results: SimulationResults,
-        ids: Iterable[str],
-        window: float,
-        at: Iterable[float] | None = None,
-    ) -> list[float]:
-        """
-        Amount the given accumulators gained over each window.
-
-        Parameters
-        ----------
-        results : SimulationResults
-            Simulation results, with their positions.
-        ids : Iterable[str]
-            Accumulator ids, each for all its outputs, and output names, each
-            for itself. Their outputs are summed before windowing.
-        window : float
-            Length of one window on the axis.
-        at : Iterable[float] | None, optional
-            Positions at which windows close. Defaults to every complete
-            window of the results. Pass the observation positions to
-            reproduce exactly the values a calibration used.
-
-        Returns
-        -------
-        list[float]
-            One increment per window.
-
-        Raises
-        ------
-        KeyError
-            If an id is not a bin, accumulator or output of the model, or an
-            expected output is missing from `results`.
-        ValueError
-            If `window` is not positive, or the results have no value at the
-            end or the start of a requested window.
-        """
-        return windowed_totals(
-            self.total_series(results, ids), results.positions, window, at
-        )
-
-    def sample(
-        self,
-        results: SimulationResults,
-        ids: Iterable[str],
-        at: Iterable[float],
-    ) -> list[float]:
-        """
-        Value of the given bins and accumulators at each position of `at`.
-
-        A bin holds an amount at a position, so the value is read at that
-        position, not over the window before it; `windowed_totals` reads the
-        gain of an accumulator over a window.
-
-        Parameters
-        ----------
-        results : SimulationResults
-            Simulation results, with their positions.
-        ids : Iterable[str]
-            Bin and accumulator ids, each for all its outputs
-            (`outputs_for`), and output names, each for itself. Their outputs
-            are summed before they are read.
-        at : Iterable[float]
-            Positions to read, each a position of `results`.
-
-        Returns
-        -------
-        list[float]
-            One value per position in `at`.
-
-        Raises
-        ------
-        KeyError
-            If an id is not a bin, accumulator or output of the model, or an
-            expected output is missing from `results`.
-        ValueError
-            If the results have no value at a position in `at`.
-        """
-        return sample(self.total_series(results, ids), results.positions, at)
+        return total_series(results, series_names(self.model_definition, ids))
 ```
 
 ### Attributes
@@ -960,157 +850,7 @@ def total_series(
         If an id is not a bin, accumulator or output of the model, or an
         expected output is missing from `results`.
     """
-    return total_series(results, self._series_names(ids))
-```
-
-#### windowed_totals
-
-```python
-windowed_totals(results: SimulationResults, ids: Iterable[str], window: float, at: Iterable[float] | None = None) -> list[float]
-```
-
-Amount the given accumulators gained over each window.
-
-Parameters:
-
-| Name      | Type                | Description                                                                                                              | Default                                                                                                                                                                |
-| --------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `results` | `SimulationResults` | Simulation results, with their positions.                                                                                | *required*                                                                                                                                                             |
-| `ids`     | `Iterable[str]`     | Accumulator ids, each for all its outputs, and output names, each for itself. Their outputs are summed before windowing. | *required*                                                                                                                                                             |
-| `window`  | `float`             | Length of one window on the axis.                                                                                        | *required*                                                                                                                                                             |
-| `at`      | \`Iterable[float]   | None\`                                                                                                                   | Positions at which windows close. Defaults to every complete window of the results. Pass the observation positions to reproduce exactly the values a calibration used. |
-
-Returns:
-
-| Type          | Description               |
-| ------------- | ------------------------- |
-| `list[float]` | One increment per window. |
-
-Raises:
-
-| Type         | Description                                                                                               |
-| ------------ | --------------------------------------------------------------------------------------------------------- |
-| `KeyError`   | If an id is not a bin, accumulator or output of the model, or an expected output is missing from results. |
-| `ValueError` | If window is not positive, or the results have no value at the end or the start of a requested window.    |
-
-Source code in `commol/api/simulation.py`
-
-```python
-def windowed_totals(
-    self,
-    results: SimulationResults,
-    ids: Iterable[str],
-    window: float,
-    at: Iterable[float] | None = None,
-) -> list[float]:
-    """
-    Amount the given accumulators gained over each window.
-
-    Parameters
-    ----------
-    results : SimulationResults
-        Simulation results, with their positions.
-    ids : Iterable[str]
-        Accumulator ids, each for all its outputs, and output names, each
-        for itself. Their outputs are summed before windowing.
-    window : float
-        Length of one window on the axis.
-    at : Iterable[float] | None, optional
-        Positions at which windows close. Defaults to every complete
-        window of the results. Pass the observation positions to
-        reproduce exactly the values a calibration used.
-
-    Returns
-    -------
-    list[float]
-        One increment per window.
-
-    Raises
-    ------
-    KeyError
-        If an id is not a bin, accumulator or output of the model, or an
-        expected output is missing from `results`.
-    ValueError
-        If `window` is not positive, or the results have no value at the
-        end or the start of a requested window.
-    """
-    return windowed_totals(
-        self.total_series(results, ids), results.positions, window, at
-    )
-```
-
-#### sample
-
-```python
-sample(results: SimulationResults, ids: Iterable[str], at: Iterable[float]) -> list[float]
-```
-
-Value of the given bins and accumulators at each position of `at`.
-
-A bin holds an amount at a position, so the value is read at that position, not over the window before it; `windowed_totals` reads the gain of an accumulator over a window.
-
-Parameters:
-
-| Name      | Type                | Description                                                                                                                                        | Default    |
-| --------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `results` | `SimulationResults` | Simulation results, with their positions.                                                                                                          | *required* |
-| `ids`     | `Iterable[str]`     | Bin and accumulator ids, each for all its outputs (outputs_for), and output names, each for itself. Their outputs are summed before they are read. | *required* |
-| `at`      | `Iterable[float]`   | Positions to read, each a position of results.                                                                                                     | *required* |
-
-Returns:
-
-| Type          | Description                   |
-| ------------- | ----------------------------- |
-| `list[float]` | One value per position in at. |
-
-Raises:
-
-| Type         | Description                                                                                               |
-| ------------ | --------------------------------------------------------------------------------------------------------- |
-| `KeyError`   | If an id is not a bin, accumulator or output of the model, or an expected output is missing from results. |
-| `ValueError` | If the results have no value at a position in at.                                                         |
-
-Source code in `commol/api/simulation.py`
-
-```python
-def sample(
-    self,
-    results: SimulationResults,
-    ids: Iterable[str],
-    at: Iterable[float],
-) -> list[float]:
-    """
-    Value of the given bins and accumulators at each position of `at`.
-
-    A bin holds an amount at a position, so the value is read at that
-    position, not over the window before it; `windowed_totals` reads the
-    gain of an accumulator over a window.
-
-    Parameters
-    ----------
-    results : SimulationResults
-        Simulation results, with their positions.
-    ids : Iterable[str]
-        Bin and accumulator ids, each for all its outputs
-        (`outputs_for`), and output names, each for itself. Their outputs
-        are summed before they are read.
-    at : Iterable[float]
-        Positions to read, each a position of `results`.
-
-    Returns
-    -------
-    list[float]
-        One value per position in `at`.
-
-    Raises
-    ------
-    KeyError
-        If an id is not a bin, accumulator or output of the model, or an
-        expected output is missing from `results`.
-    ValueError
-        If the results have no value at a position in `at`.
-    """
-    return sample(self.total_series(results, ids), results.positions, at)
+    return total_series(results, series_names(self.model_definition, ids))
 ```
 
 ## SimulationResults
@@ -1274,7 +1014,7 @@ class SimulationResults(ComparedByValue, dict[str, list[float]]):
 
         Parameters
         ----------
-        quantities : Sequence[Quantity]
+        quantities : Sequence[quantity]
             The quantities; a `Trajectory` gives one scalar per position.
 
         Returns
@@ -1291,6 +1031,95 @@ class SimulationResults(ComparedByValue, dict[str, list[float]]):
             with its quantity and says to call `Simulation.run_at`.
         """
         return quantities_of_runs([self], self.positions, quantities)[0]
+
+    def _total(self, ids: Iterable[str]) -> list[float]:
+        """The sum of the outputs the ids stand for, at each position: of a
+        source id, all its outputs, with the model of the run; of an output
+        name, itself."""
+        names = list(ids) if self.model is None else series_names(self.model, ids)
+        return total_series(self, names)
+
+    def sample(self, ids: Iterable[str], at: Iterable[float]) -> list[float]:
+        """
+        Value of the given bins and accumulators at each position of `at`.
+
+        A bin holds an amount at a position, so the value is read at that
+        position, not over the window before it; `windowed_totals` reads the
+        gain of an accumulator over a window. Each position is found with the
+        tolerance of the axis, as an observation finds its row (`index_at` of
+        `crates/commol-calibration/src/observation.rs`), so ``0.1 + 0.2``
+        reads the value at ``0.3``.
+
+        Parameters
+        ----------
+        ids : Iterable[str]
+            Bin and accumulator ids, each for all its outputs, and output
+            names, each for itself. Their outputs are summed before they are
+            read. Results without a model read output names only.
+        at : Iterable[float]
+            Positions to read, each a position of the results.
+
+        Returns
+        -------
+        list[float]
+            One value per position in `at`.
+
+        Raises
+        ------
+        KeyError
+            If an id is not a bin, accumulator or output of the model, or an
+            output is missing from the results.
+        ValueError
+            If the results have no value at a position in `at`.
+        """
+        return _sample(self._total(ids), self.positions, at)
+
+    def windowed_totals(
+        self,
+        ids: Iterable[str],
+        window: float,
+        at: Iterable[float] | None = None,
+    ) -> list[float]:
+        """
+        Amount the given accumulators gained over each window.
+
+        Each value is the sum of the outputs at the end of the window minus
+        the sum at its start, ``at - window``, each found with the tolerance
+        of the axis: the rule of a windowed observation (`window_increments`
+        of `crates/commol-calibration/src/observation.rs`), so the value is
+        the prediction a calibration compares an observation against when
+        that observation sets ``window``.
+
+        Parameters
+        ----------
+        ids : Iterable[str]
+            Accumulator ids, each for all its outputs, and output names, each
+            for itself. Their outputs are summed before windowing. Results
+            without a model read output names only.
+        window : float
+            Length of one window on the axis.
+        at : Iterable[float] | None, optional
+            Positions at which windows close. Defaults to every complete
+            window of the results (`window_ends` of the engine, as
+            `AxisUnits.window_ends` gives it). Pass the observation positions
+            to reproduce exactly the values a calibration used.
+
+        Returns
+        -------
+        list[float]
+            One increment per window.
+
+        Raises
+        ------
+        KeyError
+            If an id is not a bin, accumulator or output of the model, or an
+            output is missing from the results.
+        ValueError
+            If `window` is not a finite, positive length (the message of the
+            engine), a window starts before position 0, or the results have
+            no value at the end or the start of a requested window.
+        """
+        return _windowed_totals(self._total(ids), self.positions, window, at)
 
     @property
     def plot(self) -> ResultsPlot:
@@ -1566,7 +1395,7 @@ Parameters:
 
 | Name         | Type                 | Description                                                 | Default    |
 | ------------ | -------------------- | ----------------------------------------------------------- | ---------- |
-| `quantities` | `Sequence[Quantity]` | The quantities; a Trajectory gives one scalar per position. | *required* |
+| `quantities` | `Sequence[quantity]` | The quantities; a Trajectory gives one scalar per position. | *required* |
 
 Returns:
 
@@ -1603,7 +1432,7 @@ def quantities(self, quantities: "Sequence[QuantityBase]") -> dict[str, float]:
 
     Parameters
     ----------
-    quantities : Sequence[Quantity]
+    quantities : Sequence[quantity]
         The quantities; a `Trajectory` gives one scalar per position.
 
     Returns
@@ -1620,6 +1449,157 @@ def quantities(self, quantities: "Sequence[QuantityBase]") -> dict[str, float]:
         with its quantity and says to call `Simulation.run_at`.
     """
     return quantities_of_runs([self], self.positions, quantities)[0]
+```
+
+#### sample
+
+```python
+sample(ids: Iterable[str], at: Iterable[float]) -> list[float]
+```
+
+Value of the given bins and accumulators at each position of `at`.
+
+A bin holds an amount at a position, so the value is read at that position, not over the window before it; `windowed_totals` reads the gain of an accumulator over a window. Each position is found with the tolerance of the axis, as an observation finds its row (`index_at` of `crates/commol-calibration/src/observation.rs`), so `0.1 + 0.2` reads the value at `0.3`.
+
+Parameters:
+
+| Name  | Type              | Description                                                                                                                                                                          | Default    |
+| ----- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- |
+| `ids` | `Iterable[str]`   | Bin and accumulator ids, each for all its outputs, and output names, each for itself. Their outputs are summed before they are read. Results without a model read output names only. | *required* |
+| `at`  | `Iterable[float]` | Positions to read, each a position of the results.                                                                                                                                   | *required* |
+
+Returns:
+
+| Type          | Description                   |
+| ------------- | ----------------------------- |
+| `list[float]` | One value per position in at. |
+
+Raises:
+
+| Type         | Description                                                                                          |
+| ------------ | ---------------------------------------------------------------------------------------------------- |
+| `KeyError`   | If an id is not a bin, accumulator or output of the model, or an output is missing from the results. |
+| `ValueError` | If the results have no value at a position in at.                                                    |
+
+Source code in `commol/api/results.py`
+
+```python
+def sample(self, ids: Iterable[str], at: Iterable[float]) -> list[float]:
+    """
+    Value of the given bins and accumulators at each position of `at`.
+
+    A bin holds an amount at a position, so the value is read at that
+    position, not over the window before it; `windowed_totals` reads the
+    gain of an accumulator over a window. Each position is found with the
+    tolerance of the axis, as an observation finds its row (`index_at` of
+    `crates/commol-calibration/src/observation.rs`), so ``0.1 + 0.2``
+    reads the value at ``0.3``.
+
+    Parameters
+    ----------
+    ids : Iterable[str]
+        Bin and accumulator ids, each for all its outputs, and output
+        names, each for itself. Their outputs are summed before they are
+        read. Results without a model read output names only.
+    at : Iterable[float]
+        Positions to read, each a position of the results.
+
+    Returns
+    -------
+    list[float]
+        One value per position in `at`.
+
+    Raises
+    ------
+    KeyError
+        If an id is not a bin, accumulator or output of the model, or an
+        output is missing from the results.
+    ValueError
+        If the results have no value at a position in `at`.
+    """
+    return _sample(self._total(ids), self.positions, at)
+```
+
+#### windowed_totals
+
+```python
+windowed_totals(ids: Iterable[str], window: float, at: Iterable[float] | None = None) -> list[float]
+```
+
+Amount the given accumulators gained over each window.
+
+Each value is the sum of the outputs at the end of the window minus the sum at its start, `at - window`, each found with the tolerance of the axis: the rule of a windowed observation (`window_increments` of `crates/commol-calibration/src/observation.rs`), so the value is the prediction a calibration compares an observation against when that observation sets `window`.
+
+Parameters:
+
+| Name     | Type              | Description                                                                                                                                                              | Default                                                                                                                                                                                                                               |
+| -------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ids`    | `Iterable[str]`   | Accumulator ids, each for all its outputs, and output names, each for itself. Their outputs are summed before windowing. Results without a model read output names only. | *required*                                                                                                                                                                                                                            |
+| `window` | `float`           | Length of one window on the axis.                                                                                                                                        | *required*                                                                                                                                                                                                                            |
+| `at`     | \`Iterable[float] | None\`                                                                                                                                                                   | Positions at which windows close. Defaults to every complete window of the results (window_ends of the engine, as AxisUnits.window_ends gives it). Pass the observation positions to reproduce exactly the values a calibration used. |
+
+Returns:
+
+| Type          | Description               |
+| ------------- | ------------------------- |
+| `list[float]` | One increment per window. |
+
+Raises:
+
+| Type         | Description                                                                                                                                                                            |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `KeyError`   | If an id is not a bin, accumulator or output of the model, or an output is missing from the results.                                                                                   |
+| `ValueError` | If window is not a finite, positive length (the message of the engine), a window starts before position 0, or the results have no value at the end or the start of a requested window. |
+
+Source code in `commol/api/results.py`
+
+```python
+def windowed_totals(
+    self,
+    ids: Iterable[str],
+    window: float,
+    at: Iterable[float] | None = None,
+) -> list[float]:
+    """
+    Amount the given accumulators gained over each window.
+
+    Each value is the sum of the outputs at the end of the window minus
+    the sum at its start, ``at - window``, each found with the tolerance
+    of the axis: the rule of a windowed observation (`window_increments`
+    of `crates/commol-calibration/src/observation.rs`), so the value is
+    the prediction a calibration compares an observation against when
+    that observation sets ``window``.
+
+    Parameters
+    ----------
+    ids : Iterable[str]
+        Accumulator ids, each for all its outputs, and output names, each
+        for itself. Their outputs are summed before windowing. Results
+        without a model read output names only.
+    window : float
+        Length of one window on the axis.
+    at : Iterable[float] | None, optional
+        Positions at which windows close. Defaults to every complete
+        window of the results (`window_ends` of the engine, as
+        `AxisUnits.window_ends` gives it). Pass the observation positions
+        to reproduce exactly the values a calibration used.
+
+    Returns
+    -------
+    list[float]
+        One increment per window.
+
+    Raises
+    ------
+    KeyError
+        If an id is not a bin, accumulator or output of the model, or an
+        output is missing from the results.
+    ValueError
+        If `window` is not a finite, positive length (the message of the
+        engine), a window starts before position 0, or the results have
+        no value at the end or the start of a requested window.
+    """
+    return _windowed_totals(self._total(ids), self.positions, window, at)
 ```
 
 #### report
@@ -1754,6 +1734,690 @@ def __repr__(self) -> str:
     return (
         f"SimulationResults(positions={self.positions!r}, {seed}"
         f"{dict.__repr__(self)})"
+    )
+```
+
+## ResultsPlot
+
+The figures of one run, read from `results.plot`.
+
+Each figure has one panel per series, or per observed series for `observations`, and returns the matplotlib `Figure`. Given `axes=`, the `Figure` of an earlier figure of commol, it draws each series on the panel of that series instead.
+
+Source code in `commol/api/plotting/accessors.py`
+
+```python
+class ResultsPlot:
+    """
+    The figures of one run, read from ``results.plot``.
+
+    Each figure has one panel per series, or per observed series for
+    `observations`, and returns the matplotlib `Figure`. Given ``axes=``, the
+    `Figure` of an earlier figure of commol, it draws each series on the
+    panel of that series instead.
+    """
+
+    def __init__(self, results: "SimulationResults") -> None:
+        """
+        The figures of `results`.
+
+        Parameters
+        ----------
+        results : SimulationResults
+            The run.
+        """
+        self._results = results
+
+    def series(
+        self,
+        output_file: str | None = None,
+        observed_data: "list[ObservedDataPoint] | None" = None,
+        calibration_result: "CalibrationResult | None" = None,
+        config: "PlotConfig | None" = None,
+        series: list[str] | None = None,
+        show_legend: bool = True,
+        position_label: Callable[[float], str] | None = None,
+        tick_every: float | None = None,
+        x_label: str = "Step",
+        prediction_intervals: "PredictionIntervals | None" = None,
+        axes: "Figure | None" = None,
+        **kwargs: str | int | float | bool | None,
+    ) -> "Figure":
+        """
+        Draw each series along the axis, one panel per series.
+
+        Parameters
+        ----------
+        output_file : str | None
+            Path to save the figure to. If None, the figure is only returned.
+        observed_data : list[ObservedDataPoint] | None
+            Observations, each drawn as a point on the panel of its label.
+            When the observations of a series share one sum of outputs and
+            one factor and have no window, the line covers every position of
+            the results. Otherwise the model of each observation is read
+            through its own operator (outputs, window, factor) at its own
+            position, as the loss reads it, and the line joins these values.
+        calibration_result : CalibrationResult | None
+            Its ``best_parameters`` give the values of the factors of the
+            observations, which multiply the line; observed values stay in
+            their own units.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+        series : list[str] | None
+            What to draw, one panel each: an output name (such as ``A_g1``),
+            or a bin or accumulator id, which draws the sum of its outputs.
+            An exact output name wins over an id. If None, every output.
+        show_legend : bool
+            Whether each panel shows its legend.
+        position_label : Callable[[float], str] | None
+            Turns a position on the axis into a tick label. If None, a model
+            with an origin (``ModelBuilder(origin=...)``) labels each tick
+            with its date: ``2020-01-02``, with the time when it is not
+            midnight. Otherwise the ticks show the position.
+        tick_every : float | None
+            Labels the plotted positions `tick_every` apart, counted from the
+            first plotted position. If None, every plotted position, or the
+            ticks matplotlib places on a dated axis.
+        x_label : str
+            The label of the x axis.
+        prediction_intervals : PredictionIntervals | None
+            Prediction intervals of a conformal method
+            (``ConformalResult.intervals``). The panel of each of their
+            series, by label, shows the band between their lower and upper
+            ends and their point prediction, dashed; an unbounded interval
+            is left out of the band.
+        axes : Figure | None
+            A figure of commol to draw on: each series is drawn on its panel,
+            the `Axes` whose label is the id of the series. If None, a new
+            figure.
+        **kwargs : str | int | float | bool | None
+            Passed to ``Axes.plot`` for the line of the run, such as
+            ``linewidth``, ``alpha`` or ``linestyle``.
+
+        Returns
+        -------
+        Figure
+            The matplotlib figure.
+
+        Raises
+        ------
+        ValueError
+            If an entry of ``series`` is a bin or accumulator id of results
+            with no model; the results have no value at the position of an
+            observation read on its own or at the start of its window; or
+            ``axes`` has no panel of a series.
+        KeyError
+            If an entry of ``series`` is neither an output nor a bin or
+            accumulator id of the model.
+        ImportError
+            If matplotlib is not installed (``pip install 'commol[plot]'``).
+        """
+        from commol.api.plotting.figures import _run_series
+
+        return _run_series(
+            self._results,
+            output_file=output_file,
+            observed_data=observed_data,
+            calibration_result=calibration_result,
+            config=config,
+            series=series,
+            show_legend=show_legend,
+            position_label=position_label,
+            tick_every=tick_every,
+            x_label=x_label,
+            prediction_intervals=prediction_intervals,
+            axes=axes,
+            **kwargs,
+        )
+
+    def cumulative(
+        self,
+        output_file: str | None = None,
+        observed_data: "list[ObservedDataPoint] | None" = None,
+        calibration_result: "CalibrationResult | None" = None,
+        config: "PlotConfig | None" = None,
+        series: list[str] | None = None,
+        axes: "Figure | None" = None,
+        **kwargs: str | int | float | bool | None,
+    ) -> "Figure":
+        """
+        Draw the running total of each series, one panel per series.
+
+        Parameters
+        ----------
+        output_file : str | None
+            Path to save the figure to. If None, the figure is only returned.
+        observed_data : list[ObservedDataPoint] | None
+            Observations, drawn as their running total on the panel of their
+            label. An observation with a factor is divided by the value of
+            its factor in ``calibration_result``.
+        calibration_result : CalibrationResult | None
+            Its ``best_parameters`` give the values of the factors.
+        config : PlotConfig | None
+            Layout, size and style. If None, the defaults.
+        series : list[str] | None
+            What to draw, one panel each, as in `series`. If None, every
+            output.
+        axes : Figure | None
+            A figure of commol to draw on, as in `series`.
+        **kwargs : str | int | float | bool | None
+            Passed to ``Axes.plot`` for the line of the run.
+
+        Returns
+        -------
+        Figure
+            The matplotlib figure.
+
+        Raises
+        ------
+        ValueError
+            If ``axes`` has no panel of a series.
+        KeyError
+            If an entry of ``series`` is neither an output nor a bin or
+            accumulator id of the model.
+        ImportError
+            If matplotlib is not installed (``pip install 'commol[plot]'``).
+        """
+        from commol.api.plotting.figures import _run_cumulative
+
+        return _run_cumulative(
+            self._results,
+            output_file=output_file,
+            observed_data=observed_data,
+            calibration_result=calibration_result,
+            config=config,
+            series=series,
+            axes=axes,
+            **kwargs,
+        )
+
+    def observations(
+        self,
+        observed_data: "list[ObservedDataPoint]",
+        output_file: str | None = None,
+        calibration_result: "CalibrationResult | None" = None,
+        config: "PlotConfig | None" = None,
+        show_legend: bool = True,
+        position_label: Callable[[float], str] | None = None,
+        tick_every: float | None = None,
+        x_label: str = "Step",
+        axes: "Figure | None" = None,
+        **kwargs: str | int | float | bool | None,
+    ) -> "Figure":
+        """
+        Draw each observed series with the model read through its
+        observation operator, one panel per label.
+
+        The model is read only at the observations: the value of each
+        observation through its own operator (the sum of its outputs, its
+        window and its factor), as the loss reads it. A value with a window is
+        a total over ``(at - window, at]``, drawn as a step over its window
+        with a marker at ``at``. A value with no window is a marker, joined
+        to the next only as a guide. The run along the whole axis is
+        `series`, on the same figure with ``axes=``.
+
+        Parameters
+        ----------
+        observed_data : list[ObservedDataPoint]
+            The observations. Each label is one panel, in the order of its
+            first observation, with the `Axes` label of the label.
+        output_file : str | None
+            Path to save the figure to. If None, the figure is only returned.
+        calibration_result : CalibrationResult | None
+            Its ``best_parameters`` give the values of the factors of the
+            observations, which multiply the model; observed values stay in
+            their own units.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+        show_legend : bool
+            Whether each panel shows its legend.
+        position_label : Callable[[float], str] | None
+            Turns a position into a tick label, as in `series`.
+        tick_every : float | None
+            The distance between labelled observation positions, as in
+            `series`.
+        x_label : str
+            The label of the x axis.
+        axes : Figure | None
+            A figure of commol to draw on: each observed series is drawn on
+            the `Axes` whose label is its label. If None, a new figure.
+        **kwargs : str | int | float | bool | None
+            Passed to ``Axes.plot`` for the steps and the guide of the model,
+            such as ``linewidth`` or ``alpha``.
+
+        Returns
+        -------
+        Figure
+            The matplotlib figure.
+
+        Raises
+        ------
+        ValueError
+            If there are no observations; the results have no value at the
+            position of an observation or at the start of its window; or
+            ``axes`` has no panel of a label.
+        KeyError
+            If an observation names an output the results do not have.
+        ImportError
+            If matplotlib is not installed (``pip install 'commol[plot]'``).
+        """
+        from commol.api.plotting.figures import _run_observations
+
+        return _run_observations(
+            self._results,
+            observed_data,
+            output_file=output_file,
+            calibration_result=calibration_result,
+            config=config,
+            show_legend=show_legend,
+            position_label=position_label,
+            tick_every=tick_every,
+            x_label=x_label,
+            axes=axes,
+            **kwargs,
+        )
+```
+
+### Methods:
+
+#### __init__
+
+```python
+__init__(results: SimulationResults) -> None
+```
+
+The figures of `results`.
+
+Parameters:
+
+| Name      | Type                | Description | Default    |
+| --------- | ------------------- | ----------- | ---------- |
+| `results` | `SimulationResults` | The run.    | *required* |
+
+Source code in `commol/api/plotting/accessors.py`
+
+```python
+def __init__(self, results: "SimulationResults") -> None:
+    """
+    The figures of `results`.
+
+    Parameters
+    ----------
+    results : SimulationResults
+        The run.
+    """
+    self._results = results
+```
+
+#### series
+
+```python
+series(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | None = None, config: PlotConfig | None = None, series: list[str] | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', prediction_intervals: PredictionIntervals | None = None, axes: Figure | None = None, **kwargs: str | int | float | bool | None) -> Figure
+```
+
+Draw each series along the axis, one panel per series.
+
+Parameters:
+
+| Name                   | Type                       | Description                          | Default                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------------- | -------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `output_file`          | \`str                      | None\`                               | Path to save the figure to. If None, the figure is only returned.                                                                                                                                                                                                                                                                                                                          |
+| `observed_data`        | \`list[ObservedDataPoint]  | None\`                               | Observations, each drawn as a point on the panel of its label. When the observations of a series share one sum of outputs and one factor and have no window, the line covers every position of the results. Otherwise the model of each observation is read through its own operator (outputs, window, factor) at its own position, as the loss reads it, and the line joins these values. |
+| `calibration_result`   | \`CalibrationResult        | None\`                               | Its best_parameters give the values of the factors of the observations, which multiply the line; observed values stay in their own units.                                                                                                                                                                                                                                                  |
+| `config`               | \`PlotConfig               | None\`                               | Layout and style. If None, the defaults.                                                                                                                                                                                                                                                                                                                                                   |
+| `series`               | \`list[str]                | None\`                               | What to draw, one panel each: an output name (such as A_g1), or a bin or accumulator id, which draws the sum of its outputs. An exact output name wins over an id. If None, every output.                                                                                                                                                                                                  |
+| `show_legend`          | `bool`                     | Whether each panel shows its legend. | `True`                                                                                                                                                                                                                                                                                                                                                                                     |
+| `position_label`       | \`Callable\[[float], str\] | None\`                               | Turns a position on the axis into a tick label. If None, a model with an origin (ModelBuilder(origin=...)) labels each tick with its date: 2020-01-02, with the time when it is not midnight. Otherwise the ticks show the position.                                                                                                                                                       |
+| `tick_every`           | \`float                    | None\`                               | Labels the plotted positions tick_every apart, counted from the first plotted position. If None, every plotted position, or the ticks matplotlib places on a dated axis.                                                                                                                                                                                                                   |
+| `x_label`              | `str`                      | The label of the x axis.             | `'Step'`                                                                                                                                                                                                                                                                                                                                                                                   |
+| `prediction_intervals` | \`PredictionIntervals      | None\`                               | Prediction intervals of a conformal method (ConformalResult.intervals). The panel of each of their series, by label, shows the band between their lower and upper ends and their point prediction, dashed; an unbounded interval is left out of the band.                                                                                                                                  |
+| `axes`                 | \`Figure                   | None\`                               | A figure of commol to draw on: each series is drawn on its panel, the Axes whose label is the id of the series. If None, a new figure.                                                                                                                                                                                                                                                     |
+| `**kwargs`             | \`str                      | int                                  | float                                                                                                                                                                                                                                                                                                                                                                                      |
+
+Returns:
+
+| Type     | Description            |
+| -------- | ---------------------- |
+| `Figure` | The matplotlib figure. |
+
+Raises:
+
+| Type          | Description                                                                                                                                                                                                             |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError`  | If an entry of series is a bin or accumulator id of results with no model; the results have no value at the position of an observation read on its own or at the start of its window; or axes has no panel of a series. |
+| `KeyError`    | If an entry of series is neither an output nor a bin or accumulator id of the model.                                                                                                                                    |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                                                                                                                                            |
+
+Source code in `commol/api/plotting/accessors.py`
+
+```python
+def series(
+    self,
+    output_file: str | None = None,
+    observed_data: "list[ObservedDataPoint] | None" = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: "PlotConfig | None" = None,
+    series: list[str] | None = None,
+    show_legend: bool = True,
+    position_label: Callable[[float], str] | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    prediction_intervals: "PredictionIntervals | None" = None,
+    axes: "Figure | None" = None,
+    **kwargs: str | int | float | bool | None,
+) -> "Figure":
+    """
+    Draw each series along the axis, one panel per series.
+
+    Parameters
+    ----------
+    output_file : str | None
+        Path to save the figure to. If None, the figure is only returned.
+    observed_data : list[ObservedDataPoint] | None
+        Observations, each drawn as a point on the panel of its label.
+        When the observations of a series share one sum of outputs and
+        one factor and have no window, the line covers every position of
+        the results. Otherwise the model of each observation is read
+        through its own operator (outputs, window, factor) at its own
+        position, as the loss reads it, and the line joins these values.
+    calibration_result : CalibrationResult | None
+        Its ``best_parameters`` give the values of the factors of the
+        observations, which multiply the line; observed values stay in
+        their own units.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+    series : list[str] | None
+        What to draw, one panel each: an output name (such as ``A_g1``),
+        or a bin or accumulator id, which draws the sum of its outputs.
+        An exact output name wins over an id. If None, every output.
+    show_legend : bool
+        Whether each panel shows its legend.
+    position_label : Callable[[float], str] | None
+        Turns a position on the axis into a tick label. If None, a model
+        with an origin (``ModelBuilder(origin=...)``) labels each tick
+        with its date: ``2020-01-02``, with the time when it is not
+        midnight. Otherwise the ticks show the position.
+    tick_every : float | None
+        Labels the plotted positions `tick_every` apart, counted from the
+        first plotted position. If None, every plotted position, or the
+        ticks matplotlib places on a dated axis.
+    x_label : str
+        The label of the x axis.
+    prediction_intervals : PredictionIntervals | None
+        Prediction intervals of a conformal method
+        (``ConformalResult.intervals``). The panel of each of their
+        series, by label, shows the band between their lower and upper
+        ends and their point prediction, dashed; an unbounded interval
+        is left out of the band.
+    axes : Figure | None
+        A figure of commol to draw on: each series is drawn on its panel,
+        the `Axes` whose label is the id of the series. If None, a new
+        figure.
+    **kwargs : str | int | float | bool | None
+        Passed to ``Axes.plot`` for the line of the run, such as
+        ``linewidth``, ``alpha`` or ``linestyle``.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+
+    Raises
+    ------
+    ValueError
+        If an entry of ``series`` is a bin or accumulator id of results
+        with no model; the results have no value at the position of an
+        observation read on its own or at the start of its window; or
+        ``axes`` has no panel of a series.
+    KeyError
+        If an entry of ``series`` is neither an output nor a bin or
+        accumulator id of the model.
+    ImportError
+        If matplotlib is not installed (``pip install 'commol[plot]'``).
+    """
+    from commol.api.plotting.figures import _run_series
+
+    return _run_series(
+        self._results,
+        output_file=output_file,
+        observed_data=observed_data,
+        calibration_result=calibration_result,
+        config=config,
+        series=series,
+        show_legend=show_legend,
+        position_label=position_label,
+        tick_every=tick_every,
+        x_label=x_label,
+        prediction_intervals=prediction_intervals,
+        axes=axes,
+        **kwargs,
+    )
+```
+
+#### cumulative
+
+```python
+cumulative(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | None = None, config: PlotConfig | None = None, series: list[str] | None = None, axes: Figure | None = None, **kwargs: str | int | float | bool | None) -> Figure
+```
+
+Draw the running total of each series, one panel per series.
+
+Parameters:
+
+| Name                 | Type                      | Description | Default                                                                                                                                                           |
+| -------------------- | ------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `output_file`        | \`str                     | None\`      | Path to save the figure to. If None, the figure is only returned.                                                                                                 |
+| `observed_data`      | \`list[ObservedDataPoint] | None\`      | Observations, drawn as their running total on the panel of their label. An observation with a factor is divided by the value of its factor in calibration_result. |
+| `calibration_result` | \`CalibrationResult       | None\`      | Its best_parameters give the values of the factors.                                                                                                               |
+| `config`             | \`PlotConfig              | None\`      | Layout, size and style. If None, the defaults.                                                                                                                    |
+| `series`             | \`list[str]               | None\`      | What to draw, one panel each, as in series. If None, every output.                                                                                                |
+| `axes`               | \`Figure                  | None\`      | A figure of commol to draw on, as in series.                                                                                                                      |
+| `**kwargs`           | \`str                     | int         | float                                                                                                                                                             |
+
+Returns:
+
+| Type     | Description            |
+| -------- | ---------------------- |
+| `Figure` | The matplotlib figure. |
+
+Raises:
+
+| Type          | Description                                                                          |
+| ------------- | ------------------------------------------------------------------------------------ |
+| `ValueError`  | If axes has no panel of a series.                                                    |
+| `KeyError`    | If an entry of series is neither an output nor a bin or accumulator id of the model. |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                         |
+
+Source code in `commol/api/plotting/accessors.py`
+
+```python
+def cumulative(
+    self,
+    output_file: str | None = None,
+    observed_data: "list[ObservedDataPoint] | None" = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: "PlotConfig | None" = None,
+    series: list[str] | None = None,
+    axes: "Figure | None" = None,
+    **kwargs: str | int | float | bool | None,
+) -> "Figure":
+    """
+    Draw the running total of each series, one panel per series.
+
+    Parameters
+    ----------
+    output_file : str | None
+        Path to save the figure to. If None, the figure is only returned.
+    observed_data : list[ObservedDataPoint] | None
+        Observations, drawn as their running total on the panel of their
+        label. An observation with a factor is divided by the value of
+        its factor in ``calibration_result``.
+    calibration_result : CalibrationResult | None
+        Its ``best_parameters`` give the values of the factors.
+    config : PlotConfig | None
+        Layout, size and style. If None, the defaults.
+    series : list[str] | None
+        What to draw, one panel each, as in `series`. If None, every
+        output.
+    axes : Figure | None
+        A figure of commol to draw on, as in `series`.
+    **kwargs : str | int | float | bool | None
+        Passed to ``Axes.plot`` for the line of the run.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+
+    Raises
+    ------
+    ValueError
+        If ``axes`` has no panel of a series.
+    KeyError
+        If an entry of ``series`` is neither an output nor a bin or
+        accumulator id of the model.
+    ImportError
+        If matplotlib is not installed (``pip install 'commol[plot]'``).
+    """
+    from commol.api.plotting.figures import _run_cumulative
+
+    return _run_cumulative(
+        self._results,
+        output_file=output_file,
+        observed_data=observed_data,
+        calibration_result=calibration_result,
+        config=config,
+        series=series,
+        axes=axes,
+        **kwargs,
+    )
+```
+
+#### observations
+
+```python
+observations(observed_data: list[ObservedDataPoint], output_file: str | None = None, calibration_result: CalibrationResult | None = None, config: PlotConfig | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', axes: Figure | None = None, **kwargs: str | int | float | bool | None) -> Figure
+```
+
+Draw each observed series with the model read through its observation operator, one panel per label.
+
+The model is read only at the observations: the value of each observation through its own operator (the sum of its outputs, its window and its factor), as the loss reads it. A value with a window is a total over `(at - window, at]`, drawn as a step over its window with a marker at `at`. A value with no window is a marker, joined to the next only as a guide. The run along the whole axis is `series`, on the same figure with `axes=`.
+
+Parameters:
+
+| Name                 | Type                       | Description                                                                                                         | Default                                                                                                                                    |
+| -------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `observed_data`      | `list[ObservedDataPoint]`  | The observations. Each label is one panel, in the order of its first observation, with the Axes label of the label. | *required*                                                                                                                                 |
+| `output_file`        | \`str                      | None\`                                                                                                              | Path to save the figure to. If None, the figure is only returned.                                                                          |
+| `calibration_result` | \`CalibrationResult        | None\`                                                                                                              | Its best_parameters give the values of the factors of the observations, which multiply the model; observed values stay in their own units. |
+| `config`             | \`PlotConfig               | None\`                                                                                                              | Layout and style. If None, the defaults.                                                                                                   |
+| `show_legend`        | `bool`                     | Whether each panel shows its legend.                                                                                | `True`                                                                                                                                     |
+| `position_label`     | \`Callable\[[float], str\] | None\`                                                                                                              | Turns a position into a tick label, as in series.                                                                                          |
+| `tick_every`         | \`float                    | None\`                                                                                                              | The distance between labelled observation positions, as in series.                                                                         |
+| `x_label`            | `str`                      | The label of the x axis.                                                                                            | `'Step'`                                                                                                                                   |
+| `axes`               | \`Figure                   | None\`                                                                                                              | A figure of commol to draw on: each observed series is drawn on the Axes whose label is its label. If None, a new figure.                  |
+| `**kwargs`           | \`str                      | int                                                                                                                 | float                                                                                                                                      |
+
+Returns:
+
+| Type     | Description            |
+| -------- | ---------------------- |
+| `Figure` | The matplotlib figure. |
+
+Raises:
+
+| Type          | Description                                                                                                                                               |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError`  | If there are no observations; the results have no value at the position of an observation or at the start of its window; or axes has no panel of a label. |
+| `KeyError`    | If an observation names an output the results do not have.                                                                                                |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                                                                              |
+
+Source code in `commol/api/plotting/accessors.py`
+
+```python
+def observations(
+    self,
+    observed_data: "list[ObservedDataPoint]",
+    output_file: str | None = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: "PlotConfig | None" = None,
+    show_legend: bool = True,
+    position_label: Callable[[float], str] | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    axes: "Figure | None" = None,
+    **kwargs: str | int | float | bool | None,
+) -> "Figure":
+    """
+    Draw each observed series with the model read through its
+    observation operator, one panel per label.
+
+    The model is read only at the observations: the value of each
+    observation through its own operator (the sum of its outputs, its
+    window and its factor), as the loss reads it. A value with a window is
+    a total over ``(at - window, at]``, drawn as a step over its window
+    with a marker at ``at``. A value with no window is a marker, joined
+    to the next only as a guide. The run along the whole axis is
+    `series`, on the same figure with ``axes=``.
+
+    Parameters
+    ----------
+    observed_data : list[ObservedDataPoint]
+        The observations. Each label is one panel, in the order of its
+        first observation, with the `Axes` label of the label.
+    output_file : str | None
+        Path to save the figure to. If None, the figure is only returned.
+    calibration_result : CalibrationResult | None
+        Its ``best_parameters`` give the values of the factors of the
+        observations, which multiply the model; observed values stay in
+        their own units.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+    show_legend : bool
+        Whether each panel shows its legend.
+    position_label : Callable[[float], str] | None
+        Turns a position into a tick label, as in `series`.
+    tick_every : float | None
+        The distance between labelled observation positions, as in
+        `series`.
+    x_label : str
+        The label of the x axis.
+    axes : Figure | None
+        A figure of commol to draw on: each observed series is drawn on
+        the `Axes` whose label is its label. If None, a new figure.
+    **kwargs : str | int | float | bool | None
+        Passed to ``Axes.plot`` for the steps and the guide of the model,
+        such as ``linewidth`` or ``alpha``.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+
+    Raises
+    ------
+    ValueError
+        If there are no observations; the results have no value at the
+        position of an observation or at the start of its window; or
+        ``axes`` has no panel of a label.
+    KeyError
+        If an observation names an output the results do not have.
+    ImportError
+        If matplotlib is not installed (``pip install 'commol[plot]'``).
+    """
+    from commol.api.plotting.figures import _run_observations
+
+    return _run_observations(
+        self._results,
+        observed_data,
+        output_file=output_file,
+        calibration_result=calibration_result,
+        config=config,
+        show_legend=show_legend,
+        position_label=position_label,
+        tick_every=tick_every,
+        x_label=x_label,
+        axes=axes,
+        **kwargs,
     )
 ```
 
@@ -2052,7 +2716,7 @@ Bases: `ComparedByValue`, `list[SimulationResults]`
 
 Replicates of a run of a stochastic engine, one `SimulationResults` each.
 
-A `list` of runs at the same positions, each with its own seed: `replicates[i].seed` repeats replicate `i`. The statistics reduce the replicates position by position, and `member_statistics` reduces them as `ci_percentiles` requires.
+A `list` of runs at the same positions, each with its own seed: `replicates[i].seed` repeats replicate `i`. The statistics reduce the replicates position by position, and `member_statistics` reduces them to a mean, a median, the extremes and an interval.
 
 Two replicates are equal when their runs, their seed, their positions and their model are (`ComparedByValue`); a plain `list` of the same runs is not equal to them. They have no hash.
 
@@ -2073,8 +2737,8 @@ class SimulationReplicates(ComparedByValue, list[SimulationResults]):
 
     A ``list`` of runs at the same positions, each with its own seed:
     ``replicates[i].seed`` repeats replicate ``i``. The statistics reduce the
-    replicates position by position, and `member_statistics` reduces them as
-    ``ci_percentiles`` requires.
+    replicates position by position, and `member_statistics` reduces them to a
+    mean, a median, the extremes and an interval.
 
     Two replicates are equal when their runs, their seed, their positions and
     their model are (`ComparedByValue`); a plain ``list`` of the same runs is
@@ -2237,7 +2901,7 @@ class SimulationReplicates(ComparedByValue, list[SimulationResults]):
 
         Parameters
         ----------
-        quantities : Sequence[Quantity]
+        quantities : Sequence[quantity]
             The quantities; a `Trajectory` gives one scalar per position.
 
         Returns
@@ -2602,7 +3266,7 @@ Parameters:
 
 | Name         | Type                 | Description                                                 | Default    |
 | ------------ | -------------------- | ----------------------------------------------------------- | ---------- |
-| `quantities` | `Sequence[Quantity]` | The quantities; a Trajectory gives one scalar per position. | *required* |
+| `quantities` | `Sequence[quantity]` | The quantities; a Trajectory gives one scalar per position. | *required* |
 
 Returns:
 
@@ -2638,7 +3302,7 @@ def quantities(
 
     Parameters
     ----------
-    quantities : Sequence[Quantity]
+    quantities : Sequence[quantity]
         The quantities; a `Trajectory` gives one scalar per position.
 
     Returns
@@ -2872,6 +3536,655 @@ def __repr__(self) -> str:
     )
 ```
 
+## ReplicatesPlot
+
+The figures of the replicates of a stochastic engine, read from `replicates.plot`.
+
+The figures are those of `ResultsPlot` for the mean of the replicates; `series` adds the band of the replicates.
+
+Source code in `commol/api/plotting/accessors.py`
+
+```python
+class ReplicatesPlot:
+    """
+    The figures of the replicates of a stochastic engine, read from
+    ``replicates.plot``.
+
+    The figures are those of `ResultsPlot` for the mean of the replicates;
+    `series` adds the band of the replicates.
+    """
+
+    def __init__(self, replicates: "SimulationReplicates") -> None:
+        """
+        The figures of `replicates`.
+
+        Parameters
+        ----------
+        replicates : SimulationReplicates
+            The replicates.
+        """
+        self._replicates = replicates
+
+    def series(
+        self,
+        output_file: str | None = None,
+        observed_data: "list[ObservedDataPoint] | None" = None,
+        calibration_result: "CalibrationResult | None" = None,
+        config: "PlotConfig | None" = None,
+        series: list[str] | None = None,
+        show_legend: bool = True,
+        position_label: Callable[[float], str] | None = None,
+        tick_every: float | None = None,
+        x_label: str = "Step",
+        prediction_intervals: "PredictionIntervals | None" = None,
+        confidence_level: float = 0.95,
+        axes: "Figure | None" = None,
+        **kwargs: str | int | float | bool | None,
+    ) -> "Figure":
+        """
+        Draw the mean of each series and the band of the replicates, one
+        panel per series.
+
+        Each replicate is reduced to the series first, through the operator
+        of its observations, then the band takes the interval of
+        `confidence_level` across them (`member_statistics`).
+
+        Parameters
+        ----------
+        output_file : str | None
+            Path to save the figure to. If None, the figure is only returned.
+        observed_data : list[ObservedDataPoint] | None
+            Observations, as in `ResultsPlot.series`.
+        calibration_result : CalibrationResult | None
+            The values of the factors, as in `ResultsPlot.series`.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+        series : list[str] | None
+            What to draw, as in `ResultsPlot.series`.
+        show_legend : bool
+            Whether each panel shows its legend.
+        position_label : Callable[[float], str] | None
+            Turns a position into a tick label, as in `ResultsPlot.series`.
+        tick_every : float | None
+            The distance between labelled positions, as in
+            `ResultsPlot.series`.
+        x_label : str
+            The label of the x axis.
+        prediction_intervals : PredictionIntervals | None
+            Prediction intervals of a conformal method, as in
+            `ResultsPlot.series`.
+        confidence_level : float
+            The level of the band, strictly between 0 and 1.
+        axes : Figure | None
+            A figure of commol to draw on, as in `ResultsPlot.series`.
+        **kwargs : str | int | float | bool | None
+            Passed to ``Axes.plot`` for the line of the mean.
+
+        Returns
+        -------
+        Figure
+            The matplotlib figure.
+
+        Raises
+        ------
+        ValueError
+            As `ResultsPlot.series`; or if there are no replicates or the
+            confidence level is out of range.
+        KeyError
+            As `ResultsPlot.series`.
+        ImportError
+            If matplotlib is not installed (``pip install 'commol[plot]'``).
+        """
+        from commol.api.plotting.figures import _replicates_series
+
+        return _replicates_series(
+            self._replicates,
+            output_file=output_file,
+            observed_data=observed_data,
+            calibration_result=calibration_result,
+            config=config,
+            series=series,
+            show_legend=show_legend,
+            position_label=position_label,
+            tick_every=tick_every,
+            x_label=x_label,
+            prediction_intervals=prediction_intervals,
+            confidence_level=confidence_level,
+            axes=axes,
+            **kwargs,
+        )
+
+    def cumulative(
+        self,
+        output_file: str | None = None,
+        observed_data: "list[ObservedDataPoint] | None" = None,
+        calibration_result: "CalibrationResult | None" = None,
+        config: "PlotConfig | None" = None,
+        series: list[str] | None = None,
+        axes: "Figure | None" = None,
+        **kwargs: str | int | float | bool | None,
+    ) -> "Figure":
+        """
+        Draw the running total of the mean of the replicates, as
+        `ResultsPlot.cumulative` draws one run.
+
+        Parameters
+        ----------
+        output_file : str | None
+            Path to save the figure to. If None, the figure is only returned.
+        observed_data : list[ObservedDataPoint] | None
+            Observations, as in `ResultsPlot.cumulative`.
+        calibration_result : CalibrationResult | None
+            The values of the factors, as in `ResultsPlot.cumulative`.
+        config : PlotConfig | None
+            Layout, size and style. If None, the defaults.
+        series : list[str] | None
+            What to draw, as in `ResultsPlot.series`.
+        axes : Figure | None
+            A figure of commol to draw on, as in `ResultsPlot.series`.
+        **kwargs : str | int | float | bool | None
+            Passed to ``Axes.plot`` for the line of the mean.
+
+        Returns
+        -------
+        Figure
+            The matplotlib figure.
+
+        Raises
+        ------
+        ValueError
+            As `ResultsPlot.cumulative`; or if there are no replicates.
+        KeyError
+            As `ResultsPlot.cumulative`.
+        ImportError
+            If matplotlib is not installed (``pip install 'commol[plot]'``).
+        """
+        from commol.api.plotting.figures import _replicates_cumulative
+
+        return _replicates_cumulative(
+            self._replicates,
+            output_file=output_file,
+            observed_data=observed_data,
+            calibration_result=calibration_result,
+            config=config,
+            series=series,
+            axes=axes,
+            **kwargs,
+        )
+
+    def observations(
+        self,
+        observed_data: "list[ObservedDataPoint]",
+        output_file: str | None = None,
+        calibration_result: "CalibrationResult | None" = None,
+        config: "PlotConfig | None" = None,
+        show_legend: bool = True,
+        position_label: Callable[[float], str] | None = None,
+        tick_every: float | None = None,
+        x_label: str = "Step",
+        confidence_level: float = 0.95,
+        axes: "Figure | None" = None,
+        **kwargs: str | int | float | bool | None,
+    ) -> "Figure":
+        """
+        Draw each observed series with the mean of the replicates and their
+        band, read through its observation operator, one panel per label.
+
+        Each replicate is read through the operator of each observation
+        first, as `ResultsPlot.observations` reads a run, then the band takes
+        the interval of `confidence_level` across them
+        (`member_statistics`). A band over a window is a rectangle over that
+        window. The band is a band of the model, with no observation noise,
+        not a prediction interval, and its legend says so.
+
+        Parameters
+        ----------
+        observed_data : list[ObservedDataPoint]
+            The observations, as in `ResultsPlot.observations`.
+        output_file : str | None
+            Path to save the figure to. If None, the figure is only returned.
+        calibration_result : CalibrationResult | None
+            The values of the factors, as in `ResultsPlot.observations`.
+        config : PlotConfig | None
+            Layout and style. If None, the defaults.
+        show_legend : bool
+            Whether each panel shows its legend.
+        position_label : Callable[[float], str] | None
+            Turns a position into a tick label, as in `ResultsPlot.series`.
+        tick_every : float | None
+            The distance between labelled positions, as in
+            `ResultsPlot.series`.
+        x_label : str
+            The label of the x axis.
+        confidence_level : float
+            The level of the band, strictly between 0 and 1.
+        axes : Figure | None
+            A figure of commol to draw on, as in `ResultsPlot.observations`.
+        **kwargs : str | int | float | bool | None
+            Passed to ``Axes.plot`` for the steps and the guide of the mean.
+
+        Returns
+        -------
+        Figure
+            The matplotlib figure.
+
+        Raises
+        ------
+        ValueError
+            As `ResultsPlot.observations`; or if there are no replicates or
+            the confidence level is out of range.
+        KeyError
+            If an observation names an output the replicates do not have.
+        ImportError
+            If matplotlib is not installed (``pip install 'commol[plot]'``).
+        """
+        from commol.api.plotting.figures import _replicates_observations
+
+        return _replicates_observations(
+            self._replicates,
+            observed_data,
+            output_file=output_file,
+            calibration_result=calibration_result,
+            config=config,
+            show_legend=show_legend,
+            position_label=position_label,
+            tick_every=tick_every,
+            x_label=x_label,
+            confidence_level=confidence_level,
+            axes=axes,
+            **kwargs,
+        )
+```
+
+### Methods:
+
+#### __init__
+
+```python
+__init__(replicates: SimulationReplicates) -> None
+```
+
+The figures of `replicates`.
+
+Parameters:
+
+| Name         | Type                   | Description     | Default    |
+| ------------ | ---------------------- | --------------- | ---------- |
+| `replicates` | `SimulationReplicates` | The replicates. | *required* |
+
+Source code in `commol/api/plotting/accessors.py`
+
+```python
+def __init__(self, replicates: "SimulationReplicates") -> None:
+    """
+    The figures of `replicates`.
+
+    Parameters
+    ----------
+    replicates : SimulationReplicates
+        The replicates.
+    """
+    self._replicates = replicates
+```
+
+#### series
+
+```python
+series(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | None = None, config: PlotConfig | None = None, series: list[str] | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', prediction_intervals: PredictionIntervals | None = None, confidence_level: float = 0.95, axes: Figure | None = None, **kwargs: str | int | float | bool | None) -> Figure
+```
+
+Draw the mean of each series and the band of the replicates, one panel per series.
+
+Each replicate is reduced to the series first, through the operator of its observations, then the band takes the interval of `confidence_level` across them (`member_statistics`).
+
+Parameters:
+
+| Name                   | Type                       | Description                                      | Default                                                               |
+| ---------------------- | -------------------------- | ------------------------------------------------ | --------------------------------------------------------------------- |
+| `output_file`          | \`str                      | None\`                                           | Path to save the figure to. If None, the figure is only returned.     |
+| `observed_data`        | \`list[ObservedDataPoint]  | None\`                                           | Observations, as in ResultsPlot.series.                               |
+| `calibration_result`   | \`CalibrationResult        | None\`                                           | The values of the factors, as in ResultsPlot.series.                  |
+| `config`               | \`PlotConfig               | None\`                                           | Layout and style. If None, the defaults.                              |
+| `series`               | \`list[str]                | None\`                                           | What to draw, as in ResultsPlot.series.                               |
+| `show_legend`          | `bool`                     | Whether each panel shows its legend.             | `True`                                                                |
+| `position_label`       | \`Callable\[[float], str\] | None\`                                           | Turns a position into a tick label, as in ResultsPlot.series.         |
+| `tick_every`           | \`float                    | None\`                                           | The distance between labelled positions, as in ResultsPlot.series.    |
+| `x_label`              | `str`                      | The label of the x axis.                         | `'Step'`                                                              |
+| `prediction_intervals` | \`PredictionIntervals      | None\`                                           | Prediction intervals of a conformal method, as in ResultsPlot.series. |
+| `confidence_level`     | `float`                    | The level of the band, strictly between 0 and 1. | `0.95`                                                                |
+| `axes`                 | \`Figure                   | None\`                                           | A figure of commol to draw on, as in ResultsPlot.series.              |
+| `**kwargs`             | \`str                      | int                                              | float                                                                 |
+
+Returns:
+
+| Type     | Description            |
+| -------- | ---------------------- |
+| `Figure` | The matplotlib figure. |
+
+Raises:
+
+| Type          | Description                                                                                   |
+| ------------- | --------------------------------------------------------------------------------------------- |
+| `ValueError`  | As ResultsPlot.series; or if there are no replicates or the confidence level is out of range. |
+| `KeyError`    | As ResultsPlot.series.                                                                        |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                  |
+
+Source code in `commol/api/plotting/accessors.py`
+
+```python
+def series(
+    self,
+    output_file: str | None = None,
+    observed_data: "list[ObservedDataPoint] | None" = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: "PlotConfig | None" = None,
+    series: list[str] | None = None,
+    show_legend: bool = True,
+    position_label: Callable[[float], str] | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    prediction_intervals: "PredictionIntervals | None" = None,
+    confidence_level: float = 0.95,
+    axes: "Figure | None" = None,
+    **kwargs: str | int | float | bool | None,
+) -> "Figure":
+    """
+    Draw the mean of each series and the band of the replicates, one
+    panel per series.
+
+    Each replicate is reduced to the series first, through the operator
+    of its observations, then the band takes the interval of
+    `confidence_level` across them (`member_statistics`).
+
+    Parameters
+    ----------
+    output_file : str | None
+        Path to save the figure to. If None, the figure is only returned.
+    observed_data : list[ObservedDataPoint] | None
+        Observations, as in `ResultsPlot.series`.
+    calibration_result : CalibrationResult | None
+        The values of the factors, as in `ResultsPlot.series`.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+    series : list[str] | None
+        What to draw, as in `ResultsPlot.series`.
+    show_legend : bool
+        Whether each panel shows its legend.
+    position_label : Callable[[float], str] | None
+        Turns a position into a tick label, as in `ResultsPlot.series`.
+    tick_every : float | None
+        The distance between labelled positions, as in
+        `ResultsPlot.series`.
+    x_label : str
+        The label of the x axis.
+    prediction_intervals : PredictionIntervals | None
+        Prediction intervals of a conformal method, as in
+        `ResultsPlot.series`.
+    confidence_level : float
+        The level of the band, strictly between 0 and 1.
+    axes : Figure | None
+        A figure of commol to draw on, as in `ResultsPlot.series`.
+    **kwargs : str | int | float | bool | None
+        Passed to ``Axes.plot`` for the line of the mean.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+
+    Raises
+    ------
+    ValueError
+        As `ResultsPlot.series`; or if there are no replicates or the
+        confidence level is out of range.
+    KeyError
+        As `ResultsPlot.series`.
+    ImportError
+        If matplotlib is not installed (``pip install 'commol[plot]'``).
+    """
+    from commol.api.plotting.figures import _replicates_series
+
+    return _replicates_series(
+        self._replicates,
+        output_file=output_file,
+        observed_data=observed_data,
+        calibration_result=calibration_result,
+        config=config,
+        series=series,
+        show_legend=show_legend,
+        position_label=position_label,
+        tick_every=tick_every,
+        x_label=x_label,
+        prediction_intervals=prediction_intervals,
+        confidence_level=confidence_level,
+        axes=axes,
+        **kwargs,
+    )
+```
+
+#### cumulative
+
+```python
+cumulative(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | None = None, config: PlotConfig | None = None, series: list[str] | None = None, axes: Figure | None = None, **kwargs: str | int | float | bool | None) -> Figure
+```
+
+Draw the running total of the mean of the replicates, as `ResultsPlot.cumulative` draws one run.
+
+Parameters:
+
+| Name                 | Type                      | Description | Default                                                           |
+| -------------------- | ------------------------- | ----------- | ----------------------------------------------------------------- |
+| `output_file`        | \`str                     | None\`      | Path to save the figure to. If None, the figure is only returned. |
+| `observed_data`      | \`list[ObservedDataPoint] | None\`      | Observations, as in ResultsPlot.cumulative.                       |
+| `calibration_result` | \`CalibrationResult       | None\`      | The values of the factors, as in ResultsPlot.cumulative.          |
+| `config`             | \`PlotConfig              | None\`      | Layout, size and style. If None, the defaults.                    |
+| `series`             | \`list[str]               | None\`      | What to draw, as in ResultsPlot.series.                           |
+| `axes`               | \`Figure                  | None\`      | A figure of commol to draw on, as in ResultsPlot.series.          |
+| `**kwargs`           | \`str                     | int         | float                                                             |
+
+Returns:
+
+| Type     | Description            |
+| -------- | ---------------------- |
+| `Figure` | The matplotlib figure. |
+
+Raises:
+
+| Type          | Description                                                  |
+| ------------- | ------------------------------------------------------------ |
+| `ValueError`  | As ResultsPlot.cumulative; or if there are no replicates.    |
+| `KeyError`    | As ResultsPlot.cumulative.                                   |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]'). |
+
+Source code in `commol/api/plotting/accessors.py`
+
+```python
+def cumulative(
+    self,
+    output_file: str | None = None,
+    observed_data: "list[ObservedDataPoint] | None" = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: "PlotConfig | None" = None,
+    series: list[str] | None = None,
+    axes: "Figure | None" = None,
+    **kwargs: str | int | float | bool | None,
+) -> "Figure":
+    """
+    Draw the running total of the mean of the replicates, as
+    `ResultsPlot.cumulative` draws one run.
+
+    Parameters
+    ----------
+    output_file : str | None
+        Path to save the figure to. If None, the figure is only returned.
+    observed_data : list[ObservedDataPoint] | None
+        Observations, as in `ResultsPlot.cumulative`.
+    calibration_result : CalibrationResult | None
+        The values of the factors, as in `ResultsPlot.cumulative`.
+    config : PlotConfig | None
+        Layout, size and style. If None, the defaults.
+    series : list[str] | None
+        What to draw, as in `ResultsPlot.series`.
+    axes : Figure | None
+        A figure of commol to draw on, as in `ResultsPlot.series`.
+    **kwargs : str | int | float | bool | None
+        Passed to ``Axes.plot`` for the line of the mean.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+
+    Raises
+    ------
+    ValueError
+        As `ResultsPlot.cumulative`; or if there are no replicates.
+    KeyError
+        As `ResultsPlot.cumulative`.
+    ImportError
+        If matplotlib is not installed (``pip install 'commol[plot]'``).
+    """
+    from commol.api.plotting.figures import _replicates_cumulative
+
+    return _replicates_cumulative(
+        self._replicates,
+        output_file=output_file,
+        observed_data=observed_data,
+        calibration_result=calibration_result,
+        config=config,
+        series=series,
+        axes=axes,
+        **kwargs,
+    )
+```
+
+#### observations
+
+```python
+observations(observed_data: list[ObservedDataPoint], output_file: str | None = None, calibration_result: CalibrationResult | None = None, config: PlotConfig | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', confidence_level: float = 0.95, axes: Figure | None = None, **kwargs: str | int | float | bool | None) -> Figure
+```
+
+Draw each observed series with the mean of the replicates and their band, read through its observation operator, one panel per label.
+
+Each replicate is read through the operator of each observation first, as `ResultsPlot.observations` reads a run, then the band takes the interval of `confidence_level` across them (`member_statistics`). A band over a window is a rectangle over that window. The band is a band of the model, with no observation noise, not a prediction interval, and its legend says so.
+
+Parameters:
+
+| Name                 | Type                       | Description                                       | Default                                                            |
+| -------------------- | -------------------------- | ------------------------------------------------- | ------------------------------------------------------------------ |
+| `observed_data`      | `list[ObservedDataPoint]`  | The observations, as in ResultsPlot.observations. | *required*                                                         |
+| `output_file`        | \`str                      | None\`                                            | Path to save the figure to. If None, the figure is only returned.  |
+| `calibration_result` | \`CalibrationResult        | None\`                                            | The values of the factors, as in ResultsPlot.observations.         |
+| `config`             | \`PlotConfig               | None\`                                            | Layout and style. If None, the defaults.                           |
+| `show_legend`        | `bool`                     | Whether each panel shows its legend.              | `True`                                                             |
+| `position_label`     | \`Callable\[[float], str\] | None\`                                            | Turns a position into a tick label, as in ResultsPlot.series.      |
+| `tick_every`         | \`float                    | None\`                                            | The distance between labelled positions, as in ResultsPlot.series. |
+| `x_label`            | `str`                      | The label of the x axis.                          | `'Step'`                                                           |
+| `confidence_level`   | `float`                    | The level of the band, strictly between 0 and 1.  | `0.95`                                                             |
+| `axes`               | \`Figure                   | None\`                                            | A figure of commol to draw on, as in ResultsPlot.observations.     |
+| `**kwargs`           | \`str                      | int                                               | float                                                              |
+
+Returns:
+
+| Type     | Description            |
+| -------- | ---------------------- |
+| `Figure` | The matplotlib figure. |
+
+Raises:
+
+| Type          | Description                                                                                         |
+| ------------- | --------------------------------------------------------------------------------------------------- |
+| `ValueError`  | As ResultsPlot.observations; or if there are no replicates or the confidence level is out of range. |
+| `KeyError`    | If an observation names an output the replicates do not have.                                       |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                        |
+
+Source code in `commol/api/plotting/accessors.py`
+
+```python
+def observations(
+    self,
+    observed_data: "list[ObservedDataPoint]",
+    output_file: str | None = None,
+    calibration_result: "CalibrationResult | None" = None,
+    config: "PlotConfig | None" = None,
+    show_legend: bool = True,
+    position_label: Callable[[float], str] | None = None,
+    tick_every: float | None = None,
+    x_label: str = "Step",
+    confidence_level: float = 0.95,
+    axes: "Figure | None" = None,
+    **kwargs: str | int | float | bool | None,
+) -> "Figure":
+    """
+    Draw each observed series with the mean of the replicates and their
+    band, read through its observation operator, one panel per label.
+
+    Each replicate is read through the operator of each observation
+    first, as `ResultsPlot.observations` reads a run, then the band takes
+    the interval of `confidence_level` across them
+    (`member_statistics`). A band over a window is a rectangle over that
+    window. The band is a band of the model, with no observation noise,
+    not a prediction interval, and its legend says so.
+
+    Parameters
+    ----------
+    observed_data : list[ObservedDataPoint]
+        The observations, as in `ResultsPlot.observations`.
+    output_file : str | None
+        Path to save the figure to. If None, the figure is only returned.
+    calibration_result : CalibrationResult | None
+        The values of the factors, as in `ResultsPlot.observations`.
+    config : PlotConfig | None
+        Layout and style. If None, the defaults.
+    show_legend : bool
+        Whether each panel shows its legend.
+    position_label : Callable[[float], str] | None
+        Turns a position into a tick label, as in `ResultsPlot.series`.
+    tick_every : float | None
+        The distance between labelled positions, as in
+        `ResultsPlot.series`.
+    x_label : str
+        The label of the x axis.
+    confidence_level : float
+        The level of the band, strictly between 0 and 1.
+    axes : Figure | None
+        A figure of commol to draw on, as in `ResultsPlot.observations`.
+    **kwargs : str | int | float | bool | None
+        Passed to ``Axes.plot`` for the steps and the guide of the mean.
+
+    Returns
+    -------
+    Figure
+        The matplotlib figure.
+
+    Raises
+    ------
+    ValueError
+        As `ResultsPlot.observations`; or if there are no replicates or
+        the confidence level is out of range.
+    KeyError
+        If an observation names an output the replicates do not have.
+    ImportError
+        If matplotlib is not installed (``pip install 'commol[plot]'``).
+    """
+    from commol.api.plotting.figures import _replicates_observations
+
+    return _replicates_observations(
+        self._replicates,
+        observed_data,
+        output_file=output_file,
+        calibration_result=calibration_result,
+        config=config,
+        show_legend=show_legend,
+        position_label=position_label,
+        tick_every=tick_every,
+        x_label=x_label,
+        confidence_level=confidence_level,
+        axes=axes,
+        **kwargs,
+    )
+```
+
 ## ODESolver
 
 Bases: `BaseModel`
@@ -2917,28 +4230,9 @@ class ODESolver(BaseModel):
     )
 
     @model_validator(mode="after")
-    def check_with_the_engine(self) -> Self:
+    def _check_with_the_engine(self) -> Self:
         """Ask the engine's list whether it takes the settings."""
         return _checked(self)
-```
-
-### Methods:
-
-#### check_with_the_engine
-
-```python
-check_with_the_engine() -> Self
-```
-
-Ask the engine's list whether it takes the settings.
-
-Source code in `commol/context/engine.py`
-
-```python
-@model_validator(mode="after")
-def check_with_the_engine(self) -> Self:
-    """Ask the engine's list whether it takes the settings."""
-    return _checked(self)
 ```
 
 ## StochasticEventsSettings
@@ -3004,28 +4298,9 @@ class StochasticEventsSettings(BaseModel):
     )
 
     @model_validator(mode="after")
-    def check_with_the_engine(self) -> Self:
+    def _check_with_the_engine(self) -> Self:
         """Ask the engine's list whether it takes the settings."""
         return _checked(self)
-```
-
-### Methods:
-
-#### check_with_the_engine
-
-```python
-check_with_the_engine() -> Self
-```
-
-Ask the engine's list whether it takes the settings.
-
-Source code in `commol/context/engine.py`
-
-```python
-@model_validator(mode="after")
-def check_with_the_engine(self) -> Self:
-    """Ask the engine's list whether it takes the settings."""
-    return _checked(self)
 ```
 
 ## StochasticStepsSettings
@@ -3061,28 +4336,9 @@ class StochasticStepsSettings(BaseModel):
     )
 
     @model_validator(mode="after")
-    def check_with_the_engine(self) -> Self:
+    def _check_with_the_engine(self) -> Self:
         """Ask the engine's list whether it takes the settings."""
         return _checked(self)
-```
-
-### Methods:
-
-#### check_with_the_engine
-
-```python
-check_with_the_engine() -> Self
-```
-
-Ask the engine's list whether it takes the settings.
-
-Source code in `commol/context/engine.py`
-
-```python
-@model_validator(mode="after")
-def check_with_the_engine(self) -> Self:
-    """Ask the engine's list whether it takes the settings."""
-    return _checked(self)
 ```
 
 ## InfeasibleStateError
@@ -3094,173 +4350,3 @@ InfeasibleStateError = _engine.InfeasibleStateError
 A run left the values its model allows, such as an amount below zero.
 
 A difference-equations step or an impulse that leaves a compartment below zero raises it. A stochastic engine raises it for a rate it cannot draw, such as a negative rate, an impulse fraction outside 0 to 1, or an absolute impulse that is not a whole number. It is a `ValueError`; a calibration treats such a run as infeasible.
-
-## Windows and positions
-
-## windowed_totals
-
-```python
-windowed_totals(series: Sequence[float], positions: Sequence[float], window: float, at: Iterable[float] | None = None) -> list[float]
-```
-
-Amount a cumulative series gained over each window.
-
-Each value is the series at the end of the window minus the series at its start, `at - window`, each found with the tolerance of the axis: the rule of a windowed observation (`window_increments` of `crates/commol-calibration/src/observation.rs`), so the value is the prediction a calibration compares an observation against when that observation sets `window`.
-
-Parameters:
-
-| Name        | Type              | Description                                                              | Default                                                                                                                                                                                                                              |
-| ----------- | ----------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `series`    | `Sequence[float]` | A cumulative series, one value per position.                             | *required*                                                                                                                                                                                                                           |
-| `positions` | `Sequence[float]` | Positions of the series, ascending, such as SimulationResults.positions. | *required*                                                                                                                                                                                                                           |
-| `window`    | `float`           | Length of one window on the axis.                                        | *required*                                                                                                                                                                                                                           |
-| `at`        | \`Iterable[float] | None\`                                                                   | Positions at which windows close. Defaults to every complete window of the series (window_ends of the engine, as AxisUnits.window_ends gives it). Pass the observation positions to reproduce exactly the values a calibration used. |
-
-Returns:
-
-| Type          | Description                           |
-| ------------- | ------------------------------------- |
-| `list[float]` | One increment per requested position. |
-
-Raises:
-
-| Type         | Description                                                                                                                                                                                                                 |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If series and positions differ in length, window is not a finite, positive length (the message of the engine), a window starts before position 0, or the series has no value at the end or the start of a requested window. |
-
-Source code in `commol/api/windows.py`
-
-```python
-def windowed_totals(
-    series: Sequence[float],
-    positions: Sequence[float],
-    window: float,
-    at: Iterable[float] | None = None,
-) -> list[float]:
-    """
-    Amount a cumulative series gained over each window.
-
-    Each value is the series at the end of the window minus the series at its
-    start, ``at - window``, each found with the tolerance of the axis: the
-    rule of a windowed observation (`window_increments` of
-    `crates/commol-calibration/src/observation.rs`), so the value is the
-    prediction a calibration compares an observation against when that
-    observation sets ``window``.
-
-    Parameters
-    ----------
-    series : Sequence[float]
-        A cumulative series, one value per position.
-    positions : Sequence[float]
-        Positions of the series, ascending, such as
-        ``SimulationResults.positions``.
-    window : float
-        Length of one window on the axis.
-    at : Iterable[float] | None, optional
-        Positions at which windows close. Defaults to every complete window of
-        the series (`window_ends` of the engine, as `AxisUnits.window_ends`
-        gives it). Pass the observation positions to reproduce exactly the
-        values a calibration used.
-
-    Returns
-    -------
-    list[float]
-        One increment per requested position.
-
-    Raises
-    ------
-    ValueError
-        If `series` and `positions` differ in length, `window` is not a
-        finite, positive length (the message of the engine), a window starts
-        before position 0, or the series has no value at the end or the start
-        of a requested window.
-    """
-    if len(series) != len(positions):
-        raise ValueError(
-            f"The series has {len(series)} values for {len(positions)} positions."
-        )
-    ends = (
-        commol_rs.calibration.window_ends(window, positions[-1] if positions else 0.0)
-        if at is None
-        else list(at)
-    )
-    return commol_rs.calibration.window_increments(
-        [float(value) for value in series],
-        [float(position) for position in positions],
-        float(window),
-        [float(end) for end in ends],
-    )
-```
-
-## sample
-
-```python
-sample(series: Sequence[float], positions: Sequence[float], at: Iterable[float]) -> list[float]
-```
-
-Read a series at the given positions.
-
-Compartment counts are instantaneous, so they are read at the position rather than averaged over the interval leading to it. Each position is found with the tolerance of the axis, as an observation finds its row (`index_at` of `crates/commol-calibration/src/observation.rs`), so \`0.1
-
-- 0.2`reads the value at`0.3\`.
-
-Parameters:
-
-| Name        | Type              | Description                         | Default    |
-| ----------- | ----------------- | ----------------------------------- | ---------- |
-| `series`    | `Sequence[float]` | One value per position.             | *required* |
-| `positions` | `Sequence[float]` | Positions of the series, ascending. | *required* |
-| `at`        | `Iterable[float]` | Positions to read.                  | *required* |
-
-Returns:
-
-| Type          | Description                   |
-| ------------- | ----------------------------- |
-| `list[float]` | One value per position in at. |
-
-Raises:
-
-| Type         | Description                                  |
-| ------------ | -------------------------------------------- |
-| `ValueError` | If a position in at is not one of positions. |
-
-Source code in `commol/api/results.py`
-
-```python
-def sample(
-    series: Sequence[float], positions: Sequence[float], at: Iterable[float]
-) -> list[float]:
-    """
-    Read a series at the given positions.
-
-    Compartment counts are instantaneous, so they are read at the position
-    rather than averaged over the interval leading to it. Each position is
-    found with the tolerance of the axis, as an observation finds its row
-    (`index_at` of `crates/commol-calibration/src/observation.rs`), so ``0.1
-    + 0.2`` reads the value at ``0.3``.
-
-    Parameters
-    ----------
-    series : Sequence[float]
-        One value per position.
-    positions : Sequence[float]
-        Positions of the series, ascending.
-    at : Iterable[float]
-        Positions to read.
-
-    Returns
-    -------
-    list[float]
-        One value per position in `at`.
-
-    Raises
-    ------
-    ValueError
-        If a position in `at` is not one of `positions`.
-    """
-    rows = commol_rs.calibration.index_at(
-        [float(position) for position in positions],
-        [float(position) for position in at],
-    )
-    return [series[row] for row in rows]
-```
