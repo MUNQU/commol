@@ -15,6 +15,7 @@ check some of these rules. The rest depend on the author and the reviewer.
 | Rust style | `cargo fmt`; no Clippy warnings | pre-commit, CI (`-D warnings`) |
 | Rust docs | Every public item documented (`missing_docs`); no broken doc links | clippy and `cargo doc` (CI) |
 | Docstrings | NumPy style on every public module, class, function and argument | `ruff` rules `D1` and `D417` (pre-commit, CI) |
+| Design | The [Design principles](design-principles.md) | `tests/suite/test_architecture.py` (CI) and review |
 | Comments | Describe the code as it is | Review |
 | Documentation | Mandatory with every change: [definition of done](#documentation-definition-of-done) | CI and review |
 | Doc examples | Abstract names; every block runs | `pytest -m docs` (CI) and review |
@@ -232,4 +233,4 @@ methods.
 
 ## Navigation
 
-Previous: [Design decisions](design-decisions.md) | Next: [Tests](tests.md)
+Previous: [Design decisions](design-decisions.md) | Next: [Design principles](design-principles.md)

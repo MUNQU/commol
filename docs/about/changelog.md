@@ -35,6 +35,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   build still rejects a variable that the model does not define. See
   [Limits of the parser](../guide/mathematical-expressions.md#limits-of-the-parser).
 
+### Documentation
+
+- [Design principles](../codebase/design-principles.md): the structure,
+  the rules of each unit and of the interface, and the proof that every part
+  of the code follows. «Before you change code» of `AGENTS.md` links them.
+  `tests/suite/test_architecture.py` fails when a crate of `crates/`
+  depends on PyO3 or on the bridge.
+- A numbered list of the documentation keeps its first number, and a line
+  inside a paragraph that starts with a number and a period, such as `512.`,
+  stays in its paragraph: the site reads lists with `sane_lists`.
+
 ## [0.10.2] - 2026-10-24
 
 This release makes the engine the one source of every rule: the range of
