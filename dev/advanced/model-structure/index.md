@@ -1116,10 +1116,10 @@ class ModelEngine(BaseModel):
     @model_validator(mode="after")
     def check_settings(self) -> Self:
         """Ask the engine's list whether it has the engine and the settings."""
-        settings_json = (
-            None if self.settings is None else self.settings.model_dump_json()
+        settings_json = None if self.settings is None else engine_json(self.settings)
+        commol_rs.engine.EngineType(engine_json(self.type)).check_settings(
+            settings_json
         )
-        commol_rs.engine.EngineType(self.type).check_settings(settings_json)
         return self
 ```
 
@@ -1164,10 +1164,10 @@ Source code in `commol/context/engine.py`
 @model_validator(mode="after")
 def check_settings(self) -> Self:
     """Ask the engine's list whether it has the engine and the settings."""
-    settings_json = (
-        None if self.settings is None else self.settings.model_dump_json()
+    settings_json = None if self.settings is None else engine_json(self.settings)
+    commol_rs.engine.EngineType(engine_json(self.type)).check_settings(
+        settings_json
     )
-    commol_rs.engine.EngineType(self.type).check_settings(settings_json)
     return self
 ```
 

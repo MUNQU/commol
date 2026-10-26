@@ -74,10 +74,8 @@ class SensitivityAnalysis:
         )
         self._rust: "ForwardAnalysisProtocol" = commol_rs.inference.ForwardAnalysis(
             simulation.engine,
-            engine_state.rust_parameters(inputs.parameters),
-            distributions=inputs.rust_distributions(),
-            sample=None if inputs.sample is None else inputs.sample.rust_sample,
-            initial_condition_remainder=inputs.initial_condition_remainder,
+            engine_json(inputs),
+            **engine_handles(inputs),
             replicates=replicates,
             seed=None if seed is None else check_seed(seed),
         )
@@ -87,19 +85,7 @@ class SensitivityAnalysis:
                 self._rust.seed,
             )
 
-    @property
-    def rust_analysis(self) -> "ForwardAnalysisProtocol":
-        """
-        The forward analysis built in Rust, for the runners of methods.
-
-        Returns
-        -------
-        ForwardAnalysisProtocol
-            The forward model and the inputs every method reads.
-        """
-        return self._rust
-
-    def rust_predictive(
+    def _predictive(
         self, sample: ParameterSample, positions: list[float]
     ) -> "PredictiveProtocol":
         """
@@ -119,7 +105,7 @@ class SensitivityAnalysis:
         PredictiveProtocol
             The runs, computed in Rust.
         """
-        return self._rust.predictive(sample.rust_sample, positions)
+        return self._rust.predictive(sample._rust, positions)
 
     def with_model(self, model: "Model") -> "SensitivityAnalysis":
         """
@@ -147,7 +133,7 @@ class SensitivityAnalysis:
             Simulation(model), self.inputs, replicates=self.replicates, seed=self.seed
         )
 
-    def rust_observation_draws(
+    def _observation_draws(
         self,
         sample: ParameterSample,
         observed_data: list[ObservedDataPoint],
@@ -184,11 +170,9 @@ class SensitivityAnalysis:
                 "models of a problem, and a sensitivity analysis has no data. Read "
                 "the observations with NoNoise()."
             )
-        return self._rust.observation_draws(
-            sample.rust_sample, engine_state.rust_observed_data(observed_data)
-        )
+        return self._rust.observation_draws(sample._rust, engine_json(observed_data))
 
-    def rust_log_score(
+    def _log_score(
         self,
         sample: ParameterSample,  # noqa: ARG002
         observed_data: list[ObservedDataPoint],  # noqa: ARG002
@@ -260,20 +244,6 @@ class SensitivityAnalysis:
 ```
 
 ### Attributes
-
-#### rust_analysis
-
-```python
-rust_analysis: ForwardAnalysisProtocol
-```
-
-The forward analysis built in Rust, for the runners of methods.
-
-Returns:
-
-| Type                      | Description                                          |
-| ------------------------- | ---------------------------------------------------- |
-| `ForwardAnalysisProtocol` | The forward model and the inputs every method reads. |
 
 #### seed
 
@@ -365,10 +335,8 @@ def __init__(
     )
     self._rust: "ForwardAnalysisProtocol" = commol_rs.inference.ForwardAnalysis(
         simulation.engine,
-        engine_state.rust_parameters(inputs.parameters),
-        distributions=inputs.rust_distributions(),
-        sample=None if inputs.sample is None else inputs.sample.rust_sample,
-        initial_condition_remainder=inputs.initial_condition_remainder,
+        engine_json(inputs),
+        **engine_handles(inputs),
         replicates=replicates,
         seed=None if seed is None else check_seed(seed),
     )
@@ -377,53 +345,6 @@ def __init__(
             "No seed set; drew the seed %d, which repeats this analysis.",
             self._rust.seed,
         )
-```
-
-#### rust_predictive
-
-```python
-rust_predictive(sample: ParameterSample, positions: list[float]) -> PredictiveProtocol
-```
-
-The run of every draw of `sample` at `positions`, for a `Predictive`: each replicate of a stochastic engine has a seed of its own, derived from the seed of the analysis, as in a propagation.
-
-Parameters:
-
-| Name        | Type              | Description                                | Default    |
-| ----------- | ----------------- | ------------------------------------------ | ---------- |
-| `sample`    | `ParameterSample` | The draws, in the order of the inputs.     | *required* |
-| `positions` | `list[float]`     | Positions to report at, sorted and unique. | *required* |
-
-Returns:
-
-| Type                 | Description                 |
-| -------------------- | --------------------------- |
-| `PredictiveProtocol` | The runs, computed in Rust. |
-
-Source code in `commol/api/sensitivity.py`
-
-```python
-def rust_predictive(
-    self, sample: ParameterSample, positions: list[float]
-) -> "PredictiveProtocol":
-    """
-    The run of every draw of `sample` at `positions`, for a `Predictive`:
-    each replicate of a stochastic engine has a seed of its own, derived
-    from the seed of the analysis, as in a propagation.
-
-    Parameters
-    ----------
-    sample : ParameterSample
-        The draws, in the order of the inputs.
-    positions : list[float]
-        Positions to report at, sorted and unique.
-
-    Returns
-    -------
-    PredictiveProtocol
-        The runs, computed in Rust.
-    """
-    return self._rust.predictive(sample.rust_sample, positions)
 ```
 
 #### with_model
@@ -481,130 +402,6 @@ def with_model(self, model: "Model") -> "SensitivityAnalysis":
     """
     return SensitivityAnalysis(
         Simulation(model), self.inputs, replicates=self.replicates, seed=self.seed
-    )
-```
-
-#### rust_observation_draws
-
-```python
-rust_observation_draws(sample: ParameterSample, observed_data: list[ObservedDataPoint], noise: ObservationNoise) -> ObservationDrawsProtocol
-```
-
-Every draw's value of `observed_data`, for a `Predictive`.
-
-Parameters:
-
-| Name            | Type                      | Description                            | Default             |
-| --------------- | ------------------------- | -------------------------------------- | ------------------- |
-| `sample`        | `ParameterSample`         | The draws, in the order of the inputs. | *required*          |
-| `observed_data` | `list[ObservedDataPoint]` | The observations.                      | *required*          |
-| `noise`         | \`NoNoise                 | ResidualNoise                          | DistributionNoise\` |
-
-Returns:
-
-| Type                       | Description                  |
-| -------------------------- | ---------------------------- |
-| `ObservationDrawsProtocol` | The draws, computed in Rust. |
-
-Raises:
-
-| Type         | Description                                                                                                                                                      |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If the noise is not NoNoise(): residual noise needs the residuals of a fit, distribution noise the observation models of a problem, and an analysis has neither. |
-
-Source code in `commol/api/sensitivity.py`
-
-```python
-def rust_observation_draws(
-    self,
-    sample: ParameterSample,
-    observed_data: list[ObservedDataPoint],
-    noise: ObservationNoise,
-) -> "ObservationDrawsProtocol":
-    """
-    Every draw's value of `observed_data`, for a `Predictive`.
-
-    Parameters
-    ----------
-    sample : ParameterSample
-        The draws, in the order of the inputs.
-    observed_data : list[ObservedDataPoint]
-        The observations.
-    noise : NoNoise | ResidualNoise | DistributionNoise
-        The observation noise; only ``NoNoise()``.
-
-    Returns
-    -------
-    ObservationDrawsProtocol
-        The draws, computed in Rust.
-
-    Raises
-    ------
-    ValueError
-        If the noise is not ``NoNoise()``: residual noise needs the
-        residuals of a fit, distribution noise the observation models of a
-        problem, and an analysis has neither.
-    """
-    if not isinstance(noise, NoNoise):
-        raise ValueError(
-            f"{type(noise).__name__} needs a calibration: residual noise reads "
-            "the residuals of a fit and distribution noise the observation "
-            "models of a problem, and a sensitivity analysis has no data. Read "
-            "the observations with NoNoise()."
-        )
-    return self._rust.observation_draws(
-        sample.rust_sample, engine_state.rust_observed_data(observed_data)
-    )
-```
-
-#### rust_log_score
-
-```python
-rust_log_score(sample: ParameterSample, observed_data: list[ObservedDataPoint]) -> list[float]
-```
-
-Refuse the log score, which `commol.scores.log_score` asks for.
-
-Parameters:
-
-| Name            | Type                      | Description       | Default    |
-| --------------- | ------------------------- | ----------------- | ---------- |
-| `sample`        | `ParameterSample`         | The draws.        | *required* |
-| `observed_data` | `list[ObservedDataPoint]` | The observations. | *required* |
-
-Raises:
-
-| Type         | Description                                                                                   |
-| ------------ | --------------------------------------------------------------------------------------------- |
-| `ValueError` | Always: the log score reads the observation models of a problem, and an analysis has no data. |
-
-Source code in `commol/api/sensitivity.py`
-
-```python
-def rust_log_score(
-    self,
-    sample: ParameterSample,  # noqa: ARG002
-    observed_data: list[ObservedDataPoint],  # noqa: ARG002
-) -> list[float]:
-    """
-    Refuse the log score, which `commol.scores.log_score` asks for.
-
-    Parameters
-    ----------
-    sample : ParameterSample
-        The draws.
-    observed_data : list[ObservedDataPoint]
-        The observations.
-
-    Raises
-    ------
-    ValueError
-        Always: the log score reads the observation models of a problem,
-        and an analysis has no data.
-    """
-    raise ValueError(
-        "The log score needs the observation models of a calibration problem, "
-        "and a sensitivity analysis has no data."
     )
 ```
 
@@ -718,6 +515,8 @@ class InputSpace(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    _engine_handles: ClassVar[tuple[str, ...]] = ("sample",)
 
     parameters: list[CalibrationParameter] = Field(
         min_length=1, description="The inputs, in order."
@@ -889,12 +688,6 @@ class InputSpace(BaseModel):
     def names(self) -> list[str]:
         """The ids of the inputs, in order."""
         return [parameter.id for parameter in self.parameters]
-
-    def rust_distributions(self) -> list[tuple[str, str, list[float]]] | None:
-        """The distributions as the Rust runners read them, or None."""
-        if self.distributions is None:
-            return None
-        return [self.distributions[name].rust_prior(name) for name in self.names]
 ```
 
 ### Attributes
@@ -1162,24 +955,6 @@ def from_sample(
         sample=sample,
         initial_condition_remainder=initial_condition_remainder,
     )
-```
-
-#### rust_distributions
-
-```python
-rust_distributions() -> list[tuple[str, str, list[float]]] | None
-```
-
-The distributions as the Rust runners read them, or None.
-
-Source code in `commol/context/inference/global_sensitivity.py`
-
-```python
-def rust_distributions(self) -> list[tuple[str, str, list[float]]] | None:
-    """The distributions as the Rust runners read them, or None."""
-    if self.distributions is None:
-        return None
-    return [self.distributions[name].rust_prior(name) for name in self.names]
 ```
 
 ## SensitivityMethod
@@ -2536,8 +2311,7 @@ class ChaosResult(ResultModel):
             coefficients do not fit the basis.
         """
         return commol_rs.inference.chaos_evaluate(
-            engine_state.rust_parameters(self.input_space.parameters),
-            self.input_space.rust_distributions() or [],
+            engine_json(self.input_space),
             self.degree,
             self.q_norm,
             self.max_interaction,
@@ -2669,8 +2443,7 @@ def predict(self, values: Sequence[Sequence[float]]) -> list[list[float]]:
         coefficients do not fit the basis.
     """
     return commol_rs.inference.chaos_evaluate(
-        engine_state.rust_parameters(self.input_space.parameters),
-        self.input_space.rust_distributions() or [],
+        engine_json(self.input_space),
         self.degree,
         self.q_norm,
         self.max_interaction,
@@ -3321,12 +3094,6 @@ class Ratio(_OneScalar):
         numerator = self.numerator.labels()[0]
         denominator = self.denominator.labels()[0]
         return f"({numerator}) / ({denominator})"
-
-    def rust_json(self) -> str:
-        """The ratio as Rust reads it: its JSON, without the labels."""
-        return self.model_dump_json(
-            exclude={"label": True, "numerator": {"label"}, "denominator": {"label"}}
-        )
 ```
 
 ### Methods:
@@ -3370,24 +3137,6 @@ def default_label(self) -> str:
     numerator = self.numerator.labels()[0]
     denominator = self.denominator.labels()[0]
     return f"({numerator}) / ({denominator})"
-```
-
-#### rust_json
-
-```python
-rust_json() -> str
-```
-
-The ratio as Rust reads it: its JSON, without the labels.
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-def rust_json(self) -> str:
-    """The ratio as Rust reads it: its JSON, without the labels."""
-    return self.model_dump_json(
-        exclude={"label": True, "numerator": {"label"}, "denominator": {"label"}}
-    )
 ```
 
 ## quantity_schedule
@@ -3448,5 +3197,5 @@ def quantity_schedule(quantities: Sequence[QuantityBase]) -> list[float]:
     """
     if not quantities:
         raise ValueError("Give at least one quantity of interest.")
-    return commol_rs.inference.quantity_schedule(rust_quantities(quantities))
+    return commol_rs.inference.quantity_schedule(engine_json(list(quantities)))
 ```

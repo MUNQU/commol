@@ -3951,7 +3951,9 @@ unweighted statistic.</p>
 <p>A sample has no single set of parameters, so
 <code>Model.apply_calibration_parameters</code> rejects it with a <code>TypeError</code>; apply one of
 <code>sample.draws()</code>. A sample saves to JSON and loads back equal
-(<code>model_dump_json</code>, <code>model_validate_json</code>).</p>
+(<code>model_dump_json</code>, <code>model_validate_json</code>), as every result does; a weight or
+a value that is not finite is the text <code>"Infinity"</code>, <code>"-Infinity"</code> or <code>"NaN"</code>
+in the JSON.</p>
 <h3 id="the-one-quantile">The one quantile<a class="headerlink" href="#the-one-quantile" title="Permanent link">&para;</a></h3>
 <p>Every interval of commol reads one weighted quantile. It inverts the
 empirical distribution of the weighted values, and interpolates between the

@@ -10,7 +10,7 @@ Bases: `BaseModel`, `Generic[ResultT]`
 
 The configuration of a method that reads a calibration problem or a sensitivity analysis, whose result is `ResultT`.
 
-A method subclasses one of its kinds, `UncertaintyMethod`, `IdentifiabilityMethod` or `SensitivityMethod`, with its result type, and registers its runner (`commol.api.inference.registry.register`).
+A method subclasses one of its kinds, `UncertaintyMethod`, `IdentifiabilityMethod` or `SensitivityMethod`, with its result type, and registers its runner (`commol.api.inference.registry.register`). The runner sends it whole to the engine, as the JSON of its dump (`commol.context.engine_json.engine_json`); a field that holds a result with behavior in the engine, such as a sample, is named in `_engine_handles` and crosses as its handle.
 
 Source code in `commol/context/inference/method.py`
 
@@ -22,10 +22,16 @@ class InferenceMethod(BaseModel, Generic[ResultT]):
 
     A method subclasses one of its kinds, `UncertaintyMethod`,
     `IdentifiabilityMethod` or `SensitivityMethod`, with its result type, and
-    registers its runner (`commol.api.inference.registry.register`).
+    registers its runner (`commol.api.inference.registry.register`). The
+    runner sends it whole to the engine, as the JSON of its dump
+    (`commol.context.engine_json.engine_json`); a field that holds a result
+    with behavior in the engine, such as a sample, is named in
+    ``_engine_handles`` and crosses as its handle.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    _engine_handles: ClassVar[tuple[str, ...]] = ()
 ```
 
 ## UncertaintyMethod
@@ -118,7 +124,7 @@ class ParameterSample(ResultModel):
         differ.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     names: list[str] = Field(description="One name per column.")
     bounds: list[tuple[float, float]] = Field(description="Bounds of each parameter.")
@@ -141,14 +147,15 @@ class ParameterSample(ResultModel):
         data = info.data
         if not {"names", "bounds", "values"} <= data.keys():
             return log_weights
-        rust = commol_rs.inference.ParameterSample(
+        checked = commol_rs.inference.ParameterSample(
             data["names"], data["bounds"], data["values"], log_weights, None
         )
-        return rust.log_weights
+        return checked.log_weights
 
     @model_validator(mode="after")
-    def build_rust_sample(self) -> Self:
-        """Keep the Rust sample that computes the statistics."""
+    def build_engine_sample(self) -> Self:
+        """Keep the sample of the engine, which computes the statistics and
+        which the engine reads as the handle of this sample."""
         self._rust = commol_rs.inference.ParameterSample(
             self.names, self.bounds, self.values, self.log_weights, self.groups
         )
@@ -192,11 +199,6 @@ class ParameterSample(ResultModel):
             groups=groups,
             method=method,
         )
-
-    @property
-    def rust_sample(self) -> "ParameterSampleProtocol":
-        """The sample in Rust, for the runners of methods and the predictive."""
-        return self._rust
 
     @property
     def weights(self) -> list[float]:
@@ -385,14 +387,6 @@ class ParameterSample(ResultModel):
 
 ### Attributes
 
-#### rust_sample
-
-```python
-rust_sample: ParameterSampleProtocol
-```
-
-The sample in Rust, for the runners of methods and the predictive.
-
 #### weights
 
 ```python
@@ -434,26 +428,27 @@ def normalize_log_weights(
     data = info.data
     if not {"names", "bounds", "values"} <= data.keys():
         return log_weights
-    rust = commol_rs.inference.ParameterSample(
+    checked = commol_rs.inference.ParameterSample(
         data["names"], data["bounds"], data["values"], log_weights, None
     )
-    return rust.log_weights
+    return checked.log_weights
 ```
 
-#### build_rust_sample
+#### build_engine_sample
 
 ```python
-build_rust_sample() -> Self
+build_engine_sample() -> Self
 ```
 
-Keep the Rust sample that computes the statistics.
+Keep the sample of the engine, which computes the statistics and which the engine reads as the handle of this sample.
 
 Source code in `commol/context/inference/sample.py`
 
 ```python
 @model_validator(mode="after")
-def build_rust_sample(self) -> Self:
-    """Keep the Rust sample that computes the statistics."""
+def build_engine_sample(self) -> Self:
+    """Keep the sample of the engine, which computes the statistics and
+    which the engine reads as the handle of this sample."""
     self._rust = commol_rs.inference.ParameterSample(
         self.names, self.bounds, self.values, self.log_weights, self.groups
     )
@@ -1047,7 +1042,7 @@ class Predictive:
         self.sample: ParameterSample = sample
         self.positions: list[float] = [float(position) for position in positions]
         self.output_names: list[str] = list(source.simulation.engine.output_names)
-        self._rust = source.rust_predictive(sample, self.positions)
+        self._rust = source._predictive(sample, self.positions)
 
     @property
     def weights(self) -> list[float]:
@@ -1313,9 +1308,7 @@ class Predictive:
             the parameter set, then says what the run says (the compartment,
             the step and the flows), or what the initial amounts exceed.
         """
-        draws = self.source.rust_observation_draws(
-            self.sample, list(observed_data), noise
-        )
+        draws = self.source._observation_draws(self.sample, list(observed_data), noise)
         return ObservationDraws(observed_data, draws)
 ```
 
@@ -1410,7 +1403,7 @@ def __init__(
     self.sample: ParameterSample = sample
     self.positions: list[float] = [float(position) for position in positions]
     self.output_names: list[str] = list(source.simulation.engine.output_names)
-    self._rust = source.rust_predictive(sample, self.positions)
+    self._rust = source._predictive(sample, self.positions)
 ```
 
 #### runs
@@ -1839,9 +1832,7 @@ def at_observations(
         the parameter set, then says what the run says (the compartment,
         the step and the flows), or what the initial amounts exceed.
     """
-    draws = self.source.rust_observation_draws(
-        self.sample, list(observed_data), noise
-    )
+    draws = self.source._observation_draws(self.sample, list(observed_data), noise)
     return ObservationDraws(observed_data, draws)
 ```
 
@@ -1972,17 +1963,17 @@ class ObservationDraws:
             The draws, computed in Rust.
         """
         self.observations: list[ObservedDataPoint] = list(observations)
-        self.rust_draws: "ObservationDrawsProtocol" = draws
+        self._draws: "ObservationDrawsProtocol" = draws
 
     @property
     def values(self) -> list[list[float]]:
         """Each draw's value of each observation, ``[draw][observation]``."""
-        return self.rust_draws.values
+        return self._draws.values
 
     @property
     def weights(self) -> list[float]:
         """The weight of each draw; they sum to 1."""
-        return self.rust_draws.weights
+        return self._draws.weights
 
     @property
     def observed(self) -> list[float]:
@@ -2008,7 +1999,7 @@ class ObservationDraws:
         ValueError
             If the confidence level is not strictly between 0 and 1.
         """
-        mean, median, lower, upper = self.rust_draws.band(confidence_level)
+        mean, median, lower, upper = self._draws.band(confidence_level)
         return SeriesBand(
             confidence_level=confidence_level,
             positions=[point.at for point in self.observations],
@@ -2081,7 +2072,7 @@ def __init__(
         The draws, computed in Rust.
     """
     self.observations: list[ObservedDataPoint] = list(observations)
-    self.rust_draws: "ObservationDrawsProtocol" = draws
+    self._draws: "ObservationDrawsProtocol" = draws
 ```
 
 #### band
@@ -2132,7 +2123,7 @@ def band(self, confidence_level: float) -> SeriesBand:
     ValueError
         If the confidence level is not strictly between 0 and 1.
     """
-    mean, median, lower, upper = self.rust_draws.band(confidence_level)
+    mean, median, lower, upper = self._draws.band(confidence_level)
     return SeriesBand(
         confidence_level=confidence_level,
         positions=[point.at for point in self.observations],
@@ -2768,6 +2759,12 @@ No observation noise: an observation shows the prediction of each draw.
 
 The band of a predictive with `NoNoise` is a band of the model. It says where the model curve lies, not where the next observation falls, so its coverage of data is below its level.
 
+Attributes:
+
+| Name   | Type   | Description                        |
+| ------ | ------ | ---------------------------------- |
+| `kind` | `none` | The noise, which the engine reads. |
+
 Source code in `commol/context/inference/noise.py`
 
 ```python
@@ -2778,9 +2775,16 @@ class NoNoise(BaseModel):
     The band of a predictive with `NoNoise` is a band of the model. It says
     where the model curve lies, not where the next observation falls, so its
     coverage of data is below its level.
+
+    Attributes
+    ----------
+    kind : "none"
+        The noise, which the engine reads.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["none"] = Field(default="none", description="The noise.")
 ```
 
 ## ResidualNoise
@@ -2795,6 +2799,7 @@ Attributes:
 
 | Name             | Type                         | Description                                                                                                                                                            |
 | ---------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kind`           | `residual`                   | The noise, which the engine reads.                                                                                                                                     |
 | `fit`            | `CalibrationResult`          | The fit whose residuals are added.                                                                                                                                     |
 | `block_length`   | `int`                        | Positions per block, at least 1 and at most the number of distinct positions of the problem's observations. A bootstrap reports the length it used in its diagnostics. |
 | `residual_scale` | `{additive, multiplicative}` | "additive" adds r = y − ŷ; "multiplicative" multiplies by exp(r) with r = log(y / ŷ) and needs positive observed and fitted values.                                    |
@@ -2815,6 +2820,8 @@ class ResidualNoise(RangeChecked):
 
     Attributes
     ----------
+    kind : "residual"
+        The noise, which the engine reads.
     fit : CalibrationResult
         The fit whose residuals are added.
     block_length : int
@@ -2829,6 +2836,7 @@ class ResidualNoise(RangeChecked):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    kind: Literal["residual"] = Field(default="residual", description="The noise.")
     fit: CalibrationResult = Field(description="The fit whose residuals are added.")
     block_length: int = Field(description="Positions per block.")
     residual_scale: Literal["additive", "multiplicative"] = Field(
@@ -2844,6 +2852,12 @@ Observation noise of the problem's observation models.
 
 Each draw draws every observation from the model of its series around the draw's prediction, with the draw's noise parameters, so the band is a prediction interval of the posterior or bootstrap predictive. It needs a problem with `observation_models`, and serves the series they name. A prediction outside the means a model allows, such as a negative count, draws at the nearest allowed one.
 
+Attributes:
+
+| Name   | Type           | Description                        |
+| ------ | -------------- | ---------------------------------- |
+| `kind` | `distribution` | The noise, which the engine reads. |
+
 Source code in `commol/context/inference/noise.py`
 
 ```python
@@ -2857,9 +2871,18 @@ class DistributionNoise(BaseModel):
     problem with ``observation_models``, and serves the series they name. A
     prediction outside the means a model allows, such as a negative count,
     draws at the nearest allowed one.
+
+    Attributes
+    ----------
+    kind : "distribution"
+        The noise, which the engine reads.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["distribution"] = Field(
+        default="distribution", description="The noise."
+    )
 ```
 
 ## Resampling
@@ -2876,11 +2899,12 @@ Each replicate draws one Dirichlet(1, …, 1) weight per block, scaled to mean 1
 
 Attributes:
 
-| Name           | Type  | Description                                                                                                   |
-| -------------- | ----- | ------------------------------------------------------------------------------------------------------------- |
-| `replicates`   | `int` | Number of replicates, at least 1.                                                                             |
-| `block_length` | \`int | auto\`                                                                                                        |
-| `starts`       | `int` | Starts of the fit and of each replicate (default 1): the fit, then rows of a Latin hypercube over the bounds. |
+| Name           | Type       | Description                                                                                                   |
+| -------------- | ---------- | ------------------------------------------------------------------------------------------------------------- |
+| `kind`         | `bayesian` | The bootstrap, which the engine reads.                                                                        |
+| `replicates`   | `int`      | Number of replicates, at least 1.                                                                             |
+| `block_length` | \`int      | auto\`                                                                                                        |
+| `starts`       | `int`      | Starts of the fit and of each replicate (default 1): the fit, then rows of a Latin hypercube over the bounds. |
 
 Source code in `commol/context/inference/resampling.py`
 
@@ -2898,6 +2922,8 @@ class BayesianBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     Attributes
     ----------
+    kind : "bayesian"
+        The bootstrap, which the engine reads.
     replicates : int
         Number of replicates, at least 1.
     block_length : int | "auto"
@@ -2907,6 +2933,7 @@ class BayesianBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
         rows of a Latin hypercube over the bounds.
     """
 
+    kind: Literal["bayesian"] = Field(default="bayesian", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
     block_length: BlockLength = Field(description="Positions per block.")
     starts: int = Field(default=1, description="Starts per fit.")
@@ -2924,6 +2951,7 @@ Attributes:
 
 | Name             | Type                         | Description                                                                                                                                                                              |
 | ---------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kind`           | `residual`                   | The bootstrap, which the engine reads.                                                                                                                                                   |
 | `replicates`     | `int`                        | Number of replicates, at least 1.                                                                                                                                                        |
 | `block_length`   | \`int                        | auto\`                                                                                                                                                                                   |
 | `residual_scale` | `{additive, multiplicative}` | "additive": r = y − ŷ and ŷ + r\*. "multiplicative": r = log(y / ŷ) and ŷ · exp(r\*); it needs positive observed and fitted values and keeps synthetic values positive.                  |
@@ -2943,6 +2971,8 @@ class ResidualBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     Attributes
     ----------
+    kind : "residual"
+        The bootstrap, which the engine reads.
     replicates : int
         Number of replicates, at least 1.
     block_length : int | "auto"
@@ -2959,6 +2989,7 @@ class ResidualBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
         Starts of the fit and of each replicate (default 1).
     """
 
+    kind: Literal["residual"] = Field(default="residual", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
     block_length: BlockLength = Field(description="Positions per block.")
     residual_scale: Literal["additive", "multiplicative"] = Field(
@@ -2982,6 +3013,7 @@ Attributes:
 
 | Name           | Type                   | Description                                                                                                                                                      |
 | -------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kind`         | `wild`                 | The bootstrap, which the engine reads.                                                                                                                           |
 | `replicates`   | `int`                  | Number of replicates, at least 1.                                                                                                                                |
 | `block_length` | \`int                  | auto\`                                                                                                                                                           |
 | `multipliers`  | `{rademacher, mammen}` | "rademacher": ±1 with probability 1/2. "mammen": two values with mean 0, variance 1 and third moment 1 (Mammen 1993), which keeps the skewness of the residuals. |
@@ -3001,6 +3033,8 @@ class WildBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     Attributes
     ----------
+    kind : "wild"
+        The bootstrap, which the engine reads.
     replicates : int
         Number of replicates, at least 1.
     block_length : int | "auto"
@@ -3013,6 +3047,7 @@ class WildBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
         Starts of the fit and of each replicate (default 1).
     """
 
+    kind: Literal["wild"] = Field(default="wild", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
     block_length: BlockLength = Field(description="Positions per block.")
     multipliers: Literal["rademacher", "mammen"] = Field(
@@ -3069,10 +3104,11 @@ Each replicate draws every observed value from the model of its series at the fi
 
 Attributes:
 
-| Name         | Type  | Description                                                                                                   |
-| ------------ | ----- | ------------------------------------------------------------------------------------------------------------- |
-| `replicates` | `int` | Number of replicates, at least 1.                                                                             |
-| `starts`     | `int` | Starts of the fit and of each replicate (default 1): the fit, then rows of a Latin hypercube over the bounds. |
+| Name         | Type         | Description                                                                                                   |
+| ------------ | ------------ | ------------------------------------------------------------------------------------------------------------- |
+| `kind`       | `parametric` | The bootstrap, which the engine reads.                                                                        |
+| `replicates` | `int`        | Number of replicates, at least 1.                                                                             |
+| `starts`     | `int`        | Starts of the fit and of each replicate (default 1): the fit, then rows of a Latin hypercube over the bounds. |
 
 Source code in `commol/context/inference/resampling.py`
 
@@ -3089,6 +3125,8 @@ class ParametricBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     Attributes
     ----------
+    kind : "parametric"
+        The bootstrap, which the engine reads.
     replicates : int
         Number of replicates, at least 1.
     starts : int
@@ -3096,6 +3134,9 @@ class ParametricBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
         rows of a Latin hypercube over the bounds.
     """
 
+    kind: Literal["parametric"] = Field(
+        default="parametric", description="The bootstrap."
+    )
     replicates: int = Field(description="Number of replicates.")
     starts: int = Field(default=1, description="Starts per fit.")
 ```
@@ -3311,7 +3352,7 @@ class JackknifeResult(ResultModel):
         The block length.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     fit: CalibrationResult
     estimate: dict[str, float]
@@ -4827,15 +4868,6 @@ class Priors(BaseModel):
             The priors; every parameter needs finite bounds.
         """
         return cls(distributions=None)
-
-    def rust_priors(self) -> list[tuple[str, str, list[float]]] | None:
-        """The priors as the Rust runners read them; None is uniform."""
-        if self.distributions is None:
-            return None
-        return [
-            distribution.rust_prior(name)
-            for name, distribution in self.distributions.items()
-        ]
 ```
 
 ### Methods:
@@ -4870,27 +4902,6 @@ def uniform_on_bounds(cls) -> Self:
     return cls(distributions=None)
 ```
 
-#### rust_priors
-
-```python
-rust_priors() -> list[tuple[str, str, list[float]]] | None
-```
-
-The priors as the Rust runners read them; None is uniform.
-
-Source code in `commol/context/inference/distributions.py`
-
-```python
-def rust_priors(self) -> list[tuple[str, str, list[float]]] | None:
-    """The priors as the Rust runners read them; None is uniform."""
-    if self.distributions is None:
-        return None
-    return [
-        distribution.rust_prior(name)
-        for name, distribution in self.distributions.items()
-    ]
-```
-
 ## Uniform
 
 Bases: `DistributionBase`
@@ -4903,7 +4914,6 @@ Source code in `commol/context/inference/distributions.py`
 class Uniform(DistributionBase):
     """The uniform distribution on the bounds; they must be finite."""
 
-    rust_kind: ClassVar[str] = "uniform"
     kind: Literal["uniform"] = "uniform"
 ```
 
@@ -4923,7 +4933,6 @@ class LogUniform(DistributionBase):
     lower one above 0.
     """
 
-    rust_kind: ClassVar[str] = "log_uniform"
     kind: Literal["log_uniform"] = "log_uniform"
 ```
 
@@ -4956,32 +4965,9 @@ class Beta(DistributionBase, RangeChecked):
         The second shape, above 0.
     """
 
-    rust_kind: ClassVar[str] = "beta"
     kind: Literal["beta"] = "beta"
     a: float = Field(description="The first shape.")
     b: float = Field(description="The second shape.")
-
-    def rust_parameters(self) -> list[float]:
-        """The shapes `a` and `b`."""
-        return [self.a, self.b]
-```
-
-### Methods:
-
-#### rust_parameters
-
-```python
-rust_parameters() -> list[float]
-```
-
-The shapes `a` and `b`.
-
-Source code in `commol/context/inference/distributions.py`
-
-```python
-def rust_parameters(self) -> list[float]:
-    """The shapes `a` and `b`."""
-    return [self.a, self.b]
 ```
 
 ## Normal
@@ -5012,32 +4998,9 @@ class Normal(DistributionBase, RangeChecked):
         The standard deviation before truncation, above 0.
     """
 
-    rust_kind: ClassVar[str] = "normal"
     kind: Literal["normal"] = "normal"
     mean: float = Field(description="The mean.")
     sd: float = Field(description="The standard deviation.")
-
-    def rust_parameters(self) -> list[float]:
-        """The mean and the standard deviation."""
-        return [self.mean, self.sd]
-```
-
-### Methods:
-
-#### rust_parameters
-
-```python
-rust_parameters() -> list[float]
-```
-
-The mean and the standard deviation.
-
-Source code in `commol/context/inference/distributions.py`
-
-```python
-def rust_parameters(self) -> list[float]:
-    """The mean and the standard deviation."""
-    return [self.mean, self.sd]
 ```
 
 ## LogNormal
@@ -5069,32 +5032,9 @@ class LogNormal(DistributionBase, RangeChecked):
         The standard deviation of ``log x``, above 0.
     """
 
-    rust_kind: ClassVar[str] = "log_normal"
     kind: Literal["log_normal"] = "log_normal"
     mu: float = Field(description="The mean of log x.")
     sigma: float = Field(description="The standard deviation of log x.")
-
-    def rust_parameters(self) -> list[float]:
-        """`mu` and `sigma`."""
-        return [self.mu, self.sigma]
-```
-
-### Methods:
-
-#### rust_parameters
-
-```python
-rust_parameters() -> list[float]
-```
-
-`mu` and `sigma`.
-
-Source code in `commol/context/inference/distributions.py`
-
-```python
-def rust_parameters(self) -> list[float]:
-    """`mu` and `sigma`."""
-    return [self.mu, self.sigma]
 ```
 
 ## Gamma
@@ -5127,32 +5067,9 @@ class Gamma(DistributionBase, RangeChecked):
         The rate, above 0.
     """
 
-    rust_kind: ClassVar[str] = "gamma"
     kind: Literal["gamma"] = "gamma"
     shape: float = Field(description="The shape.")
     rate: float = Field(description="The rate.")
-
-    def rust_parameters(self) -> list[float]:
-        """The shape and the rate."""
-        return [self.shape, self.rate]
-```
-
-### Methods:
-
-#### rust_parameters
-
-```python
-rust_parameters() -> list[float]
-```
-
-The shape and the rate.
-
-Source code in `commol/context/inference/distributions.py`
-
-```python
-def rust_parameters(self) -> list[float]:
-    """The shape and the rate."""
-    return [self.shape, self.rate]
 ```
 
 ## GibbsPosterior
@@ -5609,7 +5526,7 @@ class SMCResult(ResultModel):
         The effective sizes, acceptance rates and move counts of each step.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     sample: ParameterSample
     levels: list[float]
@@ -6378,12 +6295,10 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
     def check_score_and_by(cls, data: JsonValue) -> JsonValue:
         """Check, in Rust, that `score` and `by` are given and fit together."""
         if isinstance(data, Mapping):
-
-            def name(key: str) -> str | None:
-                value = data.get(key)
-                return None if value is None else str(value)
-
-            commol_rs.inference.check_conformal_settings(name("score"), name("by"))
+            given = {
+                key: data[key] for key in ("score", "by") if data.get(key) is not None
+            }
+            commol_rs.inference.check_conformal_settings(engine_json(given))
         return data
 ```
 
@@ -6405,12 +6320,10 @@ Source code in `commol/context/inference/conformal.py`
 def check_score_and_by(cls, data: JsonValue) -> JsonValue:
     """Check, in Rust, that `score` and `by` are given and fit together."""
     if isinstance(data, Mapping):
-
-        def name(key: str) -> str | None:
-            value = data.get(key)
-            return None if value is None else str(value)
-
-        commol_rs.inference.check_conformal_settings(name("score"), name("by"))
+        given = {
+            key: data[key] for key in ("score", "by") if data.get(key) is not None
+        }
+        commol_rs.inference.check_conformal_settings(engine_json(given))
     return data
 ```
 
@@ -6460,6 +6373,8 @@ class SplitConformal(ConformalMethod, RangeChecked):
     starts : int
         Starts of the fit (default 1).
     """
+
+    _engine_handles: ClassVar[tuple[str, ...]] = ("sample",)
 
     calibration_data: list[ObservedDataPoint] = Field(
         min_length=1, description="Held-out observations."
@@ -6726,6 +6641,8 @@ class AdaptiveConformal(ConformalMethod, RangeChecked):
     stream: list[ObservedDataPoint] = Field(
         min_length=1, description="The observations that arrive."
     )
+    _engine_handles: ClassVar[tuple[str, ...]] = ("sample",)
+
     sample: ParameterSample | None = Field(
         default=None, description="The sample whose predictive predicts."
     )
@@ -6809,7 +6726,7 @@ class ConformalResult(ResultModel):
         otherwise None.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     intervals: PredictionIntervals
     scores: dict[str, list[float]]
@@ -6856,7 +6773,7 @@ class PredictionIntervals(ResultModel):
         is not a key.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     confidence_level: float
     series: dict[str, SeriesIntervals]
@@ -6897,7 +6814,7 @@ class SeriesIntervals(ResultModel):
         The upper end of each interval; ``inf`` when unbounded.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True, ser_json_inf_nan="constants")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     positions: list[float]
     prediction: list[float]
@@ -7009,7 +6926,7 @@ def coverage(
         the coverage. A calibrated interval covers about `confidence_level`.
     """
     draws = predictive.at_observations(observations, noise)
-    return _score(draws, draws.rust_draws.coverage(draws.observed, confidence_level))
+    return _score(draws, draws._draws.coverage(draws.observed, confidence_level))
 ```
 
 #### interval_score
@@ -7064,9 +6981,7 @@ def interval_score(
         Lower is better.
     """
     draws = predictive.at_observations(observations, noise)
-    return _score(
-        draws, draws.rust_draws.interval_score(draws.observed, confidence_level)
-    )
+    return _score(draws, draws._draws.interval_score(draws.observed, confidence_level))
 ```
 
 #### weighted_interval_score
@@ -7138,7 +7053,7 @@ def weighted_interval_score(
     draws = predictive.at_observations(observations, noise)
     return _score(
         draws,
-        draws.rust_draws.weighted_interval_score(
+        draws._draws.weighted_interval_score(
             draws.observed, [float(c) for c in confidence_levels]
         ),
     )
@@ -7197,7 +7112,7 @@ def crps(
         Lower is better; in the unit of the observations.
     """
     draws = predictive.at_observations(observations, noise)
-    return _score(draws, draws.rust_draws.crps(draws.observed))
+    return _score(draws, draws._draws.crps(draws.observed))
 ```
 
 #### pit
@@ -7256,7 +7171,7 @@ def pit(
         Values in ``[0, 1]``; calibrated predictions give uniform values.
     """
     draws = predictive.at_observations(observations, noise)
-    return _score(draws, draws.rust_draws.pit(draws.observed))
+    return _score(draws, draws._draws.pit(draws.observed))
 ```
 
 #### log_score
@@ -7336,7 +7251,7 @@ def log_score(
             f"The log score needs the density of the observation models, so it "
             f"takes DistributionNoise(); {type(noise).__name__} has no density."
         )
-    values = predictive.source.rust_log_score(predictive.sample, list(observations))
+    values = predictive.source._log_score(predictive.sample, list(observations))
     return _score_of(observations, values)
 ```
 

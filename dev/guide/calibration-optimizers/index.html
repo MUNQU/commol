@@ -3680,15 +3680,32 @@ with the message <code>Nelder-Mead needs finite bounds</code>.</p>
 without a <a href="#stop-rules">stop rule</a> always stops at <code>max_iterations</code>, so it
 reports <code>converged=False</code>; judge it by <code>final_loss</code>.</p>
 <h2 id="particle-swarm">Particle swarm<a class="headerlink" href="#particle-swarm" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">swarm</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">ParticleSwarmConfig</span><span class="p">(</span><span class="n">particles</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="n">initialization</span><span class="o">=</span><span class="s2">&quot;latin_hypercube&quot;</span><span class="p">)</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="o">.</span><span class="n">inertia</span><span class="p">(</span><span class="s2">&quot;chaotic&quot;</span><span class="p">,</span> <span class="n">w_min</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">w_max</span><span class="o">=</span><span class="mf">0.9</span><span class="p">)</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="o">.</span><span class="n">acceleration</span><span class="p">(</span><span class="s2">&quot;time_varying&quot;</span><span class="p">,</span> <span class="n">c1_initial</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span> <span class="n">c1_final</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">c2_initial</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">c2_final</span><span class="o">=</span><span class="mf">2.5</span><span class="p">)</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="o">.</span><span class="n">velocity</span><span class="p">(</span><span class="n">clamp_factor</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">mutation_threshold</span><span class="o">=</span><span class="mf">0.005</span><span class="p">)</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="o">.</span><span class="n">mutation</span><span class="p">(</span><span class="s2">&quot;gaussian&quot;</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">probability</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">application</span><span class="o">=</span><span class="s2">&quot;global_best&quot;</span><span class="p">)</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="p">)</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="nb">print</span><span class="p">(</span><span class="n">calibrate</span><span class="p">(</span><span class="n">swarm</span><span class="p">))</span>  <span class="c1"># {&#39;k1&#39;: 0.4, &#39;k2&#39;: 0.1}</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">swarm</span> <span class="o">=</span> <span class="n">ParticleSwarmConfig</span><span class="p">(</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">particles</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">max_iterations</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">initialization</span><span class="o">=</span><span class="s2">&quot;latin_hypercube&quot;</span><span class="p">,</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">inertia</span><span class="o">=</span><span class="s2">&quot;chaotic&quot;</span><span class="p">,</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">inertia_min</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">inertia_max</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">acceleration</span><span class="o">=</span><span class="s2">&quot;time_varying&quot;</span><span class="p">,</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">cognitive_initial</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="n">cognitive_final</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="n">social_initial</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    <span class="n">social_final</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="n">velocity_clamp_factor</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="n">velocity_mutation_threshold</span><span class="o">=</span><span class="mf">0.005</span><span class="p">,</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="n">mutation</span><span class="o">=</span><span class="s2">&quot;gaussian&quot;</span><span class="p">,</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>    <span class="n">mutation_scale</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>    <span class="n">mutation_probability</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>    <span class="n">mutation_application</span><span class="o">=</span><span class="s2">&quot;global_best&quot;</span><span class="p">,</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="p">)</span>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="nb">print</span><span class="p">(</span><span class="n">calibrate</span><span class="p">(</span><span class="n">swarm</span><span class="p">))</span>  <span class="c1"># {&#39;k1&#39;: 0.4, &#39;k2&#39;: 0.1}</span>
 </span></code></pre></div>
+<p>Each strategy of the swarm is a name, and its numbers are fields of their own.
+A strategy left as <code>None</code> is that of canonical PSO. A number set without its
+strategy, or with another strategy, is an error, so a setting is never
+ignored: <code>ParticleSwarmConfig(inertia_factor=0.5)</code> fails with
+<code>inertia_factor is read only with another inertia</code>.</p>
 <table>
 <thead>
 <tr>
@@ -3718,57 +3735,70 @@ reports <code>converged=False</code>; judge it by <code>final_loss</code>.</p>
 <td><code>False</code></td>
 <td>Writes progress to <code>sys.stdout</code>; needs <code>run(starts=1)</code>.</td>
 </tr>
-</tbody>
-</table>
-<p>Each method returns the configuration, so they chain:</p>
-<table>
-<thead>
 <tr>
-<th>Method</th>
-<th>Arguments</th>
-<th>Effect</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>.inertia("constant", factor=0.72135)</code></td>
-<td><code>factor</code></td>
-<td>A fixed inertia weight. The default is the weight of canonical PSO, 1/(2 ln 2), which a swarm with no <code>.inertia</code> also uses.</td>
+<td><code>header_interval</code></td>
+<td><code>100</code></td>
+<td>With <code>verbose</code>, repeats the table header every this many iterations.</td>
 </tr>
 <tr>
-<td><code>.inertia("chaotic", w_min=…, w_max=…)</code></td>
-<td><code>w_min &lt; w_max</code></td>
-<td>An inertia weight that varies chaotically between the two.</td>
+<td><code>inertia</code></td>
+<td><code>None</code></td>
+<td><code>"constant"</code> uses <code>inertia_factor</code>; <code>"chaotic"</code> moves between <code>inertia_min</code> and <code>inertia_max</code>. <code>None</code> is the weight of canonical PSO, 1/(2 ln 2) ≈ 0.72135.</td>
 </tr>
 <tr>
-<td><code>.acceleration("constant", cognitive=1.19315, social=1.19315)</code></td>
+<td><code>inertia_factor</code></td>
+<td><code>None</code></td>
+<td>With <code>inertia="constant"</code>: the weight, above 0. <code>None</code> is the weight of canonical PSO.</td>
+</tr>
+<tr>
+<td><code>inertia_min</code>, <code>inertia_max</code></td>
+<td><code>None</code></td>
+<td>With <code>inertia="chaotic"</code>, both needed: the range of the weight, <code>inertia_min &lt; inertia_max</code>.</td>
+</tr>
+<tr>
+<td><code>acceleration</code></td>
+<td><code>None</code></td>
+<td><code>"constant"</code> uses <code>cognitive</code> and <code>social</code>; <code>"time_varying"</code> moves each pull from its initial to its final value, from explore (high cognitive) to exploit (high social). <code>None</code> is the coefficients of canonical PSO, 0.5 + ln 2 ≈ 1.19315.</td>
+</tr>
+<tr>
 <td><code>cognitive</code>, <code>social</code></td>
-<td>Fixed pulls towards each particle's best and the swarm's best. The default of each is the coefficient of canonical PSO, 0.5 + ln 2, which a swarm with no <code>.acceleration</code> also uses.</td>
+<td><code>None</code></td>
+<td>With <code>acceleration="constant"</code>: the pulls towards each particle's best and the swarm's best. <code>None</code> is the coefficient of canonical PSO.</td>
 </tr>
 <tr>
-<td><code>.acceleration("time_varying", c1_initial=…, c1_final=…, c2_initial=…, c2_final=…)</code></td>
-<td>four factors</td>
-<td>Pulls that change from explore (high <code>c1</code>) to exploit (high <code>c2</code>).</td>
+<td><code>cognitive_initial</code>, <code>cognitive_final</code>, <code>social_initial</code>, <code>social_final</code></td>
+<td><code>None</code></td>
+<td>With <code>acceleration="time_varying"</code>, all four needed.</td>
 </tr>
 <tr>
-<td><code>.velocity(clamp_factor=None, mutation_threshold=None)</code></td>
-<td>fractions</td>
-<td><code>clamp_factor</code> limits speed to a share of the search box (0.1–0.2 is typical); <code>mutation_threshold</code> restarts particles slower than it (0.001–0.01).</td>
+<td><code>mutation</code></td>
+<td><code>None</code></td>
+<td>Random jumps to escape local minima: <code>"gaussian"</code> or <code>"cauchy"</code> (larger jumps). <code>None</code> mutates no particle.</td>
 </tr>
 <tr>
-<td><code>.mutation(strategy, *, scale, probability, application)</code></td>
-<td>see right</td>
-<td>Random jumps to escape local minima: <code>strategy</code> <code>"gaussian"</code> or <code>"cauchy"</code> (larger jumps), <code>probability</code> per iteration, <code>application</code> <code>"global_best"</code>, <code>"all_particles"</code> or <code>"below_average"</code>.</td>
+<td><code>mutation_scale</code>, <code>mutation_probability</code>, <code>mutation_application</code></td>
+<td><code>None</code></td>
+<td>With a mutation, all three needed: the size of a jump, the probability per iteration, and the particles it moves: <code>"global_best"</code>, <code>"all_particles"</code> or <code>"below_average"</code>.</td>
 </tr>
 <tr>
-<td><code>.improvement_stop(*, window, tol_abs, tol_rel)</code></td>
-<td>see <a href="#stop-rules">Stop rules</a></td>
-<td>Stops when the best loss stops improving.</td>
+<td><code>velocity_clamp_factor</code></td>
+<td><code>None</code></td>
+<td>Limits the speed to a share of the search box (0.1–0.2 is typical).</td>
 </tr>
 <tr>
-<td><code>.radius_stop(tol)</code></td>
-<td>see <a href="#stop-rules">Stop rules</a></td>
-<td>Stops when the swarm has gathered around its best position.</td>
+<td><code>velocity_mutation_threshold</code></td>
+<td><code>None</code></td>
+<td>Restarts the velocity of particles slower than it (0.001–0.01).</td>
+</tr>
+<tr>
+<td><code>improvement_window</code>, <code>improvement_tol_abs</code>, <code>improvement_tol_rel</code></td>
+<td><code>None</code></td>
+<td>The improvement <a href="#stop-rules">stop rule</a>: all three or none.</td>
+</tr>
+<tr>
+<td><code>radius_tol</code></td>
+<td><code>None</code></td>
+<td>The radius <a href="#stop-rules">stop rule</a>.</td>
 </tr>
 </tbody>
 </table>
@@ -3782,44 +3812,48 @@ default value. A run that stops by a rule reports <code>converged=True</code> an
 <tr>
 <th>Rule</th>
 <th>Stops when</th>
-<th>Arguments</th>
+<th>Fields</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>.improvement_stop(window=…, tol_abs=…, tol_rel=…)</code></td>
-<td>The best loss improved by at most <code>tol_abs + tol_rel·|best loss|</code> over the last <code>window</code> iterations</td>
-<td><code>window &gt; 0</code>; <code>tol_abs</code>, <code>tol_rel</code> ≥ 0</td>
+<td>Improvement</td>
+<td>The best loss improved by at most <code>improvement_tol_abs + improvement_tol_rel·|best loss|</code> over the last <code>improvement_window</code> iterations</td>
+<td><code>improvement_window &gt; 0</code>; <code>improvement_tol_abs</code>, <code>improvement_tol_rel</code> ≥ 0</td>
 </tr>
 <tr>
-<td><code>.radius_stop(tol)</code></td>
-<td>Every particle is within <code>tol</code> of the best position, as a fraction of the size of the search box (the length of its diagonal) (Zielinski and Laur, 2007)</td>
-<td><code>tol</code> ≥ 0</td>
+<td>Radius</td>
+<td>Every particle is within <code>radius_tol</code> of the best position, as a fraction of the size of the search box (the length of its diagonal) (Zielinski and Laur, 2007)</td>
+<td><code>radius_tol</code> ≥ 0</td>
 </tr>
 </tbody>
 </table>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">stopping</span> <span class="o">=</span> <span class="n">ParticleSwarmConfig</span><span class="p">(</span><span class="n">particles</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">2000</span><span class="p">)</span><span class="o">.</span><span class="n">improvement_stop</span><span class="p">(</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">window</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">tol_abs</span><span class="o">=</span><span class="mf">1e-12</span><span class="p">,</span> <span class="n">tol_rel</span><span class="o">=</span><span class="mf">1e-9</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="p">)</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">observed_data</span><span class="p">,</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">parameters</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="p">],</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="n">loss_function</span><span class="o">=</span><span class="s2">&quot;sse&quot;</span><span class="p">,</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">stopping</span><span class="p">,</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="n">seed</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="p">)</span>
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="n">result</span> <span class="o">=</span> <span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)),</span> <span class="n">problem</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">converged</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">iterations</span> <span class="o">&lt;</span> <span class="mi">2000</span><span class="p">)</span>  <span class="c1"># True True</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">stopping</span> <span class="o">=</span> <span class="n">ParticleSwarmConfig</span><span class="p">(</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">particles</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">max_iterations</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">improvement_window</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">improvement_tol_abs</span><span class="o">=</span><span class="mf">1e-12</span><span class="p">,</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">improvement_tol_rel</span><span class="o">=</span><span class="mf">1e-9</span><span class="p">,</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="p">)</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">observed_data</span><span class="p">,</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="n">parameters</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>    <span class="p">],</span>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>    <span class="n">loss_function</span><span class="o">=</span><span class="s2">&quot;sse&quot;</span><span class="p">,</span>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">stopping</span><span class="p">,</span>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>    <span class="n">seed</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span>
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="p">)</span>
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="n">result</span> <span class="o">=</span> <span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)),</span> <span class="n">problem</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">converged</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">iterations</span> <span class="o">&lt;</span> <span class="mi">2000</span><span class="p">)</span>  <span class="c1"># True True</span>
 </span></code></pre></div>
 <p>A swarm can stall for some iterations and then improve again, so a short
-<code>window</code> can stop it early. Mutation and velocity mutation scatter the
-particles again, and unknowns that the data cannot tell apart keep them
-spread, so with them the radius can stay above <code>tol</code>. Neither rule draws
-random numbers: with the same seed, a run with a rule is the run without it
-up to the iteration where it stops. In a <a href="../uncertainty/profiles/">profile</a>,
+<code>improvement_window</code> can stop it early. Mutation and velocity mutation scatter
+the particles again, and unknowns that the data cannot tell apart keep them
+spread, so with them the radius can stay above <code>radius_tol</code>. Neither rule
+draws random numbers: with the same seed, a run with a rule is the run without
+it up to the iteration where it stops. In a <a href="../uncertainty/profiles/">profile</a>,
 the improvement rule also sets the tolerance of a swarm.</p>
 <h2 id="several-starts">Several starts<a class="headerlink" href="#several-starts" title="Permanent link">&para;</a></h2>
 <p><code>Calibrator.run(starts=n)</code> runs the optimizer from <code>n</code> start points in

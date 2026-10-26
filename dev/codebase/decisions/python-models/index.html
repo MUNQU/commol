@@ -2793,6 +2793,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-data-object-crosses-as-the-json-of-its-dump" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A data object crosses as the JSON of its dump
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#results-compare-by-their-values" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3279,6 +3290,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-data-object-crosses-as-the-json-of-its-dump" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A data object crosses as the JSON of its dump
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#results-compare-by-their-values" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3361,6 +3383,87 @@ update, not of a value, and the engine never gets an update.</p>
 compiler and the validator of its Python object call.</p>
 <p><strong>Guards:</strong> <code>tests/building/test_value_rules.py</code>,
 <code>crates/commol-model/tests/value_rules.rs</code>.</p>
+<h2 id="a-data-object-crosses-as-the-json-of-its-dump">A data object crosses as the JSON of its dump<a class="headerlink" href="#a-data-object-crosses-as-the-json-of-its-dump" title="Permanent link">&para;</a></h2>
+<p>Every data object of the Python API that reaches the engine, the model, the
+calibration problem and each inference method included, crosses as the JSON
+of its <code>model_dump()</code> (<code>engine_json</code> of
+<code>py-commol/commol/context/engine_json.py</code>). The bridge reads it with one
+helper, <code>read</code> of <code>py-commol/src/json.rs</code>, into the type the engine owns,
+which takes the spelling of the Python API (<code>rename_all = "snake_case"</code>) and
+denies unknown fields. An error names the path of the field and gives the
+message of the engine (<code>optimization_config.inertia_factor: inertia_factor is
+a number greater than 0, got -1</code>).</p>
+<p>A number that is not finite crosses as standard JSON text, <code>"Infinity"</code>,
+<code>"-Infinity"</code> or <code>"NaN"</code>, in both directions. Python writes it with the
+serializer of pydantic in the mode <code>inf_nan_mode="strings"</code>, the mode that
+the setting <code>ser_json_inf_nan="strings"</code> of a model selects, once for every
+class in <code>engine_json</code>. The reader is <code>serde_json</code>, and its <code>Value</code> reads such
+a text as a number only where the type asks for a number (<code>deserialize_f64</code>),
+so a label <code>"NaN"</code> stays text; a range rule reads the text as its number, so
+an infinite setting gets the message of its rule. The writer of the engine,
+<code>commol_core::json::write</code>, and the tree of a formula write the same three
+texts, and so does the JSON of every result: <code>ResultModel</code> sets
+<code>ser_json_inf_nan="strings"</code> for all of them. A value of an enum of the engine
+crosses as the JSON of its name (<code>engine_json(name)</code>), read with serde: what a
+rate keeps (<code>RateKeeps</code>), an engine (<code>EngineType</code>), a model kind
+(<code>ModelKind</code>), the levels of the threads (<code>Levels</code>), and the score and the
+pooling of a conformal method (<code>ScoreAndPooling</code>). No binding reads a name
+with a <code>from_name</code> of its own (<code>tests/suite/test_architecture.py</code>).</p>
+<p>Each union of classes carries one tag, <code>kind</code>, with a default, so a field is
+never read by the first variant that matches; <code>tagged!</code> of
+<code>commol_core::json</code> reads the tag, keeps the path and checks the range rules
+of the variant. A method crosses whole, into one settings type of
+<code>crates/commol-inference/src/settings/</code>, and the engine decides what the
+method needs: the fit with its starts, the calibration of <code>η</code>, the threshold
+of a profile and the checks of the names. A field that holds a result with
+behavior in the engine, such as a sample, crosses as its handle: the class
+names it in <code>_engine_handles</code>, and <code>engine_handles</code> gives it as a keyword
+argument. A <code>#[pyclass]</code> is a handle or a result, never data.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A PyO3 class for each data class, filled field by field in Python</td>
+<td>Three shapes of each value (the pydantic class, the conversion, the PyO3 class), four edits per field, and nothing checks that they agree.</td>
+</tr>
+<tr>
+<td>The fields of a method as positional arguments</td>
+<td>A long signature per method, and a copy of its fields in the runner.</td>
+</tr>
+<tr>
+<td>An untagged union</td>
+<td>No path in the error, and the first variant that matches wins.</td>
+</tr>
+<tr>
+<td><code>pythonize</code> (Python objects to serde with no string)</td>
+<td>A second mechanism next to the JSON of the model.</td>
+</tr>
+<tr>
+<td>The crate <code>json5</code>, which reads <code>Infinity</code> and <code>NaN</code> as numbers</td>
+<td>A grammar far wider than three values (comments, trailing commas, unquoted keys, hexadecimal numbers) at a port that must be small, and a second convention next to the tree of a formula.</td>
+</tr>
+<tr>
+<td>The constants <code>Infinity</code> and <code>NaN</code> without quotes</td>
+<td>They are not JSON: a standard reader rejects them.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rule:</strong> a new field of a data object gets the same name in its Rust type,
+and nothing else; a new data class gets its Rust type, an entry of
+<code>objects!</code> in <code>py-commol/src/json.rs</code> and a valid object in
+<code>tests/support/data_objects.py</code>.</p>
+<p><strong>Guards:</strong> <code>tests/suite/test_bridge.py</code> (the engine reads back each dump),
+<code>tests/suite/test_architecture.py</code> (no data class in the bridge, no
+conversion in Python, each runner sends its method whole),
+<code>tests/calibration/test_settings.py</code> (the path of an error),
+<code>tests/uncertainty/test_ranges.py</code> (an infinite setting gets the message of its rule),
+<code>tests/uncertainty/test_results_equality.py</code> (the JSON of a result),
+<code>crates/commol-core/tests/json.rs</code>, <code>crates/commol-calibration/tests/test_json.rs</code>.</p>
 <h2 id="results-compare-by-their-values">Results compare by their values<a class="headerlink" href="#results-compare-by-their-values" title="Permanent link">&para;</a></h2>
 <p>Every result of commol compares with one rule, <code>ComparedByValue</code>
 (<code>py-commol/commol/context/result_model.py</code>). Its subclass <code>ResultModel</code> is

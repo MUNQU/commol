@@ -160,7 +160,7 @@ print(round(sample.effective_size, 6))  # 3.0
 print(next(sample.draws()))  # {'k1': 0.38, 'k2': 0.09}
 ```
 
-A sample has no single set of parameters, so `Model.apply_calibration_parameters` rejects it with a `TypeError`; apply one of `sample.draws()`. A sample saves to JSON and loads back equal (`model_dump_json`, `model_validate_json`).
+A sample has no single set of parameters, so `Model.apply_calibration_parameters` rejects it with a `TypeError`; apply one of `sample.draws()`. A sample saves to JSON and loads back equal (`model_dump_json`, `model_validate_json`), as every result does; a weight or a value that is not finite is the text `"Infinity"`, `"-Infinity"` or `"NaN"` in the JSON.
 
 ### The one quantile
 

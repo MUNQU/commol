@@ -174,7 +174,9 @@ class Model(BaseModel, Generic[StructureT]):
     @model_validator(mode="after")
     def validate_engine_runs_structure(self) -> Self:
         """Ask the engine whether it runs the kind of the structure."""
-        commol_rs.engine.EngineType(self.engine.type).check_kind(self.structure.kind)
+        commol_rs.engine.EngineType(engine_json(self.engine.type)).check_kind(
+            engine_json(self.structure.kind)
+        )
         return self
 
     @model_validator(mode="after")
@@ -648,7 +650,9 @@ Source code in `commol/context/model.py`
 @model_validator(mode="after")
 def validate_engine_runs_structure(self) -> Self:
     """Ask the engine whether it runs the kind of the structure."""
-    commol_rs.engine.EngineType(self.engine.type).check_kind(self.structure.kind)
+    commol_rs.engine.EngineType(engine_json(self.engine.type)).check_kind(
+        engine_json(self.structure.kind)
+    )
     return self
 ```
 
@@ -1740,7 +1744,7 @@ class ModelStructure(BaseModel, ABC):
         """
         return frozenset(
             CalibrationParameterType(name)
-            for name in commol_rs.engine.ModelKind(self.kind).value_types()
+            for name in commol_rs.engine.ModelKind(engine_json(self.kind)).value_types()
         )
 
     def uncalibrated_values(self) -> list[str]:
@@ -2142,7 +2146,7 @@ def calibration_value_types(self) -> frozenset[CalibrationParameterType]:
     """
     return frozenset(
         CalibrationParameterType(name)
-        for name in commol_rs.engine.ModelKind(self.kind).value_types()
+        for name in commol_rs.engine.ModelKind(engine_json(self.kind)).value_types()
     )
 ```
 
@@ -3700,7 +3704,7 @@ Attributes:
 
 | Name   | Type                  | Description                       |
 | ------ | --------------------- | --------------------------------- |
-| `type` | `Literal['complete']` | The tag of the neighbors in JSON. |
+| `kind` | `Literal['complete']` | The tag of the neighbors in JSON. |
 
 Source code in `commol/context/neighbors.py`
 
@@ -3714,13 +3718,13 @@ class Complete(BaseModel):
 
     Attributes
     ----------
-    type : Literal["complete"]
+    kind : Literal["complete"]
         The tag of the neighbors in JSON.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["complete"] = "complete"
+    kind: Literal["complete"] = "complete"
 ```
 
 ## Groups
@@ -3735,7 +3739,7 @@ Attributes:
 
 | Name             | Type                            | Description                                                |
 | ---------------- | ------------------------------- | ---------------------------------------------------------- |
-| `type`           | `Literal['groups']`             | The tag of the neighbors in JSON.                          |
+| `kind`           | `Literal['groups']`             | The tag of the neighbors in JSON.                          |
 | `stratification` | `str`                           | Id of the stratification whose categories group the units. |
 | `weights`        | \`dict\[str, dict[str, float]\] | None\`                                                     |
 
@@ -3752,7 +3756,7 @@ class Groups(BaseModel):
 
     Attributes
     ----------
-    type : Literal["groups"]
+    kind : Literal["groups"]
         The tag of the neighbors in JSON.
     stratification : str
         Id of the stratification whose categories group the units.
@@ -3764,7 +3768,7 @@ class Groups(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["groups"] = "groups"
+    kind: Literal["groups"] = "groups"
     stratification: str
     weights: dict[str, dict[str, float]] | None = None
 
@@ -3773,7 +3777,7 @@ class Groups(BaseModel):
         stratification: str,
         weights: Mapping[str, Mapping[str, float]] | None = None,
         *,
-        type: Literal["groups"] = "groups",
+        kind: Literal["groups"] = "groups",
     ) -> None:
         """
         Group the neighbors of a unit by the categories of a stratification.
@@ -3785,7 +3789,7 @@ class Groups(BaseModel):
         weights : Mapping[str, Mapping[str, float]] | None, default=None
             ``weights[g][g']``, the weight of category ``g'`` for a unit in
             ``g``. None is the identity.
-        type : {"groups"}, default="groups"
+        kind : {"groups"}, default="groups"
             The kind of neighbors, as JSON holds it.
         """
         super().__init__(
@@ -3793,7 +3797,7 @@ class Groups(BaseModel):
             weights=None
             if weights is None
             else {own: dict(row) for own, row in weights.items()},
-            type=type,
+            kind=kind,
         )
 ```
 
@@ -3802,7 +3806,7 @@ class Groups(BaseModel):
 #### __init__
 
 ```python
-__init__(stratification: str, weights: Mapping[str, Mapping[str, float]] | None = None, *, type: Literal['groups'] = 'groups') -> None
+__init__(stratification: str, weights: Mapping[str, Mapping[str, float]] | None = None, *, kind: Literal['groups'] = 'groups') -> None
 ```
 
 Group the neighbors of a unit by the categories of a stratification.
@@ -3813,7 +3817,7 @@ Parameters:
 | ---------------- | ------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | `stratification` | `str`                                 | Id of the stratification whose categories group the units. | *required*                                                                       |
 | `weights`        | \`Mapping\[str, Mapping[str, float]\] | None\`                                                     | weights[g][g'], the weight of category g' for a unit in g. None is the identity. |
-| `type`           | `groups`                              | The kind of neighbors, as JSON holds it.                   | `"groups"`                                                                       |
+| `kind`           | `groups`                              | The kind of neighbors, as JSON holds it.                   | `"groups"`                                                                       |
 
 Source code in `commol/context/neighbors.py`
 
@@ -3823,7 +3827,7 @@ def __init__(
     stratification: str,
     weights: Mapping[str, Mapping[str, float]] | None = None,
     *,
-    type: Literal["groups"] = "groups",
+    kind: Literal["groups"] = "groups",
 ) -> None:
     """
     Group the neighbors of a unit by the categories of a stratification.
@@ -3835,7 +3839,7 @@ def __init__(
     weights : Mapping[str, Mapping[str, float]] | None, default=None
         ``weights[g][g']``, the weight of category ``g'`` for a unit in
         ``g``. None is the identity.
-    type : {"groups"}, default="groups"
+    kind : {"groups"}, default="groups"
         The kind of neighbors, as JSON holds it.
     """
     super().__init__(
@@ -3843,7 +3847,7 @@ def __init__(
         weights=None
         if weights is None
         else {own: dict(row) for own, row in weights.items()},
-        type=type,
+        kind=kind,
     )
 ```
 

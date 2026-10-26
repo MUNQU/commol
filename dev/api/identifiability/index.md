@@ -110,6 +110,8 @@ class Collinearity(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
         it is a modelling judgment.
     """
 
+    _engine_handles: ClassVar[tuple[str, ...]] = ("at",)
+
     at: CalibrationResult | ParameterSample
     max_subset_size: int
     threshold: float = Field()
@@ -154,6 +156,8 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeC
     priors : Priors | dict[str, Distribution] | None
         The prior of each parameter, with ``reference="prior"`` only.
     """
+
+    _engine_handles: ClassVar[tuple[str, ...]] = ("sample",)
 
     sample: ParameterSample
     reference: SampleReference
@@ -263,6 +267,8 @@ class StartsIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeC
     loss_tolerance : float
         The share of the best loss within which two losses are equal.
     """
+
+    _engine_handles: ClassVar[tuple[str, ...]] = ("result",)
 
     result: CalibrationResult
     parameter_tolerance: float = Field()

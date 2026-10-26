@@ -111,48 +111,66 @@ The search starts at `initial_guess`, or at the midpoint of the bounds; a start 
 ## Particle swarm
 
 ```python
-swarm = (
-    ParticleSwarmConfig(particles=40, max_iterations=300, initialization="latin_hypercube")
-    .inertia("chaotic", w_min=0.4, w_max=0.9)
-    .acceleration("time_varying", c1_initial=2.5, c1_final=0.5, c2_initial=0.5, c2_final=2.5)
-    .velocity(clamp_factor=0.2, mutation_threshold=0.005)
-    .mutation("gaussian", scale=0.1, probability=0.05, application="global_best")
+swarm = ParticleSwarmConfig(
+    particles=40,
+    max_iterations=300,
+    initialization="latin_hypercube",
+    inertia="chaotic",
+    inertia_min=0.4,
+    inertia_max=0.9,
+    acceleration="time_varying",
+    cognitive_initial=2.5,
+    cognitive_final=0.5,
+    social_initial=0.5,
+    social_final=2.5,
+    velocity_clamp_factor=0.2,
+    velocity_mutation_threshold=0.005,
+    mutation="gaussian",
+    mutation_scale=0.1,
+    mutation_probability=0.05,
+    mutation_application="global_best",
 )
 print(calibrate(swarm))  # {'k1': 0.4, 'k2': 0.1}
 ```
 
-| Field            | Default     | Meaning                                                                                                                              |
-| ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `particles`      | `20`        | The swarm size. More particles search more widely and cost more evaluations.                                                         |
-| `max_iterations` | `1000`      | The iteration limit.                                                                                                                 |
-| `initialization` | `"uniform"` | Where particles start: `"uniform"`, `"latin_hypercube"` (spread evenly) or `"opposition_based"` (each random point with its mirror). |
-| `verbose`        | `False`     | Writes progress to `sys.stdout`; needs `run(starts=1)`.                                                                              |
+Each strategy of the swarm is a name, and its numbers are fields of their own. A strategy left as `None` is that of canonical PSO. A number set without its strategy, or with another strategy, is an error, so a setting is never ignored: `ParticleSwarmConfig(inertia_factor=0.5)` fails with `inertia_factor is read only with another inertia`.
 
-Each method returns the configuration, so they chain:
-
-| Method                                                                              | Arguments                     | Effect                                                                                                                                                                                         |
-| ----------------------------------------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.inertia("constant", factor=0.72135)`                                              | `factor`                      | A fixed inertia weight. The default is the weight of canonical PSO, 1/(2 ln 2), which a swarm with no `.inertia` also uses.                                                                    |
-| `.inertia("chaotic", w_min=…, w_max=…)`                                             | `w_min < w_max`               | An inertia weight that varies chaotically between the two.                                                                                                                                     |
-| `.acceleration("constant", cognitive=1.19315, social=1.19315)`                      | `cognitive`, `social`         | Fixed pulls towards each particle's best and the swarm's best. The default of each is the coefficient of canonical PSO, 0.5 + ln 2, which a swarm with no `.acceleration` also uses.           |
-| `.acceleration("time_varying", c1_initial=…, c1_final=…, c2_initial=…, c2_final=…)` | four factors                  | Pulls that change from explore (high `c1`) to exploit (high `c2`).                                                                                                                             |
-| `.velocity(clamp_factor=None, mutation_threshold=None)`                             | fractions                     | `clamp_factor` limits speed to a share of the search box (0.1–0.2 is typical); `mutation_threshold` restarts particles slower than it (0.001–0.01).                                            |
-| `.mutation(strategy, *, scale, probability, application)`                           | see right                     | Random jumps to escape local minima: `strategy` `"gaussian"` or `"cauchy"` (larger jumps), `probability` per iteration, `application` `"global_best"`, `"all_particles"` or `"below_average"`. |
-| `.improvement_stop(*, window, tol_abs, tol_rel)`                                    | see [Stop rules](#stop-rules) | Stops when the best loss stops improving.                                                                                                                                                      |
-| `.radius_stop(tol)`                                                                 | see [Stop rules](#stop-rules) | Stops when the swarm has gathered around its best position.                                                                                                                                    |
+| Field                                                                    | Default     | Meaning                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------------ | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `particles`                                                              | `20`        | The swarm size. More particles search more widely and cost more evaluations.                                                                                                                                                                 |
+| `max_iterations`                                                         | `1000`      | The iteration limit.                                                                                                                                                                                                                         |
+| `initialization`                                                         | `"uniform"` | Where particles start: `"uniform"`, `"latin_hypercube"` (spread evenly) or `"opposition_based"` (each random point with its mirror).                                                                                                         |
+| `verbose`                                                                | `False`     | Writes progress to `sys.stdout`; needs `run(starts=1)`.                                                                                                                                                                                      |
+| `header_interval`                                                        | `100`       | With `verbose`, repeats the table header every this many iterations.                                                                                                                                                                         |
+| `inertia`                                                                | `None`      | `"constant"` uses `inertia_factor`; `"chaotic"` moves between `inertia_min` and `inertia_max`. `None` is the weight of canonical PSO, 1/(2 ln 2) ≈ 0.72135.                                                                                  |
+| `inertia_factor`                                                         | `None`      | With `inertia="constant"`: the weight, above 0. `None` is the weight of canonical PSO.                                                                                                                                                       |
+| `inertia_min`, `inertia_max`                                             | `None`      | With `inertia="chaotic"`, both needed: the range of the weight, `inertia_min < inertia_max`.                                                                                                                                                 |
+| `acceleration`                                                           | `None`      | `"constant"` uses `cognitive` and `social`; `"time_varying"` moves each pull from its initial to its final value, from explore (high cognitive) to exploit (high social). `None` is the coefficients of canonical PSO, 0.5 + ln 2 ≈ 1.19315. |
+| `cognitive`, `social`                                                    | `None`      | With `acceleration="constant"`: the pulls towards each particle's best and the swarm's best. `None` is the coefficient of canonical PSO.                                                                                                     |
+| `cognitive_initial`, `cognitive_final`, `social_initial`, `social_final` | `None`      | With `acceleration="time_varying"`, all four needed.                                                                                                                                                                                         |
+| `mutation`                                                               | `None`      | Random jumps to escape local minima: `"gaussian"` or `"cauchy"` (larger jumps). `None` mutates no particle.                                                                                                                                  |
+| `mutation_scale`, `mutation_probability`, `mutation_application`         | `None`      | With a mutation, all three needed: the size of a jump, the probability per iteration, and the particles it moves: `"global_best"`, `"all_particles"` or `"below_average"`.                                                                   |
+| `velocity_clamp_factor`                                                  | `None`      | Limits the speed to a share of the search box (0.1–0.2 is typical).                                                                                                                                                                          |
+| `velocity_mutation_threshold`                                            | `None`      | Restarts the velocity of particles slower than it (0.001–0.01).                                                                                                                                                                              |
+| `improvement_window`, `improvement_tol_abs`, `improvement_tol_rel`       | `None`      | The improvement [stop rule](#stop-rules): all three or none.                                                                                                                                                                                 |
+| `radius_tol`                                                             | `None`      | The radius [stop rule](#stop-rules).                                                                                                                                                                                                         |
 
 ### Stop rules
 
 A swarm stops at `max_iterations` unless a stop rule holds first. The two rules come from the argmin fork; both are off until you set them, and neither has a default value. A run that stops by a rule reports `converged=True` and `termination_reason` `Terminated(SolverConverged)`.
 
-| Rule                                                | Stops when                                                                                                                                               | Arguments |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| `.improvement_stop(window=…, tol_abs=…, tol_rel=…)` | The best loss improved by at most \`tol_abs + tol_rel·                                                                                                   | best loss |
-| `.radius_stop(tol)`                                 | Every particle is within `tol` of the best position, as a fraction of the size of the search box (the length of its diagonal) (Zielinski and Laur, 2007) | `tol` ≥ 0 |
+| Rule        | Stops when                                                                                                                                                      | Fields           |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| Improvement | The best loss improved by at most \`improvement_tol_abs + improvement_tol_rel·                                                                                  | best loss        |
+| Radius      | Every particle is within `radius_tol` of the best position, as a fraction of the size of the search box (the length of its diagonal) (Zielinski and Laur, 2007) | `radius_tol` ≥ 0 |
 
 ```python
-stopping = ParticleSwarmConfig(particles=30, max_iterations=2000).improvement_stop(
-    window=30, tol_abs=1e-12, tol_rel=1e-9
+stopping = ParticleSwarmConfig(
+    particles=30,
+    max_iterations=2000,
+    improvement_window=30,
+    improvement_tol_abs=1e-12,
+    improvement_tol_rel=1e-9,
 )
 problem = CalibrationProblem(
     observed_data=observed_data,
@@ -168,7 +186,7 @@ result = Calibrator(Simulation(model(None, None)), problem).run()
 print(result.converged, result.iterations < 2000)  # True True
 ```
 
-A swarm can stall for some iterations and then improve again, so a short `window` can stop it early. Mutation and velocity mutation scatter the particles again, and unknowns that the data cannot tell apart keep them spread, so with them the radius can stay above `tol`. Neither rule draws random numbers: with the same seed, a run with a rule is the run without it up to the iteration where it stops. In a [profile](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md), the improvement rule also sets the tolerance of a swarm.
+A swarm can stall for some iterations and then improve again, so a short `improvement_window` can stop it early. Mutation and velocity mutation scatter the particles again, and unknowns that the data cannot tell apart keep them spread, so with them the radius can stay above `radius_tol`. Neither rule draws random numbers: with the same seed, a run with a rule is the run without it up to the iteration where it stops. In a [profile](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md), the improvement rule also sets the tolerance of a swarm.
 
 ## Several starts
 

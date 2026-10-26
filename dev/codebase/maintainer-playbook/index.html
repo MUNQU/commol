@@ -3717,7 +3717,7 @@
       <code>discrepancy.rs</code>, penalties only in <code>objective.rs</code>. Use only
       <code>SimulationEngine</code>: a rule of one model kind goes behind
       <code>plan_values</code>, <code>apply_values</code> or <code>output_sums</code> of its engines.</li>
-<li>[ ] Convert new options once, in <code>api/calibrator.py</code>.</li>
+<li>[ ] Give a new option one field in the pydantic class and in <code>crates/commol-calibration/src/settings.rs</code> (<a href="../decisions/python-models/#a-data-object-crosses-as-the-json-of-its-dump">A data object crosses as the JSON of its dump</a>).</li>
 <li>[ ] Check that <code>tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss</code> still
       passes if the loss changes.</li>
 <li>[ ] Update <a href="../../guide/calibration/">Calibration</a>.</li>
@@ -3742,7 +3742,7 @@ changing it (<a href="../decisions/uncertainty/#methods-plug-into-one-entry-poin
       own, and its configuration takes required <code>priors</code> (<code>WithPriors</code>)
       (<a href="../decisions/uncertainty/#one-smc-core-many-targets">Design decisions</a>).</li>
 <li>[ ] The runner, bound in <code>py-commol/src/</code> (<code>inference.rs</code> or the module
-      of its family), which runs the method through <code>parallel</code>
+      of its family), which reads the JSON of the method into its type of <code>crates/commol-inference/src/settings/</code> (<a href="../decisions/python-models/#a-data-object-crosses-as-the-json-of-its-dump">A data object crosses as the JSON of its dump</a>) and runs it through <code>parallel</code>
       (<code>py-commol/src/parallelism.rs</code>), and its stub in <code>_commol_rs.pyi</code>
       (<code>tests/suite/test_engine_rules.py::test_the_stub_declares_what_the_extension_has</code>); a
       row in the table of <code>docs/guide/parallelism.md</code> and a case of <code>METHODS</code>
@@ -3762,7 +3762,7 @@ changing it (<a href="../decisions/uncertainty/#methods-plug-into-one-entry-poin
       docstring lists <code>ValueError</code> and <code>RuntimeError</code> by that rule
       (<a href="../decisions/uncertainty/#methods-raise-one-error-type">Design decisions</a>).</li>
 <li>[ ] The Python runner in the module of its family under <code>api/inference/</code>,
-      which calls <code>register(YourMethod, runner)</code> (<code>api/inference/registry.py</code>);
+      which sends the method whole and calls <code>register(YourMethod, runner)</code> (<code>api/inference/registry.py</code>);
       <code>api/inference/__init__.py</code> imports every such module.</li>
 <li>[ ] A coverage study (<code>tests/support/coverage.py</code>, marker <code>coverage_study</code>)
       that shows its intervals cover at their level.</li>
@@ -3777,8 +3777,8 @@ it reads derivatives only through <code>SensitivitySource</code>, adds its secti
 through <code>SensitivityAnalysis.run</code>. Its Rust side is a method of
 <code>ForwardAnalysis</code> (<code>crates/commol-inference/src/global_sensitivity/</code>), which
 builds the design from <code>InputSpace</code> (<code>design.rs</code>), runs it with
-<code>BatchRunner</code> and calls the estimator; the binding and the Python runner only
-convert. A method of independent inputs refuses a sample through
+<code>BatchRunner</code> and calls the estimator; the binding reads the JSON of the
+method. A method of independent inputs refuses a sample through
 <code>InputSpace::independent</code>, and a random number comes from a stream of the
 seed of the analysis (<code>Stream</code>, <code>crates/commol-random/src/streams.rs</code>).</p>
 <h3 id="model-type-engine">Model type (engine)<a class="headerlink" href="#model-type-engine" title="Permanent link">&para;</a></h3>
@@ -3866,7 +3866,7 @@ seed of the analysis (<code>Stream</code>, <code>crates/commol-random/src/stream
 </ul>
 <h3 id="pyo3-bindings">PyO3 bindings<a class="headerlink" href="#pyo3-bindings" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] Keep logic out of <code>py-commol/src/</code>: convert types and call the crate.</li>
+<li>[ ] Keep logic out of <code>py-commol/src/</code>: read a data object with <code>crate::json::read</code> and call the crate; a <code>#[pyclass]</code> is a handle or a result (<a href="../decisions/python-models/#a-data-object-crosses-as-the-json-of-its-dump">A data object crosses as the JSON of its dump</a>).</li>
 <li>[ ] Take a count as <code>i64</code> (a seed as <code>i128</code>) and read it with its rule,
       <code>crate::counts::count(&amp;RULE, value)</code> (<code>commol_core::SEED</code> for a seed),
       so a negative one raises the message of the rule; add the case to

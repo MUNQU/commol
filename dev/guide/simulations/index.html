@@ -3818,7 +3818,7 @@ continue a run step by step, use the engine:</p>
 <p>The engine follows the model. When the model changed after the
 <code>Simulation</code> was created, for example with <code>update_parameters</code> or
 <code>apply_calibration_parameters</code>, <code>run</code> and <code>engine</code> rebuild the engine from the
-model as it is now (<code>Simulation._sync_engine</code> compares <code>model_dump_json()</code>
+model as it is now (<code>Simulation._sync_engine</code> compares the JSON of the model
 with the JSON the engine was built from):</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">model</span><span class="o">.</span><span class="n">update_parameters</span><span class="p">({</span><span class="s2">&quot;k1&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">})</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">frozen</span> <span class="o">=</span> <span class="n">simulation</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>

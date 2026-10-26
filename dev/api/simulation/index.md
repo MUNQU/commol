@@ -46,7 +46,7 @@ class Simulation:
             )
         logger.info(f"Initializing Simulation with model: '{model.name}'")
         self.model_definition: Model = model
-        self._build_engine(model.model_dump_json())
+        self._build_engine(engine_json(model))
 
     def _build_engine(self, model_json: str) -> None:
         """Build the engine and its output names from a model JSON."""
@@ -59,7 +59,7 @@ class Simulation:
 
     def _sync_engine(self) -> None:
         """Rebuild the engine when the model changed since it was built."""
-        model_json = self.model_definition.model_dump_json()
+        model_json = engine_json(self.model_definition)
         if model_json != self._model_json:
             logger.info("Model changed since the engine was built; rebuilding it.")
             self._build_engine(model_json)
@@ -104,7 +104,7 @@ class Simulation:
     def is_stochastic(self) -> bool:
         """Whether the engine of the model draws random numbers."""
         return commol_rs.engine.EngineType(
-            self.model_definition.engine.type
+            engine_json(self.model_definition.engine.type)
         ).is_stochastic
 
     def _seed_run(self, seed: int | None) -> int | None:
@@ -543,7 +543,7 @@ def __init__(self, model: Model) -> None:
         )
     logger.info(f"Initializing Simulation with model: '{model.name}'")
     self.model_definition: Model = model
-    self._build_engine(model.model_dump_json())
+    self._build_engine(engine_json(model))
 ```
 
 #### run

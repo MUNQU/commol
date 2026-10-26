@@ -4796,6 +4796,70 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Breaking:</strong> <code>ParticleSwarmConfig</code> is one class with plain fields, and
+  its chained methods <code>.inertia</code>, <code>.acceleration</code>, <code>.velocity</code>, <code>.mutation</code>,
+  <code>.improvement_stop</code> and <code>.radius_stop</code> and their <code>*_config</code> properties are
+  removed, with the <code>PSO*</code> classes of <code>commol.context.calibration</code> and the
+  <code>PSO*</code> enumerations of <code>commol.context.constants</code>. Each strategy is a name
+  (<code>inertia</code>, <code>acceleration</code>, <code>mutation</code>, <code>initialization</code>), and its numbers
+  are fields: <code>inertia_factor</code>, <code>inertia_min</code>, <code>inertia_max</code>, <code>cognitive</code>,
+  <code>social</code>, <code>cognitive_initial</code>, <code>cognitive_final</code>, <code>social_initial</code>,
+  <code>social_final</code>, <code>mutation_scale</code>, <code>mutation_probability</code>,
+  <code>mutation_application</code>, <code>velocity_clamp_factor</code>,
+  <code>velocity_mutation_threshold</code>, <code>improvement_window</code>, <code>improvement_tol_abs</code>,
+  <code>improvement_tol_rel</code> and <code>radius_tol</code>. A number set without its strategy
+  raises <code>ValueError</code>. Migration: <code>ParticleSwarmConfig().inertia("chaotic",
+  w_min=0.4, w_max=0.9).improvement_stop(window=30, tol_abs=1e-12,
+  tol_rel=1e-9)</code> is <code>ParticleSwarmConfig(inertia="chaotic", inertia_min=0.4,
+  inertia_max=0.9, improvement_window=30, improvement_tol_abs=1e-12,
+  improvement_tol_rel=1e-9)</code>; <code>c1_*</code> is <code>cognitive_*</code>, <code>c2_*</code> is <code>social_*</code>,
+  <code>.velocity(clamp_factor=…, mutation_threshold=…)</code> is
+  <code>velocity_clamp_factor=…, velocity_mutation_threshold=…</code> and
+  <code>.radius_stop(tol)</code> is <code>radius_tol=tol</code>. See
+  <a href="../../guide/calibration-optimizers/#particle-swarm">Particle swarm</a>.</li>
+<li><strong>Breaking:</strong> the members that converted an object to the engine are
+  removed: <code>Calibrator.rust_problem</code> and <code>rust_optimizer</code>, <code>rust_predictive</code>,
+  <code>rust_observation_draws</code> and <code>rust_log_score</code> of <code>Calibrator</code> and
+  <code>SensitivityAnalysis</code>, <code>SensitivityAnalysis.rust_analysis</code>,
+  <code>rust_parameters</code> and <code>rust_prior</code> of the distributions, <code>Priors.rust_priors</code>,
+  <code>InputSpace.rust_distributions</code>, <code>rust_json</code> of the quantities and
+  <code>ParameterSample.rust_sample</code>; the predictive members of a source are
+  private. Migration: build a predictive with <code>Predictive</code> and score it
+  with <code>commol.scores</code>, as before; the engine reads each object from the
+  JSON of its <code>model_dump()</code>.</li>
+<li><strong>Breaking:</strong> the tag of <code>Complete</code> and <code>Groups</code> in the JSON of a model is
+  <code>kind</code>, in place of <code>type</code>. Migration: in a saved model, rename the key
+  <code>"type"</code> of each <code>neighbors</code> entry to <code>"kind"</code>.</li>
+<li>Each data object reaches the engine as the JSON of its <code>model_dump()</code>: the
+  model, the calibration problem and each inference method, whole. A setting
+  that the engine rejects raises <code>ValueError</code> with the path of its field
+  before the message of the engine
+  (<code>optimization_config.inertia_factor: inertia_factor is a number greater
+  than 0, got -1</code>). <code>NelderMeadConfig</code>, <code>ParticleSwarmConfig</code>, the four
+  bootstraps and the observation noises have a field <code>kind</code> with a default,
+  the tag of their union. The engine fits the problem for each method that
+  needs a fit, and calibrates <code>η</code> and the threshold of a profile. The results
+  are the same for the same settings and seed.</li>
+<li>An unknown name of an engine, a model kind, the levels of
+  <code>commol.set_threads</code>, or the <code>score</code> or <code>by</code> of a conformal method gives
+  the message of the reader of the engine, which lists the valid names, such
+  as <code>unknown variant `Stochastic`, expected one of `DifferenceEquations`,
+  …</code> or <code>score: unknown variant `other`, expected one of `absolute`,
+  `normalized`, `spread`</code>. A conformal method without <code>score</code> or <code>by</code>
+  gives <code>missing field `score`</code>.</li>
+<li>The JSON of every result (<code>model_dump_json</code>) is standard JSON: a number
+  that is not finite is the text <code>"Infinity"</code>, <code>"-Infinity"</code> or <code>"NaN"</code>, as
+  at the port of the engine. Before, <code>ParameterSample</code>, <code>SMCResult</code>,
+  <code>JackknifeResult</code>, <code>ConformalResult</code>, <code>PredictionIntervals</code> and
+  <code>SeriesIntervals</code> wrote the bare <code>Infinity</code> and <code>NaN</code>, which a standard JSON reader rejects, and the other results wrote
+  <code>null</code>, which did not load back. A result reads its JSON back equal, a NaN
+  included, and a result that 0.10 saved with bare <code>Infinity</code> or <code>NaN</code> still
+  loads.</li>
+<li>A method that fits the problem before it runs (the bootstraps, the
+  jackknife, the local approximations, the conformal methods, the profiles,
+  and the Gibbs posterior with a calibration of <code>η</code>) no longer logs <code>Starting calibration …</code> at info
+  level, since the engine runs that fit. A start of the fit that fails is
+  still logged as a warning, and <code>Calibrator.run</code> still logs its start.</li>
 <li>A formula has at most 100 000 nodes (numbers, variables, operators and
   calls), next to its limit of 100 levels of nesting: a longer one raises
   <code>ValueError</code> when its object is built, before it compiles. A message of
@@ -4820,6 +4884,8 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   per-step engine. A continuous engine gives <code>1/n</code> with both. With
   <code>keep="mean"</code>, a per-step engine rejects a span shorter than one step with
   <code>ValueError</code>. Migration: add <code>keep="survival"</code> to keep each rate as it is.
+  Another value of <code>keep</code> raises <code>ValueError</code> with the message of the
+  engine, <code>unknown variant `median`, expected `survival` or `mean`</code>.
   See <a href="../../guide/core-concepts/#units-of-the-axis">Units of the axis</a>.</li>
 </ul>
 <h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
@@ -4841,6 +4907,14 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>A number that is not finite in a model or in the settings of an engine
+  reached the engine as <code>null</code>. An infinite tolerance of <code>ODESolver</code> raised
+  a message about the type of the setting, and an infinite parameter value
+  failed when the model ran, with a message about a parameter index. Such a
+  number now reaches the engine as its text, as every setting does:
+  <code>ODESolver(atol=float("inf"))</code> raises <code>atol is a finite number greater
+  than 0, got inf</code>, and the infinite parameter value is rejected when the
+  engine is built, with the name of the parameter.</li>
 <li>The flow of a proportional rate is the whole rate times its source, in the
   description and in the unit check: a rate <code>k1 + k2</code> from <code>B</code> is
   <code>(k1 + k2) * B</code>; before, both read <code>k1 + k2 * B</code>, and the unit check of

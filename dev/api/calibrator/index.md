@@ -41,7 +41,9 @@ class Calibrator:
         ------
         ValueError
             If a parameter, observation, position or constraint does not fit
-            the model.
+            the model, or a setting of the problem is outside its rule; the
+            message names the path of the setting, such as
+            ``optimization_config.inertia_factor``.
         """
         logger.info(
             f"Initializing Calibration for model: '{simulation.model_definition.name}'"
@@ -57,25 +59,10 @@ class Calibrator:
             )
         )
 
-        loss_config = self._build_loss_config()
         self._validate_calibration_parameters()
         self._warn_constraint_positions_beyond_observations()
-        models = problem.observation_models
         self._rust_problem: "CalibrationProblemProtocol" = (
-            commol_rs.inference.CalibrationProblem(
-                self._engine,
-                engine_state.rust_observed_data(problem.observed_data),
-                engine_state.rust_parameters(problem.parameters),
-                engine_state.rust_constraints(problem.constraints),
-                loss_config=loss_config,
-                initial_condition_remainder=problem.initial_condition_remainder,
-                observation_models=(
-                    None
-                    if models is None
-                    else engine_state.rust_observation_models(models)
-                ),
-                seed=problem.seed,
-            )
+            commol_rs.inference.CalibrationProblem(self._engine, engine_json(problem))
         )
         if problem.seed is None:
             logger.info(
@@ -83,19 +70,7 @@ class Calibrator:
                 self._rust_problem.seed,
             )
 
-    @property
-    def rust_problem(self) -> "CalibrationProblemProtocol":
-        """
-        The calibration problem built in Rust, for the runners of methods.
-
-        Returns
-        -------
-        CalibrationProblemProtocol
-            The problem every optimization, prediction and method reads.
-        """
-        return self._rust_problem
-
-    def rust_predictive(
+    def _predictive(
         self, sample: ParameterSample, positions: list[float]
     ) -> "PredictiveProtocol":
         """
@@ -115,7 +90,7 @@ class Calibrator:
         PredictiveProtocol
             The runs, computed in Rust.
         """
-        return self._rust_problem.predictive(sample.rust_sample, positions, self.seed)
+        return self._rust_problem.predictive(sample._rust, positions)
 
     def with_model(self, model: "Model") -> "Calibrator":
         """
@@ -245,7 +220,7 @@ class Calibrator:
             upper=by_output(outputs, upper),
         )
 
-    def rust_observation_draws(
+    def _observation_draws(
         self,
         sample: ParameterSample,
         observed_data: list[ObservedDataPoint],
@@ -268,22 +243,11 @@ class Calibrator:
         ObservationDrawsProtocol
             The draws, computed in Rust.
         """
-        residual_noise = None
-        if isinstance(noise, ResidualNoise):
-            residual_noise = (
-                [noise.fit.best_parameters[name] for name in self.parameter_names],
-                noise.block_length,
-                noise.residual_scale,
-            )
         return self._rust_problem.observation_draws(
-            sample.rust_sample,
-            engine_state.rust_observed_data(observed_data),
-            self.seed,
-            residual_noise=residual_noise,
-            distribution_noise=isinstance(noise, DistributionNoise),
+            sample._rust, engine_json(observed_data), engine_json(noise)
         )
 
-    def rust_log_score(
+    def _log_score(
         self, sample: ParameterSample, observed_data: list[ObservedDataPoint]
     ) -> list[float]:
         """
@@ -302,23 +266,7 @@ class Calibrator:
         list[float]
             One log score per observation, computed in Rust.
         """
-        return self._rust_problem.log_score(
-            sample.rust_sample,
-            engine_state.rust_observed_data(observed_data),
-            self.seed,
-        )
-
-    @property
-    def rust_optimizer(self) -> "OptimizationConfigProtocol":
-        """
-        The optimizer built in Rust, for the runners of methods.
-
-        Returns
-        -------
-        OptimizationConfigProtocol
-            The optimizer of ``problem.optimization_config``.
-        """
-        return self._build_optimization_config()
+        return self._rust_problem.log_score(sample._rust, engine_json(observed_data))
 
     @property
     def seed(self) -> int:
@@ -368,51 +316,17 @@ class Calibrator:
         RuntimeError
             If every start fails.
         """
-        algorithm_name = (
-            OptimizationAlgorithm.NELDER_MEAD
-            if isinstance(self.problem.optimization_config, NelderMeadConfig)
-            else OptimizationAlgorithm.PARTICLE_SWARM
-        )
         measure = (
             f"{self.problem.loss_function} loss function"
             if self.problem.loss_function is not None
             else "the negative log-likelihood of its observation models"
         )
         logger.info(
-            f"Starting calibration with {algorithm_name} algorithm, "
-            f"{measure} and {starts} start(s)."
+            f"Starting calibration with {self.problem.optimization_config.kind} "
+            f"algorithm, {measure} and {starts} start(s)."
         )
-        run = self._rust_problem.optimize(
-            self._build_optimization_config(), starts, self.seed
-        )
-        names = self.parameter_names
-        summaries: list[StartSummary] = []
-        failed: list[str] = []
-        for index, outcome in enumerate(run.outcomes):
-            if outcome.result is None:
-                reason = f"Start {index} failed: {outcome.error}"
-                logger.warning(reason)
-                failed.append(reason)
-                continue
-            summaries.append(
-                StartSummary(
-                    start=dict(zip(names, outcome.start, strict=True)),
-                    end=dict(outcome.result.best_parameters),
-                    loss=outcome.result.final_loss,
-                    converged=outcome.result.converged,
-                )
-            )
-        best = run.outcomes[run.best].result
-        assert best is not None, "the best start did not fail"
-        result = CalibrationResult(
-            best_parameters=dict(best.best_parameters),
-            final_loss=best.final_loss,
-            iterations=best.iterations,
-            converged=best.converged,
-            termination_reason=best.termination_reason,
-            starts=summaries,
-            failed=failed,
-            seed=self.seed,
+        result = fit_result(
+            self._rust_problem.optimize(starts), self.parameter_names, self.seed, logger
         )
         logger.info(
             (
@@ -439,17 +353,15 @@ class Calibrator:
             If optimization fails.
         """
         logger.info("Starting calibration with history tracking")
-        history = self._rust_problem.optimize_with_history(
-            self._build_optimization_config(), self.seed
-        )
+        history = self._rust_problem.optimize_with_history()
         names = self.parameter_names
-        rust_result = history.result
+        best = history.result
         result = CalibrationResult(
-            best_parameters=dict(rust_result.best_parameters),
-            final_loss=rust_result.final_loss,
-            iterations=rust_result.iterations,
-            converged=rust_result.converged,
-            termination_reason=rust_result.termination_reason,
+            best_parameters=dict(best.best_parameters),
+            final_loss=best.final_loss,
+            iterations=best.iterations,
+            converged=best.converged,
+            termination_reason=best.termination_reason,
             seed=self.seed,
         )
         evaluations = [
@@ -543,110 +455,6 @@ class Calibrator:
 
         return run_method(self, method, IdentifiabilityMethod)
 
-    def _build_loss_config(self) -> "LossConfigProtocol | None":
-        """The Rust loss, with the settings of the replicates; None with
-        observation models."""
-        if self.problem.loss_function is None:
-            return None
-        return engine_state.rust_loss_config(self.problem, self.problem.loss_function)
-
-    def _build_optimization_config(self) -> "OptimizationConfigProtocol":
-        """Convert Python OptimizationConfig to Rust OptimizationConfig."""
-        opt_config = self.problem.optimization_config
-
-        if isinstance(opt_config, NelderMeadConfig):
-            nm_config = rust_calibration.NelderMeadConfig(
-                max_iterations=opt_config.max_iterations,
-                sd_tolerance=opt_config.sd_tolerance,
-                initial_simplex_size=opt_config.initial_simplex_size,
-                alpha=opt_config.alpha,
-                gamma=opt_config.gamma,
-                rho=opt_config.rho,
-                sigma=opt_config.sigma,
-                verbose=opt_config.verbose,
-                header_interval=opt_config.header_interval,
-            )
-            return rust_calibration.OptimizationConfig.nelder_mead(nm_config)
-
-        return self._build_pso_config(opt_config)
-
-    def _build_pso_config(
-        self, opt_config: ParticleSwarmConfig
-    ) -> "OptimizationConfigProtocol":
-        """Convert ParticleSwarmConfig to Rust OptimizationConfig."""
-        rust_inertia = self._build_rust_inertia(opt_config.inertia_config)
-        rust_acceleration = self._build_rust_acceleration(
-            opt_config.acceleration_config
-        )
-
-        mutation = opt_config.mutation_config
-        rust_mutation = None
-        if mutation is not None:
-            rust_mutation = rust_calibration.PSOMutation(
-                strategy=mutation.strategy,
-                scale=mutation.scale,
-                probability=mutation.probability,
-                application=mutation.application,
-            )
-
-        velocity = opt_config.velocity_config
-        rust_velocity = None
-        if velocity is not None:
-            rust_velocity = rust_calibration.PSOVelocity(
-                clamp_factor=velocity.clamp_factor,
-                mutation_threshold=velocity.mutation_threshold,
-            )
-
-        improvement = opt_config.improvement_stop_config
-        radius = opt_config.radius_stop_config
-        ps_config = rust_calibration.ParticleSwarmConfig(
-            particles=opt_config.particles,
-            max_iterations=opt_config.max_iterations,
-            verbose=opt_config.verbose,
-            inertia=rust_inertia,
-            acceleration=rust_acceleration,
-            mutation=rust_mutation,
-            velocity=rust_velocity,
-            initialization=opt_config.initialization,
-            improvement_stop=(
-                None
-                if improvement is None
-                else (improvement.window, improvement.tol_abs, improvement.tol_rel)
-            ),
-            radius_stop=None if radius is None else radius.tol,
-        )
-        return rust_calibration.OptimizationConfig.particle_swarm(ps_config)
-
-    def _build_rust_inertia(
-        self, inertia: PSOConstantInertia | PSOChaoticInertia | None
-    ) -> "PSOInertiaConstantProtocol | PSOInertiaChaoticProtocol | None":
-        """Convert Python inertia config to Rust type."""
-        if inertia is None:
-            return None
-        if isinstance(inertia, PSOConstantInertia):
-            return rust_calibration.PSOInertiaConstant(factor=inertia.factor)
-        return rust_calibration.PSOInertiaChaotic(
-            w_min=inertia.w_min, w_max=inertia.w_max
-        )
-
-    def _build_rust_acceleration(
-        self, acceleration: PSOConstantAcceleration | PSOTimeVaryingAcceleration | None
-    ) -> "PSOAccelerationConstantProtocol | PSOAccelerationTimeVaryingProtocol | None":
-        """Convert Python acceleration config to Rust type."""
-        if acceleration is None:
-            return None
-        if isinstance(acceleration, PSOConstantAcceleration):
-            return rust_calibration.PSOAccelerationConstant(
-                cognitive=acceleration.cognitive,
-                social=acceleration.social,
-            )
-        return rust_calibration.PSOAccelerationTimeVarying(
-            c1_initial=acceleration.c1_initial,
-            c1_final=acceleration.c1_final,
-            c2_initial=acceleration.c2_initial,
-            c2_final=acceleration.c2_final,
-        )
-
     @property
     def num_parameters(self) -> int:
         """Number of parameters being calibrated."""
@@ -692,34 +500,6 @@ class Calibrator:
 ```
 
 ### Attributes
-
-#### rust_problem
-
-```python
-rust_problem: CalibrationProblemProtocol
-```
-
-The calibration problem built in Rust, for the runners of methods.
-
-Returns:
-
-| Type                         | Description                                                  |
-| ---------------------------- | ------------------------------------------------------------ |
-| `CalibrationProblemProtocol` | The problem every optimization, prediction and method reads. |
-
-#### rust_optimizer
-
-```python
-rust_optimizer: OptimizationConfigProtocol
-```
-
-The optimizer built in Rust, for the runners of methods.
-
-Returns:
-
-| Type                         | Description                                   |
-| ---------------------------- | --------------------------------------------- |
-| `OptimizationConfigProtocol` | The optimizer of problem.optimization_config. |
 
 #### seed
 
@@ -778,9 +558,9 @@ Parameters:
 
 Raises:
 
-| Type         | Description                                                                 |
-| ------------ | --------------------------------------------------------------------------- |
-| `ValueError` | If a parameter, observation, position or constraint does not fit the model. |
+| Type         | Description                                                                                                                                                                                                         |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If a parameter, observation, position or constraint does not fit the model, or a setting of the problem is outside its rule; the message names the path of the setting, such as optimization_config.inertia_factor. |
 
 Source code in `commol/api/calibrator.py`
 
@@ -804,7 +584,9 @@ def __init__(
     ------
     ValueError
         If a parameter, observation, position or constraint does not fit
-        the model.
+        the model, or a setting of the problem is outside its rule; the
+        message names the path of the setting, such as
+        ``optimization_config.inertia_factor``.
     """
     logger.info(
         f"Initializing Calibration for model: '{simulation.model_definition.name}'"
@@ -820,78 +602,16 @@ def __init__(
         )
     )
 
-    loss_config = self._build_loss_config()
     self._validate_calibration_parameters()
     self._warn_constraint_positions_beyond_observations()
-    models = problem.observation_models
     self._rust_problem: "CalibrationProblemProtocol" = (
-        commol_rs.inference.CalibrationProblem(
-            self._engine,
-            engine_state.rust_observed_data(problem.observed_data),
-            engine_state.rust_parameters(problem.parameters),
-            engine_state.rust_constraints(problem.constraints),
-            loss_config=loss_config,
-            initial_condition_remainder=problem.initial_condition_remainder,
-            observation_models=(
-                None
-                if models is None
-                else engine_state.rust_observation_models(models)
-            ),
-            seed=problem.seed,
-        )
+        commol_rs.inference.CalibrationProblem(self._engine, engine_json(problem))
     )
     if problem.seed is None:
         logger.info(
             "No seed set; drew the seed %d, which repeats this calibration.",
             self._rust_problem.seed,
         )
-```
-
-#### rust_predictive
-
-```python
-rust_predictive(sample: ParameterSample, positions: list[float]) -> PredictiveProtocol
-```
-
-The run of every draw of `sample` at `positions`, for a `Predictive`: each replicate of a stochastic engine has a seed of its own, derived from the calibrator's seed.
-
-Parameters:
-
-| Name        | Type              | Description                                | Default    |
-| ----------- | ----------------- | ------------------------------------------ | ---------- |
-| `sample`    | `ParameterSample` | The draws, in the problem's order.         | *required* |
-| `positions` | `list[float]`     | Positions to report at, sorted and unique. | *required* |
-
-Returns:
-
-| Type                 | Description                 |
-| -------------------- | --------------------------- |
-| `PredictiveProtocol` | The runs, computed in Rust. |
-
-Source code in `commol/api/calibrator.py`
-
-```python
-def rust_predictive(
-    self, sample: ParameterSample, positions: list[float]
-) -> "PredictiveProtocol":
-    """
-    The run of every draw of `sample` at `positions`, for a `Predictive`:
-    each replicate of a stochastic engine has a seed of its own, derived
-    from the calibrator's seed.
-
-    Parameters
-    ----------
-    sample : ParameterSample
-        The draws, in the problem's order.
-    positions : list[float]
-        Positions to report at, sorted and unique.
-
-    Returns
-    -------
-    PredictiveProtocol
-        The runs, computed in Rust.
-    """
-    return self._rust_problem.predictive(sample.rust_sample, positions, self.seed)
 ```
 
 #### with_model
@@ -1121,120 +841,6 @@ def delta_band(
     )
 ```
 
-#### rust_observation_draws
-
-```python
-rust_observation_draws(sample: ParameterSample, observed_data: list[ObservedDataPoint], noise: ObservationNoise) -> ObservationDrawsProtocol
-```
-
-Every draw's value of `observed_data` with `noise`, for a `Predictive`.
-
-Parameters:
-
-| Name            | Type                      | Description                        | Default             |
-| --------------- | ------------------------- | ---------------------------------- | ------------------- |
-| `sample`        | `ParameterSample`         | The draws, in the problem's order. | *required*          |
-| `observed_data` | `list[ObservedDataPoint]` | The observations.                  | *required*          |
-| `noise`         | \`NoNoise                 | ResidualNoise                      | DistributionNoise\` |
-
-Returns:
-
-| Type                       | Description                  |
-| -------------------------- | ---------------------------- |
-| `ObservationDrawsProtocol` | The draws, computed in Rust. |
-
-Source code in `commol/api/calibrator.py`
-
-```python
-def rust_observation_draws(
-    self,
-    sample: ParameterSample,
-    observed_data: list[ObservedDataPoint],
-    noise: ObservationNoise,
-) -> "ObservationDrawsProtocol":
-    """
-    Every draw's value of `observed_data` with `noise`, for a `Predictive`.
-
-    Parameters
-    ----------
-    sample : ParameterSample
-        The draws, in the problem's order.
-    observed_data : list[ObservedDataPoint]
-        The observations.
-    noise : NoNoise | ResidualNoise | DistributionNoise
-        The observation noise, drawn from the calibrator's seed.
-
-    Returns
-    -------
-    ObservationDrawsProtocol
-        The draws, computed in Rust.
-    """
-    residual_noise = None
-    if isinstance(noise, ResidualNoise):
-        residual_noise = (
-            [noise.fit.best_parameters[name] for name in self.parameter_names],
-            noise.block_length,
-            noise.residual_scale,
-        )
-    return self._rust_problem.observation_draws(
-        sample.rust_sample,
-        engine_state.rust_observed_data(observed_data),
-        self.seed,
-        residual_noise=residual_noise,
-        distribution_noise=isinstance(noise, DistributionNoise),
-    )
-```
-
-#### rust_log_score
-
-```python
-rust_log_score(sample: ParameterSample, observed_data: list[ObservedDataPoint]) -> list[float]
-```
-
-The log score of each observation under the predictive of `sample`, for `commol.scores.log_score`.
-
-Parameters:
-
-| Name            | Type                      | Description                        | Default    |
-| --------------- | ------------------------- | ---------------------------------- | ---------- |
-| `sample`        | `ParameterSample`         | The draws, in the problem's order. | *required* |
-| `observed_data` | `list[ObservedDataPoint]` | The observations.                  | *required* |
-
-Returns:
-
-| Type          | Description                                      |
-| ------------- | ------------------------------------------------ |
-| `list[float]` | One log score per observation, computed in Rust. |
-
-Source code in `commol/api/calibrator.py`
-
-```python
-def rust_log_score(
-    self, sample: ParameterSample, observed_data: list[ObservedDataPoint]
-) -> list[float]:
-    """
-    The log score of each observation under the predictive of `sample`,
-    for `commol.scores.log_score`.
-
-    Parameters
-    ----------
-    sample : ParameterSample
-        The draws, in the problem's order.
-    observed_data : list[ObservedDataPoint]
-        The observations.
-
-    Returns
-    -------
-    list[float]
-        One log score per observation, computed in Rust.
-    """
-    return self._rust_problem.log_score(
-        sample.rust_sample,
-        engine_state.rust_observed_data(observed_data),
-        self.seed,
-    )
-```
-
 #### run
 
 ```python
@@ -1302,51 +908,17 @@ def run(self, starts: int = 1) -> CalibrationResult:
     RuntimeError
         If every start fails.
     """
-    algorithm_name = (
-        OptimizationAlgorithm.NELDER_MEAD
-        if isinstance(self.problem.optimization_config, NelderMeadConfig)
-        else OptimizationAlgorithm.PARTICLE_SWARM
-    )
     measure = (
         f"{self.problem.loss_function} loss function"
         if self.problem.loss_function is not None
         else "the negative log-likelihood of its observation models"
     )
     logger.info(
-        f"Starting calibration with {algorithm_name} algorithm, "
-        f"{measure} and {starts} start(s)."
+        f"Starting calibration with {self.problem.optimization_config.kind} "
+        f"algorithm, {measure} and {starts} start(s)."
     )
-    run = self._rust_problem.optimize(
-        self._build_optimization_config(), starts, self.seed
-    )
-    names = self.parameter_names
-    summaries: list[StartSummary] = []
-    failed: list[str] = []
-    for index, outcome in enumerate(run.outcomes):
-        if outcome.result is None:
-            reason = f"Start {index} failed: {outcome.error}"
-            logger.warning(reason)
-            failed.append(reason)
-            continue
-        summaries.append(
-            StartSummary(
-                start=dict(zip(names, outcome.start, strict=True)),
-                end=dict(outcome.result.best_parameters),
-                loss=outcome.result.final_loss,
-                converged=outcome.result.converged,
-            )
-        )
-    best = run.outcomes[run.best].result
-    assert best is not None, "the best start did not fail"
-    result = CalibrationResult(
-        best_parameters=dict(best.best_parameters),
-        final_loss=best.final_loss,
-        iterations=best.iterations,
-        converged=best.converged,
-        termination_reason=best.termination_reason,
-        starts=summaries,
-        failed=failed,
-        seed=self.seed,
+    result = fit_result(
+        self._rust_problem.optimize(starts), self.parameter_names, self.seed, logger
     )
     logger.info(
         (
@@ -1397,17 +969,15 @@ def run_with_history(self) -> CalibrationHistory:
         If optimization fails.
     """
     logger.info("Starting calibration with history tracking")
-    history = self._rust_problem.optimize_with_history(
-        self._build_optimization_config(), self.seed
-    )
+    history = self._rust_problem.optimize_with_history()
     names = self.parameter_names
-    rust_result = history.result
+    best = history.result
     result = CalibrationResult(
-        best_parameters=dict(rust_result.best_parameters),
-        final_loss=rust_result.final_loss,
-        iterations=rust_result.iterations,
-        converged=rust_result.converged,
-        termination_reason=rust_result.termination_reason,
+        best_parameters=dict(best.best_parameters),
+        final_loss=best.final_loss,
+        iterations=best.iterations,
+        converged=best.converged,
+        termination_reason=best.termination_reason,
         seed=self.seed,
     )
     evaluations = [
@@ -1589,7 +1159,7 @@ Attributes:
 | `loss_function`               | \`{sse, rmse, mae}            | None\`                                                                                                                                                                                                    |
 | `observation_models`          | \`dict[str, ObservationModel] | None\`                                                                                                                                                                                                    |
 | `normalize_observations`      | `bool`                        | When True, divide each residual by the RMS of its observation series before applying the loss metric (default: False). It needs a loss: observation models set the scale of each series with their noise. |
-| `optimization_config`         | `OptimizationConfig`          | Configuration for the optimization algorithm                                                                                                                                                              |
+| `optimization_config`         | \`NelderMeadConfig            | ParticleSwarmConfig\`                                                                                                                                                                                     |
 | `initial_condition_remainder` | \`str                         | None\`                                                                                                                                                                                                    |
 | `replicates`                  | \`int                         | None\`                                                                                                                                                                                                    |
 | `replicate_summary`           | \`{mean, median, crps}        | Quantile                                                                                                                                                                                                  |
@@ -1630,8 +1200,8 @@ class CalibrationProblem(RangeChecked):
         When True, divide each residual by the RMS of its observation series
         before applying the loss metric (default: False). It needs a loss:
         observation models set the scale of each series with their noise.
-    optimization_config : OptimizationConfig
-        Configuration for the optimization algorithm
+    optimization_config : NelderMeadConfig | ParticleSwarmConfig
+        Configuration for the optimization algorithm, by its ``kind``
     initial_condition_remainder : str | None
         Expanded compartment or bin that takes what the calibrated initial
         conditions leave of the amounts the model states (default: None). It
@@ -1690,9 +1260,9 @@ class CalibrationProblem(RangeChecked):
             "scales comparable in the loss."
         ),
     )
-    optimization_config: NelderMeadConfig | ParticleSwarmConfig = Field(
-        default=..., description="Optimization algorithm configuration"
-    )
+    optimization_config: Annotated[
+        NelderMeadConfig | ParticleSwarmConfig, Field(discriminator="kind")
+    ] = Field(default=..., description="Optimization algorithm configuration")
     initial_condition_remainder: str | None = Field(
         default=None,
         description=(
@@ -2651,17 +2221,18 @@ The Nelder-Mead method is a simplex-based derivative-free optimization algorithm
 
 Attributes:
 
-| Name                   | Type    | Description                                                                                                                                                                                                                                     |
-| ---------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `max_iterations`       | `int`   | Maximum number of iterations (default: 1000)                                                                                                                                                                                                    |
-| `sd_tolerance`         | `float` | Convergence tolerance for standard deviation (default: 1e-6)                                                                                                                                                                                    |
-| `initial_simplex_size` | `float` | Size of the initial simplex, as a fraction of each parameter's bound width, in (0, 1\] (default: 0.1). Nelder-Mead searches an unbounded coordinate u and scores x = lo + (hi - lo)(sin u + 1)/2, so every point it tries is inside the bounds. |
-| `alpha`                | \`float | None\`                                                                                                                                                                                                                                          |
-| `gamma`                | \`float | None\`                                                                                                                                                                                                                                          |
-| `rho`                  | \`float | None\`                                                                                                                                                                                                                                          |
-| `sigma`                | \`float | None\`                                                                                                                                                                                                                                          |
-| `verbose`              | `bool`  | Enable verbose output during optimization (default: False)                                                                                                                                                                                      |
-| `header_interval`      | `int`   | Number of iterations between table header repeats in verbose output (default: 100)                                                                                                                                                              |
+| Name                   | Type          | Description                                                                                                                                                                                                                                     |
+| ---------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kind`                 | `nelder_mead` | The optimizer, which the engine reads.                                                                                                                                                                                                          |
+| `max_iterations`       | `int`         | Maximum number of iterations (default: 1000)                                                                                                                                                                                                    |
+| `sd_tolerance`         | `float`       | Convergence tolerance for standard deviation (default: 1e-6)                                                                                                                                                                                    |
+| `initial_simplex_size` | `float`       | Size of the initial simplex, as a fraction of each parameter's bound width, in (0, 1\] (default: 0.1). Nelder-Mead searches an unbounded coordinate u and scores x = lo + (hi - lo)(sin u + 1)/2, so every point it tries is inside the bounds. |
+| `alpha`                | \`float       | None\`                                                                                                                                                                                                                                          |
+| `gamma`                | \`float       | None\`                                                                                                                                                                                                                                          |
+| `rho`                  | \`float       | None\`                                                                                                                                                                                                                                          |
+| `sigma`                | \`float       | None\`                                                                                                                                                                                                                                          |
+| `verbose`              | `bool`        | Enable verbose output during optimization (default: False)                                                                                                                                                                                      |
+| `header_interval`      | `int`         | Number of iterations between table header repeats in verbose output (default: 100)                                                                                                                                                              |
 
 Source code in `commol/context/calibration.py`
 
@@ -2675,6 +2246,8 @@ class NelderMeadConfig(RangeChecked):
 
     Attributes
     ----------
+    kind : "nelder_mead"
+        The optimizer, which the engine reads.
     max_iterations : int
         Maximum number of iterations (default: 1000)
     sd_tolerance : float
@@ -2701,6 +2274,9 @@ class NelderMeadConfig(RangeChecked):
 
     model_config = ConfigDict(extra="forbid")
 
+    kind: Literal["nelder_mead"] = Field(
+        default="nelder_mead", description="The optimizer"
+    )
     max_iterations: int = Field(
         default=1000, description="Maximum number of iterations"
     )
@@ -2748,25 +2324,47 @@ Bases: `RangeChecked`
 
 Configuration for the Particle Swarm Optimization algorithm.
 
+Each strategy of the swarm is a name, and its numbers are fields of their own. A strategy left as None is that of canonical PSO; a number set without its strategy, or with another strategy, is an error, so a setting is never ignored.
+
 Attributes:
 
-| Name             | Type   | Description                                           |
-| ---------------- | ------ | ----------------------------------------------------- |
-| `particles`      | `int`  | Number of particles in the swarm (default: 20)        |
-| `max_iterations` | `int`  | Maximum number of iterations (default: 1000)          |
-| `verbose`        | `bool` | Enable verbose output (default: False)                |
-| `initialization` | `str`  | Particle initialization strategy (default: "uniform") |
+| Name                                 | Type                                           | Description                                                                         |
+| ------------------------------------ | ---------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `kind`                               | `particle_swarm`                               | The optimizer, which the engine reads.                                              |
+| `particles`                          | `int`                                          | Number of particles in the swarm (default: 20).                                     |
+| `max_iterations`                     | `int`                                          | Maximum number of iterations (default: 1000).                                       |
+| `verbose`                            | `bool`                                         | Enable verbose output (default: False).                                             |
+| `header_interval`                    | `int`                                          | Number of iterations between table header repeats in verbose output (default: 100). |
+| `initialization`                     | `{uniform, latin_hypercube, opposition_based}` | How the particles start (default: "uniform").                                       |
+| `inertia`                            | \`{constant, chaotic}                          | None\`                                                                              |
+| `inertia_factor`                     | \`float                                        | None\`                                                                              |
+| `inertia_min`                        | \`float                                        | None\`                                                                              |
+| `inertia_max`                        | \`float                                        | None\`                                                                              |
+| `acceleration`                       | \`{constant, time_varying}                     | None\`                                                                              |
+| `cognitive`                          | \`float                                        | None\`                                                                              |
+| `social`                             | \`float                                        | None\`                                                                              |
+| `cognitive_initial, cognitive_final` | \`float                                        | None\`                                                                              |
+| `social_initial, social_final`       | \`float                                        | None\`                                                                              |
+| `mutation`                           | \`{gaussian, cauchy}                           | None\`                                                                              |
+| `mutation_scale`                     | \`float                                        | None\`                                                                              |
+| `mutation_probability`               | \`float                                        | None\`                                                                              |
+| `mutation_application`               | \`{global_best, all_particles, below_average}  | None\`                                                                              |
+| `velocity_clamp_factor`              | \`float                                        | None\`                                                                              |
+| `velocity_mutation_threshold`        | \`float                                        | None\`                                                                              |
+| `improvement_window`                 | \`int                                          | None\`                                                                              |
+| `improvement_tol_abs`                | \`float                                        | None\`                                                                              |
+| `improvement_tol_rel`                | \`float                                        | None\`                                                                              |
+| `radius_tol`                         | \`float                                        | None\`                                                                              |
 
-Methods:
+References
 
-| Name               | Description                                                  |
-| ------------------ | ------------------------------------------------------------ |
-| `inertia`          | Set inertia weight strategy ("constant" or "chaotic")        |
-| `acceleration`     | Set acceleration coefficients ("constant" or "time_varying") |
-| `mutation`         | Enable mutation to escape local optima                       |
-| `velocity`         | Configure velocity control                                   |
-| `improvement_stop` | Stop when the best loss stops improving                      |
-| `radius_stop`      | Stop when the swarm has gathered around its best position    |
+Liu, B., Wang, L., Jin, Y. H., Tang, F., & Huang, D. X. (2005). Improved particle swarm optimization combined with chaos. Chaos, Solitons & Fractals, 25(5), 1261-1271.
+
+Ratnaweera, A., Halgamuge, S. K., & Watson, H. C. (2004). Self-organizing hierarchical particle swarm optimizer with time-varying acceleration coefficients. IEEE Transactions on Evolutionary Computation, 8(3), 240-255.
+
+Stacey, A., Jancic, M., & Grundy, I. (2003). Particle swarm optimization with mutation. In Proceedings of the 2003 Congress on Evolutionary Computation (CEC 2003) (Vol. 2, pp. 1425-1430).
+
+Zielinski, K., & Laur, R. (2007). Stopping criteria for a constrained single-objective particle swarm optimization algorithm. Informatica, 31(1), 51-59.
 
 Source code in `commol/context/calibration.py`
 
@@ -2775,833 +2373,258 @@ class ParticleSwarmConfig(RangeChecked):
     """
     Configuration for the Particle Swarm Optimization algorithm.
 
+    Each strategy of the swarm is a name, and its numbers are fields of their
+    own. A strategy left as None is that of canonical PSO; a number set
+    without its strategy, or with another strategy, is an error, so a setting
+    is never ignored.
+
     Attributes
     ----------
+    kind : "particle_swarm"
+        The optimizer, which the engine reads.
     particles : int
-        Number of particles in the swarm (default: 20)
+        Number of particles in the swarm (default: 20).
     max_iterations : int
-        Maximum number of iterations (default: 1000)
+        Maximum number of iterations (default: 1000).
     verbose : bool
-        Enable verbose output (default: False)
-    initialization : str
-        Particle initialization strategy (default: "uniform")
+        Enable verbose output (default: False).
+    header_interval : int
+        Number of iterations between table header repeats in verbose output
+        (default: 100).
+    initialization : {"uniform", "latin_hypercube", "opposition_based"}
+        How the particles start (default: "uniform").
+    inertia : {"constant", "chaotic"} | None
+        The inertia weight: "constant" uses `inertia_factor`, "chaotic" moves
+        between `inertia_min` and `inertia_max` on a logistic map (Liu et al.,
+        2005). None is the weight of canonical PSO, 1/(2 ln 2) ≈ 0.72135.
+    inertia_factor : float | None
+        The constant weight, above 0; None is that of canonical PSO. Only with
+        ``inertia="constant"``.
+    inertia_min : float | None
+        The lowest chaotic weight, above 0. Needed with ``inertia="chaotic"``.
+    inertia_max : float | None
+        The highest chaotic weight, above `inertia_min`. Needed with
+        ``inertia="chaotic"``.
+    acceleration : {"constant", "time_varying"} | None
+        The acceleration coefficients: "constant" uses `cognitive` and
+        `social`, "time_varying" moves each from its initial to its final
+        value (Ratnaweera et al., 2004). None is the coefficients of canonical
+        PSO, 0.5 + ln 2 ≈ 1.19315.
+    cognitive : float | None
+        The attraction to the best point of the particle (c1), above 0; None
+        is that of canonical PSO. Only with ``acceleration="constant"``.
+    social : float | None
+        The attraction to the best point of the swarm (c2), above 0; None is
+        that of canonical PSO. Only with ``acceleration="constant"``.
+    cognitive_initial, cognitive_final : float | None
+        The cognitive coefficient at the first and the last iteration, above
+        0. Needed with ``acceleration="time_varying"``.
+    social_initial, social_final : float | None
+        The social coefficient at the first and the last iteration, above 0.
+        Needed with ``acceleration="time_varying"``.
+    mutation : {"gaussian", "cauchy"} | None
+        The distribution of a mutation step, to escape a local optimum
+        (Stacey et al., 2003); Cauchy has heavier tails. None mutates no
+        particle.
+    mutation_scale : float | None
+        The standard deviation (gaussian) or the scale (cauchy) of a step,
+        above 0. Needed with a mutation.
+    mutation_probability : float | None
+        The probability of a mutation at each iteration, from 0 to 1. Needed
+        with a mutation.
+    mutation_application : {"global_best", "all_particles", "below_average"} | None
+        The particles a mutation moves. Needed with a mutation.
+    velocity_clamp_factor : float | None
+        The largest velocity, as a fraction of each bound width, from 0 to 1;
+        None clamps no velocity.
+    velocity_mutation_threshold : float | None
+        The speed below which a velocity is drawn again, above 0; None draws
+        none again.
+    improvement_window : int | None
+        Stop when the best loss improved by at most
+        ``improvement_tol_abs + improvement_tol_rel * |best loss|`` over the
+        last `improvement_window` iterations, and report ``converged=True``.
+        Give the three fields or none. A swarm can stall for some iterations
+        and then improve again, so a short window can stop it early.
+    improvement_tol_abs : float | None
+        The absolute tolerance of the improvement, at least 0.
+    improvement_tol_rel : float | None
+        The tolerance of the improvement relative to the best loss, at least
+        0.
+    radius_tol : float | None
+        Stop when the largest distance of a particle from the best position,
+        divided by the size of the search box (the norm of the widths of the
+        bounds), is at most `radius_tol`, and report ``converged=True``
+        (Zielinski and Laur, 2007). Mutation and velocity mutation scatter the
+        swarm again, so with them the radius can stay above it.
 
-    Methods
-    -------
-    inertia(type, **kwargs)
-        Set inertia weight strategy ("constant" or "chaotic")
-    acceleration(type, **kwargs)
-        Set acceleration coefficients ("constant" or "time_varying")
-    mutation(strategy, scale, probability, application)
-        Enable mutation to escape local optima
-    velocity(clamp_factor, mutation_threshold)
-        Configure velocity control
-    improvement_stop(window, tol_abs, tol_rel)
-        Stop when the best loss stops improving
-    radius_stop(tol)
-        Stop when the swarm has gathered around its best position
+    References
+    ----------
+    Liu, B., Wang, L., Jin, Y. H., Tang, F., & Huang, D. X. (2005).
+    Improved particle swarm optimization combined with chaos.
+    Chaos, Solitons & Fractals, 25(5), 1261-1271.
+
+    Ratnaweera, A., Halgamuge, S. K., & Watson, H. C. (2004).
+    Self-organizing hierarchical particle swarm optimizer with
+    time-varying acceleration coefficients. IEEE Transactions on
+    Evolutionary Computation, 8(3), 240-255.
+
+    Stacey, A., Jancic, M., & Grundy, I. (2003). Particle swarm
+    optimization with mutation. In Proceedings of the 2003 Congress
+    on Evolutionary Computation (CEC 2003) (Vol. 2, pp. 1425-1430).
+
+    Zielinski, K., & Laur, R. (2007). Stopping criteria for a constrained
+    single-objective particle swarm optimization algorithm. Informatica,
+    31(1), 51-59.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    # Core parameters
+    kind: Literal["particle_swarm"] = Field(
+        default="particle_swarm", description="The optimizer"
+    )
     particles: int = Field(default=20, description="Number of particles in the swarm")
     max_iterations: int = Field(
         default=1000, description="Maximum number of iterations"
     )
     verbose: bool = Field(
-        default=False,
-        description="Enable verbose output during optimization",
+        default=False, description="Enable verbose output during optimization"
     )
-    initialization: str = Field(
-        default=PSOInitializationStrategy.UNIFORM,
-        description=(
-            "Particle initialization strategy: 'uniform' (default), 'latin_hypercube',"
-            "or 'opposition_based'"
-        ),
+    header_interval: int = Field(
+        default=100,
+        description="Number of iterations between table header repeats",
+    )
+    initialization: Literal["uniform", "latin_hypercube", "opposition_based"] = Field(
+        default="uniform", description="How the particles start"
+    )
+    inertia: Literal["constant", "chaotic"] | None = Field(
+        default=None, description="The inertia weight"
+    )
+    inertia_factor: float | None = Field(
+        default=None, description="The constant inertia weight"
+    )
+    inertia_min: float | None = Field(
+        default=None, description="The lowest chaotic inertia weight"
+    )
+    inertia_max: float | None = Field(
+        default=None, description="The highest chaotic inertia weight"
+    )
+    acceleration: Literal["constant", "time_varying"] | None = Field(
+        default=None, description="The acceleration coefficients"
+    )
+    cognitive: float | None = Field(
+        default=None, description="The constant cognitive coefficient (c1)"
+    )
+    social: float | None = Field(
+        default=None, description="The constant social coefficient (c2)"
+    )
+    cognitive_initial: float | None = Field(
+        default=None, description="The cognitive coefficient at the first iteration"
+    )
+    cognitive_final: float | None = Field(
+        default=None, description="The cognitive coefficient at the last iteration"
+    )
+    social_initial: float | None = Field(
+        default=None, description="The social coefficient at the first iteration"
+    )
+    social_final: float | None = Field(
+        default=None, description="The social coefficient at the last iteration"
+    )
+    mutation: Literal["gaussian", "cauchy"] | None = Field(
+        default=None, description="The distribution of a mutation step"
+    )
+    mutation_scale: float | None = Field(
+        default=None, description="The scale of a mutation step"
+    )
+    mutation_probability: float | None = Field(
+        default=None, description="The probability of a mutation per iteration"
+    )
+    mutation_application: (
+        Literal["global_best", "all_particles", "below_average"] | None
+    ) = Field(default=None, description="The particles a mutation moves")
+    velocity_clamp_factor: float | None = Field(
+        default=None, description="The largest velocity, as a share of the bounds"
+    )
+    velocity_mutation_threshold: float | None = Field(
+        default=None, description="The speed below which a velocity is drawn again"
+    )
+    improvement_window: int | None = Field(
+        default=None, description="The iterations of the improvement stop rule"
+    )
+    improvement_tol_abs: float | None = Field(
+        default=None, description="The absolute tolerance of the improvement"
+    )
+    improvement_tol_rel: float | None = Field(
+        default=None, description="The relative tolerance of the improvement"
+    )
+    radius_tol: float | None = Field(
+        default=None, description="The tolerance of the radius stop rule"
     )
 
-    # Private attributes for optional configurations (set via fluent methods)
-    _inertia: PSOConstantInertia | PSOChaoticInertia | None = PrivateAttr(default=None)
-    _acceleration: PSOConstantAcceleration | PSOTimeVaryingAcceleration | None = (
-        PrivateAttr(default=None)
-    )
-    _mutation: PSOMutationConfig | None = PrivateAttr(default=None)
-    _velocity: PSOVelocityConfig | None = PrivateAttr(default=None)
-    _improvement_stop: PSOImprovementStop | None = PrivateAttr(default=None)
-    _radius_stop: PSORadiusStop | None = PrivateAttr(default=None)
-
-    @field_validator("initialization")
-    @classmethod
-    def validate_initialization(cls, v: str) -> str:
-        if v not in PSOInitializationStrategy:
-            raise ValueError(
-                f"Invalid initialization: {v}. "
-                f"Must be one of {list(PSOInitializationStrategy)}"
-            )
-        return v
-
-    @overload
-    def inertia(
-        self, type: str, *, factor: float = PSO_DEFAULT_INERTIA_FACTOR
-    ) -> Self: ...
-
-    @overload
-    def inertia(self, type: str, *, w_min: float, w_max: float) -> Self: ...
-
-    def inertia(self, type: str, **kwargs: float) -> Self:
+    @model_validator(mode="after")
+    def check_strategies(self) -> Self:
         """
-        Set inertia weight strategy.
-
-        Parameters
-        ----------
-        type : str
-            Inertia strategy type: "constant" or "chaotic"
-        **kwargs : float
-            The settings of the strategy, listed under Other Parameters.
-
-        Other Parameters
-        ----------------
-        factor : float, default=PSO_DEFAULT_INERTIA_FACTOR
-            Fixed inertia weight; the default is the weight of canonical PSO,
-            1/(2 ln 2) ≈ 0.72135, which a swarm with no inertia strategy
-            uses. Only used when type="constant".
-        w_min : float
-            Minimum inertia weight. Only used when type="chaotic".
-        w_max : float
-            Maximum inertia weight (must be > w_min). Only used when type="chaotic".
+        Check each number against its strategy, as the engine reads them.
 
         Returns
         -------
         Self
-            The config instance for method chaining
+            The configuration.
+
+        Raises
+        ------
+        ValueError
+            If a strategy lacks a number it needs, a number is set without
+            its strategy or with another one, or the chaotic weights are not
+            in order; the message is that of the engine.
         """
-        if type not in PSOInertiaType:
-            raise ValueError(
-                f"Invalid inertia type: {type}. Must be one of {list(PSOInertiaType)}"
-            )
-        if type == PSOInertiaType.CONSTANT:
-            self._inertia = PSOConstantInertia(
-                factor=kwargs.get("factor", PSO_DEFAULT_INERTIA_FACTOR)
-            )
-        else:
-            self._inertia = PSOChaoticInertia(
-                w_min=kwargs["w_min"], w_max=kwargs["w_max"]
-            )
+        commol_rs.json.as_read("ParticleSwarmConfig", engine_json(self))
         return self
-
-    @overload
-    def acceleration(
-        self,
-        type: str,
-        *,
-        cognitive: float = PSO_DEFAULT_ACCELERATION,
-        social: float = PSO_DEFAULT_ACCELERATION,
-    ) -> Self: ...
-
-    @overload
-    def acceleration(
-        self,
-        type: str,
-        *,
-        c1_initial: float,
-        c1_final: float,
-        c2_initial: float,
-        c2_final: float,
-    ) -> Self: ...
-
-    def acceleration(self, type: str, **kwargs: float) -> Self:
-        """
-        Set acceleration coefficient strategy.
-
-        Parameters
-        ----------
-        type : str
-            Acceleration strategy type: "constant" or "time_varying"
-        **kwargs : float
-            The settings of the strategy, listed under Other Parameters.
-
-        Other Parameters
-        ----------------
-        cognitive : float, default=PSO_DEFAULT_ACCELERATION
-            Cognitive coefficient (c1) - attraction to personal best; the
-            default is the coefficient of canonical PSO, 0.5 + ln 2 ≈ 1.19315,
-            which a swarm with no acceleration strategy uses. Only used when
-            type="constant".
-        social : float, default=PSO_DEFAULT_ACCELERATION
-            Social coefficient (c2) - attraction to swarm best, with the
-            same default. Only used when type="constant".
-        c1_initial : float
-            Initial cognitive factor (typically high, e.g., 2.5).
-            Only used when type="time_varying".
-        c1_final : float
-            Final cognitive factor (typically low, e.g., 0.5).
-            Only used when type="time_varying".
-        c2_initial : float
-            Initial social factor (typically low, e.g., 0.5).
-            Only used when type="time_varying".
-        c2_final : float
-            Final social factor (typically high, e.g., 2.5).
-            Only used when type="time_varying".
-
-        Returns
-        -------
-        Self
-            The config instance for method chaining
-        """
-        if type not in PSOAccelerationType:
-            raise ValueError(
-                f"Invalid acceleration type: {type}. "
-                f"Must be one of {list(PSOAccelerationType)}"
-            )
-        if type == PSOAccelerationType.CONSTANT:
-            self._acceleration = PSOConstantAcceleration(
-                cognitive=kwargs.get("cognitive", PSO_DEFAULT_ACCELERATION),
-                social=kwargs.get("social", PSO_DEFAULT_ACCELERATION),
-            )
-        else:
-            self._acceleration = PSOTimeVaryingAcceleration(
-                c1_initial=kwargs["c1_initial"],
-                c1_final=kwargs["c1_final"],
-                c2_initial=kwargs["c2_initial"],
-                c2_final=kwargs["c2_final"],
-            )
-        return self
-
-    def mutation(
-        self,
-        strategy: str,
-        *,
-        scale: float,
-        probability: float,
-        application: str,
-    ) -> Self:
-        """
-        Enable mutation to help escape local optima.
-
-        Parameters
-        ----------
-        strategy : str
-            Mutation distribution: "gaussian" or "cauchy".
-            Cauchy has heavier tails for larger jumps.
-        scale : float
-            Standard deviation (gaussian) or scale parameter (cauchy)
-        probability : float
-            Mutation probability per iteration (0.0 to 1.0)
-        application : str
-            Which particles to mutate:
-            "global_best", "all_particles", or "below_average"
-
-        Returns
-        -------
-        Self
-            The config instance for method chaining
-        """
-        if strategy not in PSOMutationStrategy:
-            raise ValueError(
-                f"Invalid mutation strategy: {strategy}. "
-                f"Must be one of {list(PSOMutationStrategy)}"
-            )
-        if application not in PSOMutationApplication:
-            raise ValueError(
-                f"Invalid mutation application: {application}. "
-                f"Must be one of {list(PSOMutationApplication)}"
-            )
-
-        self._mutation = PSOMutationConfig(
-            strategy=PSOMutationStrategy(strategy),
-            scale=scale,
-            probability=probability,
-            application=PSOMutationApplication(application),
-        )
-        return self
-
-    def velocity(
-        self,
-        *,
-        clamp_factor: float | None = None,
-        mutation_threshold: float | None = None,
-    ) -> Self:
-        """
-        Configure velocity control.
-
-        Parameters
-        ----------
-        clamp_factor : float, optional
-            Velocity clamping as fraction of search space (0.0-1.0).
-            Typically 0.1-0.2. Prevents explosive velocities.
-        mutation_threshold : float, optional
-            Reinitialize velocities below this threshold.
-            Typically 0.001-0.01. Prevents stagnation.
-
-        Returns
-        -------
-        Self
-            The config instance for method chaining
-        """
-        self._velocity = PSOVelocityConfig(
-            clamp_factor=clamp_factor,
-            mutation_threshold=mutation_threshold,
-        )
-        return self
-
-    def improvement_stop(self, *, window: int, tol_abs: float, tol_rel: float) -> Self:
-        """
-        Stop when the best loss stops improving.
-
-        The run stops when the best loss improved by at most
-        ``tol_abs + tol_rel * |best loss|`` over the last `window` iterations,
-        and reports ``converged=True``. Off by default. A swarm can stall for
-        some iterations and then improve again, so a short window can stop it
-        early.
-
-        Parameters
-        ----------
-        window : int
-            Iterations over which the improvement is measured (> 0).
-        tol_abs : float
-            Absolute tolerance on the improvement (>= 0).
-        tol_rel : float
-            Tolerance on the improvement relative to the best loss (>= 0).
-
-        Returns
-        -------
-        Self
-            The config instance for method chaining
-        """
-        self._improvement_stop = PSOImprovementStop(
-            window=window, tol_abs=tol_abs, tol_rel=tol_rel
-        )
-        return self
-
-    def radius_stop(self, tol: float) -> Self:
-        """
-        Stop when the swarm has gathered around its best position.
-
-        The run stops when the largest distance of a particle from the best
-        position, divided by the size of the search box, is at most `tol`, and
-        reports ``converged=True``. Off by default. Mutation and velocity
-        mutation scatter the swarm again, so with them the radius can stay
-        above `tol`; values that the data do not tell apart keep the swarm
-        spread.
-
-        Parameters
-        ----------
-        tol : float
-            Tolerance on the radius of the swarm, relative to the size of the
-            search box (>= 0).
-
-        Returns
-        -------
-        Self
-            The config instance for method chaining
-        """
-        self._radius_stop = PSORadiusStop(tol=tol)
-        return self
-
-    @property
-    def inertia_config(self) -> PSOConstantInertia | PSOChaoticInertia | None:
-        """Get the inertia configuration (for internal use)."""
-        return self._inertia
-
-    @property
-    def acceleration_config(
-        self,
-    ) -> PSOConstantAcceleration | PSOTimeVaryingAcceleration | None:
-        """Get the acceleration configuration (for internal use)."""
-        return self._acceleration
-
-    @property
-    def mutation_config(self) -> PSOMutationConfig | None:
-        """Get the mutation configuration (for internal use)."""
-        return self._mutation
-
-    @property
-    def velocity_config(self) -> PSOVelocityConfig | None:
-        """Get the velocity configuration (for internal use)."""
-        return self._velocity
-
-    @property
-    def improvement_stop_config(self) -> PSOImprovementStop | None:
-        """Get the improvement stop rule (for internal use)."""
-        return self._improvement_stop
-
-    @property
-    def radius_stop_config(self) -> PSORadiusStop | None:
-        """Get the radius stop rule (for internal use)."""
-        return self._radius_stop
 ```
-
-### Attributes
-
-#### inertia_config
-
-```python
-inertia_config: PSOConstantInertia | PSOChaoticInertia | None
-```
-
-Get the inertia configuration (for internal use).
-
-#### acceleration_config
-
-```python
-acceleration_config: PSOConstantAcceleration | PSOTimeVaryingAcceleration | None
-```
-
-Get the acceleration configuration (for internal use).
-
-#### mutation_config
-
-```python
-mutation_config: PSOMutationConfig | None
-```
-
-Get the mutation configuration (for internal use).
-
-#### velocity_config
-
-```python
-velocity_config: PSOVelocityConfig | None
-```
-
-Get the velocity configuration (for internal use).
-
-#### improvement_stop_config
-
-```python
-improvement_stop_config: PSOImprovementStop | None
-```
-
-Get the improvement stop rule (for internal use).
-
-#### radius_stop_config
-
-```python
-radius_stop_config: PSORadiusStop | None
-```
-
-Get the radius stop rule (for internal use).
 
 ### Methods:
 
-#### inertia
+#### check_strategies
 
 ```python
-inertia(type: str, *, factor: float = PSO_DEFAULT_INERTIA_FACTOR) -> Self
+check_strategies() -> Self
 ```
 
-```python
-inertia(type: str, *, w_min: float, w_max: float) -> Self
-```
-
-```python
-inertia(type: str, **kwargs: float) -> Self
-```
-
-Set inertia weight strategy.
-
-Parameters:
-
-| Name       | Type    | Description                                                  | Default    |
-| ---------- | ------- | ------------------------------------------------------------ | ---------- |
-| `type`     | `str`   | Inertia strategy type: "constant" or "chaotic"               | *required* |
-| `**kwargs` | `float` | The settings of the strategy, listed under Other Parameters. | `{}`       |
-
-Other Parameters:
-
-| Name     | Type    | Description                                                                                                                                                          |
-| -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `factor` | `float` | Fixed inertia weight; the default is the weight of canonical PSO, 1/(2 ln 2) ≈ 0.72135, which a swarm with no inertia strategy uses. Only used when type="constant". |
-| `w_min`  | `float` | Minimum inertia weight. Only used when type="chaotic".                                                                                                               |
-| `w_max`  | `float` | Maximum inertia weight (must be > w_min). Only used when type="chaotic".                                                                                             |
+Check each number against its strategy, as the engine reads them.
 
 Returns:
 
-| Type   | Description                             |
-| ------ | --------------------------------------- |
-| `Self` | The config instance for method chaining |
+| Type   | Description        |
+| ------ | ------------------ |
+| `Self` | The configuration. |
+
+Raises:
+
+| Type         | Description                                                                                                                                                                  |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If a strategy lacks a number it needs, a number is set without its strategy or with another one, or the chaotic weights are not in order; the message is that of the engine. |
 
 Source code in `commol/context/calibration.py`
 
 ```python
-def inertia(self, type: str, **kwargs: float) -> Self:
+@model_validator(mode="after")
+def check_strategies(self) -> Self:
     """
-    Set inertia weight strategy.
-
-    Parameters
-    ----------
-    type : str
-        Inertia strategy type: "constant" or "chaotic"
-    **kwargs : float
-        The settings of the strategy, listed under Other Parameters.
-
-    Other Parameters
-    ----------------
-    factor : float, default=PSO_DEFAULT_INERTIA_FACTOR
-        Fixed inertia weight; the default is the weight of canonical PSO,
-        1/(2 ln 2) ≈ 0.72135, which a swarm with no inertia strategy
-        uses. Only used when type="constant".
-    w_min : float
-        Minimum inertia weight. Only used when type="chaotic".
-    w_max : float
-        Maximum inertia weight (must be > w_min). Only used when type="chaotic".
+    Check each number against its strategy, as the engine reads them.
 
     Returns
     -------
     Self
-        The config instance for method chaining
+        The configuration.
+
+    Raises
+    ------
+    ValueError
+        If a strategy lacks a number it needs, a number is set without
+        its strategy or with another one, or the chaotic weights are not
+        in order; the message is that of the engine.
     """
-    if type not in PSOInertiaType:
-        raise ValueError(
-            f"Invalid inertia type: {type}. Must be one of {list(PSOInertiaType)}"
-        )
-    if type == PSOInertiaType.CONSTANT:
-        self._inertia = PSOConstantInertia(
-            factor=kwargs.get("factor", PSO_DEFAULT_INERTIA_FACTOR)
-        )
-    else:
-        self._inertia = PSOChaoticInertia(
-            w_min=kwargs["w_min"], w_max=kwargs["w_max"]
-        )
-    return self
-```
-
-#### acceleration
-
-```python
-acceleration(type: str, *, cognitive: float = PSO_DEFAULT_ACCELERATION, social: float = PSO_DEFAULT_ACCELERATION) -> Self
-```
-
-```python
-acceleration(type: str, *, c1_initial: float, c1_final: float, c2_initial: float, c2_final: float) -> Self
-```
-
-```python
-acceleration(type: str, **kwargs: float) -> Self
-```
-
-Set acceleration coefficient strategy.
-
-Parameters:
-
-| Name       | Type    | Description                                                  | Default    |
-| ---------- | ------- | ------------------------------------------------------------ | ---------- |
-| `type`     | `str`   | Acceleration strategy type: "constant" or "time_varying"     | *required* |
-| `**kwargs` | `float` | The settings of the strategy, listed under Other Parameters. | `{}`       |
-
-Other Parameters:
-
-| Name         | Type    | Description                                                                                                                                                                                                        |
-| ------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `cognitive`  | `float` | Cognitive coefficient (c1) - attraction to personal best; the default is the coefficient of canonical PSO, 0.5 + ln 2 ≈ 1.19315, which a swarm with no acceleration strategy uses. Only used when type="constant". |
-| `social`     | `float` | Social coefficient (c2) - attraction to swarm best, with the same default. Only used when type="constant".                                                                                                         |
-| `c1_initial` | `float` | Initial cognitive factor (typically high, e.g., 2.5). Only used when type="time_varying".                                                                                                                          |
-| `c1_final`   | `float` | Final cognitive factor (typically low, e.g., 0.5). Only used when type="time_varying".                                                                                                                             |
-| `c2_initial` | `float` | Initial social factor (typically low, e.g., 0.5). Only used when type="time_varying".                                                                                                                              |
-| `c2_final`   | `float` | Final social factor (typically high, e.g., 2.5). Only used when type="time_varying".                                                                                                                               |
-
-Returns:
-
-| Type   | Description                             |
-| ------ | --------------------------------------- |
-| `Self` | The config instance for method chaining |
-
-Source code in `commol/context/calibration.py`
-
-```python
-def acceleration(self, type: str, **kwargs: float) -> Self:
-    """
-    Set acceleration coefficient strategy.
-
-    Parameters
-    ----------
-    type : str
-        Acceleration strategy type: "constant" or "time_varying"
-    **kwargs : float
-        The settings of the strategy, listed under Other Parameters.
-
-    Other Parameters
-    ----------------
-    cognitive : float, default=PSO_DEFAULT_ACCELERATION
-        Cognitive coefficient (c1) - attraction to personal best; the
-        default is the coefficient of canonical PSO, 0.5 + ln 2 ≈ 1.19315,
-        which a swarm with no acceleration strategy uses. Only used when
-        type="constant".
-    social : float, default=PSO_DEFAULT_ACCELERATION
-        Social coefficient (c2) - attraction to swarm best, with the
-        same default. Only used when type="constant".
-    c1_initial : float
-        Initial cognitive factor (typically high, e.g., 2.5).
-        Only used when type="time_varying".
-    c1_final : float
-        Final cognitive factor (typically low, e.g., 0.5).
-        Only used when type="time_varying".
-    c2_initial : float
-        Initial social factor (typically low, e.g., 0.5).
-        Only used when type="time_varying".
-    c2_final : float
-        Final social factor (typically high, e.g., 2.5).
-        Only used when type="time_varying".
-
-    Returns
-    -------
-    Self
-        The config instance for method chaining
-    """
-    if type not in PSOAccelerationType:
-        raise ValueError(
-            f"Invalid acceleration type: {type}. "
-            f"Must be one of {list(PSOAccelerationType)}"
-        )
-    if type == PSOAccelerationType.CONSTANT:
-        self._acceleration = PSOConstantAcceleration(
-            cognitive=kwargs.get("cognitive", PSO_DEFAULT_ACCELERATION),
-            social=kwargs.get("social", PSO_DEFAULT_ACCELERATION),
-        )
-    else:
-        self._acceleration = PSOTimeVaryingAcceleration(
-            c1_initial=kwargs["c1_initial"],
-            c1_final=kwargs["c1_final"],
-            c2_initial=kwargs["c2_initial"],
-            c2_final=kwargs["c2_final"],
-        )
-    return self
-```
-
-#### mutation
-
-```python
-mutation(strategy: str, *, scale: float, probability: float, application: str) -> Self
-```
-
-Enable mutation to help escape local optima.
-
-Parameters:
-
-| Name          | Type    | Description                                                                               | Default    |
-| ------------- | ------- | ----------------------------------------------------------------------------------------- | ---------- |
-| `strategy`    | `str`   | Mutation distribution: "gaussian" or "cauchy". Cauchy has heavier tails for larger jumps. | *required* |
-| `scale`       | `float` | Standard deviation (gaussian) or scale parameter (cauchy)                                 | *required* |
-| `probability` | `float` | Mutation probability per iteration (0.0 to 1.0)                                           | *required* |
-| `application` | `str`   | Which particles to mutate: "global_best", "all_particles", or "below_average"             | *required* |
-
-Returns:
-
-| Type   | Description                             |
-| ------ | --------------------------------------- |
-| `Self` | The config instance for method chaining |
-
-Source code in `commol/context/calibration.py`
-
-```python
-def mutation(
-    self,
-    strategy: str,
-    *,
-    scale: float,
-    probability: float,
-    application: str,
-) -> Self:
-    """
-    Enable mutation to help escape local optima.
-
-    Parameters
-    ----------
-    strategy : str
-        Mutation distribution: "gaussian" or "cauchy".
-        Cauchy has heavier tails for larger jumps.
-    scale : float
-        Standard deviation (gaussian) or scale parameter (cauchy)
-    probability : float
-        Mutation probability per iteration (0.0 to 1.0)
-    application : str
-        Which particles to mutate:
-        "global_best", "all_particles", or "below_average"
-
-    Returns
-    -------
-    Self
-        The config instance for method chaining
-    """
-    if strategy not in PSOMutationStrategy:
-        raise ValueError(
-            f"Invalid mutation strategy: {strategy}. "
-            f"Must be one of {list(PSOMutationStrategy)}"
-        )
-    if application not in PSOMutationApplication:
-        raise ValueError(
-            f"Invalid mutation application: {application}. "
-            f"Must be one of {list(PSOMutationApplication)}"
-        )
-
-    self._mutation = PSOMutationConfig(
-        strategy=PSOMutationStrategy(strategy),
-        scale=scale,
-        probability=probability,
-        application=PSOMutationApplication(application),
-    )
-    return self
-```
-
-#### velocity
-
-```python
-velocity(*, clamp_factor: float | None = None, mutation_threshold: float | None = None) -> Self
-```
-
-Configure velocity control.
-
-Parameters:
-
-| Name                 | Type    | Description                                                                                                | Default |
-| -------------------- | ------- | ---------------------------------------------------------------------------------------------------------- | ------- |
-| `clamp_factor`       | `float` | Velocity clamping as fraction of search space (0.0-1.0). Typically 0.1-0.2. Prevents explosive velocities. | `None`  |
-| `mutation_threshold` | `float` | Reinitialize velocities below this threshold. Typically 0.001-0.01. Prevents stagnation.                   | `None`  |
-
-Returns:
-
-| Type   | Description                             |
-| ------ | --------------------------------------- |
-| `Self` | The config instance for method chaining |
-
-Source code in `commol/context/calibration.py`
-
-```python
-def velocity(
-    self,
-    *,
-    clamp_factor: float | None = None,
-    mutation_threshold: float | None = None,
-) -> Self:
-    """
-    Configure velocity control.
-
-    Parameters
-    ----------
-    clamp_factor : float, optional
-        Velocity clamping as fraction of search space (0.0-1.0).
-        Typically 0.1-0.2. Prevents explosive velocities.
-    mutation_threshold : float, optional
-        Reinitialize velocities below this threshold.
-        Typically 0.001-0.01. Prevents stagnation.
-
-    Returns
-    -------
-    Self
-        The config instance for method chaining
-    """
-    self._velocity = PSOVelocityConfig(
-        clamp_factor=clamp_factor,
-        mutation_threshold=mutation_threshold,
-    )
-    return self
-```
-
-#### improvement_stop
-
-```python
-improvement_stop(*, window: int, tol_abs: float, tol_rel: float) -> Self
-```
-
-Stop when the best loss stops improving.
-
-The run stops when the best loss improved by at most `tol_abs + tol_rel * |best loss|` over the last `window` iterations, and reports `converged=True`. Off by default. A swarm can stall for some iterations and then improve again, so a short window can stop it early.
-
-Parameters:
-
-| Name      | Type    | Description                                                    | Default    |
-| --------- | ------- | -------------------------------------------------------------- | ---------- |
-| `window`  | `int`   | Iterations over which the improvement is measured (> 0).       | *required* |
-| `tol_abs` | `float` | Absolute tolerance on the improvement (>= 0).                  | *required* |
-| `tol_rel` | `float` | Tolerance on the improvement relative to the best loss (>= 0). | *required* |
-
-Returns:
-
-| Type   | Description                             |
-| ------ | --------------------------------------- |
-| `Self` | The config instance for method chaining |
-
-Source code in `commol/context/calibration.py`
-
-```python
-def improvement_stop(self, *, window: int, tol_abs: float, tol_rel: float) -> Self:
-    """
-    Stop when the best loss stops improving.
-
-    The run stops when the best loss improved by at most
-    ``tol_abs + tol_rel * |best loss|`` over the last `window` iterations,
-    and reports ``converged=True``. Off by default. A swarm can stall for
-    some iterations and then improve again, so a short window can stop it
-    early.
-
-    Parameters
-    ----------
-    window : int
-        Iterations over which the improvement is measured (> 0).
-    tol_abs : float
-        Absolute tolerance on the improvement (>= 0).
-    tol_rel : float
-        Tolerance on the improvement relative to the best loss (>= 0).
-
-    Returns
-    -------
-    Self
-        The config instance for method chaining
-    """
-    self._improvement_stop = PSOImprovementStop(
-        window=window, tol_abs=tol_abs, tol_rel=tol_rel
-    )
-    return self
-```
-
-#### radius_stop
-
-```python
-radius_stop(tol: float) -> Self
-```
-
-Stop when the swarm has gathered around its best position.
-
-The run stops when the largest distance of a particle from the best position, divided by the size of the search box, is at most `tol`, and reports `converged=True`. Off by default. Mutation and velocity mutation scatter the swarm again, so with them the radius can stay above `tol`; values that the data do not tell apart keep the swarm spread.
-
-Parameters:
-
-| Name  | Type    | Description                                                                          | Default    |
-| ----- | ------- | ------------------------------------------------------------------------------------ | ---------- |
-| `tol` | `float` | Tolerance on the radius of the swarm, relative to the size of the search box (>= 0). | *required* |
-
-Returns:
-
-| Type   | Description                             |
-| ------ | --------------------------------------- |
-| `Self` | The config instance for method chaining |
-
-Source code in `commol/context/calibration.py`
-
-```python
-def radius_stop(self, tol: float) -> Self:
-    """
-    Stop when the swarm has gathered around its best position.
-
-    The run stops when the largest distance of a particle from the best
-    position, divided by the size of the search box, is at most `tol`, and
-    reports ``converged=True``. Off by default. Mutation and velocity
-    mutation scatter the swarm again, so with them the radius can stay
-    above `tol`; values that the data do not tell apart keep the swarm
-    spread.
-
-    Parameters
-    ----------
-    tol : float
-        Tolerance on the radius of the swarm, relative to the size of the
-        search box (>= 0).
-
-    Returns
-    -------
-    Self
-        The config instance for method chaining
-    """
-    self._radius_stop = PSORadiusStop(tol=tol)
+    commol_rs.json.as_read("ParticleSwarmConfig", engine_json(self))
     return self
 ```
 

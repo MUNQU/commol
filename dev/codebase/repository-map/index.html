@@ -3726,8 +3726,13 @@
 <td>Anything that runs the <code>git</code> program.</td>
 </tr>
 <tr>
+<td><code>py-commol/src/json.rs</code></td>
+<td>The port of the bridge: <code>read</code>, which reads the JSON of the <code>model_dump()</code> of a data object into the type of the engine, with the path of the field an error is about, and the module <code>json</code> of <code>commol_rs</code>: <code>as_read</code>, which reads an object by the name of its Python class and writes back what it read, and <code>objects</code>, the classes it reads.</td>
+<td>A conversion of a field.</td>
+</tr>
+<tr>
 <td><code>py-commol/src/core.rs</code></td>
-<td>Bindings of the model types (<code>Model</code>, <code>Process</code>, <code>Aggregate</code>, …).</td>
+<td>The reading of a model, a process and an aggregate structure from their JSON, <code>MathExpression</code>, and the range check of <code>py-commol/src/ranges.rs</code>.</td>
 <td>Logic.</td>
 </tr>
 <tr>
@@ -3757,47 +3762,47 @@
 </tr>
 <tr>
 <td><code>py-commol/src/calibration.rs</code></td>
-<td>The calibration types (observations, parameters, constraints, loss, optimizers, results), the checks that take an <code>Engine</code>, and the windows of the engine (<code>check_window</code>, <code>check_window_end</code>, <code>window_bounds</code>, <code>window_index</code>, <code>window_ends</code>, <code>windows_in</code>, <code>window_increments</code>).</td>
+<td>The results of a fit (<code>CalibrationResult</code>, <code>Starts</code>, the history), the checks that take an <code>Engine</code> and the parameters as JSON, and the windows of the engine (<code>check_window</code>, <code>check_window_end</code>, <code>window_bounds</code>, <code>window_index</code>, <code>window_ends</code>, <code>windows_in</code>, <code>window_increments</code>).</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
 <td><code>py-commol/src/identifiability.rs</code></td>
-<td><code>commol_rs.inference</code>: <code>structural_rank</code>, <code>collinearity</code>, <code>sample_identifiability</code>, <code>starts_identifiability</code> and their result classes.</td>
+<td><code>commol_rs.inference</code>: <code>structural_rank</code>, <code>collinearity</code>, <code>sample_identifiability</code>, <code>starts_identifiability</code>, each with the JSON of its method and the handle of the result it reads, the checks of the engine type and of the names, and their result classes.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
 <td><code>py-commol/src/smc.rs</code></td>
-<td><code>commol_rs.inference</code>: <code>Distribution</code>, the priors as Python passes them, the runners of the sequential Monte Carlo methods (<code>gibbs_posterior</code>, <code>bayesian_posterior</code>, <code>information_matching_eta</code>, <code>bootstrap_coverage_eta</code>, <code>abc_smc</code>, <code>abc_rejection</code>) and <code>SMCRun</code>, <code>EtaCoverage</code>.</td>
+<td><code>commol_rs.inference</code>: <code>Distribution</code>, the runners of the sequential Monte Carlo methods (<code>gibbs_posterior</code>, which fits the problem and calibrates <code>η</code> when its method asks, <code>bayesian_posterior</code>, <code>abc_smc</code>, <code>abc_rejection</code>), each with the JSON of its method, and <code>SMCRun</code>, <code>EtaCalibration</code>.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
 <td><code>py-commol/src/local.rs</code></td>
-<td><code>commol_rs.inference</code>: the runners of the local approximations (<code>laplace</code>, <code>sandwich</code>, <code>delta_band</code>, <code>laplace_mixture</code>) and <code>LocalRun</code>, <code>MixtureRun</code>.</td>
+<td><code>commol_rs.inference</code>: the runners of the local approximations (<code>laplace</code>, <code>sandwich</code>, <code>laplace_mixture</code>, each with the JSON of its method, which fit the problem first; <code>delta_band</code>) and <code>LocalRun</code>, <code>MixtureRun</code>.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
 <td><code>py-commol/src/conformal.rs</code></td>
-<td><code>commol_rs.inference</code>: <code>check_conformal_settings</code>, the runners of the conformal methods (<code>split_conformal</code>, <code>rolling_conformal</code>, <code>jackknife_plus</code>, <code>enbpi</code>, <code>adaptive_conformal</code>) and <code>ConformalRun</code>.</td>
+<td><code>commol_rs.inference</code>: <code>check_conformal_settings</code>, the runners of the conformal methods (<code>split_conformal</code>, <code>rolling_conformal</code>, <code>jackknife_plus</code>, <code>enbpi</code>, <code>adaptive_conformal</code>), each with the JSON of its method and, for a sample, its handle, and <code>ConformalRun</code>.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
 <td><code>py-commol/src/sensitivity.rs</code></td>
-<td><code>commol_rs.inference</code>: <code>ForwardAnalysis</code>, the wrapper of the Rust type (one call per method, the predictive, the observation draws with no noise), <code>chaos_evaluate</code>, <code>SobolRun</code>, <code>ChaosRun</code>.</td>
+<td><code>commol_rs.inference</code>: <code>ForwardAnalysis</code>, built from the JSON of the inputs (the predictive, the observation draws with no noise), the runners of the sensitivity methods (<code>propagation</code>, <code>prcc</code>, <code>morris</code>, <code>sobol</code>, <code>polynomial_chaos</code>), each with the JSON of its method, <code>chaos_evaluate</code>, <code>SobolRun</code>, <code>ChaosRun</code>.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
 <td><code>py-commol/src/quantity.rs</code></td>
-<td><code>commol_rs.inference</code>: the quantities of interest read from the JSON of their classes, <code>quantities_as_read</code>, which writes them back, <code>quantity_schedule</code>, and <code>quantities_of_runs</code>, the quantities of runs that are done.</td>
+<td><code>commol_rs.inference</code>: the quantities of interest read from the JSON of their classes, <code>quantity_schedule</code>, and <code>quantities_of_runs</code>, the quantities of runs that are done.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
 <td><code>py-commol/src/inference.rs</code></td>
-<td><code>commol_rs.inference</code>: <code>CalibrationProblem</code> (built once from a <code>Calibrator</code>, with a loss or observation models: starts, history, predictions, the predictive, the log score, the pointwise log-likelihood), <code>ParameterSample</code>, <code>Predictive</code>, <code>ObservationDraws</code>, <code>BootstrapRun</code>, <code>JackknifeRun</code>, <code>weighted_quantiles</code>, <code>weighted_summary</code> (<code>WeightedSummary</code>), <code>effective_size</code>, <code>by_series</code>, <code>quantile_error</code>; the runners of methods (the bootstraps, <code>parametric_bootstrap</code>, <code>jackknife</code>).</td>
+<td><code>commol_rs.inference</code>: <code>CalibrationProblem</code> (built once from the JSON of the problem of a <code>Calibrator</code>, with its optimizer and seed: starts, history, predictions, the predictive, the log score, the pointwise log-likelihood), <code>ParameterSample</code>, <code>Predictive</code>, <code>ObservationDraws</code>, <code>BootstrapRun</code>, <code>JackknifeRun</code>, <code>weighted_quantiles</code>, <code>weighted_summary</code> (<code>WeightedSummary</code>), <code>effective_size</code>, <code>by_series</code>, <code>quantile_error</code>; the runners <code>bootstrap</code> (the four bootstraps, by <code>kind</code>) and <code>block_jackknife</code>, each with the JSON of its method.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
 <td><code>py-commol/src/profiles.rs</code></td>
-<td><code>commol_rs.inference</code>: <code>trace_profiles</code>, <code>BootstrapSettings</code>, <code>Profile</code>, <code>ProfileRun</code>.</td>
+<td><code>commol_rs.inference</code>: <code>profile_likelihood</code> and <code>prediction_profile</code>, each with the JSON of its method, which fit the problem, calibrate the threshold with its bootstrap and check the names; <code>Profile</code>, <code>ProfileRun</code>.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
@@ -3859,7 +3864,7 @@
 </tr>
 <tr>
 <td><code>api/inference/</code></td>
-<td>What reads a sample: <code>Predictive</code> (<code>predictive.py</code>), <code>Scenarios</code>, the predictive of each scenario and their paired comparison (<code>scenarios.py</code>), the scores (<code>api/inference/scores.py</code>, exposed as <code>commol.scores</code>), the one interval convention (<code>intervals.py</code>: <code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code>), the registry of method runners (<code>registry.py</code>), the runners of the identifiability methods (<code>api/inference/identifiability.py</code>), which build the report, the runners of the resampling methods (<code>api/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>api/inference/smc.py</code>), of the local approximations (<code>api/inference/local.py</code>), of the conformal methods (<code>api/inference/conformal.py</code>), which build <code>ConformalResult</code>, of the sensitivity methods (<code>api/inference/global_sensitivity.py</code>), and of the profiles (<code>api/inference/profiles.py</code>), which build <code>ProfileResult</code>.</td>
+<td>What reads a sample: <code>Predictive</code> (<code>predictive.py</code>), <code>Scenarios</code>, the predictive of each scenario and their paired comparison (<code>scenarios.py</code>), the scores (<code>api/inference/scores.py</code>, exposed as <code>commol.scores</code>), the one interval convention (<code>intervals.py</code>: <code>weighted_quantiles</code>, <code>member_statistics</code>, <code>ci_percentiles</code>), the registry of method runners (<code>registry.py</code>), the <code>CalibrationResult</code> of the starts of a fit that the engine ran (<code>fit.py</code>), the runners of the identifiability methods (<code>api/inference/identifiability.py</code>), which build the report, the runners of the resampling methods (<code>api/inference/resampling.py</code>), of the sequential Monte Carlo methods (<code>api/inference/smc.py</code>), of the local approximations (<code>api/inference/local.py</code>), of the conformal methods (<code>api/inference/conformal.py</code>), which build <code>ConformalResult</code>, of the sensitivity methods (<code>api/inference/global_sensitivity.py</code>), and of the profiles (<code>api/inference/profiles.py</code>), which build <code>ProfileResult</code>.</td>
 <td>Transforms of predictions; quantile formulas.</td>
 </tr>
 <tr>
@@ -3934,7 +3939,7 @@
 </tr>
 <tr>
 <td><code>context/calibration.py</code></td>
-<td>The calibration problem as settings: <code>CalibrationProblem</code>, <code>ObservedDataPoint</code>, <code>CalibrationParameter</code>, <code>CalibrationConstraint</code>, <code>Quantile</code>, the optimizer settings (<code>NelderMeadConfig</code>, <code>ParticleSwarmConfig</code> and its parts, the stop rules), and the results (<code>CalibrationResult</code>, <code>StartSummary</code>, <code>CalibrationHistory</code>).</td>
+<td>The calibration problem as settings: <code>CalibrationProblem</code>, <code>ObservedDataPoint</code>, <code>CalibrationParameter</code>, <code>CalibrationConstraint</code>, <code>Quantile</code>, the optimizer settings (<code>NelderMeadConfig</code>, <code>ParticleSwarmConfig</code> with its strategies and stop rules as plain fields, tagged by <code>kind</code>), and the results (<code>CalibrationResult</code>, <code>StartSummary</code>, <code>CalibrationHistory</code>).</td>
 <td>Losses, penalties, optimizers (the engine's).</td>
 </tr>
 <tr>
@@ -3949,7 +3954,7 @@
 </tr>
 <tr>
 <td><code>context/constants.py</code></td>
-<td>The enumerations of the calibration settings: <code>CalibrationParameterType</code>, <code>LossFunction</code>, <code>OptimizationAlgorithm</code> and those of a particle swarm.</td>
+<td>The enumerations of the calibration settings: <code>CalibrationParameterType</code>, <code>LossFunction</code>, <code>OptimizationAlgorithm</code>.</td>
 <td>—</td>
 </tr>
 <tr>
@@ -3986,6 +3991,11 @@
 <td><code>context/engine.py</code></td>
 <td><code>ModelEngine</code> (<code>Model.engine</code>: the engine type and its settings, read with the class of that engine), the settings classes <code>ODESolver</code>, <code>StochasticEventsSettings</code> and <code>StochasticStepsSettings</code> (their defaults are constants of the engine, and each checks itself with <code>check_settings</code> of its engine), <code>Rounding</code>, and the names of the engines as the <code>Literal</code> <code>EngineName</code>.</td>
 <td>Settings validation or engine meanings: ask <code>commol_rs.engine.EngineType</code>.</td>
+</tr>
+<tr>
+<td><code>context/engine_json.py</code></td>
+<td>The port of the bridge on the Python side: <code>engine_json</code>, the JSON of the <code>model_dump()</code> of a data object, with the texts <code>"Infinity"</code>, <code>"-Infinity"</code> and <code>"NaN"</code> for the numbers that are not finite, and <code>engine_handles</code>, the handle of each field a class names in <code>_engine_handles</code> (a sample, or the JSON of a result).</td>
+<td>A conversion of a field to the engine.</td>
 </tr>
 <tr>
 <td><code>context/_model/engine_state.py</code></td>
@@ -4170,16 +4180,16 @@
 <tr>
 <td>Change calibration</td>
 <td><code>crates/commol-calibration/src/calibration_problem.rs</code> and its layers (<code>forward.rs</code>, <code>observation.rs</code>, <code>feasibility.rs</code>, <code>discrepancy.rs</code>, <code>objective.rs</code>); <code>crates/commol-calibration/src/starts.rs</code></td>
-<td><code>values.rs</code>, <code>crates/commol-model/src/initial_conditions.rs</code>, <code>py-commol/commol/api/calibrator.py</code>, <code>py-commol/src/inference.rs</code> (<code>CalibrationProblem</code>)</td>
+<td><code>values.rs</code>, <code>crates/commol-model/src/initial_conditions.rs</code>, <code>crates/commol-calibration/src/settings.rs</code> (the problem as Python writes it), <code>py-commol/commol/api/calibrator.py</code>, <code>py-commol/src/inference.rs</code> (<code>CalibrationProblem</code>)</td>
 </tr>
 <tr>
 <td>Add or change an observation model or the likelihood</td>
 <td><code>crates/commol-calibration/src/likelihood/</code> (<code>likelihood/mod.rs</code>, <code>density.rs</code>)</td>
-<td><code>crates/commol-inference/src/predictive.rs</code> (<code>draw_observation</code>), <code>py-commol/src/calibration.rs</code> (<code>ObservationModel</code>), <code>py-commol/commol/context/observation_models.py</code>, <code>context/_model/engine_state.py</code> (<code>rust_observation_models</code>), <code>docs/guide/uncertainty/observation-models.md</code></td>
+<td><code>crates/commol-inference/src/predictive.rs</code> (<code>draw_observation</code>), <code>py-commol/commol/context/observation_models.py</code>, <code>docs/guide/uncertainty/observation-models.md</code></td>
 </tr>
 <tr>
 <td>Add an uncertainty method</td>
-<td><code>crates/commol-inference/</code></td>
+<td><code>crates/commol-inference/</code> (its settings in <code>settings/</code>)</td>
 <td><code>py-commol/src/</code> (<code>inference.rs</code> or the module of its family), <code>py-commol/commol/context/inference/</code>, <code>api/inference/registry.py</code>, the checklist "Uncertainty method" in <code>docs/codebase/maintainer-playbook.md</code></td>
 </tr>
 <tr>
@@ -4229,7 +4239,7 @@
 </tr>
 <tr>
 <td>Expose a Rust function to Python</td>
-<td><code>py-commol/src/</code>; <code>py-commol/src/engine.rs</code> for a function that takes an engine; <code>parallel</code> (<code>py-commol/src/parallelism.rs</code>) to run parallel work</td>
+<td><code>py-commol/src/</code>; <code>py-commol/src/engine.rs</code> for a function that takes an engine; <code>parallel</code> (<code>py-commol/src/parallelism.rs</code>) to run parallel work; a data object as JSON, read with <code>read</code> of <code>py-commol/src/json.rs</code> and sent with <code>engine_json</code> (<code>py-commol/commol/context/engine_json.py</code>)</td>
 <td><code>py-commol/commol/commol_rs/_commol_rs.pyi</code>, <code>py-commol/commol/context/_model/engine_state.py</code> (the only Python caller of the engine queries)</td>
 </tr>
 <tr>
