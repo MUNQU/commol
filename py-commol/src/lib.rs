@@ -8,10 +8,12 @@
 //!
 //! ## Modules
 //!
-//! - `core`: Core data structures (Model, Process, Aggregate, etc.)
+//! - `json`: The port: every data object crosses as the JSON of its
+//!   `model_dump()`, which the engine reads into its own types
+//! - `core`: The checks and formulas of a model, read from its JSON
 //! - `model`: What a model expands into (compartments, flows, initial state)
 //! - `engine`: The list of engines, and the engine a model names
-//! - `calibration`: The types of a calibration problem and its optimizers
+//! - `calibration`: What a calibration reads of a model, and its results
 //! - `inference`: A calibration problem built once, and the methods that read it
 //! - `parallelism`: The threads of the parallel methods and the levels that run in parallel
 //!
@@ -20,13 +22,10 @@
 //! ```python
 //! from pathlib import Path
 //!
-//! from commol.commol_rs._commol_rs import core, engine
+//! from commol.commol_rs._commol_rs import engine
 //!
-//! # Load a model from the JSON that `Model.to_json` writes
-//! model = core.Model.from_json(Path("model.json").read_text())
-//!
-//! # Build the engine the model names
-//! simulation = engine.Engine(model)
+//! # Build the engine a model names, from the JSON that `Model.to_json` writes
+//! simulation = engine.Engine(Path("model.json").read_text())
 //!
 //! # Run simulation
 //! positions, rows = simulation.run(100)
@@ -46,6 +45,7 @@ mod counts;
 mod engine;
 mod identifiability;
 mod inference;
+mod json;
 mod local;
 mod model;
 mod parallelism;
@@ -64,12 +64,21 @@ mod test_kind;
 /// enabling high-performance compartment modeling with a Pythonic API.
 #[pymodule]
 fn _commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    // Core module: fundamental data structures
+    // JSON module: the port of every data object
+    let json_module = PyModule::new(py, "json")?;
+    json_module.add(
+        "__doc__",
+        "The port of the bridge: the classes whose JSON the engine reads,\n\
+         and what it reads of each.",
+    )?; // coverage: an error that only PyO3 returns, when the module cannot take it
+    json::register(&json_module)?;
+    m.add_submodule(&json_module)?;
+
+    // Core module: the checks and formulas of a model
     let core_module = PyModule::new(py, "core")?;
     core_module.add(
         "__doc__",
-        "Core data structures for compartment models.\n\n\
-         Includes Model, Process, Aggregate, Bin, Transition, and related types.",
+        "The checks and formulas of a model, read from its JSON.",
     )?; // coverage: an error that only PyO3 returns, when the module cannot take it
     core::register(&core_module)?;
     m.add_submodule(&core_module)?;
@@ -100,9 +109,7 @@ fn _commol_rs(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     let calibration_module = PyModule::new(py, "calibration")?;
     calibration_module.add(
         "__doc__",
-        "Model calibration and parameter optimization.\n\n\
-         Provides tools for calibrating model parameters against observed data\n\
-         using various optimization algorithms (Nelder-Mead, Particle Swarm, etc.).",
+        "What a calibration reads of a model, and the results of a fit.",
     )?; // coverage: an error that only PyO3 returns, when the module cannot take it
     calibration::register(&calibration_module)?;
     m.add_submodule(&calibration_module)?;

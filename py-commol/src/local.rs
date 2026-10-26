@@ -2,23 +2,25 @@
 //! Laplace approximation, the delta method, the sandwich and the Laplace
 //! mixture.
 //!
-//! Each runner takes the problem built once by a `Calibrator` and the fit,
-//! and returns plain values; Python builds the result.
+//! Each runner takes the problem built once by a `Calibrator` and the JSON
+//! of its method ([`commol_inference::settings::local`]), fits the problem,
+//! and returns the starts of the fit and plain values; Python builds the
+//! result.
 
 use crate::parallelism::parallel;
 use commol_inference::importance::TemperedPosterior;
-use commol_inference::local::{self, CurvatureKind, Gaussian, MixtureRun};
+use commol_inference::local::{self, Gaussian, MixtureRun};
 use commol_inference::sensitivity::Matrix;
+use commol_inference::settings::local::{
+    LaplaceMixtureSettings, LaplaceSettings, MixtureTarget, SandwichSettings,
+};
 use commol_inference::smc::{GibbsTarget, LikelihoodTarget};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
-use crate::inference::{PyCalibrationProblem, method_error};
-use crate::smc::{PriorArgs, problem_priors};
-
-fn curvature_kind(name: &str) -> PyResult<CurvatureKind> {
-    CurvatureKind::from_name(name).map_err(method_error)
-}
+use crate::calibration::PyStarts;
+use crate::inference::{PyCalibrationProblem, best_values, method_error, start_ends};
+use crate::smc::problem_priors;
 
 fn rows(matrix: &Matrix) -> Vec<Vec<f64>> {
     matrix
@@ -54,86 +56,102 @@ impl PyLocalRun {
     }
 }
 
-/// The Laplace approximation of the observation models at the fit
+/// Fit the problem, then take the Laplace approximation of the
+/// observation models at the fit
 ///
 /// Args:
 ///     problem: The calibration problem, with observation models
-///     fit: The fitted values, in problem order
-///     curvature: "gauss_newton" or "hessian"
-///     draws: Number of draws
-///     seed: Seed of the draws
+///     settings: The JSON of a `Laplace`
+///
+/// Returns:
+///     The starts of the fit, and the approximation
 ///
 /// Raises:
-///     ValueError: If the problem has a loss, a fit is on a bound, the
-///         engine is stochastic or the curvature is singular
-///     RuntimeError: If the derivatives fail at the fit
+///     ValueError: If a setting is not valid, the problem has a loss, a fit
+///         is on a bound, the engine is stochastic or the curvature is
+///         singular
+///     RuntimeError: If the fit or the derivatives fail at the fit
 #[pyfunction]
 fn laplace(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
-    fit: Vec<f64>,
-    curvature: &str,
-    draws: i64,
-    seed: i128,
-) -> PyResult<PyLocalRun> {
-    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-    let draws: usize = crate::counts::count(&commol_inference::ranges::DRAWS, draws)?;
-    let kind = curvature_kind(curvature)?;
+    settings: &str,
+) -> PyResult<(PyStarts, PyLocalRun)> {
+    let settings: LaplaceSettings = crate::json::read(settings)?;
+    let starts = problem.fit(py, settings.starts)?;
+    let fit = best_values(&starts);
     let (curvature, gaussian) = parallel(py, || {
-        local::laplace_approximation(&problem.inner, &fit, kind)
+        local::laplace_approximation(&problem.inner, &fit, settings.curvature)
     })?
     .map_err(method_error)?;
-    Ok(PyLocalRun::of(
+    let run = PyLocalRun::of(
         &gaussian,
-        draws,
-        seed,
+        settings.draws,
+        problem.seed,
         curvature.notes().to_vec(),
-    ))
+    );
+    Ok((PyStarts { inner: starts }, run))
 }
 
-/// A sandwich: the run, the blocks, the block length and its estimates.
-type SandwichTables = (PyLocalRun, usize, usize, Option<Vec<(String, f64)>>);
+/// A sandwich: the starts of the fit, the run, the blocks, the block length
+/// and its estimates.
+type SandwichTables = (
+    PyStarts,
+    PyLocalRun,
+    usize,
+    usize,
+    Option<Vec<(String, f64)>>,
+);
 
-/// The sandwich covariance at the fit, with the meat summed over blocks
+/// Fit the problem, then take the sandwich covariance at the fit, with the
+/// meat summed over blocks
 ///
 /// Args:
 ///     problem: The calibration problem
-///     fit: The fitted values, in problem order
-///     curvature: "gauss_newton" or "hessian"
-///     block_length: Positions per block, or None for the automatic length
-///     draws: Number of draws
-///     seed: Seed of the draws
+///     settings: The JSON of a `Sandwich`
 ///
 /// Returns:
-///     The run, the number of blocks, the positions per block and, with the
-///     automatic length, the estimate of each series
+///     The starts of the fit, the run, the number of blocks, the positions
+///     per block and, with the automatic length, the estimate of each
+///     series
 ///
 /// Raises:
-///     ValueError: If the loss is the absolute error, a fit is on a bound,
-///         the engine is stochastic, the block length does not fit the
-///         positions, or there are not more blocks than parameters
-///     RuntimeError: If the derivatives fail at the fit
+///     ValueError: If a setting is not valid, the loss is the absolute
+///         error, a fit is on a bound, the engine is stochastic, the block
+///         length does not fit the positions, or there are not more blocks
+///         than parameters
+///     RuntimeError: If the fit or the derivatives fail at the fit
 #[pyfunction]
 fn sandwich(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
-    fit: Vec<f64>,
-    curvature: &str,
-    block_length: Option<i64>,
-    draws: i64,
-    seed: i128,
+    settings: &str,
 ) -> PyResult<SandwichTables> {
-    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-    let block_length: Option<usize> =
-        crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
-    let draws: usize = crate::counts::count(&commol_inference::ranges::DRAWS, draws)?;
-    let kind = curvature_kind(curvature)?;
+    let settings: SandwichSettings = crate::json::read(settings)?;
+    let starts = problem.fit(py, settings.starts)?;
+    let fit = best_values(&starts);
     let run = parallel(py, || {
-        local::sandwich_approximation(&problem.inner, &fit, kind, block_length)
+        local::sandwich_approximation(
+            &problem.inner,
+            &fit,
+            settings.curvature,
+            settings.block_length.0,
+        )
     })?
     .map_err(method_error)?;
-    let local = PyLocalRun::of(&run.gaussian, draws, seed, run.curvature.notes().to_vec());
-    Ok((local, run.blocks, run.block_length, run.estimates))
+    let local = PyLocalRun::of(
+        &run.gaussian,
+        settings.draws,
+        problem.seed,
+        run.curvature.notes().to_vec(),
+    );
+    Ok((
+        PyStarts { inner: starts },
+        local,
+        run.blocks,
+        run.block_length,
+        run.estimates,
+    ))
 }
 
 /// A band and its outputs: `(outputs, mean, lower, upper)`, each table
@@ -242,44 +260,37 @@ impl PyMixtureRun {
     }
 }
 
-/// A Laplace mixture at the ends of the starts, the proposal of an
-/// importance sampler of a posterior
+/// Fit the problem from several starts, then sample a posterior with the
+/// Laplace mixture at the ends of the starts as the proposal of an
+/// importance sampler
 ///
 /// Args:
 ///     problem: The calibration problem
-///     priors: The priors, or None for uniform on the bounds
-///     eta: The scale of the loss of a Gibbs posterior, or None for the
-///         posterior of the observation models
-///     ends: The end of each start, in problem order
-///     draws: Number of draws
-///     curvature: "gauss_newton" or "hessian"
-///     seed: Seed of the draws
+///     settings: The JSON of a `LaplaceMixture`
+///
+/// Returns:
+///     The starts of the fit, and the mixture with its sample
 ///
 /// Raises:
-///     ValueError: If a prior or eta is not valid, the target needs
+///     ValueError: If a prior or a setting is not valid, the target needs
 ///         observation models the problem lacks, or no end gives a
 ///         component
-///     RuntimeError: If a run, the derivatives or the weights fail
+///     RuntimeError: If the fit, a run, the derivatives or the weights fail
 #[pyfunction]
-#[pyo3(signature = (problem, priors, eta, ends, draws, curvature, seed))]
-#[allow(clippy::too_many_arguments)]
 fn laplace_mixture(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
-    priors: Option<Vec<PriorArgs>>,
-    eta: Option<f64>,
-    ends: Vec<Vec<f64>>,
-    draws: i64,
-    curvature: &str,
-    seed: i128,
-) -> PyResult<PyMixtureRun> {
-    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-    let draws: usize = crate::counts::count(&commol_inference::ranges::MIXTURE_DRAWS, draws)?;
-    let kind = curvature_kind(curvature)?;
-    let priors = problem_priors(problem, priors)?;
+    settings: &str,
+) -> PyResult<(PyStarts, PyMixtureRun)> {
+    let settings: LaplaceMixtureSettings = crate::json::read(settings)?;
+    let priors = problem_priors(problem, settings.target.priors())?;
+    let starts = problem.fit(py, settings.starts)?;
+    let ends = start_ends(&starts);
     let inner = &problem.inner;
-    let run = match eta {
-        None => {
+    let seed = problem.seed;
+    let (draws, curvature) = (settings.draws, settings.curvature);
+    let run = match &settings.target {
+        MixtureTarget::Likelihood { .. } => {
             let target = LikelihoodTarget::new(inner, &priors).map_err(method_error)?;
             parallel(py, || {
                 local::laplace_mixture(
@@ -288,28 +299,28 @@ fn laplace_mixture(
                     1.0,
                     &ends,
                     draws,
-                    kind,
+                    curvature,
                     seed,
                 )
             })?
         }
-        Some(eta) => {
-            let target = GibbsTarget::new(inner, &priors, eta).map_err(method_error)?;
+        MixtureTarget::Gibbs(gibbs) => {
+            let target = GibbsTarget::new(inner, &priors, gibbs.eta).map_err(method_error)?;
             parallel(py, || {
                 local::laplace_mixture(
                     inner,
                     &TemperedPosterior::new(&target, seed),
-                    eta,
+                    gibbs.eta,
                     &ends,
                     draws,
-                    kind,
+                    curvature,
                     seed,
                 )
             })?
         }
     }
     .map_err(method_error)?;
-    Ok(PyMixtureRun::of(run))
+    Ok((PyStarts { inner: starts }, PyMixtureRun::of(run)))
 }
 
 /// Register the classes and functions of this module

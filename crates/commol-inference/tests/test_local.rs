@@ -779,24 +779,6 @@ fn a_sandwich_needs_more_blocks_than_parameters_and_reads_the_automatic_length()
 }
 
 #[test]
-fn a_curvature_has_two_names() {
-    assert_eq!(
-        CurvatureKind::from_name("gauss_newton"),
-        Ok(CurvatureKind::GaussNewton)
-    );
-    assert_eq!(
-        CurvatureKind::from_name("hessian"),
-        Ok(CurvatureKind::Hessian)
-    );
-    assert!(
-        CurvatureKind::from_name("newton")
-            .unwrap_err()
-            .to_string()
-            .contains("'gauss_newton' and 'hessian'")
-    );
-}
-
-#[test]
 fn a_band_of_replicates_is_refused() {
     let problem = CalibrationProblem::new(
         Curve::new(Shape::Line),

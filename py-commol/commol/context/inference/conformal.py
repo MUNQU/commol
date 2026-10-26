@@ -9,7 +9,7 @@ sets the width of every interval.
 """
 
 from collections.abc import Mapping
-from typing import Literal, Self
+from typing import ClassVar, Literal, Self
 
 from pydantic import ConfigDict, Field, JsonValue, model_validator
 
@@ -192,6 +192,8 @@ class SplitConformal(ConformalMethod, RangeChecked):
         Starts of the fit (default 1).
     """
 
+    _engine_handles: ClassVar[tuple[str, ...]] = ("sample",)
+
     calibration_data: list[ObservedDataPoint] = Field(
         min_length=1, description="Held-out observations."
     )
@@ -327,6 +329,8 @@ class AdaptiveConformal(ConformalMethod, RangeChecked):
     stream: list[ObservedDataPoint] = Field(
         min_length=1, description="The observations that arrive."
     )
+    _engine_handles: ClassVar[tuple[str, ...]] = ("sample",)
+
     sample: ParameterSample | None = Field(
         default=None, description="The sample whose predictive predicts."
     )

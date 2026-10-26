@@ -86,7 +86,7 @@ def test_a_quantile_summary_agrees_with_the_quantiles_of_the_replicates() -> Non
     assert history.evaluations
     for evaluation in history.evaluations:
         values = [evaluation.parameters[name] for name in names]
-        (replicates,) = calibrator.rust_problem.predict_observations([values])
+        (replicates,) = calibrator._rust_problem.predict_observations([values])
         summaries = [
             weighted_quantiles([replicate[i] for replicate in replicates], [0.25])[0]
             for i in range(len(observed))

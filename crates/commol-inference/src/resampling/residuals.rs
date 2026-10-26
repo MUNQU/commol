@@ -12,7 +12,8 @@ use crate::error::MethodError;
 use crate::resampling::blocks::{distinct_positions, position_indices};
 
 /// The scale of the residuals of a fit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ResidualScale {
     /// `r = y − ŷ`, and a synthetic value is `ŷ + r`.
     Additive,
@@ -22,22 +23,6 @@ pub enum ResidualScale {
 }
 
 impl ResidualScale {
-    /// The scale of a name: `"additive"` or `"multiplicative"`.
-    ///
-    /// # Errors
-    ///
-    /// [`MethodError::Invalid`], which lists the names, when `name` is none
-    /// of them.
-    pub fn from_name(name: &str) -> Result<Self, MethodError> {
-        match name {
-            "additive" => Ok(Self::Additive),
-            "multiplicative" => Ok(Self::Multiplicative),
-            _ => Err(MethodError::Invalid(format!(
-                "residual_scale is '{name}'; it must be \"additive\" or \"multiplicative\""
-            ))),
-        }
-    }
-
     /// The value an observation shows when the model gives `fitted` and the
     /// residual is `residual`.
     pub fn apply(self, fitted: f64, residual: f64) -> f64 {
@@ -200,7 +185,8 @@ impl SeriesResiduals {
 }
 
 /// How the blocks of residuals of a synthetic series are drawn.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ResidualBlocks {
     /// Blocks of `length` consecutive positions with a uniform start
     /// (Künsch 1989).
@@ -208,24 +194,6 @@ pub enum ResidualBlocks {
     /// Blocks with a uniform start and a geometric length of mean `length`,
     /// wrapped around the end (Politis and Romano 1994).
     Stationary,
-}
-
-impl ResidualBlocks {
-    /// The blocks of a name: `"moving"` or `"stationary"`.
-    ///
-    /// # Errors
-    ///
-    /// [`MethodError::Invalid`], which lists the names, when `name` is none
-    /// of them.
-    pub fn from_name(name: &str) -> Result<Self, MethodError> {
-        match name {
-            "moving" => Ok(Self::Moving),
-            "stationary" => Ok(Self::Stationary),
-            _ => Err(MethodError::Invalid(format!(
-                "scheme is '{name}'; it must be \"moving\" or \"stationary\""
-            ))),
-        }
-    }
 }
 
 /// The source position of each of `count` synthetic positions, drawn from

@@ -19,6 +19,7 @@ test-kind = ["commol-core/test-kind"]
 
 [dependencies]
 pyo3 = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 commol-core = { path = "../crates/commol-core" }
 commol-model = { path = "../crates/commol-model" }

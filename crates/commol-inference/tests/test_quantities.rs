@@ -47,22 +47,27 @@ fn the_peak_of_increments_is_the_largest_gain_of_a_window() {
     let quantities = Quantities::new(
         &[
             Quantity::Peak {
+                label: None,
                 series: increments(&["acc"], 7.0),
                 positions: vec![7.0, 14.0, 21.0],
             },
             Quantity::PeakPosition {
+                label: None,
                 series: increments(&["acc"], 7.0),
                 positions: vec![7.0, 14.0, 21.0],
             },
             Quantity::Trajectory {
+                label: None,
                 series: increments(&["acc"], 7.0),
                 positions: vec![7.0, 14.0, 21.0],
             },
             Quantity::ValueAt {
+                label: None,
                 series: increments(&["acc"], 14.0),
                 at: 21.0,
             },
             Quantity::Peak {
+                label: None,
                 series: level(&["acc"]),
                 positions: vec![7.0, 14.0, 21.0],
             },
@@ -85,6 +90,7 @@ fn the_peak_of_increments_is_the_largest_gain_of_a_window() {
 fn a_tie_gives_the_first_position() {
     let quantities = Quantities::new(
         &[Quantity::PeakPosition {
+            label: None,
             series: level(&["acc"]),
             positions: vec![0.0, 7.0, 14.0, 21.0],
         }],
@@ -104,18 +110,22 @@ fn a_nan_makes_the_quantity_nan() {
     let quantities = Quantities::new(
         &[
             Quantity::Peak {
+                label: None,
                 series: level(&["acc"]),
                 positions: positions.clone(),
             },
             Quantity::PeakPosition {
+                label: None,
                 series: level(&["acc"]),
                 positions: positions.clone(),
             },
             Quantity::Trajectory {
+                label: None,
                 series: level(&["acc"]),
                 positions: vec![7.0, 14.0],
             },
             Quantity::ValueAt {
+                label: None,
                 series: level(&["acc"]),
                 at: 21.0,
             },
@@ -136,11 +146,13 @@ fn a_nan_makes_the_quantity_nan() {
 fn a_done_run_is_read_at_the_schedule_within_the_tolerance_of_the_axis() {
     let quantities = [
         Quantity::Gain {
+            label: None,
             outputs: names(&["acc"]),
             start: 0.0,
             end: 0.3,
         },
         Quantity::ValueAt {
+            label: None,
             series: increments(&["acc"], 0.1),
             at: 0.3,
         },
@@ -166,10 +178,12 @@ fn a_done_run_lists_every_position_it_lacks_with_its_quantity() {
     let quantities = Quantities::new(
         &[
             Quantity::ValueAt {
+                label: None,
                 series: level(&["acc"]),
                 at: 7.0,
             },
             Quantity::Peak {
+                label: None,
                 series: increments(&["acc"], 7.0),
                 positions: vec![14.0, 21.0],
             },
@@ -196,10 +210,12 @@ fn a_done_run_lists_every_position_it_lacks_with_its_quantity() {
 fn the_schedule_alone_reads_the_outputs_the_quantities_name() {
     let schedule = Quantities::schedule_of(&[
         Quantity::Trajectory {
+            label: None,
             series: level(&["B", "A"]),
             positions: vec![5.0, 1.0],
         },
         Quantity::Gain {
+            label: None,
             outputs: names(&["C"]),
             start: 2.0,
             end: 3.0,
@@ -214,7 +230,15 @@ fn the_schedule_alone_reads_the_outputs_the_quantities_name() {
 #[test]
 fn increments_cannot_start_before_zero() {
     let compile = |series: Series, at: f64| {
-        Quantities::new(&[Quantity::ValueAt { series, at }], &names(&["acc"])).unwrap_err()
+        Quantities::new(
+            &[Quantity::ValueAt {
+                label: None,
+                series,
+                at,
+            }],
+            &names(&["acc"]),
+        )
+        .unwrap_err()
     };
 
     let early = compile(increments(&["acc"], 7.0), 5.0);
@@ -223,6 +247,7 @@ fn increments_cannot_start_before_zero() {
     let no_outputs = compile(increments(&[], 1.0), 5.0);
     let no_positions = Quantities::new(
         &[Quantity::Trajectory {
+            label: None,
             series: level(&["acc"]),
             positions: vec![],
         }],
@@ -244,29 +269,35 @@ fn increments_cannot_start_before_zero() {
 fn each_quantity_crosses_as_json_tagged_by_kind() {
     let quantities = vec![
         Quantity::ValueAt {
+            label: None,
             series: level(&["A", "B"]),
             at: 1.5,
         },
         Quantity::Gain {
+            label: None,
             outputs: names(&["A"]),
             start: 0.1,
             end: 0.4,
         },
         Quantity::Peak {
+            label: None,
             series: increments(&["A"], 7.0),
             positions: vec![7.0, 14.0],
         },
         Quantity::PeakPosition {
+            label: None,
             series: level(&["A"]),
             positions: vec![1.0],
         },
         Quantity::Trajectory {
+            label: None,
             series: increments(&["A"], 1.0),
             positions: vec![1.0, 2.0],
         },
         ratio_of(
             value_at(&["A"], 1.0),
             Quantity::Gain {
+                label: None,
                 outputs: names(&["B"]),
                 start: 0.0,
                 end: 1.0,
@@ -280,9 +311,9 @@ fn each_quantity_crosses_as_json_tagged_by_kind() {
 
     assert_eq!(back, quantities);
     assert!(json.starts_with(
-        r#"[{"kind":"value_at","series":{"kind":"level","outputs":["A","B"]},"at":1.5}"#
+        r#"[{"kind":"value_at","series":{"kind":"level","outputs":["A","B"]},"at":1.5,"label":null}"#
     ));
-    assert!(json.contains(r#"{"kind":"increments","outputs":["A"],"window":7.0}"#));
+    assert!(json.contains(r#"{"kind":"increments","outputs":["A"],"window":7}"#));
     assert!(
         json.contains(r#""replicate_rule":"within_positive""#),
         "{json}"
@@ -367,10 +398,12 @@ fn a_nan_run_is_named_by_its_point_and_inputs() {
     .unwrap();
     let quantities = [
         Quantity::ValueAt {
+            label: None,
             series: level(&["A", "B"]),
             at: 2.0,
         },
         Quantity::Peak {
+            label: None,
             series: increments(&["A", "B", "C"], 1.0),
             positions: vec![1.0, 2.0],
         },
@@ -429,6 +462,7 @@ fn the_seed_of_a_nan_replicate_is_named() {
 
 fn value_at(outputs: &[&str], at: f64) -> Quantity {
     Quantity::ValueAt {
+        label: None,
         series: level(outputs),
         at,
     }
@@ -436,6 +470,7 @@ fn value_at(outputs: &[&str], at: f64) -> Quantity {
 
 fn ratio_of(numerator: Quantity, denominator: Quantity, replicate_rule: ReplicateRule) -> Quantity {
     Quantity::Ratio {
+        label: None,
         numerator: Box::new(numerator),
         denominator: Box::new(denominator),
         replicate_rule,
@@ -487,10 +522,12 @@ fn a_ratio_divides_two_values_of_one_run() {
     let quantities = [
         ratio_of(
             Quantity::Peak {
+                label: None,
                 series: level(&["acc"]),
                 positions: vec![7.0, 14.0],
             },
             Quantity::Gain {
+                label: None,
                 outputs: names(&["acc"]),
                 start: 7.0,
                 end: 21.0,
@@ -532,10 +569,12 @@ fn a_ratio_takes_values_only() {
     };
 
     let position = of(Quantity::PeakPosition {
+        label: None,
         series: level(&["acc"]),
         positions: vec![1.0],
     });
     let trajectory = of(Quantity::Trajectory {
+        label: None,
         series: level(&["acc"]),
         positions: vec![1.0],
     });
@@ -669,6 +708,7 @@ fn a_over_gain(rule: ReplicateRule) -> Vec<Quantity> {
     vec![ratio_of(
         value_at(&["A"], 1.0),
         Quantity::Gain {
+            label: None,
             outputs: names(&["B"]),
             start: 0.0,
             end: 1.0,

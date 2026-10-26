@@ -146,6 +146,8 @@ class BayesianBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     Attributes
     ----------
+    kind : "bayesian"
+        The bootstrap, which the engine reads.
     replicates : int
         Number of replicates, at least 1.
     block_length : int | "auto"
@@ -155,6 +157,7 @@ class BayesianBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
         rows of a Latin hypercube over the bounds.
     """
 
+    kind: Literal["bayesian"] = Field(default="bayesian", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
     block_length: BlockLength = Field(description="Positions per block.")
     starts: int = Field(default=1, description="Starts per fit.")
@@ -172,6 +175,8 @@ class ParametricBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     Attributes
     ----------
+    kind : "parametric"
+        The bootstrap, which the engine reads.
     replicates : int
         Number of replicates, at least 1.
     starts : int
@@ -179,6 +184,9 @@ class ParametricBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
         rows of a Latin hypercube over the bounds.
     """
 
+    kind: Literal["parametric"] = Field(
+        default="parametric", description="The bootstrap."
+    )
     replicates: int = Field(description="Number of replicates.")
     starts: int = Field(default=1, description="Starts per fit.")
 
@@ -193,6 +201,8 @@ class ResidualBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     Attributes
     ----------
+    kind : "residual"
+        The bootstrap, which the engine reads.
     replicates : int
         Number of replicates, at least 1.
     block_length : int | "auto"
@@ -209,6 +219,7 @@ class ResidualBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
         Starts of the fit and of each replicate (default 1).
     """
 
+    kind: Literal["residual"] = Field(default="residual", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
     block_length: BlockLength = Field(description="Positions per block.")
     residual_scale: Literal["additive", "multiplicative"] = Field(
@@ -231,6 +242,8 @@ class WildBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     Attributes
     ----------
+    kind : "wild"
+        The bootstrap, which the engine reads.
     replicates : int
         Number of replicates, at least 1.
     block_length : int | "auto"
@@ -243,6 +256,7 @@ class WildBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
         Starts of the fit and of each replicate (default 1).
     """
 
+    kind: Literal["wild"] = Field(default="wild", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
     block_length: BlockLength = Field(description="Positions per block.")
     multipliers: Literal["rademacher", "mammen"] = Field(

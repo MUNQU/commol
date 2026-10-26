@@ -175,6 +175,7 @@ dependencies = [
  "commol-stochastic",
  "pyo3",
  "rayon",
+ "serde",
  "serde_json",
 ]
 
@@ -190,6 +191,7 @@ dependencies = [
  "commol-random",
  "commol-statistics",
  "commol-stochastic",
+ "json5",
  "libm",
  "rayon",
  "serde",
@@ -208,7 +210,6 @@ dependencies = [
  "json5",
  "rayon",
  "serde",
- "serde-value",
  "serde_json",
  "serde_path_to_error",
  "thiserror 2.0.21",
@@ -1325,15 +1326,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 
 [[package]]
-name = "ordered-float"
-version = "2.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68f19d67e5a2795c94e73e0bb1cc1a7edeb2e28efd39e2e1c9b7a40c1108b11c"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
 name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1801,16 +1793,6 @@ checksum = "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba"
 dependencies = [
  "serde_core",
  "serde_derive",
-]
-
-[[package]]
-name = "serde-value"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3a1a3341211875ef120e117ea7fd5228530ae7e7036a779fdc9117be6b3282c"
-dependencies = [
- "ordered-float",
- "serde",
 ]
 
 [[package]]

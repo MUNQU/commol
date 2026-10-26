@@ -100,7 +100,7 @@ mod tests {
                 "variant": null,
                 "bin_amounts": {"A": 10.0},
                 "stratification_fractions": {},
-                "neighbors": {"type": "complete"}
+                "neighbors": {"kind": "complete"}
             }
         })
     }
@@ -170,20 +170,20 @@ mod aggregate_tests {
     #[test]
     fn groups_read_back_with_their_weights() {
         let groups = neighbors(json!({
-            "type": "groups",
+            "kind": "groups",
             "stratification": "group",
             "weights": {"g1": {"g1": 1.0, "g2": 0.5}, "g2": {"g1": 0.5, "g2": 1.0}}
         }));
         assert_eq!(groups.check(&process()), Ok(()));
         assert_eq!(groups.weight("g1", "g2"), 0.5);
-        let identity = neighbors(json!({"type": "groups", "stratification": "group"}));
+        let identity = neighbors(json!({"kind": "groups", "stratification": "group"}));
         assert_eq!(identity.weight("g1", "g1"), 1.0);
         assert_eq!(identity.weight("g1", "g2"), 0.0);
     }
 
     #[test]
     fn groups_of_an_unknown_stratification_name_it() {
-        let groups = neighbors(json!({"type": "groups", "stratification": "level"}));
+        let groups = neighbors(json!({"kind": "groups", "stratification": "level"}));
         let error = groups.check(&process()).unwrap_err();
         assert!(
             error.contains("level") && error.contains("group"),
@@ -194,13 +194,13 @@ mod aggregate_tests {
     #[test]
     fn weights_need_every_pair_of_categories_and_no_negative_weight() {
         let missing = neighbors(json!({
-            "type": "groups", "stratification": "group",
+            "kind": "groups", "stratification": "group",
             "weights": {"g1": {"g1": 1.0}, "g2": {"g1": 0.5, "g2": 1.0}}
         }));
         let error = missing.check(&process()).unwrap_err();
         assert!(error.contains("'g1'"), "{error}");
         let negative = neighbors(json!({
-            "type": "groups", "stratification": "group",
+            "kind": "groups", "stratification": "group",
             "weights": {"g1": {"g1": 1.0, "g2": -0.5}, "g2": {"g1": 0.5, "g2": 1.0}}
         }));
         let error = negative.check(&process()).unwrap_err();

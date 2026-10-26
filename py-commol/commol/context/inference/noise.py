@@ -16,9 +16,16 @@ class NoNoise(BaseModel):
     The band of a predictive with `NoNoise` is a band of the model. It says
     where the model curve lies, not where the next observation falls, so its
     coverage of data is below its level.
+
+    Attributes
+    ----------
+    kind : "none"
+        The noise, which the engine reads.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["none"] = Field(default="none", description="The noise.")
 
 
 class ResidualNoise(RangeChecked):
@@ -34,6 +41,8 @@ class ResidualNoise(RangeChecked):
 
     Attributes
     ----------
+    kind : "residual"
+        The noise, which the engine reads.
     fit : CalibrationResult
         The fit whose residuals are added.
     block_length : int
@@ -48,6 +57,7 @@ class ResidualNoise(RangeChecked):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    kind: Literal["residual"] = Field(default="residual", description="The noise.")
     fit: CalibrationResult = Field(description="The fit whose residuals are added.")
     block_length: int = Field(description="Positions per block.")
     residual_scale: Literal["additive", "multiplicative"] = Field(
@@ -65,9 +75,18 @@ class DistributionNoise(BaseModel):
     problem with ``observation_models``, and serves the series they name. A
     prediction outside the means a model allows, such as a negative count,
     draws at the nearest allowed one.
+
+    Attributes
+    ----------
+    kind : "distribution"
+        The noise, which the engine reads.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["distribution"] = Field(
+        default="distribution", description="The noise."
+    )
 
 
 type ObservationNoise = NoNoise | ResidualNoise | DistributionNoise

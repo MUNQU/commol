@@ -10,7 +10,8 @@ use crate::error::MethodError;
 
 /// How a predicted and an observed value become a score: `|y − ŷ| / s`,
 /// where the scale `s` depends on the score.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum NonconformityScore {
     /// `s = 1`.
     Absolute,
@@ -51,7 +52,8 @@ impl NonconformityScore {
 }
 
 /// Which scores a quantile is taken of.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Pooling {
     /// The scores of each series (observation label) apart.
     Series,

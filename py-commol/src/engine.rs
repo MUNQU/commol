@@ -346,16 +346,17 @@ impl PyEngine {
     /// Build the engine the model names, and compile the model into it
     ///
     /// Args:
-    ///     model: The model to simulate
+    ///     model: The JSON of the model to simulate
     ///
     /// Raises:
+    ///     ValueError: If the JSON is not a model
     ///     RuntimeError: If the model cannot be compiled (for example an
     ///         initial-condition override names a compartment that is not
     ///         part of the model expansion)
     #[new]
-    fn new(model: &crate::core::PyModel) -> PyResult<Self> {
+    fn new(model: &str) -> PyResult<Self> {
         Ok(Self {
-            inner: Engine::build(&model.inner).map_err(PyRuntimeError::new_err)?,
+            inner: Engine::build(&crate::core::model(model)?).map_err(PyRuntimeError::new_err)?,
         })
     }
 

@@ -9,11 +9,12 @@ the same draws on every platform.
 """
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Annotated, ClassVar, Literal, Self
+from typing import TYPE_CHECKING, Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context.engine_json import engine_json
 from commol.context.ranges import RangeChecked
 
 if TYPE_CHECKING:
@@ -32,20 +33,8 @@ class DistributionBase(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    rust_kind: ClassVar[str]
-
-    def rust_parameters(self) -> list[float]:
-        """The parameters of the family, in the order Rust reads them."""
-        return []
-
-    def rust_prior(self, parameter: str) -> tuple[str, str, list[float]]:
-        """The prior of `parameter`, as the Rust runners read it."""
-        return (parameter, self.rust_kind, self.rust_parameters())
-
     def _rust(self, bounds: Bounds) -> "DistributionProtocol":
-        return commol_rs.inference.Distribution(
-            self.rust_kind, self.rust_parameters(), bounds[0], bounds[1]
-        )
+        return commol_rs.inference.Distribution(engine_json(self), bounds[0], bounds[1])
 
     def log_density(self, x: float, bounds: Bounds) -> float:
         """
@@ -146,7 +135,6 @@ class DistributionBase(BaseModel):
 class Uniform(DistributionBase):
     """The uniform distribution on the bounds; they must be finite."""
 
-    rust_kind: ClassVar[str] = "uniform"
     kind: Literal["uniform"] = "uniform"
 
 
@@ -157,7 +145,6 @@ class LogUniform(DistributionBase):
     lower one above 0.
     """
 
-    rust_kind: ClassVar[str] = "log_uniform"
     kind: Literal["log_uniform"] = "log_uniform"
 
 
@@ -174,14 +161,9 @@ class Beta(DistributionBase, RangeChecked):
         The second shape, above 0.
     """
 
-    rust_kind: ClassVar[str] = "beta"
     kind: Literal["beta"] = "beta"
     a: float = Field(description="The first shape.")
     b: float = Field(description="The second shape.")
-
-    def rust_parameters(self) -> list[float]:
-        """The shapes `a` and `b`."""
-        return [self.a, self.b]
 
 
 class Normal(DistributionBase, RangeChecked):
@@ -196,14 +178,9 @@ class Normal(DistributionBase, RangeChecked):
         The standard deviation before truncation, above 0.
     """
 
-    rust_kind: ClassVar[str] = "normal"
     kind: Literal["normal"] = "normal"
     mean: float = Field(description="The mean.")
     sd: float = Field(description="The standard deviation.")
-
-    def rust_parameters(self) -> list[float]:
-        """The mean and the standard deviation."""
-        return [self.mean, self.sd]
 
 
 class LogNormal(DistributionBase, RangeChecked):
@@ -219,14 +196,9 @@ class LogNormal(DistributionBase, RangeChecked):
         The standard deviation of ``log x``, above 0.
     """
 
-    rust_kind: ClassVar[str] = "log_normal"
     kind: Literal["log_normal"] = "log_normal"
     mu: float = Field(description="The mean of log x.")
     sigma: float = Field(description="The standard deviation of log x.")
-
-    def rust_parameters(self) -> list[float]:
-        """`mu` and `sigma`."""
-        return [self.mu, self.sigma]
 
 
 class Gamma(DistributionBase, RangeChecked):
@@ -243,14 +215,9 @@ class Gamma(DistributionBase, RangeChecked):
         The rate, above 0.
     """
 
-    rust_kind: ClassVar[str] = "gamma"
     kind: Literal["gamma"] = "gamma"
     shape: float = Field(description="The shape.")
     rate: float = Field(description="The rate.")
-
-    def rust_parameters(self) -> list[float]:
-        """The shape and the rate."""
-        return [self.shape, self.rate]
 
 
 type Distribution = Annotated[
@@ -293,15 +260,6 @@ class Priors(BaseModel):
             The priors; every parameter needs finite bounds.
         """
         return cls(distributions=None)
-
-    def rust_priors(self) -> list[tuple[str, str, list[float]]] | None:
-        """The priors as the Rust runners read them; None is uniform."""
-        if self.distributions is None:
-            return None
-        return [
-            distribution.rust_prior(name)
-            for name, distribution in self.distributions.items()
-        ]
 
 
 def coerce_priors(data: JsonValue) -> JsonValue:

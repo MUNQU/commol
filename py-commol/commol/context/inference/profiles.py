@@ -9,7 +9,7 @@ statistic stays below a threshold (Raue et al. 2009; Kreutz et al. 2012).
 Every interval is pointwise: it holds one quantity, not several at once.
 """
 
-from typing import TYPE_CHECKING, Literal, Self
+from typing import Annotated, Literal, Self, TYPE_CHECKING
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -42,9 +42,10 @@ ProfileEndName = Literal["crossed", "bound", "max_steps", "unreachable"]
 bound of the parameter, took `max_steps` points, or met a prediction that no
 values within the bounds give."""
 
-type ProfileBootstrap = (
-    BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap
-)
+type ProfileBootstrap = Annotated[
+    BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap,
+    Field(discriminator="kind"),
+]
 """A bootstrap that calibrates a threshold."""
 
 

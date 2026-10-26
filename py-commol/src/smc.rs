@@ -1,63 +1,50 @@
 //! Python bindings of the distributions, the priors and the sequential Monte
 //! Carlo methods of `commol-inference`.
 //!
-//! A prior crosses as `(parameter, kind, parameters)`; `None` in place of
-//! the list is `Priors.uniform_on_bounds()`. Each runner takes the problem
-//! built once by a `Calibrator` and returns the run as plain values; Python
-//! builds the result.
+//! Each runner takes the problem built once by a `Calibrator` and the JSON
+//! of its method ([`commol_inference::settings::smc`]), runs every step of
+//! the method, the fit and the calibration of `η` too, and returns the run
+//! as plain values; Python builds the result.
 
 use crate::parallelism::parallel;
-use commol_inference::resampling::{BlockDrawing, BlockScheme, Estimates, FitUnit};
-use commol_inference::smc::{self, AbcTarget, Distance, RandomWalk, SmcRun, SmcSampler, Stop};
+use commol_inference::resampling::{BlockDrawing, BlockScheme, FitUnit};
+use commol_inference::settings::PriorsSettings;
+use commol_inference::settings::smc::{
+    AbcRejectionSettings, AbcSmcSettings, BayesianPosteriorSettings, Eta, EtaCalibration,
+    GibbsPosteriorSettings,
+};
+use commol_inference::smc::{self, AbcTarget, RandomWalk, SmcRun, SmcSampler, Stop};
 use commol_inference::{Distribution, Family, Priors};
 use commol_random::Generator;
 use commol_random::Stream;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
-use crate::inference::{PyCalibrationProblem, method_error};
+use crate::calibration::PyStarts;
+use crate::inference::{PyCalibrationProblem, best_values, method_error, value_error};
 
-/// A prior as Python passes it: the parameter, the kind and its parameters.
-pub(crate) type PriorArgs = (String, String, Vec<f64>);
-
-fn value_error(message: String) -> PyErr {
-    PyValueError::new_err(message)
-}
-
-/// The priors of `names` with `bounds`; `None` is uniform on the bounds.
-pub(crate) fn priors(
-    names: &[String],
-    bounds: &[(f64, f64)],
-    given: Option<Vec<PriorArgs>>,
+/// The priors of `settings` for the parameters of `problem`.
+pub(crate) fn problem_priors(
+    problem: &PyCalibrationProblem,
+    settings: &PriorsSettings,
 ) -> PyResult<Priors> {
-    match given {
-        None => Priors::uniform_on_bounds(names, bounds),
-        Some(given) => {
-            let families = given
-                .into_iter()
-                .map(|(name, kind, parameters)| {
-                    Family::from_name(&kind, &parameters).map(|family| (name, family))
-                })
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(value_error)?;
-            Priors::new(names, bounds, &families)
-        }
-    }
-    .map_err(value_error)
+    settings
+        .priors(
+            &problem.inner.parameter_names(),
+            &problem.inner.parameter_bounds(),
+        )
+        .map_err(value_error)
 }
 
 /// A distribution truncated to the bounds of a parameter
 ///
 /// Args:
-///     kind: "uniform", "log_uniform", "beta", "normal", "log_normal" or
-///         "gamma"
-///     parameters: The parameters of the kind, in order
+///     distribution: The JSON of a distribution of `commol`, by its `kind`
 ///     lower: The lower bound
 ///     upper: The upper bound
 ///
 /// Raises:
-///     ValueError: If a parameter is not valid or the bounds do not fit the
-///         kind
+///     ValueError: If the JSON is not a distribution, a parameter is not
+///         valid or the bounds do not fit the kind
 #[pyclass(name = "Distribution", frozen)]
 pub struct PyDistribution {
     inner: Distribution,
@@ -66,8 +53,8 @@ pub struct PyDistribution {
 #[pymethods]
 impl PyDistribution {
     #[new]
-    fn new(kind: &str, parameters: Vec<f64>, lower: f64, upper: f64) -> PyResult<Self> {
-        let family = Family::from_name(kind, &parameters).map_err(value_error)?;
+    fn new(distribution: &str, lower: f64, upper: f64) -> PyResult<Self> {
+        let family: Family = crate::json::read(distribution)?;
         Distribution::new(family, lower, upper)
             .map(|inner| Self { inner })
             .map_err(value_error)
@@ -162,17 +149,18 @@ impl PySmcRun {
     }
 }
 
-/// The `η` of bootstrap coverage
-#[pyclass(name = "EtaCoverage", frozen, get_all)]
-pub struct PyEtaCoverage {
-    /// The calibrated `η`
+/// The `η` of a Gibbs posterior and, when it was calibrated, how
+#[pyclass(name = "EtaCalibration", frozen, get_all)]
+pub struct PyEtaCalibration {
+    /// The `η` the posterior used
     eta: f64,
-    /// The coverage of the fit by the intervals at `η`
-    coverage: f64,
+    /// The coverage of the fit by the intervals at `η`, for bootstrap
+    /// coverage
+    coverage: Option<f64>,
     /// Each replicate that failed: "Replicate <index> failed: <reason>"
     failed: Vec<String>,
-    /// The positions per block of the bootstrap
-    block_length: usize,
+    /// The positions per block of a calibration
+    block_length: Option<usize>,
     /// With the automatic length, the estimate of each series by label
     block_length_estimates: Option<Vec<(String, f64)>>,
 }
@@ -194,219 +182,166 @@ fn sampler(
     .map_err(method_error)
 }
 
-pub(crate) fn problem_priors(
-    problem: &PyCalibrationProblem,
-    given: Option<Vec<PriorArgs>>,
-) -> PyResult<Priors> {
-    priors(
-        &problem.inner.parameter_names(),
-        &problem.inner.parameter_bounds(),
-        given,
+/// The sampler of a Gibbs posterior.
+fn gibbs_sampler(settings: &GibbsPosteriorSettings) -> PyResult<SmcSampler<RandomWalk>> {
+    sampler(
+        settings.particles,
+        settings.resample_threshold,
+        settings.target_cess,
+        settings.stay_probability,
     )
 }
 
-/// Sample the Gibbs posterior with a given `η`
+/// The `η` of `calibration`, from a fit of the problem.
+fn calibrated_eta(
+    py: Python<'_>,
+    problem: &PyCalibrationProblem,
+    settings: &GibbsPosteriorSettings,
+    priors: &Priors,
+    calibration: &EtaCalibration,
+) -> PyResult<(PyStarts, PyEtaCalibration)> {
+    match calibration {
+        EtaCalibration::InformationMatching(calibration) => {
+            let starts = problem.fit(py, calibration.starts)?;
+            let found = smc::information_matching_eta(
+                &problem.inner,
+                &best_values(&starts),
+                calibration.block_length.0,
+            )
+            .map_err(method_error)?;
+            Ok((
+                PyStarts { inner: starts },
+                PyEtaCalibration {
+                    eta: found.eta,
+                    coverage: None,
+                    failed: Vec::new(),
+                    block_length: Some(found.block_length),
+                    block_length_estimates: found.estimates,
+                },
+            ))
+        }
+        EtaCalibration::BootstrapCoverage(calibration) => {
+            let starts = problem.fit(py, calibration.starts)?;
+            let fit = best_values(&starts);
+            let blocks = BlockScheme::at_fit(
+                &problem.inner,
+                &fit,
+                calibration.block_length.0,
+                BlockDrawing::NonOverlapping,
+            )
+            .map_err(method_error)?;
+            let mut sampler = gibbs_sampler(settings)?;
+            let found = parallel(py, || {
+                smc::bootstrap_coverage_eta(
+                    &problem.inner,
+                    priors,
+                    &fit,
+                    &mut sampler,
+                    &blocks,
+                    calibration.replicates,
+                    calibration.confidence_level,
+                    problem.seed,
+                )
+            })?
+            .map_err(method_error)?;
+            Ok((
+                PyStarts { inner: starts },
+                PyEtaCalibration {
+                    eta: found.eta,
+                    coverage: Some(found.coverage),
+                    failed: FitUnit::Replicate.entries(&found.failed),
+                    block_length: Some(blocks.length()),
+                    block_length_estimates: blocks.estimates().map(<[_]>::to_vec),
+                },
+            ))
+        }
+    }
+}
+
+/// Sample a Gibbs posterior, after a fit and the calibration of its `η`
+/// when the settings calibrate it
 ///
 /// Args:
 ///     problem: The calibration problem
-///     priors: The priors, or None for uniform on the bounds
-///     eta: The scale of the loss, above 0
-///     particles: Number of particles
-///     resample_threshold: Resample below this share of effective size
-///     target_cess: The conditional effective sample size of each step
-///     stay_probability: The probability that a particle never moves in a
-///         step
-///     seed: Seed of every random number
+///     settings: The JSON of a `GibbsPosterior`
+///
+/// Returns:
+///     The starts of the fit, or None for a given `η`; the run; and the `η`
+///     with its calibration
 ///
 /// Raises:
-///     ValueError: If a prior or a setting is not valid
-///     RuntimeError: If a run fails or the sampler stops before its target
+///     ValueError: If a prior or a setting is not valid, or the problem
+///         does not fit the calibration of `η`
+///     RuntimeError: If the fit or a run fails, the calibration of `η`
+///         fails, or the sampler stops before its target
 #[pyfunction]
-#[allow(clippy::too_many_arguments)]
 fn gibbs_posterior(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
-    priors: Option<Vec<PriorArgs>>,
-    eta: f64,
-    particles: i64,
-    resample_threshold: f64,
-    target_cess: f64,
-    stay_probability: f64,
-    seed: i128,
-) -> PyResult<PySmcRun> {
-    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-    let particles: usize = crate::counts::count(&commol_inference::ranges::PARTICLES, particles)?;
-    let priors = problem_priors(problem, priors)?;
-    let mut sampler = sampler(particles, resample_threshold, target_cess, stay_probability)?;
+    settings: &str,
+) -> PyResult<(Option<PyStarts>, PySmcRun, PyEtaCalibration)> {
+    let settings: GibbsPosteriorSettings = crate::json::read(settings)?;
+    let priors = problem_priors(problem, &settings.priors)?;
+    let (starts, eta) = match &settings.eta {
+        Eta::Value(eta) => (
+            None,
+            PyEtaCalibration {
+                eta: *eta,
+                coverage: None,
+                failed: Vec::new(),
+                block_length: None,
+                block_length_estimates: None,
+            },
+        ),
+        Eta::Calibrated(calibration) => {
+            let (starts, eta) = calibrated_eta(py, problem, &settings, &priors, calibration)?;
+            (Some(starts), eta)
+        }
+    };
+    let mut sampler = gibbs_sampler(&settings)?;
     let run = parallel(py, || {
-        smc::gibbs_posterior(&problem.inner, &priors, eta, &mut sampler, seed)
+        smc::gibbs_posterior(&problem.inner, &priors, eta.eta, &mut sampler, problem.seed)
     })?
     .map_err(method_error)?;
-    Ok(PySmcRun::of(run.run))
+    Ok((starts, PySmcRun::of(run.run), eta))
 }
 
 /// Sample the posterior of the observation models of the problem
 ///
 /// Args:
 ///     problem: The calibration problem, with observation models
-///     priors: The priors, or None for uniform on the bounds
-///     particles: Number of particles
-///     resample_threshold: Resample below this share of effective size
-///     target_cess: The conditional effective sample size of each step
-///     stay_probability: The probability that a particle never moves in a
-///         step
-///     seed: Seed of every random number
+///     settings: The JSON of a `BayesianPosterior`
 ///
 /// Raises:
 ///     ValueError: If the problem has a loss, or a prior or a setting is not
 ///         valid
 ///     RuntimeError: If a run fails or the sampler stops before its target
 #[pyfunction]
-#[allow(clippy::too_many_arguments)]
 fn bayesian_posterior(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
-    priors: Option<Vec<PriorArgs>>,
-    particles: i64,
-    resample_threshold: f64,
-    target_cess: f64,
-    stay_probability: f64,
-    seed: i128,
+    settings: &str,
 ) -> PyResult<PySmcRun> {
-    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-    let particles: usize = crate::counts::count(&commol_inference::ranges::PARTICLES, particles)?;
-    let priors = problem_priors(problem, priors)?;
-    let mut sampler = sampler(particles, resample_threshold, target_cess, stay_probability)?;
+    let settings: BayesianPosteriorSettings = crate::json::read(settings)?;
+    let priors = problem_priors(problem, &settings.priors)?;
+    let mut sampler = sampler(
+        settings.particles,
+        settings.resample_threshold,
+        settings.target_cess,
+        settings.stay_probability,
+    )?;
     let run = parallel(py, || {
-        smc::bayesian_posterior(&problem.inner, &priors, &mut sampler, seed)
+        smc::bayesian_posterior(&problem.inner, &priors, &mut sampler, problem.seed)
     })?
     .map_err(method_error)?;
     Ok(PySmcRun::of(run))
-}
-
-/// The `η` of information matching at the fit
-///
-/// Args:
-///     problem: The calibration problem
-///     fit: The fitted values, in problem order
-///     block_length: Positions per block of the scores, or None for the
-///         automatic length
-///
-/// Returns:
-///     η, the positions per block, and with the automatic length the
-///     estimate of each series by label
-///
-/// Raises:
-///     ValueError: If the loss is not the sum of squares, the engine is
-///         stochastic, the fit is on a bound, or the blocks are not more
-///         than the parameters
-///     RuntimeError: If the derivatives fail at the fit or the variance of
-///         the scores is singular
-#[pyfunction]
-fn information_matching_eta(
-    problem: &PyCalibrationProblem,
-    fit: Vec<f64>,
-    block_length: Option<i64>,
-) -> PyResult<(f64, usize, Option<Estimates>)> {
-    let block_length: Option<usize> =
-        crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
-    let calibration =
-        smc::information_matching_eta(&problem.inner, &fit, block_length).map_err(method_error)?;
-    Ok((
-        calibration.eta,
-        calibration.block_length,
-        calibration.estimates,
-    ))
-}
-
-/// The `η` of bootstrap coverage
-///
-/// Args:
-///     problem: The calibration problem
-///     priors: The priors, or None for uniform on the bounds
-///     fit: The fitted values, in problem order
-///     replicates: Number of Bayesian-bootstrap data sets
-///     block_length: Positions per block, or None for the automatic length
-///     confidence_level: The level of the intervals
-///     particles: Number of particles of each replicate
-///     resample_threshold: Resample below this share of effective size
-///     target_cess: The conditional effective sample size of each step
-///     stay_probability: The probability that a particle never moves in a
-///         step
-///     seed: Seed of every random number
-///
-/// Raises:
-///     ValueError: If a prior or a setting is not valid, the replicates
-///         are too few for the level, the fit is outside the support, or the
-///         loss at the fit is 0
-///     RuntimeError: If the run at the fit fails, every replicate fails, or
-///         the coverage does not cross the level
-#[pyfunction]
-#[allow(clippy::too_many_arguments)]
-fn bootstrap_coverage_eta(
-    py: Python<'_>,
-    problem: &PyCalibrationProblem,
-    priors: Option<Vec<PriorArgs>>,
-    fit: Vec<f64>,
-    replicates: i64,
-    block_length: Option<i64>,
-    confidence_level: f64,
-    particles: i64,
-    resample_threshold: f64,
-    target_cess: f64,
-    stay_probability: f64,
-    seed: i128,
-) -> PyResult<PyEtaCoverage> {
-    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-    let replicates: usize =
-        crate::counts::count(&commol_inference::ranges::REPLICATES, replicates)?;
-    let block_length: Option<usize> =
-        crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
-    let particles: usize = crate::counts::count(&commol_inference::ranges::PARTICLES, particles)?;
-    let priors = problem_priors(problem, priors)?;
-    let mut sampler = sampler(particles, resample_threshold, target_cess, stay_probability)?;
-    let blocks = BlockScheme::at_fit(
-        &problem.inner,
-        &fit,
-        block_length,
-        BlockDrawing::NonOverlapping,
-    )
-    .map_err(method_error)?;
-    let calibration = parallel(py, || {
-        smc::bootstrap_coverage_eta(
-            &problem.inner,
-            &priors,
-            &fit,
-            &mut sampler,
-            &blocks,
-            replicates,
-            confidence_level,
-            seed,
-        )
-    })?
-    .map_err(method_error)?;
-    Ok(PyEtaCoverage {
-        eta: calibration.eta,
-        coverage: calibration.coverage,
-        failed: FitUnit::Replicate.entries(&calibration.failed),
-        block_length: blocks.length(),
-        block_length_estimates: blocks.estimates().map(<[_]>::to_vec),
-    })
 }
 
 /// Sample ABC by sequential Monte Carlo
 ///
 /// Args:
 ///     problem: The calibration problem
-///     priors: The priors, or None for uniform on the bounds
-///     metric: The metric of each series, "rmse" or "mae"; None for the
-///         problem's loss
-///     particles: Number of particles
-///     target_cess: The weighted share of particles each tolerance keeps
-///     min_acceptance: Stop when the first move of a step accepts less
-///     stay_probability: The probability that a particle never moves in a
-///         step
-///     seed: Seed of every random number
+///     settings: The JSON of an `ABCSMC`
 ///
 /// Returns:
 ///     The run and whether each distance read one fresh replicate of a
@@ -416,30 +351,26 @@ fn bootstrap_coverage_eta(
 ///     ValueError: If a prior or a setting is not valid
 ///     RuntimeError: If a run fails or the sampler stops before its target
 #[pyfunction]
-#[pyo3(signature = (problem, priors, metric, particles, target_cess, min_acceptance, stay_probability, seed))]
-#[allow(clippy::too_many_arguments)]
 fn abc_smc(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
-    priors: Option<Vec<PriorArgs>>,
-    metric: Option<&str>,
-    particles: i64,
-    target_cess: f64,
-    min_acceptance: f64,
-    stay_probability: f64,
-    seed: i128,
+    settings: &str,
 ) -> PyResult<(PySmcRun, bool)> {
-    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-    let particles: usize = crate::counts::count(&commol_inference::ranges::PARTICLES, particles)?;
-    let priors = problem_priors(problem, priors)?;
-    let distance = Distance::from_metric(metric).map_err(method_error)?;
+    let settings: AbcSmcSettings = crate::json::read(settings)?;
+    let priors = problem_priors(problem, &settings.priors)?;
     // With weights of 0 or 1, a particle of weight 0 cannot move: every
     // step resamples.
-    let mut sampler = sampler(particles, 1.0, target_cess, stay_probability)?
-        .with_min_acceptance(min_acceptance)
+    let mut sampler = sampler(
+        settings.particles,
+        1.0,
+        settings.target_cess,
+        settings.stay_probability,
+    )?
+    .with_min_acceptance(settings.min_acceptance)
+    .map_err(method_error)?;
+    let target = AbcTarget::new(&problem.inner, &priors, settings.distance.distance())
         .map_err(method_error)?;
-    let target = AbcTarget::new(&problem.inner, &priors, distance).map_err(method_error)?;
-    let run = parallel(py, || sampler.run(&target, seed))?.map_err(method_error)?;
+    let run = parallel(py, || sampler.run(&target, problem.seed))?.map_err(method_error)?;
     Ok((PySmcRun::of(run), target.stochastic()))
 }
 
@@ -447,12 +378,7 @@ fn abc_smc(
 ///
 /// Args:
 ///     problem: The calibration problem
-///     priors: The priors, or None for uniform on the bounds
-///     metric: The metric of each series, "rmse" or "mae"; None for the
-///         problem's loss
-///     draws: Number of draws
-///     quantile: The share of draws kept
-///     seed: Seed of every random number
+///     settings: The JSON of an `ABCRejection`
 ///
 /// Returns:
 ///     The run and whether each distance read one fresh replicate of a
@@ -460,25 +386,21 @@ fn abc_smc(
 ///
 /// Raises:
 ///     ValueError: If a prior or a setting is not valid
-///     RuntimeError: If a run fails or the sampler stops before its target
+///     RuntimeError: If a run fails
 #[pyfunction]
-#[pyo3(signature = (problem, priors, metric, draws, quantile, seed))]
 fn abc_rejection(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
-    priors: Option<Vec<PriorArgs>>,
-    metric: Option<&str>,
-    draws: i64,
-    quantile: f64,
-    seed: i128,
+    settings: &str,
 ) -> PyResult<(PySmcRun, bool)> {
-    let seed: u64 = crate::counts::count(&commol_core::SEED, seed)?;
-    let draws: usize = crate::counts::count(&commol_inference::ranges::TWO_DRAWS, draws)?;
-    let priors = problem_priors(problem, priors)?;
-    let distance = Distance::from_metric(metric).map_err(method_error)?;
-    let target = AbcTarget::new(&problem.inner, &priors, distance).map_err(method_error)?;
-    let run = parallel(py, || smc::abc_rejection(&target, draws, quantile, seed))?
+    let settings: AbcRejectionSettings = crate::json::read(settings)?;
+    let priors = problem_priors(problem, &settings.priors)?;
+    let target = AbcTarget::new(&problem.inner, &priors, settings.distance.distance())
         .map_err(method_error)?;
+    let run = parallel(py, || {
+        smc::abc_rejection(&target, settings.draws, settings.quantile, problem.seed)
+    })?
+    .map_err(method_error)?;
     Ok((PySmcRun::of(run), target.stochastic()))
 }
 
@@ -486,11 +408,9 @@ fn abc_rejection(
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDistribution>()?;
     m.add_class::<PySmcRun>()?;
-    m.add_class::<PyEtaCoverage>()?;
+    m.add_class::<PyEtaCalibration>()?;
     m.add_function(wrap_pyfunction!(gibbs_posterior, m)?)?;
     m.add_function(wrap_pyfunction!(bayesian_posterior, m)?)?;
-    m.add_function(wrap_pyfunction!(information_matching_eta, m)?)?;
-    m.add_function(wrap_pyfunction!(bootstrap_coverage_eta, m)?)?;
     m.add_function(wrap_pyfunction!(abc_smc, m)?)?;
     m.add_function(wrap_pyfunction!(abc_rejection, m)?)?;
     Ok(())

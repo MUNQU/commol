@@ -235,7 +235,7 @@ class TestObservations:
         predictive = Predictive(calibrator, sample, POSITIONS)
 
         draws = predictive.at_observations(calibrator.problem.observed_data, NoNoise())
-        expected = calibrator.rust_problem.predict_observations(sample.values)
+        expected = calibrator._rust_problem.predict_observations(sample.values)
 
         np.testing.assert_allclose(draws.values, [per_set[0] for per_set in expected])
 

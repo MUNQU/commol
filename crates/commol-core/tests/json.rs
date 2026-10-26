@@ -26,6 +26,21 @@ enum Move {
 
 tagged!(Move);
 
+const HEIGHT: Count = Count::at_least("height", 1);
+const JUMP: commol_core::Ranges = commol_core::Ranges {
+    object: "Jump",
+    rules: &[Rule::Count(HEIGHT)],
+};
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(remote = "Self", rename_all = "snake_case", deny_unknown_fields)]
+enum Leap {
+    Jump { height: u64 },
+    Rest,
+}
+
+tagged!(Leap, ranges = {"jump" => JUMP});
+
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Plan {
@@ -101,7 +116,7 @@ fn an_unknown_kind_is_an_error_at_the_tag() {
     let message = error(r#"{"moves": [{"kind": "run"}]}"#);
 
     assert!(
-        message.starts_with("moves[0].kind: Unknown variant run"),
+        message.starts_with("moves[0].kind: unknown variant `run`"),
         "{message}"
     );
 }
@@ -112,7 +127,7 @@ fn an_unknown_field_is_named() {
 
     assert_eq!(
         message,
-        "moves[0].pace: Unknown field pace. Expected one of steps, scale"
+        "moves[0].pace: unknown field `pace`, expected `steps` or `scale`"
     );
 }
 
@@ -120,18 +135,60 @@ fn an_unknown_field_is_named() {
 fn a_missing_field_is_named() {
     let message = error(r#"{"moves": [{"kind": "walk", "steps": 1}]}"#);
 
-    assert_eq!(message, "moves[0]: Missing field scale");
+    assert_eq!(message, "moves[0]: missing field `scale`");
 }
 
 #[test]
 fn a_union_needs_its_tag() {
     assert_eq!(
         error(r#"{"moves": [{"steps": 1}]}"#),
-        "moves[0]: Missing field kind"
+        "moves[0]: missing field `kind`"
     );
 }
 
 #[test]
 fn a_text_that_is_not_json_is_named() {
     assert!(error("{moves: [").starts_with("Not JSON"));
+}
+
+#[test]
+fn the_json_written_quotes_each_key_and_names_each_number_that_is_not_finite() {
+    let value = Value::Map(vec![
+        ("a \"b\"".to_owned(), Value::Null),
+        ("c".to_owned(), Value::Bool(true)),
+        (
+            "d".to_owned(),
+            Value::List(vec![
+                Value::Int(-3),
+                Value::Float(0.5),
+                Value::Float(f64::NAN),
+                Value::Float(f64::INFINITY),
+                Value::Float(f64::NEG_INFINITY),
+            ]),
+        ),
+        ("e".to_owned(), Value::String("f".to_owned())),
+    ]);
+
+    assert_eq!(
+        json::write(&value),
+        r#"{"a \"b\"":null,"c":true,"d":[-3,0.5,NaN,Infinity,-Infinity],"e":"f"}"#
+    );
+}
+
+#[test]
+fn a_union_checks_the_rules_of_the_variant_of_its_kind() {
+    let leap = |text: &str| json::read::<Vec<Leap>>(text);
+
+    assert_eq!(
+        leap(r#"[{"kind": "jump", "height": 2}, {"kind": "rest"}]"#).unwrap(),
+        [Leap::Jump { height: 2 }, Leap::Rest]
+    );
+    assert_eq!(
+        leap(r#"[{"kind": "jump", "height": 0}]"#).unwrap_err(),
+        "[0].height: height is a whole number of at least 1, got 0"
+    );
+    assert_eq!(
+        leap(r#"[{"height": 0}]"#).unwrap_err(),
+        "[0]: missing field `kind`"
+    );
 }

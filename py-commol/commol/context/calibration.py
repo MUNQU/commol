@@ -1,14 +1,13 @@
 """Calibration problems, observations, unknowns, constraints, optimizers and results."""
 
 from collections.abc import Mapping
-from typing import Annotated, Literal, Self, overload, override
+from typing import Annotated, Literal, Self, override
 
 from pydantic import (
     AfterValidator,
     BaseModel,
     ConfigDict,
     Field,
-    PrivateAttr,
     field_validator,
     model_validator,
 )
@@ -18,12 +17,8 @@ from commol.context.constants import (
     CalibrationParameterType,
     LossFunction,
     OptimizationAlgorithm,
-    PSOAccelerationType,
-    PSOInertiaType,
-    PSOInitializationStrategy,
-    PSOMutationApplication,
-    PSOMutationStrategy,
 )
+from commol.context.engine_json import engine_json
 from commol.context.observation_models import ObservationModel
 from commol.context.ranges import RangeChecked
 from commol.context.result_model import ResultModel
@@ -31,13 +26,6 @@ from commol.context.result_model import ResultModel
 
 # Re-export for documentation
 __all__ = ["OptimizationAlgorithm", "calibrated_values"]
-
-PSO_DEFAULT_INERTIA_FACTOR: float = commol_rs.calibration.PSO_DEFAULT_INERTIA_FACTOR
-"""The inertia weight of canonical PSO, 1/(2 ln 2): the engine's default."""
-
-PSO_DEFAULT_ACCELERATION: float = commol_rs.calibration.PSO_DEFAULT_ACCELERATION
-"""The cognitive and social coefficient of canonical PSO, 0.5 + ln 2: the
-engine's default."""
 
 
 class ObservedDataPoint(RangeChecked):
@@ -330,6 +318,8 @@ class NelderMeadConfig(RangeChecked):
 
     Attributes
     ----------
+    kind : "nelder_mead"
+        The optimizer, which the engine reads.
     max_iterations : int
         Maximum number of iterations (default: 1000)
     sd_tolerance : float
@@ -356,6 +346,9 @@ class NelderMeadConfig(RangeChecked):
 
     model_config = ConfigDict(extra="forbid")
 
+    kind: Literal["nelder_mead"] = Field(
+        default="nelder_mead", description="The optimizer"
+    )
     max_iterations: int = Field(
         default=1000, description="Maximum number of iterations"
     )
@@ -397,253 +390,110 @@ class NelderMeadConfig(RangeChecked):
     )
 
 
-class PSOInertiaStrategy(BaseModel):
+class ParticleSwarmConfig(RangeChecked):
     """
-    Base class for PSO inertia weight strategies.
+    Configuration for the Particle Swarm Optimization algorithm.
 
-    Use either `PSOConstantInertia` or `PSOChaoticInertia`.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    pass
-
-
-class PSOConstantInertia(PSOInertiaStrategy, RangeChecked):
-    """
-    Constant inertia weight for PSO.
+    Each strategy of the swarm is a name, and its numbers are fields of their
+    own. A strategy left as None is that of canonical PSO; a number set
+    without its strategy, or with another strategy, is an error, so a setting
+    is never ignored.
 
     Attributes
     ----------
-    factor : float
-        Constant inertia weight factor (must be positive).
-    """
-
-    factor: float = Field(default=..., description="Constant inertia weight factor")
-
-
-class PSOChaoticInertia(PSOInertiaStrategy, RangeChecked):
-    """
-    Chaotic inertia weight for PSO using logistic map.
-
-    The chaotic variation helps particles escape local optima through
-    non-linear dynamics.
-
-    Attributes
-    ----------
-    w_min : float
-        Minimum inertia weight (must be positive)
-    w_max : float
-        Maximum inertia weight (must be > w_min)
+    kind : "particle_swarm"
+        The optimizer, which the engine reads.
+    particles : int
+        Number of particles in the swarm (default: 20).
+    max_iterations : int
+        Maximum number of iterations (default: 1000).
+    verbose : bool
+        Enable verbose output (default: False).
+    header_interval : int
+        Number of iterations between table header repeats in verbose output
+        (default: 100).
+    initialization : {"uniform", "latin_hypercube", "opposition_based"}
+        How the particles start (default: "uniform").
+    inertia : {"constant", "chaotic"} | None
+        The inertia weight: "constant" uses `inertia_factor`, "chaotic" moves
+        between `inertia_min` and `inertia_max` on a logistic map (Liu et al.,
+        2005). None is the weight of canonical PSO, 1/(2 ln 2) ≈ 0.72135.
+    inertia_factor : float | None
+        The constant weight, above 0; None is that of canonical PSO. Only with
+        ``inertia="constant"``.
+    inertia_min : float | None
+        The lowest chaotic weight, above 0. Needed with ``inertia="chaotic"``.
+    inertia_max : float | None
+        The highest chaotic weight, above `inertia_min`. Needed with
+        ``inertia="chaotic"``.
+    acceleration : {"constant", "time_varying"} | None
+        The acceleration coefficients: "constant" uses `cognitive` and
+        `social`, "time_varying" moves each from its initial to its final
+        value (Ratnaweera et al., 2004). None is the coefficients of canonical
+        PSO, 0.5 + ln 2 ≈ 1.19315.
+    cognitive : float | None
+        The attraction to the best point of the particle (c1), above 0; None
+        is that of canonical PSO. Only with ``acceleration="constant"``.
+    social : float | None
+        The attraction to the best point of the swarm (c2), above 0; None is
+        that of canonical PSO. Only with ``acceleration="constant"``.
+    cognitive_initial, cognitive_final : float | None
+        The cognitive coefficient at the first and the last iteration, above
+        0. Needed with ``acceleration="time_varying"``.
+    social_initial, social_final : float | None
+        The social coefficient at the first and the last iteration, above 0.
+        Needed with ``acceleration="time_varying"``.
+    mutation : {"gaussian", "cauchy"} | None
+        The distribution of a mutation step, to escape a local optimum
+        (Stacey et al., 2003); Cauchy has heavier tails. None mutates no
+        particle.
+    mutation_scale : float | None
+        The standard deviation (gaussian) or the scale (cauchy) of a step,
+        above 0. Needed with a mutation.
+    mutation_probability : float | None
+        The probability of a mutation at each iteration, from 0 to 1. Needed
+        with a mutation.
+    mutation_application : {"global_best", "all_particles", "below_average"} | None
+        The particles a mutation moves. Needed with a mutation.
+    velocity_clamp_factor : float | None
+        The largest velocity, as a fraction of each bound width, from 0 to 1;
+        None clamps no velocity.
+    velocity_mutation_threshold : float | None
+        The speed below which a velocity is drawn again, above 0; None draws
+        none again.
+    improvement_window : int | None
+        Stop when the best loss improved by at most
+        ``improvement_tol_abs + improvement_tol_rel * |best loss|`` over the
+        last `improvement_window` iterations, and report ``converged=True``.
+        Give the three fields or none. A swarm can stall for some iterations
+        and then improve again, so a short window can stop it early.
+    improvement_tol_abs : float | None
+        The absolute tolerance of the improvement, at least 0.
+    improvement_tol_rel : float | None
+        The tolerance of the improvement relative to the best loss, at least
+        0.
+    radius_tol : float | None
+        Stop when the largest distance of a particle from the best position,
+        divided by the size of the search box (the norm of the widths of the
+        bounds), is at most `radius_tol`, and report ``converged=True``
+        (Zielinski and Laur, 2007). Mutation and velocity mutation scatter the
+        swarm again, so with them the radius can stay above it.
 
     References
     ----------
     Liu, B., Wang, L., Jin, Y. H., Tang, F., & Huang, D. X. (2005).
     Improved particle swarm optimization combined with chaos.
     Chaos, Solitons & Fractals, 25(5), 1261-1271.
-    """
 
-    w_min: float = Field(default=..., description="Minimum inertia weight")
-    w_max: float = Field(default=..., description="Maximum inertia weight")
-
-    @model_validator(mode="after")
-    def validate_bounds(self) -> Self:
-        """Validate that w_max > w_min."""
-        if self.w_max <= self.w_min:
-            raise ValueError(
-                f"w_max ({self.w_max}) must be greater than w_min ({self.w_min})"
-            )
-        return self
-
-
-class PSOAccelerationStrategy(BaseModel):
-    """
-    Base class for PSO acceleration coefficient strategies.
-
-    Use either `PSOConstantAcceleration` or `PSOTimeVaryingAcceleration`.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    pass
-
-
-class PSOConstantAcceleration(PSOAccelerationStrategy, RangeChecked):
-    """
-    Constant acceleration coefficients for PSO (canonical PSO).
-
-    Attributes
-    ----------
-    cognitive : float
-        Cognitive coefficient (c1) - attraction to personal best.
-    social : float
-        Social coefficient (c2) - attraction to swarm best.
-    """
-
-    cognitive: float = Field(default=..., description="Cognitive coefficient (c1)")
-    social: float = Field(default=..., description="Social coefficient (c2)")
-
-
-class PSOTimeVaryingAcceleration(PSOAccelerationStrategy, RangeChecked):
-    """
-    Time-Varying Acceleration Coefficients (TVAC) for PSO.
-
-    TVAC adjusts cognitive and social coefficients over iterations to
-    balance exploration and exploitation. Typically, c1 decreases and
-    c2 increases over the iterations.
-
-    Attributes
-    ----------
-    c1_initial : float
-        Initial cognitive factor
-    c1_final : float
-        Final cognitive factor
-    c2_initial : float
-        Initial social factor
-    c2_final : float
-        Final social factor
-
-    References
-    ----------
     Ratnaweera, A., Halgamuge, S. K., & Watson, H. C. (2004).
     Self-organizing hierarchical particle swarm optimizer with
     time-varying acceleration coefficients. IEEE Transactions on
     Evolutionary Computation, 8(3), 240-255.
-    """
 
-    c1_initial: float = Field(default=..., description="Initial cognitive factor")
-    c1_final: float = Field(default=..., description="Final cognitive factor")
-    c2_initial: float = Field(default=..., description="Initial social factor")
-    c2_final: float = Field(default=..., description="Final social factor")
-
-
-class PSOMutationConfig(RangeChecked):
-    """
-    Configuration for PSO particle mutation to help escape local optima.
-
-    Mutation can use Gaussian or Cauchy distributions. Cauchy has heavier tails
-    and provides larger jumps, making it more effective for escaping local optima.
-
-    Attributes
-    ----------
-    strategy : str
-        Mutation strategy: "gaussian" or "cauchy"
-    scale : float
-        Standard deviation (gaussian) or scale parameter (cauchy)
-    probability : float
-        Mutation probability per iteration (0.0 to 1.0)
-    application : str
-        Which particles to mutate:
-        - "global_best": Only mutate global best (most efficient)
-        - "all_particles": Mutate all particles (maximum diversity)
-        - "below_average": Mutate only below-average particles (balanced)
-
-    References
-    ----------
     Stacey, A., Jancic, M., & Grundy, I. (2003). Particle swarm
     optimization with mutation. In Proceedings of the 2003 Congress
     on Evolutionary Computation (CEC 2003) (Vol. 2, pp. 1425-1430).
-    """
 
-    model_config = ConfigDict(extra="forbid")
-
-    strategy: PSOMutationStrategy = Field(
-        default=...,
-        description='Mutation strategy: "gaussian" or "cauchy"',
-    )
-    scale: float = Field(
-        default=..., description="Standard deviation or scale parameter"
-    )
-    probability: float = Field(
-        default=...,
-        description="Mutation probability per iteration (0.0-1.0)",
-    )
-    application: PSOMutationApplication = Field(
-        default=...,
-        description='Application: "global_best", "all_particles", or "below_average"',
-    )
-
-
-class PSOVelocityConfig(RangeChecked):
-    """
-    Configuration for PSO particle velocity control.
-
-    Both clamping and mutation threshold can be used together.
-
-    Attributes
-    ----------
-    clamp_factor : float | None
-        Velocity clamping factor as fraction of search space range (0.0-1.0).
-        Limits velocity to prevent explosive behavior.
-        Typically 0.1 to 0.2. If None, no clamping is applied.
-    mutation_threshold : float | None
-        Velocity threshold for reinitialization when velocity approaches zero.
-        Prevents particle stagnation.
-        Typically 0.001 to 0.01. If None, no velocity mutation is applied.
-
-    References
-    ----------
-    - Shi, Y., & Eberhart, R. C. (1998). A modified particle swarm optimizer.
-    - Ratnaweera, A., Halgamuge, S. K., & Watson, H. C. (2004).
-      Self-organizing hierarchical particle swarm optimizer.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    clamp_factor: float | None = Field(
-        default=None,
-        description="Velocity clamping factor (0.0-1.0), typically 0.1-0.2",
-    )
-    mutation_threshold: float | None = Field(
-        default=None,
-        description="Velocity mutation threshold, typically 0.001-0.01",
-    )
-
-
-class PSOImprovementStop(RangeChecked):
-    """
-    The improvement stop rule of a particle swarm.
-
-    The run stops when the best loss improved by at most
-    ``tol_abs + tol_rel * |best loss|`` over the last `window` iterations.
-
-    Attributes
-    ----------
-    window : int
-        Iterations over which the improvement is measured (> 0).
-    tol_abs : float
-        Absolute tolerance on the improvement (>= 0).
-    tol_rel : float
-        Tolerance on the improvement relative to the best loss (>= 0).
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    window: int = Field(default=..., description="Iterations of the window")
-    tol_abs: float = Field(
-        default=..., description="Absolute tolerance on the improvement"
-    )
-    tol_rel: float = Field(
-        default=..., description="Relative tolerance on the improvement"
-    )
-
-
-class PSORadiusStop(RangeChecked):
-    """
-    The radius stop rule of a particle swarm.
-
-    The run stops when the largest distance of a particle from the best
-    position, divided by the size of the search box (the norm of the widths of
-    the bounds), is at most `tol` (Zielinski and Laur, 2007).
-
-    Attributes
-    ----------
-    tol : float
-        Tolerance on the radius of the swarm, relative to the size of the
-        search box (>= 0).
-
-    References
-    ----------
     Zielinski, K., & Laur, R. (2007). Stopping criteria for a constrained
     single-objective particle swarm optimization algorithm. Informatica,
     31(1), 51-59.
@@ -651,368 +501,106 @@ class PSORadiusStop(RangeChecked):
 
     model_config = ConfigDict(extra="forbid")
 
-    tol: float = Field(default=..., description="Tolerance on the radius of the swarm")
-
-
-class ParticleSwarmConfig(RangeChecked):
-    """
-    Configuration for the Particle Swarm Optimization algorithm.
-
-    Attributes
-    ----------
-    particles : int
-        Number of particles in the swarm (default: 20)
-    max_iterations : int
-        Maximum number of iterations (default: 1000)
-    verbose : bool
-        Enable verbose output (default: False)
-    initialization : str
-        Particle initialization strategy (default: "uniform")
-
-    Methods
-    -------
-    inertia(type, **kwargs)
-        Set inertia weight strategy ("constant" or "chaotic")
-    acceleration(type, **kwargs)
-        Set acceleration coefficients ("constant" or "time_varying")
-    mutation(strategy, scale, probability, application)
-        Enable mutation to escape local optima
-    velocity(clamp_factor, mutation_threshold)
-        Configure velocity control
-    improvement_stop(window, tol_abs, tol_rel)
-        Stop when the best loss stops improving
-    radius_stop(tol)
-        Stop when the swarm has gathered around its best position
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    # Core parameters
+    kind: Literal["particle_swarm"] = Field(
+        default="particle_swarm", description="The optimizer"
+    )
     particles: int = Field(default=20, description="Number of particles in the swarm")
     max_iterations: int = Field(
         default=1000, description="Maximum number of iterations"
     )
     verbose: bool = Field(
-        default=False,
-        description="Enable verbose output during optimization",
+        default=False, description="Enable verbose output during optimization"
     )
-    initialization: str = Field(
-        default=PSOInitializationStrategy.UNIFORM,
-        description=(
-            "Particle initialization strategy: 'uniform' (default), 'latin_hypercube',"
-            "or 'opposition_based'"
-        ),
+    header_interval: int = Field(
+        default=100,
+        description="Number of iterations between table header repeats",
+    )
+    initialization: Literal["uniform", "latin_hypercube", "opposition_based"] = Field(
+        default="uniform", description="How the particles start"
+    )
+    inertia: Literal["constant", "chaotic"] | None = Field(
+        default=None, description="The inertia weight"
+    )
+    inertia_factor: float | None = Field(
+        default=None, description="The constant inertia weight"
+    )
+    inertia_min: float | None = Field(
+        default=None, description="The lowest chaotic inertia weight"
+    )
+    inertia_max: float | None = Field(
+        default=None, description="The highest chaotic inertia weight"
+    )
+    acceleration: Literal["constant", "time_varying"] | None = Field(
+        default=None, description="The acceleration coefficients"
+    )
+    cognitive: float | None = Field(
+        default=None, description="The constant cognitive coefficient (c1)"
+    )
+    social: float | None = Field(
+        default=None, description="The constant social coefficient (c2)"
+    )
+    cognitive_initial: float | None = Field(
+        default=None, description="The cognitive coefficient at the first iteration"
+    )
+    cognitive_final: float | None = Field(
+        default=None, description="The cognitive coefficient at the last iteration"
+    )
+    social_initial: float | None = Field(
+        default=None, description="The social coefficient at the first iteration"
+    )
+    social_final: float | None = Field(
+        default=None, description="The social coefficient at the last iteration"
+    )
+    mutation: Literal["gaussian", "cauchy"] | None = Field(
+        default=None, description="The distribution of a mutation step"
+    )
+    mutation_scale: float | None = Field(
+        default=None, description="The scale of a mutation step"
+    )
+    mutation_probability: float | None = Field(
+        default=None, description="The probability of a mutation per iteration"
+    )
+    mutation_application: (
+        Literal["global_best", "all_particles", "below_average"] | None
+    ) = Field(default=None, description="The particles a mutation moves")
+    velocity_clamp_factor: float | None = Field(
+        default=None, description="The largest velocity, as a share of the bounds"
+    )
+    velocity_mutation_threshold: float | None = Field(
+        default=None, description="The speed below which a velocity is drawn again"
+    )
+    improvement_window: int | None = Field(
+        default=None, description="The iterations of the improvement stop rule"
+    )
+    improvement_tol_abs: float | None = Field(
+        default=None, description="The absolute tolerance of the improvement"
+    )
+    improvement_tol_rel: float | None = Field(
+        default=None, description="The relative tolerance of the improvement"
+    )
+    radius_tol: float | None = Field(
+        default=None, description="The tolerance of the radius stop rule"
     )
 
-    # Private attributes for optional configurations (set via fluent methods)
-    _inertia: PSOConstantInertia | PSOChaoticInertia | None = PrivateAttr(default=None)
-    _acceleration: PSOConstantAcceleration | PSOTimeVaryingAcceleration | None = (
-        PrivateAttr(default=None)
-    )
-    _mutation: PSOMutationConfig | None = PrivateAttr(default=None)
-    _velocity: PSOVelocityConfig | None = PrivateAttr(default=None)
-    _improvement_stop: PSOImprovementStop | None = PrivateAttr(default=None)
-    _radius_stop: PSORadiusStop | None = PrivateAttr(default=None)
-
-    @field_validator("initialization")
-    @classmethod
-    def validate_initialization(cls, v: str) -> str:
-        if v not in PSOInitializationStrategy:
-            raise ValueError(
-                f"Invalid initialization: {v}. "
-                f"Must be one of {list(PSOInitializationStrategy)}"
-            )
-        return v
-
-    @overload
-    def inertia(
-        self, type: str, *, factor: float = PSO_DEFAULT_INERTIA_FACTOR
-    ) -> Self: ...
-
-    @overload
-    def inertia(self, type: str, *, w_min: float, w_max: float) -> Self: ...
-
-    def inertia(self, type: str, **kwargs: float) -> Self:
+    @model_validator(mode="after")
+    def check_strategies(self) -> Self:
         """
-        Set inertia weight strategy.
-
-        Parameters
-        ----------
-        type : str
-            Inertia strategy type: "constant" or "chaotic"
-        **kwargs : float
-            The settings of the strategy, listed under Other Parameters.
-
-        Other Parameters
-        ----------------
-        factor : float, default=PSO_DEFAULT_INERTIA_FACTOR
-            Fixed inertia weight; the default is the weight of canonical PSO,
-            1/(2 ln 2) ≈ 0.72135, which a swarm with no inertia strategy
-            uses. Only used when type="constant".
-        w_min : float
-            Minimum inertia weight. Only used when type="chaotic".
-        w_max : float
-            Maximum inertia weight (must be > w_min). Only used when type="chaotic".
+        Check each number against its strategy, as the engine reads them.
 
         Returns
         -------
         Self
-            The config instance for method chaining
+            The configuration.
+
+        Raises
+        ------
+        ValueError
+            If a strategy lacks a number it needs, a number is set without
+            its strategy or with another one, or the chaotic weights are not
+            in order; the message is that of the engine.
         """
-        if type not in PSOInertiaType:
-            raise ValueError(
-                f"Invalid inertia type: {type}. Must be one of {list(PSOInertiaType)}"
-            )
-        if type == PSOInertiaType.CONSTANT:
-            self._inertia = PSOConstantInertia(
-                factor=kwargs.get("factor", PSO_DEFAULT_INERTIA_FACTOR)
-            )
-        else:
-            self._inertia = PSOChaoticInertia(
-                w_min=kwargs["w_min"], w_max=kwargs["w_max"]
-            )
+        commol_rs.json.as_read("ParticleSwarmConfig", engine_json(self))
         return self
-
-    @overload
-    def acceleration(
-        self,
-        type: str,
-        *,
-        cognitive: float = PSO_DEFAULT_ACCELERATION,
-        social: float = PSO_DEFAULT_ACCELERATION,
-    ) -> Self: ...
-
-    @overload
-    def acceleration(
-        self,
-        type: str,
-        *,
-        c1_initial: float,
-        c1_final: float,
-        c2_initial: float,
-        c2_final: float,
-    ) -> Self: ...
-
-    def acceleration(self, type: str, **kwargs: float) -> Self:
-        """
-        Set acceleration coefficient strategy.
-
-        Parameters
-        ----------
-        type : str
-            Acceleration strategy type: "constant" or "time_varying"
-        **kwargs : float
-            The settings of the strategy, listed under Other Parameters.
-
-        Other Parameters
-        ----------------
-        cognitive : float, default=PSO_DEFAULT_ACCELERATION
-            Cognitive coefficient (c1) - attraction to personal best; the
-            default is the coefficient of canonical PSO, 0.5 + ln 2 ≈ 1.19315,
-            which a swarm with no acceleration strategy uses. Only used when
-            type="constant".
-        social : float, default=PSO_DEFAULT_ACCELERATION
-            Social coefficient (c2) - attraction to swarm best, with the
-            same default. Only used when type="constant".
-        c1_initial : float
-            Initial cognitive factor (typically high, e.g., 2.5).
-            Only used when type="time_varying".
-        c1_final : float
-            Final cognitive factor (typically low, e.g., 0.5).
-            Only used when type="time_varying".
-        c2_initial : float
-            Initial social factor (typically low, e.g., 0.5).
-            Only used when type="time_varying".
-        c2_final : float
-            Final social factor (typically high, e.g., 2.5).
-            Only used when type="time_varying".
-
-        Returns
-        -------
-        Self
-            The config instance for method chaining
-        """
-        if type not in PSOAccelerationType:
-            raise ValueError(
-                f"Invalid acceleration type: {type}. "
-                f"Must be one of {list(PSOAccelerationType)}"
-            )
-        if type == PSOAccelerationType.CONSTANT:
-            self._acceleration = PSOConstantAcceleration(
-                cognitive=kwargs.get("cognitive", PSO_DEFAULT_ACCELERATION),
-                social=kwargs.get("social", PSO_DEFAULT_ACCELERATION),
-            )
-        else:
-            self._acceleration = PSOTimeVaryingAcceleration(
-                c1_initial=kwargs["c1_initial"],
-                c1_final=kwargs["c1_final"],
-                c2_initial=kwargs["c2_initial"],
-                c2_final=kwargs["c2_final"],
-            )
-        return self
-
-    def mutation(
-        self,
-        strategy: str,
-        *,
-        scale: float,
-        probability: float,
-        application: str,
-    ) -> Self:
-        """
-        Enable mutation to help escape local optima.
-
-        Parameters
-        ----------
-        strategy : str
-            Mutation distribution: "gaussian" or "cauchy".
-            Cauchy has heavier tails for larger jumps.
-        scale : float
-            Standard deviation (gaussian) or scale parameter (cauchy)
-        probability : float
-            Mutation probability per iteration (0.0 to 1.0)
-        application : str
-            Which particles to mutate:
-            "global_best", "all_particles", or "below_average"
-
-        Returns
-        -------
-        Self
-            The config instance for method chaining
-        """
-        if strategy not in PSOMutationStrategy:
-            raise ValueError(
-                f"Invalid mutation strategy: {strategy}. "
-                f"Must be one of {list(PSOMutationStrategy)}"
-            )
-        if application not in PSOMutationApplication:
-            raise ValueError(
-                f"Invalid mutation application: {application}. "
-                f"Must be one of {list(PSOMutationApplication)}"
-            )
-
-        self._mutation = PSOMutationConfig(
-            strategy=PSOMutationStrategy(strategy),
-            scale=scale,
-            probability=probability,
-            application=PSOMutationApplication(application),
-        )
-        return self
-
-    def velocity(
-        self,
-        *,
-        clamp_factor: float | None = None,
-        mutation_threshold: float | None = None,
-    ) -> Self:
-        """
-        Configure velocity control.
-
-        Parameters
-        ----------
-        clamp_factor : float, optional
-            Velocity clamping as fraction of search space (0.0-1.0).
-            Typically 0.1-0.2. Prevents explosive velocities.
-        mutation_threshold : float, optional
-            Reinitialize velocities below this threshold.
-            Typically 0.001-0.01. Prevents stagnation.
-
-        Returns
-        -------
-        Self
-            The config instance for method chaining
-        """
-        self._velocity = PSOVelocityConfig(
-            clamp_factor=clamp_factor,
-            mutation_threshold=mutation_threshold,
-        )
-        return self
-
-    def improvement_stop(self, *, window: int, tol_abs: float, tol_rel: float) -> Self:
-        """
-        Stop when the best loss stops improving.
-
-        The run stops when the best loss improved by at most
-        ``tol_abs + tol_rel * |best loss|`` over the last `window` iterations,
-        and reports ``converged=True``. Off by default. A swarm can stall for
-        some iterations and then improve again, so a short window can stop it
-        early.
-
-        Parameters
-        ----------
-        window : int
-            Iterations over which the improvement is measured (> 0).
-        tol_abs : float
-            Absolute tolerance on the improvement (>= 0).
-        tol_rel : float
-            Tolerance on the improvement relative to the best loss (>= 0).
-
-        Returns
-        -------
-        Self
-            The config instance for method chaining
-        """
-        self._improvement_stop = PSOImprovementStop(
-            window=window, tol_abs=tol_abs, tol_rel=tol_rel
-        )
-        return self
-
-    def radius_stop(self, tol: float) -> Self:
-        """
-        Stop when the swarm has gathered around its best position.
-
-        The run stops when the largest distance of a particle from the best
-        position, divided by the size of the search box, is at most `tol`, and
-        reports ``converged=True``. Off by default. Mutation and velocity
-        mutation scatter the swarm again, so with them the radius can stay
-        above `tol`; values that the data do not tell apart keep the swarm
-        spread.
-
-        Parameters
-        ----------
-        tol : float
-            Tolerance on the radius of the swarm, relative to the size of the
-            search box (>= 0).
-
-        Returns
-        -------
-        Self
-            The config instance for method chaining
-        """
-        self._radius_stop = PSORadiusStop(tol=tol)
-        return self
-
-    @property
-    def inertia_config(self) -> PSOConstantInertia | PSOChaoticInertia | None:
-        """Get the inertia configuration (for internal use)."""
-        return self._inertia
-
-    @property
-    def acceleration_config(
-        self,
-    ) -> PSOConstantAcceleration | PSOTimeVaryingAcceleration | None:
-        """Get the acceleration configuration (for internal use)."""
-        return self._acceleration
-
-    @property
-    def mutation_config(self) -> PSOMutationConfig | None:
-        """Get the mutation configuration (for internal use)."""
-        return self._mutation
-
-    @property
-    def velocity_config(self) -> PSOVelocityConfig | None:
-        """Get the velocity configuration (for internal use)."""
-        return self._velocity
-
-    @property
-    def improvement_stop_config(self) -> PSOImprovementStop | None:
-        """Get the improvement stop rule (for internal use)."""
-        return self._improvement_stop
-
-    @property
-    def radius_stop_config(self) -> PSORadiusStop | None:
-        """Get the radius stop rule (for internal use)."""
-        return self._radius_stop
 
 
 class StartSummary(ResultModel):
@@ -1243,8 +831,8 @@ class CalibrationProblem(RangeChecked):
         When True, divide each residual by the RMS of its observation series
         before applying the loss metric (default: False). It needs a loss:
         observation models set the scale of each series with their noise.
-    optimization_config : OptimizationConfig
-        Configuration for the optimization algorithm
+    optimization_config : NelderMeadConfig | ParticleSwarmConfig
+        Configuration for the optimization algorithm, by its ``kind``
     initial_condition_remainder : str | None
         Expanded compartment or bin that takes what the calibrated initial
         conditions leave of the amounts the model states (default: None). It
@@ -1303,9 +891,9 @@ class CalibrationProblem(RangeChecked):
             "scales comparable in the loss."
         ),
     )
-    optimization_config: NelderMeadConfig | ParticleSwarmConfig = Field(
-        default=..., description="Optimization algorithm configuration"
-    )
+    optimization_config: Annotated[
+        NelderMeadConfig | ParticleSwarmConfig, Field(discriminator="kind")
+    ] = Field(default=..., description="Optimization algorithm configuration")
     initial_condition_remainder: str | None = Field(
         default=None,
         description=(

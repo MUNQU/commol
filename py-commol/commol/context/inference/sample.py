@@ -133,14 +133,15 @@ class ParameterSample(ResultModel):
         data = info.data
         if not {"names", "bounds", "values"} <= data.keys():
             return log_weights
-        rust = commol_rs.inference.ParameterSample(
+        checked = commol_rs.inference.ParameterSample(
             data["names"], data["bounds"], data["values"], log_weights, None
         )
-        return rust.log_weights
+        return checked.log_weights
 
     @model_validator(mode="after")
-    def build_rust_sample(self) -> Self:
-        """Keep the Rust sample that computes the statistics."""
+    def build_engine_sample(self) -> Self:
+        """Keep the sample of the engine, which computes the statistics and
+        which the engine reads as the handle of this sample."""
         self._rust = commol_rs.inference.ParameterSample(
             self.names, self.bounds, self.values, self.log_weights, self.groups
         )
@@ -184,11 +185,6 @@ class ParameterSample(ResultModel):
             groups=groups,
             method=method,
         )
-
-    @property
-    def rust_sample(self) -> "ParameterSampleProtocol":
-        """The sample in Rust, for the runners of methods and the predictive."""
-        return self._rust
 
     @property
     def weights(self) -> list[float]:

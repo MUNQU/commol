@@ -24,7 +24,7 @@ from commol import (
     ValueAt,
     weighted_quantiles,
 )
-from commol.context.inference.quantities import expand_quantities
+from commol.context.inference.quantities import quantity_labels
 from tests.support import (
     a_to_b_builder,
     abc_builder,
@@ -170,7 +170,7 @@ def test_a_trajectory_is_compared_position_by_position() -> None:
 
     compared = scenarios.compare("slow", "base", [trajectory], 0.5)
 
-    assert [s.label for s in compared] == expand_quantities([trajectory])[0]
+    assert [s.label for s in compared] == quantity_labels([trajectory])
     for summary, at in zip(compared, [10, 20, 30], strict=True):
         differences = [
             _run(k1, 0.02)["C"][at] - _run(k1, 0.1)["C"][at] for k1 in [0.2, 0.25, 0.3]

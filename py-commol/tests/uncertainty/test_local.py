@@ -244,7 +244,7 @@ class TestLaplace:
             calibrator.delta_band(result, [0.5], 0.9)
         with pytest.raises(ValueError, match="1 rows of 1 values"):
             commol_rs.inference.delta_band(
-                calibrator.rust_problem, [10.0], [[1.0, 0.0]], None, [1.0], 0.9
+                calibrator._rust_problem, [10.0], [[1.0, 0.0]], None, [1.0], 0.9
             )
 
     def test_laplace_refuses_a_loss(self) -> None:

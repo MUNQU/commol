@@ -123,7 +123,7 @@ def test_a_sample_compares_its_fields_and_not_its_rust_sample() -> None:
     first = sample([[0.2], [0.4]])
     again = sample([[0.2], [0.4]])
 
-    assert first.rust_sample is not again.rust_sample
+    assert first._rust is not again._rust
     assert first == again
     assert hash(first) == hash(again)
     assert first != sample([[0.2], [0.5]])

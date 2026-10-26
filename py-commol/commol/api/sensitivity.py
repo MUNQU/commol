@@ -9,7 +9,7 @@ from commol.api.calibrator import check_values
 from commol.api.inference.registry import run_method
 from commol.api.simulation import Simulation, check_seed
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context._model import engine_state
+from commol.context.engine_json import engine_handles, engine_json
 from commol.context.inference.global_sensitivity import InputSpace
 from commol.context.calibration import ObservedDataPoint
 from commol.context.inference.method import SensitivityMethod
@@ -90,10 +90,8 @@ class SensitivityAnalysis:
         )
         self._rust: "ForwardAnalysisProtocol" = commol_rs.inference.ForwardAnalysis(
             simulation.engine,
-            engine_state.rust_parameters(inputs.parameters),
-            distributions=inputs.rust_distributions(),
-            sample=None if inputs.sample is None else inputs.sample.rust_sample,
-            initial_condition_remainder=inputs.initial_condition_remainder,
+            engine_json(inputs),
+            **engine_handles(inputs),
             replicates=replicates,
             seed=None if seed is None else check_seed(seed),
         )
@@ -103,19 +101,7 @@ class SensitivityAnalysis:
                 self._rust.seed,
             )
 
-    @property
-    def rust_analysis(self) -> "ForwardAnalysisProtocol":
-        """
-        The forward analysis built in Rust, for the runners of methods.
-
-        Returns
-        -------
-        ForwardAnalysisProtocol
-            The forward model and the inputs every method reads.
-        """
-        return self._rust
-
-    def rust_predictive(
+    def _predictive(
         self, sample: ParameterSample, positions: list[float]
     ) -> "PredictiveProtocol":
         """
@@ -135,7 +121,7 @@ class SensitivityAnalysis:
         PredictiveProtocol
             The runs, computed in Rust.
         """
-        return self._rust.predictive(sample.rust_sample, positions)
+        return self._rust.predictive(sample._rust, positions)
 
     def with_model(self, model: "Model") -> "SensitivityAnalysis":
         """
@@ -163,7 +149,7 @@ class SensitivityAnalysis:
             Simulation(model), self.inputs, replicates=self.replicates, seed=self.seed
         )
 
-    def rust_observation_draws(
+    def _observation_draws(
         self,
         sample: ParameterSample,
         observed_data: list[ObservedDataPoint],
@@ -200,11 +186,9 @@ class SensitivityAnalysis:
                 "models of a problem, and a sensitivity analysis has no data. Read "
                 "the observations with NoNoise()."
             )
-        return self._rust.observation_draws(
-            sample.rust_sample, engine_state.rust_observed_data(observed_data)
-        )
+        return self._rust.observation_draws(sample._rust, engine_json(observed_data))
 
-    def rust_log_score(
+    def _log_score(
         self,
         sample: ParameterSample,  # noqa: ARG002
         observed_data: list[ObservedDataPoint],  # noqa: ARG002

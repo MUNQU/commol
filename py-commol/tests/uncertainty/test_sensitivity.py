@@ -91,7 +91,7 @@ class TestInputs:
         )
         inputs = InputSpace.from_sample(sample, [bounded("k1")])
         assert inputs.sample == sample
-        assert inputs.rust_distributions() is None
+        assert inputs.distributions is None
         with pytest.raises(ValueError, match=r"the parameters are \['k2'\]"):
             InputSpace.from_sample(sample, [bounded("k2")])
         with pytest.raises(ValueError, match=r"bounds \[\(0\.0, 2\.0\)\]"):

@@ -1,28 +1,10 @@
 from contextvars import ContextVar
-from typing import ClassVar, Literal, Protocol
-
-class RustProcessProtocol(Protocol):
-    """The process of a model: bins, accumulators, stratifications and transitions."""
-
-    @staticmethod
-    def from_json(json_str: str) -> RustProcessProtocol: ...
-
-class RustAggregateProtocol(Protocol):
-    """The aggregate structure: amounts per compartment."""
-
-    @staticmethod
-    def from_json(json_str: str) -> RustAggregateProtocol: ...
-
-class RustModelProtocol(Protocol):
-    """A model of any kind: its header, process, structure and engine."""
-
-    @staticmethod
-    def from_json(json_str: str) -> RustModelProtocol: ...
+from typing import Literal, Protocol
 
 class EngineProtocol(Protocol):
-    """The engine a model names, built from the model."""
+    """The engine a model names, built from the JSON of the model."""
 
-    def __init__(self, model: RustModelProtocol) -> None: ...
+    def __init__(self, model: str) -> None: ...
     @property
     def engine_type(self) -> str: ...
     def run(self, num_steps: int) -> tuple[list[float], list[list[float]]]: ...
@@ -92,13 +74,13 @@ class ModelModule(Protocol):
     TOTAL: str
     SUBGROUP_TOTAL_PREFIX: str
     def initial_state(
-        self, process: RustProcessProtocol, structure: RustAggregateProtocol
+        self, process: str, structure: str
     ) -> list[tuple[str, str, list[tuple[str, str]], float]]: ...
     def transition_flows(
-        self, process: RustProcessProtocol, structure: RustAggregateProtocol
+        self, process: str, structure: str
     ) -> list[tuple[str, str | None, str | None, str, str | None, int]]: ...
-    def check_model(self, model: RustModelProtocol) -> None: ...
-    def subgroup_total_names(self, process: RustProcessProtocol) -> list[str]: ...
+    def check_model(self, model: str) -> None: ...
+    def subgroup_total_names(self, process: str) -> list[str]: ...
     def check_bin_amounts(self, amounts: list[tuple[str, float | None]]) -> None: ...
     def check_compartment_amounts(self, amounts: list[tuple[str, float]]) -> None: ...
     def check_fractions(
@@ -112,175 +94,11 @@ class ModelModule(Protocol):
     ) -> None: ...
     def check_series(self, data: list[tuple[float, float]]) -> None: ...
     def expanded_outputs(
-        self, process: RustProcessProtocol
+        self, process: str
     ) -> tuple[
         list[tuple[str, str, list[tuple[str, str]]]],
         list[tuple[str, str, list[tuple[str, str]]]],
     ]: ...
-
-class ObservedDataPointProtocol(Protocol):
-    def __init__(
-        self,
-        at: float,
-        label: str,
-        outputs: list[str],
-        value: float,
-        weight: float | None = None,
-        factor_id: str | None = None,
-        window: float | None = None,
-        trials: int | None = None,
-    ) -> None: ...
-
-class CalibrationParameterTypeProtocol(Protocol):
-    Parameter: ClassVar["CalibrationParameterTypeProtocol"]
-    InitialCondition: ClassVar["CalibrationParameterTypeProtocol"]
-    Factor: ClassVar["CalibrationParameterTypeProtocol"]
-    Noise: ClassVar["CalibrationParameterTypeProtocol"]
-
-class ObservationModelProtocol(Protocol):
-    @staticmethod
-    def normal(sd: float | str) -> ObservationModelProtocol: ...
-    @staticmethod
-    def log_normal(sigma: float | str, median: bool) -> ObservationModelProtocol: ...
-    @staticmethod
-    def student_t(df: float | str, scale: float | str) -> ObservationModelProtocol: ...
-    @staticmethod
-    def poisson() -> ObservationModelProtocol: ...
-    @staticmethod
-    def negative_binomial(overdispersion: float | str) -> ObservationModelProtocol: ...
-    @staticmethod
-    def binomial(trials: int | None = None) -> ObservationModelProtocol: ...
-
-class CalibrationParameterProtocol(Protocol):
-    def __init__(
-        self,
-        id: str,
-        parameter_type: CalibrationParameterTypeProtocol,
-        min_bound: float,
-        max_bound: float,
-        initial_guess: float | None = None,
-    ) -> None: ...
-
-class CalibrationConstraintProtocol(Protocol):
-    def __init__(
-        self,
-        id: str,
-        expression: str,
-        weight: float = 1.0,
-        at: list[float] | None = None,
-    ) -> None: ...
-
-class LossConfigProtocol(Protocol):
-    @staticmethod
-    def sse() -> LossConfigProtocol: ...
-    @staticmethod
-    def rmse() -> LossConfigProtocol: ...
-    @staticmethod
-    def mae() -> LossConfigProtocol: ...
-    def normalized(self, enabled: bool = True) -> LossConfigProtocol: ...
-    def with_replicates(
-        self,
-        count: int | None = None,
-        summary: str | None = None,
-        quantile: float | None = None,
-    ) -> LossConfigProtocol: ...
-    @property
-    def normalize_observations(self) -> bool: ...
-
-class NelderMeadConfigProtocol(Protocol):
-    def __init__(
-        self,
-        max_iterations: int = 1000,
-        sd_tolerance: float = 1e-6,
-        initial_simplex_size: float = 0.1,
-        alpha: float | None = None,
-        gamma: float | None = None,
-        rho: float | None = None,
-        sigma: float | None = None,
-        verbose: bool = False,
-        header_interval: int = 100,
-    ) -> None: ...
-
-class PSOInertiaConstantProtocol(Protocol):
-    def __init__(self, factor: float) -> None: ...
-    @property
-    def factor(self) -> float: ...
-
-class PSOInertiaChaoticProtocol(Protocol):
-    def __init__(self, w_min: float, w_max: float) -> None: ...
-    @property
-    def w_min(self) -> float: ...
-    @property
-    def w_max(self) -> float: ...
-
-class PSOAccelerationConstantProtocol(Protocol):
-    def __init__(self, cognitive: float, social: float) -> None: ...
-    @property
-    def cognitive(self) -> float: ...
-    @property
-    def social(self) -> float: ...
-
-class PSOAccelerationTimeVaryingProtocol(Protocol):
-    def __init__(
-        self, c1_initial: float, c1_final: float, c2_initial: float, c2_final: float
-    ) -> None: ...
-    @property
-    def c1_initial(self) -> float: ...
-    @property
-    def c1_final(self) -> float: ...
-    @property
-    def c2_initial(self) -> float: ...
-    @property
-    def c2_final(self) -> float: ...
-
-class PSOMutationProtocol(Protocol):
-    def __init__(
-        self, strategy: str, scale: float, probability: float, application: str
-    ) -> None: ...
-    @property
-    def strategy(self) -> str: ...
-    @property
-    def scale(self) -> float: ...
-    @property
-    def probability(self) -> float: ...
-    @property
-    def application(self) -> str: ...
-
-class PSOVelocityProtocol(Protocol):
-    def __init__(
-        self, clamp_factor: float | None = None, mutation_threshold: float | None = None
-    ) -> None: ...
-    @property
-    def clamp_factor(self) -> float | None: ...
-    @property
-    def mutation_threshold(self) -> float | None: ...
-
-class ParticleSwarmConfigProtocol(Protocol):
-    def __init__(
-        self,
-        particles: int = 20,
-        max_iterations: int = 1000,
-        verbose: bool = False,
-        inertia: PSOInertiaConstantProtocol | PSOInertiaChaoticProtocol | None = None,
-        acceleration: PSOAccelerationConstantProtocol
-        | PSOAccelerationTimeVaryingProtocol
-        | None = None,
-        mutation: PSOMutationProtocol | None = None,
-        velocity: PSOVelocityProtocol | None = None,
-        initialization: str = "uniform",
-        improvement_stop: tuple[int, float, float] | None = None,
-        radius_stop: float | None = None,
-    ) -> None: ...
-
-class OptimizationConfigProtocol(Protocol):
-    @staticmethod
-    def nelder_mead(
-        config: NelderMeadConfigProtocol | None = None,
-    ) -> OptimizationConfigProtocol: ...
-    @staticmethod
-    def particle_swarm(
-        config: ParticleSwarmConfigProtocol | None = None,
-    ) -> OptimizationConfigProtocol: ...
 
 class CalibrationResultProtocol(Protocol):
     @property
@@ -321,23 +139,6 @@ class StartsProtocol(Protocol):
     def best(self) -> int: ...
 
 class CalibrationModule(Protocol):
-    PSO_DEFAULT_INERTIA_FACTOR: float
-    PSO_DEFAULT_ACCELERATION: float
-    ObservedDataPoint: type[ObservedDataPointProtocol]
-    CalibrationParameterType: type[CalibrationParameterTypeProtocol]
-    CalibrationParameter: type[CalibrationParameterProtocol]
-    CalibrationConstraint: type[CalibrationConstraintProtocol]
-    LossConfig: type[LossConfigProtocol]
-    ObservationModel: type[ObservationModelProtocol]
-    NelderMeadConfig: type[NelderMeadConfigProtocol]
-    PSOInertiaConstant: type[PSOInertiaConstantProtocol]
-    PSOInertiaChaotic: type[PSOInertiaChaoticProtocol]
-    PSOAccelerationConstant: type[PSOAccelerationConstantProtocol]
-    PSOAccelerationTimeVarying: type[PSOAccelerationTimeVaryingProtocol]
-    PSOMutation: type[PSOMutationProtocol]
-    PSOVelocity: type[PSOVelocityProtocol]
-    ParticleSwarmConfig: type[ParticleSwarmConfigProtocol]
-    OptimizationConfig: type[OptimizationConfigProtocol]
     CalibrationResult: type[CalibrationResultProtocol]
     CalibrationEvaluation: type[CalibrationEvaluationProtocol]
     CalibrationResultWithHistory: type[CalibrationResultWithHistoryProtocol]
@@ -361,110 +162,42 @@ class CalibrationModule(Protocol):
     def check_model_values(
         self,
         engine: EngineProtocol,
-        parameters: list[CalibrationParameterProtocol],
+        parameters: str,
         initial_condition_remainder: str | None = None,
     ) -> None: ...
     def initial_condition_coverage(
         self,
         engine: EngineProtocol,
-        parameters: list[CalibrationParameterProtocol],
+        parameters: str,
         initial_condition_remainder: str | None = None,
     ) -> tuple[list[list[int]], list[int]]: ...
     def calibrated_initial_state(
         self,
         engine: EngineProtocol,
-        parameters: list[CalibrationParameterProtocol],
+        parameters: str,
         values: list[float],
         initial_condition_remainder: str | None = None,
     ) -> tuple[list[float], list[float], list[int]]: ...
 
 class CalibrationProblemProtocol(Protocol):
-    def __init__(
-        self,
-        engine: EngineProtocol,
-        observed_data: list[ObservedDataPointProtocol],
-        parameters: list[CalibrationParameterProtocol],
-        constraints: list[CalibrationConstraintProtocol],
-        loss_config: LossConfigProtocol | None = None,
-        initial_condition_remainder: str | None = None,
-        observation_models: list[tuple[str, ObservationModelProtocol]] | None = None,
-        seed: int | None = None,
-    ) -> None: ...
+    def __init__(self, engine: EngineProtocol, problem: str) -> None: ...
     @property
     def seed(self) -> int: ...
-    def optimize(
-        self, config: OptimizationConfigProtocol, starts: int, seed: int
-    ) -> StartsProtocol: ...
-    def optimize_with_history(
-        self, config: OptimizationConfigProtocol, seed: int
-    ) -> CalibrationResultWithHistoryProtocol: ...
+    def optimize(self, starts: int) -> StartsProtocol: ...
+    def optimize_with_history(self) -> CalibrationResultWithHistoryProtocol: ...
     def predict_observations(
         self, parameter_sets: list[list[float]]
     ) -> list[list[list[float]]]: ...
     def predictive(
-        self, sample: ParameterSampleProtocol, positions: list[float], seed: int
+        self, sample: ParameterSampleProtocol, positions: list[float]
     ) -> PredictiveProtocol: ...
     def observation_draws(
-        self,
-        sample: ParameterSampleProtocol,
-        observations: list[ObservedDataPointProtocol],
-        seed: int,
-        residual_noise: tuple[list[float], int, str] | None = None,
-        distribution_noise: bool = False,
+        self, sample: ParameterSampleProtocol, observations: str, noise: str
     ) -> ObservationDrawsProtocol: ...
     def log_score(
-        self,
-        sample: ParameterSampleProtocol,
-        observations: list[ObservedDataPointProtocol],
-        seed: int,
+        self, sample: ParameterSampleProtocol, observations: str
     ) -> list[float]: ...
     def pointwise_log_likelihood(self, values: list[float]) -> list[float]: ...
-    def parametric_bootstrap(
-        self,
-        config: OptimizationConfigProtocol,
-        fit: list[float],
-        replicates: int,
-        starts: int,
-        seed: int,
-    ) -> BootstrapRunProtocol: ...
-    def bayesian_bootstrap(
-        self,
-        config: OptimizationConfigProtocol,
-        fit: list[float],
-        replicates: int,
-        block_length: int | None,
-        starts: int,
-        seed: int,
-    ) -> BootstrapRunProtocol: ...
-    def residual_bootstrap(
-        self,
-        config: OptimizationConfigProtocol,
-        fit: list[float],
-        replicates: int,
-        block_length: int | None,
-        starts: int,
-        seed: int,
-        residual_scale: str,
-        scheme: str,
-    ) -> BootstrapRunProtocol: ...
-    def wild_bootstrap(
-        self,
-        config: OptimizationConfigProtocol,
-        fit: list[float],
-        replicates: int,
-        block_length: int | None,
-        starts: int,
-        seed: int,
-        multipliers: str,
-    ) -> BootstrapRunProtocol: ...
-    def jackknife(
-        self,
-        config: OptimizationConfigProtocol,
-        fit: list[float],
-        block_length: int | None,
-        starts: int,
-        seed: int,
-    ) -> JackknifeRunProtocol: ...
 
 class BootstrapRunProtocol(Protocol):
     @property
@@ -481,18 +214,6 @@ class BootstrapRunProtocol(Protocol):
     def block_length(self) -> int | None: ...
     @property
     def block_length_estimates(self) -> list[tuple[str, float]] | None: ...
-
-class BootstrapSettingsProtocol(Protocol):
-    def __init__(
-        self,
-        method: str,
-        replicates: int,
-        starts: int,
-        block_length: int | None = None,
-        residual_scale: str | None = None,
-        scheme: str | None = None,
-        multipliers: str | None = None,
-    ) -> None: ...
 
 class ProfileProtocol(Protocol):
     @property
@@ -735,9 +456,7 @@ class StartsAnalysisProtocol(Protocol):
     def flagged(self) -> list[bool]: ...
 
 class DistributionProtocol(Protocol):
-    def __init__(
-        self, kind: str, parameters: list[float], lower: float, upper: float
-    ) -> None: ...
+    def __init__(self, distribution: str, lower: float, upper: float) -> None: ...
     def log_density(self, x: float) -> float: ...
     def cdf(self, x: float) -> float: ...
     def quantile(self, p: float) -> float: ...
@@ -767,19 +486,22 @@ class SMCRunProtocol(Protocol):
     @property
     def stop_reason(self) -> str | None: ...
 
-class EtaCoverageProtocol(Protocol):
+class EtaCalibrationProtocol(Protocol):
     @property
     def eta(self) -> float: ...
     @property
-    def coverage(self) -> float: ...
+    def coverage(self) -> float | None: ...
     @property
     def failed(self) -> list[str]: ...
     @property
-    def block_length(self) -> int: ...
+    def block_length(self) -> int | None: ...
     @property
     def block_length_estimates(self) -> list[tuple[str, float]] | None: ...
 
-_Priors = list[tuple[str, str, list[float]]] | None
+type EngineHandle = ParameterSampleProtocol | str | None
+"""A field of a method that crosses as its handle (``engine_handles``): a
+sample, the JSON of a result, or None. The function of the bridge reads the
+type it takes."""
 
 class LocalRunProtocol(Protocol):
     values: list[list[float]]
@@ -866,46 +588,18 @@ class ForwardAnalysisProtocol(Protocol):
     def __init__(
         self,
         engine: EngineProtocol,
-        parameters: list[CalibrationParameterProtocol],
-        distributions: _Priors = None,
-        sample: ParameterSampleProtocol | None = None,
-        initial_condition_remainder: str | None = None,
+        inputs: str,
+        sample: EngineHandle = None,
         replicates: int | None = None,
         seed: int | None = None,
     ) -> None: ...
     @property
     def seed(self) -> int: ...
-    def propagate(
-        self, draws: int | None, quantities: str
-    ) -> tuple[_Draws, list[list[float]], list[float], list[int]]: ...
-    def prcc(
-        self, draws: int | None, quantities: str
-    ) -> tuple[_Draws, list[list[float]], list[list[float]], float]: ...
-    def morris(
-        self, trajectories: int, levels: int, quantities: str
-    ) -> tuple[list[list[float]], list[list[float]], list[list[float]], int]: ...
-    def sobol(
-        self,
-        draws: int,
-        replicates: int,
-        confidence_level: float,
-        quantities: str,
-    ) -> SobolRunProtocol: ...
-    def chaos(
-        self,
-        degree: int,
-        q_norm: float,
-        max_interaction: int | None,
-        draws: int,
-        quantities: str,
-    ) -> ChaosRunProtocol: ...
     def predictive(
         self, sample: ParameterSampleProtocol, positions: list[float]
     ) -> PredictiveProtocol: ...
     def observation_draws(
-        self,
-        sample: ParameterSampleProtocol,
-        observations: list[ObservedDataPointProtocol],
+        self, sample: ParameterSampleProtocol, observations: str
     ) -> ObservationDrawsProtocol: ...
 
 class InferenceModule(Protocol):
@@ -918,7 +612,6 @@ class InferenceModule(Protocol):
     Profile: type[ProfileProtocol]
     ProfileRun: type[ProfileRunProtocol]
     ProfileStructure: type[ProfileStructureProtocol]
-    BootstrapSettings: type[BootstrapSettingsProtocol]
     WeightedSummary: type[WeightedSummaryProtocol]
     PointRank: type[PointRankProtocol]
     StructuralAnalysis: type[StructuralAnalysisProtocol]
@@ -929,30 +622,28 @@ class InferenceModule(Protocol):
     StartsAnalysis: type[StartsAnalysisProtocol]
     LocalRun: type[LocalRunProtocol]
     MixtureRun: type[MixtureRunProtocol]
-    def trace_profiles(
-        self,
-        problem: CalibrationProblemProtocol,
-        config: OptimizationConfigProtocol,
-        fit: list[float],
-        parameters: list[int],
-        predictions: list[ObservedDataPointProtocol],
-        threshold: str,
-        confidence_level: float,
-        max_steps: int,
-        seed: int,
-        bootstrap: BootstrapSettingsProtocol | None = None,
-    ) -> ProfileRunProtocol: ...
     Distribution: type[DistributionProtocol]
     SMCRun: type[SMCRunProtocol]
-    EtaCoverage: type[EtaCoverageProtocol]
+    EtaCalibration: type[EtaCalibrationProtocol]
     ConformalRun: type[ConformalRunProtocol]
     ForwardAnalysis: type[ForwardAnalysisProtocol]
     SobolRun: type[SobolRunProtocol]
     ChaosRun: type[ChaosRunProtocol]
+    def bootstrap(
+        self, problem: CalibrationProblemProtocol, settings: str
+    ) -> tuple[StartsProtocol, BootstrapRunProtocol]: ...
+    def block_jackknife(
+        self, problem: CalibrationProblemProtocol, settings: str
+    ) -> tuple[StartsProtocol, JackknifeRunProtocol]: ...
+    def profile_likelihood(
+        self, problem: CalibrationProblemProtocol, settings: str
+    ) -> tuple[StartsProtocol, ProfileRunProtocol]: ...
+    def prediction_profile(
+        self, problem: CalibrationProblemProtocol, settings: str
+    ) -> tuple[StartsProtocol, ProfileRunProtocol]: ...
     def chaos_evaluate(
         self,
-        parameters: list[CalibrationParameterProtocol],
-        distributions: list[tuple[str, str, list[float]]],
+        inputs: str,
         degree: int,
         q_norm: float,
         max_interaction: int | None,
@@ -971,7 +662,6 @@ class InferenceModule(Protocol):
         self, values: list[float], weights: list[float], confidence_level: float
     ) -> WeightedSummaryProtocol: ...
     def effective_size(self, weights: list[float]) -> float: ...
-    def quantities_as_read(self, json: str) -> str: ...
     def quantity_schedule(self, json: str) -> list[float]: ...
     def quantities_of_runs(
         self,
@@ -985,74 +675,50 @@ class InferenceModule(Protocol):
         self, labels: list[str], values: list[float]
     ) -> list[tuple[str, float]]: ...
     def structural_rank(
-        self,
-        problem: CalibrationProblemProtocol,
-        points: int,
-        dense: bool,
-        seed: int,
+        self, problem: CalibrationProblemProtocol, settings: str
     ) -> StructuralAnalysisProtocol: ...
     def collinearity(
         self,
         problem: CalibrationProblemProtocol,
-        points: list[list[float]],
-        weights: list[float],
-        max_subset_size: int,
-        threshold: float,
+        settings: str,
+        at: EngineHandle,
     ) -> CollinearityAnalysisProtocol: ...
     def sample_identifiability(
         self,
-        sample: ParameterSampleProtocol,
-        correlation_threshold: float,
-        priors: _Priors = None,
+        problem: CalibrationProblemProtocol,
+        settings: str,
+        sample: EngineHandle,
     ) -> SampleAnalysisProtocol: ...
+    def starts_identifiability(
+        self, problem: CalibrationProblemProtocol, settings: str, result: EngineHandle
+    ) -> StartsAnalysisProtocol: ...
     def gibbs_posterior(
-        self,
-        problem: CalibrationProblemProtocol,
-        priors: _Priors,
-        eta: float,
-        particles: int,
-        resample_threshold: float,
-        target_cess: float,
-        stay_probability: float,
-        seed: int,
-    ) -> SMCRunProtocol: ...
+        self, problem: CalibrationProblemProtocol, settings: str
+    ) -> tuple[StartsProtocol | None, SMCRunProtocol, EtaCalibrationProtocol]: ...
     def bayesian_posterior(
-        self,
-        problem: CalibrationProblemProtocol,
-        priors: _Priors,
-        particles: int,
-        resample_threshold: float,
-        target_cess: float,
-        stay_probability: float,
-        seed: int,
+        self, problem: CalibrationProblemProtocol, settings: str
     ) -> SMCRunProtocol: ...
+    def abc_smc(
+        self, problem: CalibrationProblemProtocol, settings: str
+    ) -> tuple[SMCRunProtocol, bool]: ...
+    def abc_rejection(
+        self, problem: CalibrationProblemProtocol, settings: str
+    ) -> tuple[SMCRunProtocol, bool]: ...
     def laplace(
-        self,
-        problem: CalibrationProblemProtocol,
-        fit: list[float],
-        curvature: str,
-        draws: int,
-        seed: int,
-    ) -> LocalRunProtocol: ...
+        self, problem: CalibrationProblemProtocol, settings: str
+    ) -> tuple[StartsProtocol, LocalRunProtocol]: ...
     def sandwich(
-        self,
-        problem: CalibrationProblemProtocol,
-        fit: list[float],
-        curvature: str,
-        block_length: int | None,
-        draws: int,
-        seed: int,
-    ) -> tuple[LocalRunProtocol, int, int, list[tuple[str, float]] | None]: ...
+        self, problem: CalibrationProblemProtocol, settings: str
+    ) -> tuple[
+        StartsProtocol,
+        LocalRunProtocol,
+        int,
+        int,
+        list[tuple[str, float]] | None,
+    ]: ...
     def laplace_mixture(
-        self,
-        problem: CalibrationProblemProtocol,
-        priors: _Priors,
-        eta: float | None,
-        ends: list[list[float]],
-        draws: int,
-        curvature: str,
-        seed: int,
-    ) -> MixtureRunProtocol: ...
+        self, problem: CalibrationProblemProtocol, settings: str
+    ) -> tuple[StartsProtocol, MixtureRunProtocol]: ...
     def delta_band(
         self,
         problem: CalibrationProblemProtocol,
@@ -1062,118 +728,43 @@ class InferenceModule(Protocol):
         positions: list[float],
         confidence_level: float,
     ) -> tuple[list[str], list[list[float]], list[list[float]], list[list[float]]]: ...
-    def information_matching_eta(
-        self,
-        problem: CalibrationProblemProtocol,
-        fit: list[float],
-        block_length: int | None,
-    ) -> tuple[float, int, list[tuple[str, float]] | None]: ...
-    def bootstrap_coverage_eta(
-        self,
-        problem: CalibrationProblemProtocol,
-        priors: _Priors,
-        fit: list[float],
-        replicates: int,
-        block_length: int | None,
-        confidence_level: float,
-        particles: int,
-        resample_threshold: float,
-        target_cess: float,
-        stay_probability: float,
-        seed: int,
-    ) -> EtaCoverageProtocol: ...
-    def abc_smc(
-        self,
-        problem: CalibrationProblemProtocol,
-        priors: _Priors,
-        metric: str | None,
-        particles: int,
-        target_cess: float,
-        min_acceptance: float,
-        stay_probability: float,
-        seed: int,
-    ) -> tuple[SMCRunProtocol, bool]: ...
-    def abc_rejection(
-        self,
-        problem: CalibrationProblemProtocol,
-        priors: _Priors,
-        metric: str | None,
-        draws: int,
-        quantile: float,
-        seed: int,
-    ) -> tuple[SMCRunProtocol, bool]: ...
-    def starts_identifiability(
-        self,
-        ends: list[list[float]],
-        losses: list[float],
-        converged: list[bool],
-        bounds: list[tuple[float, float]],
-        parameter_tolerance: float,
-        loss_tolerance: float,
-    ) -> StartsAnalysisProtocol: ...
     def check_conformal_settings(self, score: str | None, by: str | None) -> None: ...
     def split_conformal(
         self,
         problem: CalibrationProblemProtocol,
-        fit: list[float] | None,
-        sample: ParameterSampleProtocol | None,
-        calibration: list[ObservedDataPointProtocol],
-        positions: list[float],
-        score: str,
-        by: str,
-        confidence_level: float,
-    ) -> ConformalRunProtocol: ...
+        settings: str,
+        sample: EngineHandle = None,
+    ) -> tuple[StartsProtocol | None, ConformalRunProtocol]: ...
     def rolling_conformal(
-        self,
-        problem: CalibrationProblemProtocol,
-        config: OptimizationConfigProtocol,
-        fit: list[float],
-        origins: list[float],
-        positions: list[float],
-        score: str,
-        by: str,
-        confidence_level: float,
-        starts: int,
-        seed: int,
-    ) -> ConformalRunProtocol: ...
+        self, problem: CalibrationProblemProtocol, settings: str
+    ) -> tuple[StartsProtocol, ConformalRunProtocol]: ...
     def jackknife_plus(
-        self,
-        problem: CalibrationProblemProtocol,
-        config: OptimizationConfigProtocol,
-        fit: list[float],
-        block_length: int | None,
-        positions: list[float],
-        score: str,
-        by: str,
-        confidence_level: float,
-        starts: int,
-        seed: int,
-    ) -> ConformalRunProtocol: ...
+        self, problem: CalibrationProblemProtocol, settings: str
+    ) -> tuple[StartsProtocol, ConformalRunProtocol]: ...
     def enbpi(
-        self,
-        problem: CalibrationProblemProtocol,
-        config: OptimizationConfigProtocol,
-        fit: list[float],
-        replicates: int,
-        block_length: int | None,
-        positions: list[float],
-        score: str,
-        by: str,
-        confidence_level: float,
-        starts: int,
-        seed: int,
-    ) -> ConformalRunProtocol: ...
+        self, problem: CalibrationProblemProtocol, settings: str
+    ) -> tuple[StartsProtocol, ConformalRunProtocol]: ...
     def adaptive_conformal(
         self,
         problem: CalibrationProblemProtocol,
-        fit: list[float] | None,
-        sample: ParameterSampleProtocol | None,
-        stream: list[ObservedDataPointProtocol],
-        step: float,
-        score: str,
-        by: str,
-        confidence_level: float,
-    ) -> ConformalRunProtocol: ...
+        settings: str,
+        sample: EngineHandle = None,
+    ) -> tuple[StartsProtocol | None, ConformalRunProtocol]: ...
+    def propagation(
+        self, analysis: ForwardAnalysisProtocol, settings: str
+    ) -> tuple[_Draws, list[list[float]], list[float], list[int]]: ...
+    def prcc(
+        self, analysis: ForwardAnalysisProtocol, settings: str
+    ) -> tuple[_Draws, list[list[float]], list[list[float]], float]: ...
+    def morris(
+        self, analysis: ForwardAnalysisProtocol, settings: str
+    ) -> tuple[list[list[float]], list[list[float]], list[list[float]], int]: ...
+    def sobol(
+        self, analysis: ForwardAnalysisProtocol, settings: str
+    ) -> SobolRunProtocol: ...
+    def polynomial_chaos(
+        self, analysis: ForwardAnalysisProtocol, settings: str
+    ) -> ChaosRunProtocol: ...
 
 class MathExpressionProtocol(Protocol):
     def __init__(self, expression: str) -> None: ...
@@ -1194,15 +785,17 @@ class ParallelismModule(Protocol):
     def current(self) -> ParallelismProtocol: ...
     def setting(self) -> ContextVar[ParallelismProtocol | None]: ...
 
+class JsonModule(Protocol):
+    def as_read(self, object: str, text: str) -> str: ...
+    def objects(self) -> list[str]: ...
+
 class CoreModule(Protocol):
-    Model: type[RustModelProtocol]
-    Process: type[RustProcessProtocol]
-    Aggregate: type[RustAggregateProtocol]
     MathExpression: type[MathExpressionProtocol]
     FUNCTIONS: list[str]
     def check_ranges(self, object: str, settings: dict[str, object]) -> None: ...
     def range_rules(self) -> list[tuple[str, str, int | float, str]]: ...
 
+json: JsonModule
 core: CoreModule
 model: ModelModule
 engine: EngineModule

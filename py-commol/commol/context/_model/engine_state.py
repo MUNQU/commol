@@ -6,7 +6,7 @@ overrides apply, and how calibrated values reach the initial state.
 This module only asks the engine; it does not reproduce any of those rules.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from functools import lru_cache
 from typing import TYPE_CHECKING, NamedTuple
 
@@ -14,29 +14,13 @@ from commol.commol_rs import _commol_rs as commol_rs
 
 from commol.context._model.formula_tree import Node, Variable, product, read_tree
 from commol.context.constants import CalibrationParameterType
+from commol.context.engine_json import engine_json
 
 if TYPE_CHECKING:
-    from commol.commol_rs._commol_rs import (
-        CalibrationConstraintProtocol,
-        CalibrationParameterProtocol,
-        CalibrationParameterTypeProtocol,
-        EngineProtocol,
-        LossConfigProtocol,
-        ObservationModelProtocol,
-        ObservedDataPointProtocol,
-        RustAggregateProtocol,
-        RustModelProtocol,
-        RustProcessProtocol,
-    )
-    from commol.context.calibration import (
-        CalibrationConstraint,
-        CalibrationParameter,
-        CalibrationProblem,
-        ObservedDataPoint,
-    )
+    from commol.commol_rs._commol_rs import EngineProtocol
+    from commol.context.calibration import CalibrationParameter
     from commol.context.aggregate import Aggregate
     from commol.context.model import Model
-    from commol.context.observation_models import ObservationModel
     from commol.context.process import Process
 
 
@@ -83,18 +67,6 @@ class ExpandedOutput(NamedTuple):
     categories: dict[str, str]
 
 
-def _rust_model(model: "Model") -> "RustModelProtocol":
-    return commol_rs.core.Model.from_json(model.model_dump_json())
-
-
-def _rust_process(process: "Process") -> "RustProcessProtocol":
-    return commol_rs.core.Process.from_json(process.model_dump_json())
-
-
-def _rust_structure(structure: "Aggregate") -> "RustAggregateProtocol":
-    return commol_rs.core.Aggregate.from_json(structure.model_dump_json())
-
-
 def build_engine(model: "Model | str") -> "EngineProtocol":
     """
     Build the engine that a model names.
@@ -115,7 +87,7 @@ def build_engine(model: "Model | str") -> "EngineProtocol":
         If the engine cannot compile the model.
     """
     model_json = model if isinstance(model, str) else model.model_dump_json()
-    return commol_rs.engine.Engine(commol_rs.core.Model.from_json(model_json))
+    return commol_rs.engine.Engine(model_json)
 
 
 def initial_state(
@@ -146,7 +118,7 @@ def initial_state(
     return [
         InitialCompartment(name, bin_id, dict(categories), amount)
         for name, bin_id, categories, amount in commol_rs.model.initial_state(
-            _rust_process(process), _rust_structure(structure)
+            process.model_dump_json(), structure.model_dump_json()
         )
     ]
 
@@ -168,7 +140,7 @@ def expanded_outputs(
         The expanded compartments and accumulator outputs, in engine order.
     """
     compartments, accumulators = commol_rs.model.expanded_outputs(
-        _rust_process(process)
+        process.model_dump_json()
     )
     return (
         [
@@ -251,101 +223,8 @@ def transition_flows(
     return [
         TransitionFlow(*flow)
         for flow in commol_rs.model.transition_flows(
-            _rust_process(process), _rust_structure(structure)
+            process.model_dump_json(), structure.model_dump_json()
         )
-    ]
-
-
-def _rust_parameter_type(parameter_type: str) -> "CalibrationParameterTypeProtocol":
-    rust_types = commol_rs.calibration.CalibrationParameterType
-    return {
-        CalibrationParameterType.PARAMETER: rust_types.Parameter,
-        CalibrationParameterType.INITIAL_CONDITION: rust_types.InitialCondition,
-        CalibrationParameterType.FACTOR: rust_types.Factor,
-        CalibrationParameterType.NOISE: rust_types.Noise,
-    }[CalibrationParameterType(parameter_type)]
-
-
-def rust_parameters(
-    parameters: Sequence["CalibrationParameter"],
-) -> list["CalibrationParameterProtocol"]:
-    """The parameters of a calibration problem, as the engine takes them."""
-    return [
-        commol_rs.calibration.CalibrationParameter(
-            id=param.id,
-            parameter_type=_rust_parameter_type(param.parameter_type),
-            min_bound=param.min_bound,
-            max_bound=param.max_bound,
-            initial_guess=param.initial_guess,
-        )
-        for param in parameters
-    ]
-
-
-def rust_observed_data(
-    points: Sequence["ObservedDataPoint"],
-) -> list["ObservedDataPointProtocol"]:
-    """The observations of a calibration problem, as the engine takes them."""
-    return [
-        commol_rs.calibration.ObservedDataPoint(
-            at=point.at,
-            label=point.label,
-            outputs=point.observed_outputs,
-            value=point.value,
-            weight=point.weight,
-            factor_id=point.factor_id,
-            window=point.window,
-            trials=point.trials,
-        )
-        for point in points
-    ]
-
-
-def rust_observation_models(
-    models: Mapping[str, "ObservationModel"],
-) -> list[tuple[str, "ObservationModelProtocol"]]:
-    """The observation models of a calibration problem, as the engine takes them."""
-    from commol.context.observation_models import (
-        BinomialObservations,
-        LogNormalObservations,
-        NegativeBinomialObservations,
-        NormalObservations,
-        PoissonObservations,
-        StudentTObservations,
-    )
-
-    rust = commol_rs.calibration.ObservationModel
-
-    def convert(model: "ObservationModel") -> "ObservationModelProtocol":
-        match model:
-            case NormalObservations():
-                return rust.normal(model.sd)
-            case LogNormalObservations():
-                return rust.log_normal(model.sigma, model.center == "median")
-            case StudentTObservations():
-                return rust.student_t(model.df, model.scale)
-            case PoissonObservations():
-                return rust.poisson()
-            case NegativeBinomialObservations():
-                return rust.negative_binomial(model.overdispersion)
-            case BinomialObservations():
-                return rust.binomial(model.trials)
-
-    return [(label, convert(model)) for label, model in models.items()]
-
-
-def rust_constraints(
-    constraints: Sequence["CalibrationConstraint"],
-) -> list["CalibrationConstraintProtocol"]:
-    """The constraints of a calibration problem, as the engine takes them."""
-    return [
-        commol_rs.calibration.CalibrationConstraint(
-            id=constraint.id,
-            expression=constraint.expression,
-            weight=constraint.weight,
-            at=constraint.at,
-        )
-        for constraint in constraints
     ]
 
 
@@ -402,7 +281,7 @@ def check_model_values(
             )
     commol_rs.calibration.check_model_values(
         engine,
-        rust_parameters(parameters),
+        engine_json(list(parameters)),
         initial_condition_remainder=remainder,
     )
 
@@ -432,7 +311,7 @@ def initial_condition_coverage(
     """
     values, remainder_indices = commol_rs.calibration.initial_condition_coverage(
         engine,
-        rust_parameters(parameters),
+        engine_json(list(parameters)),
         initial_condition_remainder=remainder,
     )
     names = engine.compartments
@@ -501,7 +380,7 @@ def calibrated_initial_state[S: "Aggregate"](
     engine = build_engine(model)
     applied, state, covered = commol_rs.calibration.calibrated_initial_state(
         engine,
-        rust_parameters(parameters),
+        engine_json(list(parameters)),
         list(values),
         initial_condition_remainder=remainder,
     )
@@ -535,7 +414,7 @@ def check_model(model: "Model") -> None:
         model or reads a variable the model does not define, or a rate reads
         neighbors the model cannot resolve.
     """
-    commol_rs.model.check_model(_rust_model(model))
+    commol_rs.model.check_model(model.model_dump_json())
 
 
 def subgroup_total_names(process: "Process") -> list[str]:
@@ -555,7 +434,7 @@ def subgroup_total_names(process: "Process") -> list[str]:
     list[str]
         The names, sorted. A process without stratifications has none.
     """
-    return commol_rs.model.subgroup_total_names(_rust_process(process))
+    return commol_rs.model.subgroup_total_names(process.model_dump_json())
 
 
 @lru_cache(maxsize=1024)
@@ -580,46 +459,3 @@ def formula_tree(formula: str) -> Node:
         If the formula is not in the language of formulas.
     """
     return read_tree(commol_rs.core.MathExpression(formula).tree())
-
-
-def rust_loss_config(
-    problem: "CalibrationProblem", loss_function: str
-) -> "LossConfigProtocol":
-    """
-    The Rust loss of a problem, with the settings of its replicates.
-
-    The calibration problem of the engine reads the replicates: a
-    stochastic engine runs ``problem.replicates`` replicates at each
-    evaluation, seeded from ``problem.seed`` (which the calibration problem
-    of the engine takes) and compared through ``problem.replicate_summary``,
-    and a deterministic engine reads none of them.
-
-    Parameters
-    ----------
-    problem : CalibrationProblem
-        The calibration problem.
-    loss_function : str
-        The problem's loss.
-
-    Returns
-    -------
-    LossConfigProtocol
-        The loss, its normalization and the settings of its replicates.
-    """
-    from commol.context.calibration import Quantile
-    from commol.context.constants import LossFunction
-
-    builders = {
-        LossFunction.SSE: commol_rs.calibration.LossConfig.sse,
-        LossFunction.RMSE: commol_rs.calibration.LossConfig.rmse,
-        LossFunction.MAE: commol_rs.calibration.LossConfig.mae,
-    }
-    builder = builders[LossFunction(loss_function)]
-    # Per-series normalization is orthogonal to the chosen metric.
-    loss_config = builder().normalized(problem.normalize_observations)
-    summary = problem.replicate_summary
-    if isinstance(summary, Quantile):
-        return loss_config.with_replicates(
-            problem.replicates, "quantile", summary.level
-        )
-    return loss_config.with_replicates(problem.replicates, summary)

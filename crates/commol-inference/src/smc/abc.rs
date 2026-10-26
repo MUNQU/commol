@@ -18,7 +18,8 @@ use crate::error::MethodError;
 use crate::priors::Priors;
 
 /// The metric of a [`Distance::Series`] within each series.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SeriesMetric {
     /// The weighted root mean square of the scaled residuals.
     Rmse,
@@ -27,22 +28,6 @@ pub enum SeriesMetric {
 }
 
 impl SeriesMetric {
-    /// The metric of a name: `"rmse"` or `"mae"`.
-    ///
-    /// # Errors
-    ///
-    /// [`MethodError::Invalid`], which lists the names, when `name` is none
-    /// of them.
-    pub fn from_name(name: &str) -> Result<Self, MethodError> {
-        match name {
-            "rmse" => Ok(Self::Rmse),
-            "mae" => Ok(Self::Mae),
-            _ => Err(MethodError::Invalid(format!(
-                "metric is '{name}'; it must be \"rmse\" or \"mae\""
-            ))),
-        }
-    }
-
     fn loss(self) -> LossConfig {
         match self {
             Self::Rmse => LossConfig::RootMeanSquaredError,
@@ -74,19 +59,6 @@ pub struct AbcTarget<'a, E: SimulationEngine> {
     count: usize,
     /// `1 / rms` of the observed values of the series of each observation.
     scale: Vec<f64>,
-}
-
-impl Distance {
-    /// The distance of a series metric, or the loss without one.
-    ///
-    /// # Errors
-    ///
-    /// As [`SeriesMetric::from_name`].
-    pub fn from_metric(metric: Option<&str>) -> Result<Self, MethodError> {
-        metric.map_or(Ok(Self::Loss), |name| {
-            SeriesMetric::from_name(name).map(Self::Series)
-        })
-    }
 }
 
 impl<'a, E: SimulationEngine> AbcTarget<'a, E> {
@@ -206,25 +178,5 @@ impl<E: SimulationEngine + Sync> TemperedTarget for AbcTarget<'_, E> {
 
     fn last_level(&self) -> f64 {
         0.0
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_distance_is_the_loss_or_a_metric_of_the_series() {
-        assert_eq!(Distance::from_metric(None), Ok(Distance::Loss));
-        assert_eq!(
-            Distance::from_metric(Some("mae")),
-            Ok(Distance::Series(SeriesMetric::Mae))
-        );
-        assert_eq!(
-            Distance::from_metric(Some("max")),
-            Err(MethodError::Invalid(
-                "metric is 'max'; it must be \"rmse\" or \"mae\"".to_string()
-            ))
-        );
     }
 }
