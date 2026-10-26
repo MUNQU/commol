@@ -128,19 +128,6 @@ of a formula compares them."""
 PYTHON_PARSERS = {"eval", "compile", "exec"}
 """The builtins that read a text as Python."""
 
-FORMULA_READERS = {
-    "py-commol/commol/utils/equations.py": (
-        "#402: the check of units reads the formula with ast.parse and eval, "
-        "with a pint unit for each variable"
-    ),
-    "py-commol/commol/context/_model/equations.py": (
-        "#402: the description splits the text of a rate at ' * ' and ' / ' "
-        "and counts its parentheses"
-    ),
-}
-"""The modules that read the text of a formula outside the engine, and why.
-#402 moves each onto the tree of the engine and empties this list."""
-
 
 def formula_reading(path: Path) -> Iterator[str]:
     """Each place of ``path`` that reads the text of a formula: a comparison
@@ -167,26 +154,18 @@ def formula_reading(path: Path) -> Iterator[str]:
 def test_only_the_engine_reads_a_formula() -> None:
     """The parser of the engine (``crates/commol-core/src/math_expression/``)
     is the only reader and the only check of a formula: no module of commol
-    tokenizes or checks the text of a formula, but the readers of
-    ``FORMULA_READERS``, and each of them still reads one."""
-    readers: dict[str, list[str]] = {}
-    for path in sorted(PACKAGE_DIR.rglob("*.py")):
-        if places := list(formula_reading(path)):
-            readers[relative(path)] = places
-    unlisted = [
+    tokenizes, checks or parses the text of a formula. The check of units and
+    the description read the tree that the engine gives
+    (``commol_rs.core.MathExpression.tree``)."""
+    readers = [
         place
-        for module, places in readers.items()
-        if module not in FORMULA_READERS
-        for place in places
+        for path in sorted(PACKAGE_DIR.rglob("*.py"))
+        for place in formula_reading(path)
     ]
 
-    assert not unlisted, (
+    assert not readers, (
         "Ask the engine (commol_rs.core.MathExpression) instead of reading the "
-        "text of a formula:\n" + "\n".join(unlisted)
-    )
-    assert set(FORMULA_READERS) <= set(readers), (
-        "Remove from FORMULA_READERS the modules that no longer read a formula: "
-        f"{sorted(set(FORMULA_READERS) - set(readers))}"
+        "text of a formula:\n" + "\n".join(readers)
     )
 
 

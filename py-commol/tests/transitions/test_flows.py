@@ -4,6 +4,7 @@ import pytest
 
 from commol import Aggregate
 from commol.context._model.engine_state import transition_flows
+from commol.context._model.formula_tree import formula_text
 from commol.context.model import Model
 from tests.support import (
     FactoryBuilder,
@@ -38,7 +39,7 @@ class TestCategoryTransitions:
 
     def test_printed_flows_are_the_simulated_ones(self) -> None:
         flows = {
-            (flow.transition, flow.source, flow.target, flow.term)
+            (flow.transition, flow.source, flow.target, formula_text(flow.term))
             for flow in transition_flows(
                 _group_model().process, _group_model().structure
             )

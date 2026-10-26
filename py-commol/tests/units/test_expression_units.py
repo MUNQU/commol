@@ -27,3 +27,20 @@ def test_the_unit_check_knows_every_function_of_the_engine() -> None:
     rules = equations._FUNCTION_UNITS  # pyright: ignore[reportPrivateUsage]
 
     assert set(rules) == set(commol_rs.core.FUNCTIONS)
+
+
+def test_the_unit_follows_the_grouping_of_the_parser() -> None:
+    """The unit walks the tree of the engine: a chain of powers groups from
+    the right, and ``!`` and a name that Python reserves, such as ``lambda``,
+    which the grammar of Python does not read, have the meaning of the
+    language."""
+    units = {"A": "item", "lambda": "1/day", "t": "day"}
+
+    def unit(equation: str) -> str:
+        define_units("item")
+        return str(parse_equation_unit(equation, units).units)
+
+    assert same_unit(unit("A ^ 2 ^ 0.5"), f"item ** {2**0.5}")
+    assert same_unit(unit("(A ^ 2) ^ 0.5"), "item")
+    assert same_unit(unit("lambda * A"), "item/day")
+    assert same_unit(unit("if(!(t > 2), A, 0)"), "item")
