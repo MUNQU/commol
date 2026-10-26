@@ -3643,6 +3643,10 @@ one structure runs as equations or as events depending on its engine.</p>
 <td>Mermaid in the Markdown rendering, only for a graph that is not <code>expanded</code>; Graphviz DOT for every graph in a <code>.dot</code> file. Text, LaTeX and JSON draw none.</td>
 </tr>
 <tr>
+<td>State graphs</td>
+<td>Built from the flows of the engine (<code>DynamicsDescription.state_graph</code>, <code>strata_graph</code>). The graph of the bins holds the moves between bins, the inflows and the outflows; the graph of the strata, only when a move changes categories, holds the categories that each move changes, joined when a move changes several stratifications. One edge per pair of nodes, one node <code>none</code> per side. A label is the formula of the one rate of one transition, and otherwise the parameters that the rates read, in declaration order.</td>
+</tr>
+<tr>
 <td>Layouts</td>
 <td><code>"default"</code>: overview, entities, dynamics, schedule, initialization, parameters, outputs. <code>"odd"</code>: the ODD protocol; an element commol cannot fill is marked <code>TO_BE_WRITTEN</code>. A section with no blocks is left out of every rendering.</td>
 </tr>
@@ -3667,6 +3671,22 @@ one structure runs as equations or as events depending on its engine.</p>
 <tr>
 <td>An image (PNG, SVG) of a graph</td>
 <td>Needs Graphviz or a browser at run time, a dependency for a view.</td>
+</tr>
+<tr>
+<td>One graph of the bins and the categories</td>
+<td>A move between categories crosses every bin: it is an edge from a bin to itself, which hides the categories, or one edge per bin and category.</td>
+</tr>
+<tr>
+<td>A graph per stratification</td>
+<td>A move can change several stratifications at once; one graph of the strata draws it as one edge.</td>
+</tr>
+<tr>
+<td>The formulas, or the transition ids, as the label of a shared edge</td>
+<td>The formulas are one per stratum, too long for an edge, and the graph of the compartments and the equations hold them; an id names a transition, not what drives it.</td>
+</tr>
+<tr>
+<td>A node <code>none</code> per inflow or outflow</td>
+<td>A model with an outflow from every bin draws as many <code>none</code> nodes as bins.</td>
 </tr>
 <tr>
 <td>TikZ in the LaTeX rendering</td>

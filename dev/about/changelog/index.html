@@ -4830,6 +4830,17 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li><strong>Breaking:</strong> the tag of <code>Complete</code> and <code>Groups</code> in the JSON of a model is
   <code>kind</code>, in place of <code>type</code>. Migration: in a saved model, rename the key
   <code>"type"</code> of each <code>neighbors</code> entry to <code>"kind"</code>.</li>
+<li><strong>Breaking:</strong> <code>Model.describe()</code> gives a graph of the strata, between the
+  graph of the bins and the graph of the compartments, when the model moves
+  amounts between categories, so <code>ModelDescription.graphs()</code> gives three
+  graphs for such a model. A move between categories, also one by a stratified
+  rate whose condition has <code>to</code>, is an edge between categories, not an edge
+  from a bin to itself. The graphs of the bins and of the strata hold one edge
+  per pair of nodes, labelled with the formula of its one rate or with the
+  parameters that its rates read, and one node <code>none</code> for the inflows and one
+  for the outflows; the label no longer starts with the id of the transition.
+  The Markdown rendering draws both graphs. See <a href="../../guide/describing-models/#the-state-graphs">The state
+  graphs</a>.</li>
 <li>Each data object reaches the engine as the JSON of its <code>model_dump()</code>: the
   model, the calibration problem and each inference method, whole. A setting
   that the engine rejects raises <code>ValueError</code> with the path of its field

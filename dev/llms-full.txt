@@ -2290,7 +2290,7 @@ With an origin, [`results.plot.series()`](https://munqu.github.io/commol/latest/
 
 [Back to Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md)
 
-`Model.describe()` returns a description of a model as data: sections of tables, equations, state graphs and text. You can read it in Python, render it as text, Markdown, LaTeX or JSON, save it to a file, or draw its state graph. The description works for every kind of model, and it is built from what the engine simulates, so the equations it shows are the equations that run. Use this page to document a model, to check the equations Commol derived, or to write the methods section of a paper.
+`Model.describe()` returns a description of a model as data: sections of tables, equations, state graphs and text. You can read it in Python, render it as text, Markdown, LaTeX or JSON, save it to a file, or draw its state graphs. The description works for every kind of model, and it is built from what the engine simulates, so the equations it shows are the equations that run. Use this page to document a model, to check the equations Commol derived, or to write the methods section of a paper.
 
 ## Quick path
 
@@ -2314,12 +2314,12 @@ model = (
 
 description = model.describe()
 print(description.render("text"))   # every section, in plain text
-description.save("model.md")        # Markdown, with the state graph as a Mermaid diagram
+description.save("model.md")        # Markdown, with the state graphs as Mermaid diagrams
 description.save("model.tex")       # a LaTeX document
 description.save("model.dot")       # every state graph, in Graphviz DOT
 ```
 
-In a Jupyter notebook, `model.describe()` as the last line of a cell shows the Markdown rendering, with the state graph drawn (JupyterLab draws Mermaid from version 4.1).
+In a Jupyter notebook, `model.describe()` as the last line of a cell shows the Markdown rendering, with the state graphs drawn (JupyterLab draws Mermaid from version 4.1).
 
 ## What a description holds
 
@@ -2360,12 +2360,74 @@ The blocks are a closed set (`commol.context.description`):
 | Format       | Suffix  | Equations                                | Diagrams                                                                 |
 | ------------ | ------- | ---------------------------------------- | ------------------------------------------------------------------------ |
 | `"text"`     | `.txt`  | Compact and expanded forms in plain text | None                                                                     |
-| `"markdown"` | `.md`   | LaTeX math                               | The state graph of the model as a Mermaid diagram                        |
+| `"markdown"` | `.md`   | LaTeX math                               | The graph of the bins and the graph of the strata as Mermaid diagrams    |
 | `"latex"`    | `.tex`  | `align*` environments in a full document | None                                                                     |
 | `"json"`     | `.json` | As data                                  | The graphs as data; `ModelDescription.model_validate_json` reads it back |
 | `"dot"`      | `.dot`  | None                                     | Every state graph, the expanded one included                             |
 
 The Markdown rendering does not draw the graph of the expanded compartments: a stratified model can have hundreds of edges, more than a Mermaid diagram draws. It gives the size of the graph instead. The DOT file holds every graph; `dot -Tpdf model.dot -o model.pdf` draws them with [Graphviz](https://graphviz.org/).
+
+## The state graphs
+
+`description.graphs()` gives the state graphs of the `dynamics` section, in order:
+
+| Graph            | `name`         | Nodes                                   | Edges                                                |
+| ---------------- | -------------- | --------------------------------------- | ---------------------------------------------------- |
+| The bins         | `states`       | Every bin                               | The moves between bins, the inflows and the outflows |
+| The strata       | `strata`       | The categories that a move changes      | The moves between categories, in any bin             |
+| The compartments | `compartments` | Every expanded compartment (`expanded`) | One edge per flow, labelled with its formula         |
+
+The graph of the strata is there only when the model moves amounts between categories: with a transition between categories (`source=["g1"]`, `target=["g2"]`) or with a stratified rate whose condition has `to`. A move inside one bin is an edge of the graph of the strata, not an edge from the bin to itself. A node of the graph of the strata holds the categories of the stratifications that the move changes: `group:g1`, or `group:g1, size:s1` for a move that changes two stratifications at once.
+
+The graphs of the bins and of the strata hold one edge per pair of nodes, whatever the number of transitions between them, and every inflow starts at one node `none` and every outflow ends at another. The label of an edge says what drives the move:
+
+| The edge comes from                                          | Its label                                                                                                                                        |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| One transition with one rate                                 | The formula of the rate, such as `k1 * A`                                                                                                        |
+| One transition with stratified rates, or several transitions | The parameters that the rates read, in the order the model declares them, such as `k1, k2, m`; compartments, totals, `t` and `step` are left out |
+| A transition with no rate                                    | `no rate`                                                                                                                                        |
+
+In the graph of the strata, the label first names the bins that move, such as `A, B, C: k1, k2`. The formula of each flow is in the graph of the compartments and in the [equations](#the-equations).
+
+```python
+from commol import Aggregate, ModelBuilder
+
+moving = (
+    ModelBuilder(name="Moving", bin_unit="item", step_unit="day")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_stratification(id="group", categories=["g1", "g2"])
+    .add_parameter(id="k1", value=0.5, unit="1/day")
+    .add_parameter(id="k2", value=0.1, unit="1/day")
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")
+    .add_transition(
+        id="t_move",
+        source=["A"],
+        target=["A"],
+        stratified_rates=[
+            {
+                "conditions": [
+                    {"stratification": "group", "category": "g1", "to": "g2"}
+                ],
+                "rate": "k2",
+            }
+        ],
+    )
+    .build(
+        Aggregate(
+            bin_amounts={"A": 900, "B": 100},
+            stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
+        ),
+        engine="DifferenceEquations",
+    )
+)
+
+bins, strata, compartments = moving.describe().graphs()
+print([(edge.source, edge.target, edge.label) for edge in bins.edges])
+# [('A', 'B', 'k1')]
+print([(edge.source, edge.target, edge.label) for edge in strata.edges])
+# [('group:g1', 'group:g2', 'A: k2')]
+```
 
 The LaTeX document uses only standard packages (`amsmath`, `amssymb`, `longtable`, `fontenc`, `geometry`), so `latexmk -pdf model.tex` builds it.
 
@@ -19365,8 +19427,8 @@ class ModelDescription(BaseModel):
         ----------
         format : {"text", "markdown", "latex", "json", "dot"}, default="text"
             ``"text"``: plain text, with the equations in their compact and
-            expanded forms. ``"markdown"``: Markdown, with the state graph of
-            the model as a Mermaid diagram. ``"latex"``: a LaTeX document.
+            expanded forms. ``"markdown"``: Markdown, with the graphs of the
+            bins and of the strata as Mermaid diagrams. ``"latex"``: a LaTeX document.
             ``"json"``: the description as data. ``"dot"``: every state graph
             in Graphviz DOT, the expanded one included.
 
@@ -19520,9 +19582,9 @@ The description as a string.
 
 Parameters:
 
-| Name     | Type                                 | Description                                                                                                                                                                                                                                                                                | Default  |
-| -------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
-| `format` | `(text, markdown, latex, json, dot)` | "text": plain text, with the equations in their compact and expanded forms. "markdown": Markdown, with the state graph of the model as a Mermaid diagram. "latex": a LaTeX document. "json": the description as data. "dot": every state graph in Graphviz DOT, the expanded one included. | `"text"` |
+| Name     | Type                                 | Description                                                                                                                                                                                                                                                                                           | Default  |
+| -------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `format` | `(text, markdown, latex, json, dot)` | "text": plain text, with the equations in their compact and expanded forms. "markdown": Markdown, with the graphs of the bins and of the strata as Mermaid diagrams. "latex": a LaTeX document. "json": the description as data. "dot": every state graph in Graphviz DOT, the expanded one included. | `"text"` |
 
 Returns:
 
@@ -19547,8 +19609,8 @@ def render(self, format: DescriptionFormat = "text") -> str:
     ----------
     format : {"text", "markdown", "latex", "json", "dot"}, default="text"
         ``"text"``: plain text, with the equations in their compact and
-        expanded forms. ``"markdown"``: Markdown, with the state graph of
-        the model as a Mermaid diagram. ``"latex"``: a LaTeX document.
+        expanded forms. ``"markdown"``: Markdown, with the graphs of the
+        bins and of the strata as Mermaid diagrams. ``"latex"``: a LaTeX document.
         ``"json"``: the description as data. ``"dot"``: every state graph
         in Graphviz DOT, the expanded one included.
 
@@ -39619,6 +39681,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Breaking:** `ParticleSwarmConfig` is one class with plain fields, and its chained methods `.inertia`, `.acceleration`, `.velocity`, `.mutation`, `.improvement_stop` and `.radius_stop` and their `*_config` properties are removed, with the `PSO*` classes of `commol.context.calibration` and the `PSO*` enumerations of `commol.context.constants`. Each strategy is a name (`inertia`, `acceleration`, `mutation`, `initialization`), and its numbers are fields: `inertia_factor`, `inertia_min`, `inertia_max`, `cognitive`, `social`, `cognitive_initial`, `cognitive_final`, `social_initial`, `social_final`, `mutation_scale`, `mutation_probability`, `mutation_application`, `velocity_clamp_factor`, `velocity_mutation_threshold`, `improvement_window`, `improvement_tol_abs`, `improvement_tol_rel` and `radius_tol`. A number set without its strategy raises `ValueError`. Migration: `ParticleSwarmConfig().inertia("chaotic", w_min=0.4, w_max=0.9).improvement_stop(window=30, tol_abs=1e-12, tol_rel=1e-9)` is `ParticleSwarmConfig(inertia="chaotic", inertia_min=0.4, inertia_max=0.9, improvement_window=30, improvement_tol_abs=1e-12, improvement_tol_rel=1e-9)`; `c1_*` is `cognitive_*`, `c2_*` is `social_*`, `.velocity(clamp_factor=…, mutation_threshold=…)` is `velocity_clamp_factor=…, velocity_mutation_threshold=…` and `.radius_stop(tol)` is `radius_tol=tol`. See [Particle swarm](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#particle-swarm).
 - **Breaking:** the members that converted an object to the engine are removed: `Calibrator.rust_problem` and `rust_optimizer`, `rust_predictive`, `rust_observation_draws` and `rust_log_score` of `Calibrator` and `SensitivityAnalysis`, `SensitivityAnalysis.rust_analysis`, `rust_parameters` and `rust_prior` of the distributions, `Priors.rust_priors`, `InputSpace.rust_distributions`, `rust_json` of the quantities and `ParameterSample.rust_sample`; the predictive members of a source are private. Migration: build a predictive with `Predictive` and score it with `commol.scores`, as before; the engine reads each object from the JSON of its `model_dump()`.
 - **Breaking:** the tag of `Complete` and `Groups` in the JSON of a model is `kind`, in place of `type`. Migration: in a saved model, rename the key `"type"` of each `neighbors` entry to `"kind"`.
+- **Breaking:** `Model.describe()` gives a graph of the strata, between the graph of the bins and the graph of the compartments, when the model moves amounts between categories, so `ModelDescription.graphs()` gives three graphs for such a model. A move between categories, also one by a stratified rate whose condition has `to`, is an edge between categories, not an edge from a bin to itself. The graphs of the bins and of the strata hold one edge per pair of nodes, labelled with the formula of its one rate or with the parameters that its rates read, and one node `none` for the inflows and one for the outflows; the label no longer starts with the id of the transition. The Markdown rendering draws both graphs. See [The state graphs](https://munqu.github.io/commol/latest/guide/describing-models/#the-state-graphs).
 - Each data object reaches the engine as the JSON of its `model_dump()`: the model, the calibration problem and each inference method, whole. A setting that the engine rejects raises `ValueError` with the path of its field before the message of the engine (`optimization_config.inertia_factor: inertia_factor is a number greater than 0, got -1`). `NelderMeadConfig`, `ParticleSwarmConfig`, the four bootstraps and the observation noises have a field `kind` with a default, the tag of their union. The engine fits the problem for each method that needs a fit, and calibrates `η` and the threshold of a profile. The results are the same for the same settings and seed.
 - An unknown name of an engine, a model kind, the levels of `commol.set_threads`, or the `score` or `by` of a conformal method gives the message of the reader of the engine, which lists the valid names, such as `` unknown variant `Stochastic`, expected one of `DifferenceEquations`, … `` or `` score: unknown variant `other`, expected one of `absolute`, `normalized`, `spread` ``. A conformal method without `score` or `by` gives `` missing field `score` ``.
 - The JSON of every result (`model_dump_json`) is standard JSON: a number that is not finite is the text `"Infinity"`, `"-Infinity"` or `"NaN"`, as at the port of the engine. Before, `ParameterSample`, `SMCResult`, `JackknifeResult`, `ConformalResult`, `PredictionIntervals` and `SeriesIntervals` wrote the bare `Infinity` and `NaN`, which a standard JSON reader rejects, and the other results wrote `null`, which did not load back. A result reads its JSON back equal, a NaN included, and a result that 0.10 saved with bare `Infinity` or `NaN` still loads.

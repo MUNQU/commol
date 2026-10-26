@@ -938,6 +938,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-state-graphs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The state graphs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-equations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3336,6 +3347,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-state-graphs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The state graphs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-equations" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3403,7 +3425,7 @@
 <p><a href="../building-models/">Back to Building Models</a></p>
 <p><code>Model.describe()</code> returns a description of a model as data: sections of
 tables, equations, state graphs and text. You can read it in Python, render it
-as text, Markdown, LaTeX or JSON, save it to a file, or draw its state graph.
+as text, Markdown, LaTeX or JSON, save it to a file, or draw its state graphs.
 The description works for every kind of model, and it is built from what the
 engine simulates, so the equations it shows are the equations that run. Use
 this page to document a model, to check the equations Commol derived, or to
@@ -3428,12 +3450,12 @@ write the methods section of a paper.</p>
 </span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>
 </span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="n">description</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">describe</span><span class="p">()</span>
 </span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="nb">print</span><span class="p">(</span><span class="n">description</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="s2">&quot;text&quot;</span><span class="p">))</span>   <span class="c1"># every section, in plain text</span>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="n">description</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;model.md&quot;</span><span class="p">)</span>        <span class="c1"># Markdown, with the state graph as a Mermaid diagram</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="n">description</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;model.md&quot;</span><span class="p">)</span>        <span class="c1"># Markdown, with the state graphs as Mermaid diagrams</span>
 </span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="n">description</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;model.tex&quot;</span><span class="p">)</span>       <span class="c1"># a LaTeX document</span>
 </span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="n">description</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;model.dot&quot;</span><span class="p">)</span>       <span class="c1"># every state graph, in Graphviz DOT</span>
 </span></code></pre></div>
 <p>In a Jupyter notebook, <code>model.describe()</code> as the last line of a cell shows the
-Markdown rendering, with the state graph drawn (JupyterLab draws Mermaid from
+Markdown rendering, with the state graphs drawn (JupyterLab draws Mermaid from
 version 4.1).</p>
 <h2 id="what-a-description-holds">What a description holds<a class="headerlink" href="#what-a-description-holds" title="Permanent link">&para;</a></h2>
 <p>A <code>ModelDescription</code> has a <code>title</code>, a <code>layout</code> and a list of <code>sections</code>. Each
@@ -3545,7 +3567,7 @@ without <code>format</code>, takes the format from the suffix of the path.</p>
 <td><code>"markdown"</code></td>
 <td><code>.md</code></td>
 <td>LaTeX math</td>
-<td>The state graph of the model as a Mermaid diagram</td>
+<td>The graph of the bins and the graph of the strata as Mermaid diagrams</td>
 </tr>
 <tr>
 <td><code>"latex"</code></td>
@@ -3572,6 +3594,113 @@ a stratified model can have hundreds of edges, more than a Mermaid diagram
 draws. It gives the size of the graph instead. The DOT file holds every
 graph; <code>dot -Tpdf model.dot -o model.pdf</code> draws them with
 <a href="https://graphviz.org/">Graphviz</a>.</p>
+<h2 id="the-state-graphs">The state graphs<a class="headerlink" href="#the-state-graphs" title="Permanent link">&para;</a></h2>
+<p><code>description.graphs()</code> gives the state graphs of the <code>dynamics</code> section, in
+order:</p>
+<table>
+<thead>
+<tr>
+<th>Graph</th>
+<th><code>name</code></th>
+<th>Nodes</th>
+<th>Edges</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The bins</td>
+<td><code>states</code></td>
+<td>Every bin</td>
+<td>The moves between bins, the inflows and the outflows</td>
+</tr>
+<tr>
+<td>The strata</td>
+<td><code>strata</code></td>
+<td>The categories that a move changes</td>
+<td>The moves between categories, in any bin</td>
+</tr>
+<tr>
+<td>The compartments</td>
+<td><code>compartments</code></td>
+<td>Every expanded compartment (<code>expanded</code>)</td>
+<td>One edge per flow, labelled with its formula</td>
+</tr>
+</tbody>
+</table>
+<p>The graph of the strata is there only when the model moves amounts between
+categories: with a transition between categories (<code>source=["g1"]</code>,
+<code>target=["g2"]</code>) or with a stratified rate whose condition has <code>to</code>. A move
+inside one bin is an edge of the graph of the strata, not an edge from the bin
+to itself. A node of the graph of the strata holds the categories of the
+stratifications that the move changes: <code>group:g1</code>, or <code>group:g1, size:s1</code>
+for a move that changes two stratifications at once.</p>
+<p>The graphs of the bins and of the strata hold one edge per pair of nodes,
+whatever the number of transitions between them, and every inflow starts at
+one node <code>none</code> and every outflow ends at another. The label of an edge says
+what drives the move:</p>
+<table>
+<thead>
+<tr>
+<th>The edge comes from</th>
+<th>Its label</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>One transition with one rate</td>
+<td>The formula of the rate, such as <code>k1 * A</code></td>
+</tr>
+<tr>
+<td>One transition with stratified rates, or several transitions</td>
+<td>The parameters that the rates read, in the order the model declares them, such as <code>k1, k2, m</code>; compartments, totals, <code>t</code> and <code>step</code> are left out</td>
+</tr>
+<tr>
+<td>A transition with no rate</td>
+<td><code>no rate</code></td>
+</tr>
+</tbody>
+</table>
+<p>In the graph of the strata, the label first names the bins that move, such as
+<code>A, B, C: k1, k2</code>. The formula of each flow is in the graph of the
+compartments and in the <a href="#the-equations">equations</a>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">Aggregate</span><span class="p">,</span> <span class="n">ModelBuilder</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">moving</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Moving&quot;</span><span class="p">,</span> <span class="n">bin_unit</span><span class="o">=</span><span class="s2">&quot;item&quot;</span><span class="p">,</span> <span class="n">step_unit</span><span class="o">=</span><span class="s2">&quot;day&quot;</span><span class="p">)</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State B&quot;</span><span class="p">)</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="o">.</span><span class="n">add_stratification</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;group&quot;</span><span class="p">,</span> <span class="n">categories</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;g1&quot;</span><span class="p">,</span> <span class="s2">&quot;g2&quot;</span><span class="p">])</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;1/day&quot;</span><span class="p">)</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;1/day&quot;</span><span class="p">)</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">)</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_move&quot;</span><span class="p">,</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>        <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>        <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>        <span class="n">stratified_rates</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>            <span class="p">{</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>                <span class="s2">&quot;conditions&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>                    <span class="p">{</span><span class="s2">&quot;stratification&quot;</span><span class="p">:</span> <span class="s2">&quot;group&quot;</span><span class="p">,</span> <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="s2">&quot;g1&quot;</span><span class="p">,</span> <span class="s2">&quot;to&quot;</span><span class="p">:</span> <span class="s2">&quot;g2&quot;</span><span class="p">}</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>                <span class="p">],</span>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>                <span class="s2">&quot;rate&quot;</span><span class="p">:</span> <span class="s2">&quot;k2&quot;</span><span class="p">,</span>
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>            <span class="p">}</span>
+</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>        <span class="p">],</span>
+</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>    <span class="p">)</span>
+</span><span id="__span-2-24"><a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>    <span class="o">.</span><span class="n">build</span><span class="p">(</span>
+</span><span id="__span-2-25"><a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>        <span class="n">Aggregate</span><span class="p">(</span>
+</span><span id="__span-2-26"><a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>            <span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">900</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">100</span><span class="p">},</span>
+</span><span id="__span-2-27"><a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>            <span class="n">stratification_fractions</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;group&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;g1&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s2">&quot;g2&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">}},</span>
+</span><span id="__span-2-28"><a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>        <span class="p">),</span>
+</span><span id="__span-2-29"><a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>        <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">,</span>
+</span><span id="__span-2-30"><a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>    <span class="p">)</span>
+</span><span id="__span-2-31"><a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a><span class="p">)</span>
+</span><span id="__span-2-32"><a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a>
+</span><span id="__span-2-33"><a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a><span class="n">bins</span><span class="p">,</span> <span class="n">strata</span><span class="p">,</span> <span class="n">compartments</span> <span class="o">=</span> <span class="n">moving</span><span class="o">.</span><span class="n">describe</span><span class="p">()</span><span class="o">.</span><span class="n">graphs</span><span class="p">()</span>
+</span><span id="__span-2-34"><a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a><span class="nb">print</span><span class="p">([(</span><span class="n">edge</span><span class="o">.</span><span class="n">source</span><span class="p">,</span> <span class="n">edge</span><span class="o">.</span><span class="n">target</span><span class="p">,</span> <span class="n">edge</span><span class="o">.</span><span class="n">label</span><span class="p">)</span> <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="n">bins</span><span class="o">.</span><span class="n">edges</span><span class="p">])</span>
+</span><span id="__span-2-35"><a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a><span class="c1"># [(&#39;A&#39;, &#39;B&#39;, &#39;k1&#39;)]</span>
+</span><span id="__span-2-36"><a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a><span class="nb">print</span><span class="p">([(</span><span class="n">edge</span><span class="o">.</span><span class="n">source</span><span class="p">,</span> <span class="n">edge</span><span class="o">.</span><span class="n">target</span><span class="p">,</span> <span class="n">edge</span><span class="o">.</span><span class="n">label</span><span class="p">)</span> <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="n">strata</span><span class="o">.</span><span class="n">edges</span><span class="p">])</span>
+</span><span id="__span-2-37"><a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a><span class="c1"># [(&#39;group:g1&#39;, &#39;group:g2&#39;, &#39;A: k2&#39;)]</span>
+</span></code></pre></div>
 <p>The LaTeX document uses only standard packages (<code>amsmath</code>, <code>amssymb</code>,
 <code>longtable</code>, <code>fontenc</code>, <code>geometry</code>), so <code>latexmk -pdf model.tex</code> builds it.</p>
 <h2 id="the-equations">The equations<a class="headerlink" href="#the-equations" title="Permanent link">&para;</a></h2>
@@ -3613,18 +3742,18 @@ of a proportional rate is the whole rate times its source: <code>(k1 + k2) * B</
 In LaTeX, a product is <code>\cdot</code>, a division outside parentheses is a fraction
 and a power raises its exponent.</p>
 <p>For the model above, the text rendering holds:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Bin Transitions:
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>t_ab (A -&gt; B):
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  A -&gt; B: k1(1/day) * A(item) * B(item) / total(item) [item / day]
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>t_bc (B -&gt; C):
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  B -&gt; C: k2(1/day) * B(item) [item / day]
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>Total System: 3 coupled equations (3 bins)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Bin Transitions:
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>t_ab (A -&gt; B):
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  A -&gt; B: k1(1/day) * A(item) * B(item) / total(item) [item / day]
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>t_bc (B -&gt; C):
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>  B -&gt; C: k2(1/day) * B(item) [item / day]
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>Total System: 3 coupled equations (3 bins)
 </span></code></pre></div>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>[A(t+Dt) - A(t)] / Dt = - (k1 * A * B / total)
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>[B(t+Dt) - B(t)] / Dt = (k1 * A * B / total) - (k2 * B)
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>[C(t+Dt) - C(t)] / Dt = (k2 * B)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>[A(t+Dt) - A(t)] / Dt = - (k1 * A * B / total)
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>[B(t+Dt) - B(t)] / Dt = (k1 * A * B / total) - (k2 * B)
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>[C(t+Dt) - C(t)] / Dt = (k2 * B)
 </span></code></pre></div>
 <p>Units appear only when every bin and every constant parameter has one; with
 some units missing, the equations show none. To check the units, use
@@ -3635,12 +3764,12 @@ concepts, Details), the standard description of individual-based and
 agent-based models, used for other simulation models too (Grimm et al. 2006,
 updated in 2010 and 2020). The same layout works for every kind of model, so a
 paper can describe an aggregate model and an agent model in one format.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">odd</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">describe</span><span class="p">(</span><span class="n">layout</span><span class="o">=</span><span class="s2">&quot;odd&quot;</span><span class="p">)</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nb">print</span><span class="p">([</span><span class="n">section</span><span class="o">.</span><span class="n">title</span> <span class="k">for</span> <span class="n">section</span> <span class="ow">in</span> <span class="n">odd</span><span class="o">.</span><span class="n">sections</span><span class="p">])</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># [&#39;Purpose and patterns&#39;, &#39;Entities, state variables and scales&#39;,</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1">#  &#39;Process overview and scheduling&#39;, &#39;Design concepts&#39;, &#39;Initialization&#39;,</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1">#  &#39;Input data&#39;, &#39;Submodels&#39;]</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">odd</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;model_odd.tex&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">odd</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">describe</span><span class="p">(</span><span class="n">layout</span><span class="o">=</span><span class="s2">&quot;odd&quot;</span><span class="p">)</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">print</span><span class="p">([</span><span class="n">section</span><span class="o">.</span><span class="n">title</span> <span class="k">for</span> <span class="n">section</span> <span class="ow">in</span> <span class="n">odd</span><span class="o">.</span><span class="n">sections</span><span class="p">])</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># [&#39;Purpose and patterns&#39;, &#39;Entities, state variables and scales&#39;,</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1">#  &#39;Process overview and scheduling&#39;, &#39;Design concepts&#39;, &#39;Initialization&#39;,</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1">#  &#39;Input data&#39;, &#39;Submodels&#39;]</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="n">odd</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;model_odd.tex&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <table>
 <thead>
