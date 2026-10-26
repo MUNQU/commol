@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, override
 import numpy as np
 
 from commol.api.plotting.accessors import ReplicatesPlot, ResultsPlot
+from commol.api.windows import _windowed_totals
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.result_model import ComparedByValue
 
@@ -163,7 +164,7 @@ class SimulationResults(ComparedByValue, dict[str, list[float]]):
 
         Parameters
         ----------
-        quantities : Sequence[Quantity]
+        quantities : Sequence[quantity]
             The quantities; a `Trajectory` gives one scalar per position.
 
         Returns
@@ -180,6 +181,95 @@ class SimulationResults(ComparedByValue, dict[str, list[float]]):
             with its quantity and says to call `Simulation.run_at`.
         """
         return quantities_of_runs([self], self.positions, quantities)[0]
+
+    def _total(self, ids: Iterable[str]) -> list[float]:
+        """The sum of the outputs the ids stand for, at each position: of a
+        source id, all its outputs, with the model of the run; of an output
+        name, itself."""
+        names = list(ids) if self.model is None else series_names(self.model, ids)
+        return total_series(self, names)
+
+    def sample(self, ids: Iterable[str], at: Iterable[float]) -> list[float]:
+        """
+        Value of the given bins and accumulators at each position of `at`.
+
+        A bin holds an amount at a position, so the value is read at that
+        position, not over the window before it; `windowed_totals` reads the
+        gain of an accumulator over a window. Each position is found with the
+        tolerance of the axis, as an observation finds its row (`index_at` of
+        `crates/commol-calibration/src/observation.rs`), so ``0.1 + 0.2``
+        reads the value at ``0.3``.
+
+        Parameters
+        ----------
+        ids : Iterable[str]
+            Bin and accumulator ids, each for all its outputs, and output
+            names, each for itself. Their outputs are summed before they are
+            read. Results without a model read output names only.
+        at : Iterable[float]
+            Positions to read, each a position of the results.
+
+        Returns
+        -------
+        list[float]
+            One value per position in `at`.
+
+        Raises
+        ------
+        KeyError
+            If an id is not a bin, accumulator or output of the model, or an
+            output is missing from the results.
+        ValueError
+            If the results have no value at a position in `at`.
+        """
+        return _sample(self._total(ids), self.positions, at)
+
+    def windowed_totals(
+        self,
+        ids: Iterable[str],
+        window: float,
+        at: Iterable[float] | None = None,
+    ) -> list[float]:
+        """
+        Amount the given accumulators gained over each window.
+
+        Each value is the sum of the outputs at the end of the window minus
+        the sum at its start, ``at - window``, each found with the tolerance
+        of the axis: the rule of a windowed observation (`window_increments`
+        of `crates/commol-calibration/src/observation.rs`), so the value is
+        the prediction a calibration compares an observation against when
+        that observation sets ``window``.
+
+        Parameters
+        ----------
+        ids : Iterable[str]
+            Accumulator ids, each for all its outputs, and output names, each
+            for itself. Their outputs are summed before windowing. Results
+            without a model read output names only.
+        window : float
+            Length of one window on the axis.
+        at : Iterable[float] | None, optional
+            Positions at which windows close. Defaults to every complete
+            window of the results (`window_ends` of the engine, as
+            `AxisUnits.window_ends` gives it). Pass the observation positions
+            to reproduce exactly the values a calibration used.
+
+        Returns
+        -------
+        list[float]
+            One increment per window.
+
+        Raises
+        ------
+        KeyError
+            If an id is not a bin, accumulator or output of the model, or an
+            output is missing from the results.
+        ValueError
+            If `window` is not a finite, positive length (the message of the
+            engine), a window starts before position 0, or the results have
+            no value at the end or the start of a requested window.
+        """
+        return _windowed_totals(self._total(ids), self.positions, window, at)
 
     @property
     def plot(self) -> ResultsPlot:
@@ -299,6 +389,35 @@ def outputs_for(model: "Model", id: str) -> list[str]:
     return outputs[id]
 
 
+def series_names(model: "Model", ids: Iterable[str]) -> list[str]:
+    """
+    The outputs the ids stand for, in the order given.
+
+    A source id, such as a bin or accumulator id, stands for all its outputs
+    (`outputs_for`); an output name stands for itself.
+
+    Raises
+    ------
+    KeyError
+        If an id is neither a source nor an output of the model.
+    """
+    by_source = model.structure.outputs_by_source(model)
+    outputs = [name for names in by_source.values() for name in names]
+    names: list[str] = []
+    for id in ids:
+        if id in by_source:
+            names.extend(by_source[id])
+        elif id in outputs:
+            names.append(id)
+        else:
+            raise KeyError(
+                f"'{id}' is not a bin, accumulator or output of model "
+                f"'{model.name}'. Bins and accumulators: {sorted(by_source)}. "
+                f"Outputs: {outputs}"
+            )
+    return names
+
+
 def total_series(
     results: Mapping[str, Sequence[float]], outputs: Sequence[str]
 ) -> list[float]:
@@ -345,7 +464,7 @@ def quantities_of_runs(
         The runs, at `positions`, with the same outputs.
     positions : Sequence[float]
         Positions of the runs, ascending.
-    quantities : Sequence[Quantity]
+    quantities : Sequence[quantity]
         The quantities.
 
     Returns
@@ -375,7 +494,7 @@ def quantities_of_runs(
     return [dict(zip(labels, row, strict=True)) for row in values]
 
 
-def sample(
+def _sample(
     series: Sequence[float], positions: Sequence[float], at: Iterable[float]
 ) -> list[float]:
     """
@@ -583,7 +702,7 @@ class SimulationReplicates(ComparedByValue, list[SimulationResults]):
 
         Parameters
         ----------
-        quantities : Sequence[Quantity]
+        quantities : Sequence[quantity]
             The quantities; a `Trajectory` gives one scalar per position.
 
         Returns

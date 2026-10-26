@@ -20,11 +20,6 @@ from commol.context.inference.sample import ParameterSample
 from commol.context.ranges import RangeChecked
 from commol.context.result_model import ResultModel
 
-type BlockLength = int | Literal["auto"]
-"""Positions per block: an integer of at least 1, or ``"auto"``, the rule of
-Politis and White (2004) with the correction of Patton, Politis and White
-(2009) on the residuals of the fit, the largest over the series."""
-
 
 class ResamplingDiagnostics(ResultModel):
     """
@@ -159,7 +154,7 @@ class BayesianBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     kind: Literal["bayesian"] = Field(default="bayesian", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
-    block_length: BlockLength = Field(description="Positions per block.")
+    block_length: int | Literal["auto"] = Field(description="Positions per block.")
     starts: int = Field(default=1, description="Starts per fit.")
 
 
@@ -221,7 +216,7 @@ class ResidualBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     kind: Literal["residual"] = Field(default="residual", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
-    block_length: BlockLength = Field(description="Positions per block.")
+    block_length: int | Literal["auto"] = Field(description="Positions per block.")
     residual_scale: Literal["additive", "multiplicative"] = Field(
         description="The scale of the residuals."
     )
@@ -258,7 +253,7 @@ class WildBootstrap(UncertaintyMethod[BootstrapResult], RangeChecked):
 
     kind: Literal["wild"] = Field(default="wild", description="The bootstrap.")
     replicates: int = Field(description="Number of replicates.")
-    block_length: BlockLength = Field(description="Positions per block.")
+    block_length: int | Literal["auto"] = Field(description="Positions per block.")
     multipliers: Literal["rademacher", "mammen"] = Field(
         description="The distribution of the multipliers."
     )
@@ -334,5 +329,5 @@ class BlockJackknife(UncertaintyMethod[JackknifeResult], RangeChecked):
         Starts of the fit and of each leave-out fit (default 1).
     """
 
-    block_length: BlockLength = Field(description="Positions per block.")
+    block_length: int | Literal["auto"] = Field(description="Positions per block.")
     starts: int = Field(default=1, description="Starts per fit.")

@@ -120,7 +120,7 @@ Design reasons and invariants that cross components go to
 
 | If the change… | Update |
 |---|---|
-| Adds or changes a public Python name, argument, default or error | Its docstring; for a new name in `commol.__all__`, a `::: path` entry in `docs/api/` and a place in the table of `docs/api/index.md`; the guide page that uses it |
+| Adds or changes a public Python name, argument, default or error | Its docstring; for a new name in `commol.__all__`, the name in `py-commol/tests/suite/public_surface.py`, a `::: path` entry in `docs/api/` and a place in the table of `docs/api/index.md`; for a new result, the result in `RESULTS` of that file and its `::: path` entry on the page of the object that returns it; the guide page that uses it |
 | Changes model behavior (expansion, rates, initial conditions, simulation) | The guide page in `docs/guide/`; [Model structure](../advanced/model-structure.md) if a type changes |
 | Changes calibration or uncertainty | `guide/calibration.md` and its sub-pages, or `guide/uncertainty/` |
 | Changes an expression function or variable | `guide/mathematical-expressions.md` |
@@ -188,7 +188,8 @@ every match.
 | The site builds with no broken internal link or anchor | `mkdocs build --strict` (with `validation:` in `mkdocs.yaml`) | CI (Documentation) |
 | External links answer | lychee (`.github/workflows/links.yaml`) | CI on documentation changes, weekly; not a required check |
 | The documentation examples run | `pytest -m docs` (from `py-commol/`) | CI (Python Coverage, and Test of Build) |
-| Every name in `commol.__all__` has an API entry (`::: …` under `docs/api/`) and is in the table of `docs/api/index.md` | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Python Coverage, and Test of Build) |
+| Every name in `commol.__all__` has an API entry (`::: …` under `docs/api/`) and is in the table of `docs/api/index.md`; each result has its entry on the page of the object that returns it | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Python Coverage, and Test of Build) |
+| The exports are the names of `tests/suite/public_surface.py`; a public signature names no enum, no public alias and no private type that a user passes in; every validator of a public class starts with `_` | `pytest` (`tests/suite/test_architecture.py`) | CI (Python Coverage, and Test of Build) |
 | Every crate under `crates/` is named in [Architecture](architecture.md) | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Python Coverage, and Test of Build) |
 | Every test or definition a page names as `<file>::<name>` exists in that file | `pytest -m docs` (`tests/docs/test_reference.py`) | CI (Python Coverage, and Test of Build) |
 | Public Python modules, classes, functions and arguments have docstrings | `ruff check . ../.github/scripts` (rules `D1`, `D417`, NumPy convention) | pre-commit, CI |

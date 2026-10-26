@@ -1,11 +1,9 @@
 """Schedules give each stratification category its own axis pattern."""
 
-from typing import cast
-
 import pytest
 
+from commol import StratificationCondition, StratifiedRate
 from commol import Aggregate, AxisPattern
-from commol.api.patterns import ConditionDict
 from tests.support import FactoryBuilder, a_to_b_builder, run
 from tests.axis_patterns.conditions import condition, rate_string, stratified_rates
 
@@ -40,10 +38,10 @@ class TestScheduleUnit:
         assert isinstance(rate, AxisPattern)
         # Builder hook returns one stratified rate, no default.
         assert rate._builder_stratified_rates() == [
-            {
-                "conditions": [condition("group", "cat1")],
-                "rate": str(AxisPattern.pulse(at=5, value=0.1)),
-            }
+            StratifiedRate(
+                conditions=[condition("group", "cat1")],
+                rate=str(AxisPattern.pulse(at=5, value=0.1)),
+            )
         ]
         assert rate._builder_rate() is None
 
@@ -57,8 +55,8 @@ class TestScheduleUnit:
         )
         srs = stratified_rates(rate)
         assert len(srs) == 2
-        assert srs[0]["conditions"] == [condition("group", "cat1")]
-        assert srs[1]["conditions"] == [condition("group", "cat2")]
+        assert srs[0].conditions == [condition("group", "cat1")]
+        assert srs[1].conditions == [condition("group", "cat2")]
 
     def test_a_default_is_the_fallback_of_the_formula(self):
         rate = AxisPattern.add_group(
@@ -99,8 +97,8 @@ class TestScheduleUnit:
                     conditions=[condition("group", "cat1")], schedule=_rate("0.2")
                 ),
                 ValueError,
-                "A group with conditions [{'stratification': 'group', 'category': "
-                "'cat1'}] has already been registered.",
+                "A group with conditions [StratificationCondition(stratification="
+                "'group', category='cat1', to=None)] has already been registered.",
                 id="same-group-twice",
             ),
             pytest.param(
@@ -128,15 +126,6 @@ class TestScheduleUnit:
                 "one compartment is almost certainly a bug.",
                 id="default-with-a-compartment",
             ),
-            pytest.param(
-                lambda: AxisPattern.add_group(
-                    conditions=cast(list[ConditionDict], [{"strat": "g"}]),
-                    schedule=_rate("0.1"),
-                ),
-                ValueError,
-                "Condition is missing required key 'stratification': {'strat': 'g'}",
-                id="condition-without-stratification",
-            ),
         ],
     )
     def test_a_misuse_of_a_schedule_says_how_to_fix_it(
@@ -149,10 +138,10 @@ class TestScheduleUnit:
 
     def test_groups_that_differ_only_in_their_target_are_two_groups(self):
         rate = AxisPattern.add_group(
-            conditions=[{"stratification": "group", "to": "cat1"}],
+            conditions=[StratificationCondition(stratification="group", to="cat1")],
             schedule=_rate("0.1"),
         ).add_group(
-            conditions=[{"stratification": "group", "to": "cat2"}],
+            conditions=[StratificationCondition(stratification="group", to="cat2")],
             schedule=_rate("0.2"),
         )
 
@@ -172,7 +161,7 @@ class TestScheduleUnit:
         )
 
         entries = rate._builder_stratified_rates() or []
-        assert [entry["absolute"] for entry in entries] == [True, False]
+        assert [entry.absolute for entry in entries] == [True, False]
         assert [entry.pattern.source_compartment for entry in rate.patterns] == [
             "A_cat1",
             "A_cat2",
@@ -226,7 +215,7 @@ class TestScheduleUnit:
             absolute=False,
         )
         srs = stratified_rates(rate)
-        assert srs[0]["absolute"] is False
+        assert srs[0].absolute is False
 
     def test_absolute_true_is_preserved(self):
         rate = AxisPattern.add_group(
@@ -235,7 +224,7 @@ class TestScheduleUnit:
             absolute=True,
         )
         srs = stratified_rates(rate)
-        assert srs[0]["absolute"] is True
+        assert srs[0].absolute is True
 
 
 class TestScheduleIntegration:
@@ -318,10 +307,12 @@ class TestScheduleIntegration:
                 ["A"],
                 ["B"],
                 stratified_rates=[
-                    {
-                        "conditions": [{"stratification": "group", "to": "g2"}],
-                        "rate": 1.0,
-                    }
+                    StratifiedRate(
+                        conditions=[
+                            StratificationCondition(stratification="group", to="g2")
+                        ],
+                        rate=1.0,
+                    )
                 ],
             )
             .set_structure(

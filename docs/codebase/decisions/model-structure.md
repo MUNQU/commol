@@ -58,9 +58,9 @@ no unit, and the [unit check](../../guide/units-and-equations.md) rejects a
 rate that reads one. An amount is a real number, finite and not negative, so a
 model of a count, a mass or a concentration can be stated, and a model whose
 bins all start at `0` builds and runs (`initial_state` in
-`crates/commol-model/src/builder.rs`, `InitialConditions.validate_bin_amounts`).
+`crates/commol-model/src/builder.rs`, `InitialConditions._validate_bin_amounts`).
 A structure that states `total`, `bin_fractions` or `compartment_fractions` is
-rejected with the fields to use (`InitialConditions.reject_fractions_of_a_total`).
+rejected with the fields to use (`InitialConditions._reject_fractions_of_a_total`).
 
 **Why, against the alternatives:**
 

@@ -17,21 +17,9 @@ from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.engine_json import engine_json
 from commol.context.calibration import ObservedDataPoint
 from commol.context.inference.method import UncertaintyMethod
-from commol.context.inference.resampling import BlockLength
 from commol.context.inference.sample import ParameterSample
 from commol.context.ranges import RangeChecked
 from commol.context.result_model import ResultModel
-
-type ConformalScore = Literal["absolute", "normalized", "spread"]
-"""How a predicted value ``ŷ`` and an observed value ``y`` become a score:
-``"absolute"`` is ``|y − ŷ|``; ``"normalized"`` is ``|y − ŷ| / s``, where
-``s`` is the root mean square of the observed values of the series in the
-problem; ``"spread"`` is ``|y − ŷ| / σ̂``, where ``σ̂`` is the spread of the
-predictions at that point."""
-
-type Pooling = Literal["series", "all"]
-"""Which scores a quantile reads: ``"series"``, the scores of each series
-(observation label) apart; ``"all"``, the scores of every series together."""
 
 
 class SeriesIntervals(ResultModel):
@@ -142,13 +130,17 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
         The level of the intervals, strictly between 0 and 1.
     """
 
-    score: ConformalScore = Field(description="The nonconformity score.")
-    by: Pooling = Field(description="Which scores each quantile reads.")
+    score: Literal["absolute", "normalized", "spread"] = Field(
+        description="The nonconformity score."
+    )
+    by: Literal["series", "all"] = Field(
+        description="Which scores each quantile reads."
+    )
     confidence_level: float = Field(description="The level of the intervals.")
 
     @model_validator(mode="before")
     @classmethod
-    def check_score_and_by(cls, data: JsonValue) -> JsonValue:
+    def _check_score_and_by(cls, data: JsonValue) -> JsonValue:
         """Check, in Rust, that `score` and `by` are given and fit together."""
         if isinstance(data, Mapping):
             given = {
@@ -203,7 +195,7 @@ class SplitConformal(ConformalMethod, RangeChecked):
     starts: int = Field(default=1, description="Starts of the fit.")
 
     @model_validator(mode="after")
-    def check_spread(self) -> Self:
+    def _check_spread(self) -> Self:
         """Reject ``score="spread"`` without a sample."""
         _no_spread_without_sample(self)
         return self
@@ -236,7 +228,7 @@ class RollingConformal(ConformalMethod, RangeChecked):
     starts: int = Field(default=1, description="Starts of each fit.")
 
     @model_validator(mode="after")
-    def check_spread(self) -> Self:
+    def _check_spread(self) -> Self:
         """Reject ``score="spread"``: one fit per origin has no spread."""
         if self.score == "spread":
             raise ValueError(
@@ -266,7 +258,7 @@ class JackknifePlus(ConformalMethod, RangeChecked):
         Starts of the fit and of each refit (default 1).
     """
 
-    block_length: BlockLength = Field(description="Positions per block.")
+    block_length: int | Literal["auto"] = Field(description="Positions per block.")
     positions: list[float] = Field(min_length=1, description="Where the intervals are.")
     starts: int = Field(default=1, description="Starts per fit.")
 
@@ -295,7 +287,7 @@ class EnbPI(ConformalMethod, RangeChecked):
     """
 
     replicates: int = Field(description="Number of replicates.")
-    block_length: BlockLength = Field(description="Positions per block.")
+    block_length: int | Literal["auto"] = Field(description="Positions per block.")
     positions: list[float] = Field(min_length=1, description="Where the intervals are.")
     starts: int = Field(default=1, description="Starts per fit.")
 
@@ -336,7 +328,7 @@ class AdaptiveConformal(ConformalMethod, RangeChecked):
     starts: int = Field(default=1, description="Starts of the fit.")
 
     @model_validator(mode="after")
-    def check_spread(self) -> Self:
+    def _check_spread(self) -> Self:
         """Reject ``score="spread"`` without a sample."""
         _no_spread_without_sample(self)
         return self

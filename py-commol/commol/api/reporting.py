@@ -14,8 +14,8 @@ from typing import NotRequired, TypedDict, cast
 import numpy as np
 
 from commol.api.inference.intervals import member_statistics
-from commol.api.results import SimulationResults, outputs_for, sample, total_series
-from commol.api.windows import windowed_totals
+from commol.api.results import SimulationResults, _sample, outputs_for, total_series
+from commol.api.windows import _windowed_totals
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import (
     CalibrationProblem,
@@ -23,7 +23,6 @@ from commol.context.calibration import (
     ObservedDataPoint,
     calibrated_values,
 )
-from commol.context.constants import CalibrationParameterType
 from commol.context.model import Model
 from commol.context.inference.conformal import PredictionIntervals
 from commol.context.inference.identifiability import (
@@ -136,12 +135,11 @@ def _observation_parameter_ids(problem: CalibrationProblem | None) -> list[str]:
     return [
         parameter.id
         for parameter in problem.parameters
-        if parameter.parameter_type
-        in (CalibrationParameterType.FACTOR, CalibrationParameterType.NOISE)
+        if parameter.parameter_type in ("factor", "noise")
     ]
 
 
-type ReportLeaf = float | list[float] | dict[str, float | list[float]]
+type _ReportLeaf = float | list[float] | dict[str, float | list[float]]
 
 
 class ObservedSeries(TypedDict):
@@ -156,14 +154,14 @@ class ObservedSeries(TypedDict):
 class WindowedAccumulator(TypedDict):
     """One reading of an accumulator, as a total and per output."""
 
-    total: ReportLeaf
-    by_output: dict[str, ReportLeaf]
+    total: _ReportLeaf
+    by_output: dict[str, _ReportLeaf]
 
 
 class AccumulatorReport(TypedDict):
     """Both readings of one accumulator."""
 
-    total: ReportLeaf
+    total: _ReportLeaf
     windowed: WindowedAccumulator
     cumulative: WindowedAccumulator
 
@@ -193,7 +191,7 @@ class SimulationReport(TypedDict):
     """
 
     observed: dict[str, ObservedSeries]
-    series: dict[str, ReportLeaf]
+    series: dict[str, _ReportLeaf]
     accumulators: dict[str, AccumulatorReport]
     prediction_intervals: NotRequired[PredictionIntervalsReport]
 
@@ -216,7 +214,7 @@ class _ReportRuns:
 
     def leaf(
         self, reduce_fn: Callable[[SimulationResults], float | list[float]]
-    ) -> ReportLeaf:
+    ) -> _ReportLeaf:
         """One reported value, as a quantity or as the spread of that quantity."""
         if self.confidence_level is None:
             return reduce_fn(self.runs[0])
@@ -279,7 +277,7 @@ def _series_report(
     runs: _ReportRuns,
     at: Sequence[float],
     accumulators: Iterable[str],
-) -> dict[str, ReportLeaf]:
+) -> dict[str, _ReportLeaf]:
     """
     Report every compartment series, sampled at the given positions.
 
@@ -293,7 +291,9 @@ def _series_report(
         for name in runs.outputs_for(accumulator_id)
     }
     return {
-        name: runs.leaf(lambda run, output=name: sample(run[output], run.positions, at))
+        name: runs.leaf(
+            lambda run, output=name: _sample(run[output], run.positions, at)
+        )
         for name in sorted(runs.runs[0])
         if name not in excluded
     }
@@ -322,7 +322,7 @@ def _accumulators_report(
 
     def windowed(series: Sequence[float], positions: Sequence[float]) -> list[float]:
         last = positions[-1] if positions else 0.0
-        return windowed_totals(
+        return _windowed_totals(
             series, positions, window, [end for end in ends if end <= last]
         )
 
@@ -348,13 +348,13 @@ def _accumulators_report(
             },
             "cumulative": {
                 "total": runs.leaf(
-                    lambda run, ids=outputs: sample(
+                    lambda run, ids=outputs: _sample(
                         total_series(run, ids), run.positions, at
                     )
                 ),
                 "by_output": {
                     name: runs.leaf(
-                        lambda run, output=name: sample(run[output], run.positions, at)
+                        lambda run, output=name: _sample(run[output], run.positions, at)
                     )
                     for name in outputs
                 },

@@ -44,7 +44,7 @@ class RangeChecked(BaseModel):
             cls._range_object = cls.__name__
 
     @model_validator(mode="after")
-    def check_ranges(self) -> Self:
+    def _check_ranges(self) -> Self:
         """
         Check each setting that has a range rule with the rule of the engine.
 

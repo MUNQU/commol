@@ -17,14 +17,21 @@ def _checked_rate(value: str) -> str:
 
 class StratifiedRate(BaseModel):
     """
-    Defines a rate for specific stratification categories.
+    The rate of the compartments of a transition that match some categories.
+
+    ``ModelBuilder.add_transition`` takes a list of them as
+    ``stratified_rates``. A compartment takes the rate of the stratified rate
+    whose conditions it matches; the most specific match wins.
 
     Attributes
     ----------
     conditions : list[StratificationCondition]
-        List of stratification-category pairs that must match
-    rate : str
-        Rate expression for compartments matching these conditions
+        The categories that a compartment must match, at least one, each
+        stratification at most once.
+    rate : str | float
+        The rate of the matching compartments: a formula, a parameter or a
+        number, which is kept as its string. It can read ``$compartment``
+        when the transition expands over its compartments.
     absolute : bool | None
         True: the flow is the rate, not multiplied by the source amount.
         False: the flow is the rate times the source amount. None: the rate
@@ -37,7 +44,7 @@ class StratifiedRate(BaseModel):
     conditions: list[StratificationCondition] = Field(
         default=..., description="Stratification conditions that must match"
     )
-    rate: str = Field(
+    rate: str | float = Field(
         default=..., description="Rate expression for matching compartments"
     )
     absolute: bool | None = Field(
@@ -51,7 +58,7 @@ class StratifiedRate(BaseModel):
 
     @field_validator("conditions")
     @classmethod
-    def validate_not_empty(
+    def _validate_not_empty(
         cls, v: list[StratificationCondition]
     ) -> list[StratificationCondition]:
         """Ensure at least one stratification condition is specified."""
@@ -62,7 +69,7 @@ class StratifiedRate(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def validate_unique_stratifications(self) -> Self:
+    def _validate_unique_stratifications(self) -> Self:
         """Ensure no duplicate stratification IDs."""
         strat_ids = [sc.stratification for sc in self.conditions]
         if len(strat_ids) != len(set(strat_ids)):
@@ -77,9 +84,13 @@ class StratifiedRate(BaseModel):
 
     @field_validator("rate")
     @classmethod
-    def validate_rate(cls, value: str) -> str:
-        """Check the rate with the parser of the engine."""
-        return _checked_rate(value)
+    def _validate_rate(cls, value: str | float) -> str:
+        """The rate as its string, once the parser of the engine accepts it as
+        the builder writes it: with ``$compartment`` set to the name of a
+        compartment."""
+        text = str(value)
+        _checked_rate(text.replace("$compartment", "compartment"))
+        return text
 
 
 class Transition(BaseModel):
@@ -185,7 +196,7 @@ class Transition(BaseModel):
         return self.impulse_at is not None or self.impulse_every is not None
 
     @model_validator(mode="after")
-    def validate_impulse(self) -> Self:
+    def _validate_impulse(self) -> Self:
         """
         Check the impulse with the rule of the engine (`check_impulse` of
         `crates/commol-model/src/values.rs`): one of `impulse_at` and
@@ -197,7 +208,7 @@ class Transition(BaseModel):
 
     @field_validator("rate")
     @classmethod
-    def validate_rate(cls, value: str | None) -> str | None:
+    def _validate_rate(cls, value: str | None) -> str | None:
         """Check the rate, when there is one, with the parser of the engine."""
         if value is None:
             return value

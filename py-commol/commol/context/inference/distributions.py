@@ -20,9 +20,6 @@ from commol.context.ranges import RangeChecked
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import DistributionProtocol
 
-type Bounds = tuple[float, float]
-"""The ``(min, max)`` bounds of a parameter."""
-
 
 class DistributionBase(BaseModel):
     """
@@ -33,10 +30,10 @@ class DistributionBase(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    def _rust(self, bounds: Bounds) -> "DistributionProtocol":
+    def _rust(self, bounds: tuple[float, float]) -> "DistributionProtocol":
         return commol_rs.inference.Distribution(engine_json(self), bounds[0], bounds[1])
 
-    def log_density(self, x: float, bounds: Bounds) -> float:
+    def log_density(self, x: float, bounds: tuple[float, float]) -> float:
         """
         The log density at `x`.
 
@@ -59,7 +56,7 @@ class DistributionBase(BaseModel):
         """
         return self._rust(bounds).log_density(x)
 
-    def cdf(self, x: float, bounds: Bounds) -> float:
+    def cdf(self, x: float, bounds: tuple[float, float]) -> float:
         """
         The distribution function at `x`.
 
@@ -82,7 +79,7 @@ class DistributionBase(BaseModel):
         """
         return self._rust(bounds).cdf(x)
 
-    def quantile(self, p: float, bounds: Bounds) -> float:
+    def quantile(self, p: float, bounds: tuple[float, float]) -> float:
         """
         The quantile at level `p`.
 
@@ -106,7 +103,7 @@ class DistributionBase(BaseModel):
         """
         return self._rust(bounds).quantile(p)
 
-    def sample(self, count: int, bounds: Bounds, seed: int) -> list[float]:
+    def sample(self, count: int, bounds: tuple[float, float], seed: int) -> list[float]:
         """
         Draw `count` values.
 
@@ -220,7 +217,7 @@ class Gamma(DistributionBase, RangeChecked):
     rate: float = Field(description="The rate.")
 
 
-type Distribution = Annotated[
+type _Distribution = Annotated[
     Uniform | LogUniform | Beta | Normal | LogNormal | Gamma,
     Field(discriminator="kind"),
 ]
@@ -238,14 +235,14 @@ class Priors(BaseModel):
 
     Attributes
     ----------
-    distributions : dict[str, Distribution] | None
+    distributions : dict[str, distribution] | None
         The prior of each parameter; None gives ``Uniform()`` to every
         parameter (`uniform_on_bounds`).
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    distributions: dict[str, Distribution] | None = Field(
+    distributions: dict[str, _Distribution] | None = Field(
         description="The prior of each parameter, or None for uniform on the bounds."
     )
 
@@ -290,7 +287,7 @@ class WithPriors(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def require_priors(cls, data: JsonValue) -> JsonValue:
+    def _require_priors(cls, data: JsonValue) -> JsonValue:
         """Name `Priors.uniform_on_bounds()` when the priors are missing."""
         if isinstance(data, Mapping):
             if data.get("priors") is None:

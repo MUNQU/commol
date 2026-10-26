@@ -2,6 +2,7 @@
 
 import pytest
 
+from commol import StratificationCondition, StratifiedRate
 from commol import Aggregate, ModelBuilder, Simulation
 from tests.support import (
     FactoryBuilder,
@@ -90,14 +91,22 @@ class TestExpansion:
                 target=[],
                 rate="d_base * $compartment",
                 stratified_rates=[
-                    {
-                        "conditions": [{"stratification": "group", "category": "g1"}],
-                        "rate": "d_g1 * $compartment",
-                    },
-                    {
-                        "conditions": [{"stratification": "group", "category": "g2"}],
-                        "rate": "d_g2 * $compartment",
-                    },
+                    StratifiedRate(
+                        conditions=[
+                            StratificationCondition(
+                                stratification="group", category="g1"
+                            )
+                        ],
+                        rate="d_g1 * $compartment",
+                    ),
+                    StratifiedRate(
+                        conditions=[
+                            StratificationCondition(
+                                stratification="group", category="g2"
+                            )
+                        ],
+                        rate="d_g2 * $compartment",
+                    ),
                 ],
             )
         )
@@ -121,10 +130,12 @@ class TestExpansionOverTargets:
             target=["B", "C"],
             rate="k * $compartment",
             stratified_rates=[
-                {
-                    "conditions": [{"stratification": "group", "category": "g1"}],
-                    "rate": 0.5,
-                }
+                StratifiedRate(
+                    conditions=[
+                        StratificationCondition(stratification="group", category="g1")
+                    ],
+                    rate=0.5,
+                )
             ],
             impulse_at=[2.0],
         )
@@ -192,10 +203,14 @@ class TestExpansionOverTargets:
                 target=["B", "C"],
                 rate="k * $compartment",
                 stratified_rates=[
-                    {
-                        "conditions": [{"stratification": "group", "category": "g1"}],
-                        "rate": 0.5,
-                    }
+                    StratifiedRate(
+                        conditions=[
+                            StratificationCondition(
+                                stratification="group", category="g1"
+                            )
+                        ],
+                        rate=0.5,
+                    )
                 ],
             )
 
@@ -304,10 +319,12 @@ def test_a_placeholder_with_per_compartment_reads_the_compartment_that_flows() -
             rate="k1 * $compartment",
             per_compartment=True,
             stratified_rates=[
-                {
-                    "conditions": [{"stratification": "g", "category": "g2"}],
-                    "rate": "k2 * $compartment",
-                }
+                StratifiedRate(
+                    conditions=[
+                        StratificationCondition(stratification="g", category="g2")
+                    ],
+                    rate="k2 * $compartment",
+                )
             ],
         )
     )
@@ -359,11 +376,13 @@ def test_a_placeholder_keeps_the_absolute_flag_of_a_stratified_rate() -> None:
             target=[],
             rate="k1 * $compartment",
             stratified_rates=[
-                {
-                    "conditions": [{"stratification": "g", "category": "g2"}],
-                    "rate": "k2",
-                    "absolute": True,
-                }
+                StratifiedRate(
+                    conditions=[
+                        StratificationCondition(stratification="g", category="g2")
+                    ],
+                    rate="k2",
+                    absolute=True,
+                )
             ],
         )
     )

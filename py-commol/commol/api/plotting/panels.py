@@ -19,10 +19,10 @@ from commol.api.results import (
     SimulationReplicates,
     SimulationResults,
     outputs_for,
-    sample,
+    _sample,
     total_series,
 )
-from commol.api.windows import windowed_totals
+from commol.api.windows import _windowed_totals
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.calibration import CalibrationResult, ObservedDataPoint
 from commol.context.inference.noise import NoNoise
@@ -845,7 +845,7 @@ def _windowed(
     ends = commol_rs.calibration.window_ends(window, result.positions[-1])
     if isinstance(result, SimulationReplicates):
         gains = [
-            windowed_totals(total_series(run, components), run.positions, window, ends)
+            _windowed_totals(total_series(run, components), run.positions, window, ends)
             for run in result
         ]
         statistics = member_statistics(gains, confidence_level)
@@ -856,7 +856,7 @@ def _windowed(
             f"{confidence_level:.0%} of the replicates",
         )
     if isinstance(result, SimulationResults):
-        gains = windowed_totals(
+        gains = _windowed_totals(
             total_series(result, components), result.positions, window, ends
         )
         return Trace(ends, gains, "Simulation"), None
@@ -1030,8 +1030,8 @@ def _read(
     """
     series = total_series(results, outputs)
     if point.window:
-        return windowed_totals(series, results.positions, point.window, [point.at])[0]
-    return sample(series, results.positions, [point.at])[0]
+        return _windowed_totals(series, results.positions, point.window, [point.at])[0]
+    return _sample(series, results.positions, [point.at])[0]
 
 
 def _model_line(

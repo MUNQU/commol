@@ -30,7 +30,6 @@ from commol import (
     NelderMeadConfig,
     Normal,
     NormalObservations,
-    ObservationModel,
     ObservedDataPoint,
     ParameterSample,
     ParametricBootstrap,
@@ -44,6 +43,7 @@ from commol import (
 )
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.engine_json import engine_json
+from commol.context.observation_models import _ObservationModel
 from tests.support import (
     a_to_b_builder,
     bounded,
@@ -69,7 +69,7 @@ def _posterior(**settings: object) -> BayesianPosterior:
 
 def _problem(
     observed_data: list[ObservedDataPoint],
-    models: dict[str, ObservationModel],
+    models: dict[str, _ObservationModel],
     noise: tuple[str, ...] = (),
     **settings: object,
 ) -> CalibrationProblem:
@@ -192,7 +192,7 @@ class TestModels:
         ids=lambda model: f"{type(model).__name__}-{getattr(model, 'center', '')}",
     )
     def test_the_loss_of_each_model_is_its_negative_log_likelihood(
-        self, model: ObservationModel
+        self, model: _ObservationModel
     ) -> None:
         names = [name for name in model.model_dump().values() if name == "s"]
         noise = [bounded("s", 0.01, 5.0, kind="noise")] if names else []

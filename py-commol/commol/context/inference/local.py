@@ -14,18 +14,9 @@ from pydantic import ConfigDict, Field
 from commol.context.calibration import CalibrationResult
 from commol.context.inference.distributions import WithPriors
 from commol.context.inference.method import UncertaintyMethod
-from commol.context.inference.resampling import BlockLength
 from commol.context.inference.sample import ParameterSample
 from commol.context.ranges import RangeChecked
 from commol.context.result_model import ResultModel
-
-type CurvatureName = Literal["gauss_newton", "hessian"]
-"""The curvature a local approximation reads. ``"gauss_newton"``: the
-expected curvature, ``Jᵀ W J`` with the Fisher information ``W`` of each
-observation, and the Fisher information of each noise parameter.
-``"hessian"``: the observed curvature, central differences of the objective
-with steps from the accuracy of the engine, ``4p² + 1`` runs; for a fit with
-large residuals or a wrong model, where the two differ."""
 
 
 class DeltaBand(ResultModel):
@@ -137,7 +128,7 @@ class Laplace(UncertaintyMethod[LaplaceResult], RangeChecked):
     """
 
     draws: int = Field(description="Number of draws.")
-    curvature: CurvatureName = Field(
+    curvature: Literal["gauss_newton", "hessian"] = Field(
         default="gauss_newton", description="The curvature."
     )
     starts: int = Field(default=1, description="Starts of the fit.")
@@ -218,9 +209,9 @@ class Sandwich(UncertaintyMethod[SandwichResult], RangeChecked):
         hypercube over the bounds.
     """
 
-    block_length: BlockLength = Field(description="Positions per block.")
+    block_length: int | Literal["auto"] = Field(description="Positions per block.")
     draws: int = Field(description="Number of draws.")
-    curvature: CurvatureName = Field(
+    curvature: Literal["gauss_newton", "hessian"] = Field(
         default="gauss_newton", description="The curvature."
     )
     starts: int = Field(default=1, description="Starts of the fit.")
@@ -233,7 +224,7 @@ class LikelihoodTarget(WithPriors):
 
     Attributes
     ----------
-    priors : Priors | dict[str, Distribution]
+    priors : Priors | dict[str, distribution]
         The prior of each calibrated parameter, or
         ``Priors.uniform_on_bounds()``.
     """
@@ -249,7 +240,7 @@ class GibbsTarget(WithPriors, RangeChecked):
 
     Attributes
     ----------
-    priors : Priors | dict[str, Distribution]
+    priors : Priors | dict[str, distribution]
         The prior of each calibrated parameter, or
         ``Priors.uniform_on_bounds()``.
     eta : float
@@ -260,7 +251,7 @@ class GibbsTarget(WithPriors, RangeChecked):
     eta: float = Field(description="Scale of the loss.")
 
 
-type MixtureTarget = Annotated[
+type _MixtureTarget = Annotated[
     LikelihoodTarget | GibbsTarget, Field(discriminator="kind")
 ]
 """The posterior a `LaplaceMixture` samples."""
@@ -359,7 +350,7 @@ class LaplaceMixture(UncertaintyMethod[ImportanceResult], RangeChecked):
 
     starts: int = Field(default=1, description="Starts of the fit.")
     draws: int = Field(description="Number of draws.")
-    target: MixtureTarget = Field(description="The posterior to sample.")
-    curvature: CurvatureName = Field(
+    target: _MixtureTarget = Field(description="The posterior to sample.")
+    curvature: Literal["gauss_newton", "hessian"] = Field(
         default="gauss_newton", description="The curvature."
     )

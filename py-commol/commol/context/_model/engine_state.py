@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, NamedTuple
 from commol.commol_rs import _commol_rs as commol_rs
 
 from commol.context._model.formula_tree import Node, Variable, product, read_tree
-from commol.context.constants import CalibrationParameterType
 from commol.context.engine_json import engine_json
 
 if TYPE_CHECKING:
@@ -265,9 +264,9 @@ def check_model_values(
     """
     accepted = model.structure.calibration_value_types()
     generic = {
-        CalibrationParameterType.PARAMETER,
-        CalibrationParameterType.FACTOR,
-        CalibrationParameterType.NOISE,
+        "parameter",
+        "factor",
+        "noise",
     }
     for param in parameters:
         if param.parameter_type not in generic and param.parameter_type not in accepted:

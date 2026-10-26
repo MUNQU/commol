@@ -8,13 +8,13 @@ in a ``.dot`` file (every graph). The text, LaTeX and JSON renderings draw no
 diagram; the JSON holds the graphs as data.
 """
 
+from typing import Literal
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from commol.context.description import (
-    Block,
-    Cell,
-    DescriptionFormat,
+    _Block,
+    _Cell,
     Equation,
     Equations,
     Matrix,
@@ -24,7 +24,7 @@ from commol.context.description import (
     Text,
 )
 
-SUFFIXES: dict[str, DescriptionFormat] = {
+SUFFIXES: dict[str, Literal["text", "markdown", "latex", "json", "dot"]] = {
     ".txt": "text",
     ".md": "markdown",
     ".tex": "latex",
@@ -34,7 +34,10 @@ SUFFIXES: dict[str, DescriptionFormat] = {
 """The format of each file suffix `save` reads."""
 
 
-def render(description: ModelDescription, format: DescriptionFormat) -> str:
+def render(
+    description: ModelDescription,
+    format: Literal["text", "markdown", "latex", "json", "dot"],
+) -> str:
     """
     A description as a string.
 
@@ -71,7 +74,9 @@ def render(description: ModelDescription, format: DescriptionFormat) -> str:
 
 
 def save(
-    description: ModelDescription, path: Path, format: DescriptionFormat | None
+    description: ModelDescription,
+    path: Path,
+    format: Literal["text", "markdown", "latex", "json", "dot"] | None,
 ) -> Path:
     """
     Write a description to a file, in the format of its suffix by default.
@@ -111,7 +116,7 @@ def _visible(description: ModelDescription) -> list:
     return [section for section in description.sections if section.blocks]
 
 
-def _cell(value: Cell) -> str:
+def _cell(value: _Cell) -> str:
     """A cell as text: a number in its shortest form, a flag as yes or no."""
     if value is None:
         return ""
@@ -169,7 +174,7 @@ def _underline(title: str, mark: str) -> str:
     return f"{title}\n{mark * len(title)}"
 
 
-def _text_block(block: Block) -> str | None:
+def _text_block(block: _Block) -> str | None:
     if isinstance(block, StateGraph):
         return None
     lines = [_underline(block.heading, "~")] if block.heading else []
@@ -185,7 +190,7 @@ def _text_block(block: Block) -> str | None:
     return "\n".join(lines)
 
 
-def _text_table(columns: Sequence[str], rows: Sequence[Sequence[Cell]]) -> str:
+def _text_table(columns: Sequence[str], rows: Sequence[Sequence[_Cell]]) -> str:
     cells = [list(columns), *[[_cell(value) for value in row] for row in rows]]
     widths = [max(len(row[index]) for row in cells) for index in range(len(columns))]
 
@@ -249,7 +254,7 @@ def render_markdown(description: ModelDescription) -> str:
     return "\n\n".join(parts) + "\n"
 
 
-def _markdown_block(block: Block) -> str:
+def _markdown_block(block: _Block) -> str:
     lines = [f"### {block.heading}"] if block.heading else []
     if isinstance(block, Text):
         lines.append(block.text)
@@ -272,7 +277,7 @@ def _markdown_block(block: Block) -> str:
     return "\n\n".join(lines)
 
 
-def _markdown_table(columns: Sequence[str], rows: Sequence[Sequence[Cell]]) -> str:
+def _markdown_table(columns: Sequence[str], rows: Sequence[Sequence[_Cell]]) -> str:
     def line(values: Sequence[str]) -> str:
         return "| " + " | ".join(value.replace("|", "\\|") for value in values) + " |"
 
@@ -426,7 +431,7 @@ def render_latex(description: ModelDescription) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _latex_block(block: Block) -> list[str]:
+def _latex_block(block: _Block) -> list[str]:
     if isinstance(block, StateGraph):
         return []
     lines = [rf"\subsection*{{{latex_text(block.heading)}}}"] if block.heading else []
@@ -442,7 +447,7 @@ def _latex_block(block: Block) -> list[str]:
     return lines
 
 
-def _latex_table(columns: Sequence[str], rows: Sequence[Sequence[Cell]]) -> list[str]:
+def _latex_table(columns: Sequence[str], rows: Sequence[Sequence[_Cell]]) -> list[str]:
     width = round(0.9 / len(columns), 3)
     spec = "".join(f"p{{{width}\\linewidth}}" for _ in columns)
 

@@ -7,9 +7,13 @@ import pytest
 
 from commol import (
     ObservedDataPoint,
+    Simulation,
+)
+from commol.context.inference.conformal import (
     PredictionIntervals,
     SeriesIntervals,
-    Simulation,
+)
+from commol.api.results import (
     SimulationReplicates,
     SimulationResults,
 )

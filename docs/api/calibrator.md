@@ -6,6 +6,8 @@ Fits a model to observations. Guide: [Model Calibration](../guide/calibration.md
 
 ::: commol.api.calibrator.Calibrator
 
+::: commol.context.inference.local.DeltaBand
+
 ::: commol.context.calibration.CalibrationProblem
 
 ::: commol.context.calibration.Quantile
@@ -15,8 +17,6 @@ Fits a model to observations. Guide: [Model Calibration](../guide/calibration.md
 ## Observation models
 
 Guide: [Observation Models](../guide/uncertainty/observation-models.md).
-
-::: commol.context.observation_models.ObservationModel
 
 ::: commol.context.observation_models.NormalObservations
 
@@ -47,5 +47,3 @@ Guide: [Observation Models](../guide/uncertainty/observation-models.md).
 ::: commol.context.calibration.CalibrationHistory
 
 ::: commol.context.calibration.CalibrationEvaluation
-
-::: commol.context.constants.LossFunction

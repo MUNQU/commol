@@ -14,7 +14,6 @@ from commol.api.inference import (
     smc,
 )
 from commol.api.inference.intervals import (
-    ci_percentiles,
     member_statistics,
     weighted_quantiles,
 )
@@ -33,7 +32,6 @@ __all__ = [
     "ScenarioSummary",
     "Scenarios",
     "SeriesBand",
-    "ci_percentiles",
     "conformal",
     "global_sensitivity",
     "identifiability",

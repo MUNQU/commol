@@ -13,6 +13,8 @@ from commol import (
     ObservedDataPoint,
     PlotConfig,
     Simulation,
+)
+from commol.api.results import (
     SimulationResults,
 )
 from commol.api.plotting import figures

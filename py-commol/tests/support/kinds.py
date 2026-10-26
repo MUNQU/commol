@@ -12,7 +12,13 @@ from typing import TYPE_CHECKING, Literal, Self
 
 from pydantic import BaseModel, ConfigDict
 
-from commol import Aggregate, Model, ModelStructure
+from commol import (
+    Aggregate,
+    Model,
+)
+from commol.context.structure import (
+    ModelStructure,
+)
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.description import (
     Equation,

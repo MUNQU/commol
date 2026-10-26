@@ -31,7 +31,7 @@ from commol.context.calibration import (
 from commol.context.engine_json import engine_json
 from commol.context.inference.local import DeltaBand, LocalResult
 from commol.context.inference.method import IdentifiabilityMethod, UncertaintyMethod
-from commol.context.inference.noise import ObservationNoise
+from commol.context.inference.noise import _ObservationNoise
 from commol.context.inference.sample import ParameterSample, SampleMethod
 
 logger = logging.getLogger(__name__)
@@ -250,7 +250,7 @@ class Calibrator:
         self,
         sample: ParameterSample,
         observed_data: list[ObservedDataPoint],
-        noise: ObservationNoise,
+        noise: _ObservationNoise,
     ) -> "ObservationDrawsProtocol":
         """
         Every draw's value of `observed_data` with `noise`, for a `Predictive`.

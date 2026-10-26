@@ -166,10 +166,8 @@ predicted(at) = output(at) - output(at - window)
 ```
 
 ```python
-from commol import windowed_totals
-
 ends = model(0.4).axis_units().window_ends(7, "step", 70)
-counts = windowed_totals(truth["cum_ab"], truth.positions, 7, ends)
+counts = truth.windowed_totals(["cum_ab"], 7, ends)
 
 windowed = [
     ObservedDataPoint(at=end, output="cum_ab", value=count, window=7)
@@ -185,12 +183,11 @@ print(calibrate_k1(windowed))  # 0.4
 | Mixed windows | Observations may use different windows, and positions need not be multiples of the window. |
 | Combinations | Works with `factor_id` and `outputs`. |
 
-`windowed_totals` (module function) and `Simulation.windowed_totals` apply the
-same reduction outside calibration, so a report shows exactly what the loss
-compared. See [Windowed totals](simulations.md#windowed-totals). An
-observation without `window` reads its output at `at`; `sample` and
-`Simulation.sample` read a run there in the same way
-([Values at positions](simulations.md#values-at-positions)).
+`SimulationResults.windowed_totals` applies the same reduction outside
+calibration, so a report shows exactly what the loss compared. See
+[Windowed totals](simulations.md#windowed-totals). An observation without
+`window` reads its output at `at`; `SimulationResults.sample` reads a run
+there in the same way ([Values at positions](simulations.md#values-at-positions)).
 
 ## Positions between integers
 

@@ -11,7 +11,13 @@ between categories, stratified rates, impulses, amounts below zero, and what
 ## Quick path
 
 ```python
-from commol import Aggregate, ModelBuilder, Simulation
+from commol import (
+    Aggregate,
+    ModelBuilder,
+    Simulation,
+    StratificationCondition,
+    StratifiedRate,
+)
 
 model = (
     ModelBuilder(name="Transitions")
@@ -41,7 +47,7 @@ print(model.describe().render("text"))  # every flow, as the engine computes it
 | `source` | `list[str]` | required | Bins (or one category) that lose the flow. `[]` means the flow enters the system. |
 | `target` | `list[str]` | required | Bins (or one category) that gain the flow. `[]` means the flow leaves the system. |
 | `rate` | `str`, `float`, `AxisPattern` or `None` | `None` | The rate formula; see [Rates](#rates). With `stratified_rates`, the fallback rate. `None` with no stratified rate gives a transition with no flows. |
-| `stratified_rates` | `list[dict] \| None` | `None` | Rates for some categories; see [Stratified rates](#stratified-rates). |
+| `stratified_rates` | `list[StratifiedRate] \| None` | `None` | Rates for some categories; see [Stratified rates](#stratified-rates). |
 | `per_compartment` | `bool \| None` | `None` | Replaces bin names in the rate with each flow's own compartment; see [per_compartment](#per_compartment). |
 | `accumulators` | `list[str] \| None` | `None` | Accumulators that count the flow; see [Building Models](building-models.md#accumulators). |
 | `impulse_at` | `list[float] \| None` | `None` | Makes the transition an impulse at these steps; see [Impulses](#impulses). |
@@ -263,8 +269,18 @@ group_rates = (
         target=["B"],
         rate="k_default",
         stratified_rates=[
-            {"conditions": [{"stratification": "group", "category": "g1"}], "rate": "k_g1"},
-            {"conditions": [{"stratification": "group", "category": "g2"}], "rate": "k_g2"},
+            StratifiedRate(
+                conditions=[
+                    StratificationCondition(stratification="group", category="g1")
+                ],
+                rate="k_g1",
+            ),
+            StratifiedRate(
+                conditions=[
+                    StratificationCondition(stratification="group", category="g2")
+                ],
+                rate="k_g2",
+            ),
         ],
     )
     .build(
@@ -279,13 +295,13 @@ print(group_rates.describe().render("text"))
 # A_g1 -> B_g1: k_g1 * A_g1,  A_g2 -> B_g2: k_g2 * A_g2,  A_g3 -> B_g3: k_default * A_g3
 ```
 
-| Entry key | Type | Meaning |
+| Field of `StratifiedRate` | Type | Meaning |
 |---|---|---|
-| `conditions` | `list[dict]` | All must match the source compartment (AND). |
+| `conditions` | `list[StratificationCondition]` | All must match the source compartment (AND). |
 | `rate` | `str` or `float` | The rate for matching compartments. |
 | `absolute` | `bool`, optional | Forces the rate to be absolute or proportional. |
 
-| Condition key | Meaning |
+| Field of `StratificationCondition` | Meaning |
 |---|---|
 | `stratification` | The stratification id. |
 | `category` | Optional. The category the **source** must have. |
@@ -317,14 +333,19 @@ redirect = (
     .add_stratification(
         id="subtype",
         categories=["s1", "s2"],
-        conditions=[{"stratification": "group", "category": "g2"}],
+        conditions=[StratificationCondition(stratification="group", category="g2")],
     )
     .add_parameter(id="k", value=0.1)
     .add_transition(
         id="move",
         source=["g1"],
         target=["g2"],
-        stratified_rates=[{"conditions": [{"stratification": "subtype", "to": "s1"}], "rate": "k"}],
+        stratified_rates=[
+            StratifiedRate(
+                conditions=[StratificationCondition(stratification="subtype", to="s1")],
+                rate="k",
+            )
+        ],
     )
     .build(
         Aggregate(

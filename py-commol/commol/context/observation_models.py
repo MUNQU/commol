@@ -14,9 +14,6 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field
 from commol.context.ranges import RangeChecked
 
-type NoiseArgument = float | str
-"""A noise argument: a number, or the id of a noise parameter."""
-
 
 class _ObservationModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -36,7 +33,7 @@ class NormalObservations(_ObservationModel, RangeChecked):
     """
 
     kind: Literal["normal"] = "normal"
-    sd: NoiseArgument = Field(description="The standard deviation.")
+    sd: float | str = Field(description="The standard deviation.")
 
 
 class LogNormalObservations(_ObservationModel, RangeChecked):
@@ -59,7 +56,7 @@ class LogNormalObservations(_ObservationModel, RangeChecked):
     """
 
     kind: Literal["log_normal"] = "log_normal"
-    sigma: NoiseArgument = Field(description="The standard deviation of log y.")
+    sigma: float | str = Field(description="The standard deviation of log y.")
     center: Literal["mean", "median"] = Field(description="What the prediction is.")
 
 
@@ -78,8 +75,8 @@ class StudentTObservations(_ObservationModel, RangeChecked):
     """
 
     kind: Literal["student_t"] = "student_t"
-    df: NoiseArgument = Field(description="The degrees of freedom.")
-    scale: NoiseArgument = Field(description="The scale.")
+    df: float | str = Field(description="The degrees of freedom.")
+    scale: float | str = Field(description="The scale.")
 
 
 class PoissonObservations(_ObservationModel):
@@ -108,7 +105,7 @@ class NegativeBinomialObservations(_ObservationModel, RangeChecked):
     """
 
     kind: Literal["negative_binomial"] = "negative_binomial"
-    overdispersion: NoiseArgument = Field(description="The overdispersion φ.")
+    overdispersion: float | str = Field(description="The overdispersion φ.")
 
 
 class BinomialObservations(_ObservationModel, RangeChecked):
@@ -134,7 +131,7 @@ class BinomialObservations(_ObservationModel, RangeChecked):
     trials: int | None = Field(default=None, description="The trials.")
 
 
-type ObservationModel = Annotated[
+type _ObservationModel = Annotated[
     NormalObservations
     | LogNormalObservations
     | StudentTObservations

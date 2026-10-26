@@ -8,10 +8,8 @@ from numpy.typing import NDArray
 
 from commol.commol_rs import _commol_rs as commol_rs
 
-type EnsembleValues = Sequence[float] | Sequence[Sequence[float]] | NDArray[np.float64]
 
-
-def ci_percentiles(confidence_level: float) -> tuple[float, float]:
+def _ci_percentiles(confidence_level: float) -> tuple[float, float]:
     """
     Lower and upper percentile points of a two-sided confidence interval.
 
@@ -101,7 +99,7 @@ def member_statistics(
 
 
 def member_statistics(
-    per_member: EnsembleValues,
+    per_member: Sequence[float] | Sequence[Sequence[float]] | NDArray[np.float64],
     confidence_level: float,
     weights: Sequence[float] | None = None,
 ) -> dict[str, float] | dict[str, list[float]] | dict[str, float | list[float]]:

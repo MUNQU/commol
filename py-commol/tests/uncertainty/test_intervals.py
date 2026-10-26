@@ -10,11 +10,9 @@ import pytest
 from commol import (
     BayesianBootstrap,
     BootstrapCoverageEta,
-    BootstrapResult,
     InputSpace,
     ObservedDataPoint,
     ParameterSample,
-    PropagationResult,
     SampleMethod,
     Scenarios,
     SensitivityAnalysis,
@@ -23,10 +21,16 @@ from commol import (
     SplitConformal,
     Threshold,
     ValueAt,
-    ci_percentiles,
     member_statistics,
     weighted_quantiles,
 )
+from commol.context.inference.resampling import (
+    BootstrapResult,
+)
+from commol.context.inference.global_sensitivity import (
+    PropagationResult,
+)
+from commol.api.inference.intervals import _ci_percentiles as ci_percentiles
 from tests.support import abc_builder, bounded, build
 
 

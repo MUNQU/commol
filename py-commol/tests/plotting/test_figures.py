@@ -17,15 +17,21 @@ from matplotlib.figure import Figure
 
 import commol
 from commol import (
-    ChaosResult,
-    MorrisResult,
     ObservedDataPoint,
     PlotConfig,
-    PRCCResult,
-    ProfileResult,
     Simulation,
-    SimulationResults,
+)
+from commol.context.inference.global_sensitivity import (
+    ChaosResult,
+    MorrisResult,
+    PRCCResult,
     SobolResult,
+)
+from commol.context.inference.profiles import (
+    ProfileResult,
+)
+from commol.api.results import (
+    SimulationResults,
 )
 from commol.api.plotting import figures
 from commol.api.plotting.accessors import PredictivePlot, ReplicatesPlot, ResultsPlot
@@ -412,7 +418,7 @@ class TestDifferentialModel:
         np.testing.assert_allclose(line.get_xdata(), ends)
         np.testing.assert_allclose(
             line.get_ydata(),
-            simulation.windowed_totals(results, ["events"], 2.5, ends),
+            results.windowed_totals(["events"], 2.5, ends),
         )
 
     def test_a_window_the_results_do_not_hold_is_an_error(self) -> None:
@@ -446,7 +452,7 @@ def test_each_observed_point_is_read_through_its_own_window_and_position() -> No
     np.testing.assert_allclose(
         line.get_ydata(),
         [
-            simulation.windowed_totals(run_at_half_steps, ["events"], 7, [7.5])[0],
-            simulation.windowed_totals(run_at_half_steps, ["events"], 14, [17.5])[0],
+            run_at_half_steps.windowed_totals(["events"], 7, [7.5])[0],
+            run_at_half_steps.windowed_totals(["events"], 14, [17.5])[0],
         ],
     )

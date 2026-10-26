@@ -13,14 +13,8 @@ from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-type Cell = str | int | float | bool | None
+type _Cell = str | int | float | bool | None
 """The value of one cell of a `Table`."""
-
-type DescriptionFormat = Literal["text", "markdown", "latex", "json", "dot"]
-"""A format a description renders to."""
-
-type Layout = Literal["default", "odd"]
-"""The sections of a description and their order: ``"default"`` or ``"odd"``."""
 
 
 class Text(BaseModel):
@@ -56,7 +50,7 @@ class Table(BaseModel):
         A heading above the block.
     columns : list[str]
         The column names.
-    rows : list[list[Cell]]
+    rows : list[list[_Cell]]
         The rows, each with one cell per column.
     """
 
@@ -65,10 +59,10 @@ class Table(BaseModel):
     type: Literal["table"] = "table"
     heading: str | None = None
     columns: list[str]
-    rows: list[list[Cell]]
+    rows: list[list[_Cell]]
 
     @model_validator(mode="after")
-    def check_row_lengths(self) -> Self:
+    def _check_row_lengths(self) -> Self:
         """Each row has one cell per column."""
         for index, row in enumerate(self.rows):
             if len(row) != len(self.columns):
@@ -252,7 +246,7 @@ class Matrix(BaseModel):
     values: list[list[float]]
 
     @model_validator(mode="after")
-    def check_shape(self) -> Self:
+    def _check_shape(self) -> Self:
         """One row of values per row label, one value per column label."""
         shape = [len(row) for row in self.values]
         if shape != [len(self.column_labels)] * len(self.row_labels):
@@ -263,7 +257,7 @@ class Matrix(BaseModel):
         return self
 
 
-type Block = Annotated[
+type _Block = Annotated[
     Text | Table | Equations | StateGraph | Matrix, Field(discriminator="type")
 ]
 """One block of a section: `Text`, `Table`, `Equations`, `StateGraph` or `Matrix`."""
@@ -279,7 +273,7 @@ class Section(BaseModel):
         The key of the section, such as ``"dynamics"``.
     title : str
         The title a rendering shows.
-    blocks : list[Block]
+    blocks : list[_Block]
         The blocks, in order. A section with no blocks is left out of every
         rendering.
     """
@@ -288,7 +282,7 @@ class Section(BaseModel):
 
     key: str
     title: str
-    blocks: list[Block] = Field(default_factory=list)
+    blocks: list[_Block] = Field(default_factory=list)
 
 
 class ModelDescription(BaseModel):
@@ -358,7 +352,9 @@ class ModelDescription(BaseModel):
             if isinstance(block, StateGraph)
         ]
 
-    def render(self, format: DescriptionFormat = "text") -> str:
+    def render(
+        self, format: Literal["text", "markdown", "latex", "json", "dot"] = "text"
+    ) -> str:
         """
         The description as a string.
 
@@ -385,7 +381,11 @@ class ModelDescription(BaseModel):
 
         return render(self, format)
 
-    def save(self, path: str | Path, format: DescriptionFormat | None = None) -> Path:
+    def save(
+        self,
+        path: str | Path,
+        format: Literal["text", "markdown", "latex", "json", "dot"] | None = None,
+    ) -> Path:
         """
         Write the description to a file.
 

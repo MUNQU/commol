@@ -95,7 +95,13 @@ A stratification splits every bin into three groups, and the transition from
 sum of its compartments:
 
 ```python
-from commol import Aggregate, ModelBuilder, Simulation
+from commol import (
+    Aggregate,
+    ModelBuilder,
+    Simulation,
+    StratificationCondition,
+    StratifiedRate,
+)
 
 model = (
     ModelBuilder(name="Stratified Model", version="1.0")
@@ -113,9 +119,24 @@ model = (
         source=["B"],
         target=["C"],
         stratified_rates=[
-            {"conditions": [{"stratification": "group", "category": "g1"}], "rate": "k2_g1"},
-            {"conditions": [{"stratification": "group", "category": "g2"}], "rate": "k2_g2"},
-            {"conditions": [{"stratification": "group", "category": "g3"}], "rate": "k2_g3"},
+            StratifiedRate(
+                conditions=[
+                    StratificationCondition(stratification="group", category="g1")
+                ],
+                rate="k2_g1",
+            ),
+            StratifiedRate(
+                conditions=[
+                    StratificationCondition(stratification="group", category="g2")
+                ],
+                rate="k2_g2",
+            ),
+            StratifiedRate(
+                conditions=[
+                    StratificationCondition(stratification="group", category="g3")
+                ],
+                rate="k2_g3",
+            ),
         ],
     )
     .build(
@@ -143,7 +164,13 @@ rate the compartments of each flow, so each compartment of `A` loses an amount
 computed from its own amount:
 
 ```python
-from commol import Aggregate, ModelBuilder, Simulation
+from commol import (
+    Aggregate,
+    ModelBuilder,
+    Simulation,
+    StratificationCondition,
+    StratifiedRate,
+)
 
 model = (
     ModelBuilder(name="Intersection Model", version="1.0")
@@ -161,14 +188,18 @@ model = (
         target=["B"],
         rate="k1_low * A * B / total",
         stratified_rates=[
-            {
-                "conditions": [{"stratification": "group", "category": "g1"}],
-                "rate": "k1_low * A * B / total_g1",
-            },
-            {
-                "conditions": [{"stratification": "type", "category": "t2"}],
-                "rate": "k1_high * A * B / total",
-            },
+            StratifiedRate(
+                conditions=[
+                    StratificationCondition(stratification="group", category="g1")
+                ],
+                rate="k1_low * A * B / total_g1",
+            ),
+            StratifiedRate(
+                conditions=[
+                    StratificationCondition(stratification="type", category="t2")
+                ],
+                rate="k1_high * A * B / total",
+            ),
         ],
         per_compartment=True,
     )
@@ -196,7 +227,13 @@ The stratification `subtype` splits only the compartments of group `g2`; the
 compartments of `g1` are not split further:
 
 ```python
-from commol import Aggregate, ModelBuilder, Simulation
+from commol import (
+    Aggregate,
+    ModelBuilder,
+    Simulation,
+    StratificationCondition,
+    StratifiedRate,
+)
 
 model = (
     ModelBuilder(name="Conditional Stratification Model", version="1.0")
@@ -207,7 +244,7 @@ model = (
     .add_stratification(
         id="subtype",
         categories=["s1", "s2"],
-        conditions=[{"stratification": "group", "category": "g2"}],
+        conditions=[StratificationCondition(stratification="group", category="g2")],
     )
     .add_parameter(id="k1", value=0.3)
     .add_parameter(id="k2_default", value=0.1)
@@ -226,8 +263,18 @@ model = (
         target=["C"],
         rate="k2_default",
         stratified_rates=[
-            {"conditions": [{"stratification": "subtype", "category": "s1"}], "rate": "k2_s1"},
-            {"conditions": [{"stratification": "subtype", "category": "s2"}], "rate": "k2_s2"},
+            StratifiedRate(
+                conditions=[
+                    StratificationCondition(stratification="subtype", category="s1")
+                ],
+                rate="k2_s1",
+            ),
+            StratifiedRate(
+                conditions=[
+                    StratificationCondition(stratification="subtype", category="s2")
+                ],
+                rate="k2_s2",
+            ),
         ],
     )
     .build(
@@ -323,7 +370,13 @@ gives each group its own schedule: the first `add_group` call is on the
 class, the next ones on the pattern it returns:
 
 ```python
-from commol import Aggregate, AxisPattern, ModelBuilder, Simulation
+from commol import (
+    Aggregate,
+    AxisPattern,
+    ModelBuilder,
+    Simulation,
+    StratificationCondition,
+)
 
 combined = AxisPattern.combine(
     AxisPattern.pulse(at=0, value=0.3),
@@ -340,10 +393,10 @@ model = (
 results = Simulation(model).run(num_steps=365)
 
 per_group = AxisPattern.add_group(
-    conditions=[{"stratification": "group", "category": "cat1"}],
+    conditions=[StratificationCondition(stratification="group", category="cat1")],
     schedule=AxisPattern.periodic(period=7, value=0.05),
 ).add_group(
-    conditions=[{"stratification": "group", "category": "cat2"}],
+    conditions=[StratificationCondition(stratification="group", category="cat2")],
     schedule=AxisPattern.periodic(period=30, value=0.05),
 )
 grouped = (

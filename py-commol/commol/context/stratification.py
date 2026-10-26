@@ -55,7 +55,7 @@ class Stratification(BaseModel):
         return isinstance(other, Stratification) and self.id == other.id
 
     @model_validator(mode="after")
-    def validate_categories_length(self) -> Self:
+    def _validate_categories_length(self) -> Self:
         """
         Enforces that categories are not empty.
         """
@@ -66,7 +66,7 @@ class Stratification(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_categories_uniqueness(self) -> Self:
+    def _validate_categories_uniqueness(self) -> Self:
         """
         Enforces that categories are not repeated.
         """
@@ -86,7 +86,7 @@ class Stratification(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_conditions_have_categories(self) -> Self:
+    def _validate_conditions_have_categories(self) -> Self:
         """
         Enforces that stratification expansion conditions filter by category.
         """

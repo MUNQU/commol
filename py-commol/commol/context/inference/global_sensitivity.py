@@ -17,10 +17,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.engine_json import engine_json
 from commol.context.calibration import CalibrationParameter
-from commol.context.constants import CalibrationParameterType
-from commol.context.inference.distributions import Distribution, Uniform
+from commol.context.inference.distributions import _Distribution, Uniform
 from commol.context.inference.method import SensitivityMethod
-from commol.context.inference.quantities import Quantity
+from commol.context.inference.quantities import _Quantity
 from commol.context.inference.sample import ParameterSample
 from commol.context.ranges import RangeChecked
 from commol.context.result_model import ResultModel
@@ -47,7 +46,7 @@ class InputSpace(BaseModel):
     parameters : list[CalibrationParameter]
         The inputs, in order. A factor or a noise parameter is not an input:
         both belong to observations, and an analysis has none.
-    distributions : dict[str, Distribution] | None
+    distributions : dict[str, distribution] | None
         The distribution of each input, for independent inputs.
     sample : ParameterSample | None
         The draws of the inputs, for inputs from a sample.
@@ -63,7 +62,7 @@ class InputSpace(BaseModel):
     parameters: list[CalibrationParameter] = Field(
         min_length=1, description="The inputs, in order."
     )
-    distributions: dict[str, Distribution] | None = Field(
+    distributions: dict[str, _Distribution] | None = Field(
         default=None, description="The distribution of each independent input."
     )
     sample: ParameterSample | None = Field(
@@ -75,22 +74,18 @@ class InputSpace(BaseModel):
     )
 
     @model_validator(mode="after")
-    def check_inputs(self) -> Self:
+    def _check_inputs(self) -> Self:
         """Check the inputs against the distributions or the sample."""
         ids = [parameter.id for parameter in self.parameters]
         repeated = sorted({i for i in ids if ids.count(i) > 1})
         if repeated:
             raise ValueError(f"Inputs repeat the ids {repeated}.")
         observed = {
-            CalibrationParameterType.FACTOR: (
-                "a factor, which multiplies an observation"
-            ),
-            CalibrationParameterType.NOISE: (
-                "a noise parameter, which belongs to an observation model"
-            ),
+            "factor": ("a factor, which multiplies an observation"),
+            "noise": ("a noise parameter, which belongs to an observation model"),
         }
         for parameter in self.parameters:
-            what = observed.get(CalibrationParameterType(parameter.parameter_type))
+            what = observed.get(parameter.parameter_type)
             if what is not None:
                 raise ValueError(
                     f"'{parameter.id}' is {what}; a sensitivity analysis has no "
@@ -122,7 +117,7 @@ class InputSpace(BaseModel):
     def independent(
         cls,
         parameters: Sequence[CalibrationParameter],
-        distributions: Mapping[str, Distribution],
+        distributions: Mapping[str, _Distribution],
         *,
         initial_condition_remainder: str | None = None,
     ) -> Self:
@@ -133,7 +128,7 @@ class InputSpace(BaseModel):
         ----------
         parameters : Sequence[CalibrationParameter]
             The inputs, in order.
-        distributions : Mapping[str, Distribution]
+        distributions : Mapping[str, distribution]
             The distribution of each input, truncated to its bounds.
         initial_condition_remainder : str | None, optional
             The bin or compartment that takes what the initial conditions
@@ -419,7 +414,7 @@ class Propagation(SensitivityMethod[PropagationResult], RangeChecked):
     draws : int | None
         The number of points of the Latin hypercube; required with
         independent inputs, and left unset with inputs from a sample.
-    quantities : list[Quantity]
+    quantities : list[quantity]
         What each run is reduced to; none gives only the sample, for a
         `Predictive`.
     """
@@ -427,7 +422,7 @@ class Propagation(SensitivityMethod[PropagationResult], RangeChecked):
     draws: int | None = Field(
         default=None, description="Points of the Latin hypercube."
     )
-    quantities: list[Quantity] = Field(
+    quantities: list[_Quantity] = Field(
         default_factory=list, description="What each run is reduced to."
     )
 
@@ -534,14 +529,14 @@ class PRCC(SensitivityMethod[PRCCResult], RangeChecked):
     draws : int | None
         The number of points of the Latin hypercube; required with
         independent inputs, and left unset with inputs from a sample.
-    quantities : list[Quantity]
+    quantities : list[quantity]
         What each run is reduced to.
     """
 
     draws: int | None = Field(
         default=None, description="Points of the Latin hypercube."
     )
-    quantities: list[Quantity] = Field(
+    quantities: list[_Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
 
@@ -639,13 +634,13 @@ class Morris(SensitivityMethod[MorrisResult], RangeChecked):
         inputs.
     levels : int
         The number of levels of each input; even, at least 2.
-    quantities : list[Quantity]
+    quantities : list[quantity]
         What each run is reduced to.
     """
 
     trajectories: int = Field(description="The number of trajectories.")
     levels: int = Field(description="The number of levels; even.")
-    quantities: list[Quantity] = Field(
+    quantities: list[_Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
 
@@ -752,14 +747,14 @@ class Sobol(SensitivityMethod[SobolResult], RangeChecked):
         The bootstrap replicates of the intervals, at least 2.
     confidence_level : float
         The level of the intervals, strictly between 0 and 1.
-    quantities : list[Quantity]
+    quantities : list[quantity]
         What each run is reduced to.
     """
 
     draws: int = Field(description="Rows of each base matrix.")
     replicates: int = Field(description="Bootstrap replicates.")
     confidence_level: float = Field(description="Level of the intervals.")
-    quantities: list[Quantity] = Field(
+    quantities: list[_Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )
 
@@ -926,7 +921,7 @@ class PolynomialChaos(SensitivityMethod[ChaosResult], RangeChecked):
     draws : int
         The points of the Latin hypercube; more than the terms, and two or
         three times as many is the usual choice.
-    quantities : list[Quantity]
+    quantities : list[quantity]
         What each run is reduced to.
     """
 
@@ -936,6 +931,6 @@ class PolynomialChaos(SensitivityMethod[ChaosResult], RangeChecked):
         default=None, description="The largest number of inputs of a term."
     )
     draws: int = Field(description="Points of the Latin hypercube.")
-    quantities: list[Quantity] = Field(
+    quantities: list[_Quantity] = Field(
         min_length=1, description="What each run is reduced to."
     )

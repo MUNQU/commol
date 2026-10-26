@@ -8,7 +8,7 @@ from pydantic import ConfigDict, Field
 from commol.api.plotting.accessors import PredictivePlot
 from commol.api.results import SimulationResults, quantities_of_runs
 from commol.context.calibration import ObservedDataPoint
-from commol.context.inference.noise import ObservationNoise
+from commol.context.inference.noise import _ObservationNoise
 from commol.context.inference.sample import ParameterSample
 from commol.context.result_model import ResultModel
 
@@ -48,7 +48,7 @@ class PredictiveSource(Protocol):
         self,
         sample: ParameterSample,
         observed_data: list[ObservedDataPoint],
-        noise: ObservationNoise,
+        noise: _ObservationNoise,
     ) -> "ObservationDrawsProtocol":
         """Every draw's value of `observed_data` with `noise`."""
         ...
@@ -318,7 +318,7 @@ class Predictive:
 
         Parameters
         ----------
-        quantities : Sequence[Quantity]
+        quantities : Sequence[quantity]
             The quantities; a `Trajectory` gives one scalar per position.
 
         Returns
@@ -490,7 +490,7 @@ class Predictive:
     def at_observations(
         self,
         observed_data: Sequence[ObservedDataPoint],
-        noise: ObservationNoise,
+        noise: _ObservationNoise,
     ) -> ObservationDraws:
         """
         Every draw's value of each observation, with observation noise.

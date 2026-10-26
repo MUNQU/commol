@@ -18,6 +18,8 @@ from commol import (
     Predictive,
     SampleMethod,
     Simulation,
+)
+from commol.api.results import (
     SimulationResults,
 )
 from commol.context.calibration import CalibrationResult

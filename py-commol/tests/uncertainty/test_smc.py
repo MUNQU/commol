@@ -28,9 +28,13 @@ from commol import (
     ObservedDataPoint,
     Priors,
     Sandwich,
-    SandwichResult,
     SeriesDistance,
     Simulation,
+)
+from commol.context.inference.local import (
+    SandwichResult,
+)
+from commol.context.inference.smc import (
     SMCResult,
 )
 from tests.support import (

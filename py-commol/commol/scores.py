@@ -4,7 +4,6 @@ See `commol.api.inference.scores`.
 """
 
 from commol.api.inference.scores import (
-    Score,
     coverage,
     crps,
     interval_score,
@@ -14,7 +13,6 @@ from commol.api.inference.scores import (
 )
 
 __all__ = [
-    "Score",
     "coverage",
     "crps",
     "interval_score",

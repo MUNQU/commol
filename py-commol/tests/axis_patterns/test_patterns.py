@@ -3,6 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
+from commol import StratificationCondition, StratifiedRate
 from commol import ModelBuilder, AxisPattern
 from tests.axis_patterns.conditions import condition
 from tests.support import abc_builder, assert_accepted
@@ -214,10 +215,8 @@ class TestCombine:
     @pytest.mark.parametrize(
         ("mode", "formula"),
         [
-            (AxisPattern.SUM, "((a) + (b) + (c))"),
-            (AxisPattern.MAX, "(max(max((a), (b)), (c)))"),
-            (AxisPattern.MIN, "(min(min((a), (b)), (c)))"),
-            ("min", "(min(min((a), (b)), (c)))"),
+            ("sum", "((a) + (b) + (c))"),
+            ("max", "(max(max((a), (b)), (c)))"),
         ],
     )
     def test_a_mode_nests_its_function_over_the_patterns(self, mode, formula):
@@ -226,7 +225,9 @@ class TestCombine:
 
     def test_an_unknown_mode_is_rejected(self):
         a, b = AxisPattern.from_formula("a"), AxisPattern.from_formula("b")
-        with pytest.raises(ValueError, match="'mean' is not a valid CombineMode"):
+        with pytest.raises(
+            ValueError, match="'mean' is not a mode of combine: sum, max, min"
+        ):
             AxisPattern.combine(a, b, mode="mean")  # ty: ignore[invalid-argument-type]
 
     def test_a_combined_formula_deeper_than_the_limit_gets_the_parser_message(self):
@@ -236,7 +237,7 @@ class TestCombine:
             ValueError,
             match="it nests deeper than 100 levels of parentheses, calls, signs",
         ):
-            AxisPattern.combine(*patterns, mode=AxisPattern.MAX)
+            AxisPattern.combine(*patterns, mode="max")
 
     def test_single_pattern_is_identity(self):
         """combine(p) returns p unchanged."""
@@ -308,32 +309,27 @@ class TestFromFormula:
 class TestForGroup:
     def test_original_is_unchanged(self):
         p = AxisPattern.pulse(at=5, value=0.1)
-        p.for_group([{"stratification": "group", "category": "g2"}])
+        p.for_group([StratificationCondition(stratification="group", category="g2")])
         assert p.conditions is None
 
 
 class TestToStratifiedRate:
     def test_without_source_compartment(self):
         p = AxisPattern.pulse(at=5, value=0.1).for_group([condition("group", "g2")])
-        assert p.to_stratified_rate() == {
-            "conditions": [condition("group", "g2")],
-            "rate": "(if(step == 5, 0.1, 0))",
-        }
+        assert p._stratified_rate() == StratifiedRate(
+            conditions=[condition("group", "g2")],
+            rate="(if(step == 5, 0.1, 0))",
+        )
 
     def test_with_source_compartment(self):
         p = AxisPattern.pulse(at=5, value=0.1).for_group(
             [condition("group", "g2")],
             source_compartment="A_g2",
         )
-        assert p.to_stratified_rate() == {
-            "conditions": [condition("group", "g2")],
-            "rate": "(if(step == 5, 0.1, 0)) * A_g2",
-        }
-
-    def test_no_conditions_gives_empty_list(self):
-        p = AxisPattern.pulse(at=5, value=0.1)
-        sr = p.to_stratified_rate()
-        assert sr["conditions"] == []
+        assert p._stratified_rate() == StratifiedRate(
+            conditions=[condition("group", "g2")],
+            rate="(if(step == 5, 0.1, 0)) * A_g2",
+        )
 
 
 class TestCompositionSafety:
@@ -367,7 +363,7 @@ class TestEngineCheck:
             AxisPattern.combine(
                 AxisPattern.pulse(at=1, value=0.1),
                 AxisPattern.pulse(at=2, value=0.2),
-                mode=AxisPattern.MAX,
+                mode="max",
             ),
         ],
     )

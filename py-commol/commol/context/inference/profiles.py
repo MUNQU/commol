@@ -42,7 +42,7 @@ ProfileEndName = Literal["crossed", "bound", "max_steps", "unreachable"]
 bound of the parameter, took `max_steps` points, or met a prediction that no
 values within the bounds give."""
 
-type ProfileBootstrap = Annotated[
+type _ProfileBootstrap = Annotated[
     BayesianBootstrap | ParametricBootstrap | ResidualBootstrap | WildBootstrap,
     Field(discriminator="kind"),
 ]
@@ -74,10 +74,10 @@ class Threshold(RangeChecked):
 
     kind: Literal["chi_square", "beale", "bootstrap_calibrated"]
     confidence_level: float
-    bootstrap: ProfileBootstrap | None = None
+    bootstrap: _ProfileBootstrap | None = None
 
     @model_validator(mode="after")
-    def check_bootstrap(self) -> Self:
+    def _check_bootstrap(self) -> Self:
         """A bootstrap goes with ``"bootstrap_calibrated"``, and only with it."""
         if (self.kind == "bootstrap_calibrated") != (self.bootstrap is not None):
             raise ValueError(
@@ -142,7 +142,7 @@ class Threshold(RangeChecked):
 
     @classmethod
     def bootstrap_calibrated(
-        cls, bootstrap: ProfileBootstrap, confidence_level: float
+        cls, bootstrap: _ProfileBootstrap, confidence_level: float
     ) -> Self:
         """
         The threshold of each quantity calibrated by `bootstrap`
@@ -272,7 +272,7 @@ class ProfileLikelihood(UncertaintyMethod["ProfileResult"], RangeChecked):
     )
 
     @model_validator(mode="after")
-    def check_unique(self) -> Self:
+    def _check_unique(self) -> Self:
         """Each parameter is profiled once."""
         if len(set(self.parameters)) != len(self.parameters):
             raise ValueError(f"A parameter is listed twice: {self.parameters}.")
@@ -311,7 +311,7 @@ class PredictionProfile(UncertaintyMethod["ProfileResult"], RangeChecked):
     )
 
     @model_validator(mode="after")
-    def check_labels(self) -> Self:
+    def _check_labels(self) -> Self:
         """Each prediction has a label of its own."""
         labels = [spec.as_observation().label for spec in self.specs]
         if len(set(labels)) != len(labels):

@@ -16,6 +16,8 @@ from commol import (
     InputSpace,
     SensitivityAnalysis,
     Simulation,
+)
+from commol.api.results import (
     SimulationReplicates,
     SimulationResults,
 )

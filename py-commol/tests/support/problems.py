@@ -9,11 +9,11 @@ from commol import (
     InputSpace,
     NelderMeadConfig,
     NormalObservations,
-    ObservationModel,
     ObservedDataPoint,
     ParticleSwarmConfig,
     Simulation,
 )
+from commol.context.observation_models import _ObservationModel
 
 from .models import a_to_b_builder, abc_builder, build
 
@@ -113,7 +113,7 @@ def flow_calibrator(
     windowed: bool,
     seed: int = 1,
     bounds: tuple[float, float] = (0.0, 50.0),
-    observation_models: Mapping[str, ObservationModel] | None = None,
+    observation_models: Mapping[str, _ObservationModel] | None = None,
     noise: Sequence[CalibrationParameter] = (),
 ) -> Calibrator:
     """
@@ -202,7 +202,7 @@ def two_wells_calibrator() -> Calibrator:
 def line_calibrator(
     values: Sequence[float],
     *,
-    observation_models: Mapping[str, ObservationModel] | None = None,
+    observation_models: Mapping[str, _ObservationModel] | None = None,
     seed: int = 1,
 ) -> Calibrator:
     """

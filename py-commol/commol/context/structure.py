@@ -22,7 +22,6 @@ from pydantic import BaseModel, ConfigDict
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.engine_json import engine_json
 
-from commol.context.constants import CalibrationParameterType
 
 if TYPE_CHECKING:
     from commol.context._model.report import CategorySplitEntry, InitialAmountEntry
@@ -202,7 +201,7 @@ class ModelStructure(BaseModel, ABC):
         """
         return SeriesLabel(series_id, None)
 
-    def calibration_value_types(self) -> frozenset[CalibrationParameterType]:
+    def calibration_value_types(self) -> frozenset[str]:
         """
         Types of value of this kind that calibration may set.
 
@@ -211,11 +210,11 @@ class ModelStructure(BaseModel, ABC):
 
         Returns
         -------
-        frozenset[CalibrationParameterType]
+        frozenset[str]
             For example ``{"initial_condition"}`` for an aggregate model.
         """
         return frozenset(
-            CalibrationParameterType(name)
+            name
             for name in commol_rs.engine.ModelKind(engine_json(self.kind)).value_types()
         )
 

@@ -77,7 +77,7 @@ class InitialConditions(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def reject_fractions_of_a_total(cls, data: JsonValue) -> JsonValue:
+    def _reject_fractions_of_a_total(cls, data: JsonValue) -> JsonValue:
         """Name the field of amounts that replaces a field of fractions.
 
         A total over bins of different units has no meaning, so the initial
@@ -99,7 +99,7 @@ class InitialConditions(BaseModel):
 
     @field_validator("bin_amounts")
     @classmethod
-    def validate_bin_amounts(
+    def _validate_bin_amounts(
         cls, value: dict[str, float | None]
     ) -> dict[str, float | None]:
         """Check every bin amount with the rule of the engine."""
@@ -108,7 +108,7 @@ class InitialConditions(BaseModel):
 
     @field_validator("stratification_fractions")
     @classmethod
-    def validate_stratification_fractions(
+    def _validate_stratification_fractions(
         cls, value: dict[str, dict[str, float]]
     ) -> dict[str, dict[str, float]]:
         """Check the fractions of every stratification with the rule of the
@@ -118,7 +118,7 @@ class InitialConditions(BaseModel):
 
     @field_validator("compartment_amounts")
     @classmethod
-    def validate_compartment_amounts(cls, value: dict[str, float]) -> dict[str, float]:
+    def _validate_compartment_amounts(cls, value: dict[str, float]) -> dict[str, float]:
         """Check every compartment amount with the rule of the engine."""
         commol_rs.model.check_compartment_amounts(list(value.items()))
         return value

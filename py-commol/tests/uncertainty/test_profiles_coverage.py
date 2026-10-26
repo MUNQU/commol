@@ -20,10 +20,14 @@ from commol import (
     PredictionProfile,
     PredictionSpec,
     ProfileLikelihood,
-    ProfileResult,
     ResidualBootstrap,
     Simulation,
     Threshold,
+)
+from commol.context.inference.profiles import (
+    ProfileResult,
+)
+from commol.context.inference.method import (
     UncertaintyMethod,
 )
 from tests.support import a_to_b_builder, bounded, build

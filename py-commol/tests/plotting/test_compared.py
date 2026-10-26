@@ -10,6 +10,8 @@ from commol import (
     NoNoise,
     ObservedDataPoint,
     Simulation,
+)
+from commol.api.results import (
     SimulationResults,
 )
 from commol.api.inference.intervals import member_statistics
@@ -159,7 +161,6 @@ def test_compared_replicates_show_their_band() -> None:
 def test_compared_runs_can_be_windowed() -> None:
     """Each line is the gain of the accumulator over each window of 7."""
     slow, fast = _abc_run(0.3, "moved"), _abc_run(0.6, "moved")
-    simulation = Simulation(build(abc_builder(accumulator="moved")))
 
     fig = commol.plot_compared({"slow": slow, "fast": fast}, series=["moved"], window=7)
 
@@ -168,7 +169,7 @@ def test_compared_runs_can_be_windowed() -> None:
         assert np.asarray(line.get_xdata(), dtype=float).tolist() == [7.0, 14.0]
         np.testing.assert_allclose(
             np.asarray(line.get_ydata()),
-            simulation.windowed_totals(run, ["moved"], window=7),
+            run.windowed_totals(["moved"], window=7),
         )
 
 
@@ -291,15 +292,11 @@ def test_compared_results_draw_a_panel_per_observed_series() -> None:
             markers,
             [
                 [10, 20, 30],
-                simulation.windowed_totals(
-                    run, ["events_g2", "events_g3"], 5, [10, 20, 30]
-                ),
+                run.windowed_totals(["events_g2", "events_g3"], 5, [10, 20, 30]),
             ],
         )
     for run, markers in zip((slow, fast), _markers(one), strict=True):
-        np.testing.assert_allclose(
-            markers, [[10, 20], simulation.sample(run, ["B_g1"], [10, 20])]
-        )
+        np.testing.assert_allclose(markers, [[10, 20], run.sample(["B_g1"], [10, 20])])
     for ax in (one, summed):
         (points,) = ax.collections
         assert points.get_label() == "Observed"
@@ -346,9 +343,7 @@ def test_compared_observed_series_show_the_band_of_each_result() -> None:
     )
 
     (ax,) = fig.axes
-    per_run = [
-        simulation.windowed_totals(run, ["events"], 10, [20, 30]) for run in replicates
-    ]
+    per_run = [run.windowed_totals(["events"], 10, [20, 30]) for run in replicates]
     statistics = member_statistics(per_run, 0.9)
     draws = predictive.at_observations(observed, NoNoise()).band(0.9)
     mean, median = _markers(ax)

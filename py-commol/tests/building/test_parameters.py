@@ -9,7 +9,7 @@ from pydantic import ValidationError
 
 from commol import ModelBuilder, SeriesValue, Simulation
 from commol.context.engine import EngineName
-from commol.context.parameter import Parameter, ParameterUpdate
+from commol.context.parameter import Parameter
 from tests.support import (
     ENGINE_REL,
     a_to_b_builder,
@@ -204,7 +204,9 @@ class TestSeriesParameters:
         ],
     )
     def test_update_parameters_rejects_a_value_it_cannot_take(
-        self, values: dict[str, ParameterUpdate], message: str
+        self,
+        values: dict[str, float | str | list[tuple[float, float]] | SeriesValue | None],
+        message: str,
     ) -> None:
         builder = a_to_b_builder(parameters={"k": 0.1}, rate="k * d")
         builder.add_parameter("d", [(1, 1.0)], mode="pulse")

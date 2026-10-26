@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from commol.context._model import engine_state
 from commol.context._model.equations import DynamicsDescription
-from commol.context.description import Block, Matrix, Section, Table, Text
+from commol.context.description import _Block, Matrix, Section, Table, Text
 from commol.context.neighbors import Complete, Groups
 
 if TYPE_CHECKING:
@@ -45,9 +45,9 @@ def describe_aggregate[S: "Aggregate"](model: "Model[S]") -> list[Section]:
     ]
 
 
-def _entities[S: "Aggregate"](model: "Model[S]") -> list[Block]:
+def _entities[S: "Aggregate"](model: "Model[S]") -> list[_Block]:
     process = model.process
-    blocks: list[Block] = [
+    blocks: list[_Block] = [
         Table(
             heading="Bins",
             columns=["Bin", "Name", "Unit"],
@@ -108,7 +108,7 @@ def _conditions(conditions: list | None) -> str:
     )
 
 
-def _neighbors[S: "Aggregate"](model: "Model[S]") -> list[Block]:
+def _neighbors[S: "Aggregate"](model: "Model[S]") -> list[_Block]:
     neighbors = model.structure.neighbors
     if isinstance(neighbors, Complete):
         return [
@@ -158,7 +158,7 @@ def _neighbors[S: "Aggregate"](model: "Model[S]") -> list[Block]:
     return []
 
 
-def _initialization[S: "Aggregate"](model: "Model[S]") -> list[Block]:
+def _initialization[S: "Aggregate"](model: "Model[S]") -> list[_Block]:
     structure = model.structure
     process = model.process
 
@@ -166,7 +166,7 @@ def _initialization[S: "Aggregate"](model: "Model[S]") -> list[Block]:
         bin_item = process.bin(bin_id)
         return None if bin_item is None else bin_item.unit
 
-    blocks: list[Block] = [
+    blocks: list[_Block] = [
         Table(
             heading="Bin amounts",
             columns=["Bin", "Amount", "Unit"],
@@ -221,7 +221,7 @@ def _initialization[S: "Aggregate"](model: "Model[S]") -> list[Block]:
     return blocks
 
 
-def _design_concepts[S: "Aggregate"](model: "Model[S]") -> list[Block]:
+def _design_concepts[S: "Aggregate"](model: "Model[S]") -> list[_Block]:
     neighbors = model.structure.neighbors
     if neighbors is None:
         return []

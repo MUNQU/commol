@@ -5,8 +5,6 @@
 The identifiability methods, the report they return, and its parts. Guide:
 [Identifiability](../guide/uncertainty/identifiability.md).
 
-::: commol.context.inference.method.IdentifiabilityMethod
-
 ::: commol.context.inference.identifiability.StructuralRank
 
 ::: commol.context.inference.identifiability.Collinearity

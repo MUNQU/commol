@@ -13,19 +13,13 @@ from pydantic import (
 )
 
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.context.constants import (
-    CalibrationParameterType,
-    LossFunction,
-    OptimizationAlgorithm,
-)
 from commol.context.engine_json import engine_json
-from commol.context.observation_models import ObservationModel
+from commol.context.observation_models import _ObservationModel
 from commol.context.ranges import RangeChecked
 from commol.context.result_model import ResultModel
 
 
-# Re-export for documentation
-__all__ = ["OptimizationAlgorithm", "calibrated_values"]
+__all__ = ["calibrated_values"]
 
 
 class ObservedDataPoint(RangeChecked):
@@ -106,7 +100,7 @@ class ObservedDataPoint(RangeChecked):
     )
 
     @model_validator(mode="after")
-    def validate_observed_outputs(self) -> Self:
+    def _validate_observed_outputs(self) -> Self:
         """Require one of `output` and `outputs`; name the series."""
         if (self.output is None) == (self.outputs is None):
             raise ValueError("Give exactly one of 'output' and 'outputs'.")
@@ -123,7 +117,7 @@ class ObservedDataPoint(RangeChecked):
         return self
 
     @model_validator(mode="after")
-    def validate_window(self) -> Self:
+    def _validate_window(self) -> Self:
         """
         A window must not start before position 0, with the rule of the
         engine (`check_window_end` of
@@ -147,8 +141,11 @@ class CalibrationParameter(BaseModel):
     ----------
     id : str
         Identifier (parameter ID for parameters, bin ID for initial conditions)
-    parameter_type : str
-        Type of value being calibrated
+    parameter_type : {"parameter", "initial_condition", "factor", "noise"}
+        What the value is: a parameter of the model; the initial amount of a
+        compartment, a bin or a category; a factor that multiplies the model
+        output of an observation; or an argument of an observation model, such
+        as its standard deviation, which never reaches the engine
     min_bound : float
         Minimum allowed value for this parameter
     max_bound : float
@@ -162,9 +159,11 @@ class CalibrationParameter(BaseModel):
     id: str = Field(
         default=..., min_length=1, description="Parameter or bin identifier"
     )
-    parameter_type: str = Field(
-        default=...,
-        description="Type of value being calibrated",
+    parameter_type: Literal["parameter", "initial_condition", "factor", "noise"] = (
+        Field(
+            default=...,
+            description="Type of value being calibrated",
+        )
     )
     min_bound: float = Field(default=..., description="Minimum allowed value")
     max_bound: float = Field(default=..., description="Maximum allowed value")
@@ -172,18 +171,8 @@ class CalibrationParameter(BaseModel):
         default=None, description="Optional starting value for optimization"
     )
 
-    @field_validator("parameter_type")
-    @classmethod
-    def validate_parameter_type(cls, v: str) -> str:
-        if v not in CalibrationParameterType:
-            raise ValueError(
-                f"Invalid parameter_type: {v}. "
-                f"Must be one of {list(CalibrationParameterType)}"
-            )
-        return v
-
     @model_validator(mode="after")
-    def validate_bounds(self) -> Self:
+    def _validate_bounds(self) -> Self:
         """Validate that max_bound > min_bound and initial_guess is within bounds."""
         if self.max_bound <= self.min_bound:
             raise ValueError(
@@ -294,13 +283,13 @@ class CalibrationConstraint(RangeChecked):
 
     @field_validator("expression")
     @classmethod
-    def validate_expression(cls, value: str) -> str:
+    def _validate_expression(cls, value: str) -> str:
         """Check the expression with the parser of the engine."""
         commol_rs.core.MathExpression(value).check()
         return value
 
     @model_validator(mode="after")
-    def validate_positions(self) -> Self:
+    def _validate_positions(self) -> Self:
         """Validate that the positions, when given, are not empty."""
         if self.at is not None and len(self.at) == 0:
             raise ValueError(
@@ -583,7 +572,7 @@ class ParticleSwarmConfig(RangeChecked):
     )
 
     @model_validator(mode="after")
-    def check_strategies(self) -> Self:
+    def _check_strategies(self) -> Self:
         """
         Check each number against its strategy, as the engine reads them.
 
@@ -758,10 +747,6 @@ def check_quantile_level(level: float) -> float:
     return level
 
 
-type QuantileLevel = Annotated[float, AfterValidator(check_quantile_level)]
-"""The level of a quantile, from 0 to 1."""
-
-
 class Quantile(BaseModel):
     """
     A quantile of the replicates of a stochastic engine, for
@@ -780,7 +765,9 @@ class Quantile(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    level: QuantileLevel = Field(..., description="Level of the quantile.")
+    level: Annotated[float, AfterValidator(check_quantile_level)] = Field(
+        ..., description="Level of the quantile."
+    )
 
     def __init__(self, level: float) -> None:
         """
@@ -792,11 +779,6 @@ class Quantile(BaseModel):
             The level, between 0 and 1.
         """
         super().__init__(level=level)
-
-
-type ReplicateSummary = Literal["mean", "median", "crps"] | Quantile
-"""What the observations are compared with: the mean, the median or a
-`Quantile` of the replicates, or their whole distribution (``"crps"``)."""
 
 
 class CalibrationProblem(RangeChecked):
@@ -819,7 +801,7 @@ class CalibrationProblem(RangeChecked):
         The loss that measures the fit, with the observation weights. A
         problem has a loss or ``observation_models``, exactly one, with no
         default: what to fit is a modelling choice.
-    observation_models : dict[str, ObservationModel] | None
+    observation_models : dict[str, observation model] | None
         One observation model per series label (`NormalObservations`,
         `LogNormalObservations`, `StudentTObservations`,
         `PoissonObservations`, `NegativeBinomialObservations`,
@@ -875,11 +857,11 @@ class CalibrationProblem(RangeChecked):
         default_factory=list,
         description="Constraints on calibration parameters",
     )
-    loss_function: str | None = Field(
+    loss_function: Literal["sse", "rmse", "mae"] | None = Field(
         default=None,
         description="Loss function to use for measuring fit quality",
     )
-    observation_models: dict[str, ObservationModel] | None = Field(
+    observation_models: dict[str, _ObservationModel] | None = Field(
         default=None,
         description="One observation model per series label",
     )
@@ -905,7 +887,7 @@ class CalibrationProblem(RangeChecked):
         default=None,
         description="Replicates per evaluation of a stochastic engine.",
     )
-    replicate_summary: ReplicateSummary | None = Field(
+    replicate_summary: Literal["mean", "median", "crps"] | Quantile | None = Field(
         default=None,
         description="What the observations are compared with, for a stochastic engine.",
     )
@@ -917,17 +899,8 @@ class CalibrationProblem(RangeChecked):
         ),
     )
 
-    @field_validator("loss_function")
-    @classmethod
-    def validate_loss_function(cls, v: str | None) -> str | None:
-        if v is not None and v not in LossFunction:
-            raise ValueError(
-                f"Invalid loss_function: {v}. Must be one of {list(LossFunction)}"
-            )
-        return v
-
     @model_validator(mode="after")
-    def validate_loss_or_models(self) -> Self:
+    def _validate_loss_or_models(self) -> Self:
         """Require a loss or observation models, exactly one."""
         if self.loss_function is not None and self.observation_models is not None:
             raise ValueError(
@@ -936,9 +909,9 @@ class CalibrationProblem(RangeChecked):
             )
         if self.loss_function is None and self.observation_models is None:
             raise ValueError(
-                "A problem needs a loss_function (one of "
-                f"{', '.join(LossFunction)}) or observation_models. There is no "
-                "default: what to fit is a modelling choice."
+                "A problem needs a loss_function (sse, rmse or mae) or "
+                "observation_models. There is no default: what to fit is a "
+                "modelling choice."
             )
         if self.observation_models is not None and self.normalize_observations:
             raise ValueError(
@@ -948,7 +921,7 @@ class CalibrationProblem(RangeChecked):
         return self
 
     @model_validator(mode="after")
-    def validate_unique_parameter_ids(self) -> Self:
+    def _validate_unique_parameter_ids(self) -> Self:
         """Ensure parameter IDs are unique."""
         param_ids = [p.id for p in self.parameters]
         if len(param_ids) != len(set(param_ids)):

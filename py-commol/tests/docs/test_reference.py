@@ -10,6 +10,8 @@ from pathlib import Path
 import pytest
 
 import commol
+from tests.suite.public_surface import RESULTS
+from tests.support.surface import results
 
 API_DIR = Path(__file__).resolve().parents[3] / "docs" / "api"
 DIRECTIVE = re.compile(r"^:::\s*(?P<target>\S+)", re.MULTILINE)
@@ -33,6 +35,42 @@ def test_public_name_has_an_api_entry(name: str) -> None:
     assert path in documented_targets(), (
         f"commol.{name} ({path}) has no '::: {path}' entry under docs/api/"
     )
+
+
+def pages_of_targets() -> dict[str, set[str]]:
+    """The pages of ``docs/api/`` that document each ``:::`` target."""
+    pages: dict[str, set[str]] = {}
+    for page in API_DIR.glob("*.md"):
+        for match in DIRECTIVE.finditer(page.read_text(encoding="utf-8")):
+            pages.setdefault(match.group("target"), set()).add(page.name)
+    return pages
+
+
+def pages_of(item: object, pages: dict[str, set[str]]) -> set[str]:
+    """The pages that document ``item``, by its path or by its module."""
+    module = getattr(item, "__module__", "")
+    path = f"{module}.{getattr(item, '__qualname__', '')}"
+    return pages.get(path, set()) | pages.get(module, set())
+
+
+@pytest.mark.docs
+def test_each_result_is_on_the_page_of_its_object() -> None:
+    """Each result of ``RESULTS`` is returned by an object of the surface, and
+    has its ``:::`` entry on the page of an object that returns it."""
+    pages = pages_of_targets()
+    returned_by = {cls.__name__: owners for cls, owners in results().items()}
+    classes = {cls.__name__: cls for cls in results()}
+    wrong = []
+    for name in sorted(RESULTS):
+        if name not in returned_by:
+            wrong.append(f"{name}: no member of the surface returns it")
+            continue
+        owners = set().union(*(pages_of(owner, pages) for owner in returned_by[name]))
+        found = pages_of(classes[name], pages)
+        if not found & owners:
+            wrong.append(f"{name}: on {sorted(found)}, its objects on {sorted(owners)}")
+
+    assert not wrong, "Document each result with its object:\n" + "\n".join(wrong)
 
 
 @pytest.mark.docs

@@ -6,8 +6,6 @@ from datetime import date
 from typing import Self, TypeVar
 
 from commol.api.patterns import (
-    ConditionDict as StratificationConditionDict,
-    StratifiedRateDict,
     AxisPattern,
     _ComputedAxisPattern,
     _GroupEntry,
@@ -156,7 +154,7 @@ class ModelBuilder:
         id: str,
         categories: list[str],
         description: str | None = None,
-        conditions: list[StratificationConditionDict] | None = None,
+        conditions: list[StratificationCondition] | None = None,
     ) -> Self:
         """
         Add a stratification to the model.
@@ -169,15 +167,16 @@ class ModelBuilder:
             list of category identifiers within this stratification.
         description : str | None, default=None
             Human-readable description of the stratification.
-        conditions : list[dict] | None, default=None
+        conditions : list[StratificationCondition] | None, default=None
             When set, this stratification only expands compartments whose
-            already-applied categories satisfy ALL conditions. Each dict must
-            contain "stratification" and "category" keys referencing a
-            stratification declared before this one.
+            already-applied categories satisfy ALL conditions. Each condition
+            names a stratification declared before this one and its category.
 
             Example: only apply the `sub` stratification to `group1`::
 
-                conditions = [{"stratification": "group", "category": "group1"}]
+                conditions = [
+                    StratificationCondition(stratification="group", category="group1")
+                ]
 
         Returns
         -------
@@ -192,23 +191,20 @@ class ModelBuilder:
         if conditions:
             declared_ids = {s.id for s in self._stratifications}
             for cond in conditions:
-                if cond["stratification"] not in declared_ids:
+                if cond.stratification not in declared_ids:
                     raise ValueError(
                         f"Stratification '{id}': condition references "
-                        f"'{cond['stratification']}' which has not been declared yet. "
+                        f"'{cond.stratification}' which has not been declared yet. "
                         "Conditions may only reference stratifications declared before "
                         "this one."
                     )
 
-        condition_objects = (
-            [StratificationCondition(**c) for c in conditions] if conditions else None
-        )
         self._stratifications.append(
             Stratification(
                 id=id,
                 categories=categories,
                 description=description,
-                conditions=condition_objects,
+                conditions=list(conditions) if conditions else None,
             )
         )
         logger.info(f"Added stratification: id='{id}', categories={categories}")
@@ -310,11 +306,9 @@ class ModelBuilder:
             return pattern
         conditions = pattern.conditions
         if transition_id and conditions:
-            src_cats = "_".join(c["category"] for c in conditions if "category" in c)
+            src_cats = "_".join(c.category for c in conditions if c.category)
             tgt_cats = "_".join(
-                c["to"] if "to" in c else c["category"]
-                for c in conditions
-                if "to" in c or "category" in c
+                target for c in conditions if (target := c.to or c.category)
             )
             src = f"{source_bin}_{src_cats}" if source_bin else src_cats
             tgt = f"{target_bin}_{tgt_cats}" if target_bin else tgt_cats
@@ -341,7 +335,7 @@ class ModelBuilder:
         source: list[str],
         target: list[str],
         rate: "str | float | AxisPattern | None" = None,
-        stratified_rates: list[StratifiedRateDict] | None = None,
+        stratified_rates: list[StratifiedRate] | None = None,
         per_compartment: bool | None = None,
         accumulators: list[str] | None = None,
         impulse_at: list[float] | None = None,
@@ -415,10 +409,9 @@ class ModelBuilder:
             - $compartment: Expands to each source compartment name (only with
               multiple sources)
 
-        stratified_rates : list[dict] | None, default=None
-            List of stratification-specific rates. Each dict must contain:
-            - "conditions": List of dicts with "stratification" and "category" keys
-            - "rate": Rate expression string
+        stratified_rates : list[StratifiedRate] | None, default=None
+            The rates of the compartments that match some categories. A
+            compartment that no stratified rate matches takes ``rate``.
 
         per_compartment : bool | None, default=None
             When True, each id of a source or target bin in a rate reads the
@@ -561,7 +554,7 @@ class ModelBuilder:
             Target compartments
         rate : str
             Rate formula
-        stratified_rates : list[StratifiedRateDict] | None
+        stratified_rates : list[StratifiedRate] | None
             Stratified rates
 
         Raises
@@ -602,7 +595,7 @@ class ModelBuilder:
         source: list[str],
         target: list[str],
         rate: str,
-        stratified_rates: list[StratifiedRateDict] | None,
+        stratified_rates: list[StratifiedRate] | None,
         per_compartment: bool | None,
         accumulators: list[str] | None,
         impulse_at: list[float] | None,
@@ -623,7 +616,7 @@ class ModelBuilder:
             (will create one transition per target if multiple targets)
         rate : str
             Rate formula containing $compartment
-        stratified_rates : list[StratifiedRateDict] | None
+        stratified_rates : list[StratifiedRate] | None
             Stratified rates (can contain $compartment which will be expanded)
         per_compartment, accumulators, impulse_at, impulse_every : optional
             The arguments of `add_transition` that every expanded transition
@@ -845,25 +838,19 @@ class ModelBuilder:
 
 
 def _stratified_rate_objects(
-    stratified_rates: list[StratifiedRateDict] | None,
+    stratified_rates: list[StratifiedRate] | None,
     compartment: str | None = None,
 ) -> list[StratifiedRate] | None:
-    """The stratified rates as models, with ``$compartment`` set to ``compartment``."""
+    """The stratified rates, with ``$compartment`` set to ``compartment``."""
     if not stratified_rates:
         return None
-    objects: list[StratifiedRate] = []
-    for rate_dict in stratified_rates:
-        rate = str(rate_dict["rate"])
-        if compartment is not None:
-            rate = rate.replace("$compartment", compartment)
-        objects.append(
-            StratifiedRate(
-                conditions=[
-                    StratificationCondition(**condition)
-                    for condition in rate_dict["conditions"]
-                ],
-                rate=rate,
-                absolute=rate_dict.get("absolute"),
-            )
+    if compartment is None:
+        return list(stratified_rates)
+    return [
+        StratifiedRate(
+            conditions=stratified.conditions,
+            rate=str(stratified.rate).replace("$compartment", compartment),
+            absolute=stratified.absolute,
         )
-    return objects
+        for stratified in stratified_rates
+    ]

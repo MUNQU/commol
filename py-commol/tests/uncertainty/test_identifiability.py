@@ -7,7 +7,6 @@ from pydantic import ValidationError
 from commol import (
     Beta,
     CalibrationProblem,
-    CalibrationResult,
     Calibrator,
     Collinearity,
     Gamma,
@@ -20,8 +19,11 @@ from commol import (
     SampleMethod,
     Simulation,
     StartsIdentifiability,
-    StartSummary,
     StructuralRank,
+)
+from commol.context.calibration import (
+    CalibrationResult,
+    StartSummary,
 )
 from commol.context.inference.identifiability import (
     PracticalVerdict,

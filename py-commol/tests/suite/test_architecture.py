@@ -3,13 +3,30 @@ Rust crates of ``crates/`` decide, and the PyO3 bridge of ``py-commol/`` is
 their Python edge. No crate of ``crates/`` depends on PyO3 or on the bridge."""
 
 import ast
+import enum
+import importlib
 import inspect
 import re
 import tomllib
+import typing
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
 from pydantic import BaseModel
+
+from tests.suite import public_surface
+from tests.support.surface import (
+    annotations,
+    choice_faults,
+    exported,
+    inputs,
+    is_commol,
+    named_types,
+    own_classes,
+    results,
+    surface,
+    validators,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BRIDGE = REPO_ROOT / "py-commol" / "Cargo.toml"
@@ -343,3 +360,91 @@ def test_the_check_names_each_enum_read_by_name(tmp_path: Path) -> None:
     )
 
     assert enums_read_by_name(tmp_path) == {"RateKeeps", "Levels"}
+
+
+# The public surface (#404): the names a user writes
+
+
+def private_inputs() -> list[str]:
+    """Each argument of the surface that names a class of commol a user
+    cannot pass: one that is not exported, not a result of the table, not a
+    base of either and not a protocol that they implement."""
+    reachable = {
+        item
+        for item in [*exported().values(), *results()]
+        if isinstance(item, type)
+        and (item.__name__ in public_surface.RESULTS or item in exported().values())
+    }
+    allowed = {base for cls in reachable for base in own_classes(cls)}
+    return sorted(
+        f"{owner}: {item.__name__}"
+        for owner, annotation in inputs()
+        for item in named_types(annotation)
+        if isinstance(item, type)
+        and is_commol(item)
+        and item not in allowed
+        and not getattr(item, "_is_protocol", False)
+    )
+
+
+def test_the_public_surface_is_the_table() -> None:
+    """The exports are the table of ``tests/suite/public_surface.py``, and a
+    user can reach every class that a public signature takes."""
+    found = {
+        module: set(importlib.import_module(module).__all__)
+        for module in public_surface.EXPORTS
+    }
+
+    assert found == {
+        module: set(names) for module, names in public_surface.EXPORTS.items()
+    }
+    assert private_inputs() == []
+
+
+def test_a_choice_is_a_literal() -> None:
+    """No signature of the surface names an enum or a public type alias."""
+    wrong = sorted(
+        f"{owner}: {fault}"
+        for owner, annotation in annotations()
+        for fault in choice_faults(annotation)
+    )
+
+    assert not wrong, (
+        "Write a choice among names as a Literal, and keep a union private "
+        "(``type _Name = ...``):\n" + "\n".join(wrong)
+    )
+
+
+def test_the_check_of_choices_names_each_enum_and_alias() -> None:
+    class Mode(enum.StrEnum):
+        SUM = "sum"
+
+    type Pooling = typing.Literal["series", "all"]
+    type _Union = int | str
+
+    assert choice_faults(list[Mode] | None, "tests.") == ["the enum Mode"]
+    assert choice_faults(dict[str, Pooling], "tests.") == ["the alias Pooling"]
+    assert choice_faults(typing.Literal["a", "b"] | _Union, "tests.") == []
+
+
+def test_no_public_member_is_internal() -> None:
+    """No class of the surface has a public validator, and no exported class
+    has an exported base."""
+    public = {item for item in exported().values() if isinstance(item, type)}
+    wrong = sorted(
+        f"{cls.__name__}.{name}"
+        for cls in (item for item in surface() if isinstance(item, type))
+        for name in validators(cls)
+        if not name.startswith("_")
+    )
+    wrong += sorted(
+        f"{cls.__name__} has the exported base {base.__name__}"
+        for cls in public
+        for base in own_classes(cls)[1:]
+        if base in public
+    )
+
+    assert not wrong, (
+        "Start the name of a validator with _, and keep a base private:\n"
+        + "\n".join(wrong)
+    )

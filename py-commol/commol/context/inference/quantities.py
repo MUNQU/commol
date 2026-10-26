@@ -62,7 +62,7 @@ class _Outputs(BaseModel):
 
     @field_validator("outputs", mode="before")
     @classmethod
-    def one_output(cls, value: JsonValue) -> JsonValue:
+    def _one_output(cls, value: JsonValue) -> JsonValue:
         """One name is a list of one."""
         return _output_list(value)
 
@@ -150,7 +150,7 @@ class Increments(_Outputs, RangeChecked):
             commol_rs.calibration.check_window_end(at, self.window)
 
 
-type Series = Annotated[Level | Increments, Field(discriminator="kind")]
+type _Series = Annotated[Level | Increments, Field(discriminator="kind")]
 """What a quantity reads at each position: a `Level` or `Increments`."""
 
 
@@ -192,11 +192,11 @@ class QuantityBase(BaseModel, ABC):
 class _OfSeries(QuantityBase):
     """A quantity that reads a series."""
 
-    series: Series = Field(description="The series read.")
+    series: _Series = Field(description="The series read.")
 
     @field_validator("series", mode="before")
     @classmethod
-    def level_of_outputs(cls, value: JsonValue) -> JsonValue | Level:
+    def _level_of_outputs(cls, value: JsonValue) -> JsonValue | Level:
         """A name or a list of names is the level of those outputs."""
         return _series(value)
 
@@ -233,7 +233,7 @@ class ValueAt(_OfSeries, _OneScalar, RangeChecked):
     at: float = Field(description="The position.")
 
     @model_validator(mode="after")
-    def window_after_zero(self) -> Self:
+    def _window_after_zero(self) -> Self:
         """The window of increments ends at least its width after 0."""
         self.series.check_ends([self.at])
         return self
@@ -267,7 +267,7 @@ class Gain(_Outputs, _OneScalar, RangeChecked):
     end: float = Field(description="The end of the window.")
 
     @model_validator(mode="after")
-    def end_after_start(self) -> Self:
+    def _end_after_start(self) -> Self:
         """A window ends after it starts."""
         if self.end <= self.start:
             raise ValueError(
@@ -291,14 +291,14 @@ class _AtPositions(_OfSeries):
 
     @field_validator("positions")
     @classmethod
-    def ascending(cls, value: list[float]) -> list[float]:
+    def _ascending(cls, value: list[float]) -> list[float]:
         """The positions ascend, each once."""
         if any(later <= earlier for earlier, later in zip(value, value[1:])):
             raise ValueError("positions must ascend, each once")
         return value
 
     @model_validator(mode="after")
-    def windows_after_zero(self) -> Self:
+    def _windows_after_zero(self) -> Self:
         """The window of increments ends at least its width after 0."""
         self.series.check_ends(self.positions)
         return self
@@ -390,9 +390,6 @@ type _Operand = Annotated[
 ]
 """A quantity that is not a ratio; a `Ratio` takes the ones of one value."""
 
-type ReplicateRule = Literal["within", "within_positive", "pooled"]
-"""How the replicates of a stochastic run combine into the value of a ratio."""
-
 
 class Ratio(_OneScalar):
     """
@@ -428,13 +425,13 @@ class Ratio(_OneScalar):
     kind: Literal["ratio"] = "ratio"
     numerator: _Operand = Field(description="The quantity divided.")
     denominator: _Operand = Field(description="The quantity it is divided by.")
-    replicate_rule: ReplicateRule = Field(
+    replicate_rule: Literal["within", "within_positive", "pooled"] = Field(
         description="How the replicates of a stochastic run combine."
     )
 
     @field_validator("numerator", "denominator")
     @classmethod
-    def one_value(cls, value: QuantityBase) -> QuantityBase:
+    def _one_value(cls, value: QuantityBase) -> QuantityBase:
         """An operand gives one value per run."""
         if isinstance(value, PeakPosition | Trajectory):
             raise ValueError(
@@ -450,7 +447,7 @@ class Ratio(_OneScalar):
         return f"({numerator}) / ({denominator})"
 
 
-type Quantity = Annotated[
+type _Quantity = Annotated[
     ValueAt | Gain | Peak | PeakPosition | Trajectory | Ratio,
     Field(discriminator="kind"),
 ]
@@ -463,7 +460,7 @@ def quantity_labels(quantities: Sequence[QuantityBase]) -> list[str]:
 
     Parameters
     ----------
-    quantities : Sequence[Quantity]
+    quantities : Sequence[quantity]
         The quantities; a `Trajectory` gives one scalar per position.
 
     Returns
@@ -499,7 +496,7 @@ def quantity_schedule(quantities: Sequence[QuantityBase]) -> list[float]:
 
     Parameters
     ----------
-    quantities : Sequence[Quantity]
+    quantities : Sequence[quantity]
         The quantities.
 
     Returns

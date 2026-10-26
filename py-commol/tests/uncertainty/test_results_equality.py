@@ -10,19 +10,27 @@ import pytest
 from pydantic import BaseModel
 
 from commol import (
-    CalibrationResult,
-    ConformalResult,
     ParameterSample,
-    ParameterSummary,
     PRCC,
-    PRCCResult,
-    PredictionIntervals,
     SampleMethod,
     SensitivityAnalysis,
-    SeriesIntervals,
     Simulation,
-    StartSummary,
     ValueAt,
+)
+from commol.context.calibration import (
+    CalibrationResult,
+    StartSummary,
+)
+from commol.context.inference.conformal import (
+    ConformalResult,
+    PredictionIntervals,
+    SeriesIntervals,
+)
+from commol.context.inference.sample import (
+    ParameterSummary,
+)
+from commol.context.inference.global_sensitivity import (
+    PRCCResult,
 )
 from commol.api.inference.registry import _RUNNERS
 from commol.context.result_model import ResultModel

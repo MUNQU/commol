@@ -10,12 +10,14 @@ from pydantic import ValidationError
 from commol import (
     CalibrationParameter,
     CalibrationProblem,
-    CalibrationResult,
     Calibrator,
     NelderMeadConfig,
     ObservedDataPoint,
     ParticleSwarmConfig,
     Simulation,
+)
+from commol.context.calibration import (
+    CalibrationResult,
 )
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.context.engine_json import engine_json
@@ -126,13 +128,18 @@ class TestValidation:
             CalibrationParameter(id="k1", parameter_type="parameter", **bounds)
 
     def test_a_parameter_type_is_one_of_the_known_ones(self) -> None:
-        with pytest.raises(ValidationError, match="Invalid parameter_type: rate"):
+        with pytest.raises(
+            ValidationError,
+            match="Input should be 'parameter', 'initial_condition', 'factor' or",
+        ):
             CalibrationParameter(
                 id="k1", parameter_type="rate", min_bound=0.0, max_bound=1.0
             )
 
     def test_a_loss_function_is_one_of_the_known_ones(self) -> None:
-        with pytest.raises(ValidationError, match="Invalid loss_function: mse"):
+        with pytest.raises(
+            ValidationError, match="Input should be .sse., .rmse. or .mae."
+        ):
             CalibrationProblem(
                 observed_data=[ObservedDataPoint(at=0, output="B", value=1.0)],
                 parameters=[bounded("k1")],

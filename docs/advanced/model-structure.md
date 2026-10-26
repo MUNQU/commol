@@ -77,7 +77,9 @@ structure, and loads back as its own class
 
 ::: commol.context.stratification.Stratification
 
-::: commol.context.stratification_condition.StratificationCondition
+A condition of a stratification or of a stratified rate,
+`StratificationCondition`, is documented in
+[ModelBuilder API](../api/model-builder.md).
 
 ## Parameters
 
@@ -90,7 +92,8 @@ The value of a series parameter, `SeriesValue`, is documented in
 
 ::: commol.context.transition.Transition
 
-::: commol.context.transition.StratifiedRate
+The rate of a transition in the compartments that match its conditions,
+`StratifiedRate`, is documented in [ModelBuilder API](../api/model-builder.md).
 
 ## Engine
 

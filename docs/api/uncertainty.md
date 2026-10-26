@@ -2,16 +2,11 @@
 
 [Back to API Reference](index.md)
 
-What every uncertainty method takes and returns: the configuration bases, the
-weighted parameter sample, the predictive and its observation noise, and the
-scenarios. Then the methods of each family with their results (resampling,
+What every uncertainty method returns: the weighted parameter sample, the
+predictive with its observation noise and its figures, and the scenarios. Then the methods of each family with their results (resampling,
 profile likelihood, sequential Monte Carlo, local approximations and conformal
 prediction), the scores and the one quantile.
 Guide: [Uncertainty](../guide/uncertainty/index.md).
-
-::: commol.context.inference.method.InferenceMethod
-
-::: commol.context.inference.method.UncertaintyMethod
 
 ::: commol.context.inference.sample.ParameterSample
 
@@ -26,6 +21,8 @@ Guide: [Uncertainty](../guide/uncertainty/index.md).
 ::: commol.api.inference.predictive.SeriesBand
 
 ::: commol.api.inference.predictive.ObservationDraws
+
+::: commol.api.plotting.accessors.PredictivePlot
 
 ::: commol.api.inference.scenarios.Scenarios
 
@@ -139,8 +136,6 @@ Guide: [Local Approximations](../guide/uncertainty/local.md).
 
 ::: commol.context.inference.local.SandwichResult
 
-::: commol.context.inference.local.DeltaBand
-
 ::: commol.context.inference.local.ImportanceResult
 
 ::: commol.context.inference.local.MixtureComponent
@@ -174,5 +169,3 @@ Guide: [Conformal Prediction Intervals](../guide/uncertainty/conformal.md).
 ::: commol.api.inference.intervals.weighted_quantiles
 
 ::: commol.api.inference.intervals.member_statistics
-
-::: commol.api.inference.intervals.ci_percentiles

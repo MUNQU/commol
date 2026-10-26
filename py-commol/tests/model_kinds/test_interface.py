@@ -6,7 +6,14 @@ from typing import Literal, Self
 import pytest
 from pydantic import ValidationError
 
-from commol import Aggregate, Model, ModelStructure, Simulation
+from commol import (
+    Aggregate,
+    Model,
+    Simulation,
+)
+from commol.context.structure import (
+    ModelStructure,
+)
 from commol.context.engine import ModelEngine
 from commol.context.process import Process
 from commol.context.structure import SeriesLabel

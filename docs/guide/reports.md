@@ -29,7 +29,6 @@ from commol import (
     NelderMeadConfig,
     ObservedDataPoint,
     Simulation,
-    windowed_totals,
 )
 
 def model(k1: float | None):
@@ -57,7 +56,7 @@ ends = [7, 14, 21, 28]
 truth = Simulation(model(0.4)).run(num_steps=28)
 observed_data = [
     ObservedDataPoint(at=end, output="cum_ab", value=count, window=7)
-    for end, count in zip(ends, windowed_totals(truth["cum_ab"], truth.positions, 7, ends))
+    for end, count in zip(ends, truth.windowed_totals(["cum_ab"], 7, ends))
 ]
 problem = CalibrationProblem(
     observed_data=observed_data,

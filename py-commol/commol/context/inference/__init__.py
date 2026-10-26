@@ -78,7 +78,6 @@ from commol.context.inference.method import (
 from commol.context.inference.noise import (
     DistributionNoise,
     NoNoise,
-    ObservationNoise,
     ResidualNoise,
 )
 from commol.context.inference.profiles import (
@@ -93,7 +92,6 @@ from commol.context.inference.profiles import (
 from commol.context.inference.resampling import (
     BayesianBootstrap,
     BlockJackknife,
-    BlockLength,
     BootstrapResult,
     BoundError,
     JackknifeResult,
@@ -129,7 +127,6 @@ __all__ = [
     "BayesianPosterior",
     "Beta",
     "BlockJackknife",
-    "BlockLength",
     "BootstrapCoverageEta",
     "BootstrapResult",
     "BoundError",
@@ -168,7 +165,6 @@ __all__ = [
     "MorrisResult",
     "NoNoise",
     "Normal",
-    "ObservationNoise",
     "PRCC",
     "PRCCResult",
     "ParameterSample",

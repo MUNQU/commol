@@ -15,7 +15,6 @@ from commol import (
     BayesianBootstrap,
     CalibrationProblem,
     Calibrator,
-    ConformalResult,
     EnbPI,
     JackknifePlus,
     NelderMeadConfig,
@@ -25,6 +24,9 @@ from commol import (
     SampleMethod,
     Simulation,
     SplitConformal,
+)
+from commol.context.inference.conformal import (
+    ConformalResult,
 )
 from tests.support import (
     a_to_b_builder,

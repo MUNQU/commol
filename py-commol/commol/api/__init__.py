@@ -3,12 +3,11 @@ plotting and reporting."""
 
 from .calibrator import Calibrator
 from .model_builder import ModelBuilder
-from .inference.intervals import ci_percentiles, member_statistics, weighted_quantiles
-from .results import SimulationReplicates, SimulationResults, sample
+from .inference.intervals import member_statistics, weighted_quantiles
+from .results import SimulationReplicates, SimulationResults
 from .sensitivity import SensitivityAnalysis
 from .simulation import ReplicateRuns, Simulation
 from .patterns import AxisPattern
-from .windows import windowed_totals
 
 __all__ = [
     "Calibrator",
@@ -19,9 +18,6 @@ __all__ = [
     "SimulationReplicates",
     "ReplicateRuns",
     "AxisPattern",
-    "ci_percentiles",
     "member_statistics",
     "weighted_quantiles",
-    "sample",
-    "windowed_totals",
 ]
