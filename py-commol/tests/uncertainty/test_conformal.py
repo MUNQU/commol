@@ -164,9 +164,12 @@ class TestScores:
             with pytest.raises(ValueError) as error:
                 variant(**settings)
             message = str(error.value)
-            assert argument in message
-            for value in values:
-                assert f'"{value}"' in message, message
+            if given is None:
+                assert f"missing field `{argument}`" in message, message
+            else:
+                assert f"{argument}: unknown variant `other`" in message, message
+                for value in values:
+                    assert f"`{value}`" in message, message
 
     @pytest.mark.parametrize("variant", VARIANTS)
     def test_normalized_score_needs_pooled_quantiles(self, variant: type) -> None:

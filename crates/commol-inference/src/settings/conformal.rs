@@ -30,6 +30,28 @@ fn pair(score: NonconformityScore, by: Pooling) -> Result<(), String> {
     ConformalSettings::check_pair(score, by).map_err(|error| error.to_string())
 }
 
+/// The score and the pooling of a conformal method, which the Python class
+/// checks before its other fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScoreAndPooling {
+    /// The nonconformity score.
+    pub score: NonconformityScore,
+    /// Which scores each quantile reads.
+    pub by: Pooling,
+}
+
+impl ScoreAndPooling {
+    /// Check the pair.
+    ///
+    /// # Errors
+    ///
+    /// As [`ConformalSettings::check_pair`].
+    pub fn check(self) -> Result<(), MethodError> {
+        ConformalSettings::check_pair(self.score, self.by)
+    }
+}
+
 /// Split conformal prediction, as the Python class `SplitConformal` writes
 /// it; its sample crosses as a handle.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

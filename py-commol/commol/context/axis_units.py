@@ -183,7 +183,7 @@ class AxisUnits(BaseModel):
         if self.origin is not None:
             seconds_per_step(self.step_unit)
         if self.engine is not None:
-            commol_rs.engine.EngineType(self.engine)
+            commol_rs.engine.EngineType(engine_json(self.engine))
         return self
 
     def position_of(self, moment: date) -> float:
@@ -613,4 +613,4 @@ class AxisUnits(BaseModel):
                 "A rate needs the engine that reads it: give AxisUnits an "
                 "engine, or use Model.axis_units()."
             )
-        return commol_rs.engine.EngineType(self.engine)
+        return commol_rs.engine.EngineType(engine_json(self.engine))

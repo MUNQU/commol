@@ -165,7 +165,7 @@ class TestRates:
         )
 
     def test_an_unknown_engine_is_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="Unknown engine"):
+        with pytest.raises(ValidationError, match="unknown variant `Stochastic`"):
             AxisUnits(engine="Stochastic")
 
     def test_the_engine_says_what_a_rate_means(self) -> None:

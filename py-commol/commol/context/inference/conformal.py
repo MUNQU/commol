@@ -14,6 +14,7 @@ from typing import ClassVar, Literal, Self
 from pydantic import ConfigDict, Field, JsonValue, model_validator
 
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context.engine_json import engine_json
 from commol.context.calibration import ObservedDataPoint
 from commol.context.inference.method import UncertaintyMethod
 from commol.context.inference.resampling import BlockLength
@@ -150,12 +151,10 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
     def check_score_and_by(cls, data: JsonValue) -> JsonValue:
         """Check, in Rust, that `score` and `by` are given and fit together."""
         if isinstance(data, Mapping):
-
-            def name(key: str) -> str | None:
-                value = data.get(key)
-                return None if value is None else str(value)
-
-            commol_rs.inference.check_conformal_settings(name("score"), name("by"))
+            given = {
+                key: data[key] for key in ("score", "by") if data.get(key) is not None
+            }
+            commol_rs.inference.check_conformal_settings(engine_json(given))
         return data
 
 

@@ -11,8 +11,10 @@ use serde_json::Value;
 
 use crate::Real;
 
-/// The kind of model an engine runs: the kind of its structure.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// The kind of model an engine runs: the kind of its structure. It crosses
+/// from Python as the JSON of its name, such as `"aggregate"`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ModelKind {
     /// Amounts per compartment: bins expanded over stratifications.
     Aggregate,
@@ -36,22 +38,6 @@ impl ModelKind {
             #[cfg(feature = "test-kind")]
             Self::Test => "test",
         }
-    }
-
-    /// The kind with a name.
-    ///
-    /// # Errors
-    ///
-    /// Returns a message with every name when no kind has it.
-    pub fn from_name(name: &str) -> Result<Self, String> {
-        Self::ALL
-            .iter()
-            .copied()
-            .find(|kind| kind.name() == name)
-            .ok_or_else(|| {
-                let names: Vec<&str> = Self::ALL.iter().map(|kind| kind.name()).collect();
-                format!("Unknown model kind '{name}'; the kinds are {names:?}")
-            })
     }
 
     /// The types of value of the kind that calibration may set, besides
@@ -256,7 +242,8 @@ impl DynamicsForm {
     }
 }
 
-/// The list of engines a model can name.
+/// The list of engines a model can name. An entry crosses from Python as the
+/// JSON of its name, such as `"DifferenceEquations"`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EngineType {
     /// Discrete time: each step applies every flow once (`commol-difference`).
@@ -307,22 +294,6 @@ impl EngineType {
             #[cfg(feature = "test-kind")]
             Self::TestStochasticEngine => "TestStochasticEngine",
         }
-    }
-
-    /// The entry with a name.
-    ///
-    /// # Errors
-    ///
-    /// Returns a message with every name of the list when no entry has it.
-    pub fn from_name(name: &str) -> Result<Self, String> {
-        Self::ALL
-            .iter()
-            .copied()
-            .find(|engine| engine.name() == name)
-            .ok_or_else(|| {
-                let names: Vec<&str> = Self::ALL.iter().map(|engine| engine.name()).collect();
-                format!("Unknown engine '{name}'; the engines are {names:?}")
-            })
     }
 
     /// The kinds of model the engine runs.
@@ -880,11 +851,11 @@ mod tests {
     #[test]
     fn every_entry_has_a_unique_name_that_reads_back() {
         for &engine in EngineType::ALL {
-            assert_eq!(EngineType::from_name(engine.name()), Ok(engine));
             let json = serde_json::to_value(engine).unwrap();
             assert_eq!(json, json!(engine.name()));
+            assert_eq!(crate::json::read(&json.to_string()), Ok(engine));
         }
-        let error = EngineType::from_name("Stochastic").unwrap_err();
+        let error = crate::json::read::<EngineType>(r#""Stochastic""#).unwrap_err();
         assert!(error.contains("DifferenceEquations") && error.contains("DifferentialEquations"));
     }
 
@@ -1180,9 +1151,11 @@ mod tests {
     #[test]
     fn every_kind_has_a_unique_name_that_reads_back() {
         for &kind in ModelKind::ALL {
-            assert_eq!(ModelKind::from_name(kind.name()), Ok(kind));
+            let json = serde_json::to_value(kind).unwrap();
+            assert_eq!(json, json!(kind.name()));
+            assert_eq!(crate::json::read(&json.to_string()), Ok(kind));
         }
-        let error = ModelKind::from_name("network").unwrap_err();
+        let error = crate::json::read::<ModelKind>(r#""network""#).unwrap_err();
         assert!(error.contains("aggregate"), "{error}");
         assert_eq!(
             ModelKind::Aggregate.value_types(),

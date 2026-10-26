@@ -8,13 +8,11 @@
 
 use crate::parallelism::parallel;
 use commol_calibration::observed_data;
-use commol_inference::conformal::{
-    self, ConformalRun, ConformalSettings, NonconformityScore, Pooling, Predictor,
-};
+use commol_inference::conformal::{self, ConformalRun, Predictor};
 use commol_inference::resampling::{BlockDrawing, BlockScheme, FitUnit, ReplicateRunner};
 use commol_inference::settings::conformal::{
     AdaptiveConformalSettings, EnbPiSettings, JackknifePlusSettings, RollingConformalSettings,
-    SplitConformalSettings,
+    ScoreAndPooling, SplitConformalSettings,
 };
 use pyo3::prelude::*;
 
@@ -105,15 +103,17 @@ fn refits<'a>(
 
 /// Check the score and the pooling of a conformal method
 ///
+/// Args:
+///     settings: The JSON of the fields `score` and `by` that are given
+///
 /// Raises:
 ///     ValueError: If one is missing or not a valid name, or the pair is
 ///         rejected
 #[pyfunction]
-#[pyo3(signature = (score, by))]
-fn check_conformal_settings(score: Option<&str>, by: Option<&str>) -> PyResult<()> {
-    let score = NonconformityScore::from_name(score).map_err(method_error)?;
-    let by = Pooling::from_name(by).map_err(method_error)?;
-    ConformalSettings::check_pair(score, by).map_err(method_error)
+fn check_conformal_settings(settings: &str) -> PyResult<()> {
+    crate::json::read::<ScoreAndPooling>(settings)?
+        .check()
+        .map_err(method_error)
 }
 
 /// Split conformal intervals at the positions of the settings, for each

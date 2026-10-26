@@ -66,11 +66,12 @@ so a label `"NaN"` stays text; a range rule reads the text as its number, so
 an infinite setting gets the message of its rule. The writer of the engine,
 `commol_core::json::write`, and the tree of a formula write the same three
 texts, and so does the JSON of every result: `ResultModel` sets
-`ser_json_inf_nan="strings"` for all of them. A value of an enum of the engine,
-such as what a rate keeps (`RateKeeps`), crosses as the JSON of its name, read
-with serde; a binding reads no value of an enum with a `from_name` of its own,
-except the names of handles listed in `NAMED` of
-`tests/suite/test_architecture.py`.
+`ser_json_inf_nan="strings"` for all of them. A value of an enum of the engine
+crosses as the JSON of its name (`engine_json(name)`), read with serde: what a
+rate keeps (`RateKeeps`), an engine (`EngineType`), a model kind
+(`ModelKind`), the levels of the threads (`Levels`), and the score and the
+pooling of a conformal method (`ScoreAndPooling`). No binding reads a name
+with a `from_name` of its own (`tests/suite/test_architecture.py`).
 
 Each union of classes carries one tag, `kind`, with a default, so a field is
 never read by the first variant that matches; `tagged!` of

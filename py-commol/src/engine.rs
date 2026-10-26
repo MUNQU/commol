@@ -557,14 +557,15 @@ impl PyEngineType {
     /// The entry with a name
     ///
     /// Args:
-    ///     name: Name of the engine, for example "DifferentialEquations"
+    ///     name: The JSON of the name of the engine, for example
+    ///         `"DifferentialEquations"` in quotes
     ///
     /// Raises:
     ///     ValueError: If no entry has the name; the message lists them all
     #[new]
     fn new(name: &str) -> PyResult<Self> {
         Ok(Self {
-            inner: EngineType::from_name(name).map_err(PyValueError::new_err)?,
+            inner: crate::json::read(name)?,
         })
     }
 
@@ -679,15 +680,15 @@ impl PyEngineType {
     /// Check that the engine runs a model kind
     ///
     /// Args:
-    ///     kind: Name of the kind of a model structure, for example
-    ///         "aggregate"
+    ///     kind: The JSON of the name of the kind of a model structure, for
+    ///         example `"aggregate"` in quotes
     ///
     /// Raises:
     ///     ValueError: If the kind is unknown, or the engine does not run
     ///         it; the message names the engine, the kinds and the engines
     ///         of the kind
     fn check_kind(&self, kind: &str) -> PyResult<()> {
-        let kind = ModelKind::from_name(kind).map_err(PyValueError::new_err)?;
+        let kind: ModelKind = crate::json::read(kind)?;
         self.inner.check_kind(kind).map_err(PyValueError::new_err)
     }
 }
@@ -705,14 +706,15 @@ impl PyModelKind {
     /// The kind with a name
     ///
     /// Args:
-    ///     name: Name of the kind, for example "aggregate"
+    ///     name: The JSON of the name of the kind, for example `"aggregate"`
+    ///         in quotes
     ///
     /// Raises:
     ///     ValueError: If no kind has the name; the message lists them all
     #[new]
     fn new(name: &str) -> PyResult<Self> {
         Ok(Self {
-            inner: ModelKind::from_name(name).map_err(PyValueError::new_err)?,
+            inner: crate::json::read(name)?,
         })
     }
 

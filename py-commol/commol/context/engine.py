@@ -170,7 +170,9 @@ def _checked[SettingsT: EngineSettings](settings: SettingsT) -> SettingsT:
         If the engine does not take them; the message is the engine's.
     """
     engine = next(name for name, cls in _SETTINGS.items() if cls is type(settings))
-    commol_rs.engine.EngineType(engine).check_settings(engine_json(settings))
+    commol_rs.engine.EngineType(engine_json(engine)).check_settings(
+        engine_json(settings)
+    )
     return settings
 
 
@@ -216,5 +218,7 @@ class ModelEngine(BaseModel):
     def check_settings(self) -> Self:
         """Ask the engine's list whether it has the engine and the settings."""
         settings_json = None if self.settings is None else engine_json(self.settings)
-        commol_rs.engine.EngineType(self.type).check_settings(settings_json)
+        commol_rs.engine.EngineType(engine_json(self.type)).check_settings(
+            settings_json
+        )
         return self

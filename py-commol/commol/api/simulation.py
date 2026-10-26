@@ -142,7 +142,7 @@ class Simulation:
     def is_stochastic(self) -> bool:
         """Whether the engine of the model draws random numbers."""
         return commol_rs.engine.EngineType(
-            self.model_definition.engine.type
+            engine_json(self.model_definition.engine.type)
         ).is_stochastic
 
     def _seed_run(self, seed: int | None) -> int | None:

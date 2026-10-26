@@ -14,6 +14,7 @@ from commol import (
     StochasticStepsSettings,
 )
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context.engine_json import engine_json
 from commol.context.engine import EngineName
 from tests.support.kinds import TEST_ENGINE, TEST_STOCHASTIC_ENGINE
 from tests.support import a_to_b_builder, assert_close, build, build_ode
@@ -30,7 +31,7 @@ class TestEngineList:
         assert list(get_args(EngineName)) == engines
 
     def test_the_aggregate_kind_lists_its_engines(self) -> None:
-        kind = commol_rs.engine.ModelKind("aggregate")
+        kind = commol_rs.engine.ModelKind(engine_json("aggregate"))
 
         assert kind.engines() == [
             "DifferenceEquations",
@@ -41,7 +42,7 @@ class TestEngineList:
 
     def test_each_engine_says_what_a_rate_means(self) -> None:
         meanings = {
-            name: commol_rs.engine.EngineType(name).rate_meaning
+            name: commol_rs.engine.EngineType(engine_json(name)).rate_meaning
             for name in get_args(EngineName)
         }
 
@@ -54,7 +55,7 @@ class TestEngineList:
 
     def test_an_unknown_engine_lists_the_engines(self) -> None:
         with pytest.raises(ValueError, match="DifferentialEquations"):
-            commol_rs.engine.EngineType("Stochastic")
+            commol_rs.engine.EngineType(engine_json("Stochastic"))
 
     def test_every_engine_gives_the_form_of_its_dynamics(self) -> None:
         forms = {
@@ -64,13 +65,13 @@ class TestEngineList:
             "rules",
         }
         for name in commol_rs.engine.EngineType.names():
-            engine = commol_rs.engine.EngineType(name)
+            engine = commol_rs.engine.EngineType(engine_json(name))
             assert engine.dynamics_form in forms
             assert engine.schedule
 
     def test_an_engine_of_equations_gives_their_left_hand_side(self) -> None:
-        difference = commol_rs.engine.EngineType("DifferenceEquations")
-        differential = commol_rs.engine.EngineType("DifferentialEquations")
+        difference = commol_rs.engine.EngineType(engine_json("DifferenceEquations"))
+        differential = commol_rs.engine.EngineType(engine_json("DifferentialEquations"))
 
         assert difference.dynamics_form == "difference_equation"
         assert difference.equation_lhs("A", False) == "[A(t+Dt) - A(t)] / Dt"
@@ -82,20 +83,20 @@ class TestEngineList:
 
         assert "aggregate" in kinds
         for name in commol_rs.engine.EngineType.names():
-            engine_kinds = commol_rs.engine.EngineType(name).kinds
+            engine_kinds = commol_rs.engine.EngineType(engine_json(name)).kinds
             assert engine_kinds
             assert set(engine_kinds) <= set(kinds)
 
     def test_an_aggregate_model_accepts_initial_conditions(self) -> None:
-        kind = commol_rs.engine.ModelKind("aggregate")
+        kind = commol_rs.engine.ModelKind(engine_json("aggregate"))
 
         assert kind.value_types() == ["initial_condition"]
 
     def test_an_unknown_kind_lists_the_kinds(self) -> None:
-        engine = commol_rs.engine.EngineType("DifferenceEquations")
+        engine = commol_rs.engine.EngineType(engine_json("DifferenceEquations"))
 
         with pytest.raises(ValueError, match="aggregate"):
-            engine.check_kind("network")
+            engine.check_kind(engine_json("network"))
 
 
 class TestBuild:

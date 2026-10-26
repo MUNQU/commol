@@ -16,6 +16,7 @@ parameters, outputs), adds the sections of the kind
 from typing import TYPE_CHECKING
 
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context.engine_json import engine_json
 
 from commol.context.description import (
     Block,
@@ -354,4 +355,4 @@ def _input_data(model: "Model") -> list[Block]:
 
 
 def _engine(model: "Model") -> "EngineTypeProtocol":
-    return commol_rs.engine.EngineType(model.engine.type)
+    return commol_rs.engine.EngineType(engine_json(model.engine.type))

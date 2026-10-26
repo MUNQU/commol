@@ -67,6 +67,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the tag of their union. The engine fits the problem for each method that
   needs a fit, and calibrates `η` and the threshold of a profile. The results
   are the same for the same settings and seed.
+- An unknown name of an engine, a model kind, the levels of
+  `commol.set_threads`, or the `score` or `by` of a conformal method gives
+  the message of the reader of the engine, which lists the valid names, such
+  as ``unknown variant `Stochastic`, expected one of `DifferenceEquations`,
+  … `` or ``score: unknown variant `other`, expected one of `absolute`,
+  `normalized`, `spread` ``. A conformal method without `score` or `by`
+  gives ``missing field `score` ``.
 - The JSON of every result (`model_dump_json`) is standard JSON: a number
   that is not finite is the text `"Infinity"`, `"-Infinity"` or `"NaN"`, as
   at the port of the engine. Before, `ParameterSample`, `SMCResult`,

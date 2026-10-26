@@ -17,7 +17,7 @@ variable ``_engine_handles``, and it crosses as its handle
 (`engine_handles`).
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
@@ -32,31 +32,37 @@ def _dump(value: BaseModel) -> object:
     return value.model_dump(exclude=set(handles))
 
 
-def engine_json(value: BaseModel | Sequence[BaseModel] | str) -> str:
+def _plain(value: object) -> object:
+    """`value` with the dump of each data object in it."""
+    if isinstance(value, BaseModel):
+        return _dump(value)
+    if isinstance(value, list | tuple):
+        return [_plain(item) for item in value]
+    if isinstance(value, Mapping):
+        return {key: _plain(item) for key, item in value.items()}
+    return value
+
+
+def engine_json(value: object) -> str:
     """
     The JSON of `value` that the engine reads.
 
     Parameters
     ----------
-    value : BaseModel | Sequence[BaseModel] | str
-        A data object, a list of them, or the name of a value of an enum of
-        the engine, such as ``"survival"``.
+    value : object
+        A data object, the name of a value of an enum of the engine, such as
+        ``"survival"`` or ``"DifferenceEquations"``, or a list or a mapping
+        of them.
 
     Returns
     -------
     str
-        The JSON of its ``model_dump()``, without the fields that cross as
-        handles, with the texts ``"Infinity"``, ``"-Infinity"`` and ``"NaN"``
-        for the numbers that are not finite.
+        The JSON of `value`, with the ``model_dump()`` of each data object
+        without the fields that cross as handles, and with the texts
+        ``"Infinity"``, ``"-Infinity"`` and ``"NaN"`` for the numbers that
+        are not finite.
     """
-    dumped = (
-        value
-        if isinstance(value, str)
-        else _dump(value)
-        if isinstance(value, BaseModel)
-        else [_dump(item) for item in value]
-    )
-    return to_json(dumped, inf_nan_mode="strings").decode()
+    return to_json(_plain(value), inf_nan_mode="strings").decode()
 
 
 def _handle(value: object) -> "EngineHandle":

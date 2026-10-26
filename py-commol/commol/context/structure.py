@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, ClassVar, NamedTuple, Self, TypedDict
 from pydantic import BaseModel, ConfigDict
 
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.context.engine_json import engine_json
 
 from commol.context.constants import CalibrationParameterType
 
@@ -215,7 +216,7 @@ class ModelStructure(BaseModel, ABC):
         """
         return frozenset(
             CalibrationParameterType(name)
-            for name in commol_rs.engine.ModelKind(self.kind).value_types()
+            for name in commol_rs.engine.ModelKind(engine_json(self.kind)).value_types()
         )
 
     def uncalibrated_values(self) -> list[str]:
