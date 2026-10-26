@@ -3,8 +3,9 @@
 //! its name, and an invalid value with its path.
 
 use commol_calibration::{
-    InertiaWeightStrategy, LossConfig, MutationApplication, MutationStrategy, OptimizationConfig,
-    OptimizerSettings, ProblemSettings, ReplicateSummary,
+    FitRecord, InertiaWeightStrategy, LossConfig, MutationApplication, MutationStrategy,
+    Observation, ObservationModel, OptimizationConfig, OptimizerSettings, ProblemSettings,
+    ReplicateSummary,
 };
 use commol_core::json;
 
@@ -261,4 +262,89 @@ fn a_nelder_mead_optimizer_reads_its_verbosity() {
 
     assert!(settings.verbose());
     assert_eq!(settings.header_interval(), 7);
+}
+
+#[test]
+fn a_summary_of_replicates_writes_back_its_name() {
+    for name in ["mean", "median", "crps"] {
+        let summary = read_with(&[("replicate_summary", &format!(r#""{name}""#))])
+            .unwrap()
+            .replicate_summary
+            .unwrap();
+
+        assert_eq!(json::write(&summary), format!(r#""{name}""#));
+    }
+    let message = read_with(&[("replicate_summary", "true")]).unwrap_err();
+    assert!(
+        message.starts_with("replicate_summary: a replicate summary is"),
+        "{message}"
+    );
+}
+
+#[test]
+fn a_noise_argument_is_a_number_or_a_parameter() {
+    let read =
+        |sd: &str| json::read::<ObservationModel>(&format!(r#"{{"kind": "normal", "sd": {sd}}}"#));
+
+    assert_eq!(read("2").unwrap(), read("2.0").unwrap());
+    let by_name = read(r#""sigma""#).unwrap();
+    assert_eq!(
+        json::read::<ObservationModel>(&json::write(&by_name)).unwrap(),
+        by_name
+    );
+    let message = read("true").unwrap_err();
+    assert!(
+        message.contains("a noise argument is a number or the id of a noise parameter"),
+        "{message}"
+    );
+}
+
+/// An observation of `B` at 1 with `output`, `outputs` and `label`.
+fn observation(output: &str, outputs: &str, label: &str) -> Result<(), String> {
+    let text = format!(
+        r#"{{"at": 1.0, "output": {output}, "outputs": {outputs}, "label": "{label}",
+        "value": 2.0, "weight": 1.0, "factor_id": null, "window": null, "trials": null}}"#
+    );
+    json::read::<Observation>(&text).map(|_| ())
+}
+
+#[test]
+fn an_observation_has_one_output_and_a_label() {
+    for ((output, outputs, label), message) in [
+        (
+            ("null", "[]", "B"),
+            "outputs must be non-empty when provided",
+        ),
+        (
+            (r#""B""#, r#"["B"]"#, "B"),
+            "Give exactly one of 'output' and 'outputs'.",
+        ),
+        (
+            (r#""B""#, "null", ""),
+            "An observation needs a 'label' that names its series.",
+        ),
+    ] {
+        assert_eq!(
+            observation(output, outputs, label),
+            Err(message.to_string()),
+            "{output} {outputs} {label}"
+        );
+    }
+    assert_eq!(observation("null", r#"["B"]"#, "B"), Ok(()));
+}
+
+#[test]
+fn a_fit_gives_the_values_of_the_parameters_it_has() {
+    let fit: FitRecord = json::read(
+        r#"{"best_parameters": {"k": 0.5}, "final_loss": 1.0, "iterations": 3,
+        "converged": true, "termination_reason": "done", "starts": [], "failed": [],
+        "seed": 1}"#,
+    )
+    .unwrap();
+
+    assert_eq!(fit.values(&["k".to_string()]), Ok(vec![0.5]));
+    assert_eq!(
+        fit.values(&["k".to_string(), "m".to_string()]),
+        Err(r#"The fit is not a fit of this problem: it lacks ["m"]"#.to_string())
+    );
 }

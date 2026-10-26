@@ -752,3 +752,18 @@ fn a_calibration_of_eta_needs_a_fit_inside_the_support() {
         .to_string();
     assert!(error.contains("infeasible"), "{error}");
 }
+
+#[test]
+fn eta_is_a_number_or_a_calibration_of_it() {
+    use commol_inference::settings::smc::Eta;
+
+    let eta: Eta = commol_core::json::read("0.5").unwrap();
+
+    assert_eq!(eta, Eta::Value(0.5));
+    assert_eq!(commol_core::json::write(&eta), "0.5");
+    let message = commol_core::json::read::<Eta>(r#""auto""#).unwrap_err();
+    assert!(
+        message.starts_with("eta is a number or a calibration of eta"),
+        "{message}"
+    );
+}

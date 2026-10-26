@@ -192,3 +192,104 @@ fn a_union_checks_the_rules_of_the_variant_of_its_kind() {
         "[0]: missing field `kind`"
     );
 }
+
+#[test]
+fn a_union_needs_an_object_whose_kind_is_a_name() {
+    assert_eq!(
+        error(r#"{"moves": [3]}"#),
+        "moves[0]: expected an object with a kind"
+    );
+    assert_eq!(
+        error(r#"{"moves": [{"kind": 1}]}"#),
+        "moves[0].kind: the kind is the name of a variant"
+    );
+}
+
+#[test]
+fn two_values_are_equal_when_their_numbers_are() {
+    assert_eq!(Value::Float(0.5), Value::Float(0.5));
+    assert_eq!(Value::Int(1), Value::Float(1.0));
+    assert_ne!(Value::Null, Value::Bool(false));
+    assert_eq!(Value::Float(0.5).field("kind"), None);
+}
+
+#[test]
+fn a_whole_number_beyond_64_bits_keeps_its_value() {
+    let big = Value::Int(i128::MAX);
+
+    assert_eq!(
+        json::from_value::<i128, json::Error>(big.clone()),
+        Ok(i128::MAX)
+    );
+    assert_eq!(
+        json::from_value::<Value, json::Error>(big.clone()),
+        Ok(big.clone())
+    );
+    assert_eq!(serde_json::to_string(&big).unwrap(), i128::MAX.to_string());
+}
+
+#[test]
+fn a_value_is_only_what_json_holds() {
+    let bytes = serde::de::value::BytesDeserializer::<json::Error>::new(b"x");
+
+    let error = Value::deserialize(bytes).unwrap_err();
+
+    assert!(
+        error.to_string().contains("expected a JSON value"),
+        "{error}"
+    );
+}
+
+#[derive(Debug, PartialEq, Deserialize)]
+enum Shape {
+    Dot,
+    Line(f64),
+}
+
+#[derive(Debug, PartialEq, Deserialize)]
+struct Length(f64);
+
+#[test]
+fn an_enum_reads_a_name_or_an_object_of_one_field() {
+    assert_eq!(
+        json::from_value::<Shape, json::Error>(Value::String("Dot".to_string())),
+        Ok(Shape::Dot)
+    );
+    assert_eq!(
+        json::from_value::<Shape, json::Error>(Value::Map(vec![(
+            "Line".to_string(),
+            Value::Float(2.0)
+        )])),
+        Ok(Shape::Line(2.0))
+    );
+    let error = json::from_value::<Shape, json::Error>(Value::Bool(true)).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("expected a name or an object of one field, got true"),
+        "{error}"
+    );
+}
+
+#[test]
+fn a_newtype_reads_its_value() {
+    assert_eq!(
+        json::from_value::<Length, json::Error>(Value::Float(2.0)),
+        Ok(Length(2.0))
+    );
+}
+
+#[test]
+fn a_setting_is_read_only_from_json() {
+    let bytes = || serde::de::value::BytesDeserializer::<json::Error>::new(b"x");
+
+    assert!(<Walk as Deserialize>::deserialize(bytes()).is_err());
+    assert!(<Leap as Deserialize>::deserialize(bytes()).is_err());
+}
+
+#[test]
+fn pairs_are_an_object() {
+    let error = json::read::<json::Pairs<f64>>("[1]").unwrap_err();
+
+    assert!(error.contains("expected an object"), "{error}");
+}

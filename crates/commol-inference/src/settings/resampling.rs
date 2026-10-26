@@ -136,16 +136,6 @@ impl Bootstrap {
             Self::Wild(settings) => settings.starts,
         }
     }
-
-    /// The name of the method that a sample of the bootstrap records.
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Bayesian(_) => "bayesian_bootstrap",
-            Self::Parametric(_) => "parametric_bootstrap",
-            Self::Residual(_) => "residual_bootstrap",
-            Self::Wild(_) => "wild_bootstrap",
-        }
-    }
 }
 
 /// A block jackknife, as the Python class `BlockJackknife` writes it.

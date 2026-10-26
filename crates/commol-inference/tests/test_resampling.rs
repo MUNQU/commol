@@ -919,3 +919,19 @@ fn a_bootstrap_of_a_parameter_named_twice_has_no_sample() {
 
     assert_eq!(error, "A sample names 'k' twice; one name per column");
 }
+
+#[test]
+fn a_block_length_is_a_number_or_auto() {
+    use commol_inference::settings::BlockLength;
+
+    for text in [r#""auto""#, "3"] {
+        let length: BlockLength = commol_core::json::read(text).unwrap();
+
+        assert_eq!(commol_core::json::write(&length), text);
+    }
+    let message = commol_core::json::read::<BlockLength>("true").unwrap_err();
+    assert_eq!(
+        message,
+        r#"block_length is a whole number of at least 1 or "auto""#
+    );
+}

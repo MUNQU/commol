@@ -119,12 +119,6 @@ impl de::Error for Error {
     }
 }
 
-impl serde::ser::Error for Error {
-    fn custom<T: Display>(message: T) -> Self {
-        Self(message.to_string())
-    }
-}
-
 /// Reads any JSON value into a [`Value`].
 struct ValueVisitor;
 
@@ -151,11 +145,6 @@ impl<'de> Visitor<'de> for ValueVisitor {
         Ok(Value::Int(value))
     }
 
-    fn visit_u128<E>(self, value: u128) -> Result<Value, E> {
-        // A whole number beyond i128 is read as the nearest number.
-        Ok(i128::try_from(value).map_or(Value::Float(value as f64), Value::Int))
-    }
-
     fn visit_f64<E>(self, value: f64) -> Result<Value, E> {
         Ok(Value::Float(value))
     }
@@ -170,14 +159,6 @@ impl<'de> Visitor<'de> for ValueVisitor {
 
     fn visit_unit<E>(self) -> Result<Value, E> {
         Ok(Value::Null)
-    }
-
-    fn visit_none<E>(self) -> Result<Value, E> {
-        Ok(Value::Null)
-    }
-
-    fn visit_some<D: de::Deserializer<'de>>(self, deserializer: D) -> Result<Value, D::Error> {
-        de::Deserialize::deserialize(deserializer)
     }
 
     fn visit_seq<A: de::SeqAccess<'de>>(self, mut items: A) -> Result<Value, A::Error> {
@@ -288,7 +269,9 @@ impl<'de> de::Deserializer<'de> for Value {
             Self::Map(fields) if fields.len() == 1 => visitor.visit_enum(
                 MapAccessDeserializer::new(MapDeserializer::new(fields.into_iter())),
             ),
-            other => Err(de::Error::invalid_type(other.unexpected(), &visitor)),
+            other => Err(de::Error::custom(format!(
+                "expected a name or an object of one field, got {other}"
+            ))),
         }
     }
 
@@ -304,23 +287,5 @@ impl<'de> de::Deserializer<'de> for Value {
         bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string bytes
         byte_buf unit unit_struct seq tuple tuple_struct map struct identifier
         ignored_any
-    }
-}
-
-impl Value {
-    /// What `self` is, for the message of a value of the wrong type.
-    fn unexpected(&self) -> de::Unexpected<'_> {
-        match self {
-            Self::Null => de::Unexpected::Unit,
-            Self::Bool(value) => de::Unexpected::Bool(*value),
-            Self::Int(value) => i64::try_from(*value).map_or(
-                de::Unexpected::Other("a whole number"),
-                de::Unexpected::Signed,
-            ),
-            Self::Float(value) => de::Unexpected::Float(*value),
-            Self::String(value) => de::Unexpected::Str(value),
-            Self::List(_) => de::Unexpected::Seq,
-            Self::Map(_) => de::Unexpected::Map,
-        }
     }
 }

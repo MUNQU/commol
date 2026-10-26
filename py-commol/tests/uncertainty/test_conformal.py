@@ -489,3 +489,25 @@ def test_a_conformal_result_gives_its_block_length_and_estimates(
     assert automatic.block_length == blocks.block_length
     assert given.block_length == 3
     assert given.block_length_estimates is None
+
+
+@pytest.mark.parametrize(
+    ("variant", "settings"),
+    [(JackknifePlus, {}), (EnbPI, {"replicates": 20})],
+    ids=["jackknife_plus", "enbpi"],
+)
+def test_a_block_longer_than_the_data_is_an_error(
+    variant: type, settings: dict[str, object]
+) -> None:
+    values = (C + np.random.default_rng(6).normal(0.0, 1.0, 30)).tolist()
+    method = variant(
+        **settings,
+        block_length=1000,
+        score="absolute",
+        by="series",
+        confidence_level=0.5,
+        positions=[31.0],
+    )
+
+    with pytest.raises(ValueError, match="block_length is 1000; it must be between 1"):
+        flow_calibrator(values, windowed=True).uncertainty(method)

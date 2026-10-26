@@ -165,13 +165,14 @@ pub struct PyEtaCalibration {
     block_length_estimates: Option<Vec<(String, f64)>>,
 }
 
-/// The sampler of the settings of a method
+/// The sampler of the settings of a method. The reader of the settings
+/// checks them with the rules that the sampler checks, so it is valid.
 fn sampler(
     particles: usize,
     resample_threshold: f64,
     target_cess: f64,
     stay_probability: f64,
-) -> PyResult<SmcSampler<RandomWalk>> {
+) -> SmcSampler<RandomWalk> {
     SmcSampler::new(
         particles,
         RandomWalk::new(),
@@ -179,11 +180,11 @@ fn sampler(
         target_cess,
         stay_probability,
     )
-    .map_err(method_error)
+    .expect("the reader of the settings checks the rules of the sampler")
 }
 
 /// The sampler of a Gibbs posterior.
-fn gibbs_sampler(settings: &GibbsPosteriorSettings) -> PyResult<SmcSampler<RandomWalk>> {
+fn gibbs_sampler(settings: &GibbsPosteriorSettings) -> SmcSampler<RandomWalk> {
     sampler(
         settings.particles,
         settings.resample_threshold,
@@ -230,7 +231,7 @@ fn calibrated_eta(
                 BlockDrawing::NonOverlapping,
             )
             .map_err(method_error)?;
-            let mut sampler = gibbs_sampler(settings)?;
+            let mut sampler = gibbs_sampler(settings);
             let found = parallel(py, || {
                 smc::bootstrap_coverage_eta(
                     &problem.inner,
@@ -298,7 +299,7 @@ fn gibbs_posterior(
             (Some(starts), eta)
         }
     };
-    let mut sampler = gibbs_sampler(&settings)?;
+    let mut sampler = gibbs_sampler(&settings);
     let run = parallel(py, || {
         smc::gibbs_posterior(&problem.inner, &priors, eta.eta, &mut sampler, problem.seed)
     })?
@@ -329,7 +330,7 @@ fn bayesian_posterior(
         settings.resample_threshold,
         settings.target_cess,
         settings.stay_probability,
-    )?;
+    );
     let run = parallel(py, || {
         smc::bayesian_posterior(&problem.inner, &priors, &mut sampler, problem.seed)
     })?
@@ -365,7 +366,7 @@ fn abc_smc(
         1.0,
         settings.target_cess,
         settings.stay_probability,
-    )?
+    )
     .with_min_acceptance(settings.min_acceptance)
     .map_err(method_error)?;
     let target = AbcTarget::new(&problem.inner, &priors, settings.distance.distance())

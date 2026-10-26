@@ -288,3 +288,14 @@ fn every_setting_outside_its_range_is_rejected() {
         );
     }
 }
+
+#[test]
+fn an_observation_with_its_trials_is_in_range() {
+    let point = ObservedDataPoint {
+        trials: Some(3),
+        window: Some(1.0),
+        ..point()
+    };
+
+    assert_eq!(point.check_ranges(), Ok(()));
+}

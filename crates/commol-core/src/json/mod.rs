@@ -226,15 +226,15 @@ pub fn tag(value: Value) -> Value {
         Value::String(variant) => Value::Map(vec![("kind".to_string(), Value::String(variant))]),
         Value::Map(mut entries) if entries.len() == 1 => {
             let (variant, fields) = entries.remove(0);
-            let fields = match fields {
-                Value::Map(fields) => fields,
-                Value::Null => Vec::new(),
-                other => panic!("a variant of a tagged union is an object, got {other:?}"),
+            let Value::Map(fields) = fields else {
+                // coverage: invariant, serde writes the fields of a variant as an object
+                panic!("a variant of a tagged union is an object, got {fields:?}");
             };
             let mut tagged = vec![("kind".to_string(), Value::String(variant))];
             tagged.extend(fields);
             Value::Map(tagged)
         }
+        // coverage: invariant, serde writes a variant as a name or an object of one field
         other => panic!("an enum writes a name or an object, got {other:?}"),
     }
 }
