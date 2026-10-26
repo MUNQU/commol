@@ -70,7 +70,7 @@ Attributes:
 | `name` | `str` | A descriptive, human-readable name for the bin. |
 | `unit` | \`str | None\`                                          |
 
-Source code in `commol/context/bin.py`
+Source code in `commol/_model/bin.py`
 
 ```python
 class Bin(BaseModel):
@@ -122,7 +122,7 @@ Attributes:
 | `id`   | `str` | Identifier of the accumulator, and the name of its output before the stratifications expand it. |
 | `name` | `str` | A descriptive, human-readable name for the accumulator.                                         |
 
-Source code in `commol/context/bin.py`
+Source code in `commol/_model/bin.py`
 
 ```python
 class Accumulator(BaseModel):
@@ -161,7 +161,7 @@ Attributes:
 | `description` | \`str                           | None\`                                                   |
 | `conditions`  | \`list[StratificationCondition] | None\`                                                   |
 
-Source code in `commol/context/stratification.py`
+Source code in `commol/_model/stratification.py`
 
 ```python
 class Stratification(BaseModel):
@@ -283,7 +283,7 @@ Attributes:
 | `description` | \`str   | None\`                           |
 | `unit`        | \`str   | None\`                           |
 
-Source code in `commol/context/parameter.py`
+Source code in `commol/_model/parameter.py`
 
 ```python
 class Parameter(BaseModel):
@@ -420,7 +420,7 @@ Returns:
 | ------ | ----------------------------------------------------------------- |
 | `bool` | True if the parameter has a value, False if it needs calibration. |
 
-Source code in `commol/context/parameter.py`
+Source code in `commol/_model/parameter.py`
 
 ```python
 def is_calibrated(self) -> bool:
@@ -461,7 +461,7 @@ Raises:
 | ------------ | ---------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If value is a list and this parameter is not a series, or value is not a valid value; the message names the parameter. |
 
-Source code in `commol/context/parameter.py`
+Source code in `commol/_model/parameter.py`
 
 ```python
 def with_value(
@@ -530,7 +530,7 @@ Attributes:
 | `impulse_at`       | \`list[float]          | None\`                                                           |
 | `impulse_every`    | \`tuple[float, float]  | None\`                                                           |
 
-Source code in `commol/context/transition.py`
+Source code in `commol/_model/transition.py`
 
 ```python
 class Transition(BaseModel):
@@ -684,7 +684,7 @@ Attributes:
 | `type`     | `str`            | Name of an engine of the engine's list, such as "DifferenceEquations" (discrete time) or "DifferentialEquations" (continuous time). The engine must run the kind of the structure of the model. |
 | `settings` | \`EngineSettings | None\`                                                                                                                                                                                          |
 
-Source code in `commol/context/engine.py`
+Source code in `commol/engines/engine.py`
 
 ```python
 class ModelEngine(BaseModel):
@@ -755,7 +755,7 @@ Attributes:
 | `stratification_fractions` | `dict[str, dict[str, float]]` | The fraction of each category, by stratification id and category: the split of the amount of every bin the stratification applies to; each from 0 to 1, and a sum of 1 within 1e-6. A conditional stratification splits only the group its conditions select. |
 | `compartment_amounts`      | `dict[str, float]`            | Amounts of single expanded compartments, by compartment name, applied after the expansion.                                                                                                                                                                    |
 
-Source code in `commol/context/initial_conditions.py`
+Source code in `commol/_model/initial_conditions.py`
 
 ```python
 class InitialConditions(BaseModel):
@@ -1034,7 +1034,7 @@ class InitialConditions(BaseModel):
         A compartment already present in ``compartment_amounts`` has its
         amount replaced; a new one is appended. Compartment names depend on
         the expansion of the process, so
-        :meth:`~commol.context.aggregate.Aggregate.update_compartment_amounts`
+        :meth:`~commol._model.aggregate.Aggregate.update_compartment_amounts`
         validates them against the engine, not here.
 
         Raises
@@ -1092,7 +1092,7 @@ Returns:
 | ----------- | ----------------------------------------------------- |
 | `list[str]` | List of bin IDs with uncalibrated initial conditions. |
 
-Source code in `commol/context/initial_conditions.py`
+Source code in `commol/_model/initial_conditions.py`
 
 ```python
 def get_uncalibrated_bins(self) -> list[str]:
@@ -1121,7 +1121,7 @@ Returns:
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `set[str]` | Category names collected from stratification_fractions. A category declared on a stratification but absent from the initial conditions is not included. |
 
-Source code in `commol/context/initial_conditions.py`
+Source code in `commol/_model/initial_conditions.py`
 
 ```python
 def get_categories_with_fractions(self) -> set[str]:
@@ -1170,7 +1170,7 @@ Raises:
 | ------------ | --------------------------------------------------------- |
 | `ValueError` | If the category is not found or a bare name is ambiguous. |
 
-Source code in `commol/context/initial_conditions.py`
+Source code in `commol/_model/initial_conditions.py`
 
 ```python
 def resolve_category(self, category: str) -> tuple[str, str]:
@@ -1239,7 +1239,7 @@ Returns:
 | ----- | ----------------------------------------------------------------------------------------------------------- |
 | `str` | The bare name, or stratification:category when another stratification declares a category of the same name. |
 
-Source code in `commol/context/initial_conditions.py`
+Source code in `commol/_model/initial_conditions.py`
 
 ```python
 def category_id(self, stratification: str, category: str) -> str:
@@ -1294,7 +1294,7 @@ Raises:
 | ------------ | --------------------------------------------------------- |
 | `ValueError` | If the category is not found or a bare name is ambiguous. |
 
-Source code in `commol/context/initial_conditions.py`
+Source code in `commol/_model/initial_conditions.py`
 
 ```python
 def get_category_fraction(self, category: str) -> float:
@@ -1343,7 +1343,7 @@ Raises:
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If a category is not found or is ambiguous, or a stratification has more than one category omitted; with the message of the engine, if a fraction is not from 0 to 1 or the fractions of a stratification do not sum to 1 within 1e-6. |
 
-Source code in `commol/context/initial_conditions.py`
+Source code in `commol/_model/initial_conditions.py`
 
 ```python
 def update_stratification_fractions(self, fractions: Mapping[str, float]) -> None:
@@ -1408,7 +1408,7 @@ Raises:
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If a bin ID is not found in the initial conditions, or, with the message of the engine, an amount is not finite or is negative. |
 
-Source code in `commol/context/initial_conditions.py`
+Source code in `commol/_model/initial_conditions.py`
 
 ```python
 def update_bin_amounts(self, amounts: Mapping[str, float | None]) -> None:

@@ -18,8 +18,8 @@ from commol import (
     NelderMeadConfig,
     ObservedDataPoint,
     Simulation,
-    SplitConformal,
 )
+from commol.conformal import SplitConformal
 
 
 def ab_model(k: float | None):
@@ -104,7 +104,7 @@ Every variant takes a `score`, a `by` and a `confidence_level`, none with a defa
 - `score="spread"` needs predictions with a spread. `SplitConformal` and `AdaptiveConformal` take it from a `sample`, whose predictive gives the prediction (its weighted median) and the spread (its weighted standard deviation); without one they raise a `ValueError`. `JackknifePlus` and `EnbPI` take it from their own refits. `RollingConformal` fits once per origin, so it rejects `"spread"`.
 
 ```python
-from commol import ParameterSample, SampleMethod
+from commol.uncertainty import ParameterSample, SampleMethod
 
 sample = ParameterSample.equally_weighted(
     names=["k"],
@@ -157,7 +157,7 @@ print(widths)  # [6.3, 5.2]
 `RollingConformal(origins, score, by, confidence_level, positions, starts=1)` gives intervals ahead of the data, with one quantile per horizon. Horizon `k` is the `k`-th observation of a series after an origin: a count, not a distance on the axis, because positions can be irregular. Each origin fits the observations at or before it (one refit per origin, from the fit of every observation) and scores the later ones. The intervals are around the fit of every observation, at `positions`, which must all be after the data; the `k`-th position is horizon `k`, so give positions spaced as the observations. A horizon with fewer than `1/α − 1` origins that reach it has an unbounded interval.
 
 ```python
-from commol import RollingConformal
+from commol.conformal import RollingConformal
 
 every_point = CalibrationProblem(
     observed_data=observations,
@@ -196,7 +196,7 @@ where `q⁺` is the `⌈(1 − α)(n + 1)⌉`-th smallest value and `q⁻` the `
 With one observation per block, `K = n` and the bound is `1 − 2α`. With longer blocks, jackknife+ is CV+ with the blocks as folds, so CV+ has no class of its own. The theorem assumes blocks of `n/K` observations each. `cv_plus_bound` in `crates/commol-inference/src/conformal/jackknife_plus.rs` computes it, and `result.guarantee` states it.
 
 ```python
-from commol import JackknifePlus
+from commol.conformal import JackknifePlus
 
 jackknife = calibrator.uncertainty(
     JackknifePlus(block_length=4, score="absolute", by="series", confidence_level=0.9, positions=[45.0])
@@ -219,7 +219,7 @@ print(jackknife.guarantee)  # ... at least 0.7318 ... with K = 10 blocks of 4 po
 So a miss widens the next interval and a cover narrows it. The long-run share of misses tends to `α` whatever the data. `by="series"` keeps one working level per series, `by="all"` one for all. The first points have few earlier scores, so their intervals are unbounded. `result.intervals` holds the interval given at each point before it was seen.
 
 ```python
-from commol import AdaptiveConformal
+from commol.conformal import AdaptiveConformal
 
 adaptive = calibrator.uncertainty(
     AdaptiveConformal(confidence_level=0.9, step=0.05, score="absolute", by="series", stream=held_out)

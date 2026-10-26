@@ -10,7 +10,7 @@ A fluent interface that writes the process of a model, once.
 
 The builder adds bins, accumulators, stratifications, transitions and parameters: the process, which is the same for every kind of model. `build` joins it with a structure, which lays the process out (such as `Aggregate`, amounts per compartment), and an engine, which runs it. Each method that adds returns the builder, so the calls chain.
 
-Source code in `commol/api/model_builder.py`
+Source code in `commol/_model/builder.py`
 
 ```python
 class ModelBuilder:
@@ -844,7 +844,7 @@ Parameters:
 | `step_unit`   | \`str  | None\`                                     | Unit of one step on the axis, of any single dimension (for example "day" or "meter"). The unit check requires every flow to be <bin unit>/\<step_unit>, and Model.axis_units() converts values to steps of it. None means step, the default increment of any axis.                                                                                                                                                                       |
 | `origin`      | \`date | None\`                                     | Calendar moment of position 0: a datetime.datetime with no time zone, or a datetime.date, read as its midnight. With it, Model.axis_units() converts between dates and positions, and results.plot.series() labels its ticks with dates. It needs a step_unit of time whose length is a whole number of days or a whole fraction of a day, such as "hour" or "day"; build raises ValueError otherwise, or for a moment with a time zone. |
 
-Source code in `commol/api/model_builder.py`
+Source code in `commol/_model/builder.py`
 
 ```python
 def __init__(
@@ -931,7 +931,7 @@ Returns:
 | -------------- | ------------------------- |
 | `ModelBuilder` | Self for method chaining. |
 
-Source code in `commol/api/model_builder.py`
+Source code in `commol/_model/builder.py`
 
 ```python
 def add_bin(self, id: str, name: str, unit: str | None = None) -> Self:
@@ -982,7 +982,7 @@ Returns:
 | -------------- | ------------------------- |
 | `ModelBuilder` | Self for method chaining. |
 
-Source code in `commol/api/model_builder.py`
+Source code in `commol/_model/builder.py`
 
 ```python
 def add_accumulator(self, id: str, name: str) -> Self:
@@ -1041,7 +1041,7 @@ Raises:
 | ------------ | -------------------------------------------------------------- |
 | `ValueError` | If any condition references a stratification not yet declared. |
 
-Source code in `commol/api/model_builder.py`
+Source code in `commol/_model/builder.py`
 
 ```python
 def add_stratification(
@@ -1136,7 +1136,7 @@ Raises:
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If value is a list but mode is not provided, if mode is provided without a list value, or if the parser of the engine rejects a formula value, with its message. |
 
-Source code in `commol/api/model_builder.py`
+Source code in `commol/_model/builder.py`
 
 ```python
 def add_parameter(
@@ -1266,7 +1266,7 @@ Raises:
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If $compartment is used with only one source compartment If $compartment is used with multiple targets If rate is None when using $compartment |
 
-Source code in `commol/api/model_builder.py`
+Source code in `commol/_model/builder.py`
 
 ```python
 def add_transition(
@@ -1490,7 +1490,7 @@ Returns:
 | --------------------------- | ----------- |
 | \`dict\[str, dict\[str, str | int         |
 
-Source code in `commol/api/model_builder.py`
+Source code in `commol/_model/builder.py`
 
 ```python
 def get_summary(self) -> dict[str, str | int | list[str] | None]:
@@ -1531,7 +1531,7 @@ Returns:
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ModelBuilder` | A new ModelBuilder instance with the same configuration: every bin, accumulator, stratification, transition and parameter. Changes to one builder do not affect the other. |
 
-Source code in `commol/api/model_builder.py`
+Source code in `commol/_model/builder.py`
 
 ```python
 def clone(self) -> Self:
@@ -1564,7 +1564,7 @@ Returns:
 | -------------- | ------------------------- |
 | `ModelBuilder` | Self for method chaining. |
 
-Source code in `commol/api/model_builder.py`
+Source code in `commol/_model/builder.py`
 
 ```python
 def reset(self) -> Self:
@@ -1609,7 +1609,7 @@ Raises:
 | ------------ | ------------------------------------------------------------------------------------------ |
 | `ValueError` | If ids repeat, or a transition or a stratified rate names an id the process does not have. |
 
-Source code in `commol/api/model_builder.py`
+Source code in `commol/_model/builder.py`
 
 ```python
 def process(self) -> Process:
@@ -1667,7 +1667,7 @@ Raises:
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If validation fails, the structure does not fit the process (for example a fraction names no bin, or a rate reads neighbors\_<bin> and the structure has no neighbors), the engine is unknown or does not run the kind of the structure, the settings are not settings of that engine, a series point or an impulse position is one the engine cannot run (a position between two steps for an engine that steps only at integers, or a "pulse" point between two steps), a per-compartment override names an unknown compartment, a stochastic engine gets an amount that is not whole, or the origin has a time zone or a step unit that is not of fixed calendar length. |
 
-Source code in `commol/api/model_builder.py`
+Source code in `commol/_model/builder.py`
 
 ```python
 def build(
@@ -1753,7 +1753,7 @@ Attributes:
 | `category`       | `str` | The category within that stratification (e.g., "g1", "t1") |
 | `to`             | \`str | None\`                                                     |
 
-Source code in `commol/context/stratification_condition.py`
+Source code in `commol/_model/stratification_condition.py`
 
 ```python
 class StratificationCondition(BaseModel):
@@ -1813,7 +1813,7 @@ Attributes:
 | `rate`       | \`str                           | float\`                                                                                       |
 | `absolute`   | \`bool                          | None\`                                                                                        |
 
-Source code in `commol/context/transition.py`
+Source code in `commol/_model/transition.py`
 
 ```python
 class StratifiedRate(BaseModel):

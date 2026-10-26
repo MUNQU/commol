@@ -7,7 +7,7 @@ Plain-dictionary reports, each a method of the object whose data it describes. G
 ## applied_parameters
 
 ```python
-applied_parameters(values: CalibrationResult | Mapping[str, float], problem: CalibrationProblem | None = None, sample: ParameterSample | None = None, confidence_level: float | None = None) -> AppliedParametersReport
+applied_parameters(values: CalibrationResult | Mapping[str, float], problem: CalibrationProblem | None = None, sample: SummarizedSample | None = None, confidence_level: float | None = None) -> AppliedParametersReport
 ```
 
 Report every parameter of the model, and the values of its kind.
@@ -41,14 +41,14 @@ Raises:
 | ------------ | ------------------------------------------------ |
 | `ValueError` | If a sample is given without a confidence level. |
 
-Source code in `commol/context/model.py`
+Source code in `commol/_model/model.py`
 
 ```python
 def applied_parameters(
     self,
     values: CalibrationResult | Mapping[str, float],
     problem: CalibrationProblem | None = None,
-    sample: "ParameterSample | None" = None,
+    sample: "SummarizedSample | None" = None,
     confidence_level: float | None = None,
 ) -> "AppliedParametersReport":
     """
@@ -107,9 +107,7 @@ def applied_parameters(
     ValueError
         If a sample is given without a confidence level.
     """
-    from commol.api.reporting import _applied_parameters_report
-
-    return _applied_parameters_report(
+    return applied_parameters_report(
         self, values, problem, sample, confidence_level
     )
 ```
@@ -117,7 +115,7 @@ def applied_parameters(
 ## report
 
 ```python
-report(positions: Sequence[float], window: float, windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), prediction_intervals: PredictionIntervals | None = None) -> SimulationReport
+report(positions: Sequence[float], window: float, windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), prediction_intervals: PredictionIntervalsData | None = None) -> SimulationReport
 ```
 
 Report the observed data, compartment series and accumulators of the run.
@@ -133,7 +131,7 @@ Parameters:
 | `windows`              | `int`                         | Number of windows on the observed and windowed axes.                                                     | *required*                                                                                    |
 | `observed_data`        | `Iterable[ObservedDataPoint]` | The calibration targets to report alongside the run.                                                     | `()`                                                                                          |
 | `accumulators`         | `Iterable[str]`               | Accumulator ids to report; their outputs come from model.                                                | `()`                                                                                          |
-| `prediction_intervals` | \`PredictionIntervals         | None\`                                                                                                   | Prediction intervals of a conformal method (ConformalResult.intervals), reported as they are. |
+| `prediction_intervals` | \`PredictionIntervalsData     | None\`                                                                                                   | Prediction intervals of a conformal method (ConformalResult.intervals), reported as they are. |
 
 Returns:
 
@@ -148,7 +146,7 @@ Raises:
 | `ValueError` | If the results have no value at a position the report reads, or they have no model and an accumulator is reported. |
 | `KeyError`   | If an accumulator is not a bin or accumulator of the model.                                                        |
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 def report(
@@ -158,7 +156,7 @@ def report(
     windows: int,
     observed_data: "Iterable[ObservedDataPoint]" = (),
     accumulators: Iterable[str] = (),
-    prediction_intervals: "PredictionIntervals | None" = None,
+    prediction_intervals: "PredictionIntervalsData | None" = None,
 ) -> "SimulationReport":
     """
     Report the observed data, compartment series and accumulators of the run.
@@ -181,7 +179,7 @@ def report(
         The calibration targets to report alongside the run.
     accumulators : Iterable[str], optional
         Accumulator ids to report; their outputs come from `model`.
-    prediction_intervals : PredictionIntervals | None, optional
+    prediction_intervals : PredictionIntervalsData | None, optional
         Prediction intervals of a conformal method
         (``ConformalResult.intervals``), reported as they are.
 
@@ -199,7 +197,7 @@ def report(
     KeyError
         If an accumulator is not a bin or accumulator of the model.
     """
-    from commol.api.reporting import _ReportRuns, _simulation_report
+    from commol._simulation.reports import _ReportRuns, _simulation_report
 
     return _simulation_report(
         _ReportRuns(model=self.model, runs=[self]),
@@ -215,7 +213,7 @@ def report(
 ## report
 
 ```python
-report(confidence_level: float, positions: Sequence[float], window: float, windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), prediction_intervals: PredictionIntervals | None = None) -> SimulationReport
+report(confidence_level: float, positions: Sequence[float], window: float, windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), prediction_intervals: PredictionIntervalsData | None = None) -> SimulationReport
 ```
 
 Report the replicates as `SimulationResults.report` reports one run.
@@ -232,7 +230,7 @@ Parameters:
 | `windows`              | `int`                         | Number of windows on the observed and windowed axes.                                                        | *required*                                                                                    |
 | `observed_data`        | `Iterable[ObservedDataPoint]` | The calibration targets to report alongside the replicates.                                                 | `()`                                                                                          |
 | `accumulators`         | `Iterable[str]`               | Accumulator ids to report; their outputs come from model.                                                   | `()`                                                                                          |
-| `prediction_intervals` | \`PredictionIntervals         | None\`                                                                                                      | Prediction intervals of a conformal method (ConformalResult.intervals), reported as they are. |
+| `prediction_intervals` | \`PredictionIntervalsData     | None\`                                                                                                      | Prediction intervals of a conformal method (ConformalResult.intervals), reported as they are. |
 
 Returns:
 
@@ -247,7 +245,7 @@ Raises:
 | `ValueError` | If there are no replicates, the confidence level is out of range, the replicates have no value at a position the report reads, or they have no model and an accumulator is reported. |
 | `KeyError`   | If an accumulator is not a bin or accumulator of the model.                                                                                                                          |
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 def report(
@@ -258,7 +256,7 @@ def report(
     windows: int,
     observed_data: "Iterable[ObservedDataPoint]" = (),
     accumulators: Iterable[str] = (),
-    prediction_intervals: "PredictionIntervals | None" = None,
+    prediction_intervals: "PredictionIntervalsData | None" = None,
 ) -> "SimulationReport":
     """
     Report the replicates as `SimulationResults.report` reports one run.
@@ -283,7 +281,7 @@ def report(
         The calibration targets to report alongside the replicates.
     accumulators : Iterable[str], optional
         Accumulator ids to report; their outputs come from `model`.
-    prediction_intervals : PredictionIntervals | None, optional
+    prediction_intervals : PredictionIntervalsData | None, optional
         Prediction intervals of a conformal method
         (``ConformalResult.intervals``), reported as they are.
 
@@ -302,7 +300,7 @@ def report(
     KeyError
         If an accumulator is not a bin or accumulator of the model.
     """
-    from commol.api.reporting import _ReportRuns, _simulation_report
+    from commol._simulation.reports import _ReportRuns, _simulation_report
 
     if not self:
         raise ValueError("There are no replicates.")
@@ -324,7 +322,7 @@ def report(
 ## report
 
 ```python
-report(confidence_level: float, positions: Sequence[float], window: float, windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), prediction_intervals: PredictionIntervals | None = None) -> SimulationReport
+report(confidence_level: float, positions: Sequence[float], window: float, windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), prediction_intervals: PredictionIntervalsData | None = None) -> SimulationReport
 ```
 
 Report the runs of the draws as `SimulationResults.report` reports one.
@@ -341,7 +339,7 @@ Parameters:
 | `windows`              | `int`                         | Number of windows on the observed and windowed axes.                                                              | *required*                                                                                    |
 | `observed_data`        | `Iterable[ObservedDataPoint]` | The calibration targets to report alongside the draws.                                                            | `()`                                                                                          |
 | `accumulators`         | `Iterable[str]`               | Accumulator ids to report.                                                                                        | `()`                                                                                          |
-| `prediction_intervals` | \`PredictionIntervals         | None\`                                                                                                            | Prediction intervals of a conformal method (ConformalResult.intervals), reported as they are. |
+| `prediction_intervals` | \`PredictionIntervalsData     | None\`                                                                                                            | Prediction intervals of a conformal method (ConformalResult.intervals), reported as they are. |
 
 Returns:
 
@@ -356,7 +354,7 @@ Raises:
 | `ValueError` | If the confidence level is out of range, or the predictive has no value at a position the report reads. |
 | `KeyError`   | If an accumulator is not a bin or accumulator of the model.                                             |
 
-Source code in `commol/api/inference/predictive.py`
+Source code in `commol/uncertainty/predictive.py`
 
 ```python
 def report(
@@ -367,7 +365,7 @@ def report(
     windows: int,
     observed_data: Iterable[ObservedDataPoint] = (),
     accumulators: Iterable[str] = (),
-    prediction_intervals: "PredictionIntervals | None" = None,
+    prediction_intervals: "PredictionIntervalsData | None" = None,
 ) -> "SimulationReport":
     """
     Report the runs of the draws as `SimulationResults.report` reports one.
@@ -394,7 +392,7 @@ def report(
         The calibration targets to report alongside the draws.
     accumulators : Iterable[str], optional
         Accumulator ids to report.
-    prediction_intervals : PredictionIntervals | None, optional
+    prediction_intervals : PredictionIntervalsData | None, optional
         Prediction intervals of a conformal method
         (``ConformalResult.intervals``), reported as they are.
 
@@ -412,7 +410,7 @@ def report(
     KeyError
         If an accumulator is not a bin or accumulator of the model.
     """
-    from commol.api.reporting import _ReportRuns, _simulation_report
+    from commol._simulation.reports import _ReportRuns, _simulation_report
 
     return _simulation_report(
         _ReportRuns(
@@ -444,10 +442,10 @@ Returns:
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `IdentifiabilityReportData` | parameters: each parameter, in problem order, with its structural and practical verdicts; sections: the evidence of each method that ran. |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/results.py`
 
 ```python
-def report(self) -> "IdentifiabilityReportData":
+def report(self) -> IdentifiabilityReportData:
     """
     Report the identifiability of each parameter as plain data.
 
@@ -458,7 +456,5 @@ def report(self) -> "IdentifiabilityReportData":
         structural and practical verdicts; ``sections``: the evidence of
         each method that ran.
     """
-    from commol.api.reporting import _identifiability_report
-
-    return _identifiability_report(self)
+    return identifiability_report(self)
 ```

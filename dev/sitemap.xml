@@ -33,7 +33,23 @@
          <lastmod>2026-10-26</lastmod>
     </url>
     <url>
+         <loc>https://munqu.github.io/commol/dev/api/conformal/</loc>
+         <lastmod>2026-10-26</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/api/distributions/</loc>
+         <lastmod>2026-10-26</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/api/engines/</loc>
+         <lastmod>2026-10-26</lastmod>
+    </url>
+    <url>
          <loc>https://munqu.github.io/commol/dev/api/identifiability/</loc>
+         <lastmod>2026-10-26</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/api/local/</loc>
          <lastmod>2026-10-26</lastmod>
     </url>
     <url>
@@ -42,6 +58,10 @@
     </url>
     <url>
          <loc>https://munqu.github.io/commol/dev/api/model/</loc>
+         <lastmod>2026-10-26</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/api/observations/</loc>
          <lastmod>2026-10-26</lastmod>
     </url>
     <url>
@@ -57,7 +77,23 @@
          <lastmod>2026-10-26</lastmod>
     </url>
     <url>
+         <loc>https://munqu.github.io/commol/dev/api/profiles/</loc>
+         <lastmod>2026-10-26</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/api/quantities/</loc>
+         <lastmod>2026-10-26</lastmod>
+    </url>
+    <url>
          <loc>https://munqu.github.io/commol/dev/api/reports/</loc>
+         <lastmod>2026-10-26</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/api/resampling/</loc>
+         <lastmod>2026-10-26</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/api/scores/</loc>
          <lastmod>2026-10-26</lastmod>
     </url>
     <url>
@@ -66,6 +102,10 @@
     </url>
     <url>
          <loc>https://munqu.github.io/commol/dev/api/simulation/</loc>
+         <lastmod>2026-10-26</lastmod>
+    </url>
+    <url>
+         <loc>https://munqu.github.io/commol/dev/api/smc/</loc>
          <lastmod>2026-10-26</lastmod>
     </url>
     <url>

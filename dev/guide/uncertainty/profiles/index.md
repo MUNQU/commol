@@ -16,12 +16,14 @@ from commol import (
     Calibrator,
     ModelBuilder,
     NelderMeadConfig,
-    NormalObservations,
     ObservedDataPoint,
+    Simulation,
+)
+from commol.observations import NormalObservations
+from commol.profiles import (
     PredictionProfile,
     PredictionSpec,
     ProfileLikelihood,
-    Simulation,
     Threshold,
 )
 
@@ -133,7 +135,7 @@ The threshold is a required argument: it states what you assume about the noise.
 The bootstrap threshold calibrates the statistic itself (prepivoting, Beran 1988). Each replicate of `bootstrap` is the replicate `Calibrator.uncertainty(bootstrap)` makes from the problem's seed. Each replicate has two fits: a free one (`θ̂_b`), and one that holds the quantity at the value of the fit of the original data. The rise of the replicate is `PL_b(θ̂ⱼ) − L_b(θ̂_b)`. The threshold of the quantity is the quantile `confidence_level` of the rises, so each parameter gets its own. It costs one fit and one refit per quantity for each replicate. Any bootstrap of [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/index.md) works, and the [parametric bootstrap](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#maximum-likelihood-against-the-posterior) with observation models.
 
 ```python
-from commol import ResidualBootstrap
+from commol.resampling import ResidualBootstrap
 
 loss_problem = CalibrationProblem(
     observed_data=observations,
@@ -200,14 +202,14 @@ A reset whose evaluation fails counts as infeasible. The ends of the box only ru
 
 What the settings give: with Nelder-Mead at its default `sd_tolerance` (`1e-6`), the resets prove a parameter with no effect `non_identifiable` on a difference model and on an ODE model at the default solver tolerances. A ridge needs its profile flat within `ε`: on an ODE model at the default tolerances `ν` is near `1e-4` and the profiles of the ridge below read `in_combination`; on a difference model `ν` is near `1e-13`, a refit lands about `1e-6` from its minimum, and the profile reads practically non-identifiable. Its `in_combination` needs an `sd_tolerance` near `ν`, as the example below uses.
 
-`ProfileResult.identifiability()` turns the verdicts into an [identifiability report](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#the-report) with a `profile` section, which `merge` joins with the other methods. A rate that reads `k1 * s` cannot tell `k1` from `s`: their profiles are flat on the ridge `k1 · s = constant`, resetting `s` breaks it, and the profile of `k1` reads `in_combination`, compensated by `s`, as the structural rank does. The two still disagree in some cases, and the merged verdict is then `conflicting`:
+`ProfileIdentifiability(result=profiles)` (`commol.identifiability`), run through `Calibrator.identifiability`, turns the verdicts into an [identifiability report](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#the-report) with a `profile` section, which `merge` joins with the other methods. A rate that reads `k1 * s` cannot tell `k1` from `s`: their profiles are flat on the ridge `k1 · s = constant`, resetting `s` breaks it, and the profile of `k1` reads `in_combination`, compensated by `s`, as the structural rank does. The two still disagree in some cases, and the merged verdict is then `conflicting`:
 
 - the rank reads the rank most points of a Latin hypercube across the whole box have, a profile one ridge through the fit;
 - the rank calls a parameter non-identifiable when its projection on the null space is above 0.95, and identifiable below 0.05: in a sum `k1 + k2` with `k1 ≫ k2`, the rank finds `k2` non-identifiable while its profile, which `k1` compensates, reads `in_combination`;
 - a parameter with no effect while the others sit at their fit, but an effect elsewhere in the box, is `non_identifiable` for the profile, and may be identifiable for the rank.
 
 ```python
-from commol import StructuralRank
+from commol.identifiability import ProfileIdentifiability, StructuralRank
 
 
 def product_model(k1: float | None, s: float | None, k2: float | None):
@@ -251,7 +253,9 @@ print(profiles.notes[0])
 # the bounds, not the data.
 print(profiles.structure["k1"].compensated_by)  # ['s']
 report = product.identifiability(StructuralRank(points=5, design="observations"))
-merged = report.merge(profiles.identifiability())
+merged = report.merge(
+    product.identifiability(ProfileIdentifiability(result=profiles))
+)
 print(merged.verdicts["k1"].structural.verdict, merged.verdicts["s"].structural.verdict)
 # in_combination in_combination
 ```

@@ -10,7 +10,7 @@ Calibrate the parameters of a simulation against observed data.
 
 The calibration problem is built in Rust once, when the calibrator is created, and every optimization, prediction and uncertainty method reads that one problem.
 
-Source code in `commol/api/calibrator.py`
+Source code in `commol/_calibration/calibrator.py`
 
 ```python
 class Calibrator:
@@ -61,13 +61,13 @@ class Calibrator:
 
         self._validate_calibration_parameters()
         self._warn_constraint_positions_beyond_observations()
-        self._rust_problem: "CalibrationProblemProtocol" = (
+        self._engine_problem: "CalibrationProblemProtocol" = (
             commol_rs.inference.CalibrationProblem(self._engine, engine_json(problem))
         )
         if problem.seed is None:
             logger.info(
                 "No seed set; drew the seed %d, which repeats this calibration.",
-                self._rust_problem.seed,
+                self._engine_problem.seed,
             )
 
     def _predictive(
@@ -90,7 +90,7 @@ class Calibrator:
         PredictiveProtocol
             The runs, computed in Rust.
         """
-        return self._rust_problem.predictive(sample._rust, positions)
+        return self._engine_problem.predictive(sample._rust, positions)
 
     def with_model(self, model: "Model") -> "Calibrator":
         """
@@ -160,66 +160,6 @@ class Calibrator:
             SampleMethod(name="point", settings={"seed": result.seed}),
         )
 
-    def delta_band(
-        self, result: LocalResult, positions: Sequence[float], confidence_level: float
-    ) -> DeltaBand:
-        """
-        The band of every output of a local approximation by the delta method.
-
-        The model is linearized at the fit of `result`: the variance of an
-        output is ``J Σ Jᵀ``, with ``J`` its derivatives on the unbounded
-        scale and ``Σ`` the covariance of `result`. The band is the
-        prediction at the fit plus and minus the quantile of a normal, or of
-        the Student t of a `SandwichResult`, times its standard deviation. It
-        runs the model a few times per parameter, not once per draw, and reads
-        only the fields of `result`, so a result read back from JSON works.
-
-        Parameters
-        ----------
-        result : LaplaceResult | SandwichResult
-            A local approximation of this calibration problem.
-        positions : Sequence[float]
-            Positions to report at.
-        confidence_level : float
-            Strictly between 0 and 1.
-
-        Returns
-        -------
-        DeltaBand
-            The prediction at the fit and the ends of the interval of each
-            output at each position.
-
-        Raises
-        ------
-        ValueError
-            If the result's parameters are not the problem's, the level is not
-            strictly between 0 and 1, the engine is stochastic, or the engine
-            rejects a position.
-        RuntimeError
-            If the derivatives fail at the fit.
-        """
-        if result.sample.names != self.parameter_names:
-            raise ValueError(
-                f"The result has the parameters {result.sample.names}; the problem "
-                f"has {self.parameter_names}."
-            )
-        points = [float(position) for position in positions]
-        outputs, center, lower, upper = commol_rs.inference.delta_band(
-            self._rust_problem,
-            [result.fit.best_parameters[name] for name in self.parameter_names],
-            result.covariance,
-            result.degrees_of_freedom(),
-            points,
-            confidence_level,
-        )
-        return DeltaBand(
-            confidence_level=confidence_level,
-            positions=points,
-            center=by_output(outputs, center),
-            lower=by_output(outputs, lower),
-            upper=by_output(outputs, upper),
-        )
-
     def _observation_draws(
         self,
         sample: ParameterSample,
@@ -243,7 +183,7 @@ class Calibrator:
         ObservationDrawsProtocol
             The draws, computed in Rust.
         """
-        return self._rust_problem.observation_draws(
+        return self._engine_problem.observation_draws(
             sample._rust, engine_json(observed_data), engine_json(noise)
         )
 
@@ -266,7 +206,7 @@ class Calibrator:
         list[float]
             One log score per observation, computed in Rust.
         """
-        return self._rust_problem.log_score(sample._rust, engine_json(observed_data))
+        return self._engine_problem.log_score(sample._rust, engine_json(observed_data))
 
     @property
     def seed(self) -> int:
@@ -279,7 +219,7 @@ class Calibrator:
             ``problem.seed``, or the seed the engine drew when the
             calibrator was built, which it logs.
         """
-        return self._rust_problem.seed
+        return self._engine_problem.seed
 
     def run(self, starts: int = 1) -> CalibrationResult:
         """
@@ -289,7 +229,7 @@ class Calibrator:
         row of a Latin hypercube over the bounds, drawn from `seed`, so the
         starts cover the parameter space; a particle swarm takes a seed of
         its own at each start, also from `seed`. They run in parallel, on the
-        threads of `commol.threads`; the result is the best of them, the
+        threads of `commol.parallelism.threads`; the result is the best of them, the
         first start of lowest loss, and lists every start. Distinct ends with
         equal losses are a sign that the data do not identify the
         parameters.
@@ -326,7 +266,10 @@ class Calibrator:
             f"algorithm, {measure} and {starts} start(s)."
         )
         result = fit_result(
-            self._rust_problem.optimize(starts), self.parameter_names, self.seed, logger
+            self._engine_problem.optimize(starts),
+            self.parameter_names,
+            self.seed,
+            logger,
         )
         logger.info(
             (
@@ -353,7 +296,7 @@ class Calibrator:
             If optimization fails.
         """
         logger.info("Starting calibration with history tracking")
-        history = self._rust_problem.optimize_with_history()
+        history = self._engine_problem.optimize_with_history()
         names = self.parameter_names
         best = history.result
         result = CalibrationResult(
@@ -383,8 +326,8 @@ class Calibrator:
         Run an uncertainty method on this calibration problem.
 
         Each method is a configuration (a subclass of `UncertaintyMethod`)
-        whose type sets the result type; its runner is registered in
-        `commol.api.inference.registry`. The guide's table "Which method
+        whose type sets the result type and declares its runner. The guide's
+        table "Which method
         answers which question" lists them.
 
         Parameters
@@ -403,8 +346,7 @@ class Calibrator:
             If `method` is an identifiability method; the message names
             ``Calibrator.identifiability``.
         ValueError
-            If no runner is registered for the configuration's type (the
-            message names the registered ones), or
+            If the configuration's type declares no runner, or
             a setting, an input, the data or the model does not fit the
             method; the message says why.
         RuntimeError
@@ -414,8 +356,6 @@ class Calibrator:
         InfeasibleStateError
             If a draw of a prediction leaves the values its model allows.
         """
-        from commol.api.inference.registry import run_method
-
         return run_method(self, method, UncertaintyMethod)
 
     def identifiability(self, method: IdentifiabilityMethod[ResultT]) -> ResultT:
@@ -444,15 +384,13 @@ class Calibrator:
             If `method` is an uncertainty method; the message names
             ``Calibrator.uncertainty``.
         ValueError
-            If no runner is registered for the configuration's type, or
+            If the configuration's type declares no runner, or
             a setting, an input, the data or the model does not fit the
             method; the message says why.
         RuntimeError
             If a computation of the method that could start fails: an engine
             run or an optimizer.
         """
-        from commol.api.inference.registry import run_method
-
         return run_method(self, method, IdentifiabilityMethod)
 
     @property
@@ -562,7 +500,7 @@ Raises:
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If a parameter, observation, position or constraint does not fit the model, or a setting of the problem is outside its rule; the message names the path of the setting, such as optimization_config.inertia_factor. |
 
-Source code in `commol/api/calibrator.py`
+Source code in `commol/_calibration/calibrator.py`
 
 ```python
 def __init__(
@@ -604,13 +542,13 @@ def __init__(
 
     self._validate_calibration_parameters()
     self._warn_constraint_positions_beyond_observations()
-    self._rust_problem: "CalibrationProblemProtocol" = (
+    self._engine_problem: "CalibrationProblemProtocol" = (
         commol_rs.inference.CalibrationProblem(self._engine, engine_json(problem))
     )
     if problem.seed is None:
         logger.info(
             "No seed set; drew the seed %d, which repeats this calibration.",
-            self._rust_problem.seed,
+            self._engine_problem.seed,
         )
 ```
 
@@ -642,7 +580,7 @@ Raises:
 | ------------ | -------------------------------------------------------------------------------------- |
 | `ValueError` | If a parameter, observation, position or constraint of the problem does not fit model. |
 
-Source code in `commol/api/calibrator.py`
+Source code in `commol/_calibration/calibrator.py`
 
 ```python
 def with_model(self, model: "Model") -> "Calibrator":
@@ -702,7 +640,7 @@ Raises:
 | ------------ | --------------------------------------------------------------------------------------------- |
 | `ValueError` | If the names of result are not those of the problem; the message names the names that differ. |
 
-Source code in `commol/api/calibrator.py`
+Source code in `commol/_calibration/calibrator.py`
 
 ```python
 def point_sample(self, result: CalibrationResult) -> ParameterSample:
@@ -746,101 +684,6 @@ def point_sample(self, result: CalibrationResult) -> ParameterSample:
     )
 ```
 
-#### delta_band
-
-```python
-delta_band(result: LocalResult, positions: Sequence[float], confidence_level: float) -> DeltaBand
-```
-
-The band of every output of a local approximation by the delta method.
-
-The model is linearized at the fit of `result`: the variance of an output is `J Σ Jᵀ`, with `J` its derivatives on the unbounded scale and `Σ` the covariance of `result`. The band is the prediction at the fit plus and minus the quantile of a normal, or of the Student t of a `SandwichResult`, times its standard deviation. It runs the model a few times per parameter, not once per draw, and reads only the fields of `result`, so a result read back from JSON works.
-
-Parameters:
-
-| Name               | Type              | Description               | Default                                            |
-| ------------------ | ----------------- | ------------------------- | -------------------------------------------------- |
-| `result`           | \`LaplaceResult   | SandwichResult\`          | A local approximation of this calibration problem. |
-| `positions`        | `Sequence[float]` | Positions to report at.   | *required*                                         |
-| `confidence_level` | `float`           | Strictly between 0 and 1. | *required*                                         |
-
-Returns:
-
-| Type        | Description                                                                             |
-| ----------- | --------------------------------------------------------------------------------------- |
-| `DeltaBand` | The prediction at the fit and the ends of the interval of each output at each position. |
-
-Raises:
-
-| Type           | Description                                                                                                                                              |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError`   | If the result's parameters are not the problem's, the level is not strictly between 0 and 1, the engine is stochastic, or the engine rejects a position. |
-| `RuntimeError` | If the derivatives fail at the fit.                                                                                                                      |
-
-Source code in `commol/api/calibrator.py`
-
-```python
-def delta_band(
-    self, result: LocalResult, positions: Sequence[float], confidence_level: float
-) -> DeltaBand:
-    """
-    The band of every output of a local approximation by the delta method.
-
-    The model is linearized at the fit of `result`: the variance of an
-    output is ``J Σ Jᵀ``, with ``J`` its derivatives on the unbounded
-    scale and ``Σ`` the covariance of `result`. The band is the
-    prediction at the fit plus and minus the quantile of a normal, or of
-    the Student t of a `SandwichResult`, times its standard deviation. It
-    runs the model a few times per parameter, not once per draw, and reads
-    only the fields of `result`, so a result read back from JSON works.
-
-    Parameters
-    ----------
-    result : LaplaceResult | SandwichResult
-        A local approximation of this calibration problem.
-    positions : Sequence[float]
-        Positions to report at.
-    confidence_level : float
-        Strictly between 0 and 1.
-
-    Returns
-    -------
-    DeltaBand
-        The prediction at the fit and the ends of the interval of each
-        output at each position.
-
-    Raises
-    ------
-    ValueError
-        If the result's parameters are not the problem's, the level is not
-        strictly between 0 and 1, the engine is stochastic, or the engine
-        rejects a position.
-    RuntimeError
-        If the derivatives fail at the fit.
-    """
-    if result.sample.names != self.parameter_names:
-        raise ValueError(
-            f"The result has the parameters {result.sample.names}; the problem "
-            f"has {self.parameter_names}."
-        )
-    points = [float(position) for position in positions]
-    outputs, center, lower, upper = commol_rs.inference.delta_band(
-        self._rust_problem,
-        [result.fit.best_parameters[name] for name in self.parameter_names],
-        result.covariance,
-        result.degrees_of_freedom(),
-        points,
-        confidence_level,
-    )
-    return DeltaBand(
-        confidence_level=confidence_level,
-        positions=points,
-        center=by_output(outputs, center),
-        lower=by_output(outputs, lower),
-        upper=by_output(outputs, upper),
-    )
-```
-
 #### run
 
 ```python
@@ -849,7 +692,7 @@ run(starts: int = 1) -> CalibrationResult
 
 Runs the calibration optimization from one or more starts.
 
-Start 0 is the initial guess of each parameter. Each further start is a row of a Latin hypercube over the bounds, drawn from `seed`, so the starts cover the parameter space; a particle swarm takes a seed of its own at each start, also from `seed`. They run in parallel, on the threads of `commol.threads`; the result is the best of them, the first start of lowest loss, and lists every start. Distinct ends with equal losses are a sign that the data do not identify the parameters.
+Start 0 is the initial guess of each parameter. Each further start is a row of a Latin hypercube over the bounds, drawn from `seed`, so the starts cover the parameter space; a particle swarm takes a seed of its own at each start, also from `seed`. They run in parallel, on the threads of `commol.parallelism.threads`; the result is the best of them, the first start of lowest loss, and lists every start. Distinct ends with equal losses are a sign that the data do not identify the parameters.
 
 Parameters:
 
@@ -870,7 +713,7 @@ Raises:
 | `ValueError`   | If starts is below 1, or a verbose optimizer has more than one start. |
 | `RuntimeError` | If every start fails.                                                 |
 
-Source code in `commol/api/calibrator.py`
+Source code in `commol/_calibration/calibrator.py`
 
 ```python
 def run(self, starts: int = 1) -> CalibrationResult:
@@ -881,7 +724,7 @@ def run(self, starts: int = 1) -> CalibrationResult:
     row of a Latin hypercube over the bounds, drawn from `seed`, so the
     starts cover the parameter space; a particle swarm takes a seed of
     its own at each start, also from `seed`. They run in parallel, on the
-    threads of `commol.threads`; the result is the best of them, the
+    threads of `commol.parallelism.threads`; the result is the best of them, the
     first start of lowest loss, and lists every start. Distinct ends with
     equal losses are a sign that the data do not identify the
     parameters.
@@ -918,7 +761,10 @@ def run(self, starts: int = 1) -> CalibrationResult:
         f"algorithm, {measure} and {starts} start(s)."
     )
     result = fit_result(
-        self._rust_problem.optimize(starts), self.parameter_names, self.seed, logger
+        self._engine_problem.optimize(starts),
+        self.parameter_names,
+        self.seed,
+        logger,
     )
     logger.info(
         (
@@ -949,7 +795,7 @@ Raises:
 | -------------- | ---------------------- |
 | `RuntimeError` | If optimization fails. |
 
-Source code in `commol/api/calibrator.py`
+Source code in `commol/_calibration/calibrator.py`
 
 ```python
 def run_with_history(self) -> CalibrationHistory:
@@ -969,7 +815,7 @@ def run_with_history(self) -> CalibrationHistory:
         If optimization fails.
     """
     logger.info("Starting calibration with history tracking")
-    history = self._rust_problem.optimize_with_history()
+    history = self._engine_problem.optimize_with_history()
     names = self.parameter_names
     best = history.result
     result = CalibrationResult(
@@ -1003,7 +849,7 @@ uncertainty(method: UncertaintyMethod[ResultT]) -> ResultT
 
 Run an uncertainty method on this calibration problem.
 
-Each method is a configuration (a subclass of `UncertaintyMethod`) whose type sets the result type; its runner is registered in `commol.api.inference.registry`. The guide's table "Which method answers which question" lists them.
+Each method is a configuration (a subclass of `UncertaintyMethod`) whose type sets the result type and declares its runner. The guide's table "Which method answers which question" lists them.
 
 Parameters:
 
@@ -1019,14 +865,14 @@ Returns:
 
 Raises:
 
-| Type                   | Description                                                                                                                                                                                   |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TypeError`            | If method is an identifiability method; the message names Calibrator.identifiability.                                                                                                         |
-| `ValueError`           | If no runner is registered for the configuration's type (the message names the registered ones), or a setting, an input, the data or the model does not fit the method; the message says why. |
-| `RuntimeError`         | If a computation of the method that could start fails: an engine run, an optimizer, every replicate, or a sampler that does not reach its target.                                             |
-| `InfeasibleStateError` | If a draw of a prediction leaves the values its model allows.                                                                                                                                 |
+| Type                   | Description                                                                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TypeError`            | If method is an identifiability method; the message names Calibrator.identifiability.                                                             |
+| `ValueError`           | If the configuration's type declares no runner, or a setting, an input, the data or the model does not fit the method; the message says why.      |
+| `RuntimeError`         | If a computation of the method that could start fails: an engine run, an optimizer, every replicate, or a sampler that does not reach its target. |
+| `InfeasibleStateError` | If a draw of a prediction leaves the values its model allows.                                                                                     |
 
-Source code in `commol/api/calibrator.py`
+Source code in `commol/_calibration/calibrator.py`
 
 ```python
 def uncertainty(self, method: UncertaintyMethod[ResultT]) -> ResultT:
@@ -1034,8 +880,8 @@ def uncertainty(self, method: UncertaintyMethod[ResultT]) -> ResultT:
     Run an uncertainty method on this calibration problem.
 
     Each method is a configuration (a subclass of `UncertaintyMethod`)
-    whose type sets the result type; its runner is registered in
-    `commol.api.inference.registry`. The guide's table "Which method
+    whose type sets the result type and declares its runner. The guide's
+    table "Which method
     answers which question" lists them.
 
     Parameters
@@ -1054,8 +900,7 @@ def uncertainty(self, method: UncertaintyMethod[ResultT]) -> ResultT:
         If `method` is an identifiability method; the message names
         ``Calibrator.identifiability``.
     ValueError
-        If no runner is registered for the configuration's type (the
-        message names the registered ones), or
+        If the configuration's type declares no runner, or
         a setting, an input, the data or the model does not fit the
         method; the message says why.
     RuntimeError
@@ -1065,8 +910,6 @@ def uncertainty(self, method: UncertaintyMethod[ResultT]) -> ResultT:
     InfeasibleStateError
         If a draw of a prediction leaves the values its model allows.
     """
-    from commol.api.inference.registry import run_method
-
     return run_method(self, method, UncertaintyMethod)
 ```
 
@@ -1094,13 +937,13 @@ Returns:
 
 Raises:
 
-| Type           | Description                                                                                                                                           |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TypeError`    | If method is an uncertainty method; the message names Calibrator.uncertainty.                                                                         |
-| `ValueError`   | If no runner is registered for the configuration's type, or a setting, an input, the data or the model does not fit the method; the message says why. |
-| `RuntimeError` | If a computation of the method that could start fails: an engine run or an optimizer.                                                                 |
+| Type           | Description                                                                                                                                  |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TypeError`    | If method is an uncertainty method; the message names Calibrator.uncertainty.                                                                |
+| `ValueError`   | If the configuration's type declares no runner, or a setting, an input, the data or the model does not fit the method; the message says why. |
+| `RuntimeError` | If a computation of the method that could start fails: an engine run or an optimizer.                                                        |
 
-Source code in `commol/api/calibrator.py`
+Source code in `commol/_calibration/calibrator.py`
 
 ```python
 def identifiability(self, method: IdentifiabilityMethod[ResultT]) -> ResultT:
@@ -1129,60 +972,14 @@ def identifiability(self, method: IdentifiabilityMethod[ResultT]) -> ResultT:
         If `method` is an uncertainty method; the message names
         ``Calibrator.uncertainty``.
     ValueError
-        If no runner is registered for the configuration's type, or
+        If the configuration's type declares no runner, or
         a setting, an input, the data or the model does not fit the
         method; the message says why.
     RuntimeError
         If a computation of the method that could start fails: an engine
         run or an optimizer.
     """
-    from commol.api.inference.registry import run_method
-
     return run_method(self, method, IdentifiabilityMethod)
-```
-
-## DeltaBand
-
-Bases: `ResultModel`
-
-The band of every output by the delta method (`Calibrator.delta_band`): the prediction at the fit plus and minus a quantile times the standard deviation of the linearized model, `J Σ Jᵀ`, with no run of the draws.
-
-Attributes:
-
-| Name                   | Type                     | Description                                                                                      |
-| ---------------------- | ------------------------ | ------------------------------------------------------------------------------------------------ |
-| `confidence_level`     | `float`                  | The level of the central interval.                                                               |
-| `positions`            | `list[float]`            | Where the values are.                                                                            |
-| `center, lower, upper` | `dict[str, list[float]]` | For each output, one value per position: the prediction at the fit and the ends of the interval. |
-
-Source code in `commol/context/inference/local.py`
-
-```python
-class DeltaBand(ResultModel):
-    """
-    The band of every output by the delta method (``Calibrator.delta_band``):
-    the prediction at the fit
-    plus and minus a quantile times the standard deviation of the
-    linearized model, ``J Σ Jᵀ``, with no run of the draws.
-
-    Attributes
-    ----------
-    confidence_level : float
-        The level of the central interval.
-    positions : list[float]
-        Where the values are.
-    center, lower, upper : dict[str, list[float]]
-        For each output, one value per position: the prediction at the fit
-        and the ends of the interval.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    confidence_level: float
-    positions: list[float]
-    center: dict[str, list[float]] = Field(description="Prediction at the fit")
-    lower: dict[str, list[float]] = Field(description="Lower end")
-    upper: dict[str, list[float]] = Field(description="Upper end")
 ```
 
 ## CalibrationProblem
@@ -1209,7 +1006,7 @@ Attributes:
 | `replicate_summary`           | \`{mean, median, crps}         | Quantile                                                                                                                                                                                                  |
 | `seed`                        | \`int                          | None\`                                                                                                                                                                                                    |
 
-Source code in `commol/context/calibration.py`
+Source code in `commol/_problem/problem.py`
 
 ```python
 class CalibrationProblem(RangeChecked):
@@ -1375,7 +1172,7 @@ Attributes:
 | ------- | ------- | ------------------------------------------------------- |
 | `level` | `float` | The level, between 0 and 1, such as 0.5 for the median. |
 
-Source code in `commol/context/calibration.py`
+Source code in `commol/_problem/problem.py`
 
 ```python
 class Quantile(BaseModel):
@@ -1428,7 +1225,7 @@ Parameters:
 | ------- | ------- | --------------------------- | ---------- |
 | `level` | `float` | The level, between 0 and 1. | *required* |
 
-Source code in `commol/context/calibration.py`
+Source code in `commol/_problem/problem.py`
 
 ```python
 def __init__(self, level: float) -> None:
@@ -1465,7 +1262,7 @@ Attributes:
 | `window`    | \`float     | None\`                                                                                                                                                                                                         |
 | `trials`    | \`int       | None\`                                                                                                                                                                                                         |
 
-Source code in `commol/context/calibration.py`
+Source code in `commol/_problem/problem.py`
 
 ```python
 class ObservedDataPoint(RangeChecked):
@@ -1589,218 +1386,6 @@ observed_outputs: list[str]
 
 The outputs whose sum is compared: `outputs`, or `output` alone.
 
-## Observation models
-
-Guide: [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md).
-
-## NormalObservations
-
-Bases: `_ObservationModel`, `RangeChecked`
-
-Normal noise: `y ~ N(μ, sd²)`, with `μ` the prediction.
-
-For continuous values with errors of the same size everywhere. With a known `sd` the maximum-likelihood fit is the least-squares fit.
-
-Attributes:
-
-| Name | Type    | Description |
-| ---- | ------- | ----------- |
-| `sd` | \`float | str\`       |
-
-Source code in `commol/context/observation_models.py`
-
-```python
-class NormalObservations(_ObservationModel, RangeChecked):
-    """
-    Normal noise: ``y ~ N(μ, sd²)``, with ``μ`` the prediction.
-
-    For continuous values with errors of the same size everywhere. With a
-    known ``sd`` the maximum-likelihood fit is the least-squares fit.
-
-    Attributes
-    ----------
-    sd : float | str
-        The standard deviation, above 0, or the id of a noise parameter.
-    """
-
-    kind: Literal["normal"] = "normal"
-    sd: float | str = Field(description="The standard deviation.")
-```
-
-## LogNormalObservations
-
-Bases: `_ObservationModel`, `RangeChecked`
-
-Log-normal noise: `log y` is normal with standard deviation `sigma`.
-
-For positive values with errors that grow with the value. `center` says what the prediction `μ` is, and has no default: `"mean"` makes `E[y] = μ` (`log y ~ N(log μ − σ²/2, σ²)`), `"median"` makes the median `μ` (`log y ~ N(log μ, σ²)`, the proportional error `y = μ·e^ε`). Every observed value must be above 0.
-
-Attributes:
-
-| Name     | Type             | Description             |
-| -------- | ---------------- | ----------------------- |
-| `sigma`  | \`float          | str\`                   |
-| `center` | `{mean, median}` | What the prediction is. |
-
-Source code in `commol/context/observation_models.py`
-
-```python
-class LogNormalObservations(_ObservationModel, RangeChecked):
-    """
-    Log-normal noise: ``log y`` is normal with standard deviation ``sigma``.
-
-    For positive values with errors that grow with the value. ``center``
-    says what the prediction ``μ`` is, and has no default: ``"mean"`` makes
-    ``E[y] = μ`` (``log y ~ N(log μ − σ²/2, σ²)``), ``"median"`` makes the
-    median ``μ`` (``log y ~ N(log μ, σ²)``, the proportional error
-    ``y = μ·e^ε``). Every observed value must be above 0.
-
-    Attributes
-    ----------
-    sigma : float | str
-        The standard deviation of ``log y``, above 0, or the id of a noise
-        parameter.
-    center : {"mean", "median"}
-        What the prediction is.
-    """
-
-    kind: Literal["log_normal"] = "log_normal"
-    sigma: float | str = Field(description="The standard deviation of log y.")
-    center: Literal["mean", "median"] = Field(description="What the prediction is.")
-```
-
-## StudentTObservations
-
-Bases: `_ObservationModel`, `RangeChecked`
-
-Student-t noise of center `μ`, the prediction: normal noise with heavier tails, so an outlier pulls the fit less.
-
-Attributes:
-
-| Name    | Type    | Description |
-| ------- | ------- | ----------- |
-| `df`    | \`float | str\`       |
-| `scale` | \`float | str\`       |
-
-Source code in `commol/context/observation_models.py`
-
-```python
-class StudentTObservations(_ObservationModel, RangeChecked):
-    """
-    Student-t noise of center ``μ``, the prediction: normal noise with heavier
-    tails, so an outlier pulls the fit less.
-
-    Attributes
-    ----------
-    df : float | str
-        The degrees of freedom, above 0, or the id of a noise parameter. The
-        noise has a mean when ``df > 1`` and a variance when ``df > 2``.
-    scale : float | str
-        The scale, above 0, or the id of a noise parameter.
-    """
-
-    kind: Literal["student_t"] = "student_t"
-    df: float | str = Field(description="The degrees of freedom.")
-    scale: float | str = Field(description="The scale.")
-```
-
-## PoissonObservations
-
-Bases: `_ObservationModel`
-
-Poisson counts of mean `μ`, the prediction: variance equal to the mean.
-
-Every observed value must be a whole number, at least 0.
-
-Source code in `commol/context/observation_models.py`
-
-```python
-class PoissonObservations(_ObservationModel):
-    """
-    Poisson counts of mean ``μ``, the prediction: variance equal to the mean.
-
-    Every observed value must be a whole number, at least 0.
-    """
-
-    kind: Literal["poisson"] = "poisson"
-```
-
-## NegativeBinomialObservations
-
-Bases: `_ObservationModel`, `RangeChecked`
-
-Negative binomial counts of mean `μ`, the prediction, and variance `μ + φμ²`: counts that scatter more than a Poisson.
-
-`φ = 0` is the Poisson, so bounds `[0, …]` of a noise parameter hold it. The dispersion `k` (`size` in R) is `1/φ`. Every observed value must be a whole number, at least 0.
-
-Attributes:
-
-| Name             | Type    | Description |
-| ---------------- | ------- | ----------- |
-| `overdispersion` | \`float | str\`       |
-
-Source code in `commol/context/observation_models.py`
-
-```python
-class NegativeBinomialObservations(_ObservationModel, RangeChecked):
-    """
-    Negative binomial counts of mean ``μ``, the prediction, and variance
-    ``μ + φμ²``: counts that scatter more than a Poisson.
-
-    ``φ = 0`` is the Poisson, so bounds ``[0, …]`` of a noise parameter hold
-    it. The dispersion ``k`` (``size`` in R) is ``1/φ``.
-    Every observed value must be a whole number, at least 0.
-
-    Attributes
-    ----------
-    overdispersion : float | str
-        ``φ``, at least 0, or the id of a noise parameter.
-    """
-
-    kind: Literal["negative_binomial"] = "negative_binomial"
-    overdispersion: float | str = Field(description="The overdispersion φ.")
-```
-
-## BinomialObservations
-
-Bases: `_ObservationModel`, `RangeChecked`
-
-Binomial counts of `n` trials and mean `μ`, the prediction: the probability is `μ / n`, so the prediction is an expected count, not a proportion.
-
-`trials` gives `n` for every observation of the series; without it, each observation of the series gives its own (`ObservedDataPoint.trials`), for trials that change from one observation to the next. One source per series. Every observed value must be a whole number between 0 and its trials.
-
-Attributes:
-
-| Name     | Type  | Description |
-| -------- | ----- | ----------- |
-| `trials` | \`int | None\`      |
-
-Source code in `commol/context/observation_models.py`
-
-```python
-class BinomialObservations(_ObservationModel, RangeChecked):
-    """
-    Binomial counts of ``n`` trials and mean ``μ``, the prediction: the
-    probability is ``μ / n``, so the prediction is an expected count, not a
-    proportion.
-
-    ``trials`` gives ``n`` for every observation of the series; without it,
-    each observation of the series gives its own (``ObservedDataPoint.trials``),
-    for trials that change from one observation to the next. One source per
-    series. Every observed value must be a whole number between 0 and its
-    trials.
-
-    Attributes
-    ----------
-    trials : int | None
-        The trials of every observation, or None (default) to read the
-        trials of each observation.
-    """
-
-    kind: Literal["binomial"] = "binomial"
-    trials: int | None = Field(default=None, description="The trials.")
-```
-
 ## Unknowns, optimizers and results
 
 ## CalibrationParameter
@@ -1819,7 +1404,7 @@ Attributes:
 | `max_bound`      | `float`                                         | Maximum allowed value for this parameter                                                                                                                                                                                                                                   |
 | `initial_guess`  | \`float                                         | None\`                                                                                                                                                                                                                                                                     |
 
-Source code in `commol/context/calibration.py`
+Source code in `commol/_problem/problem.py`
 
 ```python
 class CalibrationParameter(BaseModel):
@@ -1940,7 +1525,7 @@ Examples:
 ... )
 ```
 
-Source code in `commol/context/calibration.py`
+Source code in `commol/_problem/problem.py`
 
 ```python
 class CalibrationConstraint(RangeChecked):
@@ -2070,7 +1655,7 @@ Attributes:
 | `verbose`              | `bool`        | Enable verbose output during optimization (default: False)                                                                                                                                                                                      |
 | `header_interval`      | `int`         | Number of iterations between table header repeats in verbose output (default: 100)                                                                                                                                                              |
 
-Source code in `commol/context/calibration.py`
+Source code in `commol/_problem/problem.py`
 
 ```python
 class NelderMeadConfig(RangeChecked):
@@ -2202,7 +1787,7 @@ Stacey, A., Jancic, M., & Grundy, I. (2003). Particle swarm optimization with mu
 
 Zielinski, K., & Laur, R. (2007). Stopping criteria for a constrained single-objective particle swarm optimization algorithm. Informatica, 31(1), 51-59.
 
-Source code in `commol/context/calibration.py`
+Source code in `commol/_problem/problem.py`
 
 ```python
 class ParticleSwarmConfig(RangeChecked):
@@ -2437,7 +2022,7 @@ Attributes:
 | `failed`             | `list[str]`          | Each start that failed: "Start <index> failed: <reason>", also logged as a warning.                                                                                                         |
 | `seed`               | `int`                | The seed of the calibration's random numbers (Calibrator.seed): problem.seed, or the seed the calibrator drew. Set as problem.seed, it repeats the calibration and its uncertainty methods. |
 
-Source code in `commol/context/calibration.py`
+Source code in `commol/_fit/result.py`
 
 ```python
 class CalibrationResult(ResultModel, RangeChecked):
@@ -2517,7 +2102,7 @@ __str__() -> str
 
 String representation of calibration result.
 
-Source code in `commol/context/calibration.py`
+Source code in `commol/_fit/result.py`
 
 ```python
 @override
@@ -2554,7 +2139,7 @@ Attributes:
 | `loss`      | `float`            | The loss at the end.                                 |
 | `converged` | `bool`             | Whether the optimizer met its convergence criterion. |
 
-Source code in `commol/context/calibration.py`
+Source code in `commol/_fit/result.py`
 
 ```python
 class StartSummary(ResultModel):
@@ -2597,7 +2182,7 @@ Attributes:
 | `result`      | `CalibrationResult`           | The result of the calibration.                                     |
 | `evaluations` | `list[CalibrationEvaluation]` | Every evaluation of a feasible point, in the order they were made. |
 
-Source code in `commol/context/calibration.py`
+Source code in `commol/_fit/result.py`
 
 ```python
 class CalibrationHistory(ResultModel):
@@ -2633,7 +2218,7 @@ Attributes:
 | `parameters` | `dict[str, float]` | The values the objective scored. |
 | `loss`       | `float`            | The loss at these values.        |
 
-Source code in `commol/context/calibration.py`
+Source code in `commol/_fit/result.py`
 
 ```python
 class CalibrationEvaluation(ResultModel):

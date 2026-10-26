@@ -31,7 +31,7 @@ model.check_unit_consistency(verbose=True)  # Unit consistency check passed succ
 
 ## Unit checking
 
-`Model.check_unit_consistency(verbose=False)` checks that every flow has the unit `<bin unit>/<step unit>`, every [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses) the unit `<bin unit>`, and that every function receives a plain number. It checks the models of every engine alike: in each, a rate is per unit of the axis, and only what its value means differs (see [What a rate means](https://munqu.github.io/commol/latest/guide/core-concepts/#what-a-rate-means)). It reads the flows the engine plans (`transition_flows`), so a proportional rate is checked as its flow, the rate times its source: `k2` in `1/day` from a bin in `item` gives `item/day`. It reads each formula as the tree that the parser of the engine reads, so a formula has the grouping of the engine: the flow of a proportional rate `k1 + k2` from `B` is `(k1 + k2) * B`, and `A ^ 2 ^ -1` is `A ^ (2 ^ -1)`. The bin unit of a flow is the unit of the bin it leaves, or of the bin it enters when it has no source; so a category transition in a model of bins in `item` and `kg` moves `item/day` in one bin and `kg/day` in the other. In such a model `total`, a subgroup total `total_<categories>` and `neighbors` add amounts of different units, so they have none, and a rate that reads one fails the check; read the bins or the compartments instead. A rate that reads the [neighbors of a unit](https://munqu.github.io/commol/latest/guide/building-models/#neighbors) is checked as the sums they are. It raises `UnitConsistencyError` (from `commol.utils.equations`) and lists every transition that fails.
+`Model.check_unit_consistency(verbose=False)` checks that every flow has the unit `<bin unit>/<step unit>`, every [impulse](https://munqu.github.io/commol/latest/guide/transitions/#impulses) the unit `<bin unit>`, and that every function receives a plain number. It checks the models of every engine alike: in each, a rate is per unit of the axis, and only what its value means differs (see [What a rate means](https://munqu.github.io/commol/latest/guide/core-concepts/#what-a-rate-means)). It reads the flows the engine plans (`transition_flows`), so a proportional rate is checked as its flow, the rate times its source: `k2` in `1/day` from a bin in `item` gives `item/day`. It reads each formula as the tree that the parser of the engine reads, so a formula has the grouping of the engine: the flow of a proportional rate `k1 + k2` from `B` is `(k1 + k2) * B`, and `A ^ 2 ^ -1` is `A ^ (2 ^ -1)`. The bin unit of a flow is the unit of the bin it leaves, or of the bin it enters when it has no source; so a category transition in a model of bins in `item` and `kg` moves `item/day` in one bin and `kg/day` in the other. In such a model `total`, a subgroup total `total_<categories>` and `neighbors` add amounts of different units, so they have none, and a rate that reads one fails the check; read the bins or the compartments instead. A rate that reads the [neighbors of a unit](https://munqu.github.io/commol/latest/guide/building-models/#neighbors) is checked as the sums they are. It raises `UnitConsistencyError` (from `commol._model.unit_checks`) and lists every transition that fails.
 
 ### What needs a unit
 
@@ -54,7 +54,7 @@ A unit means what [`pint`](https://pint.readthedocs.io/) defines, for time as fo
 
 ### The step unit
 
-The engine converts no value between units. So one step has one unit, and every rate must use it (`UnitChecker._step_unit` in `py-commol/commol/context/_model/units.py`).
+The engine converts no value between units. So one step has one unit, and every rate must use it (`UnitChecker._step_unit` in `py-commol/commol/_model/units.py`).
 
 The axis of a model is its independent variable: the quantity the model steps along or differentiates over. Time is one case; a length, a mass or any other quantity is another. So the step unit may have any single dimension. Declare it with `ModelBuilder(..., step_unit="day")` (`Model.step_unit`); `check_step_unit` accepts one unit of one dimension with exponent 1, such as `day` or `meter`, and rejects `1/day` or `meter**2`. A model that declares no step unit has the step unit `step`, the default increment of any axis, of its own dimension `[step]`. The check never guesses the step unit from the parameters.
 
@@ -99,7 +99,7 @@ An impulse moves an amount at once, so its rate must have the bin unit: `p * A` 
 ### What the check catches
 
 ```python
-from commol.utils.equations import UnitConsistencyError
+from commol._model.unit_checks import UnitConsistencyError
 
 wrong_units = (
     ModelBuilder(name="Wrong units", bin_unit="item", step_unit="day")

@@ -7,18 +7,10 @@ A sensitivity analysis asks the forward questions of a model: how uncertainty in
 ## Quick path
 
 ```python
-from commol import (
-    Aggregate,
-    CalibrationParameter,
-    InputSpace,
-    ModelBuilder,
-    Normal,
-    Peak,
-    PRCC,
-    SensitivityAnalysis,
-    Simulation,
-    Uniform,
-)
+from commol import Aggregate, CalibrationParameter, ModelBuilder, Simulation
+from commol.sensitivity import InputSpace, PRCC, SensitivityAnalysis
+from commol.distributions import Normal, Uniform
+from commol.quantities import Peak
 
 
 def abc_model(k1: float, k2: float):
@@ -81,7 +73,7 @@ An initial condition is an amount in the unit of its bin, or a category split in
 
 ## Quantities of interest
 
-A quantity reads a series of each run and reduces it to a scalar, in Rust, through the observation operator of the calibration (`crates/commol-inference/src/quantity.rs`), so a design of thousands of runs never returns to Python. The quantities live in `commol/context/inference/quantities.py`.
+A quantity reads a series of each run and reduces it to a scalar, in Rust, through the observation operator of the calibration (`crates/commol-inference/src/quantity.rs`), so a design of thousands of runs never returns to Python. The quantities live in `commol/quantities/quantities.py`.
 
 | Series                                       | Value at a position                                                                                    |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
@@ -100,7 +92,8 @@ A quantity reads a series of each run and reduces it to a scalar, in Rust, throu
 The series is a modelling choice. The peak of a level is the largest amount; for an output that only grows, such as `C` here or an accumulator, it is the value at the last position. The peak of `Increments` is the largest gain over one window, and `PeakPosition` gives the end of that window:
 
 ```python
-from commol import Increments, PeakPosition, Propagation
+from commol.quantities import Increments, PeakPosition
+from commol.sensitivity import Propagation
 
 ends = list(range(10, 101, 10))
 inflow = Increments("C", window=10)
@@ -149,7 +142,7 @@ print(round(late.summary(0.9)[0].median))  # 216
 `Ratio(numerator, denominator, replicate_rule)` divides two quantities of one value each (`ValueAt`, `Gain`, `Peak`), numerator N over denominator D, in each run. It is one quantity, so every method reads it, the sensitivity methods too. A `PeakPosition` or a `Trajectory` as an operand is a `ValueError`. The share of what entered `C` by position 100 that entered by position 50 has a denominator that depends on both inputs:
 
 ```python
-from commol import Gain, Ratio
+from commol.quantities import Gain, Ratio
 
 early = Ratio(
     numerator=Gain(outputs="C", start=0, end=50),
@@ -194,7 +187,7 @@ A propagation keeps the NaN of each run in `values`, so `summary()` raises on a 
 `quantity_schedule(quantities)` gives the positions the quantities read: the results of `run_at` at them hold every position. Each position is found within a relative tolerance of `1e-9`, as `index_at` finds it, so a window that starts at `0.3 - 0.1` reads the row of `0.2`.
 
 ```python
-from commol import quantity_schedule
+from commol.quantities import quantity_schedule
 
 one_run = simulation.run_at(quantity_schedule(quantities))
 for label, value in one_run.quantities(quantities).items():
@@ -228,7 +221,9 @@ Start with Morris to drop the inputs that do not matter, then Sobol or a polynom
 `Propagation` returns a `PropagationResult`: the `sample` of the draws (a Latin hypercube of the distributions, or the input sample as it is), the quantities of each run, their `weights`, and the seed of each draw (`draw_seeds`). `summary(confidence_level)` gives the weighted mean, median and central interval of each quantity. The sample is a `ParameterSample`, so `Predictive(analysis, result.sample, positions)` gives the bands and plots of a calibration.
 
 ```python
-from commol import Predictive, Propagation, ValueAt
+from commol.uncertainty import Predictive
+from commol.sensitivity import Propagation
+from commol.quantities import ValueAt
 
 result = analysis.run(
     Propagation(draws=100, quantities=[peak, ValueAt(series="C", at=100)])
@@ -253,7 +248,7 @@ With inputs from a sample, the sample is the design, and the ranks, the correlat
 A NaN has no rank, so a quantity that is NaN at a draw raises a `ValueError` before PRCC ranks any value ([A quantity that is NaN](#a-quantity-that-is-nan)).
 
 ```python
-from commol import Trajectory
+from commol.quantities import Trajectory
 
 over_axis = analysis.run(
     PRCC(draws=100, quantities=[Trajectory(series="C", positions=[10, 50, 100])])
@@ -268,7 +263,7 @@ print([[round(c, 2) for c in row] for row in over_axis.coefficients])
 `Morris` (Morris 1991) runs `trajectories` trajectories: each starts at a random level of every input and moves the inputs one at a time, by half the `levels`. The levels are the centres of strata of equal probability of each distribution, so a level is finite for an unbounded distribution too, and an effect is on the scale of `F(x)`, so inputs of different units compare. `mu_star` (Campolongo, Cariboni and Saltelli 2007) ranks the inputs; a `sigma` near or above `mu_star` says the effect depends on the other inputs or is not linear.
 
 ```python
-from commol import Morris
+from commol.sensitivity import Morris
 
 screening = analysis.run(Morris(trajectories=20, levels=4, quantities=[peak]))
 print([round(value) for value in screening.mu_star[0]], screening.runs)  # [385, 279] 60
@@ -281,7 +276,7 @@ print([round(value) for value in screening.mu_star[0]], screening.runs)  # [385,
 Sobol, Morris and the polynomial chaos need independent inputs. With dependent inputs, such as a posterior, moving one input breaks its dependence on the others, and the indices lose their meaning and no longer add up; an input space from a sample raises a `ValueError` that names PRCC and propagation, which take it.
 
 ```python
-from commol import Sobol
+from commol.sensitivity import Sobol
 
 indices = analysis.run(
     Sobol(draws=1024, replicates=200, confidence_level=0.9, quantities=[peak])
@@ -299,7 +294,7 @@ for name, i in [("k1", 0), ("k2", 1)]:
 `PolynomialChaos` (Sudret 2008) takes every input to `u = F(x)`, uniform on `[0, 1]`, and fits orthonormal Legendre polynomials of `u` of total degree `degree`, or a truncation of that basis ([below](#bases-for-many-inputs)), by least squares on a Latin hypercube of `draws` points. One basis fits every distribution, truncated ones too. The Sobol indices come from the squares of the coefficients. `loo_error` is the leave-one-out error relative to the variance: the indices are those of the expansion, and they are those of the model only as far as the expansion predicts it. `predict` gives the quantities at any input values, as a surrogate.
 
 ```python
-from commol import PolynomialChaos
+from commol.sensitivity import PolynomialChaos
 
 chaos = analysis.run(PolynomialChaos(degree=4, draws=60, quantities=[peak]))
 print(round(chaos.loo_error[0], 4), [round(s, 2) for s in chaos.total[0]])  # 0.0036 [0.61, 0.39]

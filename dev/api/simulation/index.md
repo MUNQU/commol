@@ -10,7 +10,7 @@ A Facade for running a simulation from a defined Model.
 
 The engine follows the model: `run` and `engine` rebuild it when `model_definition` no longer serializes to the JSON the engine was built from, for example after `Model.update_parameters`.
 
-Source code in `commol/api/simulation.py`
+Source code in `commol/_simulation/simulation.py`
 
 ```python
 class Simulation:
@@ -406,7 +406,7 @@ Raises:
 | ----------- | ------------------------------------------------------ |
 | `TypeError` | If the structure of the model is not a ModelStructure. |
 
-Source code in `commol/api/simulation.py`
+Source code in `commol/_simulation/simulation.py`
 
 ```python
 def __init__(self, model: Model) -> None:
@@ -467,7 +467,7 @@ Raises:
 | `ValueError`           | If a parameter or initial condition has no value, or the seed is not a whole number from 0 to 2\*\*64 - 1.  |
 | `RuntimeError`         | If a rate cannot be evaluated or is not a number; the message names the flow and the position.              |
 
-Source code in `commol/api/simulation.py`
+Source code in `commol/_simulation/simulation.py`
 
 ```python
 def run(self, num_steps: int, *, seed: int | None = None) -> SimulationResults:
@@ -555,7 +555,7 @@ Raises:
 | `ValueError`           | If a parameter or initial condition has no value, the positions are not sorted and unique, or the engine does not report at one of them; the message is the engine's. |
 | `RuntimeError`         | If a rate cannot be evaluated or is not a number; the message names the flow and the position.                                                                        |
 
-Source code in `commol/api/simulation.py`
+Source code in `commol/_simulation/simulation.py`
 
 ```python
 def run_at(
@@ -640,7 +640,7 @@ Raises:
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If the engine is deterministic (every replicate would be equal), count is not a whole number or is below 1, or the seed is not valid. |
 
-Source code in `commol/api/simulation.py`
+Source code in `commol/_simulation/simulation.py`
 
 ```python
 def replicates(self, count: int, *, seed: int | None = None) -> "ReplicateRuns":
@@ -712,7 +712,7 @@ Raises:
 | ---------- | ----------------------------------- |
 | `KeyError` | If id is not a source of the model. |
 
-Source code in `commol/api/simulation.py`
+Source code in `commol/_simulation/simulation.py`
 
 ```python
 def outputs_for(self, id: str) -> list[str]:
@@ -767,7 +767,7 @@ Raises:
 | ---------- | -------------------------------------------------- |
 | `KeyError` | If an id is not a bin or accumulator of the model. |
 
-Source code in `commol/api/simulation.py`
+Source code in `commol/_simulation/simulation.py`
 
 ```python
 def group_outputs(self, ids: Iterable[str]) -> dict[str, list[str]]:
@@ -819,7 +819,7 @@ Raises:
 | ---------- | --------------------------------------------------------------------------------------------------------- |
 | `KeyError` | If an id is not a bin, accumulator or output of the model, or an expected output is missing from results. |
 
-Source code in `commol/api/simulation.py`
+Source code in `commol/_simulation/simulation.py`
 
 ```python
 def total_series(
@@ -871,7 +871,7 @@ Attributes:
 | `seed`      | \`int         | None\`                                                                                   |
 | `model`     | \`Model       | None\`                                                                                   |
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 class SimulationResults(ComparedByValue, dict[str, list[float]]):
@@ -1138,7 +1138,7 @@ class SimulationResults(ComparedByValue, dict[str, list[float]]):
         windows: int,
         observed_data: "Iterable[ObservedDataPoint]" = (),
         accumulators: Iterable[str] = (),
-        prediction_intervals: "PredictionIntervals | None" = None,
+        prediction_intervals: "PredictionIntervalsData | None" = None,
     ) -> "SimulationReport":
         """
         Report the observed data, compartment series and accumulators of the run.
@@ -1161,7 +1161,7 @@ class SimulationResults(ComparedByValue, dict[str, list[float]]):
             The calibration targets to report alongside the run.
         accumulators : Iterable[str], optional
             Accumulator ids to report; their outputs come from `model`.
-        prediction_intervals : PredictionIntervals | None, optional
+        prediction_intervals : PredictionIntervalsData | None, optional
             Prediction intervals of a conformal method
             (``ConformalResult.intervals``), reported as they are.
 
@@ -1179,7 +1179,7 @@ class SimulationResults(ComparedByValue, dict[str, list[float]]):
         KeyError
             If an accumulator is not a bin or accumulator of the model.
         """
-        from commol.api.reporting import _ReportRuns, _simulation_report
+        from commol._simulation.reports import _ReportRuns, _simulation_report
 
         return _simulation_report(
             _ReportRuns(model=self.model, runs=[self]),
@@ -1242,7 +1242,7 @@ Raises:
 | ------------ | -------------------------------------------------- |
 | `ValueError` | If an output does not have one value per position. |
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 def __init__(
@@ -1309,7 +1309,7 @@ Returns:
 | ------------------- | --------------------------- |
 | `SimulationResults` | One series per output name. |
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 @classmethod
@@ -1362,7 +1362,7 @@ Returns:
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `list[list[float]]` | rows()[i][j] is the value of the j-th output, in key order (the order of Simulation.simulation_outputs), at positions[i]. |
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 def rows(self) -> list[list[float]]:
@@ -1409,7 +1409,7 @@ Raises:
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If there is no quantity, two scalars have one label, a quantity names an output the results do not have, or the run lacks a position a quantity reads; the message lists every such position with its quantity and says to call Simulation.run_at. |
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 def quantities(self, quantities: "Sequence[QuantityBase]") -> dict[str, float]:
@@ -1481,7 +1481,7 @@ Raises:
 | `KeyError`   | If an id is not a bin, accumulator or output of the model, or an output is missing from the results. |
 | `ValueError` | If the results have no value at a position in at.                                                    |
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 def sample(self, ids: Iterable[str], at: Iterable[float]) -> list[float]:
@@ -1551,7 +1551,7 @@ Raises:
 | `KeyError`   | If an id is not a bin, accumulator or output of the model, or an output is missing from the results.                                                                                   |
 | `ValueError` | If window is not a finite, positive length (the message of the engine), a window starts before position 0, or the results have no value at the end or the start of a requested window. |
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 def windowed_totals(
@@ -1605,7 +1605,7 @@ def windowed_totals(
 #### report
 
 ```python
-report(positions: Sequence[float], window: float, windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), prediction_intervals: PredictionIntervals | None = None) -> SimulationReport
+report(positions: Sequence[float], window: float, windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), prediction_intervals: PredictionIntervalsData | None = None) -> SimulationReport
 ```
 
 Report the observed data, compartment series and accumulators of the run.
@@ -1621,7 +1621,7 @@ Parameters:
 | `windows`              | `int`                         | Number of windows on the observed and windowed axes.                                                     | *required*                                                                                    |
 | `observed_data`        | `Iterable[ObservedDataPoint]` | The calibration targets to report alongside the run.                                                     | `()`                                                                                          |
 | `accumulators`         | `Iterable[str]`               | Accumulator ids to report; their outputs come from model.                                                | `()`                                                                                          |
-| `prediction_intervals` | \`PredictionIntervals         | None\`                                                                                                   | Prediction intervals of a conformal method (ConformalResult.intervals), reported as they are. |
+| `prediction_intervals` | \`PredictionIntervalsData     | None\`                                                                                                   | Prediction intervals of a conformal method (ConformalResult.intervals), reported as they are. |
 
 Returns:
 
@@ -1636,7 +1636,7 @@ Raises:
 | `ValueError` | If the results have no value at a position the report reads, or they have no model and an accumulator is reported. |
 | `KeyError`   | If an accumulator is not a bin or accumulator of the model.                                                        |
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 def report(
@@ -1646,7 +1646,7 @@ def report(
     windows: int,
     observed_data: "Iterable[ObservedDataPoint]" = (),
     accumulators: Iterable[str] = (),
-    prediction_intervals: "PredictionIntervals | None" = None,
+    prediction_intervals: "PredictionIntervalsData | None" = None,
 ) -> "SimulationReport":
     """
     Report the observed data, compartment series and accumulators of the run.
@@ -1669,7 +1669,7 @@ def report(
         The calibration targets to report alongside the run.
     accumulators : Iterable[str], optional
         Accumulator ids to report; their outputs come from `model`.
-    prediction_intervals : PredictionIntervals | None, optional
+    prediction_intervals : PredictionIntervalsData | None, optional
         Prediction intervals of a conformal method
         (``ConformalResult.intervals``), reported as they are.
 
@@ -1687,7 +1687,7 @@ def report(
     KeyError
         If an accumulator is not a bin or accumulator of the model.
     """
-    from commol.api.reporting import _ReportRuns, _simulation_report
+    from commol._simulation.reports import _ReportRuns, _simulation_report
 
     return _simulation_report(
         _ReportRuns(model=self.model, runs=[self]),
@@ -1708,7 +1708,7 @@ compared_values() -> object
 
 The values, the positions, the seed and the model.
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 @override
@@ -1725,7 +1725,7 @@ __repr__() -> str
 
 The positions, the seed and the values.
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 def __repr__(self) -> str:
@@ -1743,7 +1743,7 @@ The figures of one run, read from `results.plot`.
 
 Each figure has one panel per series, or per observed series for `observations`, and returns the matplotlib `Figure`. Given `axes=`, the `Figure` of an earlier figure of commol, it draws each series on the panel of that series instead.
 
-Source code in `commol/api/plotting/accessors.py`
+Source code in `commol/_simulation/plots.py`
 
 ```python
 class ResultsPlot:
@@ -1778,7 +1778,7 @@ class ResultsPlot:
         position_label: Callable[[float], str] | None = None,
         tick_every: float | None = None,
         x_label: str = "Step",
-        prediction_intervals: "PredictionIntervals | None" = None,
+        prediction_intervals: "PredictionIntervalsData | None" = None,
         axes: "Figure | None" = None,
         **kwargs: str | int | float | bool | None,
     ) -> "Figure":
@@ -1819,7 +1819,7 @@ class ResultsPlot:
             ticks matplotlib places on a dated axis.
         x_label : str
             The label of the x axis.
-        prediction_intervals : PredictionIntervals | None
+        prediction_intervals : PredictionIntervalsData | None
             Prediction intervals of a conformal method
             (``ConformalResult.intervals``). The panel of each of their
             series, by label, shows the band between their lower and upper
@@ -1851,9 +1851,7 @@ class ResultsPlot:
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.api.plotting.figures import _run_series
-
-        return _run_series(
+        return run_series(
             self._results,
             output_file=output_file,
             observed_data=observed_data,
@@ -1917,9 +1915,7 @@ class ResultsPlot:
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.api.plotting.figures import _run_cumulative
-
-        return _run_cumulative(
+        return run_cumulative(
             self._results,
             output_file=output_file,
             observed_data=observed_data,
@@ -2000,9 +1996,7 @@ class ResultsPlot:
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.api.plotting.figures import _run_observations
-
-        return _run_observations(
+        return run_observations(
             self._results,
             observed_data,
             output_file=output_file,
@@ -2015,6 +2009,41 @@ class ResultsPlot:
             axes=axes,
             **kwargs,
         )
+
+    def _panel_model(self) -> "Model | None":
+        """The model of the run."""
+        return self._results.model
+
+    def _panel_outputs(self) -> PanelOutputs:
+        """The outputs of the run."""
+        return PanelOutputs(self._results, self._results.model)
+
+    def _series_panels(
+        self,
+        confidence_level: float,  # noqa: ARG002
+        observed_data: "list[ObservedDataPoint]",
+        series: list[str],
+    ) -> list[Panel]:
+        """The panels of `series`, as `series` draws them."""
+        return run_panels(self._results, observed_data, series=series)
+
+    def _window_trace(
+        self,
+        outputs: PanelOutputs,
+        series_id: str,
+        confidence_level: float,  # noqa: ARG002
+        window: float,
+    ) -> tuple[Trace, Band | None]:
+        """The gain of a series over each complete window."""
+        return run_window(self._results, outputs, series_id, window)
+
+    def _observation_panels(
+        self,
+        confidence_level: float,  # noqa: ARG002
+        observed_data: "list[ObservedDataPoint]",
+    ) -> list[ObservationPanel]:
+        """The panels of the observed series, as `observations` draws them."""
+        return run_observation_panels(self._results, observed_data)
 ```
 
 ### Methods:
@@ -2033,7 +2062,7 @@ Parameters:
 | --------- | ------------------- | ----------- | ---------- |
 | `results` | `SimulationResults` | The run.    | *required* |
 
-Source code in `commol/api/plotting/accessors.py`
+Source code in `commol/_simulation/plots.py`
 
 ```python
 def __init__(self, results: "SimulationResults") -> None:
@@ -2051,7 +2080,7 @@ def __init__(self, results: "SimulationResults") -> None:
 #### series
 
 ```python
-series(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | None = None, config: PlotConfig | None = None, series: list[str] | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', prediction_intervals: PredictionIntervals | None = None, axes: Figure | None = None, **kwargs: str | int | float | bool | None) -> Figure
+series(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | None = None, config: PlotConfig | None = None, series: list[str] | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', prediction_intervals: PredictionIntervalsData | None = None, axes: Figure | None = None, **kwargs: str | int | float | bool | None) -> Figure
 ```
 
 Draw each series along the axis, one panel per series.
@@ -2069,7 +2098,7 @@ Parameters:
 | `position_label`       | \`Callable\[[float], str\] | None\`                               | Turns a position on the axis into a tick label. If None, a model with an origin (ModelBuilder(origin=...)) labels each tick with its date: 2020-01-02, with the time when it is not midnight. Otherwise the ticks show the position.                                                                                                                                                       |
 | `tick_every`           | \`float                    | None\`                               | Labels the plotted positions tick_every apart, counted from the first plotted position. If None, every plotted position, or the ticks matplotlib places on a dated axis.                                                                                                                                                                                                                   |
 | `x_label`              | `str`                      | The label of the x axis.             | `'Step'`                                                                                                                                                                                                                                                                                                                                                                                   |
-| `prediction_intervals` | \`PredictionIntervals      | None\`                               | Prediction intervals of a conformal method (ConformalResult.intervals). The panel of each of their series, by label, shows the band between their lower and upper ends and their point prediction, dashed; an unbounded interval is left out of the band.                                                                                                                                  |
+| `prediction_intervals` | \`PredictionIntervalsData  | None\`                               | Prediction intervals of a conformal method (ConformalResult.intervals). The panel of each of their series, by label, shows the band between their lower and upper ends and their point prediction, dashed; an unbounded interval is left out of the band.                                                                                                                                  |
 | `axes`                 | \`Figure                   | None\`                               | A figure of commol to draw on: each series is drawn on its panel, the Axes whose label is the id of the series. If None, a new figure.                                                                                                                                                                                                                                                     |
 | `**kwargs`             | \`str                      | int                                  | float                                                                                                                                                                                                                                                                                                                                                                                      |
 
@@ -2087,7 +2116,7 @@ Raises:
 | `KeyError`    | If an entry of series is neither an output nor a bin or accumulator id of the model.                                                                                                                                    |
 | `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                                                                                                                                            |
 
-Source code in `commol/api/plotting/accessors.py`
+Source code in `commol/_simulation/plots.py`
 
 ```python
 def series(
@@ -2101,7 +2130,7 @@ def series(
     position_label: Callable[[float], str] | None = None,
     tick_every: float | None = None,
     x_label: str = "Step",
-    prediction_intervals: "PredictionIntervals | None" = None,
+    prediction_intervals: "PredictionIntervalsData | None" = None,
     axes: "Figure | None" = None,
     **kwargs: str | int | float | bool | None,
 ) -> "Figure":
@@ -2142,7 +2171,7 @@ def series(
         ticks matplotlib places on a dated axis.
     x_label : str
         The label of the x axis.
-    prediction_intervals : PredictionIntervals | None
+    prediction_intervals : PredictionIntervalsData | None
         Prediction intervals of a conformal method
         (``ConformalResult.intervals``). The panel of each of their
         series, by label, shows the band between their lower and upper
@@ -2174,9 +2203,7 @@ def series(
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
-    from commol.api.plotting.figures import _run_series
-
-    return _run_series(
+    return run_series(
         self._results,
         output_file=output_file,
         observed_data=observed_data,
@@ -2227,7 +2254,7 @@ Raises:
 | `KeyError`    | If an entry of series is neither an output nor a bin or accumulator id of the model. |
 | `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                         |
 
-Source code in `commol/api/plotting/accessors.py`
+Source code in `commol/_simulation/plots.py`
 
 ```python
 def cumulative(
@@ -2278,9 +2305,7 @@ def cumulative(
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
-    from commol.api.plotting.figures import _run_cumulative
-
-    return _run_cumulative(
+    return run_cumulative(
         self._results,
         output_file=output_file,
         observed_data=observed_data,
@@ -2331,7 +2356,7 @@ Raises:
 | `KeyError`    | If an observation names an output the results do not have.                                                                                                |
 | `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                                                                              |
 
-Source code in `commol/api/plotting/accessors.py`
+Source code in `commol/_simulation/plots.py`
 
 ```python
 def observations(
@@ -2404,9 +2429,7 @@ def observations(
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
-    from commol.api.plotting.figures import _run_observations
-
-    return _run_observations(
+    return run_observations(
         self._results,
         observed_data,
         output_file=output_file,
@@ -2433,7 +2456,7 @@ Attributes:
 | `count`      | `int`        | How many replicates.                           |
 | `seed`       | \`int        | None\`                                         |
 
-Source code in `commol/api/simulation.py`
+Source code in `commol/_simulation/simulation.py`
 
 ```python
 class ReplicateRuns:
@@ -2571,7 +2594,7 @@ Raises:
 | ------------ | ------------------------------------------------------------------------------------- |
 | `ValueError` | With the message of the engine, if count is below 1 or the seed is outside its range. |
 
-Source code in `commol/api/simulation.py`
+Source code in `commol/_simulation/simulation.py`
 
 ```python
 def __init__(self, simulation: Simulation, count: int, seed: int | None) -> None:
@@ -2627,7 +2650,7 @@ Raises:
 | `InfeasibleStateError` | If a replicate leaves the values the model allows.   |
 | `ValueError`           | If a parameter or a value of the model has no value. |
 
-Source code in `commol/api/simulation.py`
+Source code in `commol/_simulation/simulation.py`
 
 ```python
 def run(self, num_steps: int) -> SimulationReplicates:
@@ -2682,7 +2705,7 @@ Raises:
 | `InfeasibleStateError` | If a replicate leaves the values the model allows.                                                                  |
 | `ValueError`           | If a parameter has no value, the positions are not sorted and unique, or the engine does not report at one of them. |
 
-Source code in `commol/api/simulation.py`
+Source code in `commol/_simulation/simulation.py`
 
 ```python
 def run_at(self, at: Sequence[float]) -> SimulationReplicates:
@@ -2728,7 +2751,7 @@ Attributes:
 | `positions` | `list[float]` | Positions on the axis, shared by every replicate. |
 | `model`     | \`Model       | None\`                                            |
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 class SimulationReplicates(ComparedByValue, list[SimulationResults]):
@@ -2860,13 +2883,10 @@ class SimulationReplicates(ComparedByValue, list[SimulationResults]):
         commol_rs.inference.check_levels(list(levels))
         if not self:
             raise ValueError("There are no replicates.")
-        from commol.api.inference.intervals import weighted_quantiles
-
         names = list(self[0])
         per_name = {
             name: [
-                weighted_quantiles(column.tolist(), levels)
-                for column in self._values(name).T
+                quantiles(column.tolist(), levels) for column in self._values(name).T
             ]
             for name in names
         }
@@ -2948,14 +2968,12 @@ class SimulationReplicates(ComparedByValue, list[SimulationResults]):
             If the confidence level is out of range or there are no
             replicates.
         """
-        from commol.api.inference.intervals import member_statistics
-
         if self and output not in self[0]:
             raise KeyError(
                 f"'{output}' is not an output of the replicates. "
                 f"Outputs: {sorted(self[0])}"
             )
-        return member_statistics([run[output] for run in self], confidence_level)
+        return spread([run[output] for run in self], confidence_level)
 
     def report(
         self,
@@ -2965,7 +2983,7 @@ class SimulationReplicates(ComparedByValue, list[SimulationResults]):
         windows: int,
         observed_data: "Iterable[ObservedDataPoint]" = (),
         accumulators: Iterable[str] = (),
-        prediction_intervals: "PredictionIntervals | None" = None,
+        prediction_intervals: "PredictionIntervalsData | None" = None,
     ) -> "SimulationReport":
         """
         Report the replicates as `SimulationResults.report` reports one run.
@@ -2990,7 +3008,7 @@ class SimulationReplicates(ComparedByValue, list[SimulationResults]):
             The calibration targets to report alongside the replicates.
         accumulators : Iterable[str], optional
             Accumulator ids to report; their outputs come from `model`.
-        prediction_intervals : PredictionIntervals | None, optional
+        prediction_intervals : PredictionIntervalsData | None, optional
             Prediction intervals of a conformal method
             (``ConformalResult.intervals``), reported as they are.
 
@@ -3009,7 +3027,7 @@ class SimulationReplicates(ComparedByValue, list[SimulationResults]):
         KeyError
             If an accumulator is not a bin or accumulator of the model.
         """
-        from commol.api.reporting import _ReportRuns, _simulation_report
+        from commol._simulation.reports import _ReportRuns, _simulation_report
 
         if not self:
             raise ValueError("There are no replicates.")
@@ -3083,7 +3101,7 @@ Raises:
 | ------------ | ----------------------------- |
 | `ValueError` | If a run is not at positions. |
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 def __init__(
@@ -3143,7 +3161,7 @@ Raises:
 | ------------ | --------------------------- |
 | `ValueError` | If there are no replicates. |
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 def mean(self) -> SimulationResults:
@@ -3198,7 +3216,7 @@ Raises:
 | ------------ | -------------------------------------------------------- |
 | `ValueError` | If a level is outside [0, 1] or there are no replicates. |
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 def quantiles(self, levels: Sequence[float]) -> dict[float, SimulationResults]:
@@ -3227,13 +3245,10 @@ def quantiles(self, levels: Sequence[float]) -> dict[float, SimulationResults]:
     commol_rs.inference.check_levels(list(levels))
     if not self:
         raise ValueError("There are no replicates.")
-    from commol.api.inference.intervals import weighted_quantiles
-
     names = list(self[0])
     per_name = {
         name: [
-            weighted_quantiles(column.tolist(), levels)
-            for column in self._values(name).T
+            quantiles(column.tolist(), levels) for column in self._values(name).T
         ]
         for name in names
     }
@@ -3280,7 +3295,7 @@ Raises:
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `ValueError` | If there are no replicates, there is no quantity, two scalars have one label, a quantity names an output the replicates do not have, or they lack a position a quantity reads. |
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 def quantities(
@@ -3351,7 +3366,7 @@ Raises:
 | `KeyError`   | If no replicate has the output.                                     |
 | `ValueError` | If the confidence level is out of range or there are no replicates. |
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 def member_statistics(
@@ -3381,20 +3396,18 @@ def member_statistics(
         If the confidence level is out of range or there are no
         replicates.
     """
-    from commol.api.inference.intervals import member_statistics
-
     if self and output not in self[0]:
         raise KeyError(
             f"'{output}' is not an output of the replicates. "
             f"Outputs: {sorted(self[0])}"
         )
-    return member_statistics([run[output] for run in self], confidence_level)
+    return spread([run[output] for run in self], confidence_level)
 ```
 
 #### report
 
 ```python
-report(confidence_level: float, positions: Sequence[float], window: float, windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), prediction_intervals: PredictionIntervals | None = None) -> SimulationReport
+report(confidence_level: float, positions: Sequence[float], window: float, windows: int, observed_data: Iterable[ObservedDataPoint] = (), accumulators: Iterable[str] = (), prediction_intervals: PredictionIntervalsData | None = None) -> SimulationReport
 ```
 
 Report the replicates as `SimulationResults.report` reports one run.
@@ -3411,7 +3424,7 @@ Parameters:
 | `windows`              | `int`                         | Number of windows on the observed and windowed axes.                                                        | *required*                                                                                    |
 | `observed_data`        | `Iterable[ObservedDataPoint]` | The calibration targets to report alongside the replicates.                                                 | `()`                                                                                          |
 | `accumulators`         | `Iterable[str]`               | Accumulator ids to report; their outputs come from model.                                                   | `()`                                                                                          |
-| `prediction_intervals` | \`PredictionIntervals         | None\`                                                                                                      | Prediction intervals of a conformal method (ConformalResult.intervals), reported as they are. |
+| `prediction_intervals` | \`PredictionIntervalsData     | None\`                                                                                                      | Prediction intervals of a conformal method (ConformalResult.intervals), reported as they are. |
 
 Returns:
 
@@ -3426,7 +3439,7 @@ Raises:
 | `ValueError` | If there are no replicates, the confidence level is out of range, the replicates have no value at a position the report reads, or they have no model and an accumulator is reported. |
 | `KeyError`   | If an accumulator is not a bin or accumulator of the model.                                                                                                                          |
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 def report(
@@ -3437,7 +3450,7 @@ def report(
     windows: int,
     observed_data: "Iterable[ObservedDataPoint]" = (),
     accumulators: Iterable[str] = (),
-    prediction_intervals: "PredictionIntervals | None" = None,
+    prediction_intervals: "PredictionIntervalsData | None" = None,
 ) -> "SimulationReport":
     """
     Report the replicates as `SimulationResults.report` reports one run.
@@ -3462,7 +3475,7 @@ def report(
         The calibration targets to report alongside the replicates.
     accumulators : Iterable[str], optional
         Accumulator ids to report; their outputs come from `model`.
-    prediction_intervals : PredictionIntervals | None, optional
+    prediction_intervals : PredictionIntervalsData | None, optional
         Prediction intervals of a conformal method
         (``ConformalResult.intervals``), reported as they are.
 
@@ -3481,7 +3494,7 @@ def report(
     KeyError
         If an accumulator is not a bin or accumulator of the model.
     """
-    from commol.api.reporting import _ReportRuns, _simulation_report
+    from commol._simulation.reports import _ReportRuns, _simulation_report
 
     if not self:
         raise ValueError("There are no replicates.")
@@ -3508,7 +3521,7 @@ compared_values() -> object
 
 The runs, the seed, the positions and the model.
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 @override
@@ -3525,7 +3538,7 @@ __repr__() -> str
 
 The number of replicates, their seed and their positions.
 
-Source code in `commol/api/results.py`
+Source code in `commol/_simulation/results.py`
 
 ```python
 def __repr__(self) -> str:
@@ -3542,7 +3555,7 @@ The figures of the replicates of a stochastic engine, read from `replicates.plot
 
 The figures are those of `ResultsPlot` for the mean of the replicates; `series` adds the band of the replicates.
 
-Source code in `commol/api/plotting/accessors.py`
+Source code in `commol/_simulation/plots.py`
 
 ```python
 class ReplicatesPlot:
@@ -3576,7 +3589,7 @@ class ReplicatesPlot:
         position_label: Callable[[float], str] | None = None,
         tick_every: float | None = None,
         x_label: str = "Step",
-        prediction_intervals: "PredictionIntervals | None" = None,
+        prediction_intervals: "PredictionIntervalsData | None" = None,
         confidence_level: float = 0.95,
         axes: "Figure | None" = None,
         **kwargs: str | int | float | bool | None,
@@ -3610,7 +3623,7 @@ class ReplicatesPlot:
             `ResultsPlot.series`.
         x_label : str
             The label of the x axis.
-        prediction_intervals : PredictionIntervals | None
+        prediction_intervals : PredictionIntervalsData | None
             Prediction intervals of a conformal method, as in
             `ResultsPlot.series`.
         confidence_level : float
@@ -3635,9 +3648,7 @@ class ReplicatesPlot:
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.api.plotting.figures import _replicates_series
-
-        return _replicates_series(
+        return replicates_series(
             self._replicates,
             output_file=output_file,
             observed_data=observed_data,
@@ -3699,9 +3710,7 @@ class ReplicatesPlot:
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.api.plotting.figures import _replicates_cumulative
-
-        return _replicates_cumulative(
+        return replicates_cumulative(
             self._replicates,
             output_file=output_file,
             observed_data=observed_data,
@@ -3778,9 +3787,7 @@ class ReplicatesPlot:
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.api.plotting.figures import _replicates_observations
-
-        return _replicates_observations(
+        return replicates_observations(
             self._replicates,
             observed_data,
             output_file=output_file,
@@ -3793,6 +3800,45 @@ class ReplicatesPlot:
             confidence_level=confidence_level,
             axes=axes,
             **kwargs,
+        )
+
+    def _panel_model(self) -> "Model | None":
+        """The model of the replicates."""
+        return self._replicates.model
+
+    def _panel_outputs(self) -> PanelOutputs:
+        """The outputs of the replicates."""
+        return PanelOutputs(self._replicates.mean(), self._replicates.model)
+
+    def _series_panels(
+        self,
+        confidence_level: float,
+        observed_data: "list[ObservedDataPoint]",
+        series: list[str],
+    ) -> list[Panel]:
+        """The panels of `series`, as `series` draws them."""
+        return replicate_panels(
+            self._replicates, confidence_level, observed_data, series=series
+        )
+
+    def _window_trace(
+        self,
+        outputs: PanelOutputs,
+        series_id: str,
+        confidence_level: float,
+        window: float,
+    ) -> tuple[Trace, Band | None]:
+        """The mean gain of a series over each complete window, and its band."""
+        return replicates_window(
+            self._replicates, outputs, series_id, confidence_level, window
+        )
+
+    def _observation_panels(
+        self, confidence_level: float, observed_data: "list[ObservedDataPoint]"
+    ) -> list[ObservationPanel]:
+        """The panels of the observed series, as `observations` draws them."""
+        return replicate_observation_panels(
+            self._replicates, confidence_level, observed_data
         )
 ```
 
@@ -3812,7 +3858,7 @@ Parameters:
 | ------------ | ---------------------- | --------------- | ---------- |
 | `replicates` | `SimulationReplicates` | The replicates. | *required* |
 
-Source code in `commol/api/plotting/accessors.py`
+Source code in `commol/_simulation/plots.py`
 
 ```python
 def __init__(self, replicates: "SimulationReplicates") -> None:
@@ -3830,7 +3876,7 @@ def __init__(self, replicates: "SimulationReplicates") -> None:
 #### series
 
 ```python
-series(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | None = None, config: PlotConfig | None = None, series: list[str] | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', prediction_intervals: PredictionIntervals | None = None, confidence_level: float = 0.95, axes: Figure | None = None, **kwargs: str | int | float | bool | None) -> Figure
+series(output_file: str | None = None, observed_data: list[ObservedDataPoint] | None = None, calibration_result: CalibrationResult | None = None, config: PlotConfig | None = None, series: list[str] | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', prediction_intervals: PredictionIntervalsData | None = None, confidence_level: float = 0.95, axes: Figure | None = None, **kwargs: str | int | float | bool | None) -> Figure
 ```
 
 Draw the mean of each series and the band of the replicates, one panel per series.
@@ -3850,7 +3896,7 @@ Parameters:
 | `position_label`       | \`Callable\[[float], str\] | None\`                                           | Turns a position into a tick label, as in ResultsPlot.series.         |
 | `tick_every`           | \`float                    | None\`                                           | The distance between labelled positions, as in ResultsPlot.series.    |
 | `x_label`              | `str`                      | The label of the x axis.                         | `'Step'`                                                              |
-| `prediction_intervals` | \`PredictionIntervals      | None\`                                           | Prediction intervals of a conformal method, as in ResultsPlot.series. |
+| `prediction_intervals` | \`PredictionIntervalsData  | None\`                                           | Prediction intervals of a conformal method, as in ResultsPlot.series. |
 | `confidence_level`     | `float`                    | The level of the band, strictly between 0 and 1. | `0.95`                                                                |
 | `axes`                 | \`Figure                   | None\`                                           | A figure of commol to draw on, as in ResultsPlot.series.              |
 | `**kwargs`             | \`str                      | int                                              | float                                                                 |
@@ -3869,7 +3915,7 @@ Raises:
 | `KeyError`    | As ResultsPlot.series.                                                                        |
 | `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                  |
 
-Source code in `commol/api/plotting/accessors.py`
+Source code in `commol/_simulation/plots.py`
 
 ```python
 def series(
@@ -3883,7 +3929,7 @@ def series(
     position_label: Callable[[float], str] | None = None,
     tick_every: float | None = None,
     x_label: str = "Step",
-    prediction_intervals: "PredictionIntervals | None" = None,
+    prediction_intervals: "PredictionIntervalsData | None" = None,
     confidence_level: float = 0.95,
     axes: "Figure | None" = None,
     **kwargs: str | int | float | bool | None,
@@ -3917,7 +3963,7 @@ def series(
         `ResultsPlot.series`.
     x_label : str
         The label of the x axis.
-    prediction_intervals : PredictionIntervals | None
+    prediction_intervals : PredictionIntervalsData | None
         Prediction intervals of a conformal method, as in
         `ResultsPlot.series`.
     confidence_level : float
@@ -3942,9 +3988,7 @@ def series(
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
-    from commol.api.plotting.figures import _replicates_series
-
-    return _replicates_series(
+    return replicates_series(
         self._replicates,
         output_file=output_file,
         observed_data=observed_data,
@@ -3996,7 +4040,7 @@ Raises:
 | `KeyError`    | As ResultsPlot.cumulative.                                   |
 | `ImportError` | If matplotlib is not installed (pip install 'commol[plot]'). |
 
-Source code in `commol/api/plotting/accessors.py`
+Source code in `commol/_simulation/plots.py`
 
 ```python
 def cumulative(
@@ -4044,9 +4088,7 @@ def cumulative(
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
-    from commol.api.plotting.figures import _replicates_cumulative
-
-    return _replicates_cumulative(
+    return replicates_cumulative(
         self._replicates,
         output_file=output_file,
         observed_data=observed_data,
@@ -4098,7 +4140,7 @@ Raises:
 | `KeyError`    | If an observation names an output the replicates do not have.                                       |
 | `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                        |
 
-Source code in `commol/api/plotting/accessors.py`
+Source code in `commol/_simulation/plots.py`
 
 ```python
 def observations(
@@ -4167,9 +4209,7 @@ def observations(
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
-    from commol.api.plotting.figures import _replicates_observations
-
-    return _replicates_observations(
+    return replicates_observations(
         self._replicates,
         observed_data,
         output_file=output_file,
@@ -4183,162 +4223,6 @@ def observations(
         axes=axes,
         **kwargs,
     )
-```
-
-## ODESolver
-
-Bases: `BaseModel`
-
-Settings of the `DifferentialEquations` engine.
-
-Attributes:
-
-| Name     | Type                       | Description                                                                                                                      |
-| -------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `method` | `Literal['tsit45', 'bdf']` | "tsit45": explicit Tsitouras 5(4) Runge-Kutta, for non-stiff models. "bdf": backward differentiation formulas, for stiff models. |
-| `rtol`   | `float`                    | Relative tolerance of each state component.                                                                                      |
-| `atol`   | `float`                    | Absolute tolerance of each state component, in the unit of the bins.                                                             |
-
-Source code in `commol/context/engine.py`
-
-```python
-class ODESolver(BaseModel):
-    """
-    Settings of the ``DifferentialEquations`` engine.
-
-    Attributes
-    ----------
-    method : Literal["tsit45", "bdf"]
-        ``"tsit45"``: explicit Tsitouras 5(4) Runge-Kutta, for non-stiff
-        models. ``"bdf"``: backward differentiation formulas, for stiff models.
-    rtol : float
-        Relative tolerance of each state component.
-    atol : float
-        Absolute tolerance of each state component, in the unit of the bins.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    method: Literal["tsit45", "bdf"] = Field(
-        default="tsit45", description="Integration method."
-    )
-    rtol: float = Field(
-        default=commol_rs.engine.ODE_DEFAULT_RTOL, description="Relative tolerance."
-    )
-    atol: float = Field(
-        default=commol_rs.engine.ODE_DEFAULT_ATOL, description="Absolute tolerance."
-    )
-
-    @model_validator(mode="after")
-    def _check_with_the_engine(self) -> Self:
-        """Ask the engine's list whether it takes the settings."""
-        return _checked(self)
-```
-
-## StochasticEventsSettings
-
-Bases: `BaseModel`
-
-Settings of the `StochasticEvents` engine.
-
-Attributes:
-
-| Name        | Type                               | Description                                                                                                                                                                                 |
-| ----------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `method`    | `Literal['direct', 'tau_leaping']` | "direct": Gillespie's direct method, one event at a time, exact. "tau_leaping": a Poisson number of events of each flow in each leap, an approximation that is faster when events are many. |
-| `tau`       | \`float                            | None\`                                                                                                                                                                                      |
-| `epsilon`   | `float`                            | How much a propensity may change in one chosen leap, relative to its value.                                                                                                                 |
-| `tolerance` | `float`                            | Relative tolerance of the time of an event when a rate reads t.                                                                                                                             |
-| `rounding`  | \`Rounding                         | None\`                                                                                                                                                                                      |
-
-Source code in `commol/context/engine.py`
-
-```python
-class StochasticEventsSettings(BaseModel):
-    """
-    Settings of the ``StochasticEvents`` engine.
-
-    Attributes
-    ----------
-    method : Literal["direct", "tau_leaping"]
-        ``"direct"``: Gillespie's direct method, one event at a time, exact.
-        ``"tau_leaping"``: a Poisson number of events of each flow in each
-        leap, an approximation that is faster when events are many.
-    tau : float | None
-        The length of a leap of ``"tau_leaping"``. None chooses each leap as
-        Cao, Gillespie and Petzold (2006) do, from `epsilon`.
-    epsilon : float
-        How much a propensity may change in one chosen leap, relative to its
-        value.
-    tolerance : float
-        Relative tolerance of the time of an event when a rate reads ``t``.
-    rounding : Rounding | None
-        How to make whole the initial amounts that are not. None requires
-        whole amounts.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    method: Literal["direct", "tau_leaping"] = Field(
-        default="direct", description="Simulation method."
-    )
-    tau: float | None = Field(
-        default=None, description="Length of a leap of tau-leaping."
-    )
-    epsilon: float = Field(
-        default=commol_rs.engine.STOCHASTIC_EVENTS_DEFAULT_EPSILON,
-        description="Bound of an adaptive leap.",
-    )
-    tolerance: float = Field(
-        default=commol_rs.engine.STOCHASTIC_EVENTS_DEFAULT_TOLERANCE,
-        description="Relative tolerance of an event time.",
-    )
-    rounding: Rounding | None = Field(
-        default=None, description="How to make the initial amounts whole."
-    )
-
-    @model_validator(mode="after")
-    def _check_with_the_engine(self) -> Self:
-        """Ask the engine's list whether it takes the settings."""
-        return _checked(self)
-```
-
-## StochasticStepsSettings
-
-Bases: `BaseModel`
-
-Settings of the `StochasticSteps` engine.
-
-Attributes:
-
-| Name       | Type       | Description |
-| ---------- | ---------- | ----------- |
-| `rounding` | \`Rounding | None\`      |
-
-Source code in `commol/context/engine.py`
-
-```python
-class StochasticStepsSettings(BaseModel):
-    """
-    Settings of the ``StochasticSteps`` engine.
-
-    Attributes
-    ----------
-    rounding : Rounding | None
-        How to make whole the initial amounts that are not. None requires
-        whole amounts.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    rounding: Rounding | None = Field(
-        default=None, description="How to make the initial amounts whole."
-    )
-
-    @model_validator(mode="after")
-    def _check_with_the_engine(self) -> Self:
-        """Ask the engine's list whether it takes the settings."""
-        return _checked(self)
 ```
 
 ## InfeasibleStateError

@@ -14,14 +14,12 @@ from commol import (
     Calibrator,
     ModelBuilder,
     NelderMeadConfig,
-    NoNoise,
     ObservedDataPoint,
-    ParameterSample,
-    Predictive,
-    SampleMethod,
     Simulation,
     scores,
 )
+from commol.observations import NoNoise
+from commol.uncertainty import ParameterSample, Predictive, SampleMethod
 
 
 def basic_model(k1: float | None, k2: float | None):
@@ -167,7 +165,7 @@ A sample has no single set of parameters, so `Model.apply_calibration_parameters
 Every interval of commol reads one weighted quantile. It inverts the empirical distribution of the weighted values, and interpolates between the midpoints of their cumulative weights. With equal weights it equals `numpy.percentile(..., method="hazen")`. A draw of weight zero does not count. `weighted_quantiles` computes it for any values, and `member_statistics` reduces ensemble members with it.
 
 ```python
-from commol import weighted_quantiles
+from commol.uncertainty import weighted_quantiles
 
 print(weighted_quantiles([0.0, 1.0], levels=[0.5], weights=[1.0, 3.0]))  # [0.75]
 ```
@@ -196,7 +194,8 @@ print(weighted_quantiles([0.0, 1.0], levels=[0.5], weights=[1.0, 3.0]))  # [0.75
 Run `k` of every scenario is the same draw, and every scenario takes the seed of the source (`Calibrator.with_model`, `SensitivityAnalysis.with_model`), so with a stochastic engine run `k` of each scenario runs with the same seed: common random numbers, whose noise cancels in a difference. `compare(name, baseline, quantities, confidence_level)` takes the difference `name − baseline` of each quantity within each run, then reduces the differences across the runs with their weights. So the interval of a difference is the interval of the paired differences, not the difference of two intervals.
 
 ```python
-from commol import Peak, Scenarios, ValueAt
+from commol.quantities import Peak, ValueAt
+from commol.uncertainty import Scenarios
 
 # k1 is fitted; k2 is a value of the model that a scenario overrides.
 problem_k1 = CalibrationProblem(
@@ -274,12 +273,12 @@ The functions of `commol.scores` compare a predictive with observations, and ret
 
 ## The entry point
 
-Every method runs through `Calibrator.uncertainty(method)`. A method is a configuration, a subclass of `UncertaintyMethod[R]` whose type parameter `R` is its result; the call returns an `R`, which a static type checker infers from the configuration's type. A configuration with no registered runner raises a `ValueError` that names the registered ones.
+Every method runs through `Calibrator.uncertainty(method)`. A method is a configuration, a subclass of `UncertaintyMethod[R]` whose type parameter `R` is its result; the call returns an `R`, which a static type checker infers from the configuration's type. Each configuration names the function that runs it; one that names none raises a `ValueError`.
 
-The identifiability methods run through their own entry point, `Calibrator.identifiability(method)`, with a subclass of `IdentifiabilityMethod[R]`: they answer another question ([Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md)). Both kinds subclass `InferenceMethod[R]` and share one registry; each entry point refuses the other kind with a `TypeError` that names the right one. The sensitivity methods, subclasses of `SensitivityMethod[R]`, run with no data through `SensitivityAnalysis(simulation, inputs).run(method)`, the third entry point of the registry ([Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md)).
+The identifiability methods run through their own entry point, `Calibrator.identifiability(method)`, with a subclass of `IdentifiabilityMethod[R]`: they answer another question ([Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md)). Both kinds subclass `InferenceMethod[R]`; each entry point refuses the other kind with a `TypeError` that names the right one. The sensitivity methods, subclasses of `SensitivityMethod[R]`, run with no data through `SensitivityAnalysis(simulation, inputs).run(method)`, the third entry point ([Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md)).
 
 ```python
-from commol import BayesianBootstrap
+from commol.resampling import BayesianBootstrap
 
 result = calibrator.uncertainty(BayesianBootstrap(replicates=20, block_length=1))
 print(type(result).__name__, len(result.sample))  # BootstrapResult 20

@@ -2,7 +2,7 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-The identifiability methods, the report they return, and its parts. Guide: [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md).
+The module `commol.identifiability`: the identifiability methods, the report they return, and its parts. Guide: [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md).
 
 ## StructuralRank
 
@@ -19,7 +19,7 @@ Attributes:
 | `points` | `int` | How many rows of a Latin hypercube over the bounds, at least 1.                                                                                                                                                                                       |
 | `design` | `str` | "observations": the positions and outputs of the observations, their values ignored (can this design determine the parameters?). "dense": every observed series at every unit position up to the last observation (can denser data of these series?). |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/methods.py`
 
 ```python
 class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
@@ -43,6 +43,8 @@ class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked)
         last observation (can denser data of these series?).
     """
 
+    _runner = staticmethod(run_structural_rank)
+
     points: int = Field()
     design: StructuralDesign
 ```
@@ -63,7 +65,7 @@ Attributes:
 | `max_subset_size` | `int`               | The largest subset, at least 2 and at most the number of parameters. Every subset up to 6 parameters is evaluated; a greedy search adds parameters above. |
 | `threshold`       | `float`             | The index below which a subset can be fitted together. No default: it is a modelling judgment.                                                            |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/methods.py`
 
 ```python
 class Collinearity(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
@@ -89,6 +91,8 @@ class Collinearity(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
         it is a modelling judgment.
     """
 
+    _runner = staticmethod(run_collinearity)
+
     _engine_handles: ClassVar[tuple[str, ...]] = ("at",)
 
     at: CalibrationResult | ParameterSample
@@ -111,7 +115,7 @@ Attributes:
 | `correlation_threshold` | `float`           | The absolute correlation above which a pair is listed and its parameters are poorly determined, strictly between 0 and 1. No default: it is a modelling judgment.                                  |
 | `priors`                | \`Priors          | dict[str, distribution]                                                                                                                                                                            |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/methods.py`
 
 ```python
 class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
@@ -135,6 +139,8 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeC
     priors : Priors | dict[str, distribution] | None
         The prior of each parameter, with ``reference="prior"`` only.
     """
+
+    _runner = staticmethod(run_sample_identifiability)
 
     _engine_handles: ClassVar[tuple[str, ...]] = ("sample",)
 
@@ -180,7 +186,7 @@ Attributes:
 | `parameter_tolerance` | `float`             | The share of its bound width above which a parameter differs. |
 | `loss_tolerance`      | `float`             | The share of the best loss within which two losses are equal. |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/methods.py`
 
 ```python
 class StartsIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
@@ -199,11 +205,78 @@ class StartsIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeC
         The share of the best loss within which two losses are equal.
     """
 
+    _runner = staticmethod(run_starts_identifiability)
+
     _engine_handles: ClassVar[tuple[str, ...]] = ("result",)
 
     result: CalibrationResult
     parameter_tolerance: float = Field()
     loss_tolerance: float = Field()
+```
+
+## ProfileIdentifiability
+
+Bases: `IdentifiabilityMethod[IdentifiabilityReport]`
+
+Identifiability from the profiles of a `ProfileLikelihood`: the verdict of the shape of each profile, with a `profile` section.
+
+`identifiable` gives the practical verdict `determined` and `practically_non_identifiable` the practical verdict `poorly_determined`. `structurally_non_identifiable` gives the structural verdict of its `structure`, `in_combination` or `non_identifiable`, with no combination: the reason names the compensating parameters. A flat profile with no structural verdict gives the practical verdict `poorly_determined`. Every reason says that the verdict holds with the other parameters at their fitted values. A parameter with no profile, or no verdict, gets neither.
+
+Attributes:
+
+| Name     | Type            | Description                                                 |
+| -------- | --------------- | ----------------------------------------------------------- |
+| `result` | `ProfileResult` | The profiles of the parameters of this calibration problem. |
+
+Raises:
+
+| Type         | Description                                                                    |
+| ------------ | ------------------------------------------------------------------------------ |
+| `ValueError` | If the result holds prediction profiles, which have no verdict on a parameter. |
+
+Source code in `commol/identifiability/methods.py`
+
+```python
+class ProfileIdentifiability(IdentifiabilityMethod[IdentifiabilityReport]):
+    """
+    Identifiability from the profiles of a `ProfileLikelihood`: the verdict
+    of the shape of each profile, with a ``profile`` section.
+
+    ``identifiable`` gives the practical verdict ``determined`` and
+    ``practically_non_identifiable`` the practical verdict
+    ``poorly_determined``. ``structurally_non_identifiable`` gives the
+    structural verdict of its `structure`, ``in_combination`` or
+    ``non_identifiable``, with no combination: the reason names the
+    compensating parameters. A flat profile with no structural verdict gives
+    the practical verdict ``poorly_determined``. Every reason says that the
+    verdict holds with the other parameters at their fitted values. A
+    parameter with no profile, or no verdict, gets neither.
+
+    Attributes
+    ----------
+    result : ProfileResult
+        The profiles of the parameters of this calibration problem.
+
+    Raises
+    ------
+    ValueError
+        If the result holds prediction profiles, which have no verdict on a
+        parameter.
+    """
+
+    _runner = staticmethod(run_profile_identifiability)
+
+    result: ProfileResult
+
+    @model_validator(mode="after")
+    def _parameter_profiles(self) -> Self:
+        if self.result.quantity != "parameter":
+            raise ValueError(
+                "This result holds the profiles of predictions, and predictions "
+                "have no verdict on a parameter; profile the parameters "
+                "(ProfileLikelihood) for their identifiability."
+            )
+        return self
 ```
 
 ## IdentifiabilityReport
@@ -222,7 +295,7 @@ Attributes:
 | `verdicts`                                          | `dict[str, ParameterVerdicts]` | The verdicts of each parameter.                    |
 | `structural, collinearity, sample, starts, profile` | `list`                         | The sections of the methods that ran, one per run. |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/results.py`
 
 ```python
 class IdentifiabilityReport(_FrozenResult):
@@ -264,7 +337,7 @@ class IdentifiabilityReport(_FrozenResult):
             )
         return self
 
-    def report(self) -> "IdentifiabilityReportData":
+    def report(self) -> IdentifiabilityReportData:
         """
         Report the identifiability of each parameter as plain data.
 
@@ -275,9 +348,7 @@ class IdentifiabilityReport(_FrozenResult):
             structural and practical verdicts; ``sections``: the evidence of
             each method that ran.
         """
-        from commol.api.reporting import _identifiability_report
-
-        return _identifiability_report(self)
+        return identifiability_report(self)
 
     def merge(self, *others: "IdentifiabilityReport") -> "IdentifiabilityReport":
         """
@@ -355,10 +426,10 @@ Returns:
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `IdentifiabilityReportData` | parameters: each parameter, in problem order, with its structural and practical verdicts; sections: the evidence of each method that ran. |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/results.py`
 
 ```python
-def report(self) -> "IdentifiabilityReportData":
+def report(self) -> IdentifiabilityReportData:
     """
     Report the identifiability of each parameter as plain data.
 
@@ -369,9 +440,7 @@ def report(self) -> "IdentifiabilityReportData":
         structural and practical verdicts; ``sections``: the evidence of
         each method that ran.
     """
-    from commol.api.reporting import _identifiability_report
-
-    return _identifiability_report(self)
+    return identifiability_report(self)
 ```
 
 #### merge
@@ -402,7 +471,7 @@ Raises:
 | ------------ | --------------------------------- |
 | `ValueError` | If a report has other parameters. |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/results.py`
 
 ```python
 def merge(self, *others: "IdentifiabilityReport") -> "IdentifiabilityReport":
@@ -478,7 +547,7 @@ Attributes:
 | `structural` | \`StructuralVerdict | None\`      |
 | `practical`  | \`PracticalVerdict  | None\`      |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/results.py`
 
 ```python
 class ParameterVerdicts(_FrozenResult):
@@ -511,7 +580,7 @@ Attributes:
 | `reasons`      | `list[str]`             | Why, one per piece of evidence.                                                                                                                                                                                                                                                                                  |
 | `combinations` | `list[str]`             | The algebraic combinations that hold the parameter, such as "k1 · s", from the methods that compute them (the structural rank); empty for the verdict of a profile, whose reason names the compensating parameters.                                                                                              |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/results.py`
 
 ```python
 class StructuralVerdict(_FrozenResult):
@@ -553,7 +622,7 @@ Attributes:
 | `verdict` | `PracticalVerdictName` | determined or poorly_determined by these data, or conflicting when two reports disagree. |
 | `reasons` | `list[str]`            | Why, one per piece of evidence.                                                          |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/results.py`
 
 ```python
 class PracticalVerdict(_FrozenResult):
@@ -591,7 +660,7 @@ Attributes:
 | `verdicts`     | `dict[str, StructuralVerdictName]` | The verdict of each parameter on this design.                                                             |
 | `combinations` | `list[Combination]`                | The identifiable combinations.                                                                            |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/results.py`
 
 ```python
 class StructuralSection(_FrozenResult):
@@ -642,7 +711,7 @@ Attributes:
 | `threshold`       | `float`            | The norm of the estimated errors of the sensitivities, which a singular value must pass to count. |
 | `rank`            | `int`              | How many pass it.                                                                                 |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/results.py`
 
 ```python
 class PointRank(_FrozenResult):
@@ -681,7 +750,7 @@ Attributes:
 | `exponents` | `dict[str, float]` | The exponent of each parameter, in problem order.                                                                        |
 | `text`      | `str`              | The product, such as "k1 · s" or "k1 / s^2"; a parameter whose bounds allow negative values reads as its absolute value. |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/results.py`
 
 ```python
 class Combination(_FrozenResult):
@@ -720,7 +789,7 @@ Attributes:
 | `best_by_size` | `list[SubsetIndex]`           | The subset of lowest index of each size.                                     |
 | `admissible`   | `list[SubsetIndex]`           | The largest subsets whose index is below the threshold.                      |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/results.py`
 
 ```python
 class CollinearitySection(_FrozenResult):
@@ -769,7 +838,7 @@ Attributes:
 | `gamma`       | `float`     | The weighted median of the index over the points.                             |
 | `share_below` | `float`     | The share of the weight of the points where the index is below the threshold. |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/results.py`
 
 ```python
 class SubsetIndex(_FrozenResult):
@@ -809,7 +878,7 @@ Attributes:
 | `correlated_pairs`      | `list[CorrelatedPair]`        | The pairs above the threshold.                                                                                                             |
 | `modes`                 | `dict[str, list[float]]`      | The modes of the marginal of each parameter.                                                                                               |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/results.py`
 
 ```python
 class SampleSection(_FrozenResult):
@@ -856,7 +925,7 @@ Attributes:
 | `first, second` | `str`   | The parameters, in problem order. |
 | `correlation`   | `float` | Their weighted correlation.       |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/results.py`
 
 ```python
 class CorrelatedPair(_FrozenResult):
@@ -892,7 +961,7 @@ Attributes:
 | `spread`              | `dict[str, float]` | The largest difference of each parameter between them, as a share of its bound width. |
 | `flagged`             | `list[str]`        | The parameters whose spread is above the tolerance.                                   |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/results.py`
 
 ```python
 class StartsSection(_FrozenResult):
@@ -937,7 +1006,7 @@ Attributes:
 | `verdicts`         | \`dict\[str, ProfileVerdictName             | None\]\`                                  |
 | `intervals`        | \`dict\[str, tuple\[float                   | None, float                               |
 
-Source code in `commol/context/inference/identifiability.py`
+Source code in `commol/identifiability/results.py`
 
 ```python
 class ProfileSection(_FrozenResult):

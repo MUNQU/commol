@@ -43,7 +43,7 @@ Examples:
 datetime.datetime(2020, 1, 2, 12, 0)
 ```
 
-Source code in `commol/context/axis_units.py`
+Source code in `commol/_model/axis_units.py`
 
 ```python
 class AxisUnits(BaseModel):
@@ -600,7 +600,7 @@ Raises:
 | ------------ | ----------------------------------------------------- |
 | `ValueError` | If the axis has no origin, or moment has a time zone. |
 
-Source code in `commol/context/axis_units.py`
+Source code in `commol/_model/axis_units.py`
 
 ```python
 def position_of(self, moment: date) -> float:
@@ -658,7 +658,7 @@ Raises:
 | ------------ | ----------------------------------------------------- |
 | `ValueError` | If the axis has no origin, or position is not finite. |
 
-Source code in `commol/context/axis_units.py`
+Source code in `commol/_model/axis_units.py`
 
 ```python
 def moment_of(self, position: float) -> datetime:
@@ -717,7 +717,7 @@ Raises:
 | ------------ | --------------------------------------------------------- |
 | `ValueError` | If the axis has no origin, or start or end is not finite. |
 
-Source code in `commol/context/axis_units.py`
+Source code in `commol/_model/axis_units.py`
 
 ```python
 def day_ends(self, start: float, end: float) -> list[float]:
@@ -779,7 +779,7 @@ Raises:
 | ------------ | ------------------------------------------------------------------------------------------------------ |
 | `ValueError` | If the axis has no origin, start or end is not finite, or first_weekday is not an integer from 0 to 6. |
 
-Source code in `commol/context/axis_units.py`
+Source code in `commol/_model/axis_units.py`
 
 ```python
 def week_ends(self, start: float, end: float, first_weekday: int) -> list[float]:
@@ -851,7 +851,7 @@ Raises:
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If unit has another dimension than the step unit; the message names both units, and says to declare a step unit when the step unit is step. |
 
-Source code in `commol/context/axis_units.py`
+Source code in `commol/_model/axis_units.py`
 
 ```python
 def steps(self, value: float, unit: str) -> float:
@@ -941,7 +941,7 @@ Raises:
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If there is no engine, unit has another dimension than the step unit, span is not positive, keep is another value, or a per-step rate keeps the mean of a span shorter than one step. |
 
-Source code in `commol/context/axis_units.py`
+Source code in `commol/_model/axis_units.py`
 
 ```python
 def rate_from_mean_span(
@@ -1023,7 +1023,7 @@ Raises:
 | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If there is no engine, unit has another dimension than the step unit, period is not positive, or probability is outside the range the engine accepts. |
 
-Source code in `commol/context/axis_units.py`
+Source code in `commol/_model/axis_units.py`
 
 ```python
 def rate_from_probability(
@@ -1093,7 +1093,7 @@ Raises:
 | ------------ | -------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If the width is not a positive whole number of steps, unit has another dimension than the step unit, or index is negative. |
 
-Source code in `commol/context/axis_units.py`
+Source code in `commol/_model/axis_units.py`
 
 ```python
 def window_start(self, index: int, span: float, unit: str) -> float:
@@ -1153,7 +1153,7 @@ Raises:
 | ------------ | -------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If the width is not a positive whole number of steps, unit has another dimension than the step unit, or index is negative. |
 
-Source code in `commol/context/axis_units.py`
+Source code in `commol/_model/axis_units.py`
 
 ```python
 def window_end(self, index: int, span: float, unit: str) -> float:
@@ -1215,7 +1215,7 @@ Raises:
 | ------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If the width is not a positive whole number of steps, unit has another dimension than the step unit, or at is negative. |
 
-Source code in `commol/context/axis_units.py`
+Source code in `commol/_model/axis_units.py`
 
 ```python
 def window_index(self, at: float, span: float, unit: str) -> int:
@@ -1278,7 +1278,7 @@ Raises:
 | ------------ | ------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If the width is not a positive whole number of steps, or unit has another dimension than the step unit. |
 
-Source code in `commol/context/axis_units.py`
+Source code in `commol/_model/axis_units.py`
 
 ```python
 def window_ends(self, span: float, unit: str, end: float) -> list[float]:

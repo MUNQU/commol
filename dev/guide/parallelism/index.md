@@ -7,23 +7,23 @@ commol runs its independent work in parallel in Rust: the starts of a calibratio
 ## Quick path
 
 ```python
-import commol
+import commol.parallelism
 
-commol.set_threads(4)  # every parallel method from here on, in this thread
+commol.parallelism.set_threads(4)  # every parallel method from here on, in this thread
 
-with commol.threads(2):  # only inside the block
-    print(commol.get_threads(), commol.get_levels())  # 2 all
+with commol.parallelism.threads(2):  # only inside the block
+    print(commol.parallelism.get_threads(), commol.parallelism.get_levels())  # 2 all
 
-with commol.threads(levels="outer"):  # the particles of a swarm in order
-    print(commol.get_threads(), commol.get_levels())  # 4 outer
+with commol.parallelism.threads(levels="outer"):  # the particles of a swarm in order
+    print(commol.parallelism.get_threads(), commol.parallelism.get_levels())  # 4 outer
 ```
 
-| Name                                  | What it does                                                                                                                                      |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `commol.set_threads(n, levels=None)`  | Sets the number of threads, at least 1, and optionally the levels, until the next call.                                                           |
-| `commol.threads(n=None, levels=None)` | A context manager: the setting holds inside the block and the previous one comes back after it, also on an error. `None` keeps the current value. |
-| `commol.get_threads()`                | The number of threads: the one set, or the number of cores.                                                                                       |
-| `commol.get_levels()`                 | `"all"` or `"outer"`: the levels set, or `"all"`.                                                                                                 |
+| Name                                              | What it does                                                                                                                                      |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `commol.parallelism.set_threads(n, levels=None)`  | Sets the number of threads, at least 1, and optionally the levels, until the next call.                                                           |
+| `commol.parallelism.threads(n=None, levels=None)` | A context manager: the setting holds inside the block and the previous one comes back after it, also on an error. `None` keeps the current value. |
+| `commol.parallelism.get_threads()`                | The number of threads: the one set, or the number of cores.                                                                                       |
+| `commol.parallelism.get_levels()`                 | `"all"` or `"outer"`: the levels set, or `"all"`.                                                                                                 |
 
 A number below 1, or `levels` other than `"all"` and `"outer"`, raises `ValueError`.
 
@@ -48,12 +48,11 @@ One run of a model is never split: each thread runs whole runs.
 
 Every parallel method runs in a pool of `n` threads that commol builds from the setting, and uses at most those threads, nested levels included. The setting is a `contextvars` variable: it holds in the Python thread, or the `asyncio` task, that sets it, and another thread starts with the default.
 
-`commol.threads` limits one block, for example when another library shares the machine:
+`commol.parallelism.threads` limits one block, for example when another library shares the machine:
 
 ```python
 from commol import (
     Aggregate,
-    BayesianBootstrap,
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
@@ -62,6 +61,7 @@ from commol import (
     ParticleSwarmConfig,
     Simulation,
 )
+from commol.resampling import BayesianBootstrap
 
 def model(k1: float | None):
     return (
@@ -87,7 +87,7 @@ problem = CalibrationProblem(
 )
 calibrator = Calibrator(Simulation(model(None)), problem)
 
-with commol.threads(2):
+with commol.parallelism.threads(2):
     fit = calibrator.run(starts=4)
     bootstrap = calibrator.uncertainty(BayesianBootstrap(replicates=8, block_length=1))
 print(round(fit.best_parameters["k1"], 3))  # 0.2
@@ -107,24 +107,24 @@ With `"all"`, both levels share the one pool, and a thread with no work takes wo
 The levels change no result: a seed gives the same result with any number of threads and either level, bit for bit, the history of `Calibrator.run_with_history` included.
 
 ```python
-with commol.threads(4, levels="outer"):
+with commol.parallelism.threads(4, levels="outer"):
     in_order = calibrator.run_with_history()
-with commol.threads(4, levels="all"):
+with commol.parallelism.threads(4, levels="all"):
     in_parallel = calibrator.run_with_history()
 print(in_order == in_parallel)  # True
 ```
 
 ## `RAYON_NUM_THREADS`
 
-commol does not read the environment variable `RAYON_NUM_THREADS` of the `rayon` library, and does not use the global thread pool of `rayon`. Use `commol.set_threads` instead. Another library of the process that uses `rayon` keeps its own setting.
+commol does not read the environment variable `RAYON_NUM_THREADS` of the `rayon` library, and does not use the global thread pool of `rayon`. Use `commol.parallelism.set_threads` instead. Another library of the process that uses `rayon` keeps its own setting.
 
 ## Troubleshooting
 
-| Symptom                                         | Try                                                                |
-| ----------------------------------------------- | ------------------------------------------------------------------ |
-| commol takes every core from other work         | `commol.set_threads(n)` with fewer threads                         |
-| A setting does not hold in a thread you started | Set it in that thread: each Python thread has its own              |
-| A calibration with one start uses one core      | Check `commol.get_levels()`: `"outer"` runs the particles in order |
+| Symptom                                         | Try                                                                            |
+| ----------------------------------------------- | ------------------------------------------------------------------------------ |
+| commol takes every core from other work         | `commol.parallelism.set_threads(n)` with fewer threads                         |
+| A setting does not hold in a thread you started | Set it in that thread: each Python thread has its own                          |
+| A calibration with one start uses one core      | Check `commol.parallelism.get_levels()`: `"outer"` runs the particles in order |
 
 ## Next steps
 

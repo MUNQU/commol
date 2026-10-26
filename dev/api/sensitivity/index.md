@@ -2,7 +2,7 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-The sensitivity analysis, what it varies, the quantities of interest it reads from each run, and the result of each method. Guide: [Sensitivity analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md).
+The module `commol.sensitivity`: the sensitivity analysis, what it varies, and the result of each method. The quantities of interest it reads from each run are in [Quantities](https://munqu.github.io/commol/latest/api/quantities/index.md). Guide: [Sensitivity analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md).
 
 ## SensitivityAnalysis
 
@@ -10,7 +10,7 @@ The forward questions of a model: how uncertainty in its inputs moves its output
 
 A calibration asks which inputs fit the data; an analysis needs no data. It holds the simulation, what varies (`InputSpace`), the replicates of a stochastic engine and the seed of every random number, and every method of one analysis reads the same inputs. The forward model is built in Rust once, when the analysis is created: the values of the inputs reach the engine as a calibration writes them.
 
-Source code in `commol/api/sensitivity.py`
+Source code in `commol/sensitivity/analysis.py`
 
 ```python
 class SensitivityAnalysis:
@@ -284,7 +284,7 @@ Raises:
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If an input is not a value of the model, the replicates or the seed do not fit the engine, replicates is below 1 (a negative number included), or the seed is not a whole number from 0 to 2\*\*64 - 1. |
 
-Source code in `commol/api/sensitivity.py`
+Source code in `commol/sensitivity/analysis.py`
 
 ```python
 def __init__(
@@ -375,7 +375,7 @@ Raises:
 | ------------ | ------------------------------------ |
 | `ValueError` | If an input is not a value of model. |
 
-Source code in `commol/api/sensitivity.py`
+Source code in `commol/sensitivity/analysis.py`
 
 ```python
 def with_model(self, model: "Model") -> "SensitivityAnalysis":
@@ -434,7 +434,7 @@ Raises:
 | `RuntimeError`         | If a run of the design fails.                                                                                                                                                                  |
 | `InfeasibleStateError` | If a point of the design leaves the values its model allows.                                                                                                                                   |
 
-Source code in `commol/api/sensitivity.py`
+Source code in `commol/sensitivity/analysis.py`
 
 ```python
 def run(self, method: SensitivityMethod[ResultT]) -> ResultT:
@@ -486,7 +486,7 @@ Attributes:
 | `sample`                      | \`ParameterSample            | None\`                                                                                                                      |
 | `initial_condition_remainder` | \`str                        | None\`                                                                                                                      |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 class InputSpace(BaseModel):
@@ -726,7 +726,7 @@ Raises:
 | ------------ | ------------------------------------------------------------------------------------------------ |
 | `ValueError` | If an input has no distribution or is a factor, a distribution names no input, or an id repeats. |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 @classmethod
@@ -789,7 +789,7 @@ Returns:
 | ------------ | ---------------- |
 | `InputSpace` | The input space. |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 @classmethod
@@ -852,7 +852,7 @@ Raises:
 | ------------ | -------------------------------------------------------- |
 | `ValueError` | If the sample's names or bounds are not the parameters'. |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 @classmethod
@@ -912,7 +912,7 @@ Attributes:
 | `draws`      | \`int            | None\`                                                                     |
 | `quantities` | `list[quantity]` | What each run is reduced to; none gives only the sample, for a Predictive. |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/methods.py`
 
 ```python
 class Propagation(SensitivityMethod[PropagationResult], RangeChecked):
@@ -933,6 +933,8 @@ class Propagation(SensitivityMethod[PropagationResult], RangeChecked):
         What each run is reduced to; none gives only the sample, for a
         `Predictive`.
     """
+
+    _runner = staticmethod(run_propagation)
 
     draws: int | None = Field(
         default=None, description="Points of the Latin hypercube."
@@ -963,7 +965,7 @@ Attributes:
 | `it`                                                                          | `` `where` keeps the runs a condition chooses, which conditions the `` |                                                                                                                                                                                                                                                                   |
 | `result on that condition.`                                                   |                                                                        |                                                                                                                                                                                                                                                                   |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 class PropagationResult(ResultModel):
@@ -1148,7 +1150,7 @@ Raises:
 | ------------ | ---------------------------------------------------------------------------------- |
 | `ValueError` | If mask has not one boolean per run, keeps no run, or keeps only runs of weight 0. |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 def where(self, mask: ArrayLike) -> "PropagationResult":
@@ -1224,7 +1226,7 @@ Raises:
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If the confidence level is not strictly between 0 and 1, or a quantity is NaN in a run: where keeps the runs a condition chooses. |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 def summary(self, confidence_level: float) -> list[QuantitySummary]:
@@ -1292,7 +1294,7 @@ Attributes:
 | `lower`            | `float` | The quantile (1 − c)/2.            |
 | `upper`            | `float` | The quantile (1 + c)/2.            |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 class QuantitySummary(ResultModel):
@@ -1341,7 +1343,7 @@ Attributes:
 | `draws`      | \`int            | None\`                       |
 | `quantities` | `list[quantity]` | What each run is reduced to. |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/methods.py`
 
 ```python
 class PRCC(SensitivityMethod[PRCCResult], RangeChecked):
@@ -1363,6 +1365,8 @@ class PRCC(SensitivityMethod[PRCCResult], RangeChecked):
     quantities : list[quantity]
         What each run is reduced to.
     """
+
+    _runner = staticmethod(run_prcc)
 
     draws: int | None = Field(
         default=None, description="Points of the Latin hypercube."
@@ -1393,7 +1397,7 @@ Attributes:
 | `p_values`       | `list[list[float]]` | The two-sided p-value of each coefficient, [quantity][input].                                                 |
 | `effective_size` | `float`             | Kish's effective size of the draws: their number with equal weights.                                          |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 class PRCCResult(ResultModel):
@@ -1475,9 +1479,9 @@ class PRCCResult(ResultModel):
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.api.plotting.figures import _prcc
+        from commol.sensitivity.plots import prcc_figure
 
-        return _prcc(
+        return prcc_figure(
             self, output_file=output_file, config=config, x_label=x_label, axes=axes
         )
 ```
@@ -1516,7 +1520,7 @@ Raises:
 | `ValueError`  | If axes has no panel of a series.                            |
 | `ImportError` | If matplotlib is not installed (pip install 'commol[plot]'). |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 def plot(
@@ -1556,9 +1560,9 @@ def plot(
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
-    from commol.api.plotting.figures import _prcc
+    from commol.sensitivity.plots import prcc_figure
 
-    return _prcc(
+    return prcc_figure(
         self, output_file=output_file, config=config, x_label=x_label, axes=axes
     )
 ```
@@ -1579,7 +1583,7 @@ Attributes:
 | `levels`       | `int`            | The number of levels of each input; even, at least 2.                       |
 | `quantities`   | `list[quantity]` | What each run is reduced to.                                                |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/methods.py`
 
 ```python
 class Morris(SensitivityMethod[MorrisResult], RangeChecked):
@@ -1602,6 +1606,8 @@ class Morris(SensitivityMethod[MorrisResult], RangeChecked):
     quantities : list[quantity]
         What each run is reduced to.
     """
+
+    _runner = staticmethod(run_morris)
 
     trajectories: int = Field(description="The number of trajectories.")
     levels: int = Field(description="The number of levels; even.")
@@ -1629,7 +1635,7 @@ Attributes:
 | `sigma`   | `list[list[float]]` | The standard deviation of the elementary effects, [quantity][input]; NaN with one trajectory. |
 | `runs`    | `int`               | The number of points run: one more than the inputs per trajectory.                            |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 class MorrisResult(ResultModel):
@@ -1703,9 +1709,9 @@ class MorrisResult(ResultModel):
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.api.plotting.figures import _morris
+        from commol.sensitivity.plots import morris_figure
 
-        return _morris(self, output_file=output_file, config=config, axes=axes)
+        return morris_figure(self, output_file=output_file, config=config, axes=axes)
 ```
 
 ### Methods:
@@ -1741,7 +1747,7 @@ Raises:
 | `ValueError`  | If axes has no panel of a quantity.                          |
 | `ImportError` | If matplotlib is not installed (pip install 'commol[plot]'). |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 def plot(
@@ -1779,9 +1785,9 @@ def plot(
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
-    from commol.api.plotting.figures import _morris
+    from commol.sensitivity.plots import morris_figure
 
-    return _morris(self, output_file=output_file, config=config, axes=axes)
+    return morris_figure(self, output_file=output_file, config=config, axes=axes)
 ```
 
 ## Sobol
@@ -1801,7 +1807,7 @@ Attributes:
 | `confidence_level` | `float`          | The level of the intervals, strictly between 0 and 1.                        |
 | `quantities`       | `list[quantity]` | What each run is reduced to.                                                 |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/methods.py`
 
 ```python
 class Sobol(SensitivityMethod[SobolResult], RangeChecked):
@@ -1827,6 +1833,8 @@ class Sobol(SensitivityMethod[SobolResult], RangeChecked):
     quantities : list[quantity]
         What each run is reduced to.
     """
+
+    _runner = staticmethod(run_sobol)
 
     draws: int = Field(description="Rows of each base matrix.")
     replicates: int = Field(description="Bootstrap replicates.")
@@ -1856,7 +1864,7 @@ Attributes:
 | `total_lower, total_upper` | `list[list[float]]` | The ends of the interval of each total index.                                                                                           |
 | `runs`                     | `int`               | The number of points run: draws · (inputs + 2).                                                                                         |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 class SobolResult(ResultModel):
@@ -1936,9 +1944,9 @@ class SobolResult(ResultModel):
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.api.plotting.figures import _sobol
+        from commol.sensitivity.plots import sobol_figure
 
-        return _sobol(self, output_file=output_file, config=config, axes=axes)
+        return sobol_figure(self, output_file=output_file, config=config, axes=axes)
 ```
 
 ### Methods:
@@ -1972,7 +1980,7 @@ Raises:
 | `ValueError`  | If axes has no panel of a quantity.                          |
 | `ImportError` | If matplotlib is not installed (pip install 'commol[plot]'). |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 def plot(
@@ -2007,9 +2015,9 @@ def plot(
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
-    from commol.api.plotting.figures import _sobol
+    from commol.sensitivity.plots import sobol_figure
 
-    return _sobol(self, output_file=output_file, config=config, axes=axes)
+    return sobol_figure(self, output_file=output_file, config=config, axes=axes)
 ```
 
 ## PolynomialChaos
@@ -2032,7 +2040,7 @@ Attributes:
 | `draws`           | `int`            | The points of the Latin hypercube; more than the terms, and two or three times as many is the usual choice.                      |
 | `quantities`      | `list[quantity]` | What each run is reduced to.                                                                                                     |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/methods.py`
 
 ```python
 class PolynomialChaos(SensitivityMethod[ChaosResult], RangeChecked):
@@ -2072,6 +2080,8 @@ class PolynomialChaos(SensitivityMethod[ChaosResult], RangeChecked):
         What each run is reduced to.
     """
 
+    _runner = staticmethod(run_chaos)
+
     degree: int = Field(description="The degree of the basis.")
     q_norm: float = Field(default=1.0, description="The q of the q-norm of the basis.")
     max_interaction: int | None = Field(
@@ -2108,7 +2118,7 @@ Attributes:
 | `first, total`    | `list[list[float]]` | The first-order and total Sobol indices, [quantity][input]; NaN for a quantity of no variance.                     |
 | `runs`            | `int`               | The number of points run.                                                                                          |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 class ChaosResult(ResultModel):
@@ -2204,9 +2214,9 @@ class ChaosResult(ResultModel):
         ImportError
             If matplotlib is not installed (``pip install 'commol[plot]'``).
         """
-        from commol.api.plotting.figures import _sobol
+        from commol.sensitivity.plots import sobol_figure
 
-        return _sobol(self, output_file=output_file, config=config, axes=axes)
+        return sobol_figure(self, output_file=output_file, config=config, axes=axes)
 
     def predict(self, values: Sequence[Sequence[float]]) -> list[list[float]]:
         """
@@ -2271,7 +2281,7 @@ Raises:
 | `ValueError`  | If axes has no panel of a quantity.                          |
 | `ImportError` | If matplotlib is not installed (pip install 'commol[plot]'). |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 def plot(
@@ -2306,9 +2316,9 @@ def plot(
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
-    from commol.api.plotting.figures import _sobol
+    from commol.sensitivity.plots import sobol_figure
 
-    return _sobol(self, output_file=output_file, config=config, axes=axes)
+    return sobol_figure(self, output_file=output_file, config=config, axes=axes)
 ```
 
 #### predict
@@ -2337,7 +2347,7 @@ Raises:
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If a point has not one value per input or a value outside the bounds of its input, the truncation is not valid, or the coefficients do not fit the basis. |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 def predict(self, values: Sequence[Sequence[float]]) -> list[list[float]]:
@@ -2370,689 +2380,4 @@ def predict(self, values: Sequence[Sequence[float]]) -> list[list[float]]:
         self.coefficients,
         [list(point) for point in values],
     )
-```
-
-## Level
-
-Bases: `_Outputs`
-
-The level of some outputs: their sum at each position.
-
-A quantity given a name or a list of names reads this series.
-
-Attributes:
-
-| Name      | Type        | Description                                    |
-| --------- | ----------- | ---------------------------------------------- |
-| `outputs` | `list[str]` | The outputs summed; one name is a list of one. |
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-class Level(_Outputs):
-    """
-    The level of some outputs: their sum at each position.
-
-    A quantity given a name or a list of names reads this series.
-
-    Attributes
-    ----------
-    outputs : list[str]
-        The outputs summed; one name is a list of one.
-    """
-
-    kind: Literal["level"] = "level"
-
-    def __init__(
-        self, outputs: str | list[str], *, kind: Literal["level"] = "level"
-    ) -> None:
-        BaseModel.__init__(self, outputs=outputs, kind=kind)
-
-    @property
-    def text(self) -> str:
-        """The series as a label reads it: the outputs."""
-        return self.output_name
-
-    def check_ends(self, positions: Sequence[float]) -> None:
-        """A level reads any position."""
-```
-
-### Attributes
-
-#### text
-
-```python
-text: str
-```
-
-The series as a label reads it: the outputs.
-
-### Methods:
-
-#### check_ends
-
-```python
-check_ends(positions: Sequence[float]) -> None
-```
-
-A level reads any position.
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-def check_ends(self, positions: Sequence[float]) -> None:
-    """A level reads any position."""
-```
-
-## Increments
-
-Bases: `_Outputs`, `RangeChecked`
-
-The increments of some outputs: at each end, the gain of their sum over `(end - window, end]`, as an observation with the window `window` reads it.
-
-The positions of a quantity of increments are window ends, each at least `window` within the rounding of the window (`window_start` of `crates/commol-calibration/src/observation.rs`), so no window starts before 0.
-
-Attributes:
-
-| Name      | Type        | Description                                    |
-| --------- | ----------- | ---------------------------------------------- |
-| `outputs` | `list[str]` | The outputs summed; one name is a list of one. |
-| `window`  | `float`     | The width of each window, above 0.             |
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-class Increments(_Outputs, RangeChecked):
-    """
-    The increments of some outputs: at each end, the gain of their sum over
-    ``(end - window, end]``, as an observation with the window `window`
-    reads it.
-
-    The positions of a quantity of increments are window ends, each at
-    least `window` within the rounding of the window (`window_start` of
-    `crates/commol-calibration/src/observation.rs`), so no window starts
-    before 0.
-
-    Attributes
-    ----------
-    outputs : list[str]
-        The outputs summed; one name is a list of one.
-    window : float
-        The width of each window, above 0.
-    """
-
-    kind: Literal["increments"] = "increments"
-    window: float = Field(description="The width.")
-
-    def __init__(
-        self,
-        outputs: str | list[str],
-        window: float,
-        *,
-        kind: Literal["increments"] = "increments",
-    ) -> None:
-        BaseModel.__init__(self, outputs=outputs, window=window, kind=kind)
-
-    @property
-    def text(self) -> str:
-        """The series as a label reads it: the gain over windows of a width."""
-        return f"{self.output_name} gain over windows of {_position_text(self.window)}"
-
-    def check_ends(self, positions: Sequence[float]) -> None:
-        """
-        No window starts before 0, with the rule of the engine
-        (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
-
-        Raises
-        ------
-        ValueError
-            With the message of the engine, if a window starts before 0.
-        """
-        for at in positions:
-            commol_rs.calibration.check_window_end(at, self.window)
-```
-
-### Attributes
-
-#### text
-
-```python
-text: str
-```
-
-The series as a label reads it: the gain over windows of a width.
-
-### Methods:
-
-#### check_ends
-
-```python
-check_ends(positions: Sequence[float]) -> None
-```
-
-No window starts before 0, with the rule of the engine (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
-
-Raises:
-
-| Type         | Description                                                  |
-| ------------ | ------------------------------------------------------------ |
-| `ValueError` | With the message of the engine, if a window starts before 0. |
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-def check_ends(self, positions: Sequence[float]) -> None:
-    """
-    No window starts before 0, with the rule of the engine
-    (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
-
-    Raises
-    ------
-    ValueError
-        With the message of the engine, if a window starts before 0.
-    """
-    for at in positions:
-        commol_rs.calibration.check_window_end(at, self.window)
-```
-
-## ValueAt
-
-Bases: `_OfSeries`, `_OneScalar`, `RangeChecked`
-
-The value of a series at a position: the level of the outputs, or their gain over the window that ends there.
-
-Attributes:
-
-| Name     | Type    | Description                                           |
-| -------- | ------- | ----------------------------------------------------- |
-| `series` | \`Level | Increments\`                                          |
-| `at`     | `float` | The position; with Increments, the end of the window. |
-| `label`  | \`str   | None\`                                                |
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-class ValueAt(_OfSeries, _OneScalar, RangeChecked):
-    """
-    The value of a series at a position: the level of the outputs, or their
-    gain over the window that ends there.
-
-    Attributes
-    ----------
-    series : Level | Increments
-        The series read; a name or a list of names is their `Level`.
-    at : float
-        The position; with `Increments`, the end of the window.
-    label : str | None
-        The name of the quantity in results and plots. If None, a name that
-        says what the quantity reads.
-    """
-
-    kind: Literal["value_at"] = "value_at"
-    at: float = Field(description="The position.")
-
-    @model_validator(mode="after")
-    def _window_after_zero(self) -> Self:
-        """The window of increments ends at least its width after 0."""
-        self.series.check_ends([self.at])
-        return self
-
-    def default_label(self) -> str:
-        """The series at `at`."""
-        return f"{self.series.text} at {_position_text(self.at)}"
-```
-
-### Methods:
-
-#### default_label
-
-```python
-default_label() -> str
-```
-
-The series at `at`.
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-def default_label(self) -> str:
-    """The series at `at`."""
-    return f"{self.series.text} at {_position_text(self.at)}"
-```
-
-## Gain
-
-Bases: `_Outputs`, `_OneScalar`, `RangeChecked`
-
-The value at `end` minus the value at `start`: what entered a cumulative output over `(start, end]`, as an observation with the window `end - start` that starts at exactly `start` reads it.
-
-Attributes:
-
-| Name      | Type        | Description                                    |
-| --------- | ----------- | ---------------------------------------------- |
-| `outputs` | `list[str]` | The outputs summed; one name is a list of one. |
-| `start`   | `float`     | The start of the window.                       |
-| `end`     | `float`     | The end of the window, after start.            |
-| `label`   | \`str       | None\`                                         |
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-class Gain(_Outputs, _OneScalar, RangeChecked):
-    """
-    The value at `end` minus the value at `start`: what entered a cumulative
-    output over ``(start, end]``, as an observation with the window
-    ``end - start`` that starts at exactly `start` reads it.
-
-    Attributes
-    ----------
-    outputs : list[str]
-        The outputs summed; one name is a list of one.
-    start : float
-        The start of the window.
-    end : float
-        The end of the window, after `start`.
-    label : str | None
-        The name of the quantity in results and plots. If None, a name that
-        says what the quantity reads.
-    """
-
-    kind: Literal["gain"] = "gain"
-    start: float = Field(description="The start of the window.")
-    end: float = Field(description="The end of the window.")
-
-    @model_validator(mode="after")
-    def _end_after_start(self) -> Self:
-        """A window ends after it starts."""
-        if self.end <= self.start:
-            raise ValueError(
-                f"A gain ends after it starts, got start {self.start} and end "
-                f"{self.end}"
-            )
-        return self
-
-    def default_label(self) -> str:
-        """The gain of `outputs` over the window."""
-        start, end = _position_text(self.start), _position_text(self.end)
-        return f"{self.output_name} gain over ({start}, {end}]"
-```
-
-### Methods:
-
-#### default_label
-
-```python
-default_label() -> str
-```
-
-The gain of `outputs` over the window.
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-def default_label(self) -> str:
-    """The gain of `outputs` over the window."""
-    start, end = _position_text(self.start), _position_text(self.end)
-    return f"{self.output_name} gain over ({start}, {end}]"
-```
-
-## Peak
-
-Bases: `_AtPositions`, `_OneScalar`, `RangeChecked`
-
-The largest value of a series at the positions.
-
-The series decides what the peak is: the peak of `Increments(acc, window=7)` at the ends 7, 14, ... is the largest gain of a window of 7, while the peak of the level of an accumulator, which never falls, is its value at the last position. A NaN at a position makes the peak NaN.
-
-Attributes:
-
-| Name        | Type          | Description                                                      |
-| ----------- | ------------- | ---------------------------------------------------------------- |
-| `series`    | \`Level       | Increments\`                                                     |
-| `positions` | `list[float]` | The positions compared, ascending; with Increments, window ends. |
-| `label`     | \`str         | None\`                                                           |
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-class Peak(_AtPositions, _OneScalar, RangeChecked):
-    """
-    The largest value of a series at the positions.
-
-    The series decides what the peak is: the peak of `Increments(acc,
-    window=7)` at the ends 7, 14, ... is the largest gain of a window of 7,
-    while the peak of the level of an accumulator, which never falls, is
-    its value at the last position. A NaN at a position makes the peak NaN.
-
-    Attributes
-    ----------
-    series : Level | Increments
-        The series read; a name or a list of names is their `Level`.
-    positions : list[float]
-        The positions compared, ascending; with `Increments`, window ends.
-    label : str | None
-        The name of the quantity in results and plots. If None, a name that
-        says what the quantity reads.
-    """
-
-    kind: Literal["peak"] = "peak"
-
-    def default_label(self) -> str:
-        """The peak of the series."""
-        return f"peak of {self.series.text}"
-```
-
-### Methods:
-
-#### default_label
-
-```python
-default_label() -> str
-```
-
-The peak of the series.
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-def default_label(self) -> str:
-    """The peak of the series."""
-    return f"peak of {self.series.text}"
-```
-
-## PeakPosition
-
-Bases: `_AtPositions`, `_OneScalar`, `RangeChecked`
-
-The first of the positions where the value of a series is largest; NaN when the value at a position is NaN.
-
-Attributes:
-
-| Name        | Type          | Description                                                      |
-| ----------- | ------------- | ---------------------------------------------------------------- |
-| `series`    | \`Level       | Increments\`                                                     |
-| `positions` | `list[float]` | The positions compared, ascending; with Increments, window ends. |
-| `label`     | \`str         | None\`                                                           |
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-class PeakPosition(_AtPositions, _OneScalar, RangeChecked):
-    """
-    The first of the positions where the value of a series is largest; NaN
-    when the value at a position is NaN.
-
-    Attributes
-    ----------
-    series : Level | Increments
-        The series read; a name or a list of names is their `Level`.
-    positions : list[float]
-        The positions compared, ascending; with `Increments`, window ends.
-    label : str | None
-        The name of the quantity in results and plots. If None, a name that
-        says what the quantity reads.
-    """
-
-    kind: Literal["peak_position"] = "peak_position"
-
-    def default_label(self) -> str:
-        """The position of the peak of the series."""
-        return f"position of the peak of {self.series.text}"
-```
-
-### Methods:
-
-#### default_label
-
-```python
-default_label() -> str
-```
-
-The position of the peak of the series.
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-def default_label(self) -> str:
-    """The position of the peak of the series."""
-    return f"position of the peak of {self.series.text}"
-```
-
-## Trajectory
-
-Bases: `_AtPositions`, `RangeChecked`
-
-The value of a series at each position: one scalar per position, for an analysis over the axis.
-
-Attributes:
-
-| Name        | Type          | Description                                             |
-| ----------- | ------------- | ------------------------------------------------------- |
-| `series`    | \`Level       | Increments\`                                            |
-| `positions` | `list[float]` | The positions, ascending; with Increments, window ends. |
-| `label`     | \`str         | None\`                                                  |
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-class Trajectory(_AtPositions, RangeChecked):
-    """
-    The value of a series at each position: one scalar per position, for an
-    analysis over the axis.
-
-    Attributes
-    ----------
-    series : Level | Increments
-        The series read; a name or a list of names is their `Level`.
-    positions : list[float]
-        The positions, ascending; with `Increments`, window ends.
-    label : str | None
-        The name of the series; each scalar is named after it and its
-        position.
-    """
-
-    kind: Literal["trajectory"] = "trajectory"
-
-    def _name(self) -> str:
-        """The name of the series."""
-        return self.label or self.series.text
-
-    def labels(self) -> list[str]:
-        """The name and each position."""
-        return [f"{self._name()} at {_position_text(at)}" for at in self.positions]
-
-    def axes(self) -> list[tuple[str, float | None]]:
-        """Its name and each position."""
-        return [(self._name(), at) for at in self.positions]
-```
-
-### Methods:
-
-#### labels
-
-```python
-labels() -> list[str]
-```
-
-The name and each position.
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-def labels(self) -> list[str]:
-    """The name and each position."""
-    return [f"{self._name()} at {_position_text(at)}" for at in self.positions]
-```
-
-#### axes
-
-```python
-axes() -> list[tuple[str, float | None]]
-```
-
-Its name and each position.
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-def axes(self) -> list[tuple[str, float | None]]:
-    """Its name and each position."""
-    return [(self._name(), at) for at in self.positions]
-```
-
-## Ratio
-
-Bases: `_OneScalar`
-
-The ratio of two quantities of one value each, numerator N over denominator D.
-
-The ratio of a run whose denominator is 0 is NaN, also when the numerator is not 0, and follows the NaN rule of every method. A method that reduces the points of a design (`PRCC`, `Morris`, `Sobol`, `PolynomialChaos`) reads one value per point; with a stochastic engine, `replicate_rule` says how the replicates of a point combine. A `Propagation`, the `Scenarios` and the quantities of one run keep the ratio of each run.
-
-Attributes:
-
-| Name             | Type                                | Description                                                                                                                                                                                     |
-| ---------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `numerator`      | \`ValueAt                           | Gain                                                                                                                                                                                            |
-| `denominator`    | \`ValueAt                           | Gain                                                                                                                                                                                            |
-| `replicate_rule` | `{within, within_positive, pooled}` | "within": the mean of the ratio of each replicate, E[N/D]; a replicate with D = 0 leaves the point with no value. "within_positive": the mean of the ratio of the replicates with D > 0, E\[N/D |
-| `label`          | \`str                               | None\`                                                                                                                                                                                          |
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-class Ratio(_OneScalar):
-    """
-    The ratio of two quantities of one value each, numerator N over
-    denominator D.
-
-    The ratio of a run whose denominator is 0 is NaN, also when the
-    numerator is not 0, and follows the NaN rule of every method. A method
-    that reduces the points of a design (`PRCC`, `Morris`, `Sobol`,
-    `PolynomialChaos`) reads one value per point; with a stochastic engine,
-    `replicate_rule` says how the replicates of a point combine. A `Propagation`,
-    the `Scenarios` and the quantities of one run keep the ratio of each run.
-
-    Attributes
-    ----------
-    numerator : ValueAt | Gain | Peak
-        The quantity divided.
-    denominator : ValueAt | Gain | Peak
-        The quantity it is divided by.
-    replicate_rule : {"within", "within_positive", "pooled"}
-        ``"within"``: the mean of the ratio of each replicate, E[N/D]; a
-        replicate with D = 0 leaves the point with no value.
-        ``"within_positive"``: the mean of the ratio of the replicates with
-        D > 0, E[N/D | D > 0]; a point with no such replicate has no value.
-        ``"pooled"``: the ratio of the means, E[N]/E[D]; a point with
-        E[D] = 0 has no value. With a deterministic engine, the three give
-        N/D, and a point with D = 0 has no value.
-    label : str | None
-        The name of the quantity in results and plots. If None, a name that
-        says what the quantity reads.
-    """
-
-    kind: Literal["ratio"] = "ratio"
-    numerator: _Operand = Field(description="The quantity divided.")
-    denominator: _Operand = Field(description="The quantity it is divided by.")
-    replicate_rule: Literal["within", "within_positive", "pooled"] = Field(
-        description="How the replicates of a stochastic run combine."
-    )
-
-    @field_validator("numerator", "denominator")
-    @classmethod
-    def _one_value(cls, value: QuantityBase) -> QuantityBase:
-        """An operand gives one value per run."""
-        if isinstance(value, PeakPosition | Trajectory):
-            raise ValueError(
-                f"A Ratio divides quantities of one value each (ValueAt, Gain, "
-                f"Peak), got the {type(value).__name__} '{value.labels()[0]}'"
-            )
-        return value
-
-    def default_label(self) -> str:
-        """The numerator over the denominator."""
-        numerator = self.numerator.labels()[0]
-        denominator = self.denominator.labels()[0]
-        return f"({numerator}) / ({denominator})"
-```
-
-### Methods:
-
-#### default_label
-
-```python
-default_label() -> str
-```
-
-The numerator over the denominator.
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-def default_label(self) -> str:
-    """The numerator over the denominator."""
-    numerator = self.numerator.labels()[0]
-    denominator = self.denominator.labels()[0]
-    return f"({numerator}) / ({denominator})"
-```
-
-## quantity_schedule
-
-```python
-quantity_schedule(quantities: Sequence[QuantityBase]) -> list[float]
-```
-
-The positions a run must report at for `quantities` to read it.
-
-They are every position a quantity reads and the start of every window, sorted, each once. A `SimulationResults` of `Simulation.run_at(quantity_schedule(quantities))` holds them all, so `SimulationResults.quantities` reads it; a `Propagation` runs at the same positions.
-
-Parameters:
-
-| Name         | Type                 | Description     | Default    |
-| ------------ | -------------------- | --------------- | ---------- |
-| `quantities` | `Sequence[quantity]` | The quantities. | *required* |
-
-Returns:
-
-| Type          | Description               |
-| ------------- | ------------------------- |
-| `list[float]` | The positions, ascending. |
-
-Raises:
-
-| Type         | Description              |
-| ------------ | ------------------------ |
-| `ValueError` | If there is no quantity. |
-
-Source code in `commol/context/inference/quantities.py`
-
-```python
-def quantity_schedule(quantities: Sequence[QuantityBase]) -> list[float]:
-    """
-    The positions a run must report at for `quantities` to read it.
-
-    They are every position a quantity reads and the start of every window,
-    sorted, each once. A `SimulationResults` of
-    ``Simulation.run_at(quantity_schedule(quantities))`` holds them all, so
-    `SimulationResults.quantities` reads it; a `Propagation` runs at the same
-    positions.
-
-    Parameters
-    ----------
-    quantities : Sequence[quantity]
-        The quantities.
-
-    Returns
-    -------
-    list[float]
-        The positions, ascending.
-
-    Raises
-    ------
-    ValueError
-        If there is no quantity.
-    """
-    if not quantities:
-        raise ValueError("Give at least one quantity of interest.")
-    return commol_rs.inference.quantity_schedule(engine_json(list(quantities)))
 ```

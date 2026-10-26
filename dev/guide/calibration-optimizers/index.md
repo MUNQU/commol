@@ -192,7 +192,7 @@ A swarm can stall for some iterations and then improve again, so a short `improv
 
 `Calibrator.run(starts=n)` runs the optimizer from `n` start points in parallel and returns the best result. Start 0 is the initial guess of each parameter (its `initial_guess`, or the midpoint of its bounds). Start `i > 0` is a row of a Latin hypercube over the bounds, drawn from the problem's `seed`: with `n − 1` rows, each parameter has one start in each of `n − 1` equal strata of its bounds, so the starts cover the parameter space (`start_points` in `crates/commol-calibration/src/starts.rs`). A particle swarm draws its own population; each start takes its own seed, also drawn from the problem's `seed`, so start 0 of `run(starts=n)` is the result of `run()`, with or without `verbose`.
 
-A particle swarm also scores the particles of each iteration in parallel, in the order of the particles, so the result does not depend on the number of threads. `commol.threads` chooses the threads and whether the particles run in parallel: see [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md).
+A particle swarm also scores the particles of each iteration in parallel, in the order of the particles, so the result does not depend on the number of threads. `commol.parallelism.threads` chooses the threads and whether the particles run in parallel: see [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md).
 
 ```python
 problem = CalibrationProblem(
@@ -211,10 +211,10 @@ print(result.starts[0].start)  # {'k1': 0.5, 'k2': 0.5}
 print({name: round(value, 2) for name, value in result.best_parameters.items()})  # {'k1': 0.4, 'k2': 0.1}
 ```
 
-| `CalibrationResult` field | Meaning                                                                                                                                  |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `starts`                  | One `StartSummary` per start that finished, in order: `start`, `end`, `loss`, `converged`                                                |
-| `failed`                  | Each start that failed, `"Start <index> failed: <reason>"`; each is also logged as a warning (`logging`, logger `commol.api.calibrator`) |
+| `CalibrationResult` field | Meaning                                                                                                                   |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `starts`                  | One `StartSummary` per start that finished, in order: `start`, `end`, `loss`, `converged`                                 |
+| `failed`                  | Each start that failed, `"Start <index> failed: <reason>"`; each is also logged as a warning (`logging`, logger `commol`) |
 
 The result is the start of least loss, the first of them on a tie; if every start fails, `run` raises a `RuntimeError` with the reason of each start. Starts that end at distinct points with equal losses are a sign that the data do not identify the parameters; `StartsIdentifiability` names the parameters that differ (see [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts)).
 
@@ -233,14 +233,14 @@ print(Calibrator(Simulation(model(None, None)), again).run(starts=4) == result) 
 
 ## Troubleshooting
 
-| Symptom                            | Try                                                                                                                                                                                             |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A result sits at a bound           | Check the bounds, give a better `initial_guess`, or use particle swarm                                                                                                                          |
-| `converged=False`                  | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations`; a particle swarm needs a [stop rule](#stop-rules) to converge                                                       |
-| Different results on each run      | Set `seed`; use more particles or iterations                                                                                                                                                    |
-| A local minimum                    | `run(starts=n)` from several points                                                                                                                                                             |
-| A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations                                                                                                                          |
-| Slow                               | Fewer observation steps or particles; Nelder-Mead from a good start; check `commol.get_threads()` ([Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md)) |
+| Symptom                            | Try                                                                                                                                                                                                         |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A result sits at a bound           | Check the bounds, give a better `initial_guess`, or use particle swarm                                                                                                                                      |
+| `converged=False`                  | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations`; a particle swarm needs a [stop rule](#stop-rules) to converge                                                                   |
+| Different results on each run      | Set `seed`; use more particles or iterations                                                                                                                                                                |
+| A local minimum                    | `run(starts=n)` from several points                                                                                                                                                                         |
+| A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations                                                                                                                                      |
+| Slow                               | Fewer observation steps or particles; Nelder-Mead from a good start; check `commol.parallelism.get_threads()` ([Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md)) |
 
 ## Next steps
 

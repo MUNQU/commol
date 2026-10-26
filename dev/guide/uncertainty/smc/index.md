@@ -10,20 +10,17 @@ These methods give a posterior of the parameters with no noise model. The **Gibb
 import numpy as np
 
 from commol import (
-    ABCSMC,
     Aggregate,
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
-    GibbsPosterior,
-    InformationMatchingEta,
-    LossDistance,
     ModelBuilder,
     NelderMeadConfig,
     ObservedDataPoint,
-    Priors,
     Simulation,
 )
+from commol.smc import ABCSMC, GibbsPosterior, InformationMatchingEta, LossDistance
+from commol.distributions import Priors
 
 
 def flow_model(engine: str):
@@ -106,7 +103,7 @@ Each distribution is truncated to the bounds of its parameter:
 A prior whose bounds do not fit raises a `ValueError` that names the parameter, its bounds and the distributions that fit them: a parameter in `[0, inf]` takes `Normal`, `LogNormal` or `Gamma`, not `Uniform`. Each distribution has `log_density(x, bounds)`, `cdf(x, bounds)`, `quantile(p, bounds)` and `sample(count, bounds, seed)`. A draw inverts the distribution function of a number of the commol generator, so a seed gives the same draws on every platform.
 
 ```python
-from commol import Gamma, Normal
+from commol.distributions import Gamma, Normal
 
 bounds = (0.0, 30.0)
 print(round(Normal(mean=10.0, sd=2.0).cdf(10.0, bounds), 3))  # 0.5
@@ -173,7 +170,7 @@ With a stochastic engine each distance runs one fresh replicate, seeded from its
 `ABCRejection(priors, distance, draws, quantile)` is one step of the same code with no move: it draws from the priors and keeps the closest share `quantile` of the draws.
 
 ```python
-from commol import ABCRejection
+from commol.smc import ABCRejection
 
 rejection = calibrator.uncertainty(
     ABCRejection(

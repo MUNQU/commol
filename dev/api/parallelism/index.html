@@ -15,10 +15,10 @@
         <link rel="canonical" href="https://munqu.github.io/commol/dev/api/parallelism/">
       
       
-        <link rel="prev" href="../sensitivity/">
+        <link rel="prev" href="../plotting/">
       
       
-        <link rel="next" href="../package/">
+        <link rel="next" href="../distributions/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Parallelism - Commol Documentation</title>
+        <title>commol.parallelism - Commol Documentation</title>
       
     
     
@@ -131,7 +131,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Parallelism
+              commol.parallelism
             
           </span>
         </div>
@@ -1783,34 +1783,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../plotting/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plotting
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../calibrator/" class="md-nav__link">
         
   
@@ -1867,14 +1839,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../uncertainty/" class="md-nav__link">
+      <a href="../package/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Uncertainty
+    Package
   
 
     
@@ -1895,14 +1867,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../identifiability/" class="md-nav__link">
+      <a href="../engines/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Identifiability
+    commol.engines
   
 
     
@@ -1923,14 +1895,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../sensitivity/" class="md-nav__link">
+      <a href="../plotting/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Sensitivity
+    commol.plotting
   
 
     
@@ -1967,7 +1939,7 @@
   <span class="md-ellipsis">
     
   
-    Parallelism
+    commol.parallelism
   
 
     
@@ -1985,7 +1957,7 @@
   <span class="md-ellipsis">
     
   
-    Parallelism
+    commol.parallelism
   
 
     
@@ -2011,7 +1983,7 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#commol.api.parallelism.set_threads" class="md-nav__link">
+  <a href="#commol.parallelism.set_threads" class="md-nav__link">
     <span class="md-ellipsis">
       
         set_threads
@@ -2022,7 +1994,70 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.api.parallelism.threads" class="md-nav__link">
+  <a href="#commol.parallelism.threads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        threads
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="threads">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#commol.parallelism.threads-attributes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Attributes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Attributes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#commol.parallelism.threads.Levels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Levels
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#commol.parallelism.threads-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functions:
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions:">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#commol.parallelism.threads.set_threads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        set_threads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#commol.parallelism.threads.threads" class="md-nav__link">
     <span class="md-ellipsis">
       
         threads
@@ -2031,9 +2066,41 @@
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#commol.parallelism.threads.get_threads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_threads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#commol.parallelism.threads.get_levels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_levels
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#commol.api.parallelism.get_threads" class="md-nav__link">
+  <a href="#commol.parallelism.get_threads" class="md-nav__link">
     <span class="md-ellipsis">
       
         get_threads
@@ -2044,7 +2111,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.api.parallelism.get_levels" class="md-nav__link">
+  <a href="#commol.parallelism.get_levels" class="md-nav__link">
     <span class="md-ellipsis">
       
         get_levels
@@ -2070,14 +2137,322 @@
   
   
     <li class="md-nav__item">
-      <a href="../package/" class="md-nav__link">
+      <a href="../distributions/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Package
+    commol.distributions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quantities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.quantities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../observations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.observations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uncertainty/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resampling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.resampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.local
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../smc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.smc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../conformal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.conformal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../identifiability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.identifiability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sensitivity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.sensitivity
   
 
     
@@ -3259,7 +3634,7 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#commol.api.parallelism.set_threads" class="md-nav__link">
+  <a href="#commol.parallelism.set_threads" class="md-nav__link">
     <span class="md-ellipsis">
       
         set_threads
@@ -3270,7 +3645,70 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.api.parallelism.threads" class="md-nav__link">
+  <a href="#commol.parallelism.threads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        threads
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="threads">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#commol.parallelism.threads-attributes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Attributes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Attributes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#commol.parallelism.threads.Levels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Levels
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#commol.parallelism.threads-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functions:
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions:">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#commol.parallelism.threads.set_threads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        set_threads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#commol.parallelism.threads.threads" class="md-nav__link">
     <span class="md-ellipsis">
       
         threads
@@ -3279,9 +3717,41 @@
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#commol.parallelism.threads.get_threads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_threads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#commol.parallelism.threads.get_levels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_levels
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#commol.api.parallelism.get_threads" class="md-nav__link">
+  <a href="#commol.parallelism.get_threads" class="md-nav__link">
     <span class="md-ellipsis">
       
         get_threads
@@ -3292,7 +3762,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.api.parallelism.get_levels" class="md-nav__link">
+  <a href="#commol.parallelism.get_levels" class="md-nav__link">
     <span class="md-ellipsis">
       
         get_levels
@@ -3324,19 +3794,25 @@
 
 <h1 id="parallelism-api">Parallelism API<a class="headerlink" href="#parallelism-api" title="Permanent link">&para;</a></h1>
 <p><a href="../">Back to API Reference</a></p>
-<p>The threads of every parallel method and the levels that run in parallel.
+<p>The module <code>commol.parallelism</code>: the threads of every parallel method and the
+levels that run in parallel.
 Guide: <a href="../../guide/parallelism/">Threads and Parallelism</a>.</p>
 
 
 <div class="doc doc-object doc-function">
 
 
-<h2 id="commol.api.parallelism.set_threads" class="doc doc-heading">
+<h2 id="commol.parallelism.set_threads" class="doc doc-heading">
             <span class="doc doc-object-name doc-function-name">set_threads</span>
 
 
-<a href="#commol.api.parallelism.set_threads" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">set_threads</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n"><span title="int">int</span></span><span class="p">,</span> <span class="n">levels</span><span class="p">:</span> <span class="n"><span title="commol.api.parallelism.Levels">Levels</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<a href="#commol.parallelism.set_threads" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">set_threads</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n"><span title="int">int</span></span><span class="p">,</span> <span class="n">levels</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="Levels
+
+
+  
+      module-attribute
+   (commol.parallelism.threads.Levels)" href="#commol.parallelism.threads.Levels">Levels</a></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -3419,7 +3895,212 @@ the current levels.</p>
 
 
             <details class="mkdocstrings-source">
-              <summary>Source code in <code>commol/api/parallelism.py</code></summary>
+              <summary>Source code in <code>commol/parallelism/threads.py</code></summary>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-27">27</a></span>
+<span class="normal"><a href="#__codelineno-0-28">28</a></span>
+<span class="normal"><a href="#__codelineno-0-29">29</a></span>
+<span class="normal"><a href="#__codelineno-0-30">30</a></span>
+<span class="normal"><a href="#__codelineno-0-31">31</a></span>
+<span class="normal"><a href="#__codelineno-0-32">32</a></span>
+<span class="normal"><a href="#__codelineno-0-33">33</a></span>
+<span class="normal"><a href="#__codelineno-0-34">34</a></span>
+<span class="normal"><a href="#__codelineno-0-35">35</a></span>
+<span class="normal"><a href="#__codelineno-0-36">36</a></span>
+<span class="normal"><a href="#__codelineno-0-37">37</a></span>
+<span class="normal"><a href="#__codelineno-0-38">38</a></span>
+<span class="normal"><a href="#__codelineno-0-39">39</a></span>
+<span class="normal"><a href="#__codelineno-0-40">40</a></span>
+<span class="normal"><a href="#__codelineno-0-41">41</a></span>
+<span class="normal"><a href="#__codelineno-0-42">42</a></span>
+<span class="normal"><a href="#__codelineno-0-43">43</a></span>
+<span class="normal"><a href="#__codelineno-0-44">44</a></span>
+<span class="normal"><a href="#__codelineno-0-45">45</a></span>
+<span class="normal"><a href="#__codelineno-0-46">46</a></span>
+<span class="normal"><a href="#__codelineno-0-47">47</a></span>
+<span class="normal"><a href="#__codelineno-0-48">48</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27"></a><span class="k">def</span><span class="w"> </span><span class="nf">set_threads</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">levels</span><span class="p">:</span> <span class="n">Levels</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29"></a><span class="sd">    Set the number of threads of every parallel method, in this context.</span>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30"></a>
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31"></a><span class="sd">    The setting holds in the current Python thread (a `contextvars`</span>
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32"></a><span class="sd">    context), not in other threads. Without it, commol uses one thread per</span>
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33"></a><span class="sd">    core and every level in parallel.</span>
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34"></a>
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35"></a><span class="sd">    Parameters</span>
+</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36"></a><span class="sd">    ----------</span>
+</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37"></a><span class="sd">    n : int</span>
+</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38"></a><span class="sd">        The number of threads, at least 1.</span>
+</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39"></a><span class="sd">    levels : {&quot;all&quot;, &quot;outer&quot;} | None</span>
+</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40"></a><span class="sd">        Which levels run in parallel when a method nests them; `None` keeps</span>
+</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41"></a><span class="sd">        the current levels.</span>
+</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42"></a>
+</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43"></a><span class="sd">    Raises</span>
+</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44"></a><span class="sd">    ------</span>
+</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45"></a><span class="sd">    ValueError</span>
+</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46"></a><span class="sd">        If `n` is below 1 or `levels` is neither name.</span>
+</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48"></a>    <span class="n">commol_rs</span><span class="o">.</span><span class="n">parallelism</span><span class="o">.</span><span class="n">setting</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">_choice</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">levels</span><span class="p">))</span>
+</span></code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="commol.parallelism.threads" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">threads</span>
+
+
+<a href="#commol.parallelism.threads" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>The threads of the parallel methods and the levels that run in parallel.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+<h3 id="commol.parallelism.threads-attributes">Attributes<a href="#commol.parallelism.threads-attributes" class="headerlink" title="Permanent link">&para;</a></h3>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="commol.parallelism.threads.Levels" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">Levels</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#commol.parallelism.threads.Levels" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">Levels</span> <span class="o">=</span> <span class="n"><span title="typing.Literal">Literal</span></span><span class="p">[</span><span class="s1">&#39;all&#39;</span><span class="p">,</span> <span class="s1">&#39;outer&#39;</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Which levels run in parallel when a method nests them: <code>"all"</code>, or
+<code>"outer"</code> to run the particles of a swarm one after the other.</p>
+
+    </div>
+
+</div>
+
+
+<h3 id="commol.parallelism.threads-functions">Functions:<a href="#commol.parallelism.threads-functions" class="headerlink" title="Permanent link">&para;</a></h3>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="commol.parallelism.threads.set_threads" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">set_threads</span>
+
+
+<a href="#commol.parallelism.threads.set_threads" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">set_threads</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n"><span title="int">int</span></span><span class="p">,</span> <span class="n">levels</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="Levels
+
+
+  
+      module-attribute
+   (commol.parallelism.threads.Levels)" href="#commol.parallelism.threads.Levels">Levels</a></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Set the number of threads of every parallel method, in this context.</p>
+<p>The setting holds in the current Python thread (a <code>contextvars</code>
+context), not in other threads. Without it, commol uses one thread per
+core and every level in parallel.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>n</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The number of threads, at least 1.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>levels</code>
+            </td>
+            <td>
+                  <code>(<span title="all">all</span>, <span title="outer">outer</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Which levels run in parallel when a method nests them; <code>None</code> keeps
+the current levels.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#34;all&#34;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If <code>n</code> is below 1 or <code>levels</code> is neither name.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>commol/parallelism/threads.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-27">27</a></span>
 <span class="normal"><a href="#__codelineno-0-28">28</a></span>
 <span class="normal"><a href="#__codelineno-0-29">29</a></span>
@@ -3472,15 +4153,20 @@ the current levels.</p>
 <div class="doc doc-object doc-function">
 
 
-<h2 id="commol.api.parallelism.threads" class="doc doc-heading">
+<h4 id="commol.parallelism.threads.threads" class="doc doc-heading">
             <span class="doc doc-object-name doc-function-name">threads</span>
 
 
-<a href="#commol.api.parallelism.threads" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">threads</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">levels</span><span class="p">:</span> <span class="n"><span title="commol.api.parallelism.Levels">Levels</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="collections.abc.Generator">Generator</span></span><span class="p">[</span><span class="kc">None</span><span class="p">]</span>
+<a href="#commol.parallelism.threads.threads" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">threads</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">levels</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="Levels
+
+
+  
+      module-attribute
+   (commol.parallelism.threads.Levels)" href="#commol.parallelism.threads.Levels">Levels</a></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="collections.abc.Generator">Generator</span></span><span class="p">[</span><span class="kc">None</span><span class="p">]</span>
 </span></code></pre></div>
 
-    <div class="doc doc-contents first">
+    <div class="doc doc-contents ">
 
         <p>Limit the threads of every parallel method within a block.</p>
 <p>The previous setting comes back when the block ends, also on an error.</p>
@@ -3581,7 +4267,7 @@ the current levels.</p>
 
 
             <details class="mkdocstrings-source">
-              <summary>Source code in <code>commol/api/parallelism.py</code></summary>
+              <summary>Source code in <code>commol/parallelism/threads.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-51">51</a></span>
 <span class="normal"><a href="#__codelineno-0-52">52</a></span>
 <span class="normal"><a href="#__codelineno-0-53">53</a></span>
@@ -3652,11 +4338,156 @@ the current levels.</p>
 <div class="doc doc-object doc-function">
 
 
-<h2 id="commol.api.parallelism.get_threads" class="doc doc-heading">
+<h4 id="commol.parallelism.threads.get_threads" class="doc doc-heading">
             <span class="doc doc-object-name doc-function-name">get_threads</span>
 
 
-<a href="#commol.api.parallelism.get_threads" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#commol.parallelism.threads.get_threads" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_threads</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="int">int</span></span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The number of threads of the parallel methods in this context.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The number set, or the number of cores when none is set.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>commol/parallelism/threads.py</code></summary>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-84">84</a></span>
+<span class="normal"><a href="#__codelineno-0-85">85</a></span>
+<span class="normal"><a href="#__codelineno-0-86">86</a></span>
+<span class="normal"><a href="#__codelineno-0-87">87</a></span>
+<span class="normal"><a href="#__codelineno-0-88">88</a></span>
+<span class="normal"><a href="#__codelineno-0-89">89</a></span>
+<span class="normal"><a href="#__codelineno-0-90">90</a></span>
+<span class="normal"><a href="#__codelineno-0-91">91</a></span>
+<span class="normal"><a href="#__codelineno-0-92">92</a></span>
+<span class="normal"><a href="#__codelineno-0-93">93</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-84"><a id="__codelineno-0-84" name="__codelineno-0-84"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_threads</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+</span><span id="__span-0-85"><a id="__codelineno-0-85" name="__codelineno-0-85"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-0-86"><a id="__codelineno-0-86" name="__codelineno-0-86"></a><span class="sd">    The number of threads of the parallel methods in this context.</span>
+</span><span id="__span-0-87"><a id="__codelineno-0-87" name="__codelineno-0-87"></a>
+</span><span id="__span-0-88"><a id="__codelineno-0-88" name="__codelineno-0-88"></a><span class="sd">    Returns</span>
+</span><span id="__span-0-89"><a id="__codelineno-0-89" name="__codelineno-0-89"></a><span class="sd">    -------</span>
+</span><span id="__span-0-90"><a id="__codelineno-0-90" name="__codelineno-0-90"></a><span class="sd">    int</span>
+</span><span id="__span-0-91"><a id="__codelineno-0-91" name="__codelineno-0-91"></a><span class="sd">        The number set, or the number of cores when none is set.</span>
+</span><span id="__span-0-92"><a id="__codelineno-0-92" name="__codelineno-0-92"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-93"><a id="__codelineno-0-93" name="__codelineno-0-93"></a>    <span class="k">return</span> <span class="n">commol_rs</span><span class="o">.</span><span class="n">parallelism</span><span class="o">.</span><span class="n">current</span><span class="p">()</span><span class="o">.</span><span class="n">threads</span>
+</span></code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="commol.parallelism.threads.get_levels" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">get_levels</span>
+
+
+<a href="#commol.parallelism.threads.get_levels" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_levels</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="Levels
+
+
+  
+      module-attribute
+   (commol.parallelism.threads.Levels)" href="#commol.parallelism.threads.Levels">Levels</a></span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The levels that run in parallel in this context.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>{<span title="all">all</span>, <span title="outer">outer</span>}</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The levels set, or <code>"all"</code> when none is set.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>commol/parallelism/threads.py</code></summary>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-96"> 96</a></span>
+<span class="normal"><a href="#__codelineno-0-97"> 97</a></span>
+<span class="normal"><a href="#__codelineno-0-98"> 98</a></span>
+<span class="normal"><a href="#__codelineno-0-99"> 99</a></span>
+<span class="normal"><a href="#__codelineno-0-100">100</a></span>
+<span class="normal"><a href="#__codelineno-0-101">101</a></span>
+<span class="normal"><a href="#__codelineno-0-102">102</a></span>
+<span class="normal"><a href="#__codelineno-0-103">103</a></span>
+<span class="normal"><a href="#__codelineno-0-104">104</a></span>
+<span class="normal"><a href="#__codelineno-0-105">105</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-96"><a id="__codelineno-0-96" name="__codelineno-0-96"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_levels</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Levels</span><span class="p">:</span>
+</span><span id="__span-0-97"><a id="__codelineno-0-97" name="__codelineno-0-97"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-0-98"><a id="__codelineno-0-98" name="__codelineno-0-98"></a><span class="sd">    The levels that run in parallel in this context.</span>
+</span><span id="__span-0-99"><a id="__codelineno-0-99" name="__codelineno-0-99"></a>
+</span><span id="__span-0-100"><a id="__codelineno-0-100" name="__codelineno-0-100"></a><span class="sd">    Returns</span>
+</span><span id="__span-0-101"><a id="__codelineno-0-101" name="__codelineno-0-101"></a><span class="sd">    -------</span>
+</span><span id="__span-0-102"><a id="__codelineno-0-102" name="__codelineno-0-102"></a><span class="sd">    {&quot;all&quot;, &quot;outer&quot;}</span>
+</span><span id="__span-0-103"><a id="__codelineno-0-103" name="__codelineno-0-103"></a><span class="sd">        The levels set, or `&quot;all&quot;` when none is set.</span>
+</span><span id="__span-0-104"><a id="__codelineno-0-104" name="__codelineno-0-104"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-105"><a id="__codelineno-0-105" name="__codelineno-0-105"></a>    <span class="k">return</span> <span class="n">cast</span><span class="p">(</span><span class="n">Levels</span><span class="p">,</span> <span class="n">commol_rs</span><span class="o">.</span><span class="n">parallelism</span><span class="o">.</span><span class="n">current</span><span class="p">()</span><span class="o">.</span><span class="n">levels</span><span class="p">)</span>
+</span></code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="commol.parallelism.get_threads" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">get_threads</span>
+
+
+<a href="#commol.parallelism.get_threads" class="headerlink" title="Permanent link">&para;</a></h2>
 <div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_threads</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="int">int</span></span>
 </span></code></pre></div>
 
@@ -3689,7 +4520,7 @@ the current levels.</p>
 
 
             <details class="mkdocstrings-source">
-              <summary>Source code in <code>commol/api/parallelism.py</code></summary>
+              <summary>Source code in <code>commol/parallelism/threads.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-84">84</a></span>
 <span class="normal"><a href="#__codelineno-0-85">85</a></span>
 <span class="normal"><a href="#__codelineno-0-86">86</a></span>
@@ -3718,12 +4549,17 @@ the current levels.</p>
 <div class="doc doc-object doc-function">
 
 
-<h2 id="commol.api.parallelism.get_levels" class="doc doc-heading">
+<h2 id="commol.parallelism.get_levels" class="doc doc-heading">
             <span class="doc doc-object-name doc-function-name">get_levels</span>
 
 
-<a href="#commol.api.parallelism.get_levels" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_levels</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="commol.api.parallelism.Levels">Levels</span></span>
+<a href="#commol.parallelism.get_levels" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">get_levels</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="Levels
+
+
+  
+      module-attribute
+   (commol.parallelism.threads.Levels)" href="#commol.parallelism.threads.Levels">Levels</a></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -3755,7 +4591,7 @@ the current levels.</p>
 
 
             <details class="mkdocstrings-source">
-              <summary>Source code in <code>commol/api/parallelism.py</code></summary>
+              <summary>Source code in <code>commol/parallelism/threads.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-96"> 96</a></span>
 <span class="normal"><a href="#__codelineno-0-97"> 97</a></span>
 <span class="normal"><a href="#__codelineno-0-98"> 98</a></span>

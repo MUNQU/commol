@@ -2,12 +2,12 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-The figures are read from the results they draw, and return a matplotlib `Figure`. `results.plot`, `replicates.plot` and `predictive.plot` give the figures of a run, of replicates and of a predictive: `plot.series()`, `plot.cumulative()` and `plot.observations()`; each accessor is on the page of the object that gives it: [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md) and [Uncertainty](https://munqu.github.io/commol/latest/api/uncertainty/index.md). The results of PRCC, Morris, Sobol and polynomial chaos, and the result of a profile likelihood, draw their figure with `plot()`. `plot_compared` draws several runs, replicates or predictives on the same panels. The figures need the optional extra `commol[plot]`. Guide: [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting).
+The module `commol.plotting`: `plot_compared` and the style of a figure, `PlotConfig`. The figures are read from the results they draw, and return a matplotlib `Figure`. `results.plot`, `replicates.plot` and `predictive.plot` give the figures of a run, of replicates and of a predictive: `plot.series()`, `plot.cumulative()` and `plot.observations()`; each accessor is on the page of the object that gives it: [Simulation](https://munqu.github.io/commol/latest/api/simulation/index.md) and [Uncertainty](https://munqu.github.io/commol/latest/api/uncertainty/index.md). The results of PRCC, Morris, Sobol and polynomial chaos, and the result of a profile likelihood, draw their figure with `plot()`. `plot_compared` draws several runs, replicates or predictives on the same panels. The figures need the optional extra `commol[plot]`. Guide: [Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting).
 
 ## plot_compared
 
 ```python
-plot_compared(results: Mapping[str, SimulationResults | SimulationReplicates | Predictive], series: list[str] | None = None, window: float | None = None, observed_data: list[ObservedDataPoint] | None = None, panels: Literal['series', 'observations'] = 'series', axes: Figure | None = None, output_file: str | None = None, config: PlotConfig | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', confidence_level: float = 0.95, **kwargs: str | int | float | bool | None) -> Figure
+plot_compared(results: Mapping[str, Plotted], series: list[str] | None = None, window: float | None = None, observed_data: list[ObservedDataPoint] | None = None, panels: Literal['series', 'observations'] = 'series', axes: Figure | None = None, output_file: str | None = None, config: PlotConfig | None = None, show_legend: bool = True, position_label: Callable[[float], str] | None = None, tick_every: float | None = None, x_label: str = 'Step', confidence_level: float = 0.95, **kwargs: str | int | float | bool | None) -> Figure
 ```
 
 Draw several results of the same model on the same panels, one panel per series or one per observed series.
@@ -58,11 +58,11 @@ Examples:
 ... )
 ```
 
-Source code in `commol/api/plotting/compared.py`
+Source code in `commol/plotting/compared.py`
 
 ```python
 def plot_compared(
-    results: "Mapping[str, SimulationResults | SimulationReplicates | Predictive]",
+    results: "Mapping[str, Plotted]",
     series: list[str] | None = None,
     window: float | None = None,
     observed_data: "list[ObservedDataPoint] | None" = None,
@@ -165,7 +165,7 @@ def plot_compared(
     ...     panels="observations",
     ... )
     """
-    from commol.api.plotting.figures import _compared_series
+    from commol.plotting.figures import _compared_series
 
     return _compared_series(
         results,
@@ -217,7 +217,7 @@ Raises:
 | `ValueError`  | If axes has no panel of a series.                            |
 | `ImportError` | If matplotlib is not installed (pip install 'commol[plot]'). |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 def plot(
@@ -257,9 +257,9 @@ def plot(
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
-    from commol.api.plotting.figures import _prcc
+    from commol.sensitivity.plots import prcc_figure
 
-    return _prcc(
+    return prcc_figure(
         self, output_file=output_file, config=config, x_label=x_label, axes=axes
     )
 ```
@@ -295,7 +295,7 @@ Raises:
 | `ValueError`  | If axes has no panel of a quantity.                          |
 | `ImportError` | If matplotlib is not installed (pip install 'commol[plot]'). |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 def plot(
@@ -333,9 +333,9 @@ def plot(
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
-    from commol.api.plotting.figures import _morris
+    from commol.sensitivity.plots import morris_figure
 
-    return _morris(self, output_file=output_file, config=config, axes=axes)
+    return morris_figure(self, output_file=output_file, config=config, axes=axes)
 ```
 
 ## plot
@@ -367,7 +367,7 @@ Raises:
 | `ValueError`  | If axes has no panel of a quantity.                          |
 | `ImportError` | If matplotlib is not installed (pip install 'commol[plot]'). |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 def plot(
@@ -402,9 +402,9 @@ def plot(
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
-    from commol.api.plotting.figures import _sobol
+    from commol.sensitivity.plots import sobol_figure
 
-    return _sobol(self, output_file=output_file, config=config, axes=axes)
+    return sobol_figure(self, output_file=output_file, config=config, axes=axes)
 ```
 
 ## plot
@@ -436,7 +436,7 @@ Raises:
 | `ValueError`  | If axes has no panel of a quantity.                          |
 | `ImportError` | If matplotlib is not installed (pip install 'commol[plot]'). |
 
-Source code in `commol/context/inference/global_sensitivity.py`
+Source code in `commol/sensitivity/results.py`
 
 ```python
 def plot(
@@ -471,9 +471,9 @@ def plot(
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
-    from commol.api.plotting.figures import _sobol
+    from commol.sensitivity.plots import sobol_figure
 
-    return _sobol(self, output_file=output_file, config=config, axes=axes)
+    return sobol_figure(self, output_file=output_file, config=config, axes=axes)
 ```
 
 ## plot
@@ -507,7 +507,7 @@ Raises:
 | `ValueError`  | If axes has no panel of a profile.                           |
 | `ImportError` | If matplotlib is not installed (pip install 'commol[plot]'). |
 
-Source code in `commol/context/inference/profiles.py`
+Source code in `commol/profiles/results.py`
 
 ```python
 def plot(
@@ -545,9 +545,9 @@ def plot(
     ImportError
         If matplotlib is not installed (``pip install 'commol[plot]'``).
     """
-    from commol.api.plotting.figures import _profiles
+    from commol.profiles.plots import profiles_figure
 
-    return _profiles(self, output_file=output_file, config=config, axes=axes)
+    return profiles_figure(self, output_file=output_file, config=config, axes=axes)
 ```
 
 ## PlotConfig
@@ -582,7 +582,7 @@ Examples:
 >>> config = PlotConfig.publication()
 ```
 
-Source code in `commol/context/visualization.py`
+Source code in `commol/plotting/config.py`
 
 ```python
 class PlotConfig(BaseModel):
@@ -721,7 +721,7 @@ Returns:
 | ------------ | -------------------------------------------------- |
 | `PlotConfig` | Configuration with presentation-friendly settings. |
 
-Source code in `commol/context/visualization.py`
+Source code in `commol/plotting/config.py`
 
 ```python
 @classmethod
@@ -764,7 +764,7 @@ Returns:
 | ------------ | ------------------------------------------------- |
 | `PlotConfig` | Configuration with publication-friendly settings. |
 
-Source code in `commol/context/visualization.py`
+Source code in `commol/plotting/config.py`
 
 ```python
 @classmethod
@@ -803,7 +803,7 @@ Returns:
 | ------------ | ---------------------------------------------- |
 | `PlotConfig` | Configuration with notebook-friendly settings. |
 
-Source code in `commol/context/visualization.py`
+Source code in `commol/plotting/config.py`
 
 ```python
 @classmethod

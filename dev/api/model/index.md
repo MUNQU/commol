@@ -26,7 +26,7 @@ Attributes:
 | `step_unit`   | \`str             | None\`                                                                                                                  |
 | `origin`      | \`datetime        | None\`                                                                                                                  |
 
-Source code in `commol/context/model.py`
+Source code in `commol/_model/model.py`
 
 ```python
 class Model(BaseModel, Generic[StructureT]):
@@ -311,7 +311,7 @@ class Model(BaseModel, Generic[StructureT]):
         self,
         values: CalibrationResult | Mapping[str, float],
         problem: CalibrationProblem | None = None,
-        sample: "ParameterSample | None" = None,
+        sample: "SummarizedSample | None" = None,
         confidence_level: float | None = None,
     ) -> "AppliedParametersReport":
         """
@@ -370,9 +370,7 @@ class Model(BaseModel, Generic[StructureT]):
         ValueError
             If a sample is given without a confidence level.
         """
-        from commol.api.reporting import _applied_parameters_report
-
-        return _applied_parameters_report(
+        return applied_parameters_report(
             self, values, problem, sample, confidence_level
         )
 
@@ -416,7 +414,7 @@ class Model(BaseModel, Generic[StructureT]):
         >>> description.save("model.md")
         >>> model.describe(layout="odd").save("model.tex")
         """
-        from commol.context._model.describe import describe_model
+        from commol._model.describe import describe_model
 
         return describe_model(self, layout)
 
@@ -517,7 +515,7 @@ Raises:
 | `FileNotFoundError` | If the file at file_path does not exist.                  |
 | `ValidationError`   | If the JSON content does not conform to the Model schema. |
 
-Source code in `commol/context/model.py`
+Source code in `commol/_model/model.py`
 
 ```python
 @classmethod
@@ -567,7 +565,7 @@ Parameters:
 | `file_path` | \`str | Path\`                                   | Path of the file to write. |
 | `indent`    | `int` | Indentation width for nested structures. | `2`                        |
 
-Source code in `commol/context/model.py`
+Source code in `commol/_model/model.py`
 
 ```python
 def to_json(self, file_path: str | Path, indent: int = 2) -> None:
@@ -615,7 +613,7 @@ Raises:
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If an id is not a parameter of the model, a list is given for a parameter that is not a series, a value is not valid (the message names the parameter), or the model rejects the new values. |
 
-Source code in `commol/context/model.py`
+Source code in `commol/_model/model.py`
 
 ```python
 def update_parameters(
@@ -676,7 +674,7 @@ Returns:
 | ----------- | ----------------------------------------------- |
 | `list[str]` | List of parameter IDs that require calibration. |
 
-Source code in `commol/context/model.py`
+Source code in `commol/_model/model.py`
 
 ```python
 def get_uncalibrated_parameters(self) -> list[str]:
@@ -715,7 +713,7 @@ Raises:
 | `ValueError` | If an id is not declared in problem, or the structure cannot write back a value of its kind. |
 | `TypeError`  | If result is a ParameterSample, which has no single set of parameters.                       |
 
-Source code in `commol/context/model.py`
+Source code in `commol/_model/model.py`
 
 ```python
 def apply_calibration_parameters(
@@ -777,7 +775,7 @@ def apply_calibration_parameters(
 #### applied_parameters
 
 ```python
-applied_parameters(values: CalibrationResult | Mapping[str, float], problem: CalibrationProblem | None = None, sample: ParameterSample | None = None, confidence_level: float | None = None) -> AppliedParametersReport
+applied_parameters(values: CalibrationResult | Mapping[str, float], problem: CalibrationProblem | None = None, sample: SummarizedSample | None = None, confidence_level: float | None = None) -> AppliedParametersReport
 ```
 
 Report every parameter of the model, and the values of its kind.
@@ -811,14 +809,14 @@ Raises:
 | ------------ | ------------------------------------------------ |
 | `ValueError` | If a sample is given without a confidence level. |
 
-Source code in `commol/context/model.py`
+Source code in `commol/_model/model.py`
 
 ```python
 def applied_parameters(
     self,
     values: CalibrationResult | Mapping[str, float],
     problem: CalibrationProblem | None = None,
-    sample: "ParameterSample | None" = None,
+    sample: "SummarizedSample | None" = None,
     confidence_level: float | None = None,
 ) -> "AppliedParametersReport":
     """
@@ -877,9 +875,7 @@ def applied_parameters(
     ValueError
         If a sample is given without a confidence level.
     """
-    from commol.api.reporting import _applied_parameters_report
-
-    return _applied_parameters_report(
+    return applied_parameters_report(
         self, values, problem, sample, confidence_level
     )
 ```
@@ -921,7 +917,7 @@ Examples:
 >>> model.describe(layout="odd").save("model.tex")
 ```
 
-Source code in `commol/context/model.py`
+Source code in `commol/_model/model.py`
 
 ```python
 def describe(
@@ -964,7 +960,7 @@ def describe(
     >>> description.save("model.md")
     >>> model.describe(layout="odd").save("model.tex")
     """
-    from commol.context._model.describe import describe_model
+    from commol._model.describe import describe_model
 
     return describe_model(self, layout)
 ```
@@ -994,7 +990,7 @@ Examples:
 >>> k = units.rate_from_mean_span(5, "day", keep="survival")
 ```
 
-Source code in `commol/context/model.py`
+Source code in `commol/_model/model.py`
 
 ```python
 def axis_units(self) -> AxisUnits:
@@ -1056,7 +1052,7 @@ Notes
 - `step`, a count of increments, is dimensionless
 - Mathematical constants (pi, e) are dimensionless
 
-Source code in `commol/context/model.py`
+Source code in `commol/_model/model.py`
 
 ```python
 def check_unit_consistency(self, verbose: bool = False) -> None:
@@ -1113,7 +1109,7 @@ Attributes:
 | `stratifications` | `list[Stratification]` | Categorical subdivisions of the bins, in expansion order.                     |
 | `transitions`     | `list[Transition]`     | Flows between bins, or between the categories of one stratification.          |
 
-Source code in `commol/context/process.py`
+Source code in `commol/_model/process.py`
 
 ```python
 class Process(BaseModel):
@@ -1281,7 +1277,7 @@ Returns:
 | ------ | ------------------------------------------------------------------- |
 | `bool` | True when it has no bin, accumulator, stratification or transition. |
 
-Source code in `commol/context/process.py`
+Source code in `commol/_model/process.py`
 
 ```python
 def is_empty(self) -> bool:
@@ -1319,7 +1315,7 @@ Returns:
 | ----- | ----------- |
 | \`Bin | None\`      |
 
-Source code in `commol/context/process.py`
+Source code in `commol/_model/process.py`
 
 ```python
 def bin(self, bin_id: str) -> Bin | None:
@@ -1354,7 +1350,7 @@ Attributes:
 | `kind`    | `str` | Name of the model kind, the tag of the structure in JSON. |
 | `variant` | \`str | None\`                                                    |
 
-Source code in `commol/context/structure.py`
+Source code in `commol/_model/structure.py`
 
 ```python
 class ModelStructure(BaseModel, ABC):
@@ -1584,7 +1580,7 @@ class ModelStructure(BaseModel, ABC):
         self,
         model: "Model[Self]",  # noqa: ARG002
         calibrated_ids: set[str],  # noqa: ARG002
-        parameter_statistics: "Mapping[str, ParameterSummary] | None",  # noqa: ARG002
+        parameter_statistics: "Mapping[str, EntrySummary] | None",  # noqa: ARG002
     ) -> ReportSections:
         """
         Sections of this kind in a report of applied values.
@@ -1595,7 +1591,7 @@ class ModelStructure(BaseModel, ABC):
             The model that holds the applied values.
         calibrated_ids : set[str]
             Ids that calibration set.
-        parameter_statistics : Mapping[str, ParameterSummary] | None
+        parameter_statistics : Mapping[str, EntrySummary] | None
             Statistics of each id from a sample, or None without one.
 
         Returns
@@ -1653,7 +1649,7 @@ __pydantic_init_subclass__(**kwargs: object) -> None
 
 Register a concrete subclass under its `kind` and `variant`.
 
-Source code in `commol/context/structure.py`
+Source code in `commol/_model/structure.py`
 
 ```python
 @classmethod
@@ -1706,7 +1702,7 @@ Raises:
 | ------------ | ------------------------------------------------ |
 | `ValueError` | If no structure class has that kind and variant. |
 
-Source code in `commol/context/structure.py`
+Source code in `commol/_model/structure.py`
 
 ```python
 @classmethod
@@ -1768,7 +1764,7 @@ Raises:
 | ------------ | ------------------------------------------------------------------ |
 | `ValueError` | If the structure does not agree with the parameters or the engine. |
 
-Source code in `commol/context/structure.py`
+Source code in `commol/_model/structure.py`
 
 ```python
 @abstractmethod
@@ -1813,7 +1809,7 @@ Returns:
 | ---------------------- | ---------------------------------------------------- |
 | `dict[str, list[str]]` | Each id mapped to its output names, in engine order. |
 
-Source code in `commol/context/structure.py`
+Source code in `commol/_model/structure.py`
 
 ```python
 @abstractmethod
@@ -1856,7 +1852,7 @@ Returns:
 | ------------- | -------------------------------------------------------- |
 | `SeriesLabel` | The id itself and no unit, unless the kind knows better. |
 
-Source code in `commol/context/structure.py`
+Source code in `commol/_model/structure.py`
 
 ```python
 def series_label(
@@ -1898,7 +1894,7 @@ Returns:
 | ---------------- | --------------------------------------------------------- |
 | `frozenset[str]` | For example {"initial_condition"} for an aggregate model. |
 
-Source code in `commol/context/structure.py`
+Source code in `commol/_model/structure.py`
 
 ```python
 def calibration_value_types(self) -> frozenset[str]:
@@ -1933,7 +1929,7 @@ Returns:
 | ----------- | -------------------------------------------- |
 | `list[str]` | Empty unless the kind has values left unset. |
 
-Source code in `commol/context/structure.py`
+Source code in `commol/_model/structure.py`
 
 ```python
 def uncalibrated_values(self) -> list[str]:
@@ -1967,7 +1963,7 @@ Parameters:
 | `parameters` | `Sequence[CalibrationParameter]` | The values set, with their types and bounds. | *required*                                                                             |
 | `remainder`  | \`str                            | None\`                                       | The id that takes what the initial conditions leave of the sum the kind keeps, if any. |
 
-Source code in `commol/context/structure.py`
+Source code in `commol/_model/structure.py`
 
 ```python
 def check_calibration_values(
@@ -2021,7 +2017,7 @@ Returns:
 | ------ | -------------------------------------------------------------- |
 | `Self` | A structure; this one when the kind sets no values of its own. |
 
-Source code in `commol/context/structure.py`
+Source code in `commol/_model/structure.py`
 
 ```python
 def with_calibrated_values(
@@ -2053,18 +2049,18 @@ def with_calibrated_values(
 #### report_sections
 
 ```python
-report_sections(model: Model[Self], calibrated_ids: set[str], parameter_statistics: Mapping[str, ParameterSummary] | None) -> ReportSections
+report_sections(model: Model[Self], calibrated_ids: set[str], parameter_statistics: Mapping[str, EntrySummary] | None) -> ReportSections
 ```
 
 Sections of this kind in a report of applied values.
 
 Parameters:
 
-| Name                   | Type                             | Description                              | Default                                                   |
-| ---------------------- | -------------------------------- | ---------------------------------------- | --------------------------------------------------------- |
-| `model`                | `Model`                          | The model that holds the applied values. | *required*                                                |
-| `calibrated_ids`       | `set[str]`                       | Ids that calibration set.                | *required*                                                |
-| `parameter_statistics` | \`Mapping[str, ParameterSummary] | None\`                                   | Statistics of each id from a sample, or None without one. |
+| Name                   | Type                         | Description                              | Default                                                   |
+| ---------------------- | ---------------------------- | ---------------------------------------- | --------------------------------------------------------- |
+| `model`                | `Model`                      | The model that holds the applied values. | *required*                                                |
+| `calibrated_ids`       | `set[str]`                   | Ids that calibration set.                | *required*                                                |
+| `parameter_statistics` | \`Mapping[str, EntrySummary] | None\`                                   | Statistics of each id from a sample, or None without one. |
 
 Returns:
 
@@ -2072,14 +2068,14 @@ Returns:
 | ---------------- | ------------------------------------------------------- |
 | `ReportSections` | Each section by its key in the report; none by default. |
 
-Source code in `commol/context/structure.py`
+Source code in `commol/_model/structure.py`
 
 ```python
 def report_sections(
     self,
     model: "Model[Self]",  # noqa: ARG002
     calibrated_ids: set[str],  # noqa: ARG002
-    parameter_statistics: "Mapping[str, ParameterSummary] | None",  # noqa: ARG002
+    parameter_statistics: "Mapping[str, EntrySummary] | None",  # noqa: ARG002
 ) -> ReportSections:
     """
     Sections of this kind in a report of applied values.
@@ -2090,7 +2086,7 @@ def report_sections(
         The model that holds the applied values.
     calibrated_ids : set[str]
         Ids that calibration set.
-    parameter_statistics : Mapping[str, ParameterSummary] | None
+    parameter_statistics : Mapping[str, EntrySummary] | None
         Statistics of each id from a sample, or None without one.
 
     Returns
@@ -2123,7 +2119,7 @@ Returns:
 | --------------- | ------------------------------------------ |
 | `list[Section]` | The sections of the kind; none by default. |
 
-Source code in `commol/context/structure.py`
+Source code in `commol/_model/structure.py`
 
 ```python
 def describe(
@@ -2167,7 +2163,7 @@ Raises:
 | --------------------- | ------------------------------ |
 | `NotImplementedError` | If the kind has no unit check. |
 
-Source code in `commol/context/structure.py`
+Source code in `commol/_model/structure.py`
 
 ```python
 def check_unit_consistency(self, model: "Model[Self]", verbose: bool) -> None:
@@ -2201,7 +2197,7 @@ Attributes:
 | `compartment_amounts`      | `dict[str, float]`            | Amounts of single expanded compartments, such as {"A_g1": 0.0}, applied after the expansion. The names are checked against the engine when the model is built.                                                                |
 | `neighbors`                | \`Complete                    | Groups                                                                                                                                                                                                                        |
 
-Source code in `commol/context/aggregate.py`
+Source code in `commol/_model/aggregate.py`
 
 ```python
 class Aggregate(ModelStructure, InitialConditions):
@@ -2443,9 +2439,7 @@ class Aggregate(ModelStructure, InitialConditions):
             If the engine cannot resolve an initial-condition id or the
             remainder, or the values leave the remainder below zero.
         """
-        from commol.context._model.calibration_write_back import (
-            calibrated_structure,
-        )
+        from commol._model.calibration_write_back import calibrated_structure
 
         return calibrated_structure(model, problem, values)
 
@@ -2453,7 +2447,7 @@ class Aggregate(ModelStructure, InitialConditions):
         self,
         model: "Model[Self]",
         calibrated_ids: set[str],
-        parameter_statistics: "Mapping[str, ParameterSummary] | None",
+        parameter_statistics: "Mapping[str, EntrySummary] | None",
     ) -> ReportSections:
         """
         The ``initial_amounts`` and ``category_splits`` sections of a report.
@@ -2466,7 +2460,7 @@ class Aggregate(ModelStructure, InitialConditions):
             The model that holds the applied values.
         calibrated_ids : set[str]
             Ids that calibration set.
-        parameter_statistics : Mapping[str, ParameterSummary] | None
+        parameter_statistics : Mapping[str, EntrySummary] | None
             Statistics of each id from a sample, or None without one.
 
         Returns
@@ -2474,10 +2468,7 @@ class Aggregate(ModelStructure, InitialConditions):
         ReportSections
             ``{"initial_amounts": ..., "category_splits": ...}``.
         """
-        from commol.context._model.report import (
-            category_splits_report,
-            initial_amounts_report,
-        )
+        from commol._model.report import category_splits_report, initial_amounts_report
 
         return {
             "initial_amounts": initial_amounts_report(
@@ -2510,13 +2501,13 @@ class Aggregate(ModelStructure, InitialConditions):
         list[Section]
             The sections of an aggregate model.
         """
-        from commol.context._model.aggregate_description import describe_aggregate
+        from commol._model.aggregate_description import describe_aggregate
 
         return describe_aggregate(model)
 
     def check_unit_consistency(self, model: "Model[Self]", verbose: bool) -> None:
         """Check the units of the model; see `Model.check_unit_consistency`."""
-        from commol.context._model.units import UnitChecker
+        from commol._model.units import UnitChecker
 
         UnitChecker(model).check_unit_consistency(verbose)
 
@@ -2727,7 +2718,7 @@ Raises:
 | ------------ | ----------------------------- |
 | `ValueError` | If one of these checks fails. |
 
-Source code in `commol/context/aggregate.py`
+Source code in `commol/_model/aggregate.py`
 
 ```python
 def check_model(self, model: "Model[Self]") -> None:
@@ -2786,7 +2777,7 @@ Returns:
 | ---------------------- | ------------------------------------------------------------------------------ |
 | `dict[str, list[str]]` | Bin and accumulator ids, each mapped to its output names in declaration order. |
 
-Source code in `commol/context/aggregate.py`
+Source code in `commol/_model/aggregate.py`
 
 ```python
 def outputs_by_source(self, model: "Model[Self]") -> dict[str, list[str]]:
@@ -2843,7 +2834,7 @@ Returns:
 | ------------- | ------------------------------------------------------------------ |
 | `SeriesLabel` | The bin's name and unit, or the id and no unit when no bin has it. |
 
-Source code in `commol/context/aggregate.py`
+Source code in `commol/_model/aggregate.py`
 
 ```python
 def series_label(self, model: "Model[Self]", series_id: str) -> SeriesLabel:
@@ -2882,7 +2873,7 @@ Returns:
 | ----------- | --------------------------- |
 | `list[str]` | Bin ids with a None amount. |
 
-Source code in `commol/context/aggregate.py`
+Source code in `commol/_model/aggregate.py`
 
 ```python
 def uncalibrated_values(self) -> list[str]:
@@ -2922,7 +2913,7 @@ Raises:
 | ------------ | ------------------------------------------------------- |
 | `ValueError` | If an amount set is in another unit than the remainder. |
 
-Source code in `commol/context/aggregate.py`
+Source code in `commol/_model/aggregate.py`
 
 ```python
 def check_calibration_values(
@@ -3014,7 +3005,7 @@ Raises:
 | ------------ | -------------------------------------------------------------------------------------------------------------------- |
 | `ValueError` | If the engine cannot resolve an initial-condition id or the remainder, or the values leave the remainder below zero. |
 
-Source code in `commol/context/aggregate.py`
+Source code in `commol/_model/aggregate.py`
 
 ```python
 def with_calibrated_values(
@@ -3053,9 +3044,7 @@ def with_calibrated_values(
         If the engine cannot resolve an initial-condition id or the
         remainder, or the values leave the remainder below zero.
     """
-    from commol.context._model.calibration_write_back import (
-        calibrated_structure,
-    )
+    from commol._model.calibration_write_back import calibrated_structure
 
     return calibrated_structure(model, problem, values)
 ```
@@ -3063,7 +3052,7 @@ def with_calibrated_values(
 #### report_sections
 
 ```python
-report_sections(model: Model[Self], calibrated_ids: set[str], parameter_statistics: Mapping[str, ParameterSummary] | None) -> ReportSections
+report_sections(model: Model[Self], calibrated_ids: set[str], parameter_statistics: Mapping[str, EntrySummary] | None) -> ReportSections
 ```
 
 The `initial_amounts` and `category_splits` sections of a report.
@@ -3072,11 +3061,11 @@ See `Model.applied_parameters`.
 
 Parameters:
 
-| Name                   | Type                             | Description                              | Default                                                   |
-| ---------------------- | -------------------------------- | ---------------------------------------- | --------------------------------------------------------- |
-| `model`                | `Model`                          | The model that holds the applied values. | *required*                                                |
-| `calibrated_ids`       | `set[str]`                       | Ids that calibration set.                | *required*                                                |
-| `parameter_statistics` | \`Mapping[str, ParameterSummary] | None\`                                   | Statistics of each id from a sample, or None without one. |
+| Name                   | Type                         | Description                              | Default                                                   |
+| ---------------------- | ---------------------------- | ---------------------------------------- | --------------------------------------------------------- |
+| `model`                | `Model`                      | The model that holds the applied values. | *required*                                                |
+| `calibrated_ids`       | `set[str]`                   | Ids that calibration set.                | *required*                                                |
+| `parameter_statistics` | \`Mapping[str, EntrySummary] | None\`                                   | Statistics of each id from a sample, or None without one. |
 
 Returns:
 
@@ -3084,14 +3073,14 @@ Returns:
 | ---------------- | ------------------------------------------------- |
 | `ReportSections` | {"initial_amounts": ..., "category_splits": ...}. |
 
-Source code in `commol/context/aggregate.py`
+Source code in `commol/_model/aggregate.py`
 
 ```python
 def report_sections(
     self,
     model: "Model[Self]",
     calibrated_ids: set[str],
-    parameter_statistics: "Mapping[str, ParameterSummary] | None",
+    parameter_statistics: "Mapping[str, EntrySummary] | None",
 ) -> ReportSections:
     """
     The ``initial_amounts`` and ``category_splits`` sections of a report.
@@ -3104,7 +3093,7 @@ def report_sections(
         The model that holds the applied values.
     calibrated_ids : set[str]
         Ids that calibration set.
-    parameter_statistics : Mapping[str, ParameterSummary] | None
+    parameter_statistics : Mapping[str, EntrySummary] | None
         Statistics of each id from a sample, or None without one.
 
     Returns
@@ -3112,10 +3101,7 @@ def report_sections(
     ReportSections
         ``{"initial_amounts": ..., "category_splits": ...}``.
     """
-    from commol.context._model.report import (
-        category_splits_report,
-        initial_amounts_report,
-    )
+    from commol._model.report import category_splits_report, initial_amounts_report
 
     return {
         "initial_amounts": initial_amounts_report(
@@ -3149,7 +3135,7 @@ Returns:
 | --------------- | ----------------------------------- |
 | `list[Section]` | The sections of an aggregate model. |
 
-Source code in `commol/context/aggregate.py`
+Source code in `commol/_model/aggregate.py`
 
 ```python
 def describe(self, model: "Model[Self]") -> "list[Section]":
@@ -3174,7 +3160,7 @@ def describe(self, model: "Model[Self]") -> "list[Section]":
     list[Section]
         The sections of an aggregate model.
     """
-    from commol.context._model.aggregate_description import describe_aggregate
+    from commol._model.aggregate_description import describe_aggregate
 
     return describe_aggregate(model)
 ```
@@ -3187,12 +3173,12 @@ check_unit_consistency(model: Model[Self], verbose: bool) -> None
 
 Check the units of the model; see `Model.check_unit_consistency`.
 
-Source code in `commol/context/aggregate.py`
+Source code in `commol/_model/aggregate.py`
 
 ```python
 def check_unit_consistency(self, model: "Model[Self]", verbose: bool) -> None:
     """Check the units of the model; see `Model.check_unit_consistency`."""
-    from commol.context._model.units import UnitChecker
+    from commol._model.units import UnitChecker
 
     UnitChecker(model).check_unit_consistency(verbose)
 ```
@@ -3220,7 +3206,7 @@ Raises:
 | ------------ | ------------------------------------------------------------------------------------------------- |
 | `ValueError` | If a name is not an expanded compartment of the model, or an amount is not finite or is negative. |
 
-Source code in `commol/context/aggregate.py`
+Source code in `commol/_model/aggregate.py`
 
 ```python
 def update_compartment_amounts(
@@ -3282,7 +3268,7 @@ Raises:
 | ------------ | ------------------------------------------------------------------------------- |
 | `ValueError` | If an amount is not valid or an override names no compartment of the structure. |
 
-Source code in `commol/context/aggregate.py`
+Source code in `commol/_model/aggregate.py`
 
 ```python
 def initial_state(self, process: Process) -> list[InitialCompartment]:
@@ -3341,7 +3327,7 @@ Raises:
 | ------------ | ----------------------------------- |
 | `ValueError` | If the stratification is not found. |
 
-Source code in `commol/context/aggregate.py`
+Source code in `commol/_model/aggregate.py`
 
 ```python
 def get_conditioning_categories(
@@ -3417,7 +3403,7 @@ Raises:
 | ------------ | ------------------------------------------------------- |
 | `ValueError` | If a category is not found or a bare name is ambiguous. |
 
-Source code in `commol/context/aggregate.py`
+Source code in `commol/_model/aggregate.py`
 
 ```python
 def subgroup_total(self, process: Process, categories: Iterable[str] = ()) -> float:
@@ -3471,7 +3457,7 @@ Attributes:
 | ------ | --------------------- | --------------------------------- |
 | `kind` | `Literal['complete']` | The tag of the neighbors in JSON. |
 
-Source code in `commol/context/neighbors.py`
+Source code in `commol/_model/neighbors.py`
 
 ```python
 class Complete(BaseModel):
@@ -3508,7 +3494,7 @@ Attributes:
 | `stratification` | `str`                           | Id of the stratification whose categories group the units. |
 | `weights`        | \`dict\[str, dict[str, float]\] | None\`                                                     |
 
-Source code in `commol/context/neighbors.py`
+Source code in `commol/_model/neighbors.py`
 
 ```python
 class Groups(BaseModel):
@@ -3584,7 +3570,7 @@ Parameters:
 | `weights`        | \`Mapping\[str, Mapping[str, float]\] | None\`                                                     | weights[g][g'], the weight of category g' for a unit in g. None is the identity. |
 | `kind`           | `groups`                              | The kind of neighbors, as JSON holds it.                   | `"groups"`                                                                       |
 
-Source code in `commol/context/neighbors.py`
+Source code in `commol/_model/neighbors.py`
 
 ```python
 def __init__(
@@ -3631,7 +3617,7 @@ Attributes:
 | `categories` | `dict[str, str]` | Category applied to the compartment, keyed by stratification id. A conditional stratification whose conditions the compartment does not meet is absent. |
 | `amount`     | `float`          | Initial amount, including per-compartment overrides.                                                                                                    |
 
-Source code in `commol/context/_model/engine_state.py`
+Source code in `commol/_model/engine_state.py`
 
 ```python
 class InitialCompartment(NamedTuple):
@@ -3671,7 +3657,7 @@ Attributes:
 | `data` | `list[tuple[float, float]]` | (position, value) points on the axis. Need not be pre-sorted; the engine sorts them.                                                                                                                                                                                                                                                                                                                                                                                     |
 | `mode` | `str`                       | How the series is read between its points: "pulse" (the value on the step of a point, 0 on every other step; integer positions only), "step_function" (the value of the last point at or before t), or "linear" (linear interpolation in t). The engine decides which positions its model type accepts: a DifferenceEquations or StochasticSteps model only integer steps. The model rejects a position its engine cannot run when it is built or its parameters change. |
 
-Source code in `commol/context/parameter.py`
+Source code in `commol/_model/parameter.py`
 
 ```python
 class SeriesValue(BaseModel):
@@ -3719,7 +3705,7 @@ Bases: `Exception`
 
 Raised when unit consistency check fails.
 
-Source code in `commol/utils/equations.py`
+Source code in `commol/_model/unit_checks.py`
 
 ```python
 class UnitConsistencyError(Exception):
@@ -3730,7 +3716,7 @@ class UnitConsistencyError(Exception):
 
 ## Descriptions
 
-`Model.describe` returns a `ModelDescription`; its blocks are in `commol.context.description`.
+`Model.describe` returns a `ModelDescription`; its blocks are in `commol._model.description`.
 
 ## ModelDescription
 
@@ -3748,7 +3734,7 @@ Attributes:
 | `layout`   | `str`           | The layout the sections follow: "default" or "odd". |
 | `sections` | `list[Section]` | The sections, in order.                             |
 
-Source code in `commol/context/description.py`
+Source code in `commol/_model/description.py`
 
 ```python
 class ModelDescription(BaseModel):
@@ -3843,7 +3829,7 @@ class ModelDescription(BaseModel):
         ValueError
             If the format is not one of these.
         """
-        from commol.api.description import render
+        from commol._model.render import render
 
         return render(self, format)
 
@@ -3874,7 +3860,7 @@ class ModelDescription(BaseModel):
             If the format is None and the suffix is not one of these, or the
             format is not valid.
         """
-        from commol.api.description import save
+        from commol._model.render import save
 
         return save(self, Path(path), format)
 
@@ -3911,7 +3897,7 @@ Raises:
 | ---------- | ---------------------------------------------------------------------------- |
 | `KeyError` | If the description has no section with that key; the message lists the keys. |
 
-Source code in `commol/context/description.py`
+Source code in `commol/_model/description.py`
 
 ```python
 def section(self, key: str) -> Section:
@@ -3957,7 +3943,7 @@ Returns:
 | ------------------ | --------------------------------------- |
 | `list[StateGraph]` | The graphs, the expanded ones included. |
 
-Source code in `commol/context/description.py`
+Source code in `commol/_model/description.py`
 
 ```python
 def graphs(self) -> list[StateGraph]:
@@ -4003,7 +3989,7 @@ Raises:
 | ------------ | ---------------------------------- |
 | `ValueError` | If the format is not one of these. |
 
-Source code in `commol/context/description.py`
+Source code in `commol/_model/description.py`
 
 ```python
 def render(
@@ -4031,7 +4017,7 @@ def render(
     ValueError
         If the format is not one of these.
     """
-    from commol.api.description import render
+    from commol._model.render import render
 
     return render(self, format)
 ```
@@ -4063,7 +4049,7 @@ Raises:
 | ------------ | ------------------------------------------------------------------------------------- |
 | `ValueError` | If the format is None and the suffix is not one of these, or the format is not valid. |
 
-Source code in `commol/context/description.py`
+Source code in `commol/_model/description.py`
 
 ```python
 def save(
@@ -4093,7 +4079,7 @@ def save(
         If the format is None and the suffix is not one of these, or the
         format is not valid.
     """
-    from commol.api.description import save
+    from commol._model.render import save
 
     return save(self, Path(path), format)
 ```
@@ -4112,7 +4098,7 @@ Attributes:
 | `title`  | `str`          | The title a rendering shows.                                                   |
 | `blocks` | `list[_Block]` | The blocks, in order. A section with no blocks is left out of every rendering. |
 
-Source code in `commol/context/description.py`
+Source code in `commol/_model/description.py`
 
 ```python
 class Section(BaseModel):
@@ -4151,7 +4137,7 @@ Attributes:
 | `heading` | \`str             | None\`                        |
 | `text`    | `str`             | The paragraph, in plain text. |
 
-Source code in `commol/context/description.py`
+Source code in `commol/_model/description.py`
 
 ```python
 class Text(BaseModel):
@@ -4190,7 +4176,7 @@ Attributes:
 | `columns` | `list[str]`         | The column names.                        |
 | `rows`    | `list[list[_Cell]]` | The rows, each with one cell per column. |
 
-Source code in `commol/context/description.py`
+Source code in `commol/_model/description.py`
 
 ```python
 class Table(BaseModel):
@@ -4243,7 +4229,7 @@ Attributes:
 | `title`   | \`str                  | None\`                             |
 | `groups`  | `list[EquationGroup]`  | The groups of equations, in order. |
 
-Source code in `commol/context/description.py`
+Source code in `commol/_model/description.py`
 
 ```python
 class Equations(BaseModel):
@@ -4283,7 +4269,7 @@ Attributes:
 | `heading`   | \`str            | None\`                                                                              |
 | `equations` | `list[Equation]` | The equations, in order. A group with a heading and no equations renders as (none). |
 
-Source code in `commol/context/description.py`
+Source code in `commol/_model/description.py`
 
 ```python
 class EquationGroup(BaseModel):
@@ -4321,7 +4307,7 @@ Attributes:
 | `right_latex` | `str`                       | The right side in LaTeX, without math delimiters.                                                                                         |
 | `relation`    | `Literal['equals', 'flow']` | "equals": the left side equals the right side. "flow": the left side names where an amount moves (A -> B) and the right side is the flow. |
 
-Source code in `commol/context/description.py`
+Source code in `commol/_model/description.py`
 
 ```python
 class Equation(BaseModel):
@@ -4370,7 +4356,7 @@ Attributes:
 | `edges`    | `list[GraphEdge]`        | The moves between them.                                                                                                                                                        |
 | `expanded` | `bool`                   | Whether it is the graph of the expanded compartments. The Markdown rendering draws only a graph that is not expanded: an expanded graph can pass what a Mermaid diagram draws. |
 
-Source code in `commol/context/description.py`
+Source code in `commol/_model/description.py`
 
 ```python
 class StateGraph(BaseModel):
@@ -4419,7 +4405,7 @@ Attributes:
 | `label` | `str` | The label a diagram shows.               |
 | `group` | \`str | None\`                                   |
 
-Source code in `commol/context/description.py`
+Source code in `commol/_model/description.py`
 
 ```python
 class GraphNode(BaseModel):
@@ -4457,7 +4443,7 @@ Attributes:
 | `target` | \`str | None\`                                       |
 | `label`  | `str` | The label a diagram shows, such as the rate. |
 
-Source code in `commol/context/description.py`
+Source code in `commol/_model/description.py`
 
 ```python
 class GraphEdge(BaseModel):
@@ -4497,7 +4483,7 @@ Attributes:
 | `column_labels` | `list[str]`         | The label of each column.                                    |
 | `values`        | `list[list[float]]` | One row of values per row label, one value per column label. |
 
-Source code in `commol/context/description.py`
+Source code in `commol/_model/description.py`
 
 ```python
 class Matrix(BaseModel):

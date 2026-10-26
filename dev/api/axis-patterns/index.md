@@ -14,7 +14,7 @@ Instances are created exclusively via the factory classmethods (`pulse`, `period
 
 Multi-group schedules are built by calling `AxisPattern.add_group(...)` directly on the class. The first call returns a new schedule; chain further `add_group` and `set_default` calls on the returned instance.
 
-A `AxisPattern` is accepted directly by :meth:`commol.api.model_builder.ModelBuilder.add_transition` via the `rate` argument; no auxiliary conversion is required.
+A `AxisPattern` is accepted directly by :meth:`commol._model.builder.ModelBuilder.add_transition` via the `rate` argument; no auxiliary conversion is required.
 
 Attributes:
 
@@ -46,7 +46,7 @@ Examples:
 ... )
 ```
 
-Source code in `commol/api/patterns.py`
+Source code in `commol/_model/patterns.py`
 
 ```python
 class AxisPattern(BaseModel):
@@ -63,7 +63,7 @@ class AxisPattern(BaseModel):
     further ``add_group`` and ``set_default`` calls on the returned instance.
 
     A ``AxisPattern`` is accepted directly by
-    :meth:`commol.api.model_builder.ModelBuilder.add_transition` via the
+    :meth:`commol._model.builder.ModelBuilder.add_transition` via the
     ``rate`` argument; no auxiliary conversion is required.
 
     Attributes
@@ -392,7 +392,7 @@ __str__() -> str
 
 Return the pattern's formula.
 
-Source code in `commol/api/patterns.py`
+Source code in `commol/_model/patterns.py`
 
 ```python
 def __str__(self) -> str:
@@ -421,7 +421,7 @@ Returns:
 | ------------- | ----------------------------------------------------- |
 | `AxisPattern` | The copy, with conditions and source_compartment set. |
 
-Source code in `commol/api/patterns.py`
+Source code in `commol/_model/patterns.py`
 
 ```python
 def for_group(
@@ -482,7 +482,7 @@ Raises:
 | `TypeError`  | If this pattern is not a schedule, one that AxisPattern.add_group started.                |
 | `ValueError` | If the schedule has a default already, or pattern has conditions or a source_compartment. |
 
-Source code in `commol/api/patterns.py`
+Source code in `commol/_model/patterns.py`
 
 ```python
 def set_default(self, pattern: "AxisPattern") -> "AxisPattern":  # noqa: ARG002
@@ -523,7 +523,7 @@ pulse(at: int, value: float | str) -> AxisPattern
 
 Single-step pulse: rate = `value` at step `at`, else 0.
 
-Source code in `commol/api/patterns.py`
+Source code in `commol/_model/patterns.py`
 
 ```python
 @classmethod
@@ -548,7 +548,7 @@ Parameters:
 | `at`    | `Iterable[int]` | Step indices at which the pulse fires. Must be unique and non-negative. | *required*      |
 | `value` | \`float         | str                                                                     | Iterable\[float |
 
-Source code in `commol/api/patterns.py`
+Source code in `commol/_model/patterns.py`
 
 ```python
 @classmethod
@@ -583,7 +583,7 @@ periodic(period: int, value: float | str, offset: int = 0) -> AxisPattern
 
 Periodic pulse every `period` steps starting at `offset`.
 
-Source code in `commol/api/patterns.py`
+Source code in `commol/_model/patterns.py`
 
 ```python
 @classmethod
@@ -608,7 +608,7 @@ Constant rate `value` while `t` is in `[start, end)`, else 0.
 
 In a DifferenceEquations model `t` is the step, so the rate acts on the steps `start <= step < end`. In a DifferentialEquations model the interval opens and closes at any position, and the engine restarts its integration at both ends.
 
-Source code in `commol/api/patterns.py`
+Source code in `commol/_model/patterns.py`
 
 ```python
 @classmethod
@@ -637,7 +637,7 @@ sinusoid(amplitude: float | str, period: float | str, phase: float | str = 0, ba
 
 `baseline + amplitude * sin(2*pi*(t - phase) / period)`.
 
-Source code in `commol/api/patterns.py`
+Source code in `commol/_model/patterns.py`
 
 ```python
 @classmethod
@@ -665,7 +665,7 @@ gaussian_pulse(center: float, width: float, peak: float | str) -> AxisPattern
 
 Gaussian bell pulse: `peak * exp(-(t - center)^2 / (2 * width^2))`.
 
-Source code in `commol/api/patterns.py`
+Source code in `commol/_model/patterns.py`
 
 ```python
 @classmethod
@@ -689,7 +689,7 @@ Linear in `t` from `start_value` to `end_value` on `[start, end)`.
 
 The rate is 0 outside the interval. In a DifferenceEquations model `t` is the step, so the ramp is read at each step; in a DifferentialEquations model it is continuous.
 
-Source code in `commol/api/patterns.py`
+Source code in `commol/_model/patterns.py`
 
 ```python
 @classmethod
@@ -727,7 +727,7 @@ Combine patterns into a single composed pattern.
 - `mode` is `"sum"`, `"max"` (the largest value at each position) or `"min"` (the smallest).
 - Raises `ValueError` if no patterns are supplied, `mode` is not a mode, the inputs have inconsistent group bindings, or the parser of the engine rejects the combined formula, such as a `"max"` of more patterns than the nesting limit of a formula.
 
-Source code in `commol/api/patterns.py`
+Source code in `commol/_model/patterns.py`
 
 ```python
 @classmethod
@@ -773,7 +773,7 @@ Create a pattern from an arbitrary expression string.
 
 The string is wrapped in `(...)` so it composes safely. Raises `ValueError` with the message of the parser of the engine if the wrapped formula is not in the language of formulas.
 
-Source code in `commol/api/patterns.py`
+Source code in `commol/_model/patterns.py`
 
 ```python
 @classmethod

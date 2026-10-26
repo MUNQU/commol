@@ -2,7 +2,7 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-The threads of every parallel method and the levels that run in parallel. Guide: [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md).
+The module `commol.parallelism`: the threads of every parallel method and the levels that run in parallel. Guide: [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md).
 
 ## set_threads
 
@@ -27,7 +27,7 @@ Raises:
 | ------------ | ------------------------------------------ |
 | `ValueError` | If n is below 1 or levels is neither name. |
 
-Source code in `commol/api/parallelism.py`
+Source code in `commol/parallelism/threads.py`
 
 ```python
 def set_threads(n: int, levels: Levels | None = None) -> None:
@@ -56,6 +56,72 @@ def set_threads(n: int, levels: Levels | None = None) -> None:
 
 ## threads
 
+The threads of the parallel methods and the levels that run in parallel.
+
+### Attributes
+
+#### Levels
+
+```python
+Levels = Literal['all', 'outer']
+```
+
+Which levels run in parallel when a method nests them: `"all"`, or `"outer"` to run the particles of a swarm one after the other.
+
+### Functions:
+
+#### set_threads
+
+```python
+set_threads(n: int, levels: Levels | None = None) -> None
+```
+
+Set the number of threads of every parallel method, in this context.
+
+The setting holds in the current Python thread (a `contextvars` context), not in other threads. Without it, commol uses one thread per core and every level in parallel.
+
+Parameters:
+
+| Name     | Type           | Description                                                                           | Default    |
+| -------- | -------------- | ------------------------------------------------------------------------------------- | ---------- |
+| `n`      | `int`          | The number of threads, at least 1.                                                    | *required* |
+| `levels` | `(all, outer)` | Which levels run in parallel when a method nests them; None keeps the current levels. | `"all"`    |
+
+Raises:
+
+| Type         | Description                                |
+| ------------ | ------------------------------------------ |
+| `ValueError` | If n is below 1 or levels is neither name. |
+
+Source code in `commol/parallelism/threads.py`
+
+```python
+def set_threads(n: int, levels: Levels | None = None) -> None:
+    """
+    Set the number of threads of every parallel method, in this context.
+
+    The setting holds in the current Python thread (a `contextvars`
+    context), not in other threads. Without it, commol uses one thread per
+    core and every level in parallel.
+
+    Parameters
+    ----------
+    n : int
+        The number of threads, at least 1.
+    levels : {"all", "outer"} | None
+        Which levels run in parallel when a method nests them; `None` keeps
+        the current levels.
+
+    Raises
+    ------
+    ValueError
+        If `n` is below 1 or `levels` is neither name.
+    """
+    commol_rs.parallelism.setting().set(_choice(n, levels))
+```
+
+#### threads
+
 ```python
 threads(n: int | None = None, levels: Levels | None = None) -> Generator[None]
 ```
@@ -83,7 +149,7 @@ Raises:
 | ------------ | ------------------------------------------ |
 | `ValueError` | If n is below 1 or levels is neither name. |
 
-Source code in `commol/api/parallelism.py`
+Source code in `commol/parallelism/threads.py`
 
 ```python
 @contextmanager
@@ -119,6 +185,64 @@ def threads(n: int | None = None, levels: Levels | None = None) -> Generator[Non
         variable.reset(token)
 ```
 
+#### get_threads
+
+```python
+get_threads() -> int
+```
+
+The number of threads of the parallel methods in this context.
+
+Returns:
+
+| Type  | Description                                              |
+| ----- | -------------------------------------------------------- |
+| `int` | The number set, or the number of cores when none is set. |
+
+Source code in `commol/parallelism/threads.py`
+
+```python
+def get_threads() -> int:
+    """
+    The number of threads of the parallel methods in this context.
+
+    Returns
+    -------
+    int
+        The number set, or the number of cores when none is set.
+    """
+    return commol_rs.parallelism.current().threads
+```
+
+#### get_levels
+
+```python
+get_levels() -> Levels
+```
+
+The levels that run in parallel in this context.
+
+Returns:
+
+| Type           | Description                                |
+| -------------- | ------------------------------------------ |
+| `{all, outer}` | The levels set, or "all" when none is set. |
+
+Source code in `commol/parallelism/threads.py`
+
+```python
+def get_levels() -> Levels:
+    """
+    The levels that run in parallel in this context.
+
+    Returns
+    -------
+    {"all", "outer"}
+        The levels set, or `"all"` when none is set.
+    """
+    return cast(Levels, commol_rs.parallelism.current().levels)
+```
+
 ## get_threads
 
 ```python
@@ -133,7 +257,7 @@ Returns:
 | ----- | -------------------------------------------------------- |
 | `int` | The number set, or the number of cores when none is set. |
 
-Source code in `commol/api/parallelism.py`
+Source code in `commol/parallelism/threads.py`
 
 ```python
 def get_threads() -> int:
@@ -162,7 +286,7 @@ Returns:
 | -------------- | ------------------------------------------ |
 | `{all, outer}` | The levels set, or "all" when none is set. |
 
-Source code in `commol/api/parallelism.py`
+Source code in `commol/parallelism/threads.py`
 
 ```python
 def get_levels() -> Levels:

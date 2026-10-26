@@ -158,7 +158,7 @@ The results hold a reference to their model, not a copy, and a report reads only
 `SimulationReplicates.report(confidence_level, positions, window, windows, observed_data=(), accumulators=(), prediction_intervals=None)` reports the replicates of a stochastic engine, and `Predictive.report` with the same arguments reports the draws of a [`Predictive`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-predictive). The layout is the one of the report of a run; every number becomes a `{mean, median, ci_lower, ci_upper, min, max}` block, computed per member and then reduced across the members with their weights (equal for replicates). A predictive takes no point estimate: each number comes from the draws only.
 
 ```python
-from commol import ParameterSample, Predictive, SampleMethod
+from commol.uncertainty import ParameterSample, Predictive, SampleMethod
 
 sample = ParameterSample.equally_weighted(
     ["k1"], [(0.0, 1.0)], [[0.35], [0.4], [0.45]], SampleMethod(name="draws")
@@ -172,7 +172,7 @@ print(list(band_report["series"]["A"]))  # ['mean', 'median', 'ci_lower', 'ci_up
 
 ## The report of an identifiability analysis
 
-`IdentifiabilityReport.report()` gives the result of `Calibrator.identifiability`, of `ProfileResult.identifiability()`, or of `IdentifiabilityReport.merge`, as `parameters` (each parameter, in problem order, with its `structural` and `practical` verdicts, their reasons and combinations, or `None`) and `sections` (the evidence of each method that ran, by section name).
+`IdentifiabilityReport.report()` gives the result of `Calibrator.identifiability` (also with `ProfileIdentifiability`), or of `IdentifiabilityReport.merge`, as `parameters` (each parameter, in problem order, with its `structural` and `practical` verdicts, their reasons and combinations, or `None`) and `sections` (the evidence of each method that ran, by section name).
 
 ## Checklist
 

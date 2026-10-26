@@ -58,7 +58,7 @@ See [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/in
 The process is written once. The same builder and structure build a model of another engine: differential equations in continuous time, or a stochastic process of whole units. `plot_compared` draws the runs on the same panels:
 
 ```python
-from commol import plot_compared
+from commol.plotting import plot_compared
 
 differential = Simulation(process.build(structure, engine="DifferentialEquations"))
 stochastic = Simulation(process.build(structure, engine="StochasticEvents"))
@@ -161,7 +161,7 @@ See [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/
 
 ## Log messages
 
-Commol logs with the standard `logging` module, to the logger `commol` and its children, such as `commol.api.simulation` and `commol.api.calibrator`. Commol adds no handler of its own: your application chooses where the messages go. Python shows only warnings and errors until you configure logging.
+Commol logs with the standard `logging` module, to the logger `commol` and its children: the root module logs as `commol`, and each other module as its name, such as `commol.resampling` or `commol.plotting`. Commol adds no handler of its own: your application chooses where the messages go. Python shows only warnings and errors until you configure logging.
 
 To see the messages of commol and of every other library, configure the root logger once, at the start of your program:
 
@@ -173,14 +173,14 @@ logging.basicConfig(level=logging.INFO)
 Simulation(model).run(num_steps=10)
 ```
 
-Each message shows its level and its logger, such as `INFO:commol.api.simulation:Running simulation for 10 steps.`
+Each message shows its level and its logger, such as `INFO:commol:Running simulation for 10 steps.`
 
 | To                                                  | Call                                                                        |
 | --------------------------------------------------- | --------------------------------------------------------------------------- |
 | See the messages of every library                   | `logging.basicConfig(level=logging.INFO)`                                   |
 | Set a level for commol only                         | `logging.getLogger("commol").setLevel(logging.DEBUG)`                       |
 | Send the messages of commol to a place of their own | `logging.getLogger("commol").addHandler(logging.FileHandler("commol.log"))` |
-| Read the messages of one part only                  | `logging.getLogger("commol.api.calibrator")`, with a level or a handler     |
+| Read the messages of one module only                | `logging.getLogger("commol.resampling")`, with a level or a handler         |
 
 See the [logging HOWTO](https://docs.python.org/3/howto/logging.html) for handlers, formats and levels.
 
