@@ -157,7 +157,7 @@ DAILY_DIFFERENTIAL = AxisUnits(step_unit="day", engine="DifferentialEquations")
 class TestRates:
     def test_a_rate_needs_an_engine(self) -> None:
         with pytest.raises(ValueError) as error:
-            AxisUnits(step_unit="day").rate_from_mean_span(4, "day")
+            AxisUnits(step_unit="day").rate_from_mean_span(4, "day", keep="mean")
 
         assert str(error.value) == (
             "A rate needs the engine that reads it: give AxisUnits an engine, "
@@ -173,22 +173,52 @@ class TestRates:
         assert DAILY_DIFFERENTIAL.rate_meaning == "continuous"
 
     def test_a_mean_span_is_converted_to_steps_first(self) -> None:
-        assert DAILY_DIFFERENTIAL.rate_from_mean_span(2, "week") == pytest.approx(
-            1 / 14
-        )
-        assert DAILY_DIFFERENCE.rate_from_mean_span(12, "hour") == pytest.approx(
-            1 - math.exp(-2)
-        )
+        assert DAILY_DIFFERENTIAL.rate_from_mean_span(
+            2, "week", keep="mean"
+        ) == pytest.approx(1 / 14)
+        assert DAILY_DIFFERENCE.rate_from_mean_span(
+            12, "hour", keep="survival"
+        ) == pytest.approx(1 - math.exp(-2))
 
-    def test_a_per_step_rate_from_a_mean_span_has_a_longer_mean(self) -> None:
-        rate = DAILY_DIFFERENCE.rate_from_mean_span(10, "day")
+    def test_a_rate_that_keeps_the_survival(self) -> None:
+        rate = DAILY_DIFFERENCE.rate_from_mean_span(10, "day", keep="survival")
 
+        assert rate == pytest.approx(1 - math.exp(-1 / 10))
         assert 1 / rate == pytest.approx(10.508, abs=1e-3)
+
+    def test_a_rate_that_keeps_the_mean(self) -> None:
+        rate = DAILY_DIFFERENCE.rate_from_mean_span(10, "day", keep="mean")
+        results = Simulation(_outflow(DAILY_DIFFERENCE, rate)).run(1000)
+
+        assert rate == 1 / 10
+        # The mean residence in steps is the sum of the survival over the steps.
+        assert sum(results["A"]) / 1000 == pytest.approx(10, rel=1e-9)
+        with pytest.raises(ValueError) as error:
+            DAILY_DIFFERENCE.rate_from_mean_span(12, "hour", keep="mean")
+        assert str(error.value) == (
+            "A mean span of 0.5 steps has no per-step rate that keeps the mean: "
+            "the mean of a per-step residence is at least one step"
+        )
+
+    def test_a_continuous_rate_keeps_both(self) -> None:
+        assert DAILY_DIFFERENTIAL.rate_from_mean_span(10, "day", keep="survival") == 0.1
+        assert DAILY_DIFFERENTIAL.rate_from_mean_span(10, "day", keep="mean") == 0.1
+
+    def test_what_a_rate_keeps_has_no_default(self) -> None:
+        with pytest.raises(TypeError, match="keep"):
+            DAILY_DIFFERENCE.rate_from_mean_span(10, "day")  # ty: ignore[missing-argument]
+        with pytest.raises(ValueError) as error:
+            DAILY_DIFFERENCE.rate_from_mean_span(10, "day", keep="median")  # ty: ignore[invalid-argument-type]
+
+        assert str(error.value) == (
+            "Unknown value 'median' of what a rate keeps; the values are "
+            '["survival", "mean"]'
+        )
 
     @pytest.mark.parametrize("span", [0.0, -1.0])
     def test_a_non_positive_span_is_rejected(self, span: float) -> None:
         with pytest.raises(ValueError, match="positive"):
-            DAILY_DIFFERENCE.rate_from_mean_span(span, "day")
+            DAILY_DIFFERENCE.rate_from_mean_span(span, "day", keep="survival")
 
     @pytest.mark.parametrize("probability", [-0.1, 1.1])
     def test_a_probability_outside_the_unit_interval_is_rejected(
@@ -234,7 +264,7 @@ class TestRatesMoveTheBinInBothEngines:
     def test_a_rate_from_a_mean_span_keeps_the_exponential_survival(
         self, units: AxisUnits
     ) -> None:
-        rate = units.rate_from_mean_span(MEAN_DAYS, "day")
+        rate = units.rate_from_mean_span(MEAN_DAYS, "day", keep="survival")
 
         results = Simulation(_outflow(units, rate)).run(20)
 
@@ -242,6 +272,3 @@ class TestRatesMoveTheBinInBothEngines:
             assert_close(
                 results["A"][step], 1000 * math.exp(-step / MEAN_DAYS), rel=1e-7
             )
-
-    def test_a_continuous_rate_from_a_mean_span_has_that_mean(self) -> None:
-        assert DAILY_DIFFERENTIAL.rate_from_mean_span(MEAN_DAYS, "day") == 1 / MEAN_DAYS
