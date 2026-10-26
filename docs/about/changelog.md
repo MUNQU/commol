@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `GibbsResult.block_length_estimates`: with `InformationMatchingEta` or
+  `BootstrapCoverageEta` and `block_length="auto"`, the estimate of each
+  series of the automatic block length, by label, as the bootstraps, the
+  jackknife and the sandwich give it; `None` otherwise. See
+  [Sequential Monte Carlo](../guide/uncertainty/smc.md#what-means).
+
 ## [0.10.2] - 2026-10-24
 
 This release makes the engine the one source of every rule: the range of

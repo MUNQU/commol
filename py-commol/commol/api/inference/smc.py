@@ -96,7 +96,9 @@ def run_gibbs_posterior(
     Returns
     -------
     GibbsResult
-        The sample, the levels, the log evidence, the diagnostics and `η`.
+        The sample, the levels, the log evidence, the diagnostics, `η`
+        and, with a calibration of `η` and the automatic block length, its
+        estimates.
     """
     problem = calibrator.rust_problem
     priors = method.priors.rust_priors()
@@ -109,9 +111,10 @@ def run_gibbs_posterior(
     fit: CalibrationResult | None = None
     coverage: float | None = None
     failed: list[str] = []
+    estimates: list[tuple[str, float]] | None = None
     if isinstance(method.eta, InformationMatchingEta):
         fit = calibrator.run(starts=method.eta.starts)
-        eta = rust.information_matching_eta(
+        eta, estimates = rust.information_matching_eta(
             problem,
             fit_values(calibrator, fit),
             rust_block_length(method.eta.block_length),
@@ -131,6 +134,7 @@ def run_gibbs_posterior(
         )
         eta, coverage = found.eta, found.coverage
         failed = log_failed(found.failed, logger)
+        estimates = found.block_length_estimates
     else:
         eta = method.eta
     run = rust.gibbs_posterior(problem, priors, eta, *sampler, calibrator.seed)
@@ -148,6 +152,7 @@ def run_gibbs_posterior(
         fit=fit,
         coverage=coverage,
         failed=failed,
+        block_length_estimates=dict(estimates) if estimates is not None else None,
     )
 
 

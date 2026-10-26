@@ -7,7 +7,7 @@
 //! builds the result.
 
 use crate::parallelism::parallel;
-use commol_inference::resampling::{BlockDrawing, BlockScheme, FitUnit};
+use commol_inference::resampling::{BlockDrawing, BlockScheme, Estimates, FitUnit};
 use commol_inference::smc::{self, AbcTarget, Distance, RandomWalk, SmcRun, SmcSampler, Stop};
 use commol_inference::{Distribution, Family, Priors};
 use commol_random::Generator;
@@ -171,6 +171,8 @@ pub struct PyEtaCoverage {
     coverage: f64,
     /// Each replicate that failed: "Replicate <index> failed: <reason>"
     failed: Vec<String>,
+    /// With the automatic length, the estimate of each series by label
+    block_length_estimates: Option<Vec<(String, f64)>>,
 }
 
 /// The sampler of the settings of a method
@@ -288,6 +290,10 @@ fn bayesian_posterior(
 ///     block_length: Positions per block of the scores, or None for the
 ///         automatic length
 ///
+/// Returns:
+///     η, and with the automatic length the estimate of each series by
+///     label
+///
 /// Raises:
 ///     ValueError: If the loss is not the sum of squares, the engine is
 ///         stochastic, the fit is on a bound, or the blocks are not more
@@ -299,10 +305,12 @@ fn information_matching_eta(
     problem: &PyCalibrationProblem,
     fit: Vec<f64>,
     block_length: Option<i64>,
-) -> PyResult<f64> {
+) -> PyResult<(f64, Option<Estimates>)> {
     let block_length: Option<usize> =
         crate::counts::optional_count(&commol_inference::ranges::BLOCK_LENGTH, block_length)?;
-    smc::information_matching_eta(&problem.inner, &fit, block_length).map_err(method_error)
+    let calibration =
+        smc::information_matching_eta(&problem.inner, &fit, block_length).map_err(method_error)?;
+    Ok((calibration.eta, calibration.estimates))
 }
 
 /// The `η` of bootstrap coverage
@@ -375,6 +383,7 @@ fn bootstrap_coverage_eta(
         eta: calibration.eta,
         coverage: calibration.coverage,
         failed: FitUnit::Replicate.entries(&calibration.failed),
+        block_length_estimates: blocks.estimates().map(<[_]>::to_vec),
     })
 }
 

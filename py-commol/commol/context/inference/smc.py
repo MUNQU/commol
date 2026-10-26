@@ -223,11 +223,15 @@ class GibbsResult(SMCResult):
         With `BootstrapCoverageEta`, each replicate whose sampler failed:
         ``"Replicate <index> failed: <reason>"``, also logged as a warning.
         Empty otherwise.
+    block_length_estimates : dict[str, float] | None
+        With a calibration of `η` and ``block_length="auto"``, the estimate
+        of each series, by label; otherwise None.
     """
 
     eta: float
     fit: CalibrationResult | None
     coverage: float | None
+    block_length_estimates: dict[str, float] | None
     failed: list[str] = Field(default_factory=list)
 
 
