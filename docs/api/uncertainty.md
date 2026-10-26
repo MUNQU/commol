@@ -20,7 +20,7 @@ and the one quantile. Guide: [Uncertainty](../guide/uncertainty/index.md).
 
 ::: commol.uncertainty.predictive.ObservationDraws
 
-::: commol.plotting.accessors.PredictivePlot
+::: commol.uncertainty.plots.PredictivePlot
 
 ::: commol.uncertainty.Scenarios
 

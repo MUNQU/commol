@@ -14,6 +14,8 @@ they return, and its parts. Guide:
 
 ::: commol.identifiability.StartsIdentifiability
 
+::: commol.identifiability.ProfileIdentifiability
+
 ::: commol.identifiability.results.IdentifiabilityReport
 
 ::: commol.identifiability.results.ParameterVerdicts

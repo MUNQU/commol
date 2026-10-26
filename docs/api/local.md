@@ -25,3 +25,5 @@ Laplace mixture, and their results. Guide:
 ::: commol.local.results.ImportanceResult
 
 ::: commol.local.results.MixtureComponent
+
+::: commol.local.results.DeltaBand

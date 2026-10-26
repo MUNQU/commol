@@ -6,8 +6,6 @@ Fits a model to observations. Guide: [Model Calibration](../guide/calibration.md
 
 ::: commol.Calibrator
 
-::: commol.local.results.DeltaBand
-
 ::: commol.CalibrationProblem
 
 ::: commol.Quantile

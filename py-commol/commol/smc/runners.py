@@ -1,5 +1,5 @@
-"""The runners of the sequential Monte Carlo methods, registered for
-``Calibrator.uncertainty``.
+"""The runners of the sequential Monte Carlo methods, which
+``Calibrator.uncertainty`` calls through the ``_runner`` of each method.
 
 Each runner sends its method whole to the engine, which fits the problem and
 calibrates `η` when the method asks, then draws, runs and moves every

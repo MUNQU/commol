@@ -1,5 +1,5 @@
-"""The runners of the profile likelihood, registered for
-``Calibrator.uncertainty``.
+"""The runners of the profile likelihood, which
+``Calibrator.uncertainty`` calls through the ``_runner`` of each method.
 
 Each runner sends its method whole to the engine, which fits the problem,
 calibrates the threshold when a bootstrap calibrates it, and traces every

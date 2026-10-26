@@ -1,5 +1,5 @@
-"""The runners of the resampling methods, registered for
-``Calibrator.uncertainty``.
+"""The runners of the resampling methods, which
+``Calibrator.uncertainty`` calls through the ``_runner`` of each method.
 
 Each runner sends its method whole to the engine, which fits the problem and
 then draws and fits every replicate in parallel.

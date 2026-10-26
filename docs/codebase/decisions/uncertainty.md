@@ -2,7 +2,7 @@
 
 [Back to Design decisions](../design-decisions.md)
 
-How the uncertainty methods share one sample, one registry, one error type,
+How the uncertainty methods share one sample, one entry point, one error type,
 their ports and one sampler, and what a replicate may change.
 
 ## A sample carries its weights
@@ -30,23 +30,23 @@ uncertainty method, `Calibrator.identifiability(method:
 IdentifiabilityMethod[R]) -> R` every identifiability method, and
 `SensitivityAnalysis.run(method: SensitivityMethod[R]) -> R` every sensitivity
 method. The kinds subclass `InferenceMethod[R]` (`_calibration/method.py`)
-and share one registry, which hands each runner the object of its entry
+and `run_method` hands the runner of a method the object of its entry
 point; each entry point refuses another kind with a `TypeError` that names the
 right one.
 A method is three parts: a configuration that subclasses `UncertaintyMethod`
-with its result type and a result, both in the module of its family
-(`resampling/methods.py`, …), and a runner in Rust bound in `py-commol/src/`.
-The Python runner (`resampling/runners.py`, …) registers itself with
-`register` (`_calibration/registry.py`) when the module is imported; the entry
-point looks the runner up
-by the configuration's type and knows no method. A static type checker infers
-`R` from the configuration's type.
+with its result type (`resampling/methods.py`, …), a result
+(`resampling/results.py`, …), and a runner in Rust bound in `py-commol/src/`.
+The configuration names its Python runner (`resampling/runners.py`, …) in the
+class variable `_runner`, so the entry point knows no method and works in any
+order of imports; a runner reads the calibrator through `CalibrationPort`.
+A static type checker infers `R` from the configuration's type.
 
 | Alternative | Why not |
 |---|---|
 | One `Calibrator` method per technique | A class with thirty methods that every method edits. |
 | Free functions | Each repeats the simulation and problem arguments. |
 | `method.run(calibrator)` | The configuration would import the calibrator, and the calibrator the configurations. |
+| A registry that each module of a family fills when it is imported | The entry point would depend on which modules were imported before it ran, and the calibrator imported every family to fill it. |
 
 Every random number of a method comes from the generator and the samplers
 of `commol-random`, seeded from the seed of its source ([Results](results.md#a-method-takes-its-seed-from-its-source-and-fits-from-its-starts))

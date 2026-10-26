@@ -8,12 +8,12 @@ Runs a model and reads its outputs. Guide: [Running Simulations](../guide/simula
 
 ::: commol._simulation.results.SimulationResults
 
-::: commol.plotting.accessors.ResultsPlot
+::: commol._simulation.plots.ResultsPlot
 
 ::: commol._simulation.simulation.ReplicateRuns
 
 ::: commol._simulation.results.SimulationReplicates
 
-::: commol.plotting.accessors.ReplicatesPlot
+::: commol._simulation.plots.ReplicatesPlot
 
 ::: commol.InfeasibleStateError

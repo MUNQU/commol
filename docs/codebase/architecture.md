@@ -87,6 +87,26 @@ through the `SimulationEngine` trait, so it does not depend on a specific
 engine; inference reaches an engine only through the forward model of a
 calibration problem.
 
+## Inside Python
+
+The packages of `py-commol/commol/` form one order, from the root at the top
+to the extension at the bottom, and every import points down
+([The layers of the package](decisions/python-models.md#the-layers-of-the-package)).
+
+```mermaid
+flowchart TB
+    ROOT["commol (the root)"]
+    MET["method families<br/>scores, resampling, profiles, local, smc,<br/>conformal, identifiability, sensitivity"]
+    CAL["_calibration<br/>Calibrator, InferenceMethod, CalibrationPort"]
+    UNC["uncertainty<br/>ParameterSample, Predictive"]
+    SIM["_simulation<br/>Simulation, results, reports, panels"]
+    PLT["plotting<br/>panel and chart types, drawing"]
+    MOD["_model<br/>Model, structures"]
+    SET["settings and values<br/>_problem, observations, _fit, quantities,<br/>distributions, engines, parallelism"]
+    BASE["base<br/>_statistics, _data, _build, commol_rs"]
+    ROOT --> MET --> CAL --> UNC --> SIM --> PLT --> MOD --> SET --> BASE
+```
+
 ## The path of a simulation and a calibration
 
 ```mermaid

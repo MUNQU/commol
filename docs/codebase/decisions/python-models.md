@@ -52,7 +52,7 @@ calibrate. Every other public name is in the module of its page of the guide
 `commol.identifiability`, `commol.sensitivity`), and the root exports no name
 of a module. Each public module is a package that holds its code; the code of
 the root is in private packages (`_model`, `_simulation`, `_calibration`,
-`_problem`, `_fit`, `_data`, `_build`). Each public module logs as
+`_problem`, `_fit`, `_data`, `_statistics`, `_build`). Each public module logs as
 `logging.getLogger("commol.<module>")`, and the code of the root as
 `commol`, so no record names a private path.
 
@@ -67,6 +67,44 @@ the root is in private packages (`_model`, `_simulation`, `_calibration`,
 `tests/suite/test_architecture.py::test_the_packages_are_the_modules`,
 `tests/docs/test_reference.py::test_each_module_has_its_page` and
 `tests/suite/test_logging.py::test_a_record_names_the_public_module`.
+
+## The layers of the package
+
+The packages form one order, and each imports only the packages below it:
+at the top of a module, in a function and under `TYPE_CHECKING` alike. From
+the bottom:
+
+| Layers | What they hold |
+|---|---|
+| `commol_rs`, `_build`, `_data`, `_statistics` | The extension, the build, the base of every data object with the port of the bridge, the weighted statistics |
+| `parallelism`, `engines`, `distributions`, `quantities`, `_fit`, `observations`, `_problem` | Settings and values that read no model |
+| `_model` | The model and its structure |
+| `plotting` | The one drawing layer: data types of panels and charts, and the drawing |
+| `_simulation` | Runs and replicates, their reports and the data of their figures |
+| `uncertainty` | A sample, its predictive and the data of its figures |
+| `_calibration` | The calibrator and the bases of the methods (`InferenceMethod`, `CalibrationPort`, `run_method`) |
+| `scores`, `resampling`, `profiles`, `local`, `smc`, `conformal`, `identifiability`, `sensitivity` | The method families, each with its methods, results and runners |
+| `commol` | The root, which imports what the main flow writes |
+
+A package that needs something of a package above it reads it through a
+protocol of its own: `_model` reads a sample through `SummarizedSample`
+(`_model/report_entry.py`), a report and a figure read prediction intervals
+through `PredictionIntervalsData` (`_data/intervals.py`), `plot_compared`
+reads a result through `PanelSource` (`plotting/panels.py`), and a runner
+reads a calibrator through `CalibrationPort` (`_calibration/method.py`).
+Code that serves one object lives with it: the block of
+`IdentifiabilityReport.report` in `identifiability/report.py`, the delta band
+of a local approximation in `LocalResult.delta_band`. Each method names its
+runner in the class variable `_runner`, so the calibrator imports no method.
+
+| Alternative | Why not |
+|---|---|
+| An order with listed exceptions | Each exception is a cycle that the next change makes longer; the test would guard less with each one. |
+| Imports upward in a function or under `TYPE_CHECKING` only | They hide the cycle from Python, not from the reader or the type checker: the lower package still depends on the upper one. |
+| A registry that each family of methods fills when it is imported | The result of an entry point depends on which modules were imported before; a method that names its runner works in any order of imports. |
+
+**Guards:** `tests/suite/test_architecture.py::test_the_dependencies_point_one_way`
+and `tests/suite/test_architecture.py::test_the_check_names_an_import_upward`.
 
 ## A value of a model has its rule in the engine
 

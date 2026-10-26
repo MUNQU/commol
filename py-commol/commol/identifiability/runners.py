@@ -1,9 +1,12 @@
-"""The runners of the identifiability methods.
+"""The runners of the identifiability methods, which
+``Calibrator.identifiability`` calls through the ``_runner`` of each method.
 
 Each runner sends its method whole to the engine, with the handle of the
 result the method reads, and builds the `IdentifiabilityReport` from the
 analysis. The engine checks the engine type and the parameter names; no
 runner computes a derivative, a rank or a statistic.
+`run_profile_identifiability` calls no engine: it reads the verdicts of a
+`ProfileResult` that the profile likelihood already computed.
 """
 
 from collections.abc import Sequence

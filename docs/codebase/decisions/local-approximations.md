@@ -116,17 +116,20 @@ no noise scale, so its curvature is no inverse variance. The message names
 `NormalObservations(sd="sd")` with a noise parameter, whose fit estimates
 the scale by maximum likelihood (`SSE/n`, narrower than `SSE/(n − p)` by
 `√(n/(n − p))`), and the sandwich, which needs no noise model. A result
-holds only data: `Calibrator.delta_band(result, positions, confidence_level)` reads the
-problem from the calibrator, so a result read back from JSON gives the same
-band.
+holds only data: `LocalResult.delta_band(calibrator, positions, confidence_level)`
+reads the problem from the calibrator it is given, through `CalibrationPort`
+(`_calibration/method.py`), so a result read back from JSON gives the same
+band, and the calibrator knows no method of `commol.local`.
 
 | Alternative | Why not |
 |---|---|
 | A variance scale `SSE / (n − p)` | It assumes normal, independent noise of one size, which a loss does not state. |
 | `LaplaceResult.delta_band` with a private reference to the problem | A result read back from JSON has none. |
+| `Calibrator.delta_band(result, …)` | The calibrator would import `commol.local`, a package above it, and grow with each method that gives a band. |
 
 **Guards:** `tests/uncertainty/test_local.py::TestLaplace::test_laplace_refuses_a_loss`,
-`tests/uncertainty/test_local.py::TestLaplace::test_a_result_read_from_json_gives_the_same_delta_band`.
+`tests/uncertainty/test_local.py::TestLaplace::test_a_result_read_from_json_gives_the_same_delta_band`,
+`tests/uncertainty/test_local.py::test_a_delta_band_comes_from_the_local_module`.
 
 ## PSIS lives in commol-inference
 

@@ -355,18 +355,18 @@ held-out positions above, and say whether you score a band of the model
 Every method runs through `Calibrator.uncertainty(method)`. A method is a
 configuration, a subclass of `UncertaintyMethod[R]` whose type parameter `R` is
 its result; the call returns an `R`, which a static type checker infers from
-the configuration's type. A configuration with no registered runner raises a
-`ValueError` that names the registered ones.
+the configuration's type. Each configuration names the function that runs
+it; one that names none raises a `ValueError`.
 
 The identifiability methods run through their own entry point,
 `Calibrator.identifiability(method)`, with a subclass of
 `IdentifiabilityMethod[R]`: they answer another question
 ([Identifiability](identifiability.md)). Both kinds subclass
-`InferenceMethod[R]` and share one registry; each entry point refuses the
+`InferenceMethod[R]`; each entry point refuses the
 other kind with a `TypeError` that names the right one. The sensitivity
 methods, subclasses of `SensitivityMethod[R]`, run with no data through
 `SensitivityAnalysis(simulation, inputs).run(method)`, the third entry point
-of the registry ([Sensitivity Analysis](sensitivity.md)).
+([Sensitivity Analysis](sensitivity.md)).
 
 ```python
 from commol.resampling import BayesianBootstrap

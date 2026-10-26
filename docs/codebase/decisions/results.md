@@ -211,8 +211,11 @@ A report is a method of the object of results whose data it describes:
 replicates of a stochastic engine), `Predictive.report` (the draws of a
 sample), `Model.applied_parameters` (calibrated parameters, and the sections
 of the model kind: `initial_amounts` and `category_splits` for an aggregate
-model) and `IdentifiabilityReport.report`. The private functions of
-`_simulation/reports.py` build the blocks, which are data, not documents. No module
+model) and `IdentifiabilityReport.report`. Private functions in the package
+of each object build its block, which is data, not a document:
+`_simulation/reports.py` for a run and an ensemble,
+`_model/applied_parameters.py` for the applied parameters and
+`identifiability/report.py` for an identifiability analysis. No module
 function reports anything.
 
 | Rule | Why, against the alternative |
@@ -220,6 +223,7 @@ function reports anything.
 | The report of a run is on the results, not on `Simulation` | `Simulation.report(results, ...)` puts the report on the object that produces the data and takes the data as an argument; `results.report(simulation, ...)` takes two objects that must agree. |
 | `SimulationResults` and `SimulationReplicates` hold a reference to their `Model`, which `Simulation.run`, `run_at` and `replicates` set; `Predictive` reads it through `source.simulation` | A report reads the outputs of each bin and accumulator (`ModelStructure.outputs_by_source`); a copy of that map would be a second source of truth, and the figures also need `series_label`. A report reads only the structure, never the values of the parameters, so a later `update_parameters` does not change it. `Model` holds no Rust object, so results still pickle. Results built by hand have no model, and a report that needs one raises `ValueError` that names the bin or accumulator. |
 | `Predictive.report` takes no point estimate | Each leaf of an ensemble comes from its members only; the mean of the draws is not a run of the model. |
+| The block of a report lives in the package of its object | A module of every block imports every object it reports, against the order of the layers ([Python models](python-models.md#the-layers-of-the-package)); the block changes with its object. |
 | `Model.applied_parameters` is on the model | Most of the block is data of the model (one row per parameter, the sections of its structure); the values and the problem only add what calibration set. |
 
 - A single run and an ensemble (replicates or a `Predictive`) differ only at

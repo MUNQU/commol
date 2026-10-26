@@ -1,5 +1,5 @@
-"""The runners of the sensitivity methods, registered for
-``SensitivityAnalysis.run``.
+"""The runners of the sensitivity methods, which
+``SensitivityAnalysis.run`` calls through the ``_runner`` of each method.
 
 Each runner sends its method whole to the engine, with the forward analysis
 of the inputs (`ForwardAnalysis`); the engine builds the design, runs it

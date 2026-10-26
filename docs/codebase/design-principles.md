@@ -23,13 +23,16 @@ with the better structure, also when it costs more work.
 3. **Each boundary is a port.** Two layers meet through one small typed
    interface: each data object as the JSON of its dump, the stub of the extension
    (`commol_rs/_commol_rs.pyi`), a trait (`SimulationEngine`), a protocol
-   (`PredictiveSource`). An adapter implements it. Change an adapter without
+   (`PredictiveSource`, `CalibrationPort`, `PanelSource`). An adapter
+   implements it. Dependencies point one way: a package reads a package
+   above it only through a protocol of its own
+   ([Python models](decisions/python-models.md#the-layers-of-the-package)). Change an adapter without
    a change to the core.
 4. **Decide in the core, act at the edge.** A function that decides does no
    input or output: a crate returns the information to its caller and never
    prints. A function that does input or output decides nothing:
-   `plotting/panels.py` gives the data of each panel, and
-   `plotting/figures.py` draws it. A test of a decision needs no fake.
+   each result gives the data of its panels (`_simulation/panels.py`,
+   `uncertainty/panels.py`), and `plotting/figures.py` draws it. A test of a decision needs no fake.
 
 ## Each unit
 

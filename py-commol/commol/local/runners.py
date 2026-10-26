@@ -1,5 +1,5 @@
-"""The runners of the local approximations, registered for
-``Calibrator.uncertainty``.
+"""The runners of the local approximations, which
+``Calibrator.uncertainty`` calls through the ``_runner`` of each method.
 
 Each runner sends its method whole to the engine, which fits the problem,
 differentiates it at the fit, or at the end of each start, and draws on the

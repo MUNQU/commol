@@ -1,5 +1,5 @@
-"""The runners of the conformal methods, registered for
-``Calibrator.uncertainty``.
+"""The runners of the conformal methods, which
+``Calibrator.uncertainty`` calls through the ``_runner`` of each method.
 
 Each runner sends its method whole to the engine, with the handle of its
 sample when its predictor is a sample; the engine fits the problem when the

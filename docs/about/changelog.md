@@ -20,8 +20,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for the variants without blocks. See
   [Sequential Monte Carlo](../guide/uncertainty/smc.md#what-means) and
   [Conformal Prediction Intervals](../guide/uncertainty/conformal.md#results-plots-and-reports).
+- `ProfileIdentifiability(result=profiles)` in `commol.identifiability`: the
+  identifiability report of the verdicts of a `ProfileResult`, run through
+  `Calibrator.identifiability` as every identifiability method. It runs no
+  model, and it refuses the profiles of another problem with a `ValueError`
+  that names the parameters of both. See
+  [Profile Likelihood](../guide/uncertainty/profiles.md#verdicts-and-the-identifiability-report).
 
 ### Changed
+
+- **Breaking:** `Calibrator.delta_band(result, positions, confidence_level)`
+  is `LocalResult.delta_band(calibrator, positions, confidence_level)`, a
+  method of the result of `Laplace` and of `Sandwich`. `DeltaBand`
+  is documented with `commol.local`. Migration:
+  `calibrator.delta_band(laplace, [10, 20], 0.9)` is
+  `laplace.delta_band(calibrator, [10, 20], 0.9)`. See
+  [Local Approximations](../guide/uncertainty/local.md).
+- **Breaking:** `ProfileResult.identifiability()` is removed. Migration:
+  `profiles.identifiability()` is
+  `calibrator.identifiability(ProfileIdentifiability(result=profiles))`.
 
 - **Breaking:** each public name outside the main flow lives in the module of
   its page of the guide, and the root `commol` holds only the main flow:

@@ -138,8 +138,8 @@ changing it ([Design decisions](decisions/uncertainty.md#methods-plug-into-one-e
       binding maps it with `method_error`, and the "Raises" section of its
       docstring lists `ValueError` and `RuntimeError` by that rule
       ([Design decisions](decisions/uncertainty.md#methods-raise-one-error-type)).
-- [ ] The Python runner (`resampling/runners.py`, …), which sends the method whole and calls
-      `register(YourMethod, runner)` (`_calibration/registry.py`); the module of the family imports it.
+- [ ] The configuration (`resampling/methods.py`, …) names its runner
+      (`resampling/runners.py`, …) in `_runner`, which sends the method whole.
 - [ ] A coverage study (`tests/support/coverage.py`, marker `coverage_study`)
       that shows its intervals cover at their level.
 - [ ] A guide page under `docs/guide/uncertainty/`, a row in the table
@@ -259,7 +259,7 @@ To add a kind of model, such as an agent network (see
 ### Reports
 
 - [ ] Make a report a method of the object of results whose data it
-      describes; its block is a private function of `_simulation/reports.py`.
+      describes; its block lives in the package of that object.
 - [ ] Keep the key order of existing entries.
 - [ ] Put a section that only one model kind has in its
       `ModelStructure.report_sections`, not in `_simulation/reports.py`.
