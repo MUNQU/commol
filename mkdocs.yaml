@@ -107,6 +107,7 @@ validation:
   anchors: warn
 
 markdown_extensions:
+  - sane_lists
   - pymdownx.highlight: # Code highlighting
       anchor_linenums: true
       line_spans: __span
@@ -209,6 +210,7 @@ nav:
               - Figures: codebase/decisions/figures.md
               - Security: codebase/decisions/security.md
           - Conventions: codebase/conventions.md
+          - Design Principles: codebase/design-principles.md
           - Tests: codebase/tests.md
           - Coverage and Mutation Testing: codebase/coverage.md
           - Maintainer Playbook: codebase/maintainer-playbook.md

@@ -21,7 +21,7 @@ the [documentation definition of done](docs/codebase/conventions.md#documentatio
 1. Read [Mental model](docs/codebase/mental-model.md) (5 minutes) and look at
    the diagrams of [Architecture](docs/codebase/architecture.md).
 2. Find the owner of the behavior in [Repository map](docs/codebase/repository-map.md).
-3. Read only the page of your area in [Design decisions](docs/codebase/design-decisions.md).
+3. Read the [Design principles](docs/codebase/design-principles.md) and only the page of your area in [Design decisions](docs/codebase/design-decisions.md).
 4. Follow the checklist for your change in the [Maintainer playbook](docs/codebase/maintainer-playbook.md).
 5. Update the documentation as the [definition of done](docs/codebase/conventions.md#documentation-definition-of-done) requires.
 
