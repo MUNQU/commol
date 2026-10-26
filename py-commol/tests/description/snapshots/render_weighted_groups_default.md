@@ -67,9 +67,9 @@ The graph of the expanded compartments has 6 nodes and 3 edges; it is not drawn 
 
 $$
 \begin{aligned}
-A_{g1,t1} \to B_{g1,t1} &: \frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{((A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})) \cdot A_{g1,t1}} \\
-A_{g1,t2} \to B_{g1,t2} &: \frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{((A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})) \cdot A_{g1,t2}} \\
-A_{g2} \to B_{g2} &: \frac{s \cdot k \cdot (0.5 \cdot (B_{g1,t1} + B_{g1,t2}) + B_{g2})}{(0.5 \cdot (A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + (A_{g2} + B_{g2})) \cdot A_{g2}}
+A_{g1,t1} \to B_{g1,t1} &: \frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{(A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})} \cdot A_{g1,t1} \\
+A_{g1,t2} \to B_{g1,t2} &: \frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{(A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})} \cdot A_{g1,t2} \\
+A_{g2} \to B_{g2} &: \frac{s \cdot k \cdot (0.5 \cdot (B_{g1,t1} + B_{g1,t2}) + B_{g2})}{0.5 \cdot (A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + (A_{g2} + B_{g2})} \cdot A_{g2}
 \end{aligned}
 $$
 
@@ -79,12 +79,12 @@ Total System: 6 coupled equations (2 bins × 2 group × 2 tier)
 
 $$
 \begin{aligned}
-\frac{A_{g1,t1}(t+\Delta t) - A_{g1,t1}(t)}{\Delta t} &= - (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{((A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})) \cdot A_{g1,t1}}) \\
-\frac{A_{g1,t2}(t+\Delta t) - A_{g1,t2}(t)}{\Delta t} &= - (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{((A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})) \cdot A_{g1,t2}}) \\
-\frac{A_{g2}(t+\Delta t) - A_{g2}(t)}{\Delta t} &= - (\frac{s \cdot k \cdot (0.5 \cdot (B_{g1,t1} + B_{g1,t2}) + B_{g2})}{(0.5 \cdot (A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + (A_{g2} + B_{g2})) \cdot A_{g2}}) \\
-\frac{B_{g1,t1}(t+\Delta t) - B_{g1,t1}(t)}{\Delta t} &= (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{((A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})) \cdot A_{g1,t1}}) \\
-\frac{B_{g1,t2}(t+\Delta t) - B_{g1,t2}(t)}{\Delta t} &= (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{((A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})) \cdot A_{g1,t2}}) \\
-\frac{B_{g2}(t+\Delta t) - B_{g2}(t)}{\Delta t} &= (\frac{s \cdot k \cdot (0.5 \cdot (B_{g1,t1} + B_{g1,t2}) + B_{g2})}{(0.5 \cdot (A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + (A_{g2} + B_{g2})) \cdot A_{g2}})
+\frac{A_{g1,t1}(t+\Delta t) - A_{g1,t1}(t)}{\Delta t} &= - (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{(A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})} \cdot A_{g1,t1}) \\
+\frac{A_{g1,t2}(t+\Delta t) - A_{g1,t2}(t)}{\Delta t} &= - (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{(A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})} \cdot A_{g1,t2}) \\
+\frac{A_{g2}(t+\Delta t) - A_{g2}(t)}{\Delta t} &= - (\frac{s \cdot k \cdot (0.5 \cdot (B_{g1,t1} + B_{g1,t2}) + B_{g2})}{0.5 \cdot (A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + (A_{g2} + B_{g2})} \cdot A_{g2}) \\
+\frac{B_{g1,t1}(t+\Delta t) - B_{g1,t1}(t)}{\Delta t} &= (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{(A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})} \cdot A_{g1,t1}) \\
+\frac{B_{g1,t2}(t+\Delta t) - B_{g1,t2}(t)}{\Delta t} &= (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{(A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})} \cdot A_{g1,t2}) \\
+\frac{B_{g2}(t+\Delta t) - B_{g2}(t)}{\Delta t} &= (\frac{s \cdot k \cdot (0.5 \cdot (B_{g1,t1} + B_{g1,t2}) + B_{g2})}{0.5 \cdot (A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + (A_{g2} + B_{g2})} \cdot A_{g2})
 \end{aligned}
 $$
 

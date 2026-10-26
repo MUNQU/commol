@@ -61,20 +61,20 @@ B\_g2 & B & group=g2 \\
 \subsubsection*{Bin Transitions}
 \noindent\texttt{ab (A -\textgreater{} B)}
 \begin{align*}
-A_{g1,t1} \to B_{g1,t1} &: \frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{((A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})) \cdot A_{g1,t1}} \\
-A_{g1,t2} \to B_{g1,t2} &: \frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{((A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})) \cdot A_{g1,t2}} \\
-A_{g2} \to B_{g2} &: \frac{s \cdot k \cdot (0.5 \cdot (B_{g1,t1} + B_{g1,t2}) + B_{g2})}{(0.5 \cdot (A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + (A_{g2} + B_{g2})) \cdot A_{g2}}
+A_{g1,t1} \to B_{g1,t1} &: \frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{(A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})} \cdot A_{g1,t1} \\
+A_{g1,t2} \to B_{g1,t2} &: \frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{(A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})} \cdot A_{g1,t2} \\
+A_{g2} \to B_{g2} &: \frac{s \cdot k \cdot (0.5 \cdot (B_{g1,t1} + B_{g1,t2}) + B_{g2})}{0.5 \cdot (A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + (A_{g2} + B_{g2})} \cdot A_{g2}
 \end{align*}
 Total System: 6 coupled equations (2 bins $\times$ 2 group $\times$ 2 tier)
 
 \subsection*{Expanded form}
 \begin{align*}
-\frac{A_{g1,t1}(t+\Delta t) - A_{g1,t1}(t)}{\Delta t} &= - (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{((A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})) \cdot A_{g1,t1}}) \\
-\frac{A_{g1,t2}(t+\Delta t) - A_{g1,t2}(t)}{\Delta t} &= - (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{((A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})) \cdot A_{g1,t2}}) \\
-\frac{A_{g2}(t+\Delta t) - A_{g2}(t)}{\Delta t} &= - (\frac{s \cdot k \cdot (0.5 \cdot (B_{g1,t1} + B_{g1,t2}) + B_{g2})}{(0.5 \cdot (A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + (A_{g2} + B_{g2})) \cdot A_{g2}}) \\
-\frac{B_{g1,t1}(t+\Delta t) - B_{g1,t1}(t)}{\Delta t} &= (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{((A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})) \cdot A_{g1,t1}}) \\
-\frac{B_{g1,t2}(t+\Delta t) - B_{g1,t2}(t)}{\Delta t} &= (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{((A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})) \cdot A_{g1,t2}}) \\
-\frac{B_{g2}(t+\Delta t) - B_{g2}(t)}{\Delta t} &= (\frac{s \cdot k \cdot (0.5 \cdot (B_{g1,t1} + B_{g1,t2}) + B_{g2})}{(0.5 \cdot (A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + (A_{g2} + B_{g2})) \cdot A_{g2}})
+\frac{A_{g1,t1}(t+\Delta t) - A_{g1,t1}(t)}{\Delta t} &= - (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{(A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})} \cdot A_{g1,t1}) \\
+\frac{A_{g1,t2}(t+\Delta t) - A_{g1,t2}(t)}{\Delta t} &= - (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{(A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})} \cdot A_{g1,t2}) \\
+\frac{A_{g2}(t+\Delta t) - A_{g2}(t)}{\Delta t} &= - (\frac{s \cdot k \cdot (0.5 \cdot (B_{g1,t1} + B_{g1,t2}) + B_{g2})}{0.5 \cdot (A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + (A_{g2} + B_{g2})} \cdot A_{g2}) \\
+\frac{B_{g1,t1}(t+\Delta t) - B_{g1,t1}(t)}{\Delta t} &= (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{(A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})} \cdot A_{g1,t1}) \\
+\frac{B_{g1,t2}(t+\Delta t) - B_{g1,t2}(t)}{\Delta t} &= (\frac{s \cdot k \cdot ((B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot B_{g2})}{(A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + 0.5 \cdot (A_{g2} + B_{g2})} \cdot A_{g1,t2}) \\
+\frac{B_{g2}(t+\Delta t) - B_{g2}(t)}{\Delta t} &= (\frac{s \cdot k \cdot (0.5 \cdot (B_{g1,t1} + B_{g1,t2}) + B_{g2})}{0.5 \cdot (A_{g1,t1} + A_{g1,t2} + B_{g1,t1} + B_{g1,t2}) + (A_{g2} + B_{g2})} \cdot A_{g2})
 \end{align*}
 \subsection*{Neighbors}
 Units are neighbors by the categories of 'group' (Groups): in a compartment of category g, neighbors\_\textless{}bin\textgreater{} is the sum over g' of w[g][g'] times the amount of the bin in g', and neighbors the same sum over every bin. The weights w[g][g'] are:
