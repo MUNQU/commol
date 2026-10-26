@@ -36,6 +36,8 @@
 //! - A formula nests at most [`MAX_NESTING`] levels deep: parentheses,
 //!   calls, signs and powers. A sum or a product of any number of terms is
 //!   one level.
+//! - The tree of a formula has at most [`MAX_NODES`] nodes: numbers,
+//!   variables, operators and calls.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError};
@@ -49,7 +51,7 @@ pub mod variables;
 // Re-export main types
 pub use context::MathExpressionContext;
 pub use error::MathExpressionError;
-pub use jit::parser::MAX_NESTING;
+pub use jit::parser::{MAX_NESTING, MAX_NODES};
 pub use jit::{JITCompiler, JITFunction};
 pub use language::{Arguments, FUNCTIONS, Function};
 pub use variables::{ENGINE_VARIABLES, SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX};
@@ -137,7 +139,7 @@ impl MathExpression {
         self.compiled.as_deref().map_err(|reason| {
             MathExpressionError::InvalidExpression(format!(
                 "'{}' does not compile: {reason}",
-                self.formula
+                error::quoted(&self.formula)
             ))
         })
     }
@@ -160,9 +162,11 @@ impl MathExpression {
     /// Returns [`MathExpressionError::NotInLanguage`], which names the
     /// formula and the first part of it that is not in the language: a
     /// formula that does not parse or that nests deeper than
-    /// [`MAX_NESTING`], a function that is not one of
-    /// [`FUNCTIONS`] or that has the wrong number of arguments, `&&` or `||`,
-    /// or a comparison or `!` outside the condition of an `if`.
+    /// [`MAX_NESTING`], a tree of more than [`MAX_NODES`] nodes, a function
+    /// that is not one of [`FUNCTIONS`] or that has the wrong number of
+    /// arguments, `&&` or `||`, or a comparison or `!` outside the condition
+    /// of an `if`. The message quotes the formula cut
+    /// ([`error::quoted`]).
     pub fn check(&self) -> Result<usize, MathExpressionError> {
         let outside = |reason: String| MathExpressionError::NotInLanguage {
             formula: self.formula.clone(),
@@ -381,6 +385,24 @@ mod tests {
                 .check()
                 .unwrap(),
             1
+        );
+    }
+
+    #[test]
+    fn a_formula_that_does_not_compile_is_quoted_cut() {
+        let formula = format!("{}typeof(k1)", "k1 + ".repeat(20));
+        let expr = MathExpression::new(formula);
+        let mut ctx = MathExpressionContext::new();
+        ctx.set_parameter("k1".to_string(), 0.5);
+
+        assert!(
+            expr.evaluate(&mut ctx)
+                .unwrap_err()
+                .to_string()
+                .starts_with(&format!(
+                    "Invalid expression: '{}…' does not compile: ",
+                    "k1 + ".repeat(16)
+                ))
         );
     }
 

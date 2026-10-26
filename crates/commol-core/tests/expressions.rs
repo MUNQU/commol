@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use commol_core::math_expression::MAX_NESTING;
+use commol_core::math_expression::{MAX_NESTING, MAX_NODES};
 use commol_core::{FUNCTIONS, MathExpression, MathExpressionContext};
 
 /// The message of the check of `formula`.
@@ -12,6 +12,16 @@ fn rejection(formula: &str) -> String {
         .check()
         .expect_err(formula)
         .to_string()
+}
+
+/// `formula` as a message quotes it: its first 80 characters and "…" when
+/// it is longer.
+fn quoted(formula: &str) -> String {
+    if formula.chars().count() > 80 {
+        format!("{}…", formula.chars().take(80).collect::<String>())
+    } else {
+        formula.to_string()
+    }
 }
 
 /// The value of `formula` with `x` at 2.5, `k1` at 0.3 and the step at
@@ -225,8 +235,9 @@ fn a_formula_deeper_than_the_limit_is_rejected() {
             assert_eq!(
                 rejection(&deeper),
                 format!(
-                    "Formula '{deeper}': it nests deeper than {MAX_NESTING} levels of \
-                     parentheses, calls, signs and powers"
+                    "Formula '{}': it nests deeper than {MAX_NESTING} levels of \
+                     parentheses, calls, signs and powers",
+                    quoted(&deeper)
                 )
             );
         }
@@ -276,6 +287,22 @@ fn a_chain_of_terms_is_one_level_and_adds_from_the_left() {
     assert_eq!(value("1 + 1e16 - 1e16", 0.0), 0.0);
     assert_eq!(value("1 + (1e16 - 1e16)", 0.0), 1.0);
     assert_eq!(value("2 / 4 * 8 % 3", 0.0), 1.0);
+}
+
+#[test]
+fn a_formula_of_more_nodes_than_the_limit_is_rejected_before_it_compiles() {
+    // A sum of n terms has 2n - 1 nodes.
+    let formula = vec!["x"; MAX_NODES / 2 + 1].join(" + ");
+
+    assert_eq!(
+        rejection(&formula),
+        format!(
+            "Formula '{}': it has {} nodes (numbers, variables, operators and calls), more \
+             than the limit of {MAX_NODES}",
+            quoted(&formula),
+            MAX_NODES + 1
+        )
+    );
 }
 
 #[test]

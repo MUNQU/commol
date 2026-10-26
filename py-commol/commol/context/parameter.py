@@ -12,7 +12,6 @@ from pydantic import (
 )
 
 from commol.commol_rs import _commol_rs as commol_rs
-from commol.utils.security import validate_expression_security
 
 
 class SeriesValue(BaseModel):
@@ -110,17 +109,15 @@ class Parameter(BaseModel):
             return value
         if isinstance(value, (int, float)):
             return float(value)
-        if not value.strip():
-            raise ValueError("Formula cannot be empty")
         return value.strip()
 
     @model_validator(mode="after")
     def validate_formula(self) -> Self:
-        """Check a formula value as a rate is checked: the security check and
-        the check of the language of formulas."""
+        """Check a formula value as a rate is checked, with the parser of the
+        engine."""
         if isinstance(self.value, str):
             try:
-                validate_expression_security(self.value)
+                commol_rs.core.MathExpression(self.value).check()
             except ValueError as error:
                 raise ValueError(f"Parameter '{self.id}': {error}")
         return self

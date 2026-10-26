@@ -10,7 +10,7 @@ tests are `#[cfg(test)]` modules and the `tests/` folder of each crate.
 
 A test goes in the package of the guide page that documents the behavior it
 checks, so "where is the test of X" has the same answer as "where is the guide
-of X". A pure-Python helper (`utils/security.py`, `context/axis_units.py`,
+of X". A pure-Python helper (`context/axis_units.py`,
 `api/inference/intervals.py`) goes in the package of its feature. The exceptions are
 `reference_models/`, which checks published models across features (see
 [Reference models](#reference-models)), and `model_kinds/`, which runs a model
@@ -20,7 +20,7 @@ kind that is not aggregate through every generic layer.
 |---|---|---|
 | `building/` | The builder, parameters, stratifications, reserved names, save and load | [Building Models](../guide/building-models.md) |
 | `transitions/` | Flows, `$compartment`, stratified rates, impulses | [Transitions](../guide/transitions.md) |
-| `rates/` | Formulas, functions, variables, expression security | [Mathematical Expressions](../guide/mathematical-expressions.md) |
+| `rates/` | Formulas, functions, variables, the rules and limits of a formula | [Mathematical Expressions](../guide/mathematical-expressions.md) |
 | `axis_patterns/` | `AxisPattern` formulas, runs and schedules | [Axis Patterns](../guide/axis-patterns.md) |
 | `initial_conditions/` | Bin, stratification and compartment fractions; the initial state | [Building Models](../guide/building-models.md#the-structure-aggregate) |
 | `simulation/` | Runs, `run_at`, results and their positions, differential models, outputs, the window grid and windowed totals, `AxisUnits` | [Running Simulations](../guide/simulations.md) |

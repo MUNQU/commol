@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A formula has at most 100 000 nodes (numbers, variables, operators and
+  calls), next to its limit of 100 levels of nesting: a longer one raises
+  `ValueError` when its object is built, before it compiles. A message of
+  the parser or of the compiler quotes the formula cut after its first 80
+  characters. See
+  [Limits of the parser](../guide/mathematical-expressions.md#limits-of-the-parser).
+
+### Removed
+
+- **Breaking:** `commol.utils.security` is removed, with `SecurityConfig`,
+  `SecurityError`, `validate_expression_security` and the `config=` argument
+  of `AxisPattern.combine` and `AxisPattern.from_formula`. The parser of the
+  engine is the only check of a formula: a rate, a formula parameter, a
+  calibration constraint or an axis pattern that it rejects raises
+  `ValueError` with its message, and no setting changes its limits. Remove
+  the `config=` argument, and catch `ValueError` instead of `SecurityError`.
+  A formula of the language that the old text guards rejected is now valid:
+  a name with letters outside ASCII (`α * β`), a name such as `__import__`,
+  `os` or `my_key`, a number such as `1e400`, `nan` as the name of a
+  variable, and a formula of more than 1000 nodes, 10 000 characters or 10
+  levels of nesting, within the limits of the parser. The
+  build still rejects a variable that the model does not define. See
+  [Limits of the parser](../guide/mathematical-expressions.md#limits-of-the-parser).
+
 ## [0.10.2] - 2026-10-24
 
 This release makes the engine the one source of every rule: the range of
