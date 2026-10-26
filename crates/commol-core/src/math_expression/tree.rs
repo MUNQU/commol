@@ -1,6 +1,6 @@
 //! The tree of a formula as JSON: the port through which an edge reads the
-//! tree that the parser reads ([`Expr`]), so that no edge reads the text of
-//! a formula.
+//! tree that the parser reads ([`Expr`](super::jit::ast::Expr)), so that no
+//! edge reads the text of a formula.
 //!
 //! The tree is the one the JIT compiles, with the grouping of the parser: a
 //! chain of one level applies from the left, and a chain of powers groups
