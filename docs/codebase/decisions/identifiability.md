@@ -88,7 +88,7 @@ evaluated again at a tighter accuracy when its rank is below the number of
 parameters differentiated. The sections name the parameters left out in
 `left_out`; a noise parameter has the structural verdict `None`, with the
 reason, and no practical verdict from collinearity. A problem with no other
-parameter is an error.
+parameter is an error, and collinearity needs at least 2 of them.
 
 | Alternative | Why not |
 |---|---|
@@ -100,7 +100,10 @@ parameter is an error.
 **Guards:** `crates/commol-inference/tests/test_identifiability.rs`
 (`a_noise_parameter_is_left_out_of_the_structural_rank`,
 `a_noise_parameter_is_left_out_of_the_collinearity`,
-`a_rank_with_only_noise_parameters_is_an_error`),
+`a_combination_names_the_parameters_by_their_index_in_the_problem`,
+`a_rank_with_only_noise_parameters_is_an_error`,
+`a_subset_larger_than_the_differentiated_parameters_is_an_error`,
+`collinearity_needs_two_parameters_that_are_not_noise_parameters`),
 `tests/uncertainty/test_identifiability_noise.py`,
 `tests/uncertainty/test_identifiability_report.py::TestReport::test_a_noise_parameter_leaves_the_verdicts_of_the_others_alone`.
 

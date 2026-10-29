@@ -103,8 +103,9 @@ class Collinearity(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
         summarized by the weighted median.
     max_subset_size : int
         The largest subset, at least 2 and at most the number of parameters
-        that are not noise parameters. Every subset up to 6 parameters is
-        evaluated; a greedy search adds parameters above.
+        that are not noise parameters, of which there must be at least 2.
+        Every subset up to 6 parameters is evaluated; a greedy search adds
+        parameters above.
     threshold : float
         The index below which a subset can be fitted together. No default:
         it is a modelling judgment.

@@ -54,6 +54,8 @@ _NOISE_PARAMETER = (
 def _left_out(names: list[str], differentiated: list[int]) -> dict[str, str]:
     """The parameters of `names` that are not `differentiated`, by index,
     each with the reason."""
+    # The engine leaves out only the noise parameters: `differentiated_columns`
+    # in `crates/commol-inference/src/identifiability/mod.rs`.
     return {
         name: _NOISE_PARAMETER
         for index, name in enumerate(names)
@@ -197,7 +199,7 @@ def run_structural_rank(
     structural: dict[str, StructuralVerdict] = {
         name: StructuralVerdict(
             verdict=None,
-            reasons=[f"Structural rank on the observations: left out, {why}."],
+            reasons=[f"Structural rank on the observations: left out as {why}."],
         )
         for name, why in section.left_out.items()
     }

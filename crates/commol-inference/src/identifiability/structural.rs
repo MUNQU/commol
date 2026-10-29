@@ -25,7 +25,7 @@
 
 use commol_calibration::start_points;
 
-use super::{differentiated, skippable};
+use super::{differentiated_columns, skippable};
 use crate::error::MethodError;
 use commol_core::{Accuracy, AccuracySettings};
 
@@ -209,7 +209,7 @@ pub fn structural_rank<S: SensitivitySource>(
         .check(points)
         .map_err(MethodError::Invalid)?;
     let parameters = source.parameters();
-    let columns = differentiated(parameters, "StructuralRank")?;
+    let differentiated = differentiated_columns(parameters, "StructuralRank")?;
     let accuracy = source.accuracy();
     let tighter = source.accuracy_settings().and_then(|settings| {
         let accuracy = tighter_than(accuracy)?;
@@ -225,7 +225,7 @@ pub fn structural_rank<S: SensitivitySource>(
         .into_iter()
         .skip(1)
     {
-        let sensitivities = match source.scaled_jacobian(&values, &columns) {
+        let sensitivities = match source.scaled_jacobian(&values, &differentiated) {
             Ok(sensitivities) => sensitivities,
             Err(error) if skippable(&error) => {
                 skipped.push(error.to_string());
@@ -235,8 +235,8 @@ pub fn structural_rank<S: SensitivitySource>(
         };
         let evaluation = Evaluation::of(&sensitivities);
         let again = match &tighter {
-            Some((tighter, source)) if evaluation.rank < columns.len() => {
-                match source.scaled_jacobian(&values, &columns) {
+            Some((tighter, source)) if evaluation.rank < differentiated.len() => {
+                match source.scaled_jacobian(&values, &differentiated) {
                     Ok(sensitivities) => Some((tighter.accuracy, Evaluation::of(&sensitivities))),
                     Err(error) => {
                         unchecked.push(error.to_string());
@@ -269,14 +269,14 @@ pub fn structural_rank<S: SensitivitySource>(
         });
     }
     let loose: Vec<&Evaluation> = evaluations.iter().collect();
-    let (generic_rank, projections, generic) = projections_of(&loose, columns.len());
+    let (generic_rank, projections, generic) = projections_of(&loose, differentiated.len());
     let verdicts = verdicts_of(&projections);
     let tight: Vec<&Evaluation> = evaluations
         .iter()
         .zip(&tighter_evaluations)
         .map(|(loose, tight)| tight.as_ref().unwrap_or(loose))
         .collect();
-    let (tight_rank, tight_projections, _) = projections_of(&tight, columns.len());
+    let (tight_rank, tight_projections, _) = projections_of(&tight, differentiated.len());
     let tight_verdicts = verdicts_of(&tight_projections);
     let tighter_generic_rank = tighter_evaluations
         .iter()
@@ -290,7 +290,7 @@ pub fn structural_rank<S: SensitivitySource>(
             (verdict == tight && checked).then_some(verdict)
         })
         .collect();
-    let combined: Vec<usize> = (0..columns.len())
+    let combined: Vec<usize> = (0..differentiated.len())
         .filter(|&j| verdicts[j] == StructuralVerdict::InCombination)
         .collect();
     let combinations = combinations(&evaluations[generic].null_space, &combined)
@@ -305,14 +305,14 @@ pub fn structural_rank<S: SensitivitySource>(
             exponents: combination
                 .exponents
                 .into_iter()
-                .map(|(j, exponent)| (columns[j], exponent))
+                .map(|(j, exponent)| (differentiated[j], exponent))
                 .collect(),
         })
         .collect();
     Ok(StructuralAnalysis {
         points: ranks,
         skipped,
-        parameters: columns,
+        parameters: differentiated,
         generic_rank,
         projections,
         verdicts: resolved,

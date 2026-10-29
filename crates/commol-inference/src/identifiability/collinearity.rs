@@ -24,7 +24,7 @@
 use commol_statistics::statistics::quantiles;
 use rayon::prelude::*;
 
-use super::{PracticalVerdict, differentiated, skippable};
+use super::{PracticalVerdict, differentiated_columns, skippable};
 use crate::error::MethodError;
 use crate::sensitivity::{Matrix, SensitivitySource};
 
@@ -121,7 +121,8 @@ fn index_of_normalized(normalized: &Matrix) -> f64 {
 ///
 /// [`MethodError::Invalid`] when there is no point, the weights do not match
 /// the points, `threshold` is outside its range
-/// ([`crate::ranges::THRESHOLD`]), every parameter is a noise parameter, or
+/// ([`crate::ranges::THRESHOLD`]), fewer than 2 parameters are not noise
+/// parameters, or
 /// `max_subset_size` is outside its range
 /// ([`crate::ranges::MAX_SUBSET_SIZE`]) or above the number of parameters
 /// that are not noise parameters; [`MethodError::NoFeasiblePoint`] when every
@@ -145,8 +146,13 @@ pub fn collinearity<S: SensitivitySource>(
         )));
     }
     let parameters = source.parameters();
-    let differentiated = differentiated(parameters, "Collinearity")?;
+    let differentiated = differentiated_columns(parameters, "Collinearity")?;
     let count = differentiated.len();
+    if count < 2 {
+        return Err(MethodError::Invalid(format!(
+            "Collinearity needs at least 2 parameters that are not noise parameters, got {count}"
+        )));
+    }
     crate::ranges::MAX_SUBSET_SIZE
         .at_most(count)
         .check(max_subset_size)

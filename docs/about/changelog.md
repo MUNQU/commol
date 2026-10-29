@@ -257,8 +257,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   noise parameter; both sections name it in the new field `left_out`, with
   the reason, and `IdentifiabilityReport.report()` gives `left_out` after
   `skipped`. `Collinearity(max_subset_size=...)` is at most the number of
-  parameters that are not noise parameters, and a problem whose calibrated
-  parameters are all noise parameters is a `ValueError` for both methods.
+  parameters that are not noise parameters, `Collinearity` needs at least 2
+  of them, and a problem whose calibrated parameters are all noise
+  parameters is a `ValueError` for both methods.
   Migration: read the verdict of a noise parameter from
   `StartsIdentifiability`, `SampleIdentifiability` or the profiles; read
   `left_out` for the parameters a section leaves out; lower a

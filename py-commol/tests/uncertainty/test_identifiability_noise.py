@@ -32,14 +32,14 @@ def test_a_noise_parameter_has_no_structural_verdict() -> None:
     assert (phi.verdict, phi.reasons) == (
         None,
         [
-            "Structural rank on the observations: left out, a noise parameter "
+            "Structural rank on the observations: left out as a noise parameter "
             "of an observation model, which no prediction reads."
         ],
     )
 
 
 def test_a_rank_with_only_noise_parameters_is_an_error() -> None:
-    calibrator = overdispersed_calibrator(noise_only=True)
+    calibrator = overdispersed_calibrator(rates=())
 
     with pytest.raises(
         ValueError, match="StructuralRank has no parameter to differentiate"
@@ -87,4 +87,23 @@ def test_a_subset_larger_than_the_parameters_that_are_not_noise_is_an_error() ->
     assert str(error.value) == (
         "max_subset_size is a whole number from 2 to 2, got 3: 2 of the 3 "
         "parameters are not noise parameters"
+    )
+
+
+def test_collinearity_needs_two_parameters_that_are_not_noise_parameters() -> None:
+    calibrator = overdispersed_calibrator(rates=("k1",))
+    at = CalibrationResult(
+        best_parameters={"k1": 0.4, "phi": 0.1},
+        final_loss=0.0,
+        iterations=0,
+        converged=True,
+        termination_reason="given",
+        seed=0,
+    )
+
+    with pytest.raises(ValueError) as error:
+        calibrator.identifiability(Collinearity(at=at, max_subset_size=2, threshold=10))
+
+    assert str(error.value) == (
+        "Collinearity needs at least 2 parameters that are not noise parameters, got 1"
     )

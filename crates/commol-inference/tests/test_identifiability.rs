@@ -812,3 +812,19 @@ fn a_subset_larger_than_the_differentiated_parameters_is_an_error() {
         )
     );
 }
+
+#[test]
+fn collinearity_needs_two_parameters_that_are_not_noise_parameters() {
+    let jacobian = Matrix::from_row_slice(2, 2, &[1.0, 0.0, 0.0, 0.0]);
+    let source = Fixed::with_noise(vec![jacobian], &[1]);
+
+    let error = collinearity(&source, &[vec![0.0; 2]], &[1.0], 2, 10.0).unwrap_err();
+
+    assert_eq!(
+        error,
+        MethodError::Invalid(
+            "Collinearity needs at least 2 parameters that are not noise parameters, got 1"
+                .to_string()
+        )
+    );
+}

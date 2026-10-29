@@ -232,7 +232,7 @@ prediction: its column of the sensitivities is zero. `StructuralRank` and
 | Method | A noise parameter |
 |---|---|
 | `StructuralRank` | Not in the rank, the singular values, `projections` or `verdicts` of the section; its structural `verdict` is `None`, with the reason. The generic rank is at most the number of the other parameters |
-| `Collinearity` | Not in `sensitivity`, `pair_gamma` or a subset; no other parameter is collinear with it; no practical verdict. `max_subset_size` is at most the number of the other parameters |
+| `Collinearity` | Not in `sensitivity`, `pair_gamma` or a subset; no other parameter is collinear with it; no practical verdict. `max_subset_size` is at most the number of the other parameters, and it needs at least 2 of them |
 
 Each section names the parameters it leaves out in `left_out`, each with the
 reason. The verdict of a noise parameter comes from the methods that read the

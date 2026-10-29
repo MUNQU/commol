@@ -74,7 +74,7 @@ fn skippable(error: &SensitivityError) -> bool {
 /// # Errors
 ///
 /// [`MethodError::Invalid`] when every parameter is a noise parameter.
-fn differentiated(
+fn differentiated_columns(
     parameters: &[CalibrationParameter],
     method: &str,
 ) -> Result<Vec<usize>, MethodError> {
