@@ -2,6 +2,8 @@
 //! expands into, whatever engine runs it.
 
 use crate::core::{aggregate, model, process};
+use commol_core::StratificationFractions;
+use commol_core::json::Pairs;
 use pyo3::prelude::*;
 
 /// Expand a process into its compartments and their initial amounts
@@ -133,18 +135,20 @@ fn transition_flows(
         .collect())
 }
 
-/// Check an aggregate model: its variant and neighbors, the positions of its
-/// series and impulses, the variables its rates read, and its names against
-/// the names the engine provides
+/// Check an aggregate model: its variant and neighbors, its stratification
+/// fractions against its stratifications, the positions of its series and
+/// impulses, the variables its rates read, and its names against the names
+/// the engine provides
 ///
 /// Args:
 ///     model: The JSON of an aggregate model
 ///
 /// Raises:
-///     ValueError: If the model is not aggregate, its variant or neighbors
-///         do not fit the process, a series point or an impulse position is
-///         one the engine cannot run, a parameter id is an expanded compartment,
-///         a subgroup total or a name of the neighbors, a rate uses a
+///     ValueError: If the model is not aggregate, its variant, neighbors or
+///         stratification fractions do not fit the process, a series point
+///         or an impulse position is one the engine cannot run, a parameter
+///         id is an expanded compartment, a subgroup total or a name of the
+///         neighbors, a rate uses a
 ///         `total_…` name that is not a subgroup total of the model, or a
 ///         rate reads neighbors the model cannot resolve
 #[pyfunction]
@@ -242,23 +246,21 @@ fn check_compartment_amounts(amounts: Vec<(String, f64)>) -> PyResult<()> {
         .map_err(value_error)
 }
 
-/// Check the fractions of each stratification, as `(stratification,
-/// [(category, fraction)])`: each from 0 to 1, and a sum of 1 within 1e-6
+/// Check the fractions of each stratification, the JSON of
+/// `stratification_fractions`: in each split, each fraction from 0 to 1, and
+/// a sum of 1 within 1e-6
 ///
 /// Raises:
 ///     ValueError: With the message of the first rule the fractions break,
-///         which names the stratification
+///         which names the stratification, and the category of the
+///         stratification a split by category differs by
 #[pyfunction]
-fn check_fractions(stratifications: Vec<(String, Vec<(String, f64)>)>) -> PyResult<()> {
-    stratifications
+fn check_fractions(fractions: &str) -> PyResult<()> {
+    crate::json::read::<Pairs<StratificationFractions>>(fractions)?
+        .0
         .iter()
         .try_for_each(|(stratification, fractions)| {
-            commol_model::rules::check_fractions(
-                stratification,
-                fractions
-                    .iter()
-                    .map(|(category, fraction)| (category.as_str(), *fraction)),
-            )
+            commol_model::rules::check_fractions(stratification, fractions)
         })
         .map_err(value_error)
 }
@@ -301,6 +303,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(check_fractions, m)?)?;
     m.add_function(wrap_pyfunction!(check_impulse, m)?)?;
     m.add_function(wrap_pyfunction!(check_series, m)?)?;
+    m.add("FRACTIONS_BY", commol_core::FRACTIONS_BY)?;
     m.add("NEIGHBORS", commol_core::NEIGHBORS)?;
     m.add("NEIGHBORS_PREFIX", commol_core::NEIGHBORS_PREFIX)?;
     m.add("ENGINE_VARIABLES", commol_core::ENGINE_VARIABLES.to_vec())?;

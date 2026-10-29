@@ -16,7 +16,11 @@ from pydantic import Field
 
 from commol._model import engine_state
 from commol._model.engine_state import InitialCompartment
-from commol._model.initial_conditions import InitialConditions
+from commol._model.initial_conditions import (
+    InitialConditions,
+    category_splits,
+    split_by,
+)
 from commol._model.neighbors import _Neighbors
 from commol._model.process import Process
 from commol._model.structure import ModelStructure, ReportSections, SeriesLabel
@@ -52,11 +56,17 @@ class Aggregate(ModelStructure, InitialConditions):
         The amount of each bin at the start, by bin id, in the unit of the
         bin, such as ``{"A": 990, "B": 10, "C": 1e5}``; finite and not
         negative. None leaves an amount for calibration.
-    stratification_fractions : dict[str, dict[str, float]]
-        The fraction of each category, by stratification id, such as
-        ``{"group": {"g1": 0.3, "g2": 0.7}}``: the split of the amount of
-        every bin it applies to. A conditional stratification splits only the
-        group its conditions select.
+    stratification_fractions : dict[str, dict]
+        The fraction of each category, by stratification id, a
+        ``dict[str, float]`` such as ``{"group": {"g1": 0.3, "g2": 0.7}}``:
+        the split of the amount of every bin it applies to. A stratification
+        may instead split each category of a stratification declared before
+        it by its own fractions, a ``dict[str, str | dict[str, float]]`` such
+        as ``{"type": {"by": "group", "g1": {"t1": 0.25, "t2": 0.75},
+        "g2": {"t1": 0.5, "t2": 0.5}}}``: the compartment ``A_g1_t1`` then
+        starts with the amount of ``A`` times 0.3 times 0.25. Every
+        compartment of ``type`` needs a category of ``group``. A conditional
+        stratification splits only the group its conditions select.
     compartment_amounts : dict[str, float]
         Amounts of single expanded compartments, such as ``{"A_g1": 0.0}``,
         applied after the expansion. The names are checked against the engine
@@ -82,11 +92,13 @@ class Aggregate(ModelStructure, InitialConditions):
         Check the structure against the process and the parameters.
 
         The process needs a bin and a transition, the amounts must name every
-        bin and the fractions every category of the process, and the engine
-        must plan every transition, accept every id (no parameter id is an
-        engine variable, a bin, a compartment or a subgroup total), resolve
-        the neighbors, find every variable a rate or a formula parameter
-        reads, and build the initial state.
+        bin, and the engine must check the fractions against the
+        stratifications (every stratification and category named, a split by
+        category by a stratification declared before it), plan every
+        transition, accept every id (no parameter id is an engine variable, a
+        bin, a compartment or a subgroup total), resolve the neighbors, find
+        every variable a rate or a formula parameter reads, and build the
+        initial state.
 
         Parameters
         ----------
@@ -104,7 +116,6 @@ class Aggregate(ModelStructure, InitialConditions):
         if not process.transitions:
             raise ValueError("At least one transition must be defined.")
         self._check_bin_amounts(process)
-        self._check_stratification_fractions(process)
         engine_state.transition_flows(process, self)
         engine_state.check_model(model)
         if self.compartment_amounts:
@@ -494,33 +505,46 @@ class Aggregate(ModelStructure, InitialConditions):
                 f"Extra ids: {sorted(actual_bins - expected_bins)}."
             )
 
-    def _check_stratification_fractions(self, process: Process) -> None:
-        """Check that the fractions name each stratification and its
-        categories; the rule of their values is the engine's, checked when the
-        structure is built."""
-        strat_map = {strat.id: strat for strat in process.stratifications}
-        actual_strat = set(self.stratification_fractions)
-        expected_strat = set(strat_map)
-        if actual_strat != expected_strat:
-            raise ValueError(
-                f"Initial stratification fractions keys must exactly match "
-                f"stratification ids. "
-                f"Missing ids: {sorted(expected_strat - actual_strat)}, "
-                f"Extra ids: {sorted(actual_strat - expected_strat)}."
-            )
 
-        for strat_id, fractions in self.stratification_fractions.items():
-            strat_instance = strat_map[strat_id]
+def split_groups(
+    structure: Aggregate, process: Process, stratification: str
+) -> list[tuple[tuple[str, ...], dict[str, float]]]:
+    """
+    Each split of a stratification, with the categories that select the
+    group it splits.
 
-            expected = set(strat_instance.categories)
-            actual = set(fractions)
-            if actual != expected:
-                raise ValueError(
-                    f"Categories for stratification '{strat_id}' must exactly "
-                    f"match defined categories in instance '{strat_instance.id}'. "
-                    f"Missing categories: {sorted(expected - actual)}, "
-                    f"Extra categories: {sorted(actual - expected)}."
-                )
+    The group of one split is the group the conditions of the stratification
+    select (`Aggregate.get_conditioning_categories`). The group of each split
+    of a split by category adds the category of the stratification it differs
+    by, so ``("g1",)`` for the split of ``g1``.
+
+    Parameters
+    ----------
+    structure : Aggregate
+        The structure that holds the fractions.
+    process : Process
+        The process of the model, such as ``model.process``.
+    stratification : str
+        Id of a stratification of the process.
+
+    Returns
+    -------
+    list[tuple[tuple[str, ...], dict[str, float]]]
+        The category ids of the group and the fraction of each category, one
+        entry per split.
+    """
+    conditions = structure.get_conditioning_categories(process, stratification)
+    fractions = structure.stratification_fractions[stratification]
+    by = split_by(fractions)
+    return [
+        (
+            conditions
+            if of is None or by is None
+            else (*conditions, structure.category_id(by, of)),
+            split,
+        )
+        for of, split in category_splits(fractions)
+    ]
 
 
 def _unit_name(unit: str | None) -> str:

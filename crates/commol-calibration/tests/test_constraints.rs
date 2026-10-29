@@ -14,7 +14,7 @@ use commol_model::CompartmentalEngine;
 /// The rate of the engines of the tests that read a matrix sum.
 const SUM: &str = "k * matrix_sum(M, B / total)";
 
-/// A → B in `g1` and `g2`, at `rate`, with the matrix `M` = [[2, 1], [1, 3]]
+/// A → B in `g1` and `g2`, each bin split evenly, at `rate`, with the matrix `M` = [[2, 1], [1, 3]]
 /// whose row of `g1` the parameter `a1` scales and whose column of `g2` the
 /// parameter `b2` scales. `k` is to calibrate; `a1` and `b2` have the values
 /// given, or none.
@@ -32,7 +32,8 @@ fn engine_of(rate: &str, a1: Option<f64>, b2: Option<f64>) -> DifferenceEquation
         "row_scales":{{"g1":"a1"}},"column_scales":{{"g2":"b2"}}}}],
         "transitions":[{{"id":"ab","source":["A"],"target":["B"],
         "rate":"{rate}"}}]}},
-        "structure":{{"kind":"aggregate","bin_amounts":{{"A":900.0,"B":100.0}}}}}}"#
+        "structure":{{"kind":"aggregate","bin_amounts":{{"A":900.0,"B":100.0}},
+        "stratification_fractions":{{"group":{{"g1":0.5,"g2":0.5}}}}}}}}"#
     );
     let model: Model = serde_json::from_str(&json).expect("valid model JSON");
     DifferenceEquations::try_from_model(&model).unwrap()

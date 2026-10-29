@@ -50,9 +50,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   model, and it refuses the profiles of another problem with a `ValueError`
   that names the parameters of both. See
   [Profile Likelihood](../guide/uncertainty/profiles.md#verdicts-and-the-identifiability-report).
+- The fractions of a stratification can differ by the category of a
+  stratification declared before it:
+  `stratification_fractions={"type": {"by": "group", "g1": {"t1": 0.25,
+  "t2": 0.75}, "g2": {"t1": 0.5, "t2": 0.5}}}`. The stratifications stay
+  apart, so a rate reads `A_g1` and a condition names `g1`. The engine checks
+  that `by` is declared before, that every compartment of the stratification
+  has a category of it, and each split, with a message that names the
+  stratification and the category. See
+  [Building Models](../guide/building-models.md#fractions-that-differ-by-category).
 
 ### Changed
 
+- The engine checks that the fractions name every stratification and each of
+  its categories, from `check_model`; the messages list the ids as the engine
+  writes them, `Missing ids: ["g"], Extra ids: []`, and the message of the
+  categories reads `The fractions of stratification 'g' must name exactly its
+  categories. Missing categories: ["g2"], Extra categories: ["g3"].`
 - **Breaking:** `Calibrator.delta_band(result, positions, confidence_level)`
   is `LocalResult.delta_band(calibrator, positions, confidence_level)`, a
   method of the result of `Laplace` and of `Sandwich`. `DeltaBand`
@@ -308,6 +322,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   each replicate. The cumulative figure of a `Predictive` raises the
   `ValueError` of its other figures for a factor that the problem does not
   have; before, it drew the observation as if the factor were 1.
+- A calibrated amount of a bin whose amount is `None`, or of a remainder whose
+  compartments start at `0`, split evenly among its compartments. It now
+  splits by the stratification fractions, as the amount of the model does,
+  also within a prefix whose own fraction is 0.
 - A number that is not finite in a model or in the settings of an engine
   reached the engine as `null`. An infinite tolerance of `ODESolver` raised
   a message about the type of the setting, and an infinite parameter value

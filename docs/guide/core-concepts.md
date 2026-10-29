@@ -337,7 +337,7 @@ overridden.structure.update_stratification_fractions({"g1": 0.7})  # g2 becomes 
 | Method | Rule |
 |---|---|
 | `update_bin_amounts` | Each amount is finite and not negative, or `None` for calibration. The other bins keep their amounts. |
-| `update_stratification_fractions` | Within each stratification you may omit one category; it receives what remains of 1, or 0 when the given fractions pass 1. Omitting two raises. Each fraction is from 0 to 1 and the fractions sum to 1 within 1e-6, with the rule of the engine; a rejected call changes no fraction. |
+| `update_stratification_fractions` | Within each stratification you may omit one category; it receives what remains of 1, or 0 when the given fractions pass 1. Omitting two raises. Each fraction is from 0 to 1 and the fractions sum to 1 within 1e-6, with the rule of the engine; a rejected call changes no fraction. A stratification whose fractions [differ by category](building-models.md#fractions-that-differ-by-category) takes the values in every split. |
 
 A category name that two stratifications declare must be qualified with its
 stratification, as in `{"group:g1": 0.5}`. Calibration writes its results back

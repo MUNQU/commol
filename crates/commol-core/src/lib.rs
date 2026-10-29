@@ -59,11 +59,11 @@ pub use simulation_engine::{
 pub use scaled_matrix::{MatrixScale, ScaledMatrix};
 pub use types::{
     Accumulator, Aggregate, AggregateVariant, Bin, CategoryMatrix, DynamicsForm, EngineSettings,
-    EngineType, EventMethod, InitialConditions, Model, ModelEngine, ModelKind, ModelStructure,
-    ModelValueType, NEIGHBORS, NEIGHBORS_PREFIX, Neighbors, OdeMethod, OdeSolver, Parameter,
-    ParameterValue, Process, RateKeeps, RateMeaning, Rounding, SeriesMode,
+    EngineType, EventMethod, FRACTIONS_BY, InitialConditions, Model, ModelEngine, ModelKind,
+    ModelStructure, ModelValueType, NEIGHBORS, NEIGHBORS_PREFIX, Neighbors, OdeMethod, OdeSolver,
+    Parameter, ParameterValue, Process, RateKeeps, RateMeaning, Rounding, SeriesMode,
     StochasticEventsSettings, StochasticStepsSettings, Stratification, StratificationCondition,
-    StratifiedRate, Transition,
+    StratificationFractions, StratifiedRate, Transition,
 };
 #[cfg(feature = "test-kind")]
 pub use types::{DecayOutput, TestStructure};

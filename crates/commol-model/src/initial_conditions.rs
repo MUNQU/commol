@@ -17,6 +17,11 @@
 //! compartment, so a compartment that no value covers, such as a bin of
 //! another unit, keeps its amount and cancels out. Within a layer, values are
 //! written in the order given.
+//!
+//! A bin value, and the remainder, split among their compartments as the
+//! initial state does; compartments that hold nothing, such as those of a bin
+//! whose amount is left for calibration, split as the stratification
+//! fractions declare within them ([`crate::CompiledModel::fractions`]).
 
 use commol_core::{ModelValue, ModelValueType, ValuePlan};
 
@@ -34,28 +39,96 @@ const EXCESS_TOLERANCE: f64 = 1e-9;
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum InitialConditionTarget {
     /// A bin or a bin prefix. The value is the amount the covered
-    /// compartments hold, shared by weights taken from the initial state.
+    /// compartments hold, shared by weights taken from the initial state, or
+    /// from the fractions when the compartments hold nothing ([`weights`]).
     Aggregate { entries: Vec<(usize, f64)> },
     /// One expanded compartment. The value is its amount.
     Exact { index: usize },
     /// A category of a binary stratification. The value splits each
-    /// `(category, complement)` pair of compartments.
-    PairedCategory { pairs: Vec<(usize, usize)> },
+    /// `(category, complement)` pair of groups of compartments: one
+    /// compartment each, or, when a later stratification is split by this one,
+    /// every compartment of that stratification, which keeps its split within
+    /// its side ([`weights`]).
+    PairedCategory {
+        pairs: Vec<(Vec<usize>, Vec<usize>)>,
+    },
+}
+
+/// The share of a value each compartment of `indices` takes: its share of
+/// their amounts in `state`; when they hold nothing, its share of the split
+/// the fractions declare within them; and an even split when that split
+/// gives them nothing either.
+///
+/// The split within them is the product of the fractions that differ
+/// between them. A fraction they all take scales every share alike, so it
+/// leaves the split as it is, or, when it is 0, empties every share: a side
+/// of a category, or a bin prefix, whose own fraction is 0 still takes the
+/// split of the stratifications within it.
+///
+/// `fractions` holds the fraction of each category of each compartment, in
+/// the order of the categories of its `labels`.
+fn weights(
+    indices: &[usize],
+    state: &[f64],
+    labels: &[OutputLabels],
+    fractions: &[Vec<f64>],
+) -> Vec<f64> {
+    let normalized = |of: Vec<f64>| {
+        let total: f64 = of.iter().sum();
+        (total > 0.0).then(|| of.iter().map(|value| value / total).collect())
+    };
+    let amounts = indices.iter().map(|&idx| state[idx]).collect();
+    if let Some(weights) = normalized(amounts) {
+        return weights;
+    }
+    let of = |idx: usize| {
+        labels[idx]
+            .categories
+            .iter()
+            .map(|(id, _)| id.as_str())
+            .zip(fractions[idx].iter().copied())
+    };
+    // A compartment outside a conditional stratification is not split by it.
+    let fraction = |idx: usize, id: &str| {
+        of(idx)
+            .find(|(stratification, _)| *stratification == id)
+            .map_or(1.0, |(_, value)| value)
+    };
+    // Each compartment against the first, once per stratification of either.
+    let first = indices[0];
+    let mut differing: Vec<&str> = Vec::new();
+    for &idx in &indices[1..] {
+        let mut differ = |id, value, other| {
+            if value != fraction(other, id) && !differing.contains(&id) {
+                differing.push(id);
+            }
+        };
+        of(idx).for_each(|(id, value)| differ(id, value, first));
+        of(first).for_each(|(id, value)| differ(id, value, idx));
+    }
+    let split = indices
+        .iter()
+        .map(|&idx| {
+            of(idx)
+                .filter(|(id, _)| differing.contains(id))
+                .map(|(_, value)| value)
+                .product()
+        })
+        .collect();
+    normalized(split).unwrap_or_else(|| vec![1.0 / indices.len() as f64; indices.len()])
 }
 
 impl InitialConditionTarget {
-    fn aggregate(indices: Vec<usize>, state: &[f64]) -> Self {
-        let total: f64 = indices.iter().map(|&idx| state[idx]).sum();
+    fn aggregate(
+        indices: Vec<usize>,
+        state: &[f64],
+        labels: &[OutputLabels],
+        fractions: &[Vec<f64>],
+    ) -> Self {
         let entries = indices
             .iter()
-            .map(|&idx| {
-                let weight = if total > 0.0 {
-                    state[idx] / total
-                } else {
-                    1.0 / indices.len() as f64
-                };
-                (idx, weight)
-            })
+            .copied()
+            .zip(weights(&indices, state, labels, fractions))
             .collect();
         Self::Aggregate { entries }
     }
@@ -119,14 +192,21 @@ impl InitialConditionPlan {
         let compartments = engine.compartments();
         let labels = compartment_labels(engine);
         let state = engine.initial_state();
+        let fractions = engine.model().fractions();
+        let splits_by = engine.model().splits_by();
 
         let targets = values
             .iter()
             .map(|value| match value.value_type {
-                ModelValueType::InitialCondition => {
-                    resolve_target(&value.id, &compartments, &labels, &state)
-                        .map(|target| (value.id.clone(), target))
-                }
+                ModelValueType::InitialCondition => resolve_target(
+                    &value.id,
+                    &compartments,
+                    &labels,
+                    &state,
+                    fractions,
+                    splits_by,
+                )
+                .map(|target| (value.id.clone(), target)),
             })
             .collect::<Result<Vec<_>, String>>()?;
 
@@ -286,15 +366,11 @@ impl InitialConditionPlan {
         };
         let remainder = remainder.max(0.0);
 
-        let current: f64 = indices.iter().map(|&idx| state[idx]).sum();
-        for &idx in indices {
-            let share = if current > 0.0 {
-                state[idx] / current
-            } else {
-                1.0 / indices.len() as f64
-            };
+        let model = engine.model();
+        let weights = weights(indices, &state, model.output_labels(), model.fractions());
+        for (&idx, weight) in indices.iter().zip(weights) {
             engine
-                .set_initial_condition(idx, remainder * share)
+                .set_initial_condition(idx, remainder * weight)
                 .map_err(|e| format!("Failed to set the initial-condition remainder: {}", e))?;
         }
         Ok(feasible_or(excess))
@@ -337,10 +413,21 @@ fn write_target<E: CompartmentalEngine>(
         }
         InitialConditionTarget::PairedCategory { pairs } => {
             let state = engine.initial_state();
-            for &(category_idx, complement_idx) in pairs {
-                let pair_total = state[category_idx] + state[complement_idx];
-                engine.set_initial_condition(category_idx, value * pair_total)?;
-                engine.set_initial_condition(complement_idx, (1.0 - value) * pair_total)?;
+            let model = engine.model();
+            let mut writes = Vec::new();
+            for (category, complement) in pairs {
+                let pair_total: f64 = category.iter().chain(complement).map(|&i| state[i]).sum();
+                for (side, part) in [(category, value), (complement, 1.0 - value)] {
+                    let weights = weights(side, &state, model.output_labels(), model.fractions());
+                    writes.extend(
+                        side.iter()
+                            .zip(weights)
+                            .map(|(&idx, weight)| (idx, part * pair_total * weight)),
+                    );
+                }
+            }
+            for (idx, amount) in writes {
+                engine.set_initial_condition(idx, amount)?;
             }
         }
     }
@@ -374,15 +461,19 @@ fn resolve_target(
     compartments: &[String],
     labels: &[OutputLabels],
     state: &[f64],
+    fractions: &[Vec<f64>],
+    splits_by: &[(String, String)],
 ) -> Result<InitialConditionTarget, String> {
     if let Some(index) = compartments.iter().position(|name| name == id) {
         return Ok(InitialConditionTarget::Exact { index });
     }
     if let Some((stratification, category)) = id.split_once(CATEGORY_SEPARATOR) {
-        return paired_category(stratification, category, labels);
+        return paired_category(stratification, category, labels, splits_by);
     }
     if let Some(indices) = prefix_indices(id, labels) {
-        return Ok(InitialConditionTarget::aggregate(indices, state));
+        return Ok(InitialConditionTarget::aggregate(
+            indices, state, labels, fractions,
+        ));
     }
 
     let mut stratifications: Vec<&str> = Vec::new();
@@ -394,7 +485,7 @@ fn resolve_target(
         }
     }
     match stratifications.as_slice() {
-        [stratification] => paired_category(stratification, id, labels),
+        [stratification] => paired_category(stratification, id, labels, splits_by),
         [] => Err(format!(
             "Invalid bin, compartment or category '{}' for initial condition \
              calibration (available compartments: {})",
@@ -415,49 +506,70 @@ fn resolve_target(
     }
 }
 
-/// Pairs each compartment of a category with the compartment that differs
-/// only in that stratification.
+/// Pairs the compartments of a category with those that differ from them
+/// only in that stratification and in the stratifications split by it,
+/// directly or through another (`splits_by`, `(stratification, by)` pairs),
+/// so a later stratification that differs by the category keeps its split
+/// on each side.
 fn paired_category(
     stratification: &str,
     category: &str,
     labels: &[OutputLabels],
+    splits_by: &[(String, String)],
 ) -> Result<InitialConditionTarget, String> {
     let qualified = format!("{stratification}{CATEGORY_SEPARATOR}{category}");
-    let mut pairs = Vec::new();
-    for (category_idx, label) in labels.iter().enumerate() {
-        if label.category(stratification) != Some(category) {
+    let mut follows: Vec<&str> = vec![stratification];
+    while let Some((split, _)) = splits_by
+        .iter()
+        .find(|(split, by)| follows.contains(&by.as_str()) && !follows.contains(&split.as_str()))
+    {
+        follows.push(split);
+    }
+    // The source and the categories outside `follows` of each compartment.
+    let keys: Vec<(&str, Vec<&(String, String)>)> = labels
+        .iter()
+        .map(|label| {
+            let rest = label
+                .categories
+                .iter()
+                .filter(|(id, _)| !follows.contains(&id.as_str()))
+                .collect();
+            (label.source.as_str(), rest)
+        })
+        .collect();
+    let mut pairs: Vec<(Vec<usize>, Vec<usize>)> = Vec::new();
+    let mut paired: Vec<usize> = Vec::new();
+    for (index, label) in labels.iter().enumerate() {
+        if label.category(stratification) != Some(category) || paired.contains(&index) {
             continue;
         }
-        let complements: Vec<usize> = labels
-            .iter()
-            .enumerate()
-            .filter(|(_, candidate)| {
-                candidate.source == label.source
-                    && candidate.categories.len() == label.categories.len()
-                    && candidate.categories.iter().zip(&label.categories).all(
-                        |((id, value), (other_id, other_value))| {
-                            id == other_id
-                                && if id == stratification {
-                                    value != other_value
-                                } else {
-                                    value == other_value
-                                }
-                        },
-                    )
-            })
-            .map(|(idx, _)| idx)
-            .collect();
-        match complements.as_slice() {
-            [complement_idx] => pairs.push((category_idx, *complement_idx)),
-            _ => {
-                return Err(format!(
-                    "Initial condition category '{}' needs a binary stratification: \
-                     found {} complementary categories for one of its compartments",
-                    qualified,
-                    complements.len()
-                ));
+        let (mut side, mut complement, mut others) = (Vec::new(), Vec::new(), Vec::new());
+        for (candidate_index, candidate) in labels.iter().enumerate() {
+            let Some(of) = candidate.category(stratification) else {
+                continue;
+            };
+            if keys[candidate_index] != keys[index] {
+                continue;
+            }
+            if of == category {
+                side.push(candidate_index);
+            } else {
+                complement.push(candidate_index);
+                if !others.contains(&of) {
+                    others.push(of);
+                }
             }
         }
+        if others.len() != 1 {
+            return Err(format!(
+                "Initial condition category '{}' needs a binary stratification: \
+                 found {} complementary categories for one of its compartments",
+                qualified,
+                others.len()
+            ));
+        }
+        paired.extend(&side);
+        pairs.push((side, complement));
     }
 
     if pairs.is_empty() {
@@ -508,20 +620,63 @@ mod tests {
             ("A", &[("group", "c2"), ("type", "t2")]),
         ]);
 
-        let target = resolve_target("c1", &names(4), &labels, &[0.0; 4]).unwrap();
+        let target = resolve_target(
+            "c1",
+            &names(4),
+            &labels,
+            &[0.0; 4],
+            &vec![Vec::new(); 4],
+            &[],
+        )
+        .unwrap();
 
         assert_eq!(
             target,
             InitialConditionTarget::PairedCategory {
-                pairs: vec![(0, 2), (1, 3)]
+                pairs: vec![(vec![0], vec![2]), (vec![1], vec![3])]
+            }
+        );
+    }
+
+    #[test]
+    fn a_category_pairs_the_groups_of_a_stratification_split_by_it() {
+        let labels = labels(&[
+            ("A", &[("group", "g1"), ("type", "t1")]),
+            ("A", &[("group", "g1"), ("type", "t2")]),
+            ("A", &[("group", "g2"), ("type", "t1")]),
+            ("A", &[("group", "g2"), ("type", "t2")]),
+        ]);
+        let splits_by = [("type".to_string(), "group".to_string())];
+
+        let target = resolve_target(
+            "g1",
+            &names(4),
+            &labels,
+            &[0.0; 4],
+            &vec![Vec::new(); 4],
+            &splits_by,
+        )
+        .unwrap();
+
+        assert_eq!(
+            target,
+            InitialConditionTarget::PairedCategory {
+                pairs: vec![(vec![0, 1], vec![2, 3])]
             }
         );
     }
 
     #[test]
     fn category_shared_by_two_stratifications_is_ambiguous() {
-        let error =
-            resolve_target("c1", &names(4), &shared_category_labels(), &[0.0; 4]).unwrap_err();
+        let error = resolve_target(
+            "c1",
+            &names(4),
+            &shared_category_labels(),
+            &[0.0; 4],
+            &vec![Vec::new(); 4],
+            &[],
+        )
+        .unwrap_err();
 
         assert!(error.contains("ambiguous"), "{error}");
         assert!(error.contains("'group:c1' or 'type:c1'"), "{error}");
@@ -529,13 +684,20 @@ mod tests {
 
     #[test]
     fn qualified_category_resolves_one_stratification() {
-        let target =
-            resolve_target("type:c1", &names(4), &shared_category_labels(), &[0.0; 4]).unwrap();
+        let target = resolve_target(
+            "type:c1",
+            &names(4),
+            &shared_category_labels(),
+            &[0.0; 4],
+            &vec![Vec::new(); 4],
+            &[],
+        )
+        .unwrap();
 
         assert_eq!(
             target,
             InitialConditionTarget::PairedCategory {
-                pairs: vec![(0, 1), (2, 3)]
+                pairs: vec![(vec![0], vec![1]), (vec![2], vec![3])]
             }
         );
     }
@@ -548,12 +710,20 @@ mod tests {
             ("A", &[("group", "c2"), ("status", "s2")]),
         ]);
 
-        let target = resolve_target("s1", &names(3), &labels, &[0.0; 3]).unwrap();
+        let target = resolve_target(
+            "s1",
+            &names(3),
+            &labels,
+            &[0.0; 3],
+            &vec![Vec::new(); 3],
+            &[],
+        )
+        .unwrap();
 
         assert_eq!(
             target,
             InitialConditionTarget::PairedCategory {
-                pairs: vec![(1, 2)]
+                pairs: vec![(vec![1], vec![2])]
             }
         );
     }
@@ -566,7 +736,15 @@ mod tests {
             ("A", &[("group", "c")]),
         ]);
 
-        let error = resolve_target("a", &names(3), &labels, &[0.0; 3]).unwrap_err();
+        let error = resolve_target(
+            "a",
+            &names(3),
+            &labels,
+            &[0.0; 3],
+            &vec![Vec::new(); 3],
+            &[],
+        )
+        .unwrap_err();
 
         assert!(error.contains("binary"), "{error}");
     }

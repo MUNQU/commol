@@ -9,9 +9,14 @@
 use std::collections::BTreeMap;
 
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de};
 
 use super::process::Process;
+use crate::json::{self, Value};
+
+/// The key of a split by category that names the earlier stratification it
+/// differs by, as in `{"by": "group", "g1": {...}, "g2": {...}}`.
+pub const FRACTIONS_BY: &str = "by";
 
 /// How the compartments of a model start: the amount of each bin and the
 /// split of it among the categories, each keyed by the id it applies to, in
@@ -24,15 +29,87 @@ pub struct InitialConditions {
     /// Amount of each bin, by bin id, finite and not negative; `None` needs
     /// calibration.
     pub bin_amounts: IndexMap<String, Option<f64>>,
-    /// Fraction of each category of the group a stratification splits, by
-    /// stratification id and category: each from 0 to 1, and a sum of 1
+    /// The split of each stratification, by stratification id: one split of
+    /// the group it splits, or one split per category of an earlier
+    /// stratification ([`StratificationFractions`]). Each fraction is from 0
+    /// to 1, and each split sums to 1
     /// (`commol_model::rules::check_fractions`).
     #[serde(default)]
-    pub stratification_fractions: IndexMap<String, IndexMap<String, f64>>,
+    pub stratification_fractions: IndexMap<String, StratificationFractions>,
     /// Amount of single expanded compartments, by compartment name, applied
     /// after the expansion.
     #[serde(default)]
     pub compartment_amounts: IndexMap<String, f64>,
+}
+
+/// How a stratification splits the amount of a compartment among its
+/// categories.
+///
+/// The JSON of [`Self::Split`] is the fraction of each category, such as
+/// `{"t1": 0.4, "t2": 0.6}`; the JSON of [`Self::ByCategory`] names the
+/// earlier stratification under [`FRACTIONS_BY`] and gives one split per
+/// category of it, such as `{"by": "group", "g1": {"t1": 0.25, "t2": 0.75},
+/// "g2": {"t1": 0.5, "t2": 0.5}}`.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum StratificationFractions {
+    /// One split for every group the stratification splits: the fraction of
+    /// each category, by category.
+    Split(IndexMap<String, f64>),
+    /// One split per category of the stratification `by`, declared before
+    /// the one it splits: the fraction of each category, by category of
+    /// `by` and category.
+    ByCategory {
+        /// The id of the earlier stratification the split differs by.
+        by: String,
+        /// The split of each category of `by`, by category of `by`.
+        #[serde(flatten)]
+        splits: IndexMap<String, IndexMap<String, f64>>,
+    },
+}
+
+impl StratificationFractions {
+    /// The fraction of `category` in a compartment of the `(stratification,
+    /// category)` pairs `categories`: the split of the category of `by` the
+    /// compartment has, for a split by category. `None` when the split names
+    /// no such category, or the compartment has no category of `by`.
+    pub fn fraction(&self, category: &str, categories: &[(String, String)]) -> Option<f64> {
+        let split = match self {
+            Self::Split(split) => split,
+            Self::ByCategory { by, splits } => categories
+                .iter()
+                .find(|(stratification, _)| stratification == by)
+                .and_then(|(_, of)| splits.get(of))?,
+        };
+        split.get(category).copied()
+    }
+}
+
+impl<'de> Deserialize<'de> for StratificationFractions {
+    /// A split by category when the field [`FRACTIONS_BY`] of the object is
+    /// a text, one split otherwise, so a category may be named `by`.
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let Value::Map(mut fields) = Value::deserialize(deserializer)? else {
+            return Err(de::Error::custom(
+                "expected the fraction of each category, such as {\"t1\": 0.4, \"t2\": \
+                 0.6}, or a split per category of an earlier stratification, such as \
+                 {\"by\": \"group\", \"g1\": {\"t1\": 0.4, \"t2\": 0.6}, ...}",
+            ));
+        };
+        let by = fields
+            .iter()
+            .enumerate()
+            .find_map(|(position, (key, value))| match value {
+                Value::String(by) if key == FRACTIONS_BY => Some((position, by.clone())),
+                _ => None,
+            });
+        let Some((position, by)) = by else {
+            return json::from_value(Value::Map(fields)).map(Self::Split);
+        };
+        fields.remove(position);
+        let splits = json::from_value(Value::Map(fields))?;
+        Ok(Self::ByCategory { by, splits })
+    }
 }
 
 /// Who the neighbors of a unit are, for the rate variables `neighbors_<bin>`
@@ -281,11 +358,42 @@ mod tests {
             [(&"B".to_string(), &Some(750.0)), (&"A".to_string(), &None)]
         );
         assert_eq!(
-            conditions.stratification_fractions["group"]
-                .keys()
-                .collect::<Vec<_>>(),
-            ["g2", "g1"]
+            json::write(&conditions.stratification_fractions["group"]),
+            r#"{"g2":0.5,"g1":0.5}"#
         );
         assert_eq!(conditions.compartment_amounts["B_g1"], 250.0);
+    }
+
+    #[test]
+    fn a_split_by_category_reads_and_writes_back_with_its_stratification() {
+        let text = r#"{"by":"group","g1":{"t1":0.25,"t2":0.75},"g2":{"t1":0.5,"t2":0.5}}"#;
+
+        let fractions: StratificationFractions = json::read(text).unwrap();
+
+        let pairs = |group: &str| vec![("group".to_string(), group.to_string())];
+        assert_eq!(fractions.fraction("t2", &pairs("g1")), Some(0.75));
+        assert_eq!(fractions.fraction("t1", &pairs("g2")), Some(0.5));
+        assert_eq!(fractions.fraction("t1", &[]), None);
+        assert_eq!(json::write(&fractions), text);
+    }
+
+    #[test]
+    fn a_category_may_be_named_by() {
+        let fractions: StratificationFractions = json::read(r#"{"by":0.25,"other":0.75}"#).unwrap();
+
+        assert_eq!(fractions.fraction("by", &[]), Some(0.25));
+        let error = json::read::<StratificationFractions>("[1]").unwrap_err();
+        assert!(
+            error.starts_with("expected the fraction of each category"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn a_split_reads_a_fraction_that_is_not_finite() {
+        let fractions: StratificationFractions = json::read(r#"{"t1":"NaN","t2":0.5}"#).unwrap();
+
+        assert!(fractions.fraction("t1", &[]).unwrap().is_nan());
+        assert!(matches!(fractions, StratificationFractions::Split(_)));
     }
 }

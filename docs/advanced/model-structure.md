@@ -33,7 +33,8 @@ Model                      name, description, version, step_unit, origin
 │           └── conditions: [StratificationCondition]
 └── structure: Aggregate                   (kind: "aggregate", variant: None)
     ├── bin_amounts: {bin: amount | None}          (in the unit of the bin)
-    ├── stratification_fractions: {stratification: {category: fraction}}
+    ├── stratification_fractions: {stratification: {category: fraction}
+    │                                  | {"by": stratification, category: {category: fraction}}}
     ├── compartment_amounts: {compartment: amount}
     └── neighbors: Complete | Groups | None
 ```

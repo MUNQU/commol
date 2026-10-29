@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING
 
 from commol._model import engine_state
+from commol._model.aggregate import split_groups
 from commol._model.description import Matrix, Section, Table, Text, _Block
 from commol._model.equations import DynamicsDescription
 from commol._model.neighbors import Complete, Groups
@@ -182,12 +183,17 @@ def _initialization[S: "Aggregate"](model: "Model[S]") -> list[_Block]:
     ]
     if structure.stratification_fractions:
         rows = []
-        for stratification, categories in structure.stratification_fractions.items():
-            group = structure.get_conditioning_categories(process, stratification)
-            for category, fraction in categories.items():
-                rows.append(
-                    [stratification, category, fraction, "+".join(group) or "each bin"]
-                )
+        for stratification in structure.stratification_fractions:
+            for group, split in split_groups(structure, process, stratification):
+                for category, fraction in split.items():
+                    rows.append(
+                        [
+                            stratification,
+                            category,
+                            fraction,
+                            "+".join(group) or "each bin",
+                        ]
+                    )
         blocks.append(
             Table(
                 heading="Stratification fractions",

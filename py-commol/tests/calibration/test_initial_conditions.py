@@ -4,6 +4,7 @@ import pytest
 
 from commol import (
     Aggregate,
+    CalibrationParameter,
     CalibrationProblem,
     Calibrator,
     ModelBuilder,
@@ -14,6 +15,7 @@ from commol import (
     StratificationCondition,
     StratifiedRate,
 )
+from commol._model.engine_state import calibrated_initial_state
 from commol._model.model import Model
 from commol.uncertainty import ParameterSample, Predictive, SampleMethod
 from tests.support import (
@@ -22,6 +24,8 @@ from tests.support import (
     assert_accepted,
     bounded,
     build,
+    initial_condition_problem,
+    initial_state,
     mixed_units_builder,
     observed,
 )
@@ -254,3 +258,149 @@ def test_a_calibrator_on_a_simulation_that_has_run_splits_a_bin_by_the_initial_s
     assert (start["A_g1"][0], start["A_g2"][0]) == pytest.approx((50.0, 50.0))
     assert result.best_parameters["A"] == pytest.approx(100.0, abs=1e-6)
     assert result.final_loss == pytest.approx(0.0, abs=1e-9)
+
+
+def _split_by_group(a_amount: float | None) -> Model:
+    """``group`` splits A 0.4 / 0.6; ``type`` splits ``g1`` 0.25 / 0.75 and
+    ``g2`` 0.5 / 0.5; B starts at 0."""
+    builder = a_to_b_builder()
+    builder.add_stratification(id="group", categories=["g1", "g2"])
+    builder.add_stratification(id="type", categories=["t1", "t2"])
+    builder.set_structure(
+        Aggregate(
+            bin_amounts={"A": a_amount, "B": 0},
+            stratification_fractions={
+                "group": {"g1": 0.4, "g2": 0.6},
+                "type": {
+                    "by": "group",
+                    "g1": {"t1": 0.25, "t2": 0.75},
+                    "g2": {"t1": 0.5, "t2": 0.5},
+                },
+            },
+        )
+    )
+    return build(builder)
+
+
+def test_a_calibrated_amount_keeps_the_split_by_category() -> None:
+    problem = CalibrationProblem(
+        observed_data=[ObservedDataPoint(at=1, output="B_g1_t1", value=10.0)],
+        parameters=[bounded("A", 0.0, 4000.0, kind="initial_condition")],
+        loss_function="sse",
+        optimization_config=NelderMeadConfig(max_iterations=5),
+    )
+    sample = ParameterSample.equally_weighted(
+        names=["A"],
+        bounds=[(0.0, 4000.0)],
+        values=[[2000.0]],
+        method=SampleMethod(name="hand"),
+    )
+    calibrator = Calibrator(Simulation(_split_by_group(None)), problem)
+
+    start = Predictive(calibrator, sample, positions=[0]).runs()[0]
+
+    assert {
+        name: start[name][0] for name in ("A_g1_t1", "A_g1_t2", "A_g2_t1", "A_g2_t2")
+    } == pytest.approx(
+        {"A_g1_t1": 200.0, "A_g1_t2": 600.0, "A_g2_t1": 600.0, "A_g2_t2": 600.0}
+    )
+
+
+def test_compartments_the_fractions_leave_empty_keep_their_declared_split() -> None:
+    # g1 takes no share of A, so A_g1 splits as type declares, 0.25 / 0.75.
+    builder = a_to_b_builder(
+        amounts={"A": None, "B": 0},
+        stratifications={
+            "group": {"g1": 0.0, "g2": 1.0},
+            "type": {"t1": 0.25, "t2": 0.75},
+        },
+    )
+    parameter = CalibrationParameter(
+        id="A_g1",
+        parameter_type="initial_condition",
+        min_bound=0.0,
+        max_bound=200.0,
+    )
+
+    state = calibrated_initial_state(build(builder), [parameter], [100.0]).state
+
+    assert (state["A_g1_t1"], state["A_g1_t2"]) == pytest.approx((25.0, 75.0))
+
+
+def test_a_category_keeps_a_chain_of_splits_that_differ_by_it() -> None:
+    # level differs by type, which differs by group.
+    builder = a_to_b_builder()
+    builder.add_stratification(id="group", categories=["g1", "g2"])
+    builder.add_stratification(id="type", categories=["t1", "t2"])
+    builder.add_stratification(id="level", categories=["l1", "l2"])
+    builder.set_structure(
+        Aggregate(
+            bin_amounts={"A": 1000.0, "B": 0},
+            stratification_fractions={
+                "group": {"g1": 0.4, "g2": 0.6},
+                "type": {
+                    "by": "group",
+                    "g1": {"t1": 0.25, "t2": 0.75},
+                    "g2": {"t1": 0.5, "t2": 0.5},
+                },
+                "level": {
+                    "by": "type",
+                    "t1": {"l1": 1.0, "l2": 0.0},
+                    "t2": {"l1": 0.0, "l2": 1.0},
+                },
+            },
+        )
+    )
+    parameter = CalibrationParameter(
+        id="g1", parameter_type="initial_condition", min_bound=0.0, max_bound=1.0
+    )
+
+    state = calibrated_initial_state(build(builder), [parameter], [0.5]).state
+
+    names = ["A_g1_t1_l1", "A_g1_t2_l2", "A_g2_t1_l1", "A_g2_t2_l2"]
+    assert [state[name] for name in names] == pytest.approx([125, 375, 250, 250])
+
+
+def test_a_category_of_the_stratification_a_split_differs_by_keeps_it() -> None:
+    # g1 = 0.5 of A = 1000 is 500, which type splits 0.25 / 0.75.
+    parameter = CalibrationParameter(
+        id="g1", parameter_type="initial_condition", min_bound=0.0, max_bound=1.0
+    )
+
+    state = calibrated_initial_state(_split_by_group(1000.0), [parameter], [0.5]).state
+
+    names = ["A_g1_t1", "A_g1_t2", "A_g2_t1", "A_g2_t2"]
+    assert [state[name] for name in names] == pytest.approx([125, 375, 250, 250])
+
+
+@pytest.mark.parametrize(
+    ("values", "remainder"),
+    [({"A": 800.0}, "B"), ({"t1": 0.2}, None), ({"g1": 0.5}, None)],
+    ids=["bin", "category", "category-it-differs-by"],
+)
+def test_the_write_back_of_a_split_by_category_rebuilds_the_scored_state(
+    values: dict[str, float], remainder: str | None
+) -> None:
+    model = _split_by_group(1000.0)
+    problem = initial_condition_problem(*values, remainder=remainder)
+    parameters = list(problem.parameters)
+    scored = calibrated_initial_state(
+        model, parameters, [values[p.id] for p in parameters], remainder
+    ).state
+
+    model.apply_calibration_parameters(values, problem)
+
+    assert initial_state(model) == pytest.approx(scored)
+    assert model.structure.compartment_amounts == {}
+    assert model.structure.stratification_fractions["type"]["by"] == "group"
+
+
+def test_the_report_gives_the_calibrated_value_of_each_split() -> None:
+    model = _split_by_group(1000.0)
+    problem = initial_condition_problem("t1")
+
+    model.apply_calibration_parameters({"t1": 0.2}, problem)
+    rows = model.applied_parameters({"t1": 0.2})["category_splits"]
+
+    assert rows["t1 of g1"] == {"group": ["g1"], "fraction": 0.2, "calibrated": True}
+    assert rows["t2 of g2"]["fraction"] == pytest.approx(0.8)

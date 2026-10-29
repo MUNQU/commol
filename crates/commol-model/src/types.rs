@@ -366,6 +366,13 @@ impl FlowChange {
 #[derive(Clone)]
 pub struct CompiledModel {
     pub(crate) compartments: Vec<String>,
+    /// The fraction of each category of each compartment, in engine order
+    /// and in the order of the categories of its output labels
+    /// ([`crate::InitialCompartment::fractions`]).
+    pub(crate) fractions: Vec<Vec<f64>>,
+    /// Each stratification split by the category of an earlier one, as
+    /// `(stratification, by)` pairs.
+    pub(crate) splits_by: Vec<(String, String)>,
     /// The sum of the initial amounts the model states, before any calibrated
     /// value is written.
     pub(crate) total: f64,

@@ -3,7 +3,7 @@
 //! message of the check of that rule, which the Python object of the value
 //! also calls.
 
-use commol_core::{Model, ParameterValue, SeriesMode};
+use commol_core::{Model, ParameterValue, SeriesMode, StratificationFractions};
 use commol_model::{CompiledModel, rules};
 
 /// A → B at the rate `k`, from A = 800 and B = 200, with the series `s` of
@@ -70,12 +70,44 @@ fn fractions(g1: f64, g2: f64) -> Model {
         .unwrap()
         .initial_conditions
         .stratification_fractions
-        .insert(
-            "group".to_string(),
-            [("g1".to_string(), g1), ("g2".to_string(), g2)]
-                .into_iter()
-                .collect(),
-        );
+        .insert("group".to_string(), split(g1, g2));
+    model
+}
+
+/// The split of `g1` and `g2`.
+fn split(g1: f64, g2: f64) -> StratificationFractions {
+    StratificationFractions::Split(
+        [("g1".to_string(), g1), ("g2".to_string(), g2)]
+            .into_iter()
+            .collect(),
+    )
+}
+
+/// The split of `type` by `group`: `t1` and `t2` of `g1`, and an even split
+/// of `g2`.
+fn split_by_group(t1: f64, t2: f64) -> StratificationFractions {
+    serde_json::from_value(serde_json::json!({
+        "by": "group",
+        "g1": {"t1": t1, "t2": t2},
+        "g2": {"t1": 0.5, "t2": 0.5},
+    }))
+    .expect("valid split JSON")
+}
+
+/// The model of [`fractions`] with an even split of `group`, and the
+/// stratification `type` of `t1` and `t2` split by `group`.
+fn fractions_by_group(t1: f64, t2: f64) -> Model {
+    let mut model = fractions(0.5, 0.5);
+    model.process.stratifications.push(
+        serde_json::from_str(r#"{"id":"type","categories":["t1","t2"]}"#)
+            .expect("valid stratification JSON"),
+    );
+    model
+        .aggregate_mut()
+        .unwrap()
+        .initial_conditions
+        .stratification_fractions
+        .insert("type".to_string(), split_by_group(t1, t2));
     model
 }
 
@@ -134,18 +166,24 @@ fn every_value_outside_its_rule_is_rejected() {
         ),
         (
             fractions(1.5, -0.5),
-            rules::check_fractions("group", [("g1", 1.5), ("g2", -0.5)]),
+            rules::check_fractions("group", &split(1.5, -0.5)),
             "Stratification 'group', category 'g1': fraction is a number from 0 to 1, got 1.5",
         ),
         (
             fractions(0.5, f64::NAN),
-            rules::check_fractions("group", [("g1", 0.5), ("g2", f64::NAN)]),
+            rules::check_fractions("group", &split(0.5, f64::NAN)),
             "Stratification 'group', category 'g2': fraction is a number from 0 to 1, got NaN",
         ),
         (
             fractions(0.5, 0.4),
-            rules::check_fractions("group", [("g1", 0.5), ("g2", 0.4)]),
+            rules::check_fractions("group", &split(0.5, 0.4)),
             "Stratification 'group': the fractions of its categories sum to 1 within 1e-6, got 0.9",
+        ),
+        (
+            fractions_by_group(0.5, 1.5),
+            rules::check_fractions("type", &split_by_group(0.5, 1.5)),
+            "Stratification 'type' within category 'g1' of 'group', category 't2': fraction \
+             is a number from 0 to 1, got 1.5",
         ),
         (
             series(vec![]),
@@ -187,13 +225,15 @@ fn a_value_inside_its_rule_is_accepted() {
     assert_eq!(rules::check_impulse("ab", Some(&[0.0, 2.5]), None), Ok(()));
     assert_eq!(rules::check_impulse("ab", None, Some((0.5, 0.0))), Ok(()));
     assert_eq!(rules::check_series(&[(0.0, -3.0), (2.0, 1.0)]), Ok(()));
+    assert_eq!(rules::check_fractions("group", &split(1.0, 0.0)), Ok(()));
     assert_eq!(
-        rules::check_fractions("group", [("g1", 1.0), ("g2", 0.0)]),
+        rules::check_fractions("group", &split(0.6000005, 0.4)),
         Ok(())
     );
     assert_eq!(
-        rules::check_fractions("group", [("g1", 0.6000005), ("g2", 0.4)]),
+        rules::check_fractions("type", &split_by_group(0.25, 0.75)),
         Ok(())
     );
     assert!(CompiledModel::try_from_model(&fractions(0.25, 0.75)).is_ok());
+    assert!(CompiledModel::try_from_model(&fractions_by_group(0.25, 0.75)).is_ok());
 }

@@ -16,8 +16,9 @@ use commol_core::math_expression::variables::{
     SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX,
 };
 use commol_core::{
-    Aggregate, MathExpression, MathExpressionContext, Model, NEIGHBORS, NEIGHBORS_PREFIX,
-    ParameterValue, Process, RateMathExpression, Rounding, SeriesMode,
+    Aggregate, InitialConditions, MathExpression, MathExpressionContext, Model, NEIGHBORS,
+    NEIGHBORS_PREFIX, ParameterValue, Process, RateMathExpression, Rounding, SeriesMode,
+    StratificationFractions,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -84,6 +85,16 @@ impl CompiledModel {
                 .eq(compartments.iter())
         );
         let amounts: Vec<f64> = state.iter().map(|c| c.amount).collect();
+        let fractions: Vec<Vec<f64>> = state.iter().map(|c| c.fractions.clone()).collect();
+        let splits_by: Vec<(String, String)> = aggregate
+            .initial_conditions
+            .stratification_fractions
+            .iter()
+            .filter_map(|(id, fractions)| match fractions {
+                StratificationFractions::ByCategory { by, .. } => Some((id.clone(), by.clone())),
+                StratificationFractions::Split(_) => None,
+            })
+            .collect();
         let total = amounts.iter().sum();
 
         // Labels of every output: compartments first, then accumulators
@@ -100,6 +111,12 @@ impl CompiledModel {
                     }),
             )
             .collect();
+        debug_assert!(
+            state
+                .iter()
+                .zip(&output_labels)
+                .all(|(compartment, label)| compartment.categories == label.categories)
+        );
 
         // Store constant parameters for quick lookup
         // Formula parameters will be evaluated on each step
@@ -297,6 +314,8 @@ impl CompiledModel {
 
         Ok(Self {
             compartments,
+            fractions,
+            splits_by,
             total,
             output_labels,
             output_names,
@@ -626,6 +645,9 @@ pub struct InitialCompartment {
     /// Initial amount, in the unit of the bin, including
     /// `compartment_amounts` overrides.
     pub amount: f64,
+    /// The fraction of each category of `categories`, in their order,
+    /// whatever the amount of the bin and the overrides.
+    pub fractions: Vec<f64>,
 }
 
 /// Expand a process into its compartments and their initial amounts.
@@ -636,7 +658,10 @@ pub struct InitialCompartment {
 /// categories do not meet, that compartment is kept as-is and its amount is
 /// not split by that stratification's fractions. Each compartment holds the
 /// amount of its bin, in the unit of the bin, times the fraction of each
-/// category applied to it. An uncalibrated bin amount counts as zero.
+/// category applied to it; the fraction of a stratification split by the
+/// category of an earlier one is the fraction in the category of the earlier
+/// stratification the compartment has. An uncalibrated bin amount counts as
+/// zero.
 ///
 /// After the expansion, `compartment_amounts` overrides replace the amount
 /// of the named compartments.
@@ -644,8 +669,8 @@ pub struct InitialCompartment {
 /// # Errors
 ///
 /// Returns the message of the rule of a bin amount, the fractions of a
-/// stratification or an override ([`crate::rules::check_bin_amount`],
-/// [`crate::rules::check_fractions`],
+/// stratification (`check_stratification_fractions`) or an override
+/// ([`crate::rules::check_bin_amount`],
 /// [`crate::rules::check_compartment_amount`]), or a message when an
 /// override names a compartment that is not part of the expansion.
 pub fn initial_state(
@@ -660,14 +685,7 @@ pub fn initial_state(
         }
     }
     let stratification_fractions = &initial_conditions.stratification_fractions;
-    for (stratification, fractions) in stratification_fractions {
-        crate::rules::check_fractions(
-            stratification,
-            fractions
-                .iter()
-                .map(|(category, &fraction)| (category.as_str(), fraction)),
-        )?;
-    }
+    check_stratification_fractions(process, initial_conditions)?;
 
     let mut state: Vec<InitialCompartment> = expand_compartments(process)
         .into_iter()
@@ -676,22 +694,22 @@ pub fn initial_state(
                 .get(output.source.as_str())
                 .and_then(|amount| *amount)
                 .unwrap_or(0.0);
-            let amount = output
-                .categories
-                .iter()
-                .fold(bin_amount, |amount, (id, cat)| {
-                    amount
-                        * stratification_fractions
-                            .get(id.as_str())
-                            .and_then(|fractions| fractions.get(cat.as_str()))
-                            .copied()
-                            .unwrap_or(0.0)
-                });
+            let fraction = |(id, cat): &(String, String)| {
+                stratification_fractions
+                    .get(id.as_str())
+                    .and_then(|fractions| fractions.fraction(cat, &output.categories))
+                    .unwrap_or(0.0)
+            };
+            let fractions: Vec<f64> = output.categories.iter().map(fraction).collect();
+            // The amount folds from the bin amount, in the order of the
+            // stratifications.
+            let amount = fractions.iter().fold(bin_amount, |amount, f| amount * f);
             InitialCompartment {
                 name: output.name,
                 bin: output.source,
                 categories: output.categories,
                 amount,
+                fractions,
             }
         })
         .collect();
@@ -725,6 +743,126 @@ pub fn initial_state(
     }
 
     Ok(state)
+}
+
+/// Check the fractions of an aggregate structure against the stratifications
+/// of `process`.
+///
+/// The fractions name every stratification once. One split names exactly the
+/// categories of its stratification. A split by category names a
+/// stratification declared before the one it splits that every compartment
+/// of that one has, one split per category of it, and in each split exactly
+/// the categories of the stratification it splits. Every split follows the
+/// rule of [`crate::rules::check_fractions`].
+///
+/// # Errors
+///
+/// Returns a message that names the stratification, and the category whose
+/// split is wrong, with the missing and the extra ids.
+pub(crate) fn check_stratification_fractions(
+    process: &Process,
+    initial_conditions: &InitialConditions,
+) -> Result<(), String> {
+    let fractions = &initial_conditions.stratification_fractions;
+    let ids: Vec<&str> = process
+        .stratifications
+        .iter()
+        .map(|s| s.id.as_str())
+        .collect();
+    let (missing, extra) = differences(&ids, fractions.keys().map(String::as_str));
+    if !missing.is_empty() || !extra.is_empty() {
+        return Err(format!(
+            "Initial stratification fractions keys must exactly match stratification \
+             ids. Missing ids: {missing:?}, Extra ids: {extra:?}."
+        ));
+    }
+    let compartments = expand_compartments(process);
+    for (position, stratification) in process.stratifications.iter().enumerate() {
+        let id = stratification.id.as_str();
+        let fractions = &fractions[id];
+        let names_its_categories = |owner: String, split: Vec<&str>| {
+            let (missing, extra) = differences(&stratification.categories, split);
+            if missing.is_empty() && extra.is_empty() {
+                Ok(())
+            } else {
+                Err(format!(
+                    "{owner} must name exactly its categories. Missing categories: \
+                     {missing:?}, Extra categories: {extra:?}."
+                ))
+            }
+        };
+        match fractions {
+            StratificationFractions::Split(split) => {
+                names_its_categories(
+                    format!("The fractions of stratification '{id}'"),
+                    split.keys().map(String::as_str).collect(),
+                )?;
+            }
+            StratificationFractions::ByCategory { by, splits } => {
+                let earlier = &process.stratifications[..position];
+                let Some(by_stratification) = earlier.iter().find(|s| &s.id == by) else {
+                    return Err(format!(
+                        "Stratification '{id}': its fractions differ by '{by}', which is not a \
+                         stratification declared before it. Declared before it: {:?}",
+                        earlier.iter().map(|s| s.id.as_str()).collect::<Vec<_>>()
+                    ));
+                };
+                if let Some(compartment) = compartments.iter().find(|compartment| {
+                    let has = |of: &str| compartment.categories.iter().any(|(s, _)| s == of);
+                    has(id) && !has(by)
+                }) {
+                    return Err(format!(
+                        "Stratification '{id}': its fractions differ by '{by}', but the \
+                         compartment '{}' has a category of '{id}' and none of '{by}'",
+                        compartment.name
+                    ));
+                }
+                let (missing, extra) = differences(
+                    &by_stratification.categories,
+                    splits.keys().map(String::as_str),
+                );
+                if !missing.is_empty() || !extra.is_empty() {
+                    return Err(format!(
+                        "Stratification '{id}': its fractions by '{by}' must name exactly the \
+                         categories of '{by}'. Missing categories: {missing:?}, Extra \
+                         categories: {extra:?}."
+                    ));
+                }
+                for (of, split) in splits {
+                    names_its_categories(
+                        format!(
+                            "The fractions of stratification '{id}' within category '{of}' of \
+                             '{by}'"
+                        ),
+                        split.keys().map(String::as_str).collect(),
+                    )?;
+                }
+            }
+        }
+        crate::rules::check_fractions(id, fractions)?;
+    }
+    Ok(())
+}
+
+/// The ids of `expected` that `given` misses, and the ids of `given` that
+/// `expected` does not have, each sorted.
+fn differences<'a, S: AsRef<str>>(
+    expected: &'a [S],
+    given: impl IntoIterator<Item = &'a str>,
+) -> (Vec<&'a str>, Vec<&'a str>) {
+    let given: Vec<&str> = given.into_iter().collect();
+    let mut missing: Vec<&str> = expected
+        .iter()
+        .map(AsRef::as_ref)
+        .filter(|id| !given.contains(id))
+        .collect();
+    let mut extra: Vec<&str> = given
+        .into_iter()
+        .filter(|id| !expected.iter().any(|expected| expected.as_ref() == *id))
+        .collect();
+    missing.sort_unstable();
+    extra.sort_unstable();
+    (missing, extra)
 }
 
 /// Compile planned transition flows into runtime flows.
@@ -913,6 +1051,8 @@ pub fn subgroup_total_names(process: &Process) -> Vec<String> {
 /// This function returns an error when:
 ///
 /// - the variant or the neighbors of the structure do not fit the process;
+/// - the stratification fractions do not fit the stratifications
+///   (`check_stratification_fractions`);
 /// - a rate, a stratified rate or a formula parameter is not in the language
 ///   of formulas ([`RateMathExpression::check`]);
 /// - a `"pulse"` series has a point that is not an integer, or the engine
@@ -954,6 +1094,7 @@ pub fn check_model(model: &Model) -> Result<(), String> {
     let aggregate = model.aggregate()?;
     let process = &model.process;
     aggregate.check(process)?;
+    check_stratification_fractions(process, &aggregate.initial_conditions)?;
     check_formulas(model)?;
     check_engine_variable_ids(model, process)?;
     check_neighbor_terms(model, aggregate)?;
@@ -1875,7 +2016,10 @@ mod tests {
                                 .into_iter()
                                 .map(|(category, fraction)| (category.to_string(), fraction))
                                 .collect();
-                            (id.to_string(), fractions)
+                            (
+                                id.to_string(),
+                                commol_core::StratificationFractions::Split(fractions),
+                            )
                         })
                         .collect(),
                     compartment_amounts: compartment_amounts
@@ -2297,7 +2441,12 @@ mod tests {
             categories: vec!["y".to_string(), "o".to_string()],
             conditions: None,
         };
-        let mut model = make_model(vec![group, kind], vec![], vec![]);
+        let halves = [("y", 0.5), ("o", 0.5)];
+        let mut model = make_model(
+            vec![group, kind],
+            vec![("group", halves), ("type", halves)],
+            vec![],
+        );
         model.process.bins[0].id = "total_y".to_string();
 
         let error = check_model(&model).expect_err("total_y_y names two sums");
@@ -2306,7 +2455,11 @@ mod tests {
 
     #[test]
     fn a_bin_that_starts_with_the_prefix_but_names_no_subgroup_builds() {
-        let mut model = make_model(vec![group_stratification()], vec![], vec![]);
+        let mut model = make_model(
+            vec![group_stratification()],
+            vec![group_fractions(0.5, 0.5)],
+            vec![],
+        );
         model.process.bins[0].id = "total_x".to_string();
 
         assert!(check_model(&model).is_ok());

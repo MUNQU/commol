@@ -6,7 +6,7 @@
 //! check when it is built (`commol_rs.model`), so a value outside its rule
 //! gets one message, whoever reads it first.
 
-use commol_core::{Bound, Real};
+use commol_core::{Bound, Real, StratificationFractions};
 
 /// The initial amount of a bin or of a compartment.
 pub const INITIAL_AMOUNT: Real = Real::non_negative("initial amount");
@@ -48,31 +48,55 @@ pub fn check_compartment_amount(compartment: &str, amount: f64) -> Result<(), St
         .map_err(|error| format!("Compartment '{compartment}': {error}"))
 }
 
-/// Check the `(category, fraction)` pairs of the stratification
-/// `stratification`: each fraction of [`FRACTION`], and a sum of 1 within
-/// [`FRACTION_SUM_TOLERANCE`].
+/// Check the fractions of the stratification `stratification`: in each
+/// split, each fraction of [`FRACTION`], and a sum of 1 within
+/// [`FRACTION_SUM_TOLERANCE`]. A split by category is checked category by
+/// category of the stratification it differs by.
 ///
 /// # Errors
 ///
 /// Returns the first rule that the fractions break, such as "Stratification
-/// 'g', category 'g1': fraction is a number from 0 to 1, got 1.5".
-pub fn check_fractions<'a>(
+/// 'g', category 'g1': fraction is a number from 0 to 1, got 1.5", or, in a
+/// split by category, "Stratification 't' within category 'g1' of 'g': the
+/// fractions of its categories sum to 1 within 1e-6, got 0.9".
+pub fn check_fractions(
     stratification: &str,
-    fractions: impl IntoIterator<Item = (&'a str, f64)>,
+    fractions: &StratificationFractions,
+) -> Result<(), String> {
+    match fractions {
+        StratificationFractions::Split(split) => {
+            check_split(&format!("Stratification '{stratification}'"), split)
+        }
+        StratificationFractions::ByCategory { by, splits } => {
+            splits.iter().try_for_each(|(of, split)| {
+                check_split(
+                    &format!("Stratification '{stratification}' within category '{of}' of '{by}'"),
+                    split,
+                )
+            })
+        }
+    }
+}
+
+/// Check one split of `owner`, the stratification it belongs to as a message
+/// names it.
+fn check_split<'a>(
+    owner: &str,
+    split: impl IntoIterator<Item = (&'a String, &'a f64)>,
 ) -> Result<(), String> {
     let mut sum = 0.0;
-    for (category, fraction) in fractions {
-        FRACTION.check(fraction).map_err(|error| {
-            format!("Stratification '{stratification}', category '{category}': {error}")
-        })?;
+    for (category, &fraction) in split {
+        FRACTION
+            .check(fraction)
+            .map_err(|error| format!("{owner}, category '{category}': {error}"))?;
         sum += fraction;
     }
     if (1.0 - FRACTION_SUM_TOLERANCE..=1.0 + FRACTION_SUM_TOLERANCE).contains(&sum) {
         Ok(())
     } else {
         Err(format!(
-            "Stratification '{stratification}': the fractions of its categories sum to 1 \
-             within {FRACTION_SUM_TOLERANCE:e}, got {sum}"
+            "{owner}: the fractions of its categories sum to 1 within \
+             {FRACTION_SUM_TOLERANCE:e}, got {sum}"
         ))
     }
 }

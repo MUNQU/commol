@@ -8,9 +8,11 @@ use commol_core::{
 use commol_model::{CompartmentalEngine, CompiledModel, OutputLabels};
 
 /// A compartmental engine that holds its state and does not move it: one bin
-/// of the compiled model per compartment. Compartment names are `<bin>` or
-/// `<bin>_<category>` of one stratification `group`, which its labels read,
-/// and the total is the sum of the state it starts with.
+/// of the compiled model per compartment, or the compartments of a
+/// stratified model ([`engine_of`]), which keep the labels of the model. The
+/// labels of a model of bins read a compartment name as `<bin>` or
+/// `<bin>_<category>` of one stratification `group`, and the total is the sum
+/// of the state it starts with.
 #[derive(Clone)]
 struct FrozenEngine {
     model: CompiledModel,
@@ -107,6 +109,10 @@ impl CompartmentalEngine for FrozenEngine {
     }
 
     fn output_labels(&self) -> Vec<OutputLabels> {
+        let labels = self.model.output_labels();
+        if labels.iter().any(|label| !label.categories.is_empty()) {
+            return labels.to_vec();
+        }
         self.compartments()
             .into_iter()
             .map(|name| match name.split_once('_') {
@@ -386,4 +392,260 @@ fn a_qualified_category_that_no_compartment_has_is_rejected() {
         error,
         "Initial condition category 'group:cat9' matches no compartment"
     );
+}
+
+/// Bins A and B over `group` (`g1`, `g2`) and `type` (`t1`, `t2`), and the
+/// stratifications of `more`, with the bin amounts `amounts` and the
+/// stratification fractions `fractions`, as JSON.
+fn stratified_model(more: &str, amounts: &str, fractions: &str) -> Model {
+    let json = format!(
+        r#"{{"name":"m","parameters":[],"engine":{{"type":"DifferenceEquations"}},
+        "process":{{"bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}}],
+        "stratifications":[{{"id":"group","categories":["g1","g2"]}},
+        {{"id":"type","categories":["t1","t2"]}}{more}],
+        "transitions":[{{"id":"ab","source":["A"],"target":["B"],"rate":"0.1"}}]}},
+        "structure":{{"kind":"aggregate","bin_amounts":{amounts},
+        "stratification_fractions":{fractions}}}}}"#
+    );
+    serde_json::from_str(&json).expect("valid model JSON")
+}
+
+/// `type` split by `group`: `g1` 0.25 / 0.75 and `g2` 0.5 / 0.5.
+const TYPE_BY_GROUP: &str = r#"{"by":"group","g1":{"t1":0.25,"t2":0.75},"g2":{"t1":0.5,"t2":0.5}}"#;
+
+/// The fractions of [`stratified_model`]: `group` 0.4 / 0.6, and `type`.
+fn fractions_with(type_fractions: &str) -> String {
+    format!(r#"{{"group":{{"g1":0.4,"g2":0.6}},"type":{type_fractions}}}"#)
+}
+
+fn initial_state_error(model: &Model) -> String {
+    let error =
+        commol_model::initial_state(&model.process, model.aggregate().unwrap()).unwrap_err();
+    assert_eq!(commol_model::check_model(model).unwrap_err(), error);
+    error
+}
+
+/// An engine of a stratified model that starts from its initial state.
+fn engine_of(model: &Model) -> FrozenEngine {
+    let model = CompiledModel::try_from_model(model).unwrap();
+    let state = model.initial_state()[..model.num_compartments()].to_vec();
+    FrozenEngine { model, state }
+}
+
+#[test]
+fn a_stratification_splits_each_category_of_an_earlier_one() {
+    let model = stratified_model(
+        "",
+        r#"{"A":1000.0,"B":0.0}"#,
+        &fractions_with(TYPE_BY_GROUP),
+    );
+
+    let state = commol_model::initial_state(&model.process, model.aggregate().unwrap()).unwrap();
+
+    let amounts: Vec<f64> = state.iter().map(|c| c.amount).collect();
+    assert_close(&amounts, &[100.0, 300.0, 300.0, 300.0, 0.0, 0.0, 0.0, 0.0]);
+    let fractions: Vec<f64> = state.iter().flat_map(|c| c.fractions.clone()).collect();
+    assert_close(&fractions[8..], &[0.4, 0.25, 0.4, 0.75, 0.6, 0.5, 0.6, 0.5]);
+}
+
+#[test]
+fn a_split_by_category_names_an_earlier_stratification() {
+    let conditional = r#",{"id":"level","categories":["l1","l2"],
+        "conditions":[{"stratification":"group","category":"g1"}]}"#;
+    let cases = [
+        (
+            "",
+            fractions_with(r#"{"by":"level","g1":{"t1":1.0,"t2":0.0}}"#),
+            "Stratification 'type': its fractions differ by 'level', which is not a \
+             stratification declared before it. Declared before it: [\"group\"]",
+        ),
+        (
+            "",
+            r#"{"group":{"by":"type","t1":{"g1":1.0,"g2":0.0},"t2":{"g1":1.0,"g2":0.0}},
+            "type":{"t1":0.5,"t2":0.5}}"#
+                .to_string(),
+            "Stratification 'group': its fractions differ by 'type', which is not a \
+             stratification declared before it. Declared before it: []",
+        ),
+        (
+            "",
+            fractions_with(r#"{"by":"group","g1":{"t1":0.5,"t2":0.5},"g3":{"t1":1.0,"t2":0.0}}"#),
+            "Stratification 'type': its fractions by 'group' must name exactly the \
+             categories of 'group'. Missing categories: [\"g2\"], Extra categories: [\"g3\"].",
+        ),
+        (
+            "",
+            fractions_with(r#"{"by":"group","g1":{"t1":1.0},"g2":{"t1":0.5,"t2":0.5}}"#),
+            "The fractions of stratification 'type' within category 'g1' of 'group' must \
+             name exactly its categories. Missing categories: [\"t2\"], Extra categories: [].",
+        ),
+        (
+            conditional,
+            r#"{"group":{"g1":0.4,"g2":0.6},"type":{"t1":0.5,"t2":0.5},
+            "level":{"by":"type","t1":{"l1":0.5,"l2":0.5},"t2":{"l1":1.0,"l2":0.0}}}"#
+                .to_string(),
+            "",
+        ),
+        (
+            r#",{"id":"level","categories":["l1","l2"]}"#,
+            r#"{"group":{"g1":0.4,"g2":0.6},"type":{"t1":0.5,"t2":0.5},
+            "level":{"l1":0.5,"l2":0.5}}"#
+                .to_string(),
+            "",
+        ),
+    ];
+    for (more, fractions, message) in cases {
+        let model = stratified_model(more, r#"{"A":1000.0,"B":0.0}"#, &fractions);
+        if message.is_empty() {
+            assert!(commol_model::check_model(&model).is_ok());
+        } else {
+            assert_eq!(initial_state_error(&model), message);
+        }
+    }
+}
+
+#[test]
+fn a_split_by_category_needs_its_category_in_every_compartment() {
+    // `type` applies only to `g1`, so the compartments of `g2` have no `type`;
+    // `level` applies to every compartment and cannot differ by `type`.
+    let model = stratified_model(
+        r#",{"id":"level","categories":["l1","l2"]}"#,
+        r#"{"A":1000.0,"B":0.0}"#,
+        r#"{"group":{"g1":0.4,"g2":0.6},"type":{"t1":0.5,"t2":0.5},
+        "level":{"by":"type","t1":{"l1":0.5,"l2":0.5},"t2":{"l1":1.0,"l2":0.0}}}"#,
+    );
+    let mut model = model;
+    model.process.stratifications[1].conditions =
+        Some(serde_json::from_str(r#"[{"stratification":"group","category":"g1"}]"#).unwrap());
+
+    assert_eq!(
+        initial_state_error(&model),
+        "Stratification 'level': its fractions differ by 'type', but the compartment \
+         'A_g2_l1' has a category of 'level' and none of 'type'"
+    );
+}
+
+#[test]
+fn the_fractions_of_each_category_sum_to_one() {
+    let model = stratified_model(
+        "",
+        r#"{"A":1000.0,"B":0.0}"#,
+        &fractions_with(r#"{"by":"group","g1":{"t1":0.25,"t2":0.75},"g2":{"t1":0.5,"t2":0.4}}"#),
+    );
+
+    assert_eq!(
+        initial_state_error(&model),
+        "Stratification 'type' within category 'g2' of 'group': the fractions of its \
+         categories sum to 1 within 1e-6, got 0.9"
+    );
+}
+
+#[test]
+fn every_stratification_has_its_fractions() {
+    let model = stratified_model(
+        "",
+        r#"{"A":1000.0,"B":0.0}"#,
+        r#"{"group":{"g1":0.4,"g2":0.6}}"#,
+    );
+
+    assert_eq!(
+        initial_state_error(&model),
+        "Initial stratification fractions keys must exactly match stratification ids. \
+         Missing ids: [\"type\"], Extra ids: []."
+    );
+}
+
+#[test]
+fn a_bin_left_for_calibration_splits_a_value_by_its_fractions() {
+    let model = stratified_model("", r#"{"A":null,"B":0.0}"#, &fractions_with(TYPE_BY_GROUP));
+
+    let state = written_state(engine_of(&model), &["A"], None, &[2000.0]).unwrap();
+
+    assert_close(&state, &[200.0, 600.0, 600.0, 600.0, 0.0, 0.0, 0.0, 0.0]);
+}
+
+#[test]
+fn a_remainder_of_empty_compartments_splits_by_its_fractions() {
+    // A = 1000 starts, so B takes 1000 - 600 = 400 as `type` splits it.
+    let model = stratified_model(
+        "",
+        r#"{"A":1000.0,"B":0.0}"#,
+        &fractions_with(TYPE_BY_GROUP),
+    );
+
+    let state = written_state(engine_of(&model), &["A"], Some("B"), &[600.0]).unwrap();
+
+    assert_close(
+        &state,
+        &[60.0, 180.0, 180.0, 180.0, 40.0, 120.0, 120.0, 120.0],
+    );
+}
+
+#[test]
+fn a_category_of_the_stratification_a_split_differs_by_keeps_the_split() {
+    // g1 = 0.5 of A = 1000 is 500, which `type` splits 0.25 / 0.75; g2 keeps
+    // its 0.5 / 0.5.
+    let model = stratified_model(
+        "",
+        r#"{"A":1000.0,"B":0.0}"#,
+        &fractions_with(TYPE_BY_GROUP),
+    );
+
+    let state = written_state(engine_of(&model), &["g1"], None, &[0.5]).unwrap();
+
+    assert_close(&state, &[125.0, 375.0, 250.0, 250.0, 0.0, 0.0, 0.0, 0.0]);
+}
+
+#[test]
+fn a_category_of_a_split_by_category_takes_its_value_in_every_split() {
+    let model = stratified_model(
+        "",
+        r#"{"A":1000.0,"B":0.0}"#,
+        &fractions_with(TYPE_BY_GROUP),
+    );
+
+    let state = written_state(engine_of(&model), &["t1"], None, &[0.2]).unwrap();
+
+    assert_close(&state, &[80.0, 320.0, 120.0, 480.0, 0.0, 0.0, 0.0, 0.0]);
+}
+
+#[test]
+fn a_category_keeps_a_chain_of_splits_that_differ_by_it() {
+    // `level` differs by `type`, which differs by `group`: g1 = 0.5 keeps
+    // both splits on each side.
+    let level = r#",{"id":"level","categories":["l1","l2"]}"#;
+    let fractions = format!(
+        r#"{{"group":{{"g1":0.4,"g2":0.6}},"type":{TYPE_BY_GROUP},
+        "level":{{"by":"type","t1":{{"l1":1.0,"l2":0.0}},"t2":{{"l1":0.0,"l2":1.0}}}}}}"#
+    );
+    let model = stratified_model(level, r#"{"A":1000.0,"B":0.0}"#, &fractions);
+
+    let state = written_state(engine_of(&model), &["g1"], None, &[0.5]).unwrap();
+
+    assert_close(
+        &state[..8],
+        &[125.0, 0.0, 0.0, 375.0, 250.0, 0.0, 0.0, 250.0],
+    );
+}
+
+#[test]
+fn a_side_that_starts_empty_keeps_its_declared_split() {
+    // g1 starts with nothing, so its 500 takes the split `type` declares in
+    // g1, 0.25 / 0.75.
+    let fractions = format!(r#"{{"group":{{"g1":0.0,"g2":1.0}},"type":{TYPE_BY_GROUP}}}"#);
+    let model = stratified_model("", r#"{"A":1000.0,"B":0.0}"#, &fractions);
+
+    let state = written_state(engine_of(&model), &["g1"], None, &[0.5]).unwrap();
+
+    assert_close(&state, &[125.0, 375.0, 250.0, 250.0, 0.0, 0.0, 0.0, 0.0]);
+}
+
+#[test]
+fn a_prefix_that_starts_empty_keeps_its_declared_split() {
+    let fractions = format!(r#"{{"group":{{"g1":0.0,"g2":1.0}},"type":{TYPE_BY_GROUP}}}"#);
+    let model = stratified_model("", r#"{"A":1000.0,"B":0.0}"#, &fractions);
+
+    let state = written_state(engine_of(&model), &["A_g1"], None, &[100.0]).unwrap();
+
+    assert_close(&state, &[25.0, 75.0, 500.0, 500.0, 0.0, 0.0, 0.0, 0.0]);
 }
