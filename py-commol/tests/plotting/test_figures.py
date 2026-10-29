@@ -317,6 +317,30 @@ class TestObservationOperator:
         np.testing.assert_allclose(fig.axes[0].lines[0].get_ydata(), run["B"])
         assert "Factor parameter 'f3' not found" in caplog.text
 
+    @pytest.mark.parametrize("figure", ["series", "cumulative", "observations"])
+    def test_a_missing_factor_warns_once_per_factor(
+        self,
+        run: SimulationResults,
+        caplog: pytest.LogCaptureFixture,
+        figure: str,
+    ) -> None:
+        observed = [
+            ObservedDataPoint(at=step, output="B", value=1.0, factor_id="f")
+            for step in (10, 20, 30)
+        ] + [ObservedDataPoint(at=40, output="B", value=1.0, factor_id="g")]
+
+        getattr(run.plot, figure)(observed_data=observed)
+
+        warnings = [
+            record.getMessage()
+            for record in caplog.records
+            if record.levelname == "WARNING"
+        ]
+        assert [message.split(";")[0] for message in warnings] == [
+            "Factor parameter 'f' not found in calibration result",
+            "Factor parameter 'g' not found in calibration result",
+        ]
+
     def test_points_of_different_factors_are_each_read_through_their_own(
         self, run: SimulationResults
     ) -> None:

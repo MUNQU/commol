@@ -515,8 +515,8 @@ results.plot.series(
 |---|---|---|
 | `output_file` | `None` | Where to save the figure. `None` only returns it. |
 | `series` | `None` (every output) | What to draw, one panel each: an output name (`B_g1`) or a bin or accumulator id (`B`), which draws the sum of its outputs (`ModelStructure.outputs_by_source`). An exact output name wins. An unknown entry raises `ValueError`. |
-| `observed_data` | `None` | [`ObservedDataPoint`](calibration-observations.md)s to draw on the panel of their `label`, at their positions (a differential model may observe between integers). When the observations of a series share one sum of outputs and one factor and have no window, the model line covers every position of the results. Otherwise the line joins the model value of each observation at its position, read through its own outputs, `window` and factor as the loss reads it (`ValueError` when the results have no value at a position or a window start). A predictive reads each draw through the same operator. |
-| `calibration_result` | `None` | Runs and replicates only. A [`CalibrationResult`](calibration.md#results) gives the values of the [factors](calibration-observations.md#partial-observations-factors) that scale the model. A predictive reads the factors of each draw. |
+| `observed_data` | `None` | [`ObservedDataPoint`](calibration-observations.md)s to draw on the panel of their `label`, at their positions (a differential model may observe between integers). When the observations of a series share one sum of outputs, one factor and one `scale` and have no window, the model line covers every position of the results. Otherwise the line joins the model value of each observation at its position, read through its own outputs, `window`, `scale` and factor as the loss reads it (`ValueError` when the results have no value at a position or a window start). A predictive reads each draw through the same operator. |
+| `calibration_result` | `None` | Runs and replicates only. A [`CalibrationResult`](calibration.md#results) gives the values of the [factors](calibration-observations.md#partial-observations-factors) that multiply the model; without it, each factor counts as 1, with one warning for each factor. The `scale` of each observation applies in both cases. A predictive reads the factors of each draw. |
 | `confidence_level` | `0.95` | Replicates and predictives only. The level of the band. |
 | `prediction_intervals` | `None` | `plot.series` only. The `PredictionIntervals` of a [conformal method](uncertainty/conformal.md): the panel of each of their series, by label, shows the band from `lower` to `upper` and the point prediction, dashed. An unbounded interval is left out of the band. |
 | `axes` | `None` | A `Figure` of commol to draw on ([several results on one figure](#several-results-on-one-figure)). |
@@ -673,9 +673,10 @@ print([ax.get_label() for ax in checked.axes if ax.get_visible()])  # ['cum_ab',
 With `panels="observations"`, `series` and `window` raise `ValueError`: the
 labels of `observed_data` set the panels, and each observation sets its own
 window. An empty `observed_data`, or a result with no value at the position of
-an observation or at the start of its window, also raises `ValueError`. `plot_compared` takes no
-`calibration_result`: a run or replicates read an observation with a factor
-unscaled, and log a warning. A predictive reads the factors of each draw.
+an observation or at the start of its window, also raises `ValueError`.
+`plot_compared` takes no `calibration_result`: a run or replicates read an
+observation with a factor as if the factor were 1, and log one warning for
+each factor. A predictive reads the factors of each draw.
 
 ## Next steps
 

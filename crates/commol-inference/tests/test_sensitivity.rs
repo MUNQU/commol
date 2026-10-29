@@ -9,7 +9,7 @@ use commol_core::{Model, SimulationEngine};
 use commol_difference::DifferenceEquations;
 use commol_differential::DifferentialEquations;
 use commol_inference::sensitivity::{
-    Design, FiniteDifferences, SensitivityError, SensitivitySource, observation_scales,
+    Design, FiniteDifferences, SensitivityError, SensitivitySource, observation_rms,
 };
 
 /// A → B at the proportional rate `k`, from A = 1000, with the parameters
@@ -374,7 +374,7 @@ fn a_zero_series_has_scale_one() {
     ];
     let rms = 12.5_f64.sqrt();
 
-    assert_eq!(observation_scales(&observed_data), [rms, rms, 1.0, 1.0]);
+    assert_eq!(observation_rms(&observed_data), [rms, rms, 1.0, 1.0]);
 }
 
 #[test]

@@ -643,20 +643,34 @@ def model_multiplier(
     """
     The number an observation multiplies the model by, as its operator in the
     engine reads it: its scale times the value of its factor. A factor that
-    `factors` lacks counts as 1, with a warning; no observation is 1.
+    `factors` lacks counts as 1 (`warn_missing_factors` names it); no
+    observation is 1.
     """
     if point is None:
         return 1.0
     factor_id = point.factor_id
-    if factor_id is None:
+    if factor_id is None or factor_id not in factors:
         return point.scale
-    if factor_id not in factors:
+    return point.scale * factors[factor_id]
+
+
+def warn_missing_factors(
+    observed: Iterable[ObservedDataPoint], factors: Mapping[str, float]
+) -> None:
+    """
+    Log one warning for each factor of `observed` that `factors` lacks, in
+    order of first appearance: `model_multiplier` counts it as 1.
+    """
+    missing = dict.fromkeys(
+        point.factor_id
+        for point in observed
+        if point.factor_id is not None and point.factor_id not in factors
+    )
+    for factor_id in missing:
         logger.warning(
             f"Factor parameter '{factor_id}' not found in calibration result; "
             "leaving model predictions unscaled by it."
         )
-        return point.scale
-    return point.scale * factors[factor_id]
 
 
 def reads_each_observation(observed: list[ObservedDataPoint]) -> bool:

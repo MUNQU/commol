@@ -161,9 +161,9 @@ def _predictive_band(
 
     When the observations of the series do not share one operator with no
     window, each draw is read through the operator of each observation at its
-    position, as the loss reads it. With one operator and a factor or a scale,
-    each draw is read through it at every position of the predictive. Otherwise, the
-    band of the sum of the outputs.
+    position, as the loss reads it. With one operator and a factor or a
+    scale, each draw is read through it at every position of the predictive.
+    Otherwise, the band of the sum of the outputs.
     """
     if reads_each_observation(observed):
         points = [

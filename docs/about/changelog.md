@@ -13,10 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `ObservedDataPoint(scale=...)`: a known positive number, 1 by default, that
   multiplies the prediction of the observation, with its factor. A count
-  model reads the mean `scale · model`, so counts observed on a known part of
-  what the model describes stay whole. The loss, the likelihood, the
-  predictive, the scores, the figures and the `observed` block of a report
-  (`scales`) read it. See
+  model reads the mean `scale · model`, so a count observed on a known share
+  of the model output stays whole. The loss, the likelihood, the
+  predictive, the scores, the figures, the `observed` block of a report
+  (`scales`) and a `PredictionSpec(scale=...)` of a prediction profile read
+  it. See
   [Observations](../guide/calibration-observations.md#known-shares-scales).
 - `GibbsResult` and `ConformalResult` give `block_length` and
   `block_length_estimates`, as the bootstraps, the jackknife and the sandwich
@@ -244,6 +245,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A figure of a run, or of its replicates, logs one warning for each factor of
+  its observations that `calibration_result` does not have, and counts the
+  factor as 1. Before, it logged the warning once for each observation and
+  each replicate.
 - A number that is not finite in a model or in the settings of an engine
   reached the engine as `null`. An infinite tolerance of `ODESolver` raised
   a message about the type of the setting, and an infinite parameter value

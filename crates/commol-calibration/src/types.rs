@@ -52,8 +52,8 @@ pub struct ObservedDataPoint {
     pub factor_id: Option<String>,
 
     /// Known positive number that multiplies the prediction, with the
-    /// factor if there is one: the known part of what the model describes
-    /// that the observation reads (default 1.0).
+    /// factor if there is one: the known share of the model output that the
+    /// observation sees (default 1.0).
     pub scale: f64,
 
     /// Optional window length for cumulative-output observations.

@@ -3,7 +3,7 @@
 [Back to Home](../index.md)
 
 Calibration finds the parameter values (and, if you want, initial conditions
-and observation scale factors) that make a model reproduce observed data. You
+and the factors of observations) that make a model reproduce observed data. You
 describe the observations and the unknowns in a `CalibrationProblem`, and a
 `Calibrator` runs an optimizer in the Rust engine.
 
@@ -12,7 +12,7 @@ describe the observations and the unknowns in a `CalibrationProblem`, and a
 | The workflow, the problem, losses and results | This page |
 | Maximum likelihood with a model of the noise of each series | [Observation Models](uncertainty/observation-models.md) |
 | Calibrating initial conditions | [Calibrating Initial Conditions](calibration-initial-conditions.md) |
-| Several outputs, aggregates, weights, scale factors, windowed data | [Observations](calibration-observations.md) |
+| Several outputs, aggregates, weights, factors, known scales, windowed data | [Observations](calibration-observations.md) |
 | Nelder-Mead and particle swarm settings | [Optimizers](calibration-optimizers.md) |
 | Relations the result must respect | [Constraints](calibration-constraints.md) |
 | Reports of a calibrated model and run | [Reports](reports.md) |
@@ -107,8 +107,8 @@ also when it was created while a parameter was `None`. See
 
 An `ObservedDataPoint(at=..., output=..., value=...)` is one observed value of
 an output at a position on the axis. Its other fields observe a sum of
-outputs, weigh it, scale the prediction by a factor or compare a gain over a
-window: [Observations](calibration-observations.md) lists them all.
+outputs, weigh it, multiply the prediction by an unknown factor or a known
+scale, or compare a gain over a window: [Observations](calibration-observations.md) lists them all.
 
 ### Unknowns
 

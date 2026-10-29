@@ -2,6 +2,7 @@
 and intervals; the verdicts are in test_profile_verdicts.py."""
 
 import json
+import math
 from statistics import NormalDist
 
 import pytest
@@ -245,6 +246,28 @@ class TestPredictionProfiles:
             assert interval.lower == pytest.approx(mean - half_width, rel=1e-5)
             assert interval.upper == pytest.approx(mean + half_width, rel=1e-5)
 
+    def test_a_prediction_profile_reads_the_scale_of_its_prediction(self) -> None:
+        calibrator = line_calibrator(
+            VALUES, observation_models={"B": NormalObservations(sd=1.0)}
+        )
+        level = 0.9
+        scale = 0.25
+        spec = PredictionSpec(at=4, output="B", scale=scale)
+
+        result = calibrator.uncertainty(
+            PredictionProfile(specs=[spec], threshold=Threshold.chi_square(level))
+        )
+
+        # The profile of `scale · B(4)`: the interval of B(4), times the scale.
+        z = NormalDist().inv_cdf((1 + level) / 2)
+        slope, intercept, _ = _least_squares()
+        mean = intercept + slope * spec.at
+        half_width = z * (1 / N + (spec.at - T_MEAN) ** 2 / STT) ** 0.5
+        interval = result.intervals["B"]
+        assert result.profiles["B"].center == pytest.approx(scale * mean)
+        assert interval.lower == pytest.approx(scale * (mean - half_width), rel=1e-5)
+        assert interval.upper == pytest.approx(scale * (mean + half_width), rel=1e-5)
+
 
 class TestResult:
     def test_profile_result_has_one_entry_per_parameter(self) -> None:
@@ -294,6 +317,13 @@ class TestSettings:
                 ],
                 threshold=Threshold.chi_square(0.9),
             )
+
+    @pytest.mark.parametrize("scale", [0.0, -0.5, math.inf, math.nan])
+    def test_a_prediction_refuses_a_scale_that_is_not_positive(
+        self, scale: float
+    ) -> None:
+        with pytest.raises(ValidationError, match="scale is a finite number"):
+            PredictionSpec(at=4, output="B", scale=scale)
 
     def test_the_engine_refuses_a_bootstrap_it_cannot_build(self) -> None:
         def threshold(kind: str, bootstrap: dict | None) -> str:

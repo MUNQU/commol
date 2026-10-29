@@ -439,6 +439,27 @@ mod tests {
     }
 
     #[test]
+    fn a_scale_and_a_factor_multiply() {
+        let mut observation = ObservedDataPoint::new(1.0, "A".to_string(), 0.0);
+        observation.scale = 0.25;
+        observation.factor_id = Some("f".to_string());
+        let parameters = [CalibrationParameter::with_type(
+            "f".to_string(),
+            CalibrationParameterType::Factor,
+            0.1,
+            10.0,
+        )];
+        let operator =
+            ObservationOperator::new(&[observation], &parameters, &names(), &[1.0]).unwrap();
+        let mut out = [0.0];
+
+        operator.apply(&[vec![400.0, 0.0, 0.0]], &[3.0], &mut out);
+
+        // 400 times the scale 0.25 times the factor 3.
+        assert_eq!(out, [300.0]);
+    }
+
+    #[test]
     fn a_window_finds_its_start_within_the_tolerance_of_the_axis() {
         let mut windowed = ObservedDataPoint::new(0.3, "C".to_string(), 0.0);
         windowed.window = Some(0.1);

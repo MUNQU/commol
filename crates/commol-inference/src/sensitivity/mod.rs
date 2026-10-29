@@ -160,9 +160,10 @@ pub trait SensitivitySource: Sync {
     }
 }
 
-/// The scale of each observation: the root mean square of the observed
-/// values of its series, or 1 for a series whose values are all zero.
-pub fn observation_scales(observed_data: &[ObservedDataPoint]) -> Vec<f64> {
+/// The root mean square of the observed values of the series of each
+/// observation, or 1 for a series whose values are all zero: the scale of
+/// each row of the sensitivities of the design of the observations.
+pub fn observation_rms(observed_data: &[ObservedDataPoint]) -> Vec<f64> {
     let labels: Vec<String> = observed_data.iter().map(|obs| obs.label.clone()).collect();
     let values: Vec<f64> = observed_data.iter().map(|obs| obs.value).collect();
     series_rms(&labels, &values)

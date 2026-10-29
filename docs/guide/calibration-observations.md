@@ -126,7 +126,7 @@ print(calibrate_k1(weighted, normalize_observations=True))  # 0.4
 
 ## Partial observations: factors
 
-When the data sees only part of an output, for example a fixed share of it, a
+When the data sees only part of an output, an unknown share of it, a
 `factor` unknown multiplies the prediction before the comparison. Link
 observations to it with `factor_id`:
 
@@ -153,7 +153,7 @@ print(round(scaled_result.best_parameters["share_seen"], 3))  # 0.3
 |---|---|
 | Several factors | Each observation names its own `factor_id`, so outputs can have different shares. |
 | Not part of the model | `apply_calibration_parameters` skips `factor` values. |
-| Plots | Pass `calibration_result=` to `results.plot.series` or `results.plot.observations`; it applies the calibrated factors to the comparison. |
+| Plots | Pass `calibration_result=` to `results.plot.series`, `results.plot.observations` or `results.plot.cumulative`; it applies the calibrated factors to the comparison ([Plotting](simulations.md#plotting)). |
 | Identifiability | A rate and a share can explain the same data. Fit them together only when the data can tell them apart: [Identifiability](uncertainty/identifiability.md) checks it. |
 
 ## Known shares: scales
