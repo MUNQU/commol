@@ -2,9 +2,9 @@
 //! which says how an observed value scatters around its predicted mean.
 //!
 //! The observation operator gives the mean of each observation (its sums,
-//! windows and factors); a model only adds the scatter. The log-likelihood
-//! is `Σ wᵢ · log p(yᵢ | μᵢ)`: a weight is a power of its term, so a weight
-//! of 2 counts the observation twice, as it does in every loss.
+//! windows, scales and factors); a model only adds the scatter. The
+//! log-likelihood is `Σ wᵢ · log p(yᵢ | μᵢ)`: a weight is a power of its term,
+//! so a weight of 2 counts the observation twice, as it does in every loss.
 //!
 //! | Module | Holds |
 //! |---|---|

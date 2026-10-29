@@ -53,6 +53,10 @@ class PredictiveSource(Protocol):
         """Every draw's value of `observed_data` with `noise`."""
         ...
 
+    def _check_observations(self, observed_data: list[ObservedDataPoint]) -> None:
+        """Check `observed_data` against the source, with no run."""
+        ...
+
     def with_model(self, model: "Model") -> "PredictiveSource":
         """The same source on `model`, with the same seed."""
         ...
@@ -124,9 +128,9 @@ class ObservationDraws:
     Every draw's value of a set of observations.
 
     The values are read through the observation operator of the calibration
-    problem (sums of outputs, windows, factors), the one the loss uses. Without
-    observation noise their interval is a band of the model, not a prediction
-    interval.
+    problem (sums of outputs, windows, scales, factors), the one the loss
+    uses. Without observation noise their interval is a band of the model,
+    not a prediction interval.
     """
 
     def __init__(

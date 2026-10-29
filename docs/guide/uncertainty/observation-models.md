@@ -124,10 +124,10 @@ of each observation, for trials that change from one observation to the
 next. A series has one source; both or neither raise a `ValueError` that
 names the observation.
 
-A count observed on a known part of what the model describes, such as a
-sample of a known size, keeps its own value: give the part as
+A count observed on a known share of the model output, such as a sample of
+a known size, keeps its own value: give the share as
 [`scale`](../calibration-observations.md#known-shares-scales), and the model
-reads the mean `scale · μ`. Dividing the count by the part instead gives a
+reads the mean `scale · μ`. Dividing the count by the share instead gives a
 value that is not whole, and a count multiplied by `1/scale` has the wrong
 Poisson variance.
 

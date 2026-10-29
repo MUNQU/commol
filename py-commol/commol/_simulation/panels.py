@@ -27,6 +27,7 @@ from commol.plotting.panels import (
     observed_series,
     observed_trace,
     reads_each_observation,
+    warn_missing_factors,
 )
 
 if TYPE_CHECKING:
@@ -59,10 +60,11 @@ def run_panels(
         One panel per series, in order.
     """
     outputs = PanelOutputs(results, results.model)
-    factors = calibration_result.best_parameters if calibration_result else {}
+    selected = outputs.select(series)
     by_series = group_observed(observed_data)
+    factors = _factors(calibration_result, by_series, selected)
     panels = []
-    for series_id in outputs.select(series):
+    for series_id in selected:
         observed = by_series.get(series_id, [])
         positions, values = _model_line(results, outputs, series_id, observed, factors)
         panels.append(
@@ -89,10 +91,11 @@ def replicate_panels(
     """
     mean = replicates.mean()
     outputs = PanelOutputs(mean, replicates.model)
-    factors = calibration_result.best_parameters if calibration_result else {}
+    selected = outputs.select(series)
     by_series = group_observed(observed_data)
+    factors = _factors(calibration_result, by_series, selected)
     panels = []
-    for series_id in outputs.select(series):
+    for series_id in selected:
         observed = by_series.get(series_id, [])
         positions, values = _model_line(mean, outputs, series_id, observed, factors)
         statistics = spread(
@@ -130,8 +133,9 @@ def cumulative_panels(
     factor.
     """
     outputs = PanelOutputs(results, results.model)
-    factors = calibration_result.best_parameters if calibration_result else {}
+    selected = outputs.select(series)
     by_series = group_observed(observed_data)
+    factors = _factors(calibration_result, by_series, selected)
     return [
         outputs.panel(
             series_id,
@@ -146,7 +150,7 @@ def cumulative_panels(
             ),
             observed=cumulative_observed(by_series.get(series_id, []), factors),
         )
-        for series_id in outputs.select(series)
+        for series_id in selected
     ]
 
 
@@ -173,7 +177,8 @@ def run_observation_panels(
         If an observation names an output the results do not have.
     """
     outputs = PanelOutputs(results, results.model)
-    factors = calibration_result.best_parameters if calibration_result else {}
+    by_label = observed_series(observed_data)
+    factors = _factors(calibration_result, by_label, list(by_label))
     return [
         observation_panel(
             outputs,
@@ -185,7 +190,7 @@ def run_observation_panels(
                 "Simulation",
             ),
         )
-        for label, observed in observed_series(observed_data).items()
+        for label, observed in by_label.items()
     ]
 
 
@@ -203,9 +208,10 @@ def replicate_observation_panels(
     """
     mean = replicates.mean()
     outputs = PanelOutputs(mean, replicates.model)
-    factors = calibration_result.best_parameters if calibration_result else {}
+    by_label = observed_series(observed_data)
+    factors = _factors(calibration_result, by_label, list(by_label))
     panels = []
-    for label, observed in observed_series(observed_data).items():
+    for label, observed in by_label.items():
         statistics = spread(
             [_at_observations(run, observed, factors) for run in replicates],
             confidence_level,
@@ -229,6 +235,24 @@ def replicate_observation_panels(
             )
         )
     return panels
+
+
+def _factors(
+    calibration_result: CalibrationResult | None,
+    by_series: Mapping[str, list[ObservedDataPoint]],
+    selected: Iterable[str],
+) -> Mapping[str, float]:
+    """
+    The fitted values of the factors, with one warning for each factor of the
+    observations of the `selected` series that `calibration_result` lacks
+    (`warn_missing_factors`).
+    """
+    factors = calibration_result.best_parameters if calibration_result else {}
+    warn_missing_factors(
+        (point for series_id in selected for point in by_series.get(series_id, [])),
+        factors,
+    )
+    return factors
 
 
 def _at_observations(

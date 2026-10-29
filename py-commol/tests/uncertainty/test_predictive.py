@@ -21,6 +21,7 @@ from commol.uncertainty import (
     member_statistics,
 )
 from tests.support import (
+    ENGINE_REL,
     a_to_b_builder,
     bounded,
     build,
@@ -314,4 +315,6 @@ def test_a_predictive_draws_an_observation_with_its_scale(
     draws = predictive.at_observations(points, NoNoise()).values
 
     for draw in draws:
-        assert draw[2:] == pytest.approx([0.5 * value for value in draw[:2]], rel=1e-12)
+        assert draw[2:] == pytest.approx(
+            [0.5 * value for value in draw[:2]], rel=ENGINE_REL
+        )

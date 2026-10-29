@@ -28,9 +28,10 @@ pub enum Design {
     /// The positions and outputs of the problem's observations, their values
     /// ignored: can this design determine the parameters?
     Observations,
-    /// Every series of the observations, with its outputs, factor and window,
-    /// at every unit position from 0 up to the last observation: can denser
-    /// data of the same series determine them?
+    /// Every series of the observations, with its outputs, factor and window
+    /// and the scale of its first observation, at every unit position from 0
+    /// up to the last observation: can denser data of the same series
+    /// determine them?
     Dense,
 }
 
@@ -182,9 +183,10 @@ pub trait SensitivitySource: Sync {
     }
 }
 
-/// The scale of each observation: the root mean square of the observed
-/// values of its series, or 1 for a series whose values are all zero.
-pub fn observation_scales(observed_data: &[ObservedDataPoint]) -> Vec<f64> {
+/// The root mean square of the observed values of the series of each
+/// observation, or 1 for a series whose values are all zero: the scale of
+/// each row of the sensitivities of the design of the observations.
+pub fn observation_rms(observed_data: &[ObservedDataPoint]) -> Vec<f64> {
     let labels: Vec<String> = observed_data.iter().map(|obs| obs.label.clone()).collect();
     let values: Vec<f64> = observed_data.iter().map(|obs| obs.value).collect();
     series_rms(&labels, &values)

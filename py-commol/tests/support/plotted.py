@@ -86,14 +86,24 @@ def dated_run(step_unit: str, steps: int) -> SimulationResults:
     return Simulation(model).run(steps)
 
 
-def _events_calibrator() -> Calibrator:
-    """A calibrator of ``k1`` of a model from A to B that counts its events."""
+def _events_calibrator(factor: bool = False) -> Calibrator:
+    """A calibrator of ``k1`` of a model from A to B that counts its events,
+    and of the factor ``f`` of its observation when `factor`."""
     model = build(
         a_to_b_builder(parameters={"k1": None}, rate="k1", accumulator="events")
     )
     problem = CalibrationProblem(
-        observed_data=[ObservedDataPoint(at=10, output="events", value=1.0, window=5)],
-        parameters=[bounded("k1", 0.0, 0.5)],
+        observed_data=[
+            ObservedDataPoint(
+                at=10,
+                output="events",
+                value=1.0,
+                window=5,
+                factor_id="f" if factor else None,
+            )
+        ],
+        parameters=[bounded("k1", 0.0, 0.5)]
+        + ([bounded("f", 0.1, 2.0, kind="factor")] if factor else []),
         loss_function="sse",
         optimization_config=NelderMeadConfig(max_iterations=1),
     )
@@ -107,3 +117,15 @@ def predictive_of(values: list[float]) -> Predictive:
         ["k1"], [(0.0, 0.5)], [[value] for value in values], SampleMethod(name="t")
     )
     return Predictive(_events_calibrator(), sample, list(range(41)))
+
+
+def factor_predictive_of(values: list[float]) -> Predictive:
+    """As `predictive_of`, with the factor ``f`` of the observation at 0.5 in
+    each draw."""
+    sample = ParameterSample.equally_weighted(
+        ["k1", "f"],
+        [(0.0, 0.5), (0.1, 2.0)],
+        [[value, 0.5] for value in values],
+        SampleMethod(name="t"),
+    )
+    return Predictive(_events_calibrator(factor=True), sample, list(range(41)))

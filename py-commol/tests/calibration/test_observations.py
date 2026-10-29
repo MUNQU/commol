@@ -18,6 +18,7 @@ from commol import (
 from commol._model.model import Model
 from commol.observations import NegativeBinomialObservations
 from tests.support import (
+    ENGINE_REL,
     a_to_b_builder,
     abc_builder,
     bounded,
@@ -257,9 +258,9 @@ def test_an_observation_reads_the_model_times_its_scale() -> None:
     [[[prediction]]] = scaled.predict_observations([[400.0]])
 
     # The negative binomial reads the mean 10 = 0.025 · 400.
-    assert prediction == pytest.approx(10.0, rel=1e-12)
+    assert prediction == pytest.approx(10.0, rel=ENGINE_REL)
     assert scaled.pointwise_log_likelihood([400.0]) == pytest.approx(
-        unscaled.pointwise_log_likelihood([10.0]), rel=1e-12
+        unscaled.pointwise_log_likelihood([10.0]), rel=ENGINE_REL
     )
 
 

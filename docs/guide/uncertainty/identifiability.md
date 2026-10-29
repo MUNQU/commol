@@ -143,7 +143,7 @@ units.
 | `design` | Positions and outputs | Question |
 |---|---|---|
 | `"observations"` | Those of the problem's observations; their values are ignored | Can this design determine the parameters? |
-| `"dense"` | Every observed series, with its outputs, factor and window, at every unit position from 0 to the last observation | Can denser data of the same series determine them? |
+| `"dense"` | Every observed series, with its outputs, factor, scale and window, at every unit position from 0 to the last observation | Can denser data of the same series determine them? |
 
 At each point the rank counts the singular values of `S` above the norm of the
 estimated error of `S`. The **generic rank** is the rank at most points; each
@@ -326,6 +326,6 @@ print(data["parameters"]["k2"]["practical"]["verdict"])  # determined
 | To learn | Read |
 |---|---|
 | Several starts of an optimizer | [Optimizers](../calibration-optimizers.md#several-starts) |
-| Scale factors, which often pair with a rate | [Observations](../calibration-observations.md) |
+| Factors, which often pair with a rate | [Observations](../calibration-observations.md) |
 | What a sample is | [Uncertainty](index.md#the-parameter-sample) |
 | Intervals and verdicts from profiles | [Profile Likelihood](profiles.md) |

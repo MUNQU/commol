@@ -58,8 +58,8 @@ class ObservedDataPoint(RangeChecked):
     scale : float
         A known positive number that multiplies the model output, with the
         factor if there is one, before comparison (default: 1.0): the known
-        part of what the model describes that the observation reads, such as
-        the share of the units that report. A count model then reads the
+        share of the model output that the observation sees, such as the
+        share of the units that report. A count model then reads the
         observed count with the mean ``scale · model``.
     window : float | None
         Optional window length for a cumulative output: the prediction is the

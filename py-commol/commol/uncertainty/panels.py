@@ -71,6 +71,12 @@ def predictive_cumulative_panels(
     The panels of the band of the running total of each series of a
     predictive, and of its observations, each divided by its scale and by the
     weighted median of its factor.
+
+    Raises
+    ------
+    ValueError
+        If an observation names a factor the problem does not have
+        (`_check_factors`).
     """
     outputs = PanelOutputs(
         predictive.output_names, predictive.source.simulation.model_definition
@@ -78,9 +84,14 @@ def predictive_cumulative_panels(
     factors = {
         name: values[0] for name, values in predictive.sample.quantiles([0.5]).items()
     }
+    selected = outputs.select(series)
     by_series = group_observed(observed_data)
+    _check_factors(
+        predictive,
+        [point for series_id in selected for point in by_series.get(series_id, [])],
+    )
     panels = []
-    for series_id in outputs.select(series):
+    for series_id in selected:
         band = predictive.series_band(
             outputs.components(series_id), confidence_level, cumulative=True
         )
@@ -139,6 +150,22 @@ def predictive_observation_panels(
     return panels
 
 
+def _check_factors(predictive: "Predictive", observed: list[ObservedDataPoint]) -> None:
+    """
+    Check the observations with a factor against the source of the predictive,
+    with no run: the engine refuses an unknown factor, or a parameter that is
+    not a factor, as the band of a series with that factor does.
+
+    Raises
+    ------
+    ValueError
+        With the message of the engine.
+    """
+    with_factor = [point for point in observed if point.factor_id is not None]
+    if with_factor:
+        predictive.source._check_observations(with_factor)
+
+
 def _draws_band(band: "SeriesBand") -> Band:
     """The central interval of the draws of a series band."""
     return Band(
@@ -161,9 +188,9 @@ def _predictive_band(
 
     When the observations of the series do not share one operator with no
     window, each draw is read through the operator of each observation at its
-    position, as the loss reads it. With one operator and a factor or a scale,
-    each draw is read through it at every position of the predictive. Otherwise, the
-    band of the sum of the outputs.
+    position, as the loss reads it. With one operator and a factor or a
+    scale, each draw is read through it at every position of the predictive.
+    Otherwise, the band of the sum of the outputs.
     """
     if reads_each_observation(observed):
         points = [

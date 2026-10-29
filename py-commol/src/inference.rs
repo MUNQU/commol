@@ -459,6 +459,26 @@ impl PyCalibrationProblem {
         .map_err(method_error)
     }
 
+    /// Check `observations` against the problem, with no run: the positions
+    /// the engine accepts and what the observation operator reads
+    /// (`ForwardModel::with_observations`)
+    ///
+    /// Args:
+    ///     observations: The JSON of the observations
+    ///
+    /// Raises:
+    ///     ValueError: If the engine rejects a position, or an observation
+    ///         names an unknown output or factor, or a parameter that is not
+    ///         a factor
+    fn check_observations(&self, observations: &str) -> PyResult<()> {
+        let observations = observed_data(&crate::json::read::<Vec<_>>(observations)?);
+        self.inner
+            .forward()
+            .with_observations(&observations)
+            .map(|_| ())
+            .map_err(value_error)
+    }
+
     /// The log score of each of `observations` under the predictive of
     /// `sample` and the observation models of the problem, each replicate of
     /// a stochastic engine seeded from the seed of the problem

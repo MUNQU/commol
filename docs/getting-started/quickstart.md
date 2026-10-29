@@ -175,7 +175,7 @@ fitted.plot.series(series=["B"], observed_data=observed_data, output_file="fit.p
 | `Model.apply_calibration_parameters(result, problem)` | Writes the calibrated values into the model. |
 
 See [Model Calibration](../guide/calibration.md) for initial conditions,
-constraints, scale factors and the optimizers.
+constraints, factors and the optimizers.
 
 ## Log messages
 

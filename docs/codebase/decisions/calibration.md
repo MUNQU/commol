@@ -77,18 +77,21 @@ message with no prefix.
 ## One observation operator
 
 `ObservationOperator` (`crates/commol-calibration/src/observation.rs`) is the
-only code that turns a run into observed quantities: the row of each
-observation, the sum of its outputs, its increment over its window, its
+only code of the engine that turns a run into observed quantities: the row of
+each observation, the sum of its outputs, its increment over its window, its
 scale and its factor. The loss, the predictions of `PyCalibrationProblem`, the
-predictive's `at_observations` and every score read it, and the figures read
-a windowed or scaled series of a predictive through it. The calibration problem is split
-into one layer per job, each in its own module: `ForwardModel` (`forward.rs`)
-is the only code that clones, resets, writes values to or runs the engine;
-`Feasibility` (`feasibility.rs`) checks bounds and constraints; `Discrepancy`
-(`discrepancy.rs`) compares predictions with data; `OptimizationObjective`
-(`objective.rs`) is the argmin cost function. `CalibrationProblem` holds them,
-is built once and has no interior mutability; the buffers of an evaluation are
-a `Workspace` per thread.
+predictive's `at_observations` and every score read it, and the figures of a
+predictive read a series with a window, a factor or a scale through it. The
+figures of a run and of its replicates have no problem to read, and repeat
+its rules in Python ([A known scale is a number of the
+observation](#a-known-scale-is-a-number-of-the-observation)).
+The calibration problem is split into one layer per job, each in its own
+module: `ForwardModel` (`forward.rs`) is the only code that clones, resets,
+writes values to or runs the engine; `Feasibility` (`feasibility.rs`) checks
+bounds and constraints; `Discrepancy` (`discrepancy.rs`) compares predictions
+with data; `OptimizationObjective` (`objective.rs`) is the argmin cost
+function. `CalibrationProblem` holds them, is built once and has no interior
+mutability; the buffers of an evaluation are a `Workspace` per thread.
 
 **Rule:** Python never transforms a prediction of a calibration problem or of
 a sample: their windows, sums, factors, normalization, quantiles and scores
@@ -128,17 +131,33 @@ read a position with the same `index_at`.
 
 ## A known scale is a number of the observation
 
-A known part of what an observation reads, such as the share of the units
-that report, is `ObservedDataPoint.scale` (1 by default). The operator
-multiplies the prediction by it with the factor, so every reader applies it
-with no code of its own; a target that copies the first observation of its
-series (conformal `targets`, the dense design of finite differences) keeps
-its scale. Not a `factor` with equal bounds: `CalibrationParameter` refuses
-them, and a parameter that nothing fits would enter every method that reads
-the parameter vector. Not a scale of the series: `factor_id`, `window` and
-`trials` change by observation, and a loss has no observation model.
+A known share of the model output that an observation sees, such as the
+share of the units that report, is `ObservedDataPoint.scale` (1 by default),
+or the `scale` of a `PredictionSpec`. The operator multiplies the prediction
+by it with the factor, so every reader in the engine (the loss, the
+predictive, the scores, the profiles) applies it with no code of its own. The
+figures of a `SimulationResults` and of its replicates have no calibration
+problem to read: they repeat scale times factor in Python (`model_multiplier`
+of `plotting/panels.py`). The cumulative figures of a run, of its replicates
+and of a predictive divide each observation by it in Python, a predictive with
+the weighted median of the factor; a predictive checks the factors of its
+observations in the engine first, with no run
+(`ForwardModel::with_observations`, the binding `check_observations`). A
+target that copies the first observation of its series (conformal `targets`,
+the dense design of finite differences) keeps its scale. Not a `factor` with
+equal bounds: `CalibrationParameter` refuses them, and a parameter that
+nothing fits would enter every method that reads the parameter vector. Not a
+scale of the series: `factor_id`, `window` and `trials` change by
+observation, and a loss has no observation model.
 
-**Guards:** `crates/commol-calibration/tests/test_series.rs::a_scale_and_a_factor_multiply`, `tests/calibration/test_observations.py::test_an_observation_reads_the_model_times_its_scale`.
+**Guards:** `observation::tests::a_scale_and_a_factor_multiply`,
+`tests/calibration/test_observations.py::test_an_observation_reads_the_model_times_its_scale`,
+`tests/uncertainty/test_profiles.py::TestPredictionProfiles::test_a_prediction_profile_reads_the_scale_of_its_prediction`,
+`tests/plotting/test_figures.py::TestObservationOperator::test_a_scale_multiplies_the_line_and_each_point_of_its_own`,
+`tests/plotting/test_run_figures.py::TestRunFigures::test_cumulative_observations_are_divided_by_their_scale`,
+`tests/plotting/test_figures.py::TestObservationOperator::test_a_missing_factor_warns_once_per_factor`,
+`tests/plotting/test_figures.py::TestObservationOperator::test_a_predictive_refuses_a_factor_the_problem_lacks`,
+`tests/plotting/test_figures.py::TestObservationOperator::test_a_predictive_cumulative_figure_runs_no_draw_to_check_a_factor`.
 
 ## Constraints bound the support
 
@@ -164,43 +183,6 @@ edge of the support: its log density is `−∞` (`discrepancy_in_support` in
 **Guards:** `feasibility::tests`,
 `crates/commol-calibration/tests/test_infeasible_runs.rs`,
 `crates/commol-calibration/tests/test_likelihood.rs::the_penalty_is_above_every_feasible_cost`.
-
-## A subproblem holds one quantity fixed
-
-`Subproblem` (`crates/commol-calibration/src/subproblem.rs`) holds one
-parameter or one prediction while `optimize_subproblem` (`optimization.rs`)
-fits the others with the problem's own optimizer. A held parameter leaves the
-search space (`SearchSpace`): the optimizer searches one dimension less, and
-the cost puts the fixed value back before it scores a point. A held
-prediction `g(θ) = c` is an equality constraint met by the augmented
-Lagrangian of the argmin fork, whose factory builds the problem's optimizer
-at each outer iteration: Nelder-Mead on the sine transform, from the point of
-the iteration before, or a swarm seeded by `replicate_seed(seed, k)`. The
-prediction is read through the observation operator of a copy of the problem
-whose runs also report at its positions (`CalibrationProblem::observing`), so
-one run gives the objective and the constraint, and the cost keeps the
-constraint of the last point each thread scored (the augmented Lagrangian
-asks for both on one thread; a swarm scores its particles on several). A point that is not feasible keeps
-its penalty and a constraint of 0. Each point starts from Algencan's scaled
-penalty; the multiplier is the warm start.
-
-| Alternative | Why not |
-|---|---|
-| Bounds `[v, v]` for a held parameter | Nelder-Mead keeps a vertex for a dimension that moves nothing. |
-| A growing quadratic penalty on `g − c` | It meets the constraint only as `μ → ∞`, and a large `μ` makes a narrow valley where Nelder-Mead stops early. |
-| A second run for the prediction | Twice the model runs of each evaluation. |
-| `μ = 100·|Δλ/Δc|` from the two points before | In the experiment of #132 (the ABC model of `tests/support/` with a normal model, the problem of `the_multiplier_of_a_prediction_profile_is_minus_its_slope`), B at 30 took 5465 evaluations against 3179 with Algencan's `μ₀`, C at 24 5405 against 3175, for the same intervals and a mean error of the multipliers of 0.8e-4 against 1.2e-4; `10⁴·|Δλ/Δc|` gained 4 %. The stop rule reads `‖g − c‖`, which a small `μ` leaves large. |
-
-The augmented Lagrangian stops only when an inner run converged. A swarm
-without a stop rule runs each outer iteration to its `max_iterations`, so a
-held prediction stops at the outer limit and never reports convergence; with
-the improvement rule, it stops when the constraint holds.
-
-**Guards:** `crates/commol-inference/tests/test_profiles.rs`
-(`fixing_a_parameter_at_the_fit_keeps_the_loss`,
-`fixing_a_prediction_at_the_fit_keeps_the_parameters`,
-`a_problem_observing_more_positions_scores_as_the_problem`,
-`a_swarm_fits_a_subproblem_and_repeats_from_its_seed`).
 
 ## A result records its seed
 

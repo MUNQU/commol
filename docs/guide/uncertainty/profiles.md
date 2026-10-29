@@ -210,11 +210,11 @@ held prediction to its `max_iterations`, or until one of its
 
 `PredictionProfile(specs, threshold)` profiles the value of each prediction: a
 `PredictionSpec` reads an output, or a sum of outputs, at a position, with a
-`window` and a `factor_id`, as an observation does. Its interval is the set of
-values the data do not reject (Kreutz et al. 2012); specs at several positions
-give a band. A prediction past the data has a wider interval, as `B at 50`
-shows in the [quick path](#quick-path). The intervals are pointwise: a band of
-them is not a joint region.
+`window`, a `factor_id` and a known `scale`, as an observation does. Its
+interval is the set of values the data do not reject (Kreutz et al. 2012);
+specs at several positions give a band. A prediction past the data has a wider
+interval, as `B at 50` shows in the [quick path](#quick-path). The intervals
+are pointwise: a band of them is not a joint region.
 
 ## Verdicts and the identifiability report
 

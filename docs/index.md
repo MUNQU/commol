@@ -96,7 +96,7 @@ print(round(steps["C"][-1]), round(flows["C"][-1]))  # the amount of C in each m
 | A description of a model: equations, state graphs, the ODD protocol (text, Markdown, LaTeX) | [Describing a Model](guide/describing-models.md) |
 | One process run as difference equations or differential equations; results read, plotted and compared | [Running Simulations](guide/simulations.md) |
 | The same process as a stochastic process of whole units, with seeds and replicates | [Stochastic Simulation](guide/stochastic.md) |
-| Calibration of parameters, initial conditions and scale factors | [Model Calibration](guide/calibration.md) |
+| Calibration of parameters, initial conditions and factors | [Model Calibration](guide/calibration.md) |
 | Parameter samples, predictive bands, scenarios and scores | [Uncertainty](guide/uncertainty/index.md) |
 | JSON-ready reports | [Reports](guide/reports.md) |
 | Parallel starts, replicates, particles and draws, on the threads you choose | [Threads and Parallelism](guide/parallelism.md) |

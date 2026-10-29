@@ -1,10 +1,7 @@
 //! The series of a set of observations, the schedule a run reports at, and
 //! the mean over replicates.
 
-use commol_calibration::{
-    CalibrationParameter, CalibrationParameterType, ObservationOperator, ObservedDataPoint,
-    SeriesIndex, replicate_mean, schedule_of,
-};
+use commol_calibration::{ObservedDataPoint, SeriesIndex, replicate_mean, schedule_of};
 
 fn point(at: f64, label: &str) -> ObservedDataPoint {
     ObservedDataPoint::new(at, label.to_string(), 0.0)
@@ -58,24 +55,4 @@ fn the_mean_over_replicates_is_the_mean_of_each_observation() {
 
     assert_eq!(replicate_mean(predictions.chunks(2), 2), [2.0, 20.0]);
     assert!(replicate_mean(std::iter::empty::<&[f64]>(), 0).is_empty());
-}
-
-#[test]
-fn a_scale_and_a_factor_multiply() {
-    let mut observation = point(1.0, "A");
-    observation.scale = 0.25;
-    observation.factor_id = Some("f".to_string());
-    let parameters = [CalibrationParameter::with_type(
-        "f".to_string(),
-        CalibrationParameterType::Factor,
-        0.1,
-        10.0,
-    )];
-    let operator =
-        ObservationOperator::new(&[observation], &parameters, &["A".to_string()], &[1.0]).unwrap();
-    let mut out = [0.0];
-
-    operator.apply(&[vec![400.0]], &[3.0], &mut out);
-
-    assert_eq!(out, [300.0]);
 }

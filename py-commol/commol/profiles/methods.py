@@ -47,6 +47,9 @@ class PredictionSpec(RangeChecked):
         output at ``at - window``.
     factor_id : str | None
         A factor parameter that multiplies the prediction.
+    scale : float
+        A known positive number that multiplies the prediction, with the
+        factor, as the scale of an observation does (default: 1.0).
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -59,6 +62,7 @@ class PredictionSpec(RangeChecked):
         default=None,
     )
     factor_id: str | None = None
+    scale: float = 1.0
 
     def as_observation(self) -> ObservedDataPoint:
         """
@@ -82,6 +86,7 @@ class PredictionSpec(RangeChecked):
             value=0.0,
             window=self.window,
             factor_id=self.factor_id,
+            scale=self.scale,
         )
 
 

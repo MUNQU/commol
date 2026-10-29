@@ -19,9 +19,7 @@ use commol_calibration::{
 use commol_core::{Accuracy, AccuracySettings, SimulationEngine};
 use rayon::prelude::*;
 
-use super::{
-    Design, Matrix, Sensitivities, SensitivityError, SensitivitySource, observation_scales,
-};
+use super::{Design, Matrix, Sensitivities, SensitivityError, SensitivitySource, observation_rms};
 use commol_calibration::discrepancy::series_rms;
 
 /// Finite differences of the predicted observations of a problem.
@@ -245,7 +243,7 @@ impl<E: SimulationEngine + Send + Sync> SensitivitySource for FiniteDifferences<
 
     fn scales(&self, sensitivities: &Sensitivities) -> Vec<f64> {
         match self.design {
-            Design::Observations => observation_scales(&self.observed_data),
+            Design::Observations => observation_rms(&self.observed_data),
             Design::Dense => series_rms(&sensitivities.labels, &sensitivities.predictions),
         }
     }
@@ -292,9 +290,9 @@ fn reason(violation: &Violation) -> String {
 }
 
 /// Every series of `observed_data` (its label, outputs, factor and window,
-/// with the scale of its first observation) at every unit position from 0 up to the last observation, and at the
-/// positions of the observations; a series with a window starts once a whole
-/// window fits.
+/// with the scale of its first observation) at every unit position from 0 up
+/// to the last observation, and at the positions of the observations; a
+/// series with a window starts once a whole window fits.
 fn dense_observations(observed_data: &[ObservedDataPoint]) -> Vec<ObservedDataPoint> {
     let last = observed_data.iter().map(|obs| obs.at).fold(0.0, f64::max);
     let mut series: Vec<&ObservedDataPoint> = Vec::new();
