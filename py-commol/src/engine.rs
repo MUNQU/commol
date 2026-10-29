@@ -6,7 +6,8 @@
 
 use crate::parallelism::parallel;
 use commol_core::{
-    EngineType, ModelKind, ModelValue, RateKeeps, SimulationEngine, SimulationError, ValuePlan,
+    Accuracy, AccuracySettings, EngineType, ModelKind, ModelValue, RateKeeps, SimulationEngine,
+    SimulationError, ValuePlan,
 };
 use commol_difference::DifferenceEquations;
 use commol_differential::DifferentialEquations;
@@ -235,12 +236,29 @@ impl SimulationEngine for Engine {
         dispatch!(self, engine => engine.output_sums())
     }
 
-    fn output_accuracy(&self) -> f64 {
-        dispatch!(self, engine => engine.output_accuracy())
+    fn accuracy(&self) -> Accuracy {
+        dispatch!(self, engine => engine.accuracy())
     }
 
-    fn output_absolute_accuracy(&self) -> f64 {
-        dispatch!(self, engine => engine.output_absolute_accuracy())
+    fn accuracy_settings(&self) -> Option<AccuracySettings> {
+        dispatch!(self, engine => engine.accuracy_settings())
+    }
+
+    fn at_accuracy(&self, accuracy: Accuracy) -> Option<Self> {
+        match self {
+            Self::Difference(engine) => engine.at_accuracy(accuracy).map(Self::Difference),
+            Self::Differential(engine) => engine.at_accuracy(accuracy).map(Self::Differential),
+            Self::StochasticEvents(engine) => {
+                engine.at_accuracy(accuracy).map(Self::StochasticEvents)
+            }
+            Self::StochasticSteps(engine) => {
+                engine.at_accuracy(accuracy).map(Self::StochasticSteps)
+            }
+            #[cfg(feature = "test-kind")]
+            Self::Test(engine) => engine.at_accuracy(accuracy).map(Self::Test),
+            #[cfg(feature = "test-kind")]
+            Self::TestStochastic(engine) => engine.at_accuracy(accuracy).map(Self::TestStochastic),
+        }
     }
 
     fn reset(&mut self) {
@@ -768,6 +786,12 @@ mod tests {
     use super::*;
     use commol_core::{EngineSettings, Model, ModelEngine, OdeSolver};
 
+    /// An accuracy tighter than the default tolerances.
+    const TIGHTER: Accuracy = Accuracy {
+        relative: 1e-9,
+        absolute: 1e-9,
+    };
+
     /// A → B at the proportional rate 0.1, run by `engine`.
     fn decay_model(engine: EngineType) -> Model {
         let mut model: Model = serde_json::from_str(
@@ -793,6 +817,15 @@ mod tests {
             assert_eq!(engine.engine_type(), engine_type);
             let rows = SimulationEngine::run(&mut engine, 1).unwrap().rows;
             assert!(rows[1][0] < rows[0][0], "{engine_type:?} moved nothing");
+            // Only the engine that integrates with tolerances runs at another accuracy.
+            let ode = engine_type == EngineType::DifferentialEquations;
+            let tighter = engine.at_accuracy(TIGHTER);
+            assert_eq!(
+                tighter.map(|engine| engine.accuracy()),
+                ode.then_some(TIGHTER),
+                "{engine_type:?}"
+            );
+            assert_eq!(engine.accuracy_settings().is_some(), ode, "{engine_type:?}");
         }
     }
 
@@ -807,10 +840,12 @@ mod tests {
         let Engine::Differential(engine) = Engine::build(&model).unwrap() else {
             panic!("expected the differential engine"); // coverage: the failure of a test
         };
-        assert_eq!(SimulationEngine::output_accuracy(&engine), settings.rtol);
         assert_eq!(
-            SimulationEngine::output_absolute_accuracy(&engine),
-            settings.atol
+            SimulationEngine::accuracy(&engine),
+            Accuracy {
+                relative: settings.rtol,
+                absolute: settings.atol
+            }
         );
     }
 
@@ -857,6 +892,7 @@ mod tests {
         assert_eq!(rows[0], vec![10.0]);
         assert!((rows[1][0] - 10.0 * (-1.0f64).exp()).abs() < 1e-12);
         assert!(engine.plan_values(&[], Some("x")).is_err());
+        assert!(engine.at_accuracy(TIGHTER).is_none());
     }
 
     /// A stochastic test model: 100 units of `x` leave at rate `k`.
@@ -882,6 +918,7 @@ mod tests {
     fn a_stochastic_engine_repeats_a_run_from_its_seed() {
         let mut engine = Engine::build(&stochastic_model()).unwrap();
         assert!(engine.engine_type().is_stochastic());
+        assert!(engine.at_accuracy(TIGHTER).is_none());
 
         let first = stochastic_run(&mut engine, 7);
         let again = stochastic_run(&mut engine, 7);

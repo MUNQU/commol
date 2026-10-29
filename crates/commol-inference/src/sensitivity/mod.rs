@@ -17,6 +17,7 @@ use std::fmt;
 
 use commol_calibration::discrepancy::series_rms;
 use commol_calibration::{CalibrationParameter, ObservedDataPoint};
+use commol_core::{Accuracy, AccuracySettings};
 
 /// A dense matrix of `f64`, row-major in meaning: `(observation, parameter)`.
 pub type Matrix = nalgebra::DMatrix<f64>;
@@ -147,6 +148,27 @@ pub trait SensitivitySource: Sync {
 
     /// The scale `s_i` of each row of `sensitivities`.
     fn scales(&self, sensitivities: &Sensitivities) -> Vec<f64>;
+
+    /// The accuracy of the runs the derivatives come from:
+    /// [`Accuracy::EXACT`] by default.
+    fn accuracy(&self) -> Accuracy {
+        Accuracy::EXACT
+    }
+
+    /// The settings that set [`Self::accuracy`], or `None` when no setting
+    /// sets it (the default).
+    fn accuracy_settings(&self) -> Option<AccuracySettings> {
+        None
+    }
+
+    /// The same source on runs at `accuracy`, or `None` when no setting sets
+    /// the accuracy of its runs (the default).
+    fn at_accuracy(&self, _accuracy: Accuracy) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        None
+    }
 
     /// The scaled Jacobian at `values` ([`Sensitivities::scaled`]).
     ///

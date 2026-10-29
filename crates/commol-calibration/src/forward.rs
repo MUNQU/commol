@@ -5,7 +5,7 @@
 //! engine of a calibration problem. A stochastic engine runs one replicate
 //! per seed of its [`Replicates`], the same seeds at every evaluation.
 
-use commol_core::{SimulationEngine, SimulationError, ValuePlan};
+use commol_core::{Accuracy, SimulationEngine, SimulationError, ValuePlan};
 
 use crate::feasibility::{EvaluationError, Violation};
 use crate::observation::ObservationOperator;
@@ -182,6 +182,21 @@ impl<E: SimulationEngine> ForwardModel<E> {
             observation,
             ..self.clone()
         }
+    }
+
+    /// The same model on its engine at `accuracy`
+    /// ([`SimulationEngine::at_accuracy`]): the parameters, the values, the
+    /// schedule, the observations and the replicates stay. `None` when no
+    /// setting sets the accuracy of the engine.
+    pub fn at_accuracy(&self, accuracy: Accuracy) -> Option<Self> {
+        Some(Self {
+            base_engine: self.base_engine.at_accuracy(accuracy)?,
+            parameters: self.parameters.clone(),
+            values: self.values.clone(),
+            schedule: self.schedule.clone(),
+            observation: self.observation.clone(),
+            replicates: self.replicates.clone(),
+        })
     }
 
     /// The sorted, deduplicated positions every evaluation runs at.

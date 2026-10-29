@@ -21,7 +21,7 @@ pub use collinearity::{
 pub use sample::{Reference, SampleIdentifiability, SampleVerdict, sample_identifiability};
 pub use starts::{StartsIdentifiability, starts_identifiability};
 pub use structural::{
-    Combination, PointRank, StructuralAnalysis, StructuralVerdict, structural_rank,
+    Combination, PointRank, StructuralAnalysis, StructuralVerdict, TighterRank, structural_rank,
 };
 
 use crate::sensitivity::SensitivityError;

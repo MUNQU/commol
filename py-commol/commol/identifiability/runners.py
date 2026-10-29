@@ -16,6 +16,7 @@ from commol._calibration.method import CalibrationPort
 from commol._data.engine_json import engine_handles, engine_json
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.identifiability.results import (
+    Accuracy,
     CollinearitySection,
     Combination,
     CorrelatedPair,
@@ -29,10 +30,12 @@ from commol.identifiability.results import (
     StructuralSection,
     StructuralVerdict,
     SubsetIndex,
+    TighterRank,
 )
 from commol.profiles.results import RESET_REASON
 
 if TYPE_CHECKING:
+    from commol.commol_rs._commol_rs import AccuracyProtocol
     from commol.identifiability.methods import (
         Collinearity,
         ProfileIdentifiability,
@@ -80,6 +83,38 @@ def _report(
     )
 
 
+def _accuracy(accuracy: "AccuracyProtocol") -> Accuracy:
+    return Accuracy(relative=accuracy.relative, absolute=accuracy.absolute)
+
+
+def _at(accuracy: Accuracy, settings: tuple[str, str]) -> str:
+    relative, absolute = settings
+    return f"{relative} = {accuracy.relative:g}, {absolute} = {accuracy.absolute:g}"
+
+
+def _unresolved_reason(section: StructuralSection, settings: tuple[str, str]) -> str:
+    """Why the structural rank gives no verdict: the points whose rank
+    changes at the tighter accuracy, and why a point could not run there."""
+    tighter = section.tighter
+    assert tighter is not None, "only a tighter accuracy leaves a verdict out"
+    changes = [
+        f"{point.rank} to {point.tighter.rank}"
+        for point in section.points
+        if point.tighter is not None and point.tighter.rank != point.rank
+    ]
+    count = f"{len(changes)} of {len(section.points)} points"
+    facts = [f"the rank of {count} changes ({', '.join(changes)})"] if changes else []
+    facts += [f"a point could not run: {why}" for why in section.unchecked]
+    found = "; ".join(facts) or "no rank changes, but the null space does"
+    relative, absolute = settings
+    return (
+        f"Structural rank on the observations: the accuracy of the engine "
+        f"({_at(section.accuracy, settings)}), not the structure, may set its "
+        f"verdict. Evaluated again at {_at(tighter, settings)}, {found}. "
+        f"Tighten {relative} and {absolute} until the rank stops changing."
+    )
+
+
 def run_structural_rank(
     calibrator: CalibrationPort, method: "StructuralRank"
 ) -> IdentifiabilityReport:
@@ -103,9 +138,18 @@ def run_structural_rank(
         points=[
             PointRank(
                 values=dict(zip(names, point.values, strict=True)),
+                accuracy=_accuracy(point.accuracy),
                 singular_values=point.singular_values,
                 threshold=point.threshold,
                 rank=point.rank,
+                tighter=None
+                if point.tighter is None
+                else TighterRank(
+                    accuracy=_accuracy(point.tighter.accuracy),
+                    singular_values=point.tighter.singular_values,
+                    threshold=point.tighter.threshold,
+                    rank=point.tighter.rank,
+                ),
             )
             for point in analysis.points
         ],
@@ -114,19 +158,33 @@ def run_structural_rank(
         projections=dict(zip(names, analysis.projections, strict=True)),
         verdicts=verdicts,
         combinations=combinations,
+        accuracy=_accuracy(analysis.accuracy),
+        tighter=None if analysis.tighter is None else _accuracy(analysis.tighter),
+        tighter_generic_rank=analysis.tighter_generic_rank,
+        unchecked=analysis.unchecked,
     )
     if method.design == "dense":
         return _report(calibrator, structural=[section])
+    settings = analysis.accuracy_settings
     rank = f"generic rank {analysis.generic_rank} of {len(names)}"
+    tighter_rank = section.tighter_generic_rank
+    if tighter_rank is not None and tighter_rank != section.generic_rank:
+        assert section.tighter is not None and settings is not None
+        rank += f"; {tighter_rank} at {_at(section.tighter, settings)}"
     structural: dict[str, StructuralVerdict] = {}
     for name in names:
-        projection = section.projections[name]
-        reason = (
-            f"Structural rank on the observations ({rank}): its projection on "
-            f"the null space is {projection:.2f}."
-        )
+        verdict = verdicts[name]
+        if verdict is None:
+            assert settings is not None, "only a setting of the accuracy tightens it"
+            reason = _unresolved_reason(section, settings)
+        else:
+            projection = section.projections[name]
+            reason = (
+                f"Structural rank on the observations ({rank}): its projection "
+                f"on the null space is {projection:.2f}."
+            )
         structural[name] = StructuralVerdict(
-            verdict=verdicts[name],
+            verdict=verdict,
             reasons=[reason],
             combinations=[c.text for c in combinations if name in c.exponents],
         )

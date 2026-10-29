@@ -203,8 +203,10 @@ print(list(band_report["series"]["A"]))  # ['mean', 'median', 'ci_lower', 'ci_up
 `Calibrator.identifiability` (also with `ProfileIdentifiability`), or of
 `IdentifiabilityReport.merge`, as
 `parameters` (each parameter, in problem order, with its `structural` and
-`practical` verdicts, their reasons and combinations, or `None`) and
-`sections` (the evidence of each method that ran, by section name).
+`practical` verdicts, their reasons and combinations, or `None`; a
+structural `verdict` is `None`, with its reasons, when the solver tolerance
+may set the rank) and `sections` (the evidence of each method that ran, by
+section name).
 
 ## Checklist
 

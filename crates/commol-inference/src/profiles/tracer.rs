@@ -17,7 +17,7 @@ use commol_calibration::{
     CalibrationProblem, ConstraintSettings, LossConfig, ObservedDataPoint, OptimizationConfig,
     OptimizationObjective, Subproblem, SubproblemResult, Workspace, optimize_subproblem, predict,
 };
-use commol_core::SimulationEngine;
+use commol_core::{Accuracy, SimulationEngine};
 use commol_random::replicate_seed;
 use rayon::prelude::*;
 
@@ -228,10 +228,9 @@ where
     /// `Σᵢ |∂ℓᵢ/∂mᵢ| · eᵢ`, with `ℓᵢ` the term of observation `i`
     /// ([`CalibrationProblem::term_derivatives`]), `mᵢ` its prediction and
     /// `eᵢ = rtol · |mᵢ| + k · atol` the error of a run on it, for an
-    /// observation that sums `k` outputs; `rtol` is the
-    /// [`SimulationEngine::output_accuracy`] and `atol` the
-    /// [`SimulationEngine::output_absolute_accuracy`] of the engine. They
-    /// are the tolerances of each step of a solver, so `ν₁` is an estimate,
+    /// observation that sums `k` outputs; `rtol` is the relative and `atol`
+    /// the absolute [`SimulationEngine::accuracy`] of the engine. They are the
+    /// tolerances of each step of a solver, so `ν₁` is an estimate,
     /// not a bound. 0 when it cannot be computed: a loss with no term
     /// derivatives, or a problem of replicates.
     pub fn noise_floor(&self) -> f64 {
@@ -664,7 +663,7 @@ fn floors<E: SimulationEngine>(problem: &CalibrationProblem<E>, fit: &[f64]) -> 
         .to_vec();
     let terms = problem.term_derivatives(fit, &predictions).ok()?;
     let engine = problem.forward().base_engine();
-    let (relative, absolute) = (engine.output_accuracy(), engine.output_absolute_accuracy());
+    let Accuracy { relative, absolute } = engine.accuracy();
     let errors: Vec<f64> = problem
         .observed_data()
         .iter()

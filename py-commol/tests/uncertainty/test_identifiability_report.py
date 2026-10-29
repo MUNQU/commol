@@ -12,6 +12,7 @@ from commol import (
     ObservedDataPoint,
     Simulation,
 )
+from commol.engines import ODESolver
 from commol.identifiability import StructuralRank
 from commol.identifiability.results import (
     CollinearitySection,
@@ -29,6 +30,7 @@ from tests.support import (
     abc_builder,
     bounded,
     build_stochastic,
+    rare_flow_calibrator,
 )
 
 
@@ -128,6 +130,48 @@ class TestReport:
                 second_sections[name],
             ]
             assert getattr(merged, name)[0] is first_sections[name]
+
+    def test_a_parameter_with_no_structural_verdict_keeps_the_practical_one(
+        self,
+    ) -> None:
+        # At this point the rank is 2 at the default tolerances and 3 at a
+        # hundredth of them: no parameter has a structural verdict.
+        calibrator = rare_flow_calibrator(ODESolver())
+        rank = calibrator.identifiability(
+            StructuralRank(points=1, design="observations")
+        )
+        other = IdentifiabilityReport(
+            parameters=["k1", "k2", "p"],
+            verdicts={
+                "k1": ParameterVerdicts(
+                    structural=StructuralVerdict(
+                        verdict="identifiable", reasons=["profile"]
+                    )
+                ),
+                "k2": ParameterVerdicts(
+                    practical=PracticalVerdict(verdict="determined", reasons=["starts"])
+                ),
+                "p": ParameterVerdicts(),
+            },
+        )
+
+        merged = rank.merge(other)
+        data = rank.report()["parameters"]["k2"]["structural"]
+
+        structural = rank.verdicts["k2"].structural
+        assert structural is not None
+        (reason,) = structural.reasons
+        assert "ODESolver.rtol = 1e-06, ODESolver.atol = 1e-06" in reason
+        assert data == {"verdict": None, "reasons": [reason], "combinations": []}
+        assert merged.verdicts["k1"].structural == StructuralVerdict(
+            verdict="identifiable", reasons=[reason, "profile"]
+        )
+        assert merged.verdicts["k2"].structural == StructuralVerdict(
+            verdict=None, reasons=[reason]
+        )
+        assert merged.verdicts["k2"].practical == PracticalVerdict(
+            verdict="determined", reasons=["starts"]
+        )
 
     def test_reports_of_other_parameters_do_not_merge(self) -> None:
         other = IdentifiabilityReport(

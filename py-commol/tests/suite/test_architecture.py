@@ -95,6 +95,8 @@ RESULTS = {
     "WeightedSummary",
     "ConformalRun",
     "PointRank",
+    "TighterRank",
+    "Accuracy",
     "StructuralAnalysis",
     "CollinearityVerdict",
     "CollinearityAnalysis",

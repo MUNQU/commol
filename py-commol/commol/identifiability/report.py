@@ -16,9 +16,10 @@ if TYPE_CHECKING:
 
 
 class StructuralVerdictEntry(TypedDict):
-    """The structural verdict of a parameter, its reasons and combinations."""
+    """The structural verdict of a parameter (None when the evidence gives
+    none), its reasons and combinations."""
 
-    verdict: str
+    verdict: str | None
     reasons: list[str]
     combinations: list[str]
 
@@ -37,13 +38,31 @@ class VerdictsEntry(TypedDict):
     practical: PracticalVerdictEntry | None
 
 
+class AccuracyData(TypedDict):
+    """`Accuracy` as plain data."""
+
+    relative: float
+    absolute: float
+
+
+class TighterRankData(TypedDict):
+    """`TighterRank` as plain data."""
+
+    accuracy: AccuracyData
+    singular_values: list[float]
+    threshold: float
+    rank: int
+
+
 class PointRankData(TypedDict):
     """`PointRank` as plain data."""
 
     values: dict[str, float]
+    accuracy: AccuracyData
     singular_values: list[float]
     threshold: float
     rank: int
+    tighter: TighterRankData | None
 
 
 class CombinationData(TypedDict):
@@ -61,8 +80,12 @@ class StructuralSectionData(TypedDict):
     skipped: list[str]
     generic_rank: int
     projections: dict[str, float]
-    verdicts: "dict[str, StructuralVerdictName]"
+    verdicts: "dict[str, StructuralVerdictName | None]"
     combinations: list[CombinationData]
+    accuracy: AccuracyData
+    tighter: AccuracyData | None
+    tighter_generic_rank: int | None
+    unchecked: list[str]
 
 
 class SubsetIndexData(TypedDict):

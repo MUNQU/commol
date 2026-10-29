@@ -2,7 +2,7 @@
 
 use std::time::Instant;
 
-use commol_core::{Model, SimulationEngine};
+use commol_core::{Accuracy, Model, SimulationEngine};
 use commol_difference::DifferenceEquations;
 
 use super::DifferentialEquations;
@@ -907,4 +907,29 @@ fn a_solution_that_blows_up_stops_the_solver_where_it_fails() {
         // The numerical solution may pass t = 1 by its error before it fails.
         assert!((failed_after - 1.0).abs() < 1e-3, "{settings}: {error}");
     }
+}
+
+#[test]
+fn an_engine_at_another_accuracy_integrates_with_those_tolerances() {
+    let mut loose = engine(&decay_model(
+        r#","settings":{"method":"tsit45","rtol":1e-3,"atol":1e-3}"#,
+    ));
+    loose.set_parameter("k", 0.6).unwrap();
+    let accuracy = Accuracy {
+        relative: 1e-10,
+        absolute: 1e-8,
+    };
+    let mut tight = loose.at_accuracy(accuracy).unwrap();
+
+    assert_eq!(tight.accuracy(), accuracy);
+    assert_eq!(
+        tight.accuracy_settings().map(|settings| settings.relative),
+        Some("ODESolver.rtol")
+    );
+    // The parameter stays; the error falls with the tolerances.
+    let expected = 1000.0 * (-3.0_f64).exp();
+    let loose_error = (loose.run(5).unwrap().rows[5][0] - expected).abs();
+    let tight_error = (tight.run(5).unwrap().rows[5][0] - expected).abs();
+    assert!(tight_error < 1e-6, "{tight_error}");
+    assert!(loose_error > 1e-5, "{loose_error}");
 }

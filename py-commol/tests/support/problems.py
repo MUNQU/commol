@@ -11,10 +11,12 @@ from commol import (
     ParticleSwarmConfig,
     Simulation,
 )
+from commol.engines import ODESolver
 from commol.observations import NormalObservations
 from commol.observations.models import _ObservationModel
 from commol.sensitivity import InputSpace
 
+from .flows import Flow, flow_model
 from .models import a_to_b_builder, abc_builder, build
 
 
@@ -164,6 +166,61 @@ def rate_calibrator(rate: str, flows: Sequence[float]) -> Calibrator:
         seed=1,
     )
     return Calibrator(Simulation(model), problem)
+
+
+def rare_flow_calibrator(
+    settings: ODESolver, *, seed: int = 4, unread: bool = False
+) -> Calibrator:
+    """
+    A rare flow out of a large population, integrated with `settings`.
+
+    Bins A (5·10⁶ − 10), B (10), R and H: ``ab`` at ``k1 * A * B / total``,
+    ``br`` at ``(1 - p) * k2 * B`` and ``bh`` at ``p * k2 * B``, which the
+    accumulator C counts. The 30 observations are the counts of C over
+    windows of 4, at positions 4, 8, …, 120, of the run at ``k1 = 0.5``,
+    ``k2 = 0.25``, ``p = 5·10⁻⁶`` and tight tolerances: at most 3.7, from
+    states of about 5·10⁶. ``k1`` in [0.3, 0.8], ``k2`` in [0.1, 0.4] and
+    ``p`` in [2·10⁻⁶, 8·10⁻⁶] are calibrated, and with `unread` also ``u`` in
+    [0, 1], which no rate reads.
+    """
+
+    def model(settings: ODESolver) -> Simulation:
+        values: dict[str, float | str] = {"k1": 0.5, "k2": 0.25, "p": 5e-6}
+        if unread:
+            values["u"] = 0.5
+        return Simulation(
+            flow_model(
+                {"A": 5e6 - 10, "B": 10, "R": 0, "H": 0},
+                [
+                    Flow("ab", "A", "B", "k1 * A * B / total"),
+                    Flow("br", "B", "R", "(1 - p) * k2 * B"),
+                    Flow("bh", "B", "H", "p * k2 * B", accumulators=("C",)),
+                ],
+                values,
+                settings=settings,
+                accumulators=("C",),
+            )
+        )
+
+    positions = range(4, 121, 4)
+    counts = model(ODESolver(rtol=1e-10, atol=1e-10)).run(120)["C"]
+    observations = [
+        ObservedDataPoint(at=t, output="C", value=counts[t] - counts[t - 4], window=4)
+        for t in positions
+    ]
+    bounds = [
+        bounded("k1", 0.3, 0.8),
+        bounded("k2", 0.1, 0.4),
+        bounded("p", 2e-6, 8e-6),
+    ]
+    problem = CalibrationProblem(
+        observed_data=observations,
+        parameters=[*bounds, *([bounded("u")] if unread else [])],
+        loss_function="sse",
+        optimization_config=NelderMeadConfig(max_iterations=1),
+        seed=seed,
+    )
+    return Calibrator(model(settings), problem)
 
 
 TWO_WELLS_FIT = 2.492033

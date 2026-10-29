@@ -5,7 +5,7 @@ use commol_calibration::{
     CalibrationParameter, CalibrationParameterType, CalibrationProblem, LossConfig,
     ObservedDataPoint, ReplicateSummary, Replicates,
 };
-use commol_core::{Model, SimulationEngine};
+use commol_core::{Accuracy, Model, SimulationEngine};
 use commol_difference::DifferenceEquations;
 use commol_differential::DifferentialEquations;
 use commol_inference::sensitivity::{
@@ -190,7 +190,7 @@ fn a_step_at_the_lower_bound_is_forward_and_exact_for_a_quadratic() {
     );
     let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
     // The error of the runs, η × the largest run × Σ|c| = 4, over the step.
-    let accuracy = problem.forward().base_engine().output_accuracy();
+    let accuracy = problem.forward().base_engine().accuracy().relative;
     let step = source.steps(&[0.0])[0];
     let at_zero = source.jacobian(&[0.0]).unwrap();
     let expected = accuracy * 1000.0 * 4.0 / step;
@@ -241,7 +241,7 @@ fn the_ode_step_follows_the_solver_tolerance() {
         &[],
     ))
     .unwrap();
-    assert_eq!(engine.output_accuracy(), 1e-6);
+    assert_eq!(engine.accuracy().relative, 1e-6);
     let positions = [1.0, 2.0, 3.0];
     let problem = problem(
         engine,
@@ -284,6 +284,63 @@ fn the_ode_step_follows_the_solver_tolerance() {
             &format!("∂y{t}/∂f"),
         );
     }
+}
+
+#[test]
+fn a_source_at_a_tighter_accuracy_steps_by_it() {
+    let engine = DifferentialEquations::try_from_model(&decay(
+        "DifferentialEquations",
+        &ode_settings(1e-6),
+        &[],
+    ))
+    .unwrap();
+    let problem = problem(
+        engine,
+        observed(&[1.0], &[400.0]),
+        vec![
+            CalibrationParameter::new("k".to_string(), 0.0, 1.0),
+            factor("f", 0.1, 2.0),
+        ],
+    );
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+    let tighter = Accuracy {
+        relative: 1e-9,
+        absolute: 1e-12,
+    };
+
+    let again = source.at_accuracy(tighter).unwrap();
+
+    assert_eq!(
+        source.accuracy(),
+        Accuracy {
+            relative: 1e-6,
+            absolute: 1e-10
+        }
+    );
+    assert_eq!(again.accuracy(), tighter);
+    assert_eq!(
+        again.accuracy_settings().map(|settings| settings.absolute),
+        Some("ODESolver.atol")
+    );
+    // h = η^{1/3} · max(|θ|, w) with η = 1e-9.
+    assert!((again.steps(&[0.2, 0.5])[0] - 1e-3).abs() < 1e-15);
+}
+
+#[test]
+fn a_source_of_exact_runs_has_no_other_accuracy() {
+    let problem = problem(
+        difference(&[]),
+        observed(&[1.0], &[400.0]),
+        vec![
+            CalibrationParameter::new("k".to_string(), 0.0, 1.0),
+            factor("f", 0.1, 2.0),
+        ],
+    );
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+
+    assert_eq!(source.accuracy(), Accuracy::EXACT);
+    assert_eq!(source.accuracy_settings(), None);
+    assert!(source.at_accuracy(Accuracy::EXACT).is_none());
 }
 
 #[test]

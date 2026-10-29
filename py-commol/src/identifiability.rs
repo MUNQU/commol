@@ -7,7 +7,7 @@
 
 use crate::parallelism::parallel;
 use commol_calibration::FitRecord;
-use commol_core::SimulationEngine;
+use commol_core::{Accuracy, SimulationEngine};
 use commol_inference::identifiability::{
     self, CollinearityVerdict, Reference, SampleVerdict, StructuralVerdict, Subset,
 };
@@ -91,6 +91,25 @@ fn ordered(names: &[String], values: &commol_core::json::Pairs<f64>) -> Vec<f64>
 pub struct PyPointRank {
     /// The parameter values of the point
     values: Vec<f64>,
+    /// The accuracy of the runs
+    accuracy: PyAccuracy,
+    /// The singular values, largest first
+    singular_values: Vec<f64>,
+    /// The threshold a singular value must pass
+    threshold: f64,
+    /// How many singular values pass it
+    rank: usize,
+    /// The rank at the tighter accuracy, when the point was evaluated again
+    tighter: Option<PyTighterRank>,
+}
+
+/// The rank of the scaled sensitivities at a point evaluated again at a
+/// tighter accuracy
+#[pyclass(name = "TighterRank", frozen, get_all, skip_from_py_object)]
+#[derive(Clone)]
+pub struct PyTighterRank {
+    /// The accuracy of the runs
+    accuracy: PyAccuracy,
     /// The singular values, largest first
     singular_values: Vec<f64>,
     /// The threshold a singular value must pass
@@ -110,10 +129,44 @@ pub struct PyStructuralAnalysis {
     generic_rank: usize,
     /// The projection of each parameter on the null space
     projections: Vec<f64>,
-    /// "identifiable", "in_combination" or "non_identifiable", per parameter
-    verdicts: Vec<String>,
+    /// "identifiable", "in_combination" or "non_identifiable", per
+    /// parameter; None when the accuracy of the runs may set it
+    verdicts: Vec<Option<String>>,
     /// Each identifiable combination as `(parameter index, exponent)` pairs
     combinations: Vec<Vec<(usize, f64)>>,
+    /// The accuracy of the runs of the engine
+    accuracy: PyAccuracy,
+    /// The tighter accuracy a point of rank below the number of parameters
+    /// is evaluated again at, or None
+    tighter: Option<PyAccuracy>,
+    /// The rank at most points with each point evaluated again at the
+    /// tighter accuracy, or None when no point was
+    tighter_generic_rank: Option<usize>,
+    /// The names of the settings of the relative and the absolute accuracy,
+    /// or None when no setting sets them
+    accuracy_settings: Option<(String, String)>,
+    /// Why each point that the tighter accuracy should check could not be
+    /// evaluated there
+    unchecked: Vec<String>,
+}
+
+/// The accuracy of the runs of an engine
+#[pyclass(name = "Accuracy", frozen, get_all, skip_from_py_object)]
+#[derive(Clone)]
+pub struct PyAccuracy {
+    /// The relative accuracy
+    relative: f64,
+    /// The absolute accuracy
+    absolute: f64,
+}
+
+impl From<Accuracy> for PyAccuracy {
+    fn from(accuracy: Accuracy) -> Self {
+        Self {
+            relative: accuracy.relative,
+            absolute: accuracy.absolute,
+        }
+    }
 }
 
 /// The structural rank at the points of the settings, rows of a Latin
@@ -148,9 +201,16 @@ fn structural_rank(
             .into_iter()
             .map(|point| PyPointRank {
                 values: point.values,
+                accuracy: point.accuracy.into(),
                 singular_values: point.singular_values,
                 threshold: point.threshold,
                 rank: point.rank,
+                tighter: point.tighter.map(|tighter| PyTighterRank {
+                    accuracy: tighter.accuracy.into(),
+                    singular_values: tighter.singular_values,
+                    threshold: tighter.threshold,
+                    rank: tighter.rank,
+                }),
             })
             .collect(),
         skipped: analysis.skipped,
@@ -160,12 +220,14 @@ fn structural_rank(
             .verdicts
             .iter()
             .map(|verdict| {
-                match verdict {
-                    StructuralVerdict::Identifiable => "identifiable",
-                    StructuralVerdict::InCombination => "in_combination",
-                    StructuralVerdict::NonIdentifiable => "non_identifiable",
-                }
-                .to_string()
+                verdict.map(|verdict| {
+                    match verdict {
+                        StructuralVerdict::Identifiable => "identifiable",
+                        StructuralVerdict::InCombination => "in_combination",
+                        StructuralVerdict::NonIdentifiable => "non_identifiable",
+                    }
+                    .to_string()
+                })
             })
             .collect(),
         combinations: analysis
@@ -173,6 +235,13 @@ fn structural_rank(
             .into_iter()
             .map(|combination| combination.exponents)
             .collect(),
+        accuracy: analysis.accuracy.into(),
+        tighter: analysis.tighter.map(PyAccuracy::from),
+        tighter_generic_rank: analysis.tighter_generic_rank,
+        accuracy_settings: analysis
+            .accuracy_settings
+            .map(|settings| (settings.relative.to_string(), settings.absolute.to_string())),
+        unchecked: analysis.unchecked,
     })
 }
 
@@ -440,6 +509,8 @@ fn starts_identifiability(
 /// Register the identifiability analyses with the inference module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyPointRank>()?;
+    m.add_class::<PyTighterRank>()?;
+    m.add_class::<PyAccuracy>()?;
     m.add_class::<PyStructuralAnalysis>()?;
     m.add_class::<PyCollinearityVerdict>()?;
     m.add_class::<PyCollinearityAnalysis>()?;

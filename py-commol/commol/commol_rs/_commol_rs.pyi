@@ -377,9 +377,29 @@ class WeightedSummaryProtocol(Protocol):
     minimum: float
     maximum: float
 
+class AccuracyProtocol(Protocol):
+    @property
+    def relative(self) -> float: ...
+    @property
+    def absolute(self) -> float: ...
+
 class PointRankProtocol(Protocol):
     @property
     def values(self) -> list[float]: ...
+    @property
+    def accuracy(self) -> AccuracyProtocol: ...
+    @property
+    def singular_values(self) -> list[float]: ...
+    @property
+    def threshold(self) -> float: ...
+    @property
+    def rank(self) -> int: ...
+    @property
+    def tighter(self) -> TighterRankProtocol | None: ...
+
+class TighterRankProtocol(Protocol):
+    @property
+    def accuracy(self) -> AccuracyProtocol: ...
     @property
     def singular_values(self) -> list[float]: ...
     @property
@@ -399,9 +419,19 @@ class StructuralAnalysisProtocol(Protocol):
     @property
     def verdicts(
         self,
-    ) -> list[Literal["identifiable", "in_combination", "non_identifiable"]]: ...
+    ) -> list[Literal["identifiable", "in_combination", "non_identifiable"] | None]: ...
     @property
     def combinations(self) -> list[list[tuple[int, float]]]: ...
+    @property
+    def accuracy(self) -> AccuracyProtocol: ...
+    @property
+    def tighter(self) -> AccuracyProtocol | None: ...
+    @property
+    def tighter_generic_rank(self) -> int | None: ...
+    @property
+    def accuracy_settings(self) -> tuple[str, str] | None: ...
+    @property
+    def unchecked(self) -> list[str]: ...
 
 class CollinearityVerdictProtocol(Protocol):
     @property
@@ -614,6 +644,8 @@ class InferenceModule(Protocol):
     ProfileStructure: type[ProfileStructureProtocol]
     WeightedSummary: type[WeightedSummaryProtocol]
     PointRank: type[PointRankProtocol]
+    TighterRank: type[TighterRankProtocol]
+    Accuracy: type[AccuracyProtocol]
     StructuralAnalysis: type[StructuralAnalysisProtocol]
     CollinearityAnalysis: type[CollinearityAnalysisProtocol]
     CollinearityVerdict: type[CollinearityVerdictProtocol]

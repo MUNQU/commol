@@ -58,6 +58,14 @@ class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked)
     above the norm of that error. The engine must be deterministic. The
     points come from the seed of the calibrator, ``Calibrator.seed``.
 
+    With an engine that integrates with tolerances, such as
+    ``DifferentialEquations``, each point whose rank is below the number of
+    parameters runs again at a hundredth of ``ODESolver.rtol`` and
+    ``ODESolver.atol``, which costs a second, slower evaluation of that point;
+    a parameter whose verdict changes there gets the verdict ``None``, with a
+    reason. See "When the solver tolerance sets the rank" in the guide page
+    Identifiability.
+
     Attributes
     ----------
     points : int
