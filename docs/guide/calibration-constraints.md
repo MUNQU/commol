@@ -174,7 +174,7 @@ print(growth <= 0.2 + 1e-6)  # True: the fit keeps k1 · ρ at or below 0.2
 
 | Rule | Why |
 |---|---|
-| The radius is that of `diag(a) · values · diag(b)` at the point | The rates of the run read the same matrix (`ScaledMatrix` in `crates/commol-core/src/types/process.rs`), so the bound holds for the run it allows |
+| The radius is that of `diag(a) · values · diag(b)` at the point | The rates of the run read the same matrix (`ScaledMatrix` in `crates/commol-core/src/scaled_matrix.rs`), so the bound holds for the run it allows |
 | It is computed once per point, before the run | The matrix does not change during a run |
 | A scale with no value that the calibration does not set is refused when the calibration starts | The constraint would have no matrix to read |
 

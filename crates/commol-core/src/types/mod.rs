@@ -34,8 +34,7 @@ pub use engine::{
 pub use model::Model;
 pub use parameters::{Parameter, ParameterValue, SeriesMode};
 pub use process::{
-    Accumulator, Bin, CategoryMatrix, MatrixScale, NEIGHBORS, NEIGHBORS_PREFIX, Process,
-    ScaledMatrix, Stratification,
+    Accumulator, Bin, CategoryMatrix, NEIGHBORS, NEIGHBORS_PREFIX, Process, Stratification,
 };
 pub use structure::ModelStructure;
 #[cfg(feature = "test-kind")]

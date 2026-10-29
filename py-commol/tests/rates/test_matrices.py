@@ -14,6 +14,7 @@ from commol import (
     StratifiedRate,
 )
 from commol._model.equations import latex_rate_expression
+from commol._model.model import Model
 from commol._model.formula_tree import (
     Chain,
     MatrixSum,
@@ -198,7 +199,7 @@ SCALED = {"g1": {"g1": 2.0, "g2": 1.0}, "g2": {"g1": 1.0, "g2": 3.0}}
 """Rows ``g1`` 2 and 1, ``g2`` 1 and 3: eigenvalues ``(5 ± √5) / 2``."""
 
 
-def _scaled(rate: str, a1: float | None):
+def _scaled(rate: str, a1: float | None) -> Model:
     """A → B at `rate` in ``g1`` and ``g2``, with the matrix `SCALED` whose row
     of ``g1`` the parameter ``a1`` scales; ``a1`` is None to calibrate."""
     builder = a_to_b_builder(

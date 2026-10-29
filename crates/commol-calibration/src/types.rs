@@ -525,8 +525,9 @@ impl Replicates {
 ///
 /// **Constraints at positions** (`at: Some(vec)`):
 /// - Evaluated at the given positions during simulation
-/// - Can reference what a constraint without positions does AND compartment
-///   names
+/// - Can reference the parameter IDs and matrix variables, as a constraint
+///   without positions, and the outputs at those positions (compartment
+///   names, accumulators, the total of a bin)
 /// - Use for constraining compartment values or dynamic relationships
 ///
 /// # Examples

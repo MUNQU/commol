@@ -17,6 +17,7 @@ crate-type = ["rlib"]
 test-kind = []
 
 [dependencies]
+commol-statistics = { path = "../commol-statistics" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_path_to_error = { workspace = true }

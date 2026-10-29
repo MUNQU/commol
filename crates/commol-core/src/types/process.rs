@@ -71,8 +71,8 @@ pub const MATRIX_RADIUS_SUFFIX: &str = "_radius";
 /// `Σ_j M[i, j] · e_j`. A rate and a constraint read the entry `M[i, j]` as
 /// the variable `<M>_<i>_<j>` ([`Self::entry_name`]) and the spectral
 /// radius, the largest modulus of the eigenvalues, as `<M>_radius`
-/// ([`Self::radius_name`]); [`ScaledMatrix`] computes them at the values of
-/// the scales.
+/// ([`Self::radius_name`]); [`crate::ScaledMatrix::variables`] computes
+/// them at the values of the scales.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CategoryMatrix {
     /// Identifier used in `matrix_sum` and in the names of its variables.
@@ -232,136 +232,6 @@ impl CategoryMatrix {
     }
 }
 
-/// The scale of a row or a column of a matrix: the parameter that
-/// multiplies it, and the value of that parameter.
-#[derive(Clone, Debug, PartialEq)]
-pub struct MatrixScale {
-    /// The id of the parameter.
-    pub parameter: String,
-    /// Its value; `None` while the parameter has none, such as a parameter
-    /// to calibrate before a value is set.
-    pub value: Option<f64>,
-}
-
-/// A matrix between categories with the value of each of its scales: what a
-/// rate and a calibration constraint read.
-///
-/// The engine keeps one per matrix and changes the value of a scale when a
-/// caller sets its parameter; a calibration constraint reads the entries at
-/// the values of the point it evaluates ([`Self::entries`]). The spectral
-/// radius is that of the entries
-/// (`commol_statistics::linear_algebra::spectral_radius`).
-#[derive(Clone, Debug, PartialEq)]
-pub struct ScaledMatrix {
-    /// The id of the matrix.
-    pub id: String,
-    /// The name of each entry, `<M>_<i>_<j>`, row by row in the order of the
-    /// categories.
-    pub entry_names: Vec<String>,
-    /// The name of the spectral radius, `<M>_radius`.
-    pub radius_name: String,
-    /// The values before the scales, row by row.
-    values: Vec<f64>,
-    /// The scale of each row, in the order of the categories.
-    rows: Vec<Option<MatrixScale>>,
-    /// The scale of each column, in the order of the categories.
-    columns: Vec<Option<MatrixScale>>,
-}
-
-impl ScaledMatrix {
-    /// `matrix` of `process`, with each scale at `value(parameter)`.
-    pub fn new(
-        matrix: &CategoryMatrix,
-        process: &Process,
-        value: impl Fn(&str) -> Option<f64>,
-    ) -> Self {
-        let categories = matrix.categories(process);
-        let scales = |scales: &IndexMap<String, String>| -> Vec<Option<MatrixScale>> {
-            categories
-                .iter()
-                .map(|category| {
-                    scales.get(category).map(|parameter| MatrixScale {
-                        parameter: parameter.clone(),
-                        value: value(parameter),
-                    })
-                })
-                .collect()
-        };
-        Self {
-            id: matrix.id.clone(),
-            entry_names: categories
-                .iter()
-                .flat_map(|row| {
-                    categories
-                        .iter()
-                        .map(move |column| matrix.entry_name(row, column))
-                })
-                .collect(),
-            radius_name: matrix.radius_name(),
-            values: matrix.rows(process),
-            rows: scales(&matrix.row_scales),
-            columns: scales(&matrix.column_scales),
-        }
-    }
-
-    /// The number of its rows, which is the number of its columns.
-    pub fn size(&self) -> usize {
-        self.rows.len()
-    }
-
-    /// The names of its variables: its entries row by row, then its
-    /// spectral radius.
-    pub fn names(&self) -> impl Iterator<Item = &str> {
-        self.entry_names
-            .iter()
-            .chain(std::iter::once(&self.radius_name))
-            .map(String::as_str)
-    }
-
-    /// Give every scale of `parameter` the value `value`; whether the matrix
-    /// has one.
-    pub fn set_scale(&mut self, parameter: &str, value: f64) -> bool {
-        let mut found = false;
-        for scale in self.rows.iter_mut().chain(&mut self.columns).flatten() {
-            if scale.parameter == parameter {
-                scale.value = Some(value);
-                found = true;
-            }
-        }
-        found
-    }
-
-    /// The entries row by row, `a_i · values[i][j] · b_j`: each scale at
-    /// `value(parameter)` when that gives one, else at its own value.
-    ///
-    /// # Errors
-    ///
-    /// Returns the scale, the first row then column, that has no value.
-    pub fn entries<'a>(
-        &'a self,
-        value: impl Fn(&str) -> Option<f64>,
-    ) -> Result<Vec<f64>, &'a MatrixScale> {
-        let factors = |scales: &'a [Option<MatrixScale>]| -> Result<Vec<f64>, &'a MatrixScale> {
-            scales
-                .iter()
-                .map(|scale| match scale {
-                    None => Ok(1.0),
-                    Some(scale) => value(&scale.parameter).or(scale.value).ok_or(scale),
-                })
-                .collect()
-        };
-        let rows = factors(&self.rows)?;
-        let columns = factors(&self.columns)?;
-        let size = self.size();
-        Ok(self
-            .values
-            .iter()
-            .enumerate()
-            .map(|(index, entry)| rows[index / size] * entry * columns[index % size])
-            .collect())
-    }
-}
-
 /// What changes in a model and how: bins, accumulators, stratifications,
 /// matrices and transitions, written once for every structure.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -513,7 +383,7 @@ mod tests {
     }
 
     #[test]
-    fn a_scaled_matrix_multiplies_each_row_and_column_by_its_parameter() {
+    fn a_matrix_lists_its_scales() {
         let matrix = scaled(matrix(&FULL), &[("g1", "a1")], &[("g2", "b2")]);
         let mut process = process();
         process.matrices.push(matrix.clone());
@@ -521,31 +391,6 @@ mod tests {
         assert_eq!(
             matrix.scales().collect::<Vec<_>>(),
             [("row", "g1", "a1"), ("column", "g2", "b2")]
-        );
-
-        let mut scaled = ScaledMatrix::new(&matrix, &process, |parameter| {
-            (parameter == "a1").then_some(2.0)
-        });
-        assert_eq!(scaled.size(), 2);
-        assert_eq!(
-            scaled.names().collect::<Vec<_>>(),
-            ["M_g1_g1", "M_g1_g2", "M_g2_g1", "M_g2_g2", "M_radius"]
-        );
-        // `b2` has no value: the entries need one, from the caller or a set.
-        let unset = scaled.entries(|_| None).unwrap_err();
-        assert_eq!((unset.parameter.as_str(), unset.value), ("b2", None));
-        assert_eq!(
-            scaled.entries(|parameter| (parameter == "b2").then_some(3.0)),
-            Ok(vec![4.0, 6.0, 1.0, 9.0])
-        );
-
-        assert!(scaled.set_scale("b2", 0.5));
-        assert!(!scaled.set_scale("k", 0.5));
-        assert_eq!(scaled.entries(|_| None), Ok(vec![4.0, 1.0, 1.0, 1.5]));
-        // A value from the caller wins over the value of the scale.
-        assert_eq!(
-            scaled.entries(|parameter| (parameter == "a1").then_some(1.0)),
-            Ok(vec![2.0, 0.5, 1.0, 1.5])
         );
     }
 

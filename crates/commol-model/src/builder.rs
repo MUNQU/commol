@@ -4,7 +4,7 @@ use crate::flows::{PlannedFlow, plan_transition_flows};
 use crate::helpers::stratification_conditions_met;
 use crate::labels::OutputLabels;
 use crate::layout::CompartmentLayout;
-use crate::matrices::{check_matrices, matrix_variables, scaled_matrices, variable_values};
+use crate::matrices::{check_matrices, matrix_variables, scaled_matrices};
 use crate::types::{
     AccumulatorOutputRef, CompiledModel, FAST_STACK_DEPTH, FastRateExpression, FastRateOp,
     FlowChange, GeneratedAccumulatorOutput, ImpulseFlow, ImpulseSchedule, SeriesParameter,
@@ -145,7 +145,7 @@ impl CompiledModel {
         // a scale. A matrix with a scale to calibrate has them once it is set.
         let matrices = scaled_matrices(model);
         for matrix in &matrices {
-            if let Some(values) = variable_values(matrix) {
+            if let Ok(values) = matrix.variables(|_| None) {
                 constant_parameters.extend(matrix.names().map(str::to_string).zip(values));
             }
         }

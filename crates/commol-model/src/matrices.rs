@@ -3,9 +3,10 @@
 //!
 //! A matrix `M` gives a rate one variable per entry, `<M>_<i>_<j>`, and its
 //! spectral radius, `<M>_radius` ([`matrix_variables`]), both of the matrix
-//! scaled by the parameters of its rows and columns ([`ScaledMatrix`]), so
-//! the engine writes them again when a caller sets a scale
-//! ([`variable_values`]). In the rate of a
+//! scaled by the parameters of its rows and columns
+//! ([`ScaledMatrix::variables`]), so the engine writes them again when a
+//! caller sets a scale ([`crate::CompiledModel::set_parameter`]). In the rate
+//! of a
 //! compartment of category `i`, `matrix_sum(M, e)` is
 //! `Σ_j <M>_<i>_<j> * (e_j)`, where `e_j` is `e` with each bin read as its
 //! amount in category `j` and `total` as the total of category `j`
@@ -25,7 +26,6 @@ use commol_core::{
     CategoryMatrix, MATRIX_SUM, Model, NEIGHBORS, NEIGHBORS_PREFIX, ParameterValue, Process,
     SPECIAL_VAR_TOTAL, ScaledMatrix,
 };
-use commol_statistics::linear_algebra::spectral_radius;
 
 use crate::builder::subgroup_totals_by_compartments;
 use crate::layout::CompartmentLayout;
@@ -48,7 +48,7 @@ pub struct MatrixVariable {
 
 /// The matrices of a model, each scale at the value of its parameter: the
 /// constant, or none for a parameter to calibrate.
-pub fn scaled_matrices(model: &Model) -> Vec<ScaledMatrix> {
+pub(crate) fn scaled_matrices(model: &Model) -> Vec<ScaledMatrix> {
     let constant = |id: &str| {
         model
             .parameters
@@ -67,22 +67,14 @@ pub fn scaled_matrices(model: &Model) -> Vec<ScaledMatrix> {
         .collect()
 }
 
-/// The values of the variables of `matrix` at the values of its scales,
-/// parallel to [`ScaledMatrix::names`]: its entries row by row, then the
-/// spectral radius of those entries. `None` while a scale has no value.
-pub fn variable_values(matrix: &ScaledMatrix) -> Option<Vec<f64>> {
-    let mut values = matrix.entries(|_| None).ok()?;
-    values.push(spectral_radius(&values, matrix.size()));
-    Some(values)
-}
-
 /// The variables of the matrices of a model: for each matrix, its entries
 /// row by row in the order of the categories, then its spectral radius, at
-/// the values of its scales ([`scaled_matrices`]).
+/// the values of its scales: the constants of the model, or none for a
+/// parameter to calibrate ([`ScaledMatrix::variables`]).
 pub fn matrix_variables(model: &Model) -> Vec<MatrixVariable> {
     let mut variables = Vec::new();
     for matrix in scaled_matrices(model) {
-        let values = variable_values(&matrix);
+        let values = matrix.variables(|_| None).ok();
         let count = matrix.entry_names.len();
         for (index, name) in matrix.names().enumerate() {
             variables.push(MatrixVariable {

@@ -85,9 +85,9 @@ entry. The variable holds the scaled entry `a_i · values[i][j] · b_j`, and
 `<M>_radius` the spectral radius of the scaled matrix (`spectral_radius`,
 `crates/commol-statistics/src/linear_algebra.rs`, the real Schur
 decomposition of `nalgebra`). The engine keeps each matrix with the values of
-its scales (`ScaledMatrix`, `crates/commol-core/src/types/process.rs`) and
+its scales (`ScaledMatrix`, `crates/commol-core/src/scaled_matrix.rs`) and
 writes its variables at the build and again when a caller sets a scale
-(`CompiledModel::set_parameter`, `variable_values`): once per parameter
+(`CompiledModel::set_parameter`, `ScaledMatrix::variables`): once per parameter
 vector, never during a run. A matrix with a scale to calibrate has no values
 until the scale is set. So `matrix_sum`, `<M>_<i>_<j>`, `<M>_radius` and a
 calibration constraint

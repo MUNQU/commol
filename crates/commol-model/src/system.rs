@@ -94,7 +94,7 @@ impl CompiledModel {
     /// Set the value of a parameter: a constant, or a parameter to
     /// calibrate. When it scales a row or a column of a matrix, the entries
     /// and the spectral radius of that matrix are written again at the new
-    /// value ([`crate::variable_values`]).
+    /// value ([`ScaledMatrix::variables`]).
     ///
     /// # Errors
     ///
@@ -106,7 +106,7 @@ impl CompiledModel {
             .set_parameter_str(parameter_id, value);
         for matrix in &mut self.matrices {
             if matrix.set_scale(parameter_id, value)
-                && let Some(values) = crate::variable_values(matrix)
+                && let Ok(values) = matrix.variables(|_| None)
             {
                 for (name, value) in matrix.names().zip(values) {
                     self.expression_context.set_parameter_str(name, value);

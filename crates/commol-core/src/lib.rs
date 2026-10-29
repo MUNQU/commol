@@ -21,6 +21,8 @@
 //!   settings ([`Ranges`])
 //! - [`types`]: All data structures for defining a model: its process and
 //!   its structure
+//! - [`ScaledMatrix`]: A matrix between categories at the values of the
+//!   parameters that scale it, with its spectral radius
 
 #![warn(missing_docs)]
 
@@ -29,6 +31,7 @@ pub mod math_expression;
 pub mod parallelism;
 pub mod position;
 pub mod range;
+pub mod scaled_matrix;
 pub mod simulation_engine;
 /// Data types of a model definition.
 pub mod types;
@@ -52,12 +55,13 @@ pub use simulation_engine::{
     SimulationError, Trajectory, ValuePlan, check_positions, run_replicates,
 };
 
-// Re-export all public types from the types module for convenient access
+// The matrix an engine reads, and the public types of the types module.
+pub use scaled_matrix::{MatrixScale, ScaledMatrix};
 pub use types::{
     Accumulator, Aggregate, AggregateVariant, Bin, CategoryMatrix, DynamicsForm, EngineSettings,
-    EngineType, EventMethod, InitialConditions, MatrixScale, Model, ModelEngine, ModelKind,
-    ModelStructure, ModelValueType, NEIGHBORS, NEIGHBORS_PREFIX, Neighbors, OdeMethod, OdeSolver,
-    Parameter, ParameterValue, Process, RateKeeps, RateMeaning, Rounding, ScaledMatrix, SeriesMode,
+    EngineType, EventMethod, InitialConditions, Model, ModelEngine, ModelKind, ModelStructure,
+    ModelValueType, NEIGHBORS, NEIGHBORS_PREFIX, Neighbors, OdeMethod, OdeSolver, Parameter,
+    ParameterValue, Process, RateKeeps, RateMeaning, Rounding, SeriesMode,
     StochasticEventsSettings, StochasticStepsSettings, Stratification, StratificationCondition,
     StratifiedRate, Transition,
 };

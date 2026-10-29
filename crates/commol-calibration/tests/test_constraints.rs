@@ -9,15 +9,20 @@ use commol_calibration::{
 };
 use commol_core::{Model, SimulationEngine};
 use commol_difference::DifferenceEquations;
+use commol_model::CompartmentalEngine;
 
-/// A → B in `g1` and `g2`, at the rate `k * matrix_sum(M, B / total)`, with
-/// the matrix `M` = [[2, 1], [1, 3]] whose row of `g1` the parameter `a1`
-/// scales and whose column of `g2` the parameter `b2` scales. `a1` and `k`
-/// are to calibrate; `b2` has the value `b2`, or none.
-fn engine(b2: Option<f64>) -> DifferenceEquations {
-    let b2 = b2.map_or("null".to_string(), |value| value.to_string());
+/// The rate of the engines of the tests that read a matrix sum.
+const SUM: &str = "k * matrix_sum(M, B / total)";
+
+/// A → B in `g1` and `g2`, at `rate`, with the matrix `M` = [[2, 1], [1, 3]]
+/// whose row of `g1` the parameter `a1` scales and whose column of `g2` the
+/// parameter `b2` scales. `k` is to calibrate; `a1` and `b2` have the values
+/// given, or none.
+fn engine_of(rate: &str, a1: Option<f64>, b2: Option<f64>) -> DifferenceEquations {
+    let json_value = |value: Option<f64>| value.map_or("null".to_string(), |v| v.to_string());
+    let (a1, b2) = (json_value(a1), json_value(b2));
     let json = format!(
-        r#"{{"name":"m","parameters":[{{"id":"k","value":null}},{{"id":"a1","value":null}},
+        r#"{{"name":"m","parameters":[{{"id":"k","value":null}},{{"id":"a1","value":{a1}}},
         {{"id":"b2","value":{b2}}}],
         "engine":{{"type":"DifferenceEquations"}},
         "process":{{"bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}}],
@@ -26,11 +31,16 @@ fn engine(b2: Option<f64>) -> DifferenceEquations {
         "values":{{"g1":{{"g1":2.0,"g2":1.0}},"g2":{{"g1":1.0,"g2":3.0}}}},
         "row_scales":{{"g1":"a1"}},"column_scales":{{"g2":"b2"}}}}],
         "transitions":[{{"id":"ab","source":["A"],"target":["B"],
-        "rate":"k * matrix_sum(M, B / total)"}}]}},
+        "rate":"{rate}"}}]}},
         "structure":{{"kind":"aggregate","bin_amounts":{{"A":900.0,"B":100.0}}}}}}"#
     );
     let model: Model = serde_json::from_str(&json).expect("valid model JSON");
     DifferenceEquations::try_from_model(&model).unwrap()
+}
+
+/// `engine_of` at the rate `SUM`, with `a1` to calibrate.
+fn engine(b2: Option<f64>) -> DifferenceEquations {
+    engine_of(SUM, None, b2)
 }
 
 fn parameters() -> Vec<CalibrationParameter> {
@@ -40,11 +50,19 @@ fn parameters() -> Vec<CalibrationParameter> {
     ]
 }
 
-/// The feasibility of `constraint` on the engine of `b2`.
+/// The feasibility of `constraint` on the engine of `b2`, calibrating `k`
+/// and `a1`.
 fn feasibility(constraint: &str, b2: Option<f64>) -> Result<Feasibility, String> {
-    let engine = engine(b2);
+    feasibility_of(&engine(b2), &parameters(), constraint)
+}
+
+fn feasibility_of(
+    engine: &DifferenceEquations,
+    parameters: &[CalibrationParameter],
+    constraint: &str,
+) -> Result<Feasibility, String> {
     Feasibility::new(
-        &parameters(),
+        parameters,
         &[CalibrationConstraint::new(
             "c".to_string(),
             constraint.to_string(),
@@ -59,7 +77,7 @@ fn feasibility(constraint: &str, b2: Option<f64>) -> Result<Feasibility, String>
 
 /// How much the point `(k, a1)` violates `constraint`; 0 when it holds.
 fn violation(feasibility: &Feasibility, k: f64, a1: f64) -> f64 {
-    match feasibility.check_parameters(&[k, a1]) {
+    match feasibility.check_parameters(&mut feasibility.context(&[k, a1])) {
         Ok(()) => 0.0,
         Err(EvaluationError::Violation(Violation::Constraint { amount })) => amount,
         Err(other) => panic!("{other}"),
@@ -97,10 +115,12 @@ fn a_bound_on_the_growth_factor_is_one_constraint() {
 
 #[test]
 fn the_constraint_and_the_rate_read_one_radius() {
+    // A rate of `k * M_radius` reads the slot of the radius in the engine.
+    let rate = "k * M_radius";
     let observed = vec![ObservedDataPoint::new(1.0, "B_g1".to_string(), 150.0)];
     let constraint = CalibrationConstraint::new("c".to_string(), "-M_radius".to_string());
     let problem = CalibrationProblem::new(
-        engine(Some(1.0)),
+        engine_of(rate, None, Some(1.0)),
         observed,
         parameters(),
         vec![constraint],
@@ -114,11 +134,48 @@ fn the_constraint_and_the_rate_read_one_radius() {
         panic!("the radius violates -M_radius");
     };
 
-    let (configured, _, _) =
-        configured_engine(&engine(Some(1.0)), &parameters(), None, &[0.5, 2.0]).unwrap();
-    let entries = configured.matrices()[0].entries(|_| None).unwrap();
-    assert_eq!(entries, [4.0, 2.0, 1.0, 3.0]);
+    let (configured, _, _) = configured_engine(
+        &engine_of(rate, None, Some(1.0)),
+        &parameters(),
+        None,
+        &[0.5, 2.0],
+    )
+    .unwrap();
+    let state = configured.initial_state();
+    let mut rates = vec![0.0; 2];
+    configured
+        .model()
+        .clone()
+        .transition_rates(0.0, 0.0, &state, &mut rates)
+        .unwrap();
+    // [[4, 2], [1, 3]]: the eigenvalues 5 and 2.
     close(amount, 5.0);
+    for rate in rates {
+        close(rate / 0.5, amount);
+    }
+}
+
+#[test]
+fn a_matrix_that_no_calibrated_parameter_scales_keeps_its_radius() {
+    // `a1` is 2 in the model; the calibration sets only `k`.
+    let engine = engine_of(SUM, Some(2.0), Some(1.0));
+    let only_k = [CalibrationParameter::new("k".to_string(), 0.0, 1.0)];
+    let radius = feasibility_of(&engine, &only_k, "-M_radius").unwrap();
+
+    for k in [0.1, 0.9] {
+        let amount = match radius.check_parameters(&mut radius.context(&[k])) {
+            Err(EvaluationError::Violation(Violation::Constraint { amount })) => amount,
+            other => panic!("{other:?}"),
+        };
+        close(amount, 5.0);
+    }
+    // Two variables of one matrix: the entry 4 of [[4, 2], [1, 3]] and its
+    // radius 5.
+    let two = feasibility_of(&engine, &only_k, "M_g1_g1 - M_radius").unwrap();
+    match two.check_parameters(&mut two.context(&[0.5])) {
+        Err(EvaluationError::Violation(Violation::Constraint { amount })) => close(amount, 1.0),
+        other => panic!("{other:?}"),
+    }
 }
 
 #[test]

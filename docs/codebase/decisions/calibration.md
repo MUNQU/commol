@@ -187,13 +187,12 @@ edge of the support: its log density is `−∞` (`discrepancy_in_support` in
 ## A constraint reads a matrix at its point
 
 A constraint reads `<M>_<i>_<j>` and `<M>_radius` of a matrix between
-categories. `Feasibility::new` keeps the matrices a constraint reads from
-`SimulationEngine::matrices` (each a `ScaledMatrix` with the values of its
-scales in the model) and refuses one with a scale that has no value and is not
-calibrated. At each point, before the run, `Feasibility` scales each by the
-values of the point (`ScaledMatrix::entries`) and takes `spectral_radius`.
-`CompiledModel::set_parameter` writes the matrix of the run from the same
-values, so a bound on the radius holds for the run it allows.
+categories. `Feasibility::new` keeps the matrices it reads from
+`SimulationEngine::matrices` and refuses one with a scale that has no value
+and is not calibrated. Once per evaluation, before the run,
+`Feasibility::context` scales each by the point (`ScaledMatrix::variables`);
+one no calibrated parameter scales keeps its model values. The run reads the
+same values (`CompiledModel::set_parameter`), so a radius bound holds for it.
 
 | Alternative | Why not |
 |---|---|

@@ -408,12 +408,13 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         values: &[f64],
         workspace: &mut Workspace,
     ) -> Result<f64, EvaluationError> {
-        self.feasibility.check_parameters(values)?;
+        let mut context = self.feasibility.context(values);
+        self.feasibility.check_parameters(&mut context)?;
         self.forward.run_schedule(values, workspace)?;
         if self.feasibility.reads_rows() {
             let mut amount = 0.0;
             for rows in &workspace.rows {
-                amount += self.feasibility.row_violation(values, rows);
+                amount += self.feasibility.row_violation(&mut context, rows);
             }
             if amount > 0.0 {
                 return Err(Violation::Constraint { amount }.into());
@@ -467,10 +468,13 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         seed: Option<u64>,
         workspace: &mut Workspace,
     ) -> Result<(), EvaluationError> {
-        self.feasibility.check_parameters(values)?;
+        let mut context = self.feasibility.context(values);
+        self.feasibility.check_parameters(&mut context)?;
         self.forward.run_once(values, seed, workspace)?;
         if self.feasibility.reads_rows() {
-            let amount = self.feasibility.row_violation(values, &workspace.rows[0]);
+            let amount = self
+                .feasibility
+                .row_violation(&mut context, &workspace.rows[0]);
             if amount > 0.0 {
                 return Err(Violation::Constraint { amount }.into());
             }
