@@ -314,7 +314,12 @@ impl SensitivitySource for Fixed {
 fn a_singular_value_at_the_error_of_the_sensitivities_is_not_counted() {
     // Exact sensitivities: the zero singular value equals the zero error.
     let jacobian = Matrix::from_row_slice(2, 2, &[1.0, 0.0, 0.0, 0.0]);
-    let analysis = structural_rank(&Fixed::new(vec![jacobian]), 3, 7).unwrap();
+    let source = Fixed::new(vec![jacobian]);
+    let analysis = structural_rank(&source, 3, 7).unwrap();
+
+    // A source of exact runs has no other accuracy.
+    assert!(source.at_accuracy(Accuracy::EXACT).is_none());
+    assert_eq!(analysis.tighter, None);
 
     assert_eq!(analysis.generic_rank, 1);
     assert_eq!(
