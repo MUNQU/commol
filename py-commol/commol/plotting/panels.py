@@ -668,8 +668,8 @@ def warn_missing_factors(
     )
     for factor_id in missing:
         logger.warning(
-            f"Factor parameter '{factor_id}' not found in calibration result; "
-            "leaving model predictions unscaled by it."
+            f"Factor parameter '{factor_id}' has no value in calibration_result; "
+            "the figure counts it as 1."
         )
 
 

@@ -77,11 +77,14 @@ message with no prefix.
 ## One observation operator
 
 `ObservationOperator` (`crates/commol-calibration/src/observation.rs`) is the
-only code that turns a run into observed quantities: the row of each
-observation, the sum of its outputs, its increment over its window, its
+only code of the engine that turns a run into observed quantities: the row of
+each observation, the sum of its outputs, its increment over its window, its
 scale and its factor. The loss, the predictions of `PyCalibrationProblem`, the
 predictive's `at_observations` and every score read it, and the figures of a
-predictive read a series with a window, a factor or a scale through it.
+predictive read a series with a window, a factor or a scale through it. The
+figures of a run and of its replicates have no problem to read, and repeat
+its rules in Python ([A known scale is a number of the
+observation](#a-known-scale-is-a-number-of-the-observation)).
 The calibration problem is split into one layer per job, each in its own
 module: `ForwardModel` (`forward.rs`) is the only code that clones, resets,
 writes values to or runs the engine; `Feasibility` (`feasibility.rs`) checks
@@ -135,8 +138,9 @@ by it with the factor, so every reader in the engine (the loss, the
 predictive, the scores, the profiles) applies it with no code of its own. The
 figures of a `SimulationResults` and of its replicates have no calibration
 problem to read: they repeat scale times factor in Python (`model_multiplier`
-of `plotting/panels.py`), and the cumulative figure divides each observation
-by it. A target that copies the first observation of its series (conformal
+of `plotting/panels.py`). The cumulative figures of a run, of its replicates
+and of a predictive divide each observation by it in Python, a predictive with
+the weighted median of the factor. A target that copies the first observation of its series (conformal
 `targets`, the dense design of finite differences) keeps its scale. Not a
 `factor` with equal bounds: `CalibrationParameter` refuses them, and a
 parameter that nothing fits would enter every method that reads the parameter

@@ -293,6 +293,6 @@ print(data["parameters"]["k2"]["practical"]["verdict"])  # determined
 | To learn | Read |
 |---|---|
 | Several starts of an optimizer | [Optimizers](../calibration-optimizers.md#several-starts) |
-| Scale factors, which often pair with a rate | [Observations](../calibration-observations.md) |
+| Factors, which often pair with a rate | [Observations](../calibration-observations.md) |
 | What a sample is | [Uncertainty](index.md#the-parameter-sample) |
 | Intervals and verdicts from profiles | [Profile Likelihood](profiles.md) |

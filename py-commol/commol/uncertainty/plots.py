@@ -68,7 +68,8 @@ class PredictivePlot:
         one panel per series.
 
         Each draw is read through the observation operator of the problem
-        (the sums, windows and factors of the observations of the series,
+        (the sums, windows, scales and factors of the observations of the
+        series,
         each at its own position when they do not share one operator with no
         window), then the draws are reduced with their weights.
 
@@ -155,8 +156,8 @@ class PredictivePlot:
             Path to save the figure to. If None, the figure is only returned.
         observed_data : list[ObservedDataPoint] | None
             Observations, drawn as their running total on the panel of their
-            label. An observation with a factor is divided by the weighted
-            median of that factor in the sample.
+            label. Each observation is divided by its scale and by the
+            weighted median of its factor in the sample.
         config : PlotConfig | None
             Layout, size and style. If None, the defaults.
         series : list[str] | None
@@ -176,8 +177,9 @@ class PredictivePlot:
         Raises
         ------
         ValueError
-            If the confidence level is out of range, or ``axes`` has no panel
-            of a series.
+            If an observation names a factor the problem does not have, the
+            confidence level is out of range, or ``axes`` has no panel of a
+            series.
         KeyError
             If an entry of ``series`` is neither an output nor a bin or
             accumulator id of the model.
@@ -215,7 +217,8 @@ class PredictivePlot:
 
         The values are those of ``at_observations(observed_data, NoNoise())``:
         each draw's value of each observation through its own operator (the
-        sum of its outputs, its window and the draw's value of its factor),
+        sum of its outputs, its window, its scale and the draw's value of its
+        factor),
         the values the loss compares. A value with a window is drawn as a
         step over its window with a marker at ``at``, and its band as a
         rectangle over the same window; a value with no window is a marker,

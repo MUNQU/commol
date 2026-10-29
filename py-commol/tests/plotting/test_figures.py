@@ -315,7 +315,7 @@ class TestObservationOperator:
         )
 
         np.testing.assert_allclose(fig.axes[0].lines[0].get_ydata(), run["B"])
-        assert "Factor parameter 'f3' not found" in caplog.text
+        assert "Factor parameter 'f3' has no value" in caplog.text
 
     @pytest.mark.parametrize("figure", ["series", "cumulative", "observations"])
     def test_a_missing_factor_warns_once_per_factor(
@@ -336,10 +336,19 @@ class TestObservationOperator:
             for record in caplog.records
             if record.levelname == "WARNING"
         ]
-        assert [message.split(";")[0] for message in warnings] == [
-            "Factor parameter 'f' not found in calibration result",
-            "Factor parameter 'g' not found in calibration result",
+        assert warnings == [
+            f"Factor parameter '{factor_id}' has no value in calibration_result; "
+            "the figure counts it as 1."
+            for factor_id in ("f", "g")
         ]
+
+    @pytest.mark.parametrize("figure", ["series", "cumulative", "observations"])
+    def test_a_predictive_refuses_a_factor_the_problem_lacks(self, figure: str) -> None:
+        predictive = predictive_of([0.02, 0.1])
+        observed = [ObservedDataPoint(at=10, output="events", value=1.0, factor_id="f")]
+
+        with pytest.raises(ValueError, match="Invalid factor_id 'f'"):
+            getattr(predictive.plot, figure)(observed_data=observed)
 
     def test_points_of_different_factors_are_each_read_through_their_own(
         self, run: SimulationResults

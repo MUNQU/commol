@@ -71,6 +71,12 @@ def predictive_cumulative_panels(
     The panels of the band of the running total of each series of a
     predictive, and of its observations, each divided by its scale and by the
     weighted median of its factor.
+
+    Raises
+    ------
+    ValueError
+        If an observation names a factor the problem does not have
+        (`_check_factors`).
     """
     outputs = PanelOutputs(
         predictive.output_names, predictive.source.simulation.model_definition
@@ -78,9 +84,14 @@ def predictive_cumulative_panels(
     factors = {
         name: values[0] for name, values in predictive.sample.quantiles([0.5]).items()
     }
+    selected = outputs.select(series)
     by_series = group_observed(observed_data)
+    _check_factors(
+        predictive,
+        [point for series_id in selected for point in by_series.get(series_id, [])],
+    )
     panels = []
-    for series_id in outputs.select(series):
+    for series_id in selected:
         band = predictive.series_band(
             outputs.components(series_id), confidence_level, cumulative=True
         )
@@ -137,6 +148,25 @@ def predictive_observation_panels(
         )
         start = end
     return panels
+
+
+def _check_factors(predictive: "Predictive", observed: list[ObservedDataPoint]) -> None:
+    """
+    Read the first observation of each factor through the operator of the
+    engine, which raises `ValueError` for a factor the problem does not have,
+    as the band of a series with that factor does.
+
+    Raises
+    ------
+    ValueError
+        With the message of the engine.
+    """
+    firsts: dict[str, ObservedDataPoint] = {}
+    for point in observed:
+        if point.factor_id is not None:
+            firsts.setdefault(point.factor_id, point)
+    if firsts:
+        predictive.at_observations(list(firsts.values()), NoNoise())
 
 
 def _draws_band(band: "SeriesBand") -> Band:

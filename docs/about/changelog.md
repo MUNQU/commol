@@ -248,7 +248,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A figure of a run, or of its replicates, logs one warning for each factor of
   its observations that `calibration_result` does not have, and counts the
   factor as 1. Before, it logged the warning once for each observation and
-  each replicate.
+  each replicate. The cumulative figure of a `Predictive` raises the
+  `ValueError` of its other figures for a factor that the problem does not
+  have; before, it drew the observation as if the factor were 1.
 - A number that is not finite in a model or in the settings of an engine
   reached the engine as `null`. An infinite tolerance of `ODESolver` raised
   a message about the type of the setting, and an infinite parameter value
