@@ -344,7 +344,9 @@ class Model(BaseModel, Generic[StructureT]):
         some of its compartments. ``category_splits`` gives each category its
         ``fraction`` of the group it splits, and that ``group``: the
         categories a conditional stratification is conditioned on, empty when
-        it splits every bin.
+        it splits every bin. A stratification whose fractions differ by the
+        category of an earlier one gives a row per split, under the key
+        ``t1 of g1``, with that category in its ``group``.
 
         With a `sample` each entry gains an ``interval`` holding the weighted
         statistics of its draws (`ParameterSample.summary`). Every entry is in

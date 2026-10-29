@@ -124,7 +124,7 @@ kind of model; the structure of the model adds the sections of its kind
 | Parameters | Only numeric parameters: formulas and series are inputs, not fitted values. |
 | `initial_amounts` | One row per bin and per overridden compartment: the `amount` the engine builds, overrides included, and the `unit` of its bin. No row is a share of a total, so bins of different units sit side by side. |
 | `category_splits` | One row per category: its `fraction` of the group it splits. A category has no amount, because it can split bins of different units. |
-| `group` | The conditioning categories of a conditional stratification, or `[]` when it splits every bin. |
+| `group` | The conditioning categories of a conditional stratification, or `[]` when it splits every bin. A stratification whose fractions [differ by category](building-models.md#fractions-that-differ-by-category) adds the category of each split: its rows are under `t1 of g1`, with `g1` in `group`. |
 | An uncalibrated bin (`None` amount) | `amount` is `null`. |
 | A bin with no unit | `unit` is `null`. |
 | A category name that two stratifications declare | Its row is under the qualified id, such as `group:g1`. |

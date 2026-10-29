@@ -1,7 +1,9 @@
 //! A matrix between the categories of a stratification: its variables, the
 //! matrix sums of a rate as the flows hold them, and what a build rejects.
 
-use commol_core::{Model, Neighbors, Parameter, ParameterValue, SeriesMode};
+use commol_core::{
+    Model, Neighbors, Parameter, ParameterValue, SeriesMode, StratificationFractions,
+};
 use commol_model::{CompiledModel, MatrixVariable, check_model, describe_flows, matrix_variables};
 
 /// A model of bins A and B stratified by `group` into `g1` and `g2`, and by
@@ -19,6 +21,40 @@ fn model(rate: &str, more: &str) -> Model {
         "structure":{{"kind":"aggregate","bin_amounts":{{"A":900.0,"B":100.0}}}}}}"#
     );
     serde_json::from_str(&json).expect("valid model JSON")
+}
+
+/// `model` with an even split of every stratification, whatever its
+/// stratifications and categories after a test changes them.
+fn with_even_fractions(model: &Model) -> Model {
+    let mut model = model.clone();
+    let fractions = model
+        .process
+        .stratifications
+        .iter()
+        .map(|stratification| {
+            let share = 1.0 / stratification.categories.len() as f64;
+            let split = stratification
+                .categories
+                .iter()
+                .map(|category| (category.clone(), share))
+                .collect();
+            (
+                stratification.id.clone(),
+                StratificationFractions::Split(split),
+            )
+        })
+        .collect();
+    model
+        .aggregate_mut()
+        .unwrap()
+        .initial_conditions
+        .stratification_fractions = fractions;
+    model
+}
+
+/// The compiled `model`, with an even split of every stratification.
+fn compile(model: &Model) -> Result<CompiledModel, String> {
+    CompiledModel::try_from_model(&with_even_fractions(model))
 }
 
 /// The rate and whether it is proportional, of each flow of `model`.
@@ -166,7 +202,7 @@ fn a_rate_that_reads_a_compartment_outside_its_matrix_sum_is_absolute() {
 #[test]
 fn a_matrix_sum_runs_as_the_sum_it_is() {
     let rate = "k1 * matrix_sum(M, B / total)";
-    let mut compiled = CompiledModel::try_from_model(&model(rate, "")).unwrap();
+    let mut compiled = compile(&model(rate, "")).unwrap();
     // A_g1, A_g2, B_g1, B_g2.
     let state = [400.0, 500.0, 60.0, 40.0];
     let mut rates = vec![0.0; 2];
@@ -184,7 +220,7 @@ fn a_matrix_sum_runs_as_the_sum_it_is() {
 
 /// The message of the build of `model`.
 fn rejection(model: &Model) -> String {
-    CompiledModel::try_from_model(model).err().unwrap()
+    compile(model).err().unwrap()
 }
 
 #[test]
@@ -267,7 +303,7 @@ fn a_matrix_that_does_not_fit_its_stratification_is_rejected() {
     model.process.matrices[0].values["g2"].shift_remove("g1");
 
     assert_eq!(
-        check_model(&model).unwrap_err(),
+        check_model(&with_even_fractions(&model)).unwrap_err(),
         "Matrix 'M' has no value in row 'g2' for the category 'g1' of 'group'; it needs \
          one value for each pair of its categories ([\"g1\", \"g2\"])"
     );
@@ -359,7 +395,7 @@ fn a_row_of_zeros_is_zero_where_its_first_category_is_empty() {
     values["g1"]["g1"] = 0.0;
     values["g2"]["g1"] = 0.0;
     values["g2"]["g2"] = 0.0;
-    let mut compiled = CompiledModel::try_from_model(&model).unwrap();
+    let mut compiled = compile(&model).unwrap();
     // A_g1, A_g2, B_g1, B_g2: `g1` is empty, so `B_g1 / total_g1` is NaN.
     let state = [0.0, 500.0, 0.0, 40.0];
     let mut rates = vec![0.0; 2];
@@ -433,7 +469,7 @@ fn a_scale_multiplies_the_entries_and_the_radius_follows_it() {
     );
     assert!((values(&model)[4].1.unwrap() - radius(2.0)).abs() < 1e-12);
 
-    let mut compiled = CompiledModel::try_from_model(&model).unwrap();
+    let mut compiled = compile(&model).unwrap();
     let state = [400.0, 500.0, 60.0, 40.0];
     let (b1, b2) = (60.0 / 460.0, 40.0 / 540.0);
     let mut rates = vec![0.0; 2];
@@ -455,7 +491,7 @@ fn a_scale_multiplies_the_entries_and_the_radius_follows_it() {
         [0.3 * (2.0 * b1 + 1.0 * b2), 0.3 * (1.0 * b1 + 3.0 * b2)]
     );
     let radius_rate = scaled("M_radius", Some(2.0));
-    let mut compiled = CompiledModel::try_from_model(&radius_rate).unwrap();
+    let mut compiled = compile(&radius_rate).unwrap();
     compiled.set_parameter("a1", 1.0).unwrap();
     compiled
         .transition_rates(0.0, 0.0, &state, &mut rates)
@@ -474,7 +510,7 @@ fn a_scale_to_calibrate_gives_the_matrix_its_values_once_it_is_set() {
     let model = scaled("k1 * matrix_sum(M, B / total)", None);
     assert!(values(&model).iter().all(|(_, value)| value.is_none()));
 
-    let mut compiled = CompiledModel::try_from_model(&model).unwrap();
+    let mut compiled = compile(&model).unwrap();
     assert_eq!(
         compiled.matrices()[0]
             .entries(|_| None)
@@ -503,7 +539,7 @@ fn a_scale_is_a_constant_or_a_parameter_to_calibrate() {
         .row_scales
         .insert("g2".to_string(), "a9".to_string());
     assert_eq!(
-        check_model(&unknown).unwrap_err(),
+        check_model(&with_even_fractions(&unknown)).unwrap_err(),
         "Matrix 'M' scales the row of 'g2' by 'a9', which is not a parameter of the model; \
          a scale is a constant or a parameter to calibrate, which does not change during a run"
     );
@@ -522,7 +558,7 @@ fn a_scale_is_a_constant_or_a_parameter_to_calibrate() {
         mode: SeriesMode::Linear,
     });
     assert_eq!(
-        check_model(&series).unwrap_err(),
+        check_model(&with_even_fractions(&series)).unwrap_err(),
         "Matrix 'M' scales the column of 'g2' by 'b2', a series parameter; a scale is a \
          constant or a parameter to calibrate, which does not change during a run"
     );

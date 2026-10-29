@@ -121,7 +121,8 @@ line that sets it, with the message of the engine. A range is a `Real` of
 finite number of at least 0, got -1`); a rule that is not a range, such as one
 point per position or fractions that sum to 1, has one message in the same
 module. `update_stratification_fractions` gives the one category left unnamed
-the rest of 1 and checks the result with `check_fractions`; the rule that at
+the rest of 1, in every split of a stratification split by category, and
+checks the result with `check_fractions`; the rule that at
 most one category is left unnamed stays in Python, because it is a rule of the
 update, not of a value, and the engine never gets an update.
 

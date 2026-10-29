@@ -68,6 +68,7 @@ class EngineModule(Protocol):
     ModelKind: type[ModelKindProtocol]
 
 class ModelModule(Protocol):
+    FRACTIONS_BY: str
     NEIGHBORS: str
     NEIGHBORS_PREFIX: str
     ENGINE_VARIABLES: list[str]
@@ -86,9 +87,7 @@ class ModelModule(Protocol):
     ) -> list[tuple[str, str, float | None, bool]]: ...
     def check_bin_amounts(self, amounts: list[tuple[str, float | None]]) -> None: ...
     def check_compartment_amounts(self, amounts: list[tuple[str, float]]) -> None: ...
-    def check_fractions(
-        self, stratifications: list[tuple[str, list[tuple[str, float]]]]
-    ) -> None: ...
+    def check_fractions(self, fractions: str) -> None: ...
     def check_impulse(
         self,
         transition: str,

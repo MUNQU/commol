@@ -16,10 +16,20 @@ from pydantic import (
     model_validator,
 )
 
+from commol._data.engine_json import engine_json
 from commol.commol_rs import _commol_rs as commol_rs
 
 # Separator of a qualified category id, as in ``group:g1``.
 CATEGORY_SEPARATOR = ":"
+
+# The key of a split by category that names the earlier stratification it
+# differs by, as in ``{"by": "group", "g1": {...}, "g2": {...}}``.
+FRACTIONS_BY = commol_rs.model.FRACTIONS_BY
+
+# The fractions of one stratification: one split, or a split by category,
+# as `StratificationFractions` of `crates/commol-core/src/types/aggregate.rs`
+# reads them.
+type _Fractions = dict[str, float] | dict[str, str | dict[str, float]]
 
 # Fields of a structure that states fractions of one total, and the field
 # that states each of them now.
@@ -45,11 +55,17 @@ class InitialConditions(BaseModel):
     bin_amounts : dict[str, float | None]
         The amount of each bin at the start, by bin id, in the unit of the
         bin; finite and not negative. None leaves an amount for calibration.
-    stratification_fractions : dict[str, dict[str, float]]
-        The fraction of each category, by stratification id and category: the
-        split of the amount of every bin the stratification applies to; each
-        from 0 to 1, and a sum of 1 within 1e-6. A conditional stratification
-        splits only the group its conditions select.
+    stratification_fractions : dict[str, dict]
+        The split of each stratification, by stratification id: a
+        ``dict[str, float]``, the fraction of each category, such as
+        ``{"t1": 0.4, "t2": 0.6}``, the split of the amount of every bin the
+        stratification applies to; or a
+        ``dict[str, str | dict[str, float]]``, a split per category of a
+        stratification declared before it, such as
+        ``{"by": "group", "g1": {"t1": 0.25, "t2": 0.75}, "g2": {"t1": 0.5,
+        "t2": 0.5}}``. Each fraction is from 0 to 1, and each split sums to 1
+        within 1e-6. A conditional stratification splits only the group its
+        conditions select.
     compartment_amounts : dict[str, float]
         Amounts of single expanded compartments, by compartment name, applied
         after the expansion.
@@ -64,9 +80,12 @@ class InitialConditions(BaseModel):
             "leaves an amount for calibration."
         ),
     )
-    stratification_fractions: dict[str, dict[str, float]] = Field(
+    stratification_fractions: dict[str, _Fractions] = Field(
         default_factory=dict,
-        description="The fraction of each category, by stratification id.",
+        description=(
+            "The fraction of each category, by stratification id, or a split "
+            "per category of an earlier stratification under 'by'."
+        ),
     )
     compartment_amounts: dict[str, float] = Field(
         default_factory=dict,
@@ -109,8 +128,8 @@ class InitialConditions(BaseModel):
     @field_validator("stratification_fractions")
     @classmethod
     def _validate_stratification_fractions(
-        cls, value: dict[str, dict[str, float]]
-    ) -> dict[str, dict[str, float]]:
+        cls, value: dict[str, _Fractions]
+    ) -> dict[str, _Fractions]:
         """Check the fractions of every stratification with the rule of the
         engine."""
         _check_fractions(value)
@@ -141,14 +160,15 @@ class InitialConditions(BaseModel):
         Returns
         -------
         set[str]
-            Category names collected from ``stratification_fractions``. A
+            Category names collected from ``stratification_fractions``, the
+            categories of each split of a split by category included. A
             category declared on a stratification but absent from the initial
             conditions is not included.
         """
         return {
             category
-            for categories in self.stratification_fractions.values()
-            for category in categories
+            for fractions in self.stratification_fractions.values()
+            for category in split_categories(fractions)
         }
 
     def resolve_category(self, category: str) -> tuple[str, str]:
@@ -176,9 +196,9 @@ class InitialConditions(BaseModel):
         stratification_id, separator, name = category.rpartition(CATEGORY_SEPARATOR)
         owners = [
             stratification
-            for stratification, categories in self.stratification_fractions.items()
+            for stratification, fractions in self.stratification_fractions.items()
             if (not separator or stratification == stratification_id)
-            and name in categories
+            and name in split_categories(fractions)
         ]
         if len(owners) > 1:
             qualified = " or ".join(
@@ -213,8 +233,8 @@ class InitialConditions(BaseModel):
             stratification declares a category of the same name.
         """
         declaring = sum(
-            category in categories
-            for categories in self.stratification_fractions.values()
+            category in split_categories(fractions)
+            for fractions in self.stratification_fractions.values()
         )
         if declaring > 1:
             return f"{stratification}{CATEGORY_SEPARATOR}{category}"
@@ -238,27 +258,35 @@ class InitialConditions(BaseModel):
         Raises
         ------
         ValueError
-            If the category is not found or a bare name is ambiguous.
+            If the category is not found, a bare name is ambiguous, or the
+            fractions of its stratification differ by the category of an
+            earlier one.
         """
         stratification, name = self.resolve_category(category)
-        return self.stratification_fractions[stratification][name]
+        fractions = self.stratification_fractions[stratification]
+        by = split_by(fractions)
+        if by is not None:
+            raise ValueError(
+                f"The fractions of stratification '{stratification}' differ by "
+                f"the category of '{by}': read them in stratification_fractions."
+            )
+        return category_splits(fractions)[0][1][name]
 
     def _updated_fractions(
         self, stratification: str, named: Mapping[str, float]
-    ) -> dict[str, float]:
+    ) -> _Fractions:
         """The fractions of a single stratification after an update that
-        names ``named``; the one category left unnamed takes the rest."""
-        categories = self.stratification_fractions[stratification]
-        unnamed = [category for category in categories if category not in named]
-        if len(unnamed) > 1:
-            raise ValueError(
-                f"Cannot update stratification '{stratification}': "
-                f"categories {sorted(unnamed)} were left unnamed. At most one "
-                f"category may be omitted, so that it can take the remaining "
-                f"fraction."
-            )
-        remainder = max(0.0, 1.0 - sum(named.values()))
-        return {category: named.get(category, remainder) for category in categories}
+        names ``named``: in each split, the named categories take their
+        values and the one category left unnamed takes the rest."""
+        fractions = self.stratification_fractions[stratification]
+        splits = {
+            of: _updated_split(stratification, split, named)
+            for of, split in category_splits(fractions)
+        }
+        by = split_by(fractions)
+        if by is None:
+            return splits[None]
+        return {FRACTIONS_BY: by, **{str(of): split for of, split in splits.items()}}
 
     def update_stratification_fractions(self, fractions: Mapping[str, float]) -> None:
         """
@@ -269,6 +297,8 @@ class InitialConditions(BaseModel):
         qualified with its stratification, as in ``group:g1``. Within each
         stratification, at most one category may be omitted; the omitted
         category receives the rest of 1, or 0 when the given values pass 1.
+        A stratification whose fractions differ by the category of an earlier
+        one takes the values in every split, as a calibrated category does.
         The fractions of every stratification are checked with the rule of the
         engine before any of them changes.
 
@@ -283,8 +313,8 @@ class InitialConditions(BaseModel):
         ValueError
             If a category is not found or is ambiguous, or a stratification
             has more than one category omitted; with the message of the
-            engine, if a fraction is not from 0 to 1 or the fractions of a
-            stratification do not sum to 1 within 1e-6.
+            engine, if a fraction is not from 0 to 1 or a split does not sum
+            to 1 within 1e-6.
         """
         by_stratification: dict[str, dict[str, float]] = {}
         for category, value in fractions.items():
@@ -296,8 +326,7 @@ class InitialConditions(BaseModel):
             for stratification, named in by_stratification.items()
         }
         _check_fractions(updated)
-        for stratification, categories in updated.items():
-            self.stratification_fractions[stratification].update(categories)
+        self.stratification_fractions.update(updated)
 
     def _upsert_compartment_amounts(self, amounts: Mapping[str, float]) -> None:
         """
@@ -348,12 +377,63 @@ class InitialConditions(BaseModel):
         self.bin_amounts.update(amounts)
 
 
-def _check_fractions(fractions: Mapping[str, Mapping[str, float]]) -> None:
+def split_by(fractions: _Fractions) -> str | None:
+    """The stratification a split by category differs by, or None for one
+    split: the field ``by`` when it holds a text, as the deserializer of
+    `StratificationFractions` in `crates/commol-core/src/types/aggregate.rs`
+    reads it, so a category may be named ``by`` in one split."""
+    by = fractions.get(FRACTIONS_BY)
+    return by if isinstance(by, str) else None
+
+
+def category_splits(
+    fractions: _Fractions,
+) -> list[tuple[str | None, dict[str, float]]]:
+    """Each split of a stratification, with the category of the stratification
+    it differs by: one split with None for one split."""
+    if split_by(fractions) is None:
+        return [
+            (
+                None,
+                {
+                    category: fraction
+                    for category, fraction in fractions.items()
+                    if isinstance(fraction, int | float)
+                },
+            )
+        ]
+    return [
+        (of, dict(split)) for of, split in fractions.items() if isinstance(split, dict)
+    ]
+
+
+def _updated_split(
+    stratification: str, split: Mapping[str, float], named: Mapping[str, float]
+) -> dict[str, float]:
+    """A split after an update that names ``named``; the one category left
+    unnamed takes the rest."""
+    unnamed = [category for category in split if category not in named]
+    if len(unnamed) > 1:
+        raise ValueError(
+            f"Cannot update stratification '{stratification}': "
+            f"categories {sorted(unnamed)} were left unnamed. At most one "
+            f"category may be omitted, so that it can take the remaining "
+            f"fraction."
+        )
+    remainder = max(0.0, 1.0 - sum(named.values()))
+    return {category: named.get(category, remainder) for category in split}
+
+
+def split_categories(fractions: _Fractions) -> list[str]:
+    """The categories the splits of a stratification name, in their order."""
+    return list(
+        dict.fromkeys(
+            category for _, split in category_splits(fractions) for category in split
+        )
+    )
+
+
+def _check_fractions(fractions: Mapping[str, _Fractions]) -> None:
     """Check the fractions of each stratification with the rule of the
     engine."""
-    commol_rs.model.check_fractions(
-        [
-            (stratification, list(categories.items()))
-            for stratification, categories in fractions.items()
-        ]
-    )
+    commol_rs.model.check_fractions(engine_json(fractions))

@@ -62,6 +62,20 @@ impl CompiledModel {
         self.compartments.len()
     }
 
+    /// The fraction of each category of each compartment, in engine order
+    /// and in the order of the categories of its output labels: the split of
+    /// a value written to compartments that hold nothing.
+    pub fn fractions(&self) -> &[Vec<f64>] {
+        &self.fractions
+    }
+
+    /// Each stratification whose fractions differ by the category of an
+    /// earlier one, as `(stratification, by)` pairs: a category value of
+    /// `by` keeps the split of the stratification on each side.
+    pub fn splits_by(&self) -> &[(String, String)] {
+        &self.splits_by
+    }
+
     /// Initial state: compartments, then accumulators (zero).
     pub fn initial_state(&self) -> &[f64] {
         &self.initial_state

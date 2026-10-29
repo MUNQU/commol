@@ -25,7 +25,10 @@ pub mod test_kind;
 pub mod transitions;
 
 // Re-export all public types for convenient access
-pub use aggregate::{Aggregate, AggregateVariant, InitialConditions, Neighbors};
+pub use aggregate::{
+    Aggregate, AggregateVariant, FRACTIONS_BY, InitialConditions, Neighbors,
+    StratificationFractions,
+};
 pub use engine::{
     DynamicsForm, EngineSettings, EngineType, EventMethod, ModelEngine, ModelKind, ModelValueType,
     OdeMethod, OdeSolver, RateKeeps, RateMeaning, Rounding, StochasticEventsSettings,

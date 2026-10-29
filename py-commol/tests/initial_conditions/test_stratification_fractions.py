@@ -1,15 +1,182 @@
-"""Stratification fractions: updating them, and reading categories by id."""
+"""Stratification fractions: splits by category, updating them, and reading
+categories by id."""
 
 import pytest
 from pydantic import ValidationError
 
-from commol import Aggregate
+from commol import Aggregate, CalibrationParameter
+from commol._model.description import Table
+from commol._model.engine_state import calibrated_initial_state
 from commol._model.model import Model
 from tests.support import (
     a_to_b_builder,
     build,
     shared_category_builder,
+    stratify,
 )
+
+# ``type`` splits ``g1`` 0.25 / 0.75 and ``g2`` 0.5 / 0.5.
+TYPE_BY_GROUP = {
+    "by": "group",
+    "g1": {"t1": 0.25, "t2": 0.75},
+    "g2": {"t1": 0.5, "t2": 0.5},
+}
+
+
+def _by_group(
+    type_fractions: dict[str, float] | dict[str, str | dict[str, float]],
+) -> Model:
+    """``group`` splits 0.4 / 0.6 into ``g1`` / ``g2``, then ``type`` splits
+    by ``type_fractions``; 1000 starts in A."""
+    builder = a_to_b_builder()
+    fractions = stratify(
+        builder,
+        {"group": {"g1": 0.4, "g2": 0.6}, "type": {"t1": 0.5, "t2": 0.5}},
+    )
+    builder.set_structure(
+        Aggregate(
+            bin_amounts={"A": 1000, "B": 0},
+            stratification_fractions={
+                "group": fractions["group"],
+                "type": type_fractions,
+            },
+        )
+    )
+    return build(builder)
+
+
+def _amounts(model: Model) -> dict[str, float]:
+    return {
+        compartment.name: compartment.amount
+        for compartment in model.structure.initial_state(model.process)
+        if compartment.amount
+    }
+
+
+def _fraction_rows(model: Model) -> list[list[object]]:
+    """The rows of the table of fractions of the description."""
+    return [
+        row
+        for block in model.describe().section("initialization").blocks
+        if isinstance(block, Table) and block.heading == "Stratification fractions"
+        for row in block.rows
+    ]
+
+
+def test_a_stratification_splits_each_category_of_an_earlier_one() -> None:
+    model = _by_group(TYPE_BY_GROUP)
+
+    assert _amounts(model) == pytest.approx(
+        {"A_g1_t1": 100.0, "A_g1_t2": 300.0, "A_g2_t1": 300.0, "A_g2_t2": 300.0}
+    )
+
+
+def test_one_split_per_stratification_is_unchanged() -> None:
+    model = _by_group({"t1": 0.25, "t2": 0.75})
+    t1 = CalibrationParameter(
+        id="t1", parameter_type="initial_condition", min_bound=0.0, max_bound=1.0
+    )
+
+    # The amount is the product in the order of the stratifications.
+    assert _amounts(model) == {
+        "A_g1_t1": 1000 * 0.4 * 0.25,
+        "A_g1_t2": 1000 * 0.4 * 0.75,
+        "A_g2_t1": 1000 * 0.6 * 0.25,
+        "A_g2_t2": 1000 * 0.6 * 0.75,
+    }
+    assert calibrated_initial_state(model, [t1], [0.5]).state == pytest.approx(
+        {"A_g1_t1": 200.0, "A_g1_t2": 200.0, "A_g2_t1": 300.0, "A_g2_t2": 300.0}
+        | {f"B_{g}_{t}": 0.0 for g in ("g1", "g2") for t in ("t1", "t2")}
+    )
+    assert _fraction_rows(model)[2:] == [
+        ["type", "t1", 0.25, "each bin"],
+        ["type", "t2", 0.75, "each bin"],
+    ]
+    assert model.applied_parameters({})["category_splits"]["t1"] == {
+        "group": [],
+        "fraction": 0.25,
+        "calibrated": False,
+    }
+    model.structure.update_stratification_fractions({"t1": 0.5})
+    assert model.structure.get_category_fraction("t2") == 0.5
+
+
+class TestSplitByCategory:
+    def test_the_description_gives_each_split_of_its_category(self) -> None:
+        model = _by_group(TYPE_BY_GROUP)
+
+        assert _fraction_rows(model)[2:] == [
+            ["type", "t1", 0.25, "g1"],
+            ["type", "t2", 0.75, "g1"],
+            ["type", "t1", 0.5, "g2"],
+            ["type", "t2", 0.5, "g2"],
+        ]
+
+    def test_the_report_gives_a_row_per_category_of_each_split(self) -> None:
+        model = _by_group(TYPE_BY_GROUP)
+
+        rows = model.applied_parameters({})["category_splits"]
+
+        assert rows["t2 of g1"] == {
+            "group": ["g1"],
+            "fraction": 0.75,
+            "calibrated": False,
+        }
+        assert rows["t1 of g2"]["fraction"] == 0.5
+        assert rows["g1"]["group"] == []
+
+    def test_its_categories_resolve_by_name(self) -> None:
+        model = _by_group(TYPE_BY_GROUP)
+
+        assert model.structure.resolve_category("t1") == ("type", "t1")
+        assert model.structure.subgroup_total(model.process, ("t1",)) == (
+            pytest.approx(400.0)
+        )
+
+    def test_one_fraction_of_it_is_not_read(self) -> None:
+        model = _by_group(TYPE_BY_GROUP)
+
+        with pytest.raises(ValueError, match="differ by the category of 'group'"):
+            model.structure.get_category_fraction("t1")
+
+    def test_an_update_sets_its_value_in_every_split(self) -> None:
+        model = _by_group(TYPE_BY_GROUP)
+
+        model.structure.update_stratification_fractions({"t1": 0.3})
+
+        assert model.structure.stratification_fractions["type"] == {
+            "by": "group",
+            "g1": {"t1": 0.3, "t2": 0.7},
+            "g2": {"t1": 0.3, "t2": 0.7},
+        }
+
+    def test_it_reads_back_from_its_json(self) -> None:
+        model = _by_group(TYPE_BY_GROUP)
+
+        reloaded = Model.model_validate_json(model.model_dump_json())
+
+        assert reloaded.structure.stratification_fractions == (
+            model.structure.stratification_fractions
+        )
+        assert _amounts(reloaded) == _amounts(model)
+
+    def test_a_fraction_of_a_category_gets_the_message_of_the_engine(self) -> None:
+        with pytest.raises(ValidationError) as error:
+            Aggregate(
+                bin_amounts={"A": 1000, "B": 0},
+                stratification_fractions={
+                    "type": {**TYPE_BY_GROUP, "g2": {"t1": 0.5, "t2": 0.4}}
+                },
+            )
+
+        assert (
+            "Stratification 'type' within category 'g2' of 'group': the fractions "
+            "of its categories sum to 1 within 1e-6, got 0.9" in str(error.value)
+        )
+
+    def test_a_split_by_a_later_stratification_is_refused(self) -> None:
+        with pytest.raises(ValidationError, match="not a stratification declared"):
+            _by_group({"by": "type", "t1": {"t1": 1.0, "t2": 0.0}})
 
 
 def _stratified_model() -> Model:
@@ -238,10 +405,10 @@ class TestNames:
     @pytest.mark.parametrize(
         ("fractions", "message"),
         [
-            ({}, r"stratification ids. Missing ids: \['g'\], Extra ids: \[\]"),
+            ({}, r'stratification ids. Missing ids: \["g"\], Extra ids: \[\]'),
             (
                 {"g": {"g1": 1.0, "g3": 0.0}},
-                r"Missing categories: \['g2'\], Extra categories: \['g3'\]",
+                r'Missing categories: \["g2"\], Extra categories: \["g3"\]',
             ),
         ],
         ids=["stratification", "category"],

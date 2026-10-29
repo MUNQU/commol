@@ -391,9 +391,9 @@ def check_model(model: "Model") -> None:
     """
     Check an aggregate model in the engine.
 
-    The engine checks the variant and the neighbors of the structure, the
-    variables the rates read, and the names the model uses against the names
-    the engine provides.
+    The engine checks the variant, the neighbors and the stratification
+    fractions of the structure, the variables the rates read, and the names
+    the model uses against the names the engine provides.
 
     Parameters
     ----------
@@ -403,7 +403,9 @@ def check_model(model: "Model") -> None:
     Raises
     ------
     ValueError
-        If the variant or the neighbors do not fit the process, a parameter
+        If the variant, the neighbors or the stratification fractions do not
+        fit the process (a stratification or a category not named, a split by
+        category by a stratification not declared before it), a parameter
         id is an expanded compartment, a subgroup total or a name of the
         neighbors, a rate or formula parameter is not in the language of
         formulas, uses a ``total_…`` name that is not a subgroup total of the
