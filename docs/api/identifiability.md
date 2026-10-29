@@ -28,6 +28,10 @@ they return, and its parts. Guide:
 
 ::: commol.identifiability.results.PointRank
 
+::: commol.identifiability.results.TighterRank
+
+::: commol.identifiability.results.Accuracy
+
 ::: commol.identifiability.results.Combination
 
 ::: commol.identifiability.results.CollinearitySection

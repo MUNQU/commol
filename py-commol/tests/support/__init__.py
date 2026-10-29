@@ -50,6 +50,7 @@ from .problems import (
     line_calibrator,
     observed,
     rate_calibrator,
+    rare_flow_calibrator,
     swarm,
     two_wells_calibrator,
 )
@@ -94,6 +95,7 @@ __all__ = [
     "line_calibrator",
     "observed",
     "rate_calibrator",
+    "rare_flow_calibrator",
     "override_builder",
     "reference_run",
     "run",

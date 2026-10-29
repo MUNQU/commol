@@ -8,7 +8,7 @@ use commol_inference::identifiability::{
     sample_identifiability, structural_rank,
 };
 use commol_inference::sensitivity::{
-    Design, FiniteDifferences, Matrix, Sensitivities, SensitivityError, SensitivitySource,
+    Accuracy, Design, FiniteDifferences, Matrix, Sensitivities, SensitivityError, SensitivitySource,
 };
 use commol_inference::{MethodError, ParameterSample};
 use commol_random::Generator;
@@ -66,12 +66,39 @@ fn an_unread_parameter_is_non_identifiable() {
     assert_eq!(
         analysis.verdicts,
         [
-            StructuralVerdict::Identifiable,
-            StructuralVerdict::NonIdentifiable
+            Some(StructuralVerdict::Identifiable),
+            Some(StructuralVerdict::NonIdentifiable)
         ]
     );
     assert!(analysis.combinations.is_empty());
     assert_eq!(analysis.points.len(), 5);
+}
+
+#[test]
+fn an_exact_engine_is_not_evaluated_again() {
+    let problem = problem(
+        decay("k", &["k", "u"]),
+        &[("k", 0.05, 0.5), ("u", 0.0, 1.0)],
+    );
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+    let analysis = structural_rank(&source, 5, 7).unwrap();
+
+    assert!(problem.forward().at_accuracy(1e-9, 1e-9).is_none());
+    assert_eq!(analysis.accuracy, Accuracy::EXACT);
+    assert_eq!(analysis.tighter, None);
+    assert!(
+        analysis
+            .points
+            .iter()
+            .all(|point| point.rank == 1 && point.tighter.is_none())
+    );
+    assert_eq!(
+        analysis.verdicts,
+        [
+            Some(StructuralVerdict::Identifiable),
+            Some(StructuralVerdict::NonIdentifiable)
+        ]
+    );
 }
 
 #[test]
@@ -87,8 +114,8 @@ fn a_product_is_identifiable_in_combination() {
     assert_eq!(
         analysis.verdicts,
         [
-            StructuralVerdict::InCombination,
-            StructuralVerdict::InCombination
+            Some(StructuralVerdict::InCombination),
+            Some(StructuralVerdict::InCombination)
         ]
     );
     assert_eq!(analysis.combinations.len(), 1);
@@ -293,8 +320,8 @@ fn a_singular_value_at_the_error_of_the_sensitivities_is_not_counted() {
     assert_eq!(
         analysis.verdicts,
         [
-            StructuralVerdict::Identifiable,
-            StructuralVerdict::NonIdentifiable
+            Some(StructuralVerdict::Identifiable),
+            Some(StructuralVerdict::NonIdentifiable)
         ]
     );
 }
@@ -310,6 +337,130 @@ fn a_failure_of_the_sensitivities_stops_the_structural_rank() {
     assert!(
         matches!(&error, MethodError::Sensitivity(SensitivityError::Failed(m)) if m == "broken"),
         "{error:?}"
+    );
+}
+
+/// A source of the scaled sensitivities `diag(1, 10⁻³)` whose entries all
+/// carry an error equal to the relative accuracy of its runs; at an
+/// accuracy below `fails_below` every run fails.
+#[derive(Clone)]
+struct Tolerant {
+    parameters: Vec<CalibrationParameter>,
+    accuracy: Accuracy,
+    fails_below: f64,
+}
+
+impl Tolerant {
+    fn new(relative: f64, fails_below: f64) -> Self {
+        Self {
+            parameters: vec![
+                CalibrationParameter::new("k0".to_string(), 1.0, 2.0),
+                CalibrationParameter::new("k1".to_string(), 1.0, 2.0),
+            ],
+            accuracy: Accuracy {
+                relative,
+                absolute: relative,
+            },
+            fails_below,
+        }
+    }
+}
+
+impl SensitivitySource for Tolerant {
+    fn parameters(&self) -> &[CalibrationParameter] {
+        &self.parameters
+    }
+
+    fn jacobian(&self, _values: &[f64]) -> Result<Sensitivities, SensitivityError> {
+        if self.accuracy.relative < self.fails_below {
+            return Err(SensitivityError::Failed("too stiff".to_string()));
+        }
+        Ok(Sensitivities {
+            predictions: vec![0.0; 2],
+            jacobian: Matrix::from_row_slice(2, 2, &[1.0, 0.0, 0.0, 1e-3]),
+            errors: Matrix::from_element(2, 2, self.accuracy.relative),
+            labels: vec!["A".to_string(); 2],
+        })
+    }
+
+    fn scales(&self, _sensitivities: &Sensitivities) -> Vec<f64> {
+        vec![1.0; 2]
+    }
+
+    fn scaled_jacobian(&self, values: &[f64]) -> Result<Sensitivities, SensitivityError> {
+        self.jacobian(values)
+    }
+
+    fn accuracy(&self) -> Accuracy {
+        self.accuracy
+    }
+
+    fn at_accuracy(&self, accuracy: Accuracy) -> Option<Self> {
+        Some(Self {
+            accuracy,
+            ..self.clone()
+        })
+    }
+}
+
+#[test]
+fn a_rank_lost_to_the_accuracy_gives_no_verdict() {
+    // ‖E‖_F = 2·10⁻³ hides the singular value 10⁻³; 2·10⁻⁵ does not.
+    let analysis = structural_rank(&Tolerant::new(1e-3, 0.0), 3, 7).unwrap();
+
+    let tighter = Accuracy {
+        relative: 1e-5,
+        absolute: 1e-5,
+    };
+    assert_eq!(analysis.tighter, Some(tighter));
+    for point in &analysis.points {
+        assert_eq!(point.rank, 1);
+        let again = point.tighter.as_ref().expect("evaluated again");
+        assert_eq!((again.accuracy, again.rank), (tighter, 2));
+    }
+    assert_eq!(analysis.generic_rank, 1);
+    assert_eq!(
+        analysis.verdicts,
+        [Some(StructuralVerdict::Identifiable), None]
+    );
+    assert!(analysis.unchecked.is_empty());
+}
+
+#[test]
+fn a_point_of_full_rank_is_not_evaluated_again() {
+    let analysis = structural_rank(&Tolerant::new(1e-5, 0.0), 3, 7).unwrap();
+
+    assert!(analysis.points.iter().all(|point| point.tighter.is_none()));
+    assert_eq!(
+        analysis.verdicts,
+        [Some(StructuralVerdict::Identifiable); 2]
+    );
+}
+
+#[test]
+fn the_tighter_accuracy_is_no_lower_than_the_tightest() {
+    let near = structural_rank(&Tolerant::new(1e-13, 0.0), 1, 7).unwrap();
+    let tightest = structural_rank(&Tolerant::new(1e-14, 0.0), 1, 7).unwrap();
+
+    assert_eq!(
+        near.tighter,
+        Some(Accuracy {
+            relative: 1e-14,
+            absolute: 1e-14
+        })
+    );
+    assert_eq!(tightest.tighter, None);
+}
+
+#[test]
+fn a_point_that_fails_at_the_tighter_accuracy_leaves_the_rank_unchecked() {
+    let analysis = structural_rank(&Tolerant::new(1e-3, 1e-4), 3, 7).unwrap();
+
+    assert_eq!(analysis.unchecked, vec!["too stiff".to_string(); 3]);
+    assert!(analysis.points.iter().all(|point| point.tighter.is_none()));
+    assert_eq!(
+        analysis.verdicts,
+        [Some(StructuralVerdict::Identifiable), None]
     );
 }
 

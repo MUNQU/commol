@@ -243,6 +243,29 @@ impl SimulationEngine for Engine {
         dispatch!(self, engine => engine.output_absolute_accuracy())
     }
 
+    fn at_accuracy(&self, relative: f64, absolute: f64) -> Option<Self> {
+        match self {
+            Self::Difference(engine) => {
+                engine.at_accuracy(relative, absolute).map(Self::Difference)
+            }
+            Self::Differential(engine) => engine
+                .at_accuracy(relative, absolute)
+                .map(Self::Differential),
+            Self::StochasticEvents(engine) => engine
+                .at_accuracy(relative, absolute)
+                .map(Self::StochasticEvents),
+            Self::StochasticSteps(engine) => engine
+                .at_accuracy(relative, absolute)
+                .map(Self::StochasticSteps),
+            #[cfg(feature = "test-kind")]
+            Self::Test(engine) => engine.at_accuracy(relative, absolute).map(Self::Test),
+            #[cfg(feature = "test-kind")]
+            Self::TestStochastic(engine) => engine
+                .at_accuracy(relative, absolute)
+                .map(Self::TestStochastic),
+        }
+    }
+
     fn reset(&mut self) {
         dispatch!(self, engine => engine.reset())
     }
@@ -793,6 +816,13 @@ mod tests {
             assert_eq!(engine.engine_type(), engine_type);
             let rows = SimulationEngine::run(&mut engine, 1).unwrap().rows;
             assert!(rows[1][0] < rows[0][0], "{engine_type:?} moved nothing");
+            // Only the engine that integrates with tolerances runs at another accuracy.
+            let tighter = engine.at_accuracy(1e-9, 1e-9);
+            assert_eq!(
+                tighter.map(|engine| engine.output_accuracy()),
+                (engine_type == EngineType::DifferentialEquations).then_some(1e-9),
+                "{engine_type:?}"
+            );
         }
     }
 
@@ -857,6 +887,7 @@ mod tests {
         assert_eq!(rows[0], vec![10.0]);
         assert!((rows[1][0] - 10.0 * (-1.0f64).exp()).abs() < 1e-12);
         assert!(engine.plan_values(&[], Some("x")).is_err());
+        assert!(engine.at_accuracy(1e-9, 1e-9).is_none());
     }
 
     /// A stochastic test model: 100 units of `x` leave at rate `k`.
@@ -882,6 +913,7 @@ mod tests {
     fn a_stochastic_engine_repeats_a_run_from_its_seed() {
         let mut engine = Engine::build(&stochastic_model()).unwrap();
         assert!(engine.engine_type().is_stochastic());
+        assert!(engine.at_accuracy(1e-9, 1e-9).is_none());
 
         let first = stochastic_run(&mut engine, 7);
         let again = stochastic_run(&mut engine, 7);

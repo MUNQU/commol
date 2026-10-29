@@ -9,7 +9,7 @@ use commol_core::{Model, SimulationEngine};
 use commol_difference::DifferenceEquations;
 use commol_differential::DifferentialEquations;
 use commol_inference::sensitivity::{
-    Design, FiniteDifferences, SensitivityError, SensitivitySource, observation_scales,
+    Accuracy, Design, FiniteDifferences, SensitivityError, SensitivitySource, observation_scales,
 };
 
 /// A → B at the proportional rate `k`, from A = 1000, with the parameters
@@ -284,6 +284,58 @@ fn the_ode_step_follows_the_solver_tolerance() {
             &format!("∂y{t}/∂f"),
         );
     }
+}
+
+#[test]
+fn a_source_at_a_tighter_accuracy_steps_by_it() {
+    let engine = DifferentialEquations::try_from_model(&decay(
+        "DifferentialEquations",
+        &ode_settings(1e-6),
+        &[],
+    ))
+    .unwrap();
+    let problem = problem(
+        engine,
+        observed(&[1.0], &[400.0]),
+        vec![
+            CalibrationParameter::new("k".to_string(), 0.0, 1.0),
+            factor("f", 0.1, 2.0),
+        ],
+    );
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+    let tighter = Accuracy {
+        relative: 1e-9,
+        absolute: 1e-12,
+    };
+
+    let again = source.at_accuracy(tighter).unwrap();
+
+    assert_eq!(
+        source.accuracy(),
+        Accuracy {
+            relative: 1e-6,
+            absolute: 1e-10
+        }
+    );
+    assert_eq!(again.accuracy(), tighter);
+    // h = η^{1/3} · max(|θ|, w) with η = 1e-9.
+    assert!((again.steps(&[0.2, 0.5])[0] - 1e-3).abs() < 1e-15);
+}
+
+#[test]
+fn a_source_of_exact_runs_has_no_other_accuracy() {
+    let problem = problem(
+        difference(&[]),
+        observed(&[1.0], &[400.0]),
+        vec![
+            CalibrationParameter::new("k".to_string(), 0.0, 1.0),
+            factor("f", 0.1, 2.0),
+        ],
+    );
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+
+    assert_eq!(source.accuracy(), Accuracy::EXACT);
+    assert!(source.at_accuracy(Accuracy::EXACT).is_none());
 }
 
 #[test]

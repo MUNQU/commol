@@ -167,6 +167,32 @@ print(dense.structural[0].generic_rank, dense.structural[0].verdicts["k1"])
 Denser data of `B` do not split the product either: the deficit is in the
 model, not in the design.
 
+#### When the solver tolerance sets the rank
+
+The estimated error of `S` grows with the tolerance of an ODE solver, and it
+can hide a singular value that a tighter tolerance resolves. With
+`DifferentialEquations`, each point whose rank is below the number of
+parameters is evaluated again at `rtol / 100` and `atol / 100`, no lower than
+`1e-14`, and the verdicts are computed again with those ranks. A parameter
+whose verdict changes there has no structural verdict: its `verdict` is
+`None`, and its reason names `ODESolver.rtol` and `ODESolver.atol`. When a
+point cannot run at the tighter tolerances, every parameter that is not
+`identifiable` has no verdict, and the section lists why in `unchecked`. A
+parameter that no observation reads stays `non_identifiable` at any
+tolerance. `DifferenceEquations` runs are exact up to rounding: no point is
+evaluated again.
+
+| Field of `PointRank` | Meaning |
+|---|---|
+| `accuracy` | `relative` (`rtol`) and `absolute` (`atol`) accuracy of the runs |
+| `rank` | The rank at that accuracy |
+| `tighter` | The `accuracy`, the singular values, the `threshold` and the `rank` at the tighter tolerances; `None` when the point was not evaluated again |
+
+A verdict of `None` says that the result depends on the tolerance. Tighten
+`ODESolver.rtol` and `ODESolver.atol` and run `StructuralRank` again, until
+the rank stops changing. The fit does not need these tolerances: only the
+finite differences do.
+
 ### How to read a combination
 
 A combination is a product of powers of the parameters that the data
@@ -259,7 +285,8 @@ other parameters to their fitted values breaks it, and `non_identifiable`
 when nothing the data read depends on the parameter
 ([Profile Likelihood](profiles.md#verdicts-and-the-identifiability-report)). `merge` joins reports: a
 verdict the reports agree on stays, with every reason; one they disagree on is
-`conflicting`, with both reasons. `report.report()` gives it as plain data
+`conflicting`, with both reasons. A structural verdict of `None` adds its
+reasons and leaves the verdicts of the other reports. `report.report()` gives it as plain data
 ([Reports](../reports.md#the-report-of-an-identifiability-analysis)).
 
 ```python
@@ -275,7 +302,9 @@ print(data["parameters"]["k2"]["practical"]["verdict"])  # determined
   equations; they are outside commol.
 - **Numerical.** The derivatives are finite differences; a singular value
   counts only when it is above their estimated error. The error grows with
-  the tolerance of an ODE solver (`rtol`).
+  the tolerance of an ODE solver (`rtol`, `atol`): a rank that a hundredth of
+  the tolerances raises gives no verdict, but one evaluation at a tighter
+  tolerance cannot show that a yet tighter one changes nothing.
 - **Generic points.** A point where the rank is lower or higher than at most
   points is special; the generic rank is the rank at most points.
 - **Deterministic engines.** The runs of a stochastic engine change in jumps

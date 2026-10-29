@@ -201,6 +201,18 @@ impl commol_core::SimulationEngine for DifferentialEquations {
         self.settings.atol
     }
 
+    /// The same engine with `rtol = relative` and `atol = absolute`.
+    fn at_accuracy(&self, relative: f64, absolute: f64) -> Option<Self> {
+        Some(Self {
+            settings: OdeSolver {
+                rtol: relative,
+                atol: absolute,
+                ..self.settings
+            },
+            ..self.clone()
+        })
+    }
+
     fn reset(&mut self) {
         self.state.copy_from_slice(self.model.initial_state());
         self.current_time = 0.0;

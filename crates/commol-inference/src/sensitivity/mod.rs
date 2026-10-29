@@ -33,6 +33,28 @@ pub enum Design {
     Dense,
 }
 
+/// The accuracy of the runs a source differentiates: the relative error a
+/// run may carry ([`SimulationEngine::output_accuracy`]) and the error on an
+/// output near 0 ([`SimulationEngine::output_absolute_accuracy`]).
+///
+/// [`SimulationEngine::output_accuracy`]: commol_core::SimulationEngine::output_accuracy
+/// [`SimulationEngine::output_absolute_accuracy`]: commol_core::SimulationEngine::output_absolute_accuracy
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Accuracy {
+    /// The relative accuracy.
+    pub relative: f64,
+    /// The absolute accuracy.
+    pub absolute: f64,
+}
+
+impl Accuracy {
+    /// Runs exact up to rounding: machine epsilon, and 0 near 0.
+    pub const EXACT: Self = Self {
+        relative: f64::EPSILON,
+        absolute: 0.0,
+    };
+}
+
 /// The Jacobian of the predicted observations at one point.
 #[derive(Debug, Clone)]
 pub struct Sensitivities {
@@ -147,6 +169,21 @@ pub trait SensitivitySource: Sync {
 
     /// The scale `s_i` of each row of `sensitivities`.
     fn scales(&self, sensitivities: &Sensitivities) -> Vec<f64>;
+
+    /// The accuracy of the runs the derivatives come from:
+    /// [`Accuracy::EXACT`] by default.
+    fn accuracy(&self) -> Accuracy {
+        Accuracy::EXACT
+    }
+
+    /// The same source on runs at `accuracy`, or `None` when no setting sets
+    /// the accuracy of its runs (the default).
+    fn at_accuracy(&self, _accuracy: Accuracy) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        None
+    }
 
     /// The scaled Jacobian at `values` ([`Sensitivities::scaled`]).
     ///

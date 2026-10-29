@@ -300,6 +300,8 @@ def test_an_identifiability_report_has_a_section_of_each_method() -> None:
 @pytest.mark.parametrize(
     "model",
     [
+        "Accuracy",
+        "TighterRank",
         "PointRank",
         "Combination",
         "StructuralSection",

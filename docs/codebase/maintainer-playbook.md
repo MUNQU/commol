@@ -178,15 +178,15 @@ To add an engine to the list:
       reports only at integer steps); `check_position` is the rule of
       `EngineType`, `engine_type` returns its entry (so `is_stochastic` and
       the messages of a calibration read it), and `try_from_model` rejects a
-      model of another engine. A
-      stochastic engine draws every random number from one
-      `commol_random::Generator`, implements `set_seed`, and restores the
-      generator in `reset`, so a run repeats from its seed.
+      model of another engine. A stochastic engine draws every random number
+      from one `commol_random::Generator`, implements `set_seed`, and restores
+      the generator in `reset`, so a run repeats from its seed. An engine
+      with tolerances implements [`at_accuracy`](decisions/identifiability.md#a-rank-lost-to-the-accuracy-gives-no-verdict).
 - [ ] Add a variant to `Engine` in `py-commol/src/engine.rs`: one arm in
       `build` per kind it runs (the pair of the engine and the kind),
-      `engine_type`, `dispatch!`, `plan_values` and `apply_values` (and
-      `compartmental!` for an engine of the aggregate kind). Add the crate to
-      `py-commol/Cargo.toml`.
+      `engine_type`, `dispatch!`, `at_accuracy`, `plan_values` and
+      `apply_values` (and `compartmental!` for an engine of the aggregate
+      kind). Add the crate to `py-commol/Cargo.toml`.
 - [ ] Add the name to the `EngineName` `Literal` in `engines/engine.py`; if the
       engine has settings, add their Pydantic class to `EngineSettings`.
 - [ ] Run the tests of `crates/commol-core/src/types/engine.rs`,

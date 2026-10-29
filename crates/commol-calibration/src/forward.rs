@@ -184,6 +184,19 @@ impl<E: SimulationEngine> ForwardModel<E> {
         }
     }
 
+    /// The same model on its engine at the relative accuracy `relative` and
+    /// the absolute accuracy `absolute` ([`SimulationEngine::at_accuracy`]):
+    /// the parameters, the values, the schedule, the observations and the
+    /// replicates stay. `None` when no setting sets the accuracy of the
+    /// engine.
+    pub fn at_accuracy(&self, relative: f64, absolute: f64) -> Option<Self> {
+        let base_engine = self.base_engine.at_accuracy(relative, absolute)?;
+        Some(Self {
+            base_engine,
+            ..self.clone()
+        })
+    }
+
     /// The sorted, deduplicated positions every evaluation runs at.
     pub fn schedule(&self) -> &[f64] {
         &self.schedule

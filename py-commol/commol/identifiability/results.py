@@ -43,12 +43,14 @@ class StructuralVerdict(_FrozenResult):
 
     Attributes
     ----------
-    verdict : StructuralVerdictName
+    verdict : StructuralVerdictName | None
         ``identifiable``: the null space of the sensitivities has no
         component on it, or a profile crosses its threshold. ``in_combination``:
         the data determine it only together with other parameters.
         ``non_identifiable``: it lies in the null space, or nothing the data
-        read depends on it. ``conflicting``: two reports disagree.
+        read depends on it. ``conflicting``: two reports disagree. ``None``:
+        the evidence gives no verdict, as when the accuracy of the runs, not
+        the structure, may set the structural rank; the reasons say why.
     reasons : list[str]
         Why, one per piece of evidence.
     combinations : list[str]
@@ -58,7 +60,7 @@ class StructuralVerdict(_FrozenResult):
         compensating parameters.
     """
 
-    verdict: StructuralVerdictName
+    verdict: StructuralVerdictName | None
     reasons: list[str] = Field(default_factory=list)
     combinations: list[str] = Field(default_factory=list)
 
@@ -114,14 +116,34 @@ class Combination(_FrozenResult):
     text: str
 
 
-class PointRank(_FrozenResult):
+class Accuracy(_FrozenResult):
     """
-    The rank of the scaled sensitivities at one point.
+    The accuracy of the runs the sensitivities come from.
 
     Attributes
     ----------
-    values : dict[str, float]
-        The point.
+    relative : float
+        The relative error a run may carry: ``ODESolver.rtol`` for
+        ``DifferentialEquations``, machine epsilon for an engine whose runs
+        are exact up to rounding.
+    absolute : float
+        The error a run may carry on an output near 0: ``ODESolver.atol``, or
+        0.
+    """
+
+    relative: float
+    absolute: float
+
+
+class TighterRank(_FrozenResult):
+    """
+    The rank of the scaled sensitivities at a point evaluated again at a
+    tighter accuracy.
+
+    Attributes
+    ----------
+    accuracy : Accuracy
+        The accuracy of the runs.
     singular_values : list[float]
         The singular values, largest first.
     threshold : float
@@ -131,10 +153,41 @@ class PointRank(_FrozenResult):
         How many pass it.
     """
 
-    values: dict[str, float]
+    accuracy: Accuracy
     singular_values: list[float]
     threshold: float
     rank: int
+
+
+class PointRank(_FrozenResult):
+    """
+    The rank of the scaled sensitivities at one point.
+
+    Attributes
+    ----------
+    values : dict[str, float]
+        The point.
+    accuracy : Accuracy
+        The accuracy of the runs of the engine.
+    singular_values : list[float]
+        The singular values, largest first.
+    threshold : float
+        The norm of the estimated errors of the sensitivities, which a
+        singular value must pass to count.
+    rank : int
+        How many pass it.
+    tighter : TighterRank | None
+        The rank at a tighter accuracy, when the rank is below the number of
+        parameters and a setting of the engine sets its accuracy; ``None``
+        otherwise.
+    """
+
+    values: dict[str, float]
+    accuracy: Accuracy
+    singular_values: list[float]
+    threshold: float
+    rank: int
+    tighter: TighterRank | None
 
 
 class StructuralSection(_FrozenResult):
@@ -151,14 +204,27 @@ class StructuralSection(_FrozenResult):
     skipped : list[str]
         Why each infeasible point was skipped.
     generic_rank : int
-        The rank at most points.
+        The rank at most points, at the accuracy of the engine.
     projections : dict[str, float]
         The norm of the projection of each parameter on the null space,
-        averaged over the points of generic rank.
-    verdicts : dict[str, StructuralVerdictName]
-        The verdict of each parameter on this design.
+        averaged over the points of generic rank, at the accuracy of the
+        engine.
+    verdicts : dict[str, StructuralVerdictName | None]
+        The verdict of each parameter on this design; ``None`` when the
+        verdict changes at the tighter accuracy, or a point could not run
+        there and the parameter is not identifiable.
     combinations : list[Combination]
         The identifiable combinations.
+    accuracy : Accuracy
+        The accuracy of the runs of the engine.
+    tighter : Accuracy | None
+        The accuracy a point of rank below the number of parameters is
+        evaluated again at: each accuracy of the engine divided by 100, no
+        lower than 1e-14. ``None`` when no setting sets the accuracy of the
+        engine, or it is already the tightest.
+    unchecked : list[str]
+        Why each point that the tighter accuracy should check could not run
+        there.
     """
 
     design: StructuralDesign
@@ -166,8 +232,11 @@ class StructuralSection(_FrozenResult):
     skipped: list[str]
     generic_rank: int
     projections: dict[str, float]
-    verdicts: dict[str, StructuralVerdictName]
+    verdicts: dict[str, StructuralVerdictName | None]
     combinations: list[Combination]
+    accuracy: Accuracy
+    tighter: Accuracy | None
+    unchecked: list[str]
 
 
 class SubsetIndex(_FrozenResult):
@@ -328,13 +397,15 @@ def _merge_structural(
 ) -> StructuralVerdict | None:
     if not verdicts:
         return None
-    names = {verdict.verdict for verdict in verdicts}
+    names = {verdict.verdict for verdict in verdicts if verdict.verdict is not None}
     reasons = [reason for verdict in verdicts for reason in verdict.reasons]
     combinations = list(
         dict.fromkeys(c for verdict in verdicts for c in verdict.combinations)
     )
     return StructuralVerdict(
-        verdict=names.pop() if len(names) == 1 else "conflicting",
+        verdict=(
+            None if not names else names.pop() if len(names) == 1 else "conflicting"
+        ),
         reasons=reasons,
         combinations=combinations,
     )
@@ -408,7 +479,8 @@ class IdentifiabilityReport(_FrozenResult):
 
         The sections are kept side by side. A verdict that the reports agree
         on stays, with the reasons of each; one they disagree on is
-        ``conflicting``, with every reason.
+        ``conflicting``, with every reason. A structural verdict of ``None``
+        adds its reasons and leaves the verdicts of the other reports.
 
         Parameters
         ----------

@@ -217,6 +217,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Windowed totals](../guide/simulations.md#windowed-totals).
 - **Breaking:** the pydantic validators of the public classes are private:
   each name starts with `_`, such as `CalibrationProblem._validate_loss_or_models`.
+- **Breaking:** `StructuralRank` gives no structural verdict when the
+  tolerance of the ODE solver, not the structure, may set the rank. With
+  `DifferentialEquations`, a point whose rank is below the number of
+  parameters is evaluated again at `rtol / 100` and `atol / 100` (no lower
+  than 1e-14); a parameter whose verdict changes there, or that is not
+  identifiable when a point cannot run there, has the verdict `None`, with a
+  reason that names `ODESolver.rtol` and `ODESolver.atol`. Before, the rank
+  lost to the tolerance read as `non_identifiable` or `in_combination`. A
+  parameter that no observation reads stays `non_identifiable`.
+  `StructuralVerdict.verdict` and the values of `StructuralSection.verdicts`
+  can be `None`, and `merge` keeps the verdicts of the other reports;
+  `PointRank` holds the `accuracy` of its runs and the `tighter` rank;
+  `StructuralSection` holds the `accuracy`, the `tighter` accuracy and the
+  points that could not run there (`unchecked`). Migration: read a `None`
+  verdict as no verdict, and tighten `ODESolver.rtol` and `ODESolver.atol`
+  until the rank stops changing. See
+  [Structural rank](../guide/uncertainty/identifiability.md#structural-rank).
 
 ### Removed
 

@@ -31,6 +31,42 @@ refused: its runs change in jumps with the parameters.
 `crates/commol-inference/tests/test_identifiability.rs`,
 `tests/uncertainty/test_identifiability.py`.
 
+## A rank lost to the accuracy gives no verdict
+
+The error of the runs of an engine that integrates with a tolerance enters
+the estimated error of the sensitivities, so it can hide a singular value
+that a tighter tolerance resolves. `structural_rank` asks the source for the
+accuracy of its runs (`SensitivitySource::accuracy`) and for the same source
+at a tighter one (`SensitivitySource::at_accuracy`, which
+`FiniteDifferences` builds from `ForwardModel::at_accuracy` and
+`SimulationEngine::at_accuracy`; `None` for an engine whose accuracy no
+setting sets). Each point whose rank is below the number of parameters is
+evaluated once more, at each accuracy divided by `TIGHTENING` (100), no
+lower than `TIGHTEST` (1e-14); the verdicts are computed again with the
+ranks and null spaces there. A parameter whose verdict changes has no
+verdict (`None`), as a profile whose structure is undetermined. When a point
+cannot run at the tighter accuracy, every parameter that is not identifiable
+has no verdict, and `unchecked` says why. The section keeps the generic
+rank, the projections and the combinations at the accuracy of the engine;
+a combination that holds a parameter with no verdict goes. The reason names
+`ODESolver.rtol` and `ODESolver.atol`, the only settings that set an
+accuracy today.
+
+| Alternative | Why not |
+|---|---|
+| Differentiate at one fixed tighter tolerance | `1e-9` still lost ranks in a model of 15 parameters where `1e-12` resolved them: no fixed value is enough, and the user would not see that the result depends on it. |
+| A warning only | The user cannot tell which verdicts to trust. |
+| Search until the rank is stable | Its cost has no bound, and a stiff model may not integrate at the tightest tolerances. |
+| A factor of 1,000 or more | Each run costs more as the tolerance tightens; the reason already tells the user to go further. |
+| A verdict name such as `unresolved` | A second way to say what a profile says with no verdict, and one more case in `merge` and the reports. |
+| Rebuild the model in Python at the tighter tolerances | The sensitivities run in Rust, and Python would need to know which engines integrate with a tolerance. |
+
+**Guards:** `crates/commol-inference/tests/test_identifiability.rs`
+(`a_rank_lost_to_the_accuracy_gives_no_verdict`,
+`a_point_that_fails_at_the_tighter_accuracy_leaves_the_rank_unchecked`,
+`an_exact_engine_is_not_evaluated_again`),
+`tests/uncertainty/test_identifiability_tolerance.py`.
+
 ## Two verdicts per parameter
 
 An `IdentifiabilityReport` gives each parameter a structural verdict (what

@@ -324,6 +324,17 @@ pub trait SimulationEngine: Clone {
         0.0
     }
 
+    /// The same engine with its outputs at the relative accuracy `relative`
+    /// and the absolute accuracy `absolute` ([`Self::output_accuracy`],
+    /// [`Self::output_absolute_accuracy`]), both finite and greater than 0:
+    /// its state, position and parameters stay. `None` by default, for an
+    /// engine whose accuracy no setting sets, such as one whose outputs are
+    /// exact up to rounding; an engine that integrates with tolerances
+    /// returns itself with those tolerances.
+    fn at_accuracy(&self, _relative: f64, _absolute: f64) -> Option<Self> {
+        None
+    }
+
     /// Reset the simulation to its initial state.
     ///
     /// After calling this method:

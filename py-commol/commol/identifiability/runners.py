@@ -16,6 +16,7 @@ from commol._calibration.method import CalibrationPort
 from commol._data.engine_json import engine_handles, engine_json
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.identifiability.results import (
+    Accuracy,
     CollinearitySection,
     Combination,
     CorrelatedPair,
@@ -29,6 +30,7 @@ from commol.identifiability.results import (
     StructuralSection,
     StructuralVerdict,
     SubsetIndex,
+    TighterRank,
 )
 from commol.profiles.results import RESET_REASON
 
@@ -80,6 +82,37 @@ def _report(
     )
 
 
+def _accuracy(pair: tuple[float, float]) -> Accuracy:
+    relative, absolute = pair
+    return Accuracy(relative=relative, absolute=absolute)
+
+
+def _settings(accuracy: Accuracy) -> str:
+    return (
+        f"ODESolver.rtol = {accuracy.relative:g}, "
+        f"ODESolver.atol = {accuracy.absolute:g}"
+    )
+
+
+def _unresolved_reason(section: StructuralSection) -> str:
+    """Why the structural rank gives no verdict: how the rank of each point
+    changes at the tighter accuracy, and why a point could not run there."""
+    tighter = section.tighter
+    assert tighter is not None, "only a tighter accuracy leaves a verdict out"
+    facts = [
+        f"the rank of a point goes from {point.rank} to {point.tighter.rank}"
+        for point in section.points
+        if point.tighter is not None
+    ] + [f"a point could not run: {why}" for why in section.unchecked]
+    return (
+        f"Structural rank on the observations: the accuracy of the engine "
+        f"({_settings(section.accuracy)}), not the structure, may set its "
+        f"verdict. Evaluated again at {_settings(tighter)}, "
+        f"{'; '.join(facts)}. Tighten ODESolver.rtol and ODESolver.atol until "
+        f"the rank stops changing."
+    )
+
+
 def run_structural_rank(
     calibrator: CalibrationPort, method: "StructuralRank"
 ) -> IdentifiabilityReport:
@@ -103,9 +136,18 @@ def run_structural_rank(
         points=[
             PointRank(
                 values=dict(zip(names, point.values, strict=True)),
+                accuracy=_accuracy(point.accuracy),
                 singular_values=point.singular_values,
                 threshold=point.threshold,
                 rank=point.rank,
+                tighter=None
+                if point.tighter is None
+                else TighterRank(
+                    accuracy=_accuracy(point.tighter.accuracy),
+                    singular_values=point.tighter.singular_values,
+                    threshold=point.tighter.threshold,
+                    rank=point.tighter.rank,
+                ),
             )
             for point in analysis.points
         ],
@@ -114,19 +156,26 @@ def run_structural_rank(
         projections=dict(zip(names, analysis.projections, strict=True)),
         verdicts=verdicts,
         combinations=combinations,
+        accuracy=_accuracy(analysis.accuracy),
+        tighter=None if analysis.tighter is None else _accuracy(analysis.tighter),
+        unchecked=analysis.unchecked,
     )
     if method.design == "dense":
         return _report(calibrator, structural=[section])
     rank = f"generic rank {analysis.generic_rank} of {len(names)}"
     structural: dict[str, StructuralVerdict] = {}
     for name in names:
-        projection = section.projections[name]
-        reason = (
-            f"Structural rank on the observations ({rank}): its projection on "
-            f"the null space is {projection:.2f}."
-        )
+        verdict = verdicts[name]
+        if verdict is None:
+            reason = _unresolved_reason(section)
+        else:
+            projection = section.projections[name]
+            reason = (
+                f"Structural rank on the observations ({rank}): its projection "
+                f"on the null space is {projection:.2f}."
+            )
         structural[name] = StructuralVerdict(
-            verdict=verdicts[name],
+            verdict=verdict,
             reasons=[reason],
             combinations=[c.text for c in combinations if name in c.exponents],
         )

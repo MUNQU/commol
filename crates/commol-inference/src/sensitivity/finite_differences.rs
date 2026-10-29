@@ -20,7 +20,8 @@ use commol_core::SimulationEngine;
 use rayon::prelude::*;
 
 use super::{
-    Design, Matrix, Sensitivities, SensitivityError, SensitivitySource, observation_scales,
+    Accuracy, Design, Matrix, Sensitivities, SensitivityError, SensitivitySource,
+    observation_scales,
 };
 use commol_calibration::discrepancy::series_rms;
 
@@ -248,6 +249,27 @@ impl<E: SimulationEngine + Send + Sync> SensitivitySource for FiniteDifferences<
             Design::Observations => observation_scales(&self.observed_data),
             Design::Dense => series_rms(&sensitivities.labels, &sensitivities.predictions),
         }
+    }
+
+    fn accuracy(&self) -> Accuracy {
+        let engine = self.forward.base_engine();
+        Accuracy {
+            relative: engine.output_accuracy(),
+            absolute: engine.output_absolute_accuracy(),
+        }
+    }
+
+    /// The same differences of runs of the engine at `accuracy`
+    /// ([`SimulationEngine::at_accuracy`]), whose steps follow it.
+    fn at_accuracy(&self, accuracy: Accuracy) -> Option<Self> {
+        let forward = self
+            .forward
+            .at_accuracy(accuracy.relative, accuracy.absolute)?;
+        Some(Self {
+            accuracy: forward.base_engine().output_accuracy(),
+            forward,
+            ..self.clone()
+        })
     }
 }
 
