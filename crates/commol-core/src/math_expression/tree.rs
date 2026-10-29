@@ -16,6 +16,7 @@
 //! | A sign or a negation | `{"UnaryOp": {"op": "Neg", "operand": node}}`; `"Not"` for `!` |
 //! | A call | `{"FunctionCall": {"name": "sin", "args": [node, ...]}}` |
 //! | `if` | `{"Conditional": {"condition": node, "true_expr": node, "false_expr": node}}` |
+//! | `matrix_sum` | `{"MatrixSum": {"matrix": "M", "expression": node}}`: the id of the matrix is not a variable |
 
 use serde::Serializer;
 
@@ -92,6 +93,14 @@ mod tests {
                     "args": [a, { "Constant": 16.0 }] } },
                 "false_expr": c
             } })
+        );
+    }
+
+    #[test]
+    fn a_matrix_sum_names_its_matrix_apart_from_its_variables() {
+        assert_eq!(
+            tree("matrix_sum(M, b)"),
+            json!({ "MatrixSum": { "matrix": "M", "expression": variable("b") } })
         );
     }
 

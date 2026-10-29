@@ -13,6 +13,11 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from commol.commol_rs import _commol_rs as commol_rs
+
+MATRIX_SUM: str = commol_rs.core.MATRIX_SUM
+"""The name of the matrix sum of the language: ``matrix_sum(matrix, e)``."""
+
 # How tightly a node binds when a formula writes it without parentheses,
 # from the loosest: a chain of each level, a sign, a power, then a number, a
 # variable, a call or an `if`.
@@ -86,7 +91,29 @@ class Conditional:
     false_expr: "Node"
 
 
-type Node = Constant | Variable | Chain | Power | UnaryOp | FunctionCall | Conditional
+@dataclass(frozen=True, slots=True)
+class MatrixSum:
+    """
+    ``matrix_sum(matrix, expression)``: in the rate of a compartment of
+    category ``i``, ``Σ_j matrix[i, j] · e_j``, with each bin of the
+    expression read as its amount in category ``j`` and ``total`` as the
+    total of ``j``. The id of the matrix is not a variable.
+    """
+
+    matrix: str
+    expression: "Node"
+
+
+type Node = (
+    Constant
+    | Variable
+    | Chain
+    | Power
+    | UnaryOp
+    | FunctionCall
+    | Conditional
+    | MatrixSum
+)
 """A node of the tree of a formula."""
 
 
@@ -133,6 +160,8 @@ def _node(data: object) -> Node:
             }
         }:
             return Conditional(_node(condition), _node(true_expr), _node(false_expr))
+        case {"MatrixSum": {"matrix": str() as matrix, "expression": expression}}:
+            return MatrixSum(matrix, _node(expression))
     raise ValueError(f"Not a node of the tree of a formula: {data!r}")
 
 
@@ -211,6 +240,12 @@ class FormulaWriter:
                 return f"{name}({self._arguments(args)})"
             case Conditional(condition, true_expr, false_expr):
                 return f"if({self._arguments((condition, true_expr, false_expr))})"
+            case MatrixSum(matrix, expression):
+                return self.matrix_sum(matrix, expression)
+
+    def matrix_sum(self, matrix: str, expression: Node) -> str:
+        """The text of ``matrix_sum(matrix, expression)``."""
+        return f"{MATRIX_SUM}({matrix}, {self.node(expression, free=False)})"
 
     def _arguments(self, args: tuple[Node, ...]) -> str:
         return ", ".join(self.node(arg, free=False) for arg in args)
@@ -274,6 +309,8 @@ def operands(node: Node) -> tuple[Node, ...]:
             return args
         case Conditional(condition, true_expr, false_expr):
             return (condition, true_expr, false_expr)
+        case MatrixSum(_, expression):
+            return (expression,)
     return ()
 
 

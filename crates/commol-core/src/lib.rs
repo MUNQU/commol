@@ -36,8 +36,8 @@ pub mod types;
 // Re-export commonly used types from math_expression
 pub use math_expression::variables::{SPECIAL_VAR_STEP, SPECIAL_VAR_T};
 pub use math_expression::{
-    ENGINE_VARIABLES, FUNCTIONS, MathExpression, MathExpressionContext, MathExpressionError,
-    RateMathExpression, SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX,
+    ENGINE_VARIABLES, FUNCTIONS, MATRIX_SUM, MathExpression, MathExpressionContext,
+    MathExpressionError, RateMathExpression, SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX,
 };
 
 pub use parallelism::{Levels, Parallelism, inner_levels_in_parallel};
@@ -54,11 +54,12 @@ pub use simulation_engine::{
 
 // Re-export all public types from the types module for convenient access
 pub use types::{
-    Accumulator, Aggregate, AggregateVariant, Bin, DynamicsForm, EngineSettings, EngineType,
-    EventMethod, InitialConditions, Model, ModelEngine, ModelKind, ModelStructure, ModelValueType,
-    NEIGHBORS, NEIGHBORS_PREFIX, Neighbors, OdeMethod, OdeSolver, Parameter, ParameterValue,
-    Process, RateKeeps, RateMeaning, Rounding, SeriesMode, StochasticEventsSettings,
-    StochasticStepsSettings, Stratification, StratificationCondition, StratifiedRate, Transition,
+    Accumulator, Aggregate, AggregateVariant, Bin, CategoryMatrix, DynamicsForm, EngineSettings,
+    EngineType, EventMethod, InitialConditions, Model, ModelEngine, ModelKind, ModelStructure,
+    ModelValueType, NEIGHBORS, NEIGHBORS_PREFIX, Neighbors, OdeMethod, OdeSolver, Parameter,
+    ParameterValue, Process, RateKeeps, RateMeaning, Rounding, SeriesMode,
+    StochasticEventsSettings, StochasticStepsSettings, Stratification, StratificationCondition,
+    StratifiedRate, Transition,
 };
 #[cfg(feature = "test-kind")]
 pub use types::{DecayOutput, TestStructure};

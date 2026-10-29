@@ -11,8 +11,11 @@ The flow planner (`plan_transition_flows` in
 is absolute or proportional; the cases are in the table of
 [Absolute and proportional rates](../../guide/transitions.md#absolute-and-proportional-rates).
 The closure `is_absolute` reads only the compartment names and the names of
-`subgroup_total_names` (`builder.rs`): `total` is not one of them, so a rate
-that reads `total` and no compartment stays proportional.
+`subgroup_total_names` (`builder.rs`) that the rate reads outside its matrix
+sums (`variables_outside_matrix_sums` in `crates/commol-model/src/matrices.rs`):
+`total` is not one of them, so a rate that reads `total` and no compartment
+stays proportional, and so does `k1 * matrix_sum(M, B / total)`, whose `B` is
+the amount of other categories.
 
 A transition with several sources and a proportional rate is rejected, because
 it has no single source to multiply. `Model.describe` shows the planned flows,
@@ -54,3 +57,49 @@ same formula always runs the same machine code, so results are reproducible.
 **Rule:** do not invalidate or bypass the cache.
 
 **Guard:** `crates/commol-core/src/math_expression/mod.rs::one_formula_compiles_to_one_function`.
+
+## A matrix sum is written out as the sum it is
+
+A matrix between the categories of a stratification (`CategoryMatrix`,
+`crates/commol-core/src/types/process.rs`) is a data object of the process,
+not a parameter: its values are fixed, and a calibrated scale is a parameter
+that multiplies the matrix sum. A rate reads it through `matrix_sum(M, e)`,
+a node of the tree (`Expr::MatrixSum`) whose first argument names the matrix
+and is not a variable. The JIT never compiles that node:
+`MatrixSums::resolve` (`crates/commol-model/src/matrices.rs`) writes it, for a
+compartment of category `i`, as `Σ_j <M>_<i>_<j> * (e_j)` while
+`plan_transition_flows` plans the flows. In `e_j` a bin reads the subgroup
+total of exactly its compartments in `j` (the explicit sum of them when no
+subgroup total sums that set alone), `total` reads `total_<j>`, and every
+other variable is unchanged. The terms of a zero entry are dropped; a row of
+zeros is `if(<M>_<i>_<j> != 0, <M>_<i>_<j> * (e_j), 0)` of its first column,
+which keeps the unit of the matrix for the unit check and is 0 even where
+`e_j` is not a number (the JIT compiles `if` as a select).
+
+Each entry is the variable `<M>_<i>_<j>`, a constant parameter of the
+engine (`matrix_variables`), not a number written into the rate. So the
+planned flow keeps the unit of the matrix for the unit check, `describe`
+names the entry, and a scale of rows and columns (#419) writes
+`a_i * <M>_<i>_<j> * b_j` with no other change. The spectral radius,
+`<M>_radius`, is computed once at the build by `spectral_radius`
+(`crates/commol-statistics/src/linear_algebra.rs`, the real Schur
+decomposition of `nalgebra`), where a calibration can reuse it for each
+parameter vector.
+
+Whether the rate is absolute is decided on the variables outside the matrix
+sums (`variables_outside_matrix_sums`), as for the neighbors of a unit: what
+`e` reads is a quantity of the other categories, not of the source.
+
+| Alternative | Why not |
+|---|---|
+| A variable per category, `<M>_<bin>_<i>`, made by the builder | It fixes the expression to one form, a bin over a total. |
+| A new kind of transition | The coupling is part of a rate, not a flow of its own. |
+| The matrix sum compiled by the JIT | The JIT has no compartment, so no category `i`; each engine would need the layout at run time. |
+| The entries written as numbers into the rate | The unit check and the description lose the matrix, and a scale by parameters needs a rewrite of every rate. |
+| Each entry a parameter | `n²` parameters for a matrix of fixed values, the common case; one entry can be calibrated today as a parameter. |
+| A function `radius(M)` | The value does not change during a run, so a variable computed once at the build is enough. |
+
+**Guard:** `crates/commol-model/tests/matrices.rs`,
+`crates/commol-model/tests/rates.rs::a_rate_reads_the_largest_eigenvalue_of_a_matrix`,
+`py-commol/tests/rates/test_matrices.py`,
+`py-commol/tests/units/test_matrices.py::test_a_matrix_sum_has_the_unit_of_the_matrix_times_the_expression`.

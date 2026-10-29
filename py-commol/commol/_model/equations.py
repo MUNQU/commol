@@ -820,8 +820,9 @@ def latex_variable(var_name: str) -> str:
 class _LatexWriter(FormulaWriter):
     """
     Writes a tree in LaTeX: a product with ``\\cdot``, a division that no
-    parenthesis holds as a fraction, a power with its exponent raised, and
-    each variable as `latex_variable` writes it.
+    parenthesis holds as a fraction, a power with its exponent raised, a
+    matrix sum as a sum over ``j``, and each variable as `latex_variable`
+    writes it.
     """
 
     SYMBOLS = FormulaWriter.SYMBOLS | {
@@ -854,6 +855,15 @@ class _LatexWriter(FormulaWriter):
     def power(self, base: Node, exponent: Node) -> str:
         base_text = self.grouped(base, binding(base) < PRIMARY, free=False)
         return f"{base_text}^{{{self.node(exponent, free=False)}}}"
+
+    def matrix_sum(self, matrix: str, expression: Node) -> str:
+        """``matrix_sum(M, e)`` as ``Σ_j M_{i,j} (e)_j``; its parentheses hold
+        the whole of ``e``, so a division in it is a fraction."""
+        inner = self.write(expression)
+        return (
+            f"\\sum_{{j}} {{{latex_variable(matrix)}}}_{{i,j}} "
+            f"\\left({inner}\\right)_{{j}}"
+        )
 
 
 def latex_rate_expression(rate: Node, units: Mapping[str, str] | None = None) -> str:

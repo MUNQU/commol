@@ -115,5 +115,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
         .map(|function| function.name)
         .collect();
     m.add("FUNCTIONS", functions)?;
+    m.add("MATRIX_SUM", commol_core::MATRIX_SUM)?;
     Ok(())
 }

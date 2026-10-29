@@ -16,7 +16,15 @@ parameters, outputs), adds the sections of the kind
 from typing import TYPE_CHECKING, Literal
 
 from commol._data.engine_json import engine_json
-from commol._model.description import ModelDescription, Section, Table, Text, _Block
+from commol._model import engine_state
+from commol._model.description import (
+    Matrix,
+    ModelDescription,
+    Section,
+    Table,
+    Text,
+    _Block,
+)
 from commol._model.parameter import SeriesValue
 from commol.commol_rs import _commol_rs as commol_rs
 
@@ -174,7 +182,60 @@ def schedule_blocks(model: "Model") -> list[_Block]:
 
 
 def parameter_blocks(model: "Model") -> list[_Block]:
-    """Every parameter, with its value, unit, description and calibration."""
+    """
+    Every parameter, with its value, unit, description and calibration, and
+    every matrix between categories, with its values and spectral radius.
+    """
+    return [*_parameter_table(model), *matrix_blocks(model)]
+
+
+def matrix_blocks(model: "Model") -> list[_Block]:
+    """
+    Each matrix between the categories of a stratification: what it is
+    between, its unit, the names a formula reads, and its values.
+    """
+    process = model.process
+    radius = {
+        matrix: (name, value)
+        for name, matrix, value, is_radius in engine_state.matrix_variables(process)
+        if is_radius
+    }
+    blocks: list[_Block] = []
+    for matrix in process.matrices:
+        categories = next(
+            stratification.categories
+            for stratification in process.stratifications
+            if stratification.id == matrix.stratification
+        )
+        unit = f" in {matrix.unit}" if matrix.unit else ""
+        about = f" {matrix.description}." if matrix.description else ""
+        blocks.append(
+            Text(
+                heading=f"Matrix {matrix.id}",
+                text=(
+                    f"Between the categories of '{matrix.stratification}'{unit}."
+                    f"{about} A rate reads matrix_sum({matrix.id}, e); a rate or "
+                    "a formula parameter reads its entries as "
+                    f"{matrix.id}_<row>_<column> "
+                    f"and its spectral radius, {radius[matrix.id][1]:.6g}, as "
+                    f"{radius[matrix.id][0]}."
+                ),
+            )
+        )
+        blocks.append(
+            Matrix(
+                row_labels=categories,
+                column_labels=categories,
+                values=[
+                    [matrix.values[row][column] for column in categories]
+                    for row in categories
+                ],
+            )
+        )
+    return blocks
+
+
+def _parameter_table(model: "Model") -> list[_Block]:
     if not model.parameters:
         return [Text(text="The model has no parameters.")]
     return [
@@ -231,8 +292,9 @@ def _odd_layout(model: "Model", kind: dict[str, Section]) -> list[Section]:
             *blocks_of("dynamics"),
             *[
                 block.model_copy(update={"heading": "Parameters"})
-                for block in parameter_blocks(model)
+                for block in _parameter_table(model)
             ],
+            *matrix_blocks(model),
             *[
                 block.model_copy(update={"heading": "Outputs"})
                 for block in output_blocks(model)

@@ -27,6 +27,7 @@ Model                      name, description, version, step_unit, origin
 │   ├── accumulators: [Accumulator]
 │   ├── stratifications: [Stratification]
 │   │   └── conditions: [StratificationCondition]
+│   ├── matrices: [CategoryMatrix]         (values: {row: {column: value}})
 │   └── transitions: [Transition]          (impulse_at, impulse_every for impulses)
 │       └── stratified_rates: [StratifiedRate]
 │           └── conditions: [StratificationCondition]
@@ -45,7 +46,7 @@ fields of its class:
   "name": "Model",
   "parameters": [],
   "engine": {"type": "DifferenceEquations", "settings": null},
-  "process": {"bins": [], "accumulators": [], "stratifications": [], "transitions": []},
+  "process": {"bins": [], "accumulators": [], "stratifications": [], "matrices": [], "transitions": []},
   "structure": {
     "kind": "aggregate",
     "variant": null,
@@ -80,6 +81,13 @@ structure, and loads back as its own class
 A condition of a stratification or of a stratified rate,
 `StratificationCondition`, is documented in
 [ModelBuilder API](../api/model-builder.md).
+
+## Matrices between categories
+
+::: commol._model.matrix.CategoryMatrix
+
+`ModelBuilder.add_matrix` adds one; a rate reads it through `matrix_sum`
+([Matrix sums](../guide/mathematical-expressions.md#matrix-sums)).
 
 ## Parameters
 

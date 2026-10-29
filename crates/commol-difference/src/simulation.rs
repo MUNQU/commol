@@ -321,6 +321,7 @@ mod tests {
                 ],
                 accumulators: vec![],
                 stratifications: vec![],
+                matrices: vec![],
                 transitions: vec![Transition {
                     id: "flow".to_string(),
                     source: vec!["A".to_string()],
@@ -375,6 +376,7 @@ mod tests {
                 ],
                 accumulators: vec![],
                 stratifications: vec![],
+                matrices: vec![],
                 transitions: vec![Transition {
                     id: "flow".to_string(),
                     source: vec!["A".to_string()],
@@ -511,6 +513,7 @@ mod tests {
                 ],
                 accumulators: vec![],
                 stratifications: vec![],
+                matrices: vec![],
                 transitions: vec![
                     Transition {
                         id: "a_to_b".to_string(),

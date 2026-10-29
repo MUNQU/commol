@@ -177,6 +177,7 @@ except UnitConsistencyError as error:
 | `Cannot convert from 'item' to 'dimensionless'` | A function such as `sin`, `exp` or `log` received a quantity with a unit |
 | `The following constant parameters are missing units: …` | A constant parameter has no unit |
 | `The following bins have no unit: …` | A bin has no unit (set `bin_unit`) |
+| `The following matrices have no unit: …` | A matrix has no unit (set `unit` in `add_matrix`); a matrix sum has the unit of the matrix times the unit of its expression |
 | `The model declares no step unit, so it is 'step'` | Rates in a unit such as `1/day` without `step_unit`; see [The step unit](#the-step-unit) |
 | `Variable '…' … has no defined unit` | A variable of a rate has no unit |
 

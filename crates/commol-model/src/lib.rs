@@ -24,6 +24,8 @@
 //! - `initial_conditions` - Initial conditions that calibration writes
 //! - `labels` - Labels of the outputs and the sums they name
 //! - `layout` - Structured index of the compartments
+//! - `matrices` - The variables of a matrix between categories, and the
+//!   matrix sums of a rate written as the sums they are
 //! - `rates` - Evaluation of a compiled rate
 //! - [`rules`] - The rules of the values of a model: an initial amount, an
 //!   impulse and the points of a series
@@ -58,6 +60,7 @@ mod helpers;
 mod initial_conditions;
 mod labels;
 mod layout;
+mod matrices;
 mod rates;
 pub mod rules;
 mod system;
@@ -71,4 +74,5 @@ pub use engine::{CompartmentalEngine, IntegerStepper, record_steps, rounded};
 pub use flows::{FlowDescription, describe_flows};
 pub use initial_conditions::InitialConditionPlan;
 pub use labels::{OutputLabels, output_sums};
+pub use matrices::{MatrixVariable, matrix_variables};
 pub use types::{CompiledModel, FlowChange};

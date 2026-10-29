@@ -9,6 +9,7 @@ use super::parser::parse_expression;
 use crate::math_expression::MathExpressionContext;
 use crate::math_expression::error::MathExpressionError;
 use crate::math_expression::language;
+use crate::math_expression::language::MATRIX_SUM;
 use crate::math_expression::variables::{
     SPECIAL_VAR_E, SPECIAL_VAR_PI, SPECIAL_VAR_STEP, SPECIAL_VAR_T, SPECIAL_VAR_TOTAL,
 };
@@ -137,10 +138,17 @@ impl JITCompiler {
     ///
     /// # Errors
     ///
-    /// Returns an error when the formula does not parse, or calls a
-    /// function that is not in the language or with the wrong number of
-    /// arguments.
+    /// Returns an error when the formula does not parse, holds a
+    /// `matrix_sum`, or calls a function that is not in the language or with
+    /// the wrong number of arguments.
     pub fn compile(&self, formula: &str) -> Result<JITFunction, MathExpressionError> {
+        let ast = parse_expression(formula)?;
+        if ast.reads_matrix_sum() {
+            return Err(MathExpressionError::InvalidExpression(format!(
+                "{MATRIX_SUM} reads the category of a compartment, so only the rate of a \
+                 transition reads it, and the model writes it as a sum over the categories"
+            )));
+        }
         // Create a new JIT module for this function
         let mut builder =
             JITBuilder::new(cranelift_module::default_libcall_names()).map_err(|e| {
@@ -152,8 +160,6 @@ impl JITCompiler {
             })?;
         builder.symbol_lookup_fn(Box::new(super::libm::address));
         let mut module = JITModule::new(builder);
-        // Parse to AST
-        let ast = parse_expression(formula)?;
 
         // Collect all variables in the expression
         let variable_names = collect_variables(&ast);

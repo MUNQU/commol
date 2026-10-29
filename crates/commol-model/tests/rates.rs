@@ -234,3 +234,36 @@ fn a_formula_parameter_outside_the_language_fails_at_build() {
          the condition of if(condition, a, b)"
     );
 }
+
+/// A → B at `rate` in a model stratified by `group` into `g1` and `g2`, with
+/// the matrix `M` of `group`: rows `g1` 2 and 1, `g2` 1 and 3.
+fn grouped(rate: &str) -> Model {
+    let json = format!(
+        r#"{{"name":"m","parameters":[{{"id":"k1","value":0.3}}],
+        "engine":{{"type":"DifferenceEquations"}},
+        "process":{{"bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}}],
+        "stratifications":[{{"id":"group","categories":["g1","g2"]}}],
+        "matrices":[{{"id":"M","stratification":"group",
+        "values":{{"g1":{{"g1":2.0,"g2":1.0}},"g2":{{"g1":1.0,"g2":3.0}}}}}}],
+        "transitions":[{{"id":"ab","source":["A"],"target":["B"],"rate":"{rate}"}}]}},
+        "structure":{{"kind":"aggregate","bin_amounts":{{"A":900.0,"B":100.0}},
+        "stratification_fractions":{{"group":{{"g1":0.5,"g2":0.5}}}}}}}}"#
+    );
+    serde_json::from_str(&json).expect("valid model JSON")
+}
+
+#[test]
+fn a_rate_reads_the_largest_eigenvalue_of_a_matrix() {
+    let mut compiled = CompiledModel::try_from_model(&grouped("k1 * M_radius")).unwrap();
+    let state = compiled.initial_state().to_vec();
+    let mut rates = vec![0.0; 2];
+
+    compiled
+        .transition_rates(0.0, 0.0, &state, &mut rates)
+        .unwrap();
+
+    let radius = (5.0 + 5.0_f64.sqrt()) / 2.0;
+    for rate in rates {
+        assert!((rate - 0.3 * radius).abs() < 1e-12, "{rate}");
+    }
+}

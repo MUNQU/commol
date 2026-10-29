@@ -120,6 +120,16 @@ class UnitChecker:
                 f"ModelBuilder, or unit in add_bin."
             )
 
+        matrices_without_unit = [
+            m.id for m in self._model.process.matrices if not m.unit
+        ]
+        if matrices_without_unit:
+            raise UnitConsistencyError(
+                f"Cannot perform unit consistency check. The following matrices "
+                f"have no unit: {', '.join(matrices_without_unit)}. Set unit in "
+                f"add_matrix."
+            )
+
     def _collect_unit_errors(self, variable_units: dict[str, str]) -> list[str]:
         """
         Collect unit consistency errors from every flow the engine plans.

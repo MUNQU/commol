@@ -98,6 +98,11 @@ impl<'a, M: Module> CodeGenerator<'a, M> {
                 // Generate conditional using Cranelift's select instruction
                 self.generate_conditional(condition, true_expr, false_expr)
             }
+
+            Expr::MatrixSum { .. } => {
+                // coverage: `JITCompiler::compile` rejects a matrix sum before it generates code
+                unreachable!("the compiler rejects a matrix sum before it generates code")
+            }
         }
     }
 

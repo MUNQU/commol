@@ -66,7 +66,7 @@ per member of the source:
 
 | Case | Kind | Flow |
 |---|---|---|
-| The rate names a compartment, a bin total or a `total_…` variable | Absolute | `rate` |
+| The rate names, outside every `matrix_sum`, a compartment, a bin total or a `total_…` variable | Absolute | `rate` |
 | No source | Absolute | `rate` |
 | A stratified rate sets `"absolute": True` or `False` | As set | — |
 | Otherwise | Proportional | `rate × source` |
