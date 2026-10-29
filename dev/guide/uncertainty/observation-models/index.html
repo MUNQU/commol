@@ -3869,7 +3869,9 @@ Poisson variance.</p>
 others, and never reaches the engine; <code>Model.apply_calibration_parameters</code>
 skips it, as it skips a factor. Its bounds must lie in the domain of the
 argument: above 0 for <code>sd</code>, <code>sigma</code>, <code>scale</code> and <code>df</code>, at least 0 for
-<code>overdispersion</code>.</p>
+<code>overdispersion</code>. No prediction reads a noise parameter, so <code>StructuralRank</code>
+and <code>Collinearity</code> leave it out
+(<a href="../identifiability/#noise-parameters">Identifiability</a>).</p>
 <table>
 <thead>
 <tr>

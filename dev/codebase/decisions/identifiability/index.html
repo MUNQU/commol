@@ -2933,6 +2933,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#noise-parameters-are-left-out-of-the-sensitivities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Noise parameters are left out of the sensitivities
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#two-verdicts-per-parameter" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3559,6 +3570,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#noise-parameters-are-left-out-of-the-sensitivities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Noise parameters are left out of the sensitivities
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#two-verdicts-per-parameter" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3640,21 +3662,24 @@ refused: its runs change in jumps with the parameters.</p>
 the estimated error of the sensitivities, so it can hide a singular value
 that a tighter tolerance resolves. <code>structural_rank</code> asks the source for the
 accuracy of its runs (<code>SensitivitySource::accuracy</code>, an <code>Accuracy</code> of
-<code>commol-core</code>) and for the same source at a tighter one (<code>SensitivitySource::at_accuracy</code>, which
-<code>FiniteDifferences</code> builds from <code>ForwardModel::at_accuracy</code> and
-<code>SimulationEngine::at_accuracy</code>; <code>None</code> for an engine whose accuracy no
-setting sets). Each point whose rank is below the number of parameters is
-evaluated once more, at each accuracy divided by <code>TIGHTENING</code> (100), no
-lower than <code>TIGHTEST</code> (1e-14); the verdicts are computed again with the
-ranks and null spaces there. A parameter whose verdict changes has no
-verdict (<code>None</code>), as a profile whose structure is undetermined. When a point
-cannot run at the tighter accuracy, every parameter that is not identifiable
-has no verdict, and <code>unchecked</code> says why. The section keeps the generic
-rank, the projections and the combinations at the accuracy of the engine,
-and the generic rank at the tighter one; a combination that holds a
-parameter with no verdict goes. The engine names the settings of its
-accuracy (<code>SimulationEngine::accuracy_settings</code>: <code>ODESolver.rtol</code> and
-<code>ODESolver.atol</code>), and the reason names them.</p>
+<code>commol-core</code>), for the settings that set it
+(<code>SensitivitySource::accuracy_settings</code>, from
+<code>SimulationEngine::accuracy_settings</code>: <code>ODESolver.rtol</code> and <code>ODESolver.atol</code>)
+and for the same source at a tighter accuracy
+(<code>SensitivitySource::at_accuracy</code>, which <code>FiniteDifferences</code> builds from
+<code>ForwardModel::at_accuracy</code> and <code>SimulationEngine::at_accuracy</code>). It tightens
+only when both are <code>Some</code>, and <code>StructuralAnalysis::tighter</code> holds the
+tighter accuracy with its settings (<code>Tightening</code>), so a verdict left out at
+the tighter accuracy always has settings for its reason to name. A point of
+rank below the number of parameters differentiated runs once more, at each
+accuracy divided by <code>TIGHTENING</code> (100), no lower than <code>TIGHTEST</code> (1e-14); the
+verdicts are computed again with the ranks and null spaces there. A parameter
+whose verdict changes has no verdict (<code>None</code>), as a profile whose structure
+is undetermined. When a point cannot run at the tighter accuracy, every
+parameter that is not identifiable has no verdict, and <code>unchecked</code> says why.
+The section keeps the generic rank, the projections and the combinations at
+the accuracy of the engine, and the generic rank at the tighter one; a
+combination that holds a parameter with no verdict goes.</p>
 <table>
 <thead>
 <tr>
@@ -3687,6 +3712,10 @@ accuracy (<code>SimulationEngine::accuracy_settings</code>: <code>ODESolver.rtol
 <td>Rebuild the model in Python at the tighter tolerances</td>
 <td>The sensitivities run in Rust, and Python would need to know which engines integrate with a tolerance.</td>
 </tr>
+<tr>
+<td>The settings and the tighter source as two separate answers</td>
+<td>A source could give one and not the other, and the reason of a verdict left out would have no settings to name.</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_identifiability.rs</code>
@@ -3694,6 +3723,57 @@ accuracy (<code>SimulationEngine::accuracy_settings</code>: <code>ODESolver.rtol
 <code>a_point_that_fails_at_the_tighter_accuracy_leaves_the_rank_unchecked</code>,
 <code>an_exact_engine_is_not_evaluated_again</code>),
 <code>tests/uncertainty/test_identifiability_tolerance.py</code>.</p>
+<h2 id="noise-parameters-are-left-out-of-the-sensitivities">Noise parameters are left out of the sensitivities<a class="headerlink" href="#noise-parameters-are-left-out-of-the-sensitivities" title="Permanent link">&para;</a></h2>
+<p>A noise parameter of an observation model (<code>CalibrationParameterType::Noise</code>)
+changes the likelihood and never a prediction, so its column of the
+sensitivities is zero: it would lower the rank and make every subset that
+holds it collinear. <code>structural_rank</code> and <code>collinearity</code> differentiate only
+the other parameters (<code>SensitivitySource::scaled_jacobian</code> with their
+columns; <code>FiniteDifferences::jacobian_of</code> runs no difference of the
+others). <code>StructuralAnalysis::parameters</code> and <code>Collinearity::parameters</code> name
+them by index; the projections, the verdicts, the sensitivity measures and
+the pair indices follow that order, and the combinations, the subsets and
+<code>collinear_with</code> name parameters by their index in the problem. A point is
+evaluated again at a tighter accuracy when its rank is below the number of
+parameters differentiated. The sections name the parameters left out in
+<code>left_out</code>; a noise parameter has the structural verdict <code>None</code>, with the
+reason, and no practical verdict from collinearity. A problem with no other
+parameter is an error, and collinearity needs at least 2 of them.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Keep the noise parameters with a verdict that says the method does not apply</td>
+<td>The zero column still lowers the rank and gives infinite pair indices, so every count and subset needs a special case.</td>
+</tr>
+<tr>
+<td>Judge them by the sensitivities of the likelihood (the Fisher information)</td>
+<td>A different method, with its own threshold.</td>
+</tr>
+<tr>
+<td><code>FiniteDifferences</code> leaves them out</td>
+<td>The local approximations read the same source, and their curvature needs the noise parameters.</td>
+</tr>
+<tr>
+<td>A verdict name such as <code>not_applicable</code></td>
+<td>A third way to say that a method gives no verdict, beside <code>None</code> here and in a profile.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_identifiability.rs</code>
+(<code>a_noise_parameter_is_left_out_of_the_structural_rank</code>,
+<code>a_noise_parameter_is_left_out_of_the_collinearity</code>,
+<code>a_combination_names_the_parameters_by_their_index_in_the_problem</code>,
+<code>a_rank_with_only_noise_parameters_is_an_error</code>,
+<code>a_subset_larger_than_the_differentiated_parameters_is_an_error</code>,
+<code>collinearity_needs_two_parameters_that_are_not_noise_parameters</code>),
+<code>tests/uncertainty/test_identifiability_noise.py</code>,
+<code>tests/uncertainty/test_identifiability_report.py::TestReport::test_a_noise_parameter_leaves_the_verdicts_of_the_others_alone</code>.</p>
 <h2 id="two-verdicts-per-parameter">Two verdicts per parameter<a class="headerlink" href="#two-verdicts-per-parameter" title="Permanent link">&para;</a></h2>
 <p>An <code>IdentifiabilityReport</code> gives each parameter a structural verdict (what
 any data of the design of the observations can determine) and a practical

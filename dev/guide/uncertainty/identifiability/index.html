@@ -1395,6 +1395,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#noise-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Noise parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#a-sample" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3745,6 +3756,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#noise-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Noise parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#a-sample" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3965,7 +3987,9 @@ hand.</p>
 <h2 id="the-methods">The methods<a class="headerlink" href="#the-methods" title="Permanent link">&para;</a></h2>
 <p>Every method runs through <code>Calibrator.identifiability(method)</code> and returns an
 <code>IdentifiabilityReport</code>. A threshold or a tolerance has no default: it is a
-modelling judgment, and the table gives the range the literature uses.</p>
+modelling judgment, and the table gives the range the literature uses.
+<code>StructuralRank</code> and <code>Collinearity</code> differentiate the predictions, so they
+leave out the <a href="#noise-parameters">noise parameters</a>.</p>
 <table>
 <thead>
 <tr>
@@ -4074,15 +4098,16 @@ model, not in the design.</p>
 <p>The estimated error of <code>S</code> grows with the tolerance of an ODE solver, and it
 can hide a singular value that a tighter tolerance resolves. With
 <code>DifferentialEquations</code>, each point whose rank is below the number of
-parameters is evaluated again at <code>rtol / 100</code> and <code>atol / 100</code>, no lower than
-<code>1e-14</code>, and the verdicts are computed again with those ranks. A parameter
-whose verdict changes there has no structural verdict: its <code>verdict</code> is
-<code>None</code>, and its reason names <code>ODESolver.rtol</code> and <code>ODESolver.atol</code>. When a
-point cannot run at the tighter tolerances, every parameter that is not
-<code>identifiable</code> has no verdict, and the section lists why in <code>unchecked</code>. A
-parameter that no observation reads stays <code>non_identifiable</code> at any
-tolerance, when every point runs at the tighter tolerances. <code>DifferenceEquations</code> runs are exact up to rounding: no point is
-evaluated again.</p>
+parameters differentiated is evaluated again at <code>rtol / 100</code> and
+<code>atol / 100</code>, no lower than <code>1e-14</code>, and the verdicts are computed again with
+those ranks. A parameter whose verdict changes there has no structural
+verdict: its <code>verdict</code> is <code>None</code>, and its reason names <code>ODESolver.rtol</code> and
+<code>ODESolver.atol</code>. When a point cannot run at the tighter tolerances, every
+parameter that is not <code>identifiable</code> has no verdict, and the section lists
+why in <code>unchecked</code>. A parameter that no observation reads stays
+<code>non_identifiable</code> when every point runs at the tighter tolerances.
+<code>DifferenceEquations</code> runs are exact up to rounding: no point is evaluated
+again.</p>
 <table>
 <thead>
 <tr>
@@ -4105,8 +4130,8 @@ evaluated again.</p>
 </tr>
 </tbody>
 </table>
-<p>The section gives <code>tighter_generic_rank</code>, the generic rank with each point
-evaluated again at its tighter rank, and the reason of a verdict that stays
+<p>The section gives <code>tighter_generic_rank</code>, the generic rank with the tighter
+rank of each point evaluated again, and the reason of a verdict that stays
 names it when it differs from <code>generic_rank</code>.</p>
 <p>A verdict of <code>None</code> says that the result depends on the tolerance. Tighten
 <code>ODESolver.rtol</code> and <code>ODESolver.atol</code> and run <code>StructuralRank</code> again, until
@@ -4128,21 +4153,71 @@ computed at every draw and summarized by its weighted median, and
 <code>share_below</code> gives the share of the draws below the threshold.</p>
 <p>A parameter is <code>poorly_determined</code> when a pair that holds it has an index at
 or above the threshold, or no observation is sensitive to it.</p>
+<h3 id="noise-parameters">Noise parameters<a class="headerlink" href="#noise-parameters" title="Permanent link">&para;</a></h3>
+<p>A noise parameter of an <a href="../observation-models/#noise-parameters">observation model</a>
+(<code>parameter_type="noise"</code>), such as the <code>overdispersion</code> of
+<code>NegativeBinomialObservations</code>, changes the likelihood and never a
+prediction: its column of the sensitivities is zero. <code>StructuralRank</code> and
+<code>Collinearity</code> leave it out.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>A noise parameter</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>StructuralRank</code></td>
+<td>Not in the rank, the singular values, <code>projections</code> or <code>verdicts</code> of the section; its structural <code>verdict</code> is <code>None</code>, with the reason. The generic rank is at most the number of the other parameters</td>
+</tr>
+<tr>
+<td><code>Collinearity</code></td>
+<td>Not in <code>sensitivity</code>, <code>pair_gamma</code> or a subset; no other parameter is collinear with it; no practical verdict. <code>max_subset_size</code> is at most the number of the other parameters, and it needs at least 2 of them</td>
+</tr>
+</tbody>
+</table>
+<p>Each section names the parameters it leaves out in <code>left_out</code>, each with the
+reason. The verdict of a noise parameter comes from the methods that read the
+fit: <code>StartsIdentifiability</code>, <code>SampleIdentifiability</code> and the profiles. A
+problem whose calibrated parameters are all noise parameters has nothing to
+differentiate: both methods raise a <code>ValueError</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol.observations</span><span class="w"> </span><span class="kn">import</span> <span class="n">NegativeBinomialObservations</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">counts</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>        <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">point</span><span class="o">.</span><span class="n">at</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">point</span><span class="o">.</span><span class="n">value</span><span class="p">)))</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="k">for</span> <span class="n">point</span> <span class="ow">in</span> <span class="n">problem</span><span class="o">.</span><span class="n">observed_data</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="p">],</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">parameters</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;phi&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;noise&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="p">],</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    <span class="n">observation_models</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="n">NegativeBinomialObservations</span><span class="p">(</span><span class="n">overdispersion</span><span class="o">=</span><span class="s2">&quot;phi&quot;</span><span class="p">)},</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">NelderMeadConfig</span><span class="p">(</span><span class="n">max_iterations</span><span class="o">=</span><span class="mi">2000</span><span class="p">),</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="n">seed</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="p">)</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="n">with_noise</span> <span class="o">=</span> <span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">basic_model</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">)),</span> <span class="n">counts</span><span class="p">)</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="n">rank</span> <span class="o">=</span> <span class="n">with_noise</span><span class="o">.</span><span class="n">identifiability</span><span class="p">(</span><span class="n">StructuralRank</span><span class="p">(</span><span class="n">points</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">design</span><span class="o">=</span><span class="s2">&quot;observations&quot;</span><span class="p">))</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="nb">print</span><span class="p">(</span><span class="n">rank</span><span class="o">.</span><span class="n">structural</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">generic_rank</span><span class="p">,</span> <span class="n">rank</span><span class="o">.</span><span class="n">structural</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">left_out</span><span class="p">)</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="c1"># 1 {&#39;phi&#39;: &#39;a noise parameter of an observation model, which no prediction reads&#39;}</span>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="nb">print</span><span class="p">(</span><span class="n">rank</span><span class="o">.</span><span class="n">verdicts</span><span class="p">[</span><span class="s2">&quot;phi&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">structural</span><span class="o">.</span><span class="n">verdict</span><span class="p">)</span>  <span class="c1"># None</span>
+</span></code></pre></div>
 <h3 id="a-sample">A sample<a class="headerlink" href="#a-sample" title="Permanent link">&para;</a></h3>
 <p><code>SampleIdentifiability</code> reads any sample, such as the draws of an uncertainty
 method. Here the sample is the ends of the starts.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">names</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">parameter_names</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">sample</span> <span class="o">=</span> <span class="n">ParameterSample</span><span class="o">.</span><span class="n">equally_weighted</span><span class="p">(</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">names</span><span class="p">,</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="p">[(</span><span class="n">p</span><span class="o">.</span><span class="n">min_bound</span><span class="p">,</span> <span class="n">p</span><span class="o">.</span><span class="n">max_bound</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">problem</span><span class="o">.</span><span class="n">parameters</span><span class="p">],</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="p">[[</span><span class="n">start</span><span class="o">.</span><span class="n">end</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">names</span><span class="p">]</span> <span class="k">for</span> <span class="n">start</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">starts</span><span class="p">],</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">SampleMethod</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;starts&quot;</span><span class="p">),</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="p">)</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">from_sample</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">identifiability</span><span class="p">(</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">SampleIdentifiability</span><span class="p">(</span><span class="n">sample</span><span class="o">=</span><span class="n">sample</span><span class="p">,</span> <span class="n">reference</span><span class="o">=</span><span class="s2">&quot;bounds&quot;</span><span class="p">,</span> <span class="n">correlation_threshold</span><span class="o">=</span><span class="mf">0.9</span><span class="p">)</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="p">)</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="n">pair</span> <span class="o">=</span> <span class="n">from_sample</span><span class="o">.</span><span class="n">sample</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">correlated_pairs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="nb">print</span><span class="p">(</span><span class="n">pair</span><span class="o">.</span><span class="n">first</span><span class="p">,</span> <span class="n">pair</span><span class="o">.</span><span class="n">second</span><span class="p">,</span> <span class="nb">round</span><span class="p">(</span><span class="n">pair</span><span class="o">.</span><span class="n">correlation</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>  <span class="c1"># k1 alpha -1.0</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">names</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">parameter_names</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">sample</span> <span class="o">=</span> <span class="n">ParameterSample</span><span class="o">.</span><span class="n">equally_weighted</span><span class="p">(</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">names</span><span class="p">,</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="p">[(</span><span class="n">p</span><span class="o">.</span><span class="n">min_bound</span><span class="p">,</span> <span class="n">p</span><span class="o">.</span><span class="n">max_bound</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">problem</span><span class="o">.</span><span class="n">parameters</span><span class="p">],</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="p">[[</span><span class="n">start</span><span class="o">.</span><span class="n">end</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">names</span><span class="p">]</span> <span class="k">for</span> <span class="n">start</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">starts</span><span class="p">],</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">SampleMethod</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;starts&quot;</span><span class="p">),</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="p">)</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">from_sample</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">identifiability</span><span class="p">(</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">SampleIdentifiability</span><span class="p">(</span><span class="n">sample</span><span class="o">=</span><span class="n">sample</span><span class="p">,</span> <span class="n">reference</span><span class="o">=</span><span class="s2">&quot;bounds&quot;</span><span class="p">,</span> <span class="n">correlation_threshold</span><span class="o">=</span><span class="mf">0.9</span><span class="p">)</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="p">)</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="n">pair</span> <span class="o">=</span> <span class="n">from_sample</span><span class="o">.</span><span class="n">sample</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">correlated_pairs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="nb">print</span><span class="p">(</span><span class="n">pair</span><span class="o">.</span><span class="n">first</span><span class="p">,</span> <span class="n">pair</span><span class="o">.</span><span class="n">second</span><span class="p">,</span> <span class="nb">round</span><span class="p">(</span><span class="n">pair</span><span class="o">.</span><span class="n">correlation</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>  <span class="c1"># k1 alpha -1.0</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -4171,18 +4246,18 @@ the bounds, or <code>"prior"</code> with <code>priors</code>, the prior of each 
 sample of a <a href="../smc/">Gibbs posterior or ABC</a> contracts its priors by how much
 the data inform each parameter, and a sample drawn from the priors themselves
 has a contraction near 0.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol.distributions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Priors</span><span class="p">,</span> <span class="n">Uniform</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">against_priors</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">identifiability</span><span class="p">(</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">SampleIdentifiability</span><span class="p">(</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>        <span class="n">sample</span><span class="o">=</span><span class="n">sample</span><span class="p">,</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        <span class="n">reference</span><span class="o">=</span><span class="s2">&quot;prior&quot;</span><span class="p">,</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="n">priors</span><span class="o">=</span><span class="n">Priors</span><span class="p">(</span><span class="n">distributions</span><span class="o">=</span><span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">Uniform</span><span class="p">()</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">names</span><span class="p">}),</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>        <span class="n">correlation_threshold</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="p">)</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="p">)</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="n">section</span> <span class="o">=</span> <span class="n">against_priors</span><span class="o">.</span><span class="n">sample</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="nb">print</span><span class="p">(</span><span class="n">section</span><span class="o">.</span><span class="n">reference</span><span class="p">,</span> <span class="n">section</span><span class="o">.</span><span class="n">contraction</span> <span class="o">==</span> <span class="n">from_sample</span><span class="o">.</span><span class="n">sample</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">contraction</span><span class="p">)</span>  <span class="c1"># prior True</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol.distributions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Priors</span><span class="p">,</span> <span class="n">Uniform</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">against_priors</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">identifiability</span><span class="p">(</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">SampleIdentifiability</span><span class="p">(</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>        <span class="n">sample</span><span class="o">=</span><span class="n">sample</span><span class="p">,</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>        <span class="n">reference</span><span class="o">=</span><span class="s2">&quot;prior&quot;</span><span class="p">,</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="n">priors</span><span class="o">=</span><span class="n">Priors</span><span class="p">(</span><span class="n">distributions</span><span class="o">=</span><span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">Uniform</span><span class="p">()</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">names</span><span class="p">}),</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>        <span class="n">correlation_threshold</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="p">)</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="p">)</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="n">section</span> <span class="o">=</span> <span class="n">against_priors</span><span class="o">.</span><span class="n">sample</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="nb">print</span><span class="p">(</span><span class="n">section</span><span class="o">.</span><span class="n">reference</span><span class="p">,</span> <span class="n">section</span><span class="o">.</span><span class="n">contraction</span> <span class="o">==</span> <span class="n">from_sample</span><span class="o">.</span><span class="n">sample</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">contraction</span><span class="p">)</span>  <span class="c1"># prior True</span>
 </span></code></pre></div>
 <p>A parameter is <code>poorly_determined</code> when it is in a correlated pair or its
 marginal has two or more modes.</p>
@@ -4204,11 +4279,12 @@ other parameters to their fitted values breaks it, and <code>non_identifiable</c
 when nothing the data read depends on the parameter
 (<a href="../profiles/#verdicts-and-the-identifiability-report">Profile Likelihood</a>). <code>merge</code> joins reports: a
 verdict the reports agree on stays, with every reason; one they disagree on is
-<code>conflicting</code>, with both reasons. A structural verdict of <code>None</code> adds its
-reasons and leaves the verdicts of the other reports. <code>report.report()</code> gives it as plain data
+<code>conflicting</code>, with both reasons. A structural verdict of <code>None</code>, as that of
+a noise parameter, adds its reasons and leaves the verdicts of the other
+reports. <code>report.report()</code> gives it as plain data
 (<a href="../../reports/#the-report-of-an-identifiability-analysis">Reports</a>).</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">data</span> <span class="o">=</span> <span class="n">report</span><span class="o">.</span><span class="n">report</span><span class="p">()</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;parameters&quot;</span><span class="p">][</span><span class="s2">&quot;k2&quot;</span><span class="p">][</span><span class="s2">&quot;practical&quot;</span><span class="p">][</span><span class="s2">&quot;verdict&quot;</span><span class="p">])</span>  <span class="c1"># determined</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">data</span> <span class="o">=</span> <span class="n">report</span><span class="o">.</span><span class="n">report</span><span class="p">()</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;parameters&quot;</span><span class="p">][</span><span class="s2">&quot;k2&quot;</span><span class="p">][</span><span class="s2">&quot;practical&quot;</span><span class="p">][</span><span class="s2">&quot;verdict&quot;</span><span class="p">])</span>  <span class="c1"># determined</span>
 </span></code></pre></div>
 <h2 id="limits">Limits<a class="headerlink" href="#limits" title="Permanent link">&para;</a></h2>
 <ul>

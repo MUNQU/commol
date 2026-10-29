@@ -114,7 +114,7 @@ A count observed on a known share of the model output, such as a sample of a kno
 
 ## Noise parameters
 
-A noise argument is a number, or the id of a calibration parameter of type `"noise"`. A noise parameter is fitted, sampled and reported with the others, and never reaches the engine; `Model.apply_calibration_parameters` skips it, as it skips a factor. Its bounds must lie in the domain of the argument: above 0 for `sd`, `sigma`, `scale` and `df`, at least 0 for `overdispersion`.
+A noise argument is a number, or the id of a calibration parameter of type `"noise"`. A noise parameter is fitted, sampled and reported with the others, and never reaches the engine; `Model.apply_calibration_parameters` skips it, as it skips a factor. Its bounds must lie in the domain of the argument: above 0 for `sd`, `sigma`, `scale` and `df`, at least 0 for `overdispersion`. No prediction reads a noise parameter, so `StructuralRank` and `Collinearity` leave it out ([Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#noise-parameters)).
 
 | Rule                                                                                                        | Error                                                |
 | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |

@@ -5300,17 +5300,38 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   reason that names <code>ODESolver.rtol</code> and <code>ODESolver.atol</code>. Before, the rank
   lost to the tolerance read as <code>non_identifiable</code> or <code>in_combination</code>. A
   parameter that no observation reads stays <code>non_identifiable</code> when every
-  point runs at the tighter tolerances.
-  <code>StructuralVerdict.verdict</code> and the values of <code>StructuralSection.verdicts</code>
-  can be <code>None</code>, and <code>merge</code> keeps the verdicts of the other reports;
-  <code>PointRank</code> holds the <code>accuracy</code> of its runs and the <code>tighter</code> rank;
-  <code>StructuralSection</code> holds the <code>accuracy</code>, the <code>tighter</code> accuracy, the
-  generic rank there (<code>tighter_generic_rank</code>) and the points that could not
-  run there (<code>unchecked</code>). In Rust, <code>SimulationEngine::accuracy</code> returns an
-  <code>Accuracy</code> in place of <code>output_accuracy</code> and <code>output_absolute_accuracy</code>. Migration: read a <code>None</code>
+  point runs at the tighter tolerances. <code>StructuralVerdict.verdict</code> and the
+  values of <code>StructuralSection.verdicts</code> can be <code>None</code>, and <code>merge</code> keeps the
+  verdicts of the other reports; <code>PointRank</code> holds the <code>accuracy</code> of its runs
+  and the <code>tighter</code> rank; <code>StructuralSection</code> holds the <code>accuracy</code>, the
+  <code>tighter</code> accuracy, the generic rank there (<code>tighter_generic_rank</code>) and the
+  points that could not run there (<code>unchecked</code>). In Rust,
+  <code>SimulationEngine::accuracy</code> returns an <code>Accuracy</code> in place of
+  <code>output_accuracy</code> and <code>output_absolute_accuracy</code>. Migration: read a <code>None</code>
   verdict as no verdict, and tighten <code>ODESolver.rtol</code> and <code>ODESolver.atol</code>
   until the rank stops changing. See
   <a href="../../guide/uncertainty/identifiability/#when-the-solver-tolerance-sets-the-rank">When the solver tolerance sets the rank</a>.</li>
+<li><strong>Breaking:</strong> <code>StructuralRank</code> and <code>Collinearity</code> leave out the noise
+  parameters of the observation models (<code>parameter_type="noise"</code>), which no
+  prediction reads. Before, the zero sensitivities of a noise parameter
+  lowered the generic rank, made it <code>non_identifiable</code>, and made every other
+  parameter <code>poorly_determined</code>, collinear with it; a <code>merge</code> then read
+  <code>conflicting</code>. Now the rank counts only the other parameters, a noise
+  parameter has the structural verdict <code>None</code> with a reason, collinearity
+  gives it no practical verdict, and no parameter is collinear with it.
+  <code>StructuralSection.projections</code> and <code>verdicts</code>, and
+  <code>CollinearitySection.sensitivity</code> and <code>pair_gamma</code>, have no entry for a
+  noise parameter; both sections name it in the new field <code>left_out</code>, with
+  the reason, and <code>IdentifiabilityReport.report()</code> gives <code>left_out</code> after
+  <code>skipped</code>. <code>Collinearity(max_subset_size=...)</code> is at most the number of
+  parameters that are not noise parameters, <code>Collinearity</code> needs at least 2
+  of them, and a problem whose calibrated parameters are all noise
+  parameters is a <code>ValueError</code> for both methods.
+  Migration: read the verdict of a noise parameter from
+  <code>StartsIdentifiability</code>, <code>SampleIdentifiability</code> or the profiles; read
+  <code>left_out</code> for the parameters a section leaves out; lower a
+  <code>max_subset_size</code> above the number of the other parameters. See
+  <a href="../../guide/uncertainty/identifiability/#noise-parameters">Noise parameters</a>.</li>
 </ul>
 <h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
 <ul>

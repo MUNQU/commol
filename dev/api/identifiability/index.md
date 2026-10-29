@@ -10,9 +10,9 @@ Bases: `IdentifiabilityMethod[IdentifiabilityReport]`, `RangeChecked`
 
 Structural identifiability, local and numerical: the rank of the scaled sensitivities at random points inside the bounds.
 
-The sensitivities come from finite differences, with a step and an error set by the accuracy of the engine; a singular value counts when it is above the norm of that error. The engine must be deterministic. The points come from the seed of the calibrator, `Calibrator.seed`.
+The sensitivities come from finite differences, with a step and an error set by the accuracy of the engine; a singular value counts when it is above the norm of that error. The engine must be deterministic. The points come from the seed of the calibrator, `Calibrator.seed`. A noise parameter of an observation model (`parameter_type="noise"`) changes no prediction: it is left out of the rank and gets the verdict `None`.
 
-With an engine that integrates with tolerances, such as `DifferentialEquations`, each point whose rank is below the number of parameters runs again at a hundredth of `ODESolver.rtol` and `ODESolver.atol`, which costs a second, slower evaluation of that point; a parameter whose verdict changes there gets the verdict `None`, with a reason. See "When the solver tolerance sets the rank" in the guide page Identifiability.
+With an engine that integrates with tolerances, such as `DifferentialEquations`, each point whose rank is below the number of parameters differentiated runs again at a hundredth of `ODESolver.rtol` and `ODESolver.atol`, no lower than 1e-14, which costs a second, slower evaluation of that point; a parameter whose verdict changes there gets the verdict `None`, with a reason. See "When the solver tolerance sets the rank" in the guide page Identifiability.
 
 Attributes:
 
@@ -32,15 +32,17 @@ class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked)
     The sensitivities come from finite differences, with a step and an error
     set by the accuracy of the engine; a singular value counts when it is
     above the norm of that error. The engine must be deterministic. The
-    points come from the seed of the calibrator, ``Calibrator.seed``.
+    points come from the seed of the calibrator, ``Calibrator.seed``. A noise
+    parameter of an observation model (``parameter_type="noise"``) changes
+    no prediction: it is left out of the rank and gets the verdict ``None``.
 
     With an engine that integrates with tolerances, such as
     ``DifferentialEquations``, each point whose rank is below the number of
-    parameters runs again at a hundredth of ``ODESolver.rtol`` and
-    ``ODESolver.atol``, which costs a second, slower evaluation of that point;
-    a parameter whose verdict changes there gets the verdict ``None``, with a
-    reason. See "When the solver tolerance sets the rank" in the guide page
-    Identifiability.
+    parameters differentiated runs again at a hundredth of ``ODESolver.rtol``
+    and ``ODESolver.atol``, no lower than 1e-14, which costs a second, slower
+    evaluation of that point; a parameter whose verdict changes there gets
+    the verdict ``None``, with a reason. See "When the solver tolerance sets
+    the rank" in the guide page Identifiability.
 
     Attributes
     ----------
@@ -65,15 +67,15 @@ Bases: `IdentifiabilityMethod[IdentifiabilityReport]`, `RangeChecked`
 
 Collinearity analysis after Brun et al. (2001): the sensitivity measure of each parameter and the collinearity index of each subset.
 
-The index of a subset is 1 when its sensitivities are orthogonal and grows without bound as they approach linear dependence. The literature puts the threshold between 5 and 20. The engine must be deterministic.
+The index of a subset is 1 when its sensitivities are orthogonal and grows without bound as they approach linear dependence. The literature puts the threshold between 5 and 20. The engine must be deterministic. A noise parameter of an observation model (`parameter_type="noise"`) changes no prediction: it is left out, and gets no verdict.
 
 Attributes:
 
-| Name              | Type                | Description                                                                                                                                               |
-| ----------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `at`              | \`CalibrationResult | ParameterSample\`                                                                                                                                         |
-| `max_subset_size` | `int`               | The largest subset, at least 2 and at most the number of parameters. Every subset up to 6 parameters is evaluated; a greedy search adds parameters above. |
-| `threshold`       | `float`             | The index below which a subset can be fitted together. No default: it is a modelling judgment.                                                            |
+| Name              | Type                | Description                                                                                                                                                                                                                |
+| ----------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `at`              | \`CalibrationResult | ParameterSample\`                                                                                                                                                                                                          |
+| `max_subset_size` | `int`               | The largest subset, at least 2 and at most the number of parameters that are not noise parameters, of which there must be at least 2. Every subset up to 6 parameters is evaluated; a greedy search adds parameters above. |
+| `threshold`       | `float`             | The index below which a subset can be fitted together. No default: it is a modelling judgment.                                                                                                                             |
 
 Source code in `commol/identifiability/methods.py`
 
@@ -85,7 +87,9 @@ class Collinearity(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
 
     The index of a subset is 1 when its sensitivities are orthogonal and grows
     without bound as they approach linear dependence. The literature puts the
-    threshold between 5 and 20. The engine must be deterministic.
+    threshold between 5 and 20. The engine must be deterministic. A noise
+    parameter of an observation model (``parameter_type="noise"``) changes
+    no prediction: it is left out, and gets no verdict.
 
     Attributes
     ----------
@@ -93,7 +97,8 @@ class Collinearity(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
         Where to evaluate: the best point of a fit, or each draw of a sample,
         summarized by the weighted median.
     max_subset_size : int
-        The largest subset, at least 2 and at most the number of parameters.
+        The largest subset, at least 2 and at most the number of parameters
+        that are not noise parameters, of which there must be at least 2.
         Every subset up to 6 parameters is evaluated; a greedy search adds
         parameters above.
     threshold : float
@@ -573,9 +578,11 @@ class ParameterVerdicts(_FrozenResult):
         a flat profile. ``None`` when no method that ran speaks to the
         structure of the parameter. A `StructuralVerdict` whose ``verdict``
         is ``None`` is evidence with no verdict: the structural rank ran, but
-        the accuracy of the runs may set its rank; its reasons say why.
+        the accuracy of the runs may set its rank, or the parameter is a
+        noise parameter, which it leaves out; its reasons say why.
     practical : PracticalVerdict | None
-        From collinearity, a sample or the starts.
+        From collinearity, a sample or the starts. Collinearity gives none to
+        a noise parameter.
     """
 
     structural: StructuralVerdict | None = None
@@ -612,7 +619,8 @@ class StructuralVerdict(_FrozenResult):
         ``non_identifiable``: it lies in the null space, or nothing the data
         read depends on it. ``conflicting``: two reports disagree. ``None``:
         the evidence gives no verdict, as when the accuracy of the runs, not
-        the structure, may set the structural rank; the reasons say why.
+        the structure, may set the structural rank, or for a noise parameter,
+        which the structural rank leaves out; the reasons say why.
     reasons : list[str]
         Why, one per piece of evidence.
     combinations : list[str]
@@ -668,19 +676,20 @@ The evidence of `StructuralRank`.
 
 Attributes:
 
-| Name                   | Type                               | Description                                                                                                                              |
-| ---------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `design`               | `str`                              | The design the sensitivities were evaluated on: "observations" or "dense".                                                               |
-| `points`               | `list[PointRank]`                  | Each feasible point.                                                                                                                     |
-| `skipped`              | `list[str]`                        | Why each infeasible point was skipped.                                                                                                   |
-| `generic_rank`         | `int`                              | The rank at most points, at the accuracy of the engine.                                                                                  |
-| `projections`          | `dict[str, float]`                 | The norm of the projection of each parameter on the null space, averaged over the points of generic rank, at the accuracy of the engine. |
-| `verdicts`             | \`dict\[str, StructuralVerdictName | None\]\`                                                                                                                                 |
-| `combinations`         | `list[Combination]`                | The identifiable combinations.                                                                                                           |
-| `accuracy`             | `Accuracy`                         | The accuracy of the runs of the engine.                                                                                                  |
-| `tighter`              | \`Accuracy                         | None\`                                                                                                                                   |
-| `tighter_generic_rank` | \`int                              | None\`                                                                                                                                   |
-| `unchecked`            | `list[str]`                        | Why each point that the tighter accuracy should check could not run there.                                                               |
+| Name                   | Type                               | Description                                                                                                                                                   |
+| ---------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `design`               | `str`                              | The design the sensitivities were evaluated on: "observations" or "dense".                                                                                    |
+| `points`               | `list[PointRank]`                  | Each feasible point.                                                                                                                                          |
+| `skipped`              | `list[str]`                        | Why each infeasible point was skipped.                                                                                                                        |
+| `left_out`             | `dict[str, str]`                   | The parameters left out, each with the reason: a noise parameter of an observation model, which no prediction reads. Every other parameter is differentiated. |
+| `generic_rank`         | `int`                              | The rank at most points, at the accuracy of the engine; at most the number of parameters differentiated.                                                      |
+| `projections`          | `dict[str, float]`                 | The norm of the projection of each parameter differentiated on the null space, averaged over the points of generic rank, at the accuracy of the engine.       |
+| `verdicts`             | \`dict\[str, StructuralVerdictName | None\]\`                                                                                                                                                      |
+| `combinations`         | `list[Combination]`                | The identifiable combinations.                                                                                                                                |
+| `accuracy`             | `Accuracy`                         | The accuracy of the runs of the engine.                                                                                                                       |
+| `tighter`              | \`Accuracy                         | None\`                                                                                                                                                        |
+| `tighter_generic_rank` | \`int                              | None\`                                                                                                                                                        |
+| `unchecked`            | `list[str]`                        | Why each point that the tighter accuracy should check could not run there.                                                                                    |
 
 Source code in `commol/identifiability/results.py`
 
@@ -698,25 +707,30 @@ class StructuralSection(_FrozenResult):
         Each feasible point.
     skipped : list[str]
         Why each infeasible point was skipped.
+    left_out : dict[str, str]
+        The parameters left out, each with the reason: a noise parameter of
+        an observation model, which no prediction reads. Every other
+        parameter is differentiated.
     generic_rank : int
-        The rank at most points, at the accuracy of the engine.
+        The rank at most points, at the accuracy of the engine; at most the
+        number of parameters differentiated.
     projections : dict[str, float]
-        The norm of the projection of each parameter on the null space,
-        averaged over the points of generic rank, at the accuracy of the
-        engine.
+        The norm of the projection of each parameter differentiated on the
+        null space, averaged over the points of generic rank, at the accuracy
+        of the engine.
     verdicts : dict[str, StructuralVerdictName | None]
-        The verdict of each parameter on this design; ``None`` when the
-        verdict changes at the tighter accuracy, or a point could not run
-        there and the parameter is not identifiable.
+        The verdict of each parameter differentiated on this design; ``None``
+        when the verdict changes at the tighter accuracy, or a point could
+        not run there and the parameter is not identifiable.
     combinations : list[Combination]
         The identifiable combinations.
     accuracy : Accuracy
         The accuracy of the runs of the engine.
     tighter : Accuracy | None
-        The accuracy a point of rank below the number of parameters is
-        evaluated again at: each accuracy of the engine divided by 100, no
-        lower than 1e-14. ``None`` when no setting sets the accuracy of the
-        engine, or it is already the tightest.
+        The accuracy a point of rank below the number of parameters
+        differentiated is evaluated again at: each accuracy of the engine
+        divided by 100, no lower than 1e-14. ``None`` when no setting sets the
+        accuracy of the engine, or it is already the tightest.
     tighter_generic_rank : int | None
         The rank at most points with each point evaluated again at the
         tighter accuracy in place of its rank at the accuracy of the engine;
@@ -729,6 +743,7 @@ class StructuralSection(_FrozenResult):
     design: StructuralDesign
     points: list[PointRank]
     skipped: list[str]
+    left_out: dict[str, str]
     generic_rank: int
     projections: dict[str, float]
     verdicts: dict[str, StructuralVerdictName | None]
@@ -749,9 +764,9 @@ Attributes:
 
 | Name              | Type               | Description                                                                                       |
 | ----------------- | ------------------ | ------------------------------------------------------------------------------------------------- |
-| `values`          | `dict[str, float]` | The point.                                                                                        |
+| `values`          | `dict[str, float]` | The point, with a value of every parameter.                                                       |
 | `accuracy`        | `Accuracy`         | The accuracy of the runs of the engine.                                                           |
-| `singular_values` | `list[float]`      | The singular values, largest first.                                                               |
+| `singular_values` | `list[float]`      | The singular values, largest first, one per parameter differentiated.                             |
 | `threshold`       | `float`            | The norm of the estimated errors of the sensitivities, which a singular value must pass to count. |
 | `rank`            | `int`              | How many pass it.                                                                                 |
 | `tighter`         | \`TighterRank      | None\`                                                                                            |
@@ -766,11 +781,11 @@ class PointRank(_FrozenResult):
     Attributes
     ----------
     values : dict[str, float]
-        The point.
+        The point, with a value of every parameter.
     accuracy : Accuracy
         The accuracy of the runs of the engine.
     singular_values : list[float]
-        The singular values, largest first.
+        The singular values, largest first, one per parameter differentiated.
     threshold : float
         The norm of the estimated errors of the sensitivities, which a
         singular value must pass to count.
@@ -778,11 +793,11 @@ class PointRank(_FrozenResult):
         How many pass it.
     tighter : TighterRank | None
         The rank at a tighter accuracy, when the rank is below the number of
-        parameters and a setting of the engine sets its accuracy. ``None``
-        when the rank is that number, when no setting sets the accuracy (an
-        engine exact up to rounding), when the accuracy is already the
-        tightest (1e-14), or when the point could not run at the tighter
-        accuracy (``StructuralSection.unchecked`` says why).
+        parameters differentiated and a setting of the engine sets its
+        accuracy. ``None`` when the rank is that number, when no setting sets
+        the accuracy (an engine exact up to rounding), when the accuracy is
+        already the tightest (1e-14), or when the point could not run at the
+        tighter accuracy (``StructuralSection.unchecked`` says why).
     """
 
     values: dict[str, float]
@@ -804,7 +819,7 @@ Attributes:
 | Name              | Type          | Description                                                                                       |
 | ----------------- | ------------- | ------------------------------------------------------------------------------------------------- |
 | `accuracy`        | `Accuracy`    | The accuracy of the runs.                                                                         |
-| `singular_values` | `list[float]` | The singular values, largest first.                                                               |
+| `singular_values` | `list[float]` | The singular values, largest first, one per parameter differentiated.                             |
 | `threshold`       | `float`       | The norm of the estimated errors of the sensitivities, which a singular value must pass to count. |
 | `rank`            | `int`         | How many pass it.                                                                                 |
 
@@ -821,7 +836,7 @@ class TighterRank(_FrozenResult):
     accuracy : Accuracy
         The accuracy of the runs.
     singular_values : list[float]
-        The singular values, largest first.
+        The singular values, largest first, one per parameter differentiated.
     threshold : float
         The norm of the estimated errors of the sensitivities, which a
         singular value must pass to count.
@@ -912,15 +927,16 @@ The evidence of `Collinearity`.
 
 Attributes:
 
-| Name           | Type                          | Description                                                                  |
-| -------------- | ----------------------------- | ---------------------------------------------------------------------------- |
-| `threshold`    | `float`                       | The index below which a subset can be fitted together.                       |
-| `points`       | `int`                         | How many points were used: one for a fit, one per feasible draw of a sample. |
-| `skipped`      | `list[str]`                   | Why each infeasible point was skipped.                                       |
-| `sensitivity`  | `dict[str, float]`            | The weighted median of Brun's sensitivity measure of each parameter.         |
-| `pair_gamma`   | `dict[str, dict[str, float]]` | The weighted median of the index of each pair.                               |
-| `best_by_size` | `list[SubsetIndex]`           | The subset of lowest index of each size.                                     |
-| `admissible`   | `list[SubsetIndex]`           | The largest subsets whose index is below the threshold.                      |
+| Name           | Type                          | Description                                                                                                                                                   |
+| -------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `threshold`    | `float`                       | The index below which a subset can be fitted together.                                                                                                        |
+| `points`       | `int`                         | How many points were used: one for a fit, one per feasible draw of a sample.                                                                                  |
+| `skipped`      | `list[str]`                   | Why each infeasible point was skipped.                                                                                                                        |
+| `left_out`     | `dict[str, str]`              | The parameters left out, each with the reason: a noise parameter of an observation model, which no prediction reads. Every other parameter is differentiated. |
+| `sensitivity`  | `dict[str, float]`            | The weighted median of Brun's sensitivity measure of each parameter differentiated.                                                                           |
+| `pair_gamma`   | `dict[str, dict[str, float]]` | The weighted median of the index of each pair of parameters differentiated.                                                                                   |
+| `best_by_size` | `list[SubsetIndex]`           | The subset of lowest index of each size.                                                                                                                      |
+| `admissible`   | `list[SubsetIndex]`           | The largest subsets whose index is below the threshold.                                                                                                       |
 
 Source code in `commol/identifiability/results.py`
 
@@ -938,10 +954,16 @@ class CollinearitySection(_FrozenResult):
         sample.
     skipped : list[str]
         Why each infeasible point was skipped.
+    left_out : dict[str, str]
+        The parameters left out, each with the reason: a noise parameter of
+        an observation model, which no prediction reads. Every other
+        parameter is differentiated.
     sensitivity : dict[str, float]
-        The weighted median of Brun's sensitivity measure of each parameter.
+        The weighted median of Brun's sensitivity measure of each parameter
+        differentiated.
     pair_gamma : dict[str, dict[str, float]]
-        The weighted median of the index of each pair.
+        The weighted median of the index of each pair of parameters
+        differentiated.
     best_by_size : list[SubsetIndex]
         The subset of lowest index of each size.
     admissible : list[SubsetIndex]
@@ -951,6 +973,7 @@ class CollinearitySection(_FrozenResult):
     threshold: float
     points: int
     skipped: list[str]
+    left_out: dict[str, str]
     sensitivity: dict[str, float]
     pair_gamma: dict[str, dict[str, float]]
     best_by_size: list[SubsetIndex]
