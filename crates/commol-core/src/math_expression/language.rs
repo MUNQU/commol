@@ -271,8 +271,8 @@ fn condition(expr: &Expr, nodes: &mut usize) -> Result<(), String> {
     }
 }
 
-/// The variables `tree` reads, in the order it first reads them.
-pub(crate) fn variables(tree: &Expr) -> Vec<String> {
+/// The variables `tree` reads, each once, in the order it first reads them.
+pub fn variables(tree: &Expr) -> Vec<String> {
     fn collect<'a>(expr: &'a Expr, seen: &mut HashSet<&'a str>, out: &mut Vec<String>) {
         if let Expr::Variable(name) = expr
             && seen.insert(name)

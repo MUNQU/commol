@@ -927,9 +927,14 @@ pub fn subgroup_total_names(process: &Process) -> Vec<String> {
 ///   declaration order of the stratifications, so `total_t1_g1` is not a name
 ///   when `group` is declared before `type`. A parameter or compartment whose
 ///   id starts with `total_` is not such a name;
+/// - two matrices share an id, a matrix does not fit the process, the id or a
+///   variable (`<M>_<i>_<j>`, `<M>_radius`) of a matrix is the name of
+///   another thing, two matrices give one variable, a rate reads a matrix
+///   the process does not have or the neighbors inside a matrix sum, or a
+///   formula parameter reads a matrix sum (`check_matrices`);
 /// - a rate or a formula parameter reads a variable that no parameter, bin,
-///   compartment, engine variable, subgroup total or name of the neighbors
-///   defines. A category id is not a variable.
+///   compartment, engine variable, subgroup total, variable of a matrix or
+///   name of the neighbors defines. A category id is not a variable.
 ///
 /// # Errors
 ///

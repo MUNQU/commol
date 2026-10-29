@@ -228,8 +228,8 @@ class ModelBuilder:
         A rate reads it through ``matrix_sum(id, e)``: in the rate of a
         compartment of category ``i``, ``Σ_j values[i][j] · e_j``, where
         ``e_j`` is ``e`` with each bin read as its amount in category ``j``
-        and ``total`` as the total of ``j``. Every formula also reads its
-        entries as ``<id>_<i>_<j>`` and its spectral radius, the largest
+        and ``total`` as the total of ``j``. A rate or a formula parameter
+        also reads its entries as ``<id>_<i>_<j>`` and its spectral radius, the largest
         modulus of its eigenvalues, as ``<id>_radius``.
 
         Parameters
@@ -770,6 +770,8 @@ class ModelBuilder:
             "bin_ids": [state.id for state in self._bins],
             "stratifications_count": len(self._stratifications),
             "stratification_ids": [strat.id for strat in self._stratifications],
+            "matrices_count": len(self._matrices),
+            "matrix_ids": [matrix.id for matrix in self._matrices],
             "transitions_count": len(self._transitions),
             "transition_ids": [trans.id for trans in self._transitions],
             "parameters_count": len(self._parameters),

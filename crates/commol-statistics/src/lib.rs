@@ -1,9 +1,11 @@
-//! The numerical helpers, log densities and weighted statistics of commol.
+//! The numerical helpers, log densities, weighted statistics and linear
+//! algebra of commol.
 //!
-//! What the model compiler, the calibration and the inference methods share,
+//! What the model compiler, the calibration and the inference methods use,
 //! and no model: a leaf crate, which depends on no crate of commol.
 //!
-//! - [`linear_algebra`]: the spectral radius of a square matrix;
+//! - [`linear_algebra`]: the spectral radius of a square matrix, which the
+//!   model compiler reads;
 //! - [`numeric`]: `log Σ exp`, `x ln y` and `x ln(1 + y)`, the special
 //!   functions `ln Γ`, `ln B`, digamma and trigamma, and the log densities of
 //!   the normal, the log-normal and the Student t, one copy of each;

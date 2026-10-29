@@ -11,8 +11,11 @@ The flow planner (`plan_transition_flows` in
 is absolute or proportional; the cases are in the table of
 [Absolute and proportional rates](../../guide/transitions.md#absolute-and-proportional-rates).
 The closure `is_absolute` reads only the compartment names and the names of
-`subgroup_total_names` (`builder.rs`): `total` is not one of them, so a rate
-that reads `total` and no compartment stays proportional.
+`subgroup_total_names` (`builder.rs`) that the rate reads outside its matrix
+sums (`variables_outside_matrix_sums` in `crates/commol-model/src/matrices.rs`):
+`total` is not one of them, so a rate that reads `total` and no compartment
+stays proportional, and so does `k1 * matrix_sum(M, B / total)`, whose `B` is
+the amount of other categories.
 
 A transition with several sources and a proportional rate is rejected, because
 it has no single source to multiply. `Model.describe` shows the planned flows,
@@ -68,7 +71,8 @@ compartment of category `i`, as `Σ_j <M>_<i>_<j> * (e_j)` while
 `plan_transition_flows` plans the flows. In `e_j` a bin reads the subgroup
 total of exactly its compartments in `j` (the explicit sum of them when no
 subgroup total sums that set alone), `total` reads `total_<j>`, and every
-other variable is unchanged. A term whose entry is 0 is left out.
+other variable is unchanged. The terms of a zero entry are dropped, but a row
+of zeros keeps its first term, with the value 0, for the unit check.
 
 Each entry is the variable `<M>_<i>_<j>`, a constant parameter of the
 engine (`matrix_variables`), not a number written into the rate. So the

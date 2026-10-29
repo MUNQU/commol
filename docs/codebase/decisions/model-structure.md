@@ -111,6 +111,11 @@ a prefix), `TestTotalSeries::test_an_output_name_stands_for_itself` and
 
 The engine sets one variable per expanded compartment and per subgroup total
 (`total_<categories>`, bin totals and partial bin totals).
+The variables of a matrix between categories (`<M>_<i>_<j>` and
+`<M>_radius`) are engine variables too: `check_matrices`
+(`crates/commol-model/src/matrices.rs`) rejects a parameter, bin,
+accumulator, compartment, subgroup total or engine variable that has the
+id or a variable name of a matrix, and two matrices that give one variable.
 `check_model` in `crates/commol-model/src/builder.rs` rejects a parameter
 id that is one of those names, a parameter, bin or accumulator id that is an
 engine variable (`ENGINE_VARIABLES`: `total`, `step`, `t`, `pi`, `e`) or a

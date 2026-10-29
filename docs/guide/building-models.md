@@ -78,7 +78,7 @@ Every `add_*` method returns the builder, so calls chain. The other methods:
 | `process()` | `Process` | The bins, accumulators, stratifications, matrices and transitions written so far. |
 | `clone()` | `ModelBuilder` | A deep copy of everything, accumulators included, to build variants of one model. |
 | `reset()` | `ModelBuilder` | Removes bins, accumulators, stratifications, matrices, transitions and parameters; keeps the name, description, version, `bin_unit`, `step_unit` and `origin`. |
-| `get_summary()` | `dict` | The name, description, version, and the count and ids of the bins, stratifications, transitions and parameters added so far. |
+| `get_summary()` | `dict` | The name, description, version, and the count and ids of the bins, stratifications, matrices, transitions and parameters added so far. |
 
 ```python
 variant = builder.clone()
@@ -145,12 +145,18 @@ these ids (`Aggregate.check_model` and `check_model` in
 | A bin id | `A` |
 | An expanded compartment | `A_g1` |
 | A subgroup total | `total_g1`, `A_t1` (with two stratifications) |
+| The variables of a [matrix](#matrices-between-categories) `M`: `M_<i>_<j>` and `M_radius` | `M_g1_g2`, `M_radius` |
 
 A bin or an accumulator cannot take an id of the first two rows either, because
 the engine variable would hide it. A bin whose names read as a subgroup total is
 rejected too: a bin `total_y` stratified by `group = [y, o]` and `type = [y, o]`
 expands into `total_y_y`, which is also the total of the `y` of both
 stratifications.
+
+A matrix may not take the id of a parameter, a bin, an accumulator, a
+compartment, a subgroup total or an engine variable, nor may one of its
+variables, and two matrices may not give one variable
+(`check_matrices` in `crates/commol-model/src/matrices.rs`).
 
 An id that starts with `total_` but names no subgroup total, such as
 `total_max`, is accepted. `N` is not reserved, so a bin or a parameter may use
@@ -303,8 +309,8 @@ builder = builder.add_matrix(
 | What it gives | Meaning |
 |---|---|
 | `matrix_sum(M, e)` in a transition rate | In a compartment of category `i`, `Σ_j M[i, j] · e_j`, with each bin of `e` read in category `j`. See [Matrix sums](mathematical-expressions.md#matrix-sums) |
-| `M_<i>_<j>` in any formula | The value of row `i` and column `j`, as `M_g1_g2` |
-| `M_radius` in any formula | The spectral radius: the largest modulus of its eigenvalues |
+| `M_<i>_<j>` in a rate or a formula parameter | The value of row `i` and column `j`, as `M_g1_g2` |
+| `M_radius` in a rate or a formula parameter | The spectral radius: the largest modulus of its eigenvalues |
 
 `build` raises `ValueError` when the stratification is not one of the
 process, a row or a value of a category is missing, a row or a column names

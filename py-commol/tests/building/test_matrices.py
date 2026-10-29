@@ -56,7 +56,8 @@ def test_a_model_holds_a_matrix_between_categories() -> None:
     radius = (5 + math.sqrt(5)) / 2
     assert text.text == (
         "Between the categories of 'group' in 1/day. A coupling between the "
-        "groups. A rate reads matrix_sum(M, e); every formula reads its entries as "
+        "groups. A rate reads matrix_sum(M, e); a rate or a formula parameter reads "
+        "its entries as "
         f"M_<row>_<column> and its spectral radius, {radius:.6g}, as M_radius."
     )
     assert values == Matrix(

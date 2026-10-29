@@ -3,9 +3,10 @@
 A rate reads it through ``matrix_sum(M, e)``: in the rate of a compartment of
 category ``i``, ``Σ_j M[i, j] · e_j``, with each bin of ``e`` read as its
 amount in category ``j`` and ``total`` as the total of ``j``. It also gives
-every formula the variables ``<M>_<i>_<j>``, its entries, and ``<M>_radius``,
-its spectral radius. The engine checks the matrix against the process and
-names these variables (``commol_rs.model.matrix_variables``).
+the rates and the formula parameters the variables ``<M>_<i>_<j>``, its
+entries, and ``<M>_radius``, its spectral radius. The engine checks the
+matrix against the process and names these variables
+(``commol_rs.model.matrix_variables``).
 """
 
 from pydantic import BaseModel, ConfigDict, Field

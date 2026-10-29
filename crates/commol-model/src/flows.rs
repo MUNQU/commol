@@ -23,6 +23,8 @@ use crate::helpers::{
 use crate::layout::CompartmentLayout;
 use crate::matrices::{MatrixSums, variables_outside_matrix_sums};
 use crate::types::AccumulatorOutputRef;
+use commol_core::math_expression::jit::ast::Expr;
+use commol_core::math_expression::jit::parser::parse_expression;
 
 /// One planned flow of a transition.
 ///
@@ -136,9 +138,10 @@ pub(crate) fn plan_transition_flows(
 ) -> Result<Vec<PlannedFlow>, String> {
     let stratifications = &process.stratifications;
     let compartment_names: HashSet<&str> = layout.names().iter().map(String::as_str).collect();
-    let is_absolute = |rate: &str, explicit: Option<bool>| {
+    let is_absolute = |tree: Option<&Expr>, explicit: Option<bool>| {
         explicit.unwrap_or_else(|| {
-            variables_outside_matrix_sums(rate)
+            tree.map(variables_outside_matrix_sums)
+                .unwrap_or_default()
                 .iter()
                 .any(|v| compartment_names.contains(v.as_str()) || subgroup_total_names.contains(v))
         })
@@ -147,6 +150,9 @@ pub(crate) fn plan_transition_flows(
         matrix.check(process)?;
     }
     let matrix_sums = MatrixSums::new(process, layout);
+    // The tree of each rate, parsed once; None when it does not parse, which
+    // the compilation of the rate reports.
+    let mut trees: HashMap<String, Option<Expr>> = HashMap::new();
 
     let mut flows = Vec::new();
     for transition in &process.transitions {
@@ -213,9 +219,13 @@ pub(crate) fn plan_transition_flows(
             };
 
             let explicit_absolute = matched.stratified_rate.and_then(|sr| sr.absolute);
-            let absolute =
-                sources.is_empty() || is_absolute(&matched.rate_string, explicit_absolute);
-            let mut rate = matrix_sums.resolve(&matched.rate_string, start, &transition.id)?;
+            let tree = trees
+                .entry(matched.rate_string.clone())
+                .or_insert_with(|| parse_expression(&matched.rate_string).ok())
+                .as_ref();
+            let absolute = sources.is_empty() || is_absolute(tree, explicit_absolute);
+            let mut rate =
+                matrix_sums.resolve(&matched.rate_string, tree, start, &transition.id)?;
             if transition.per_compartment.unwrap_or(false) && matches!(kind, TransitionKind::Bins) {
                 for (bin, idx) in source_bins.iter().zip(&sources) {
                     rate = replace_bin_in_rate(&rate, bin, layout.name(*idx));

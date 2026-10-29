@@ -214,8 +214,9 @@ def matrix_blocks(model: "Model") -> list[_Block]:
                 heading=f"Matrix {matrix.id}",
                 text=(
                     f"Between the categories of '{matrix.stratification}'{unit}."
-                    f"{about} A rate reads matrix_sum({matrix.id}, e); every "
-                    f"formula reads its entries as {matrix.id}_<row>_<column> "
+                    f"{about} A rate reads matrix_sum({matrix.id}, e); a rate or "
+                    "a formula parameter reads its entries as "
+                    f"{matrix.id}_<row>_<column> "
                     f"and its spectral radius, {radius[matrix.id][1]:.6g}, as "
                     f"{radius[matrix.id][0]}."
                 ),

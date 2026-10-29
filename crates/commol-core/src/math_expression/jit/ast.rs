@@ -355,6 +355,53 @@ impl Expr {
         }
     }
 
+    /// The tree with each node for which `replace` gives a node replaced by
+    /// it, and every other node rebuilt from its operands, mapped the same
+    /// way. `replace` sees a node before its operands.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first error that `replace` gives.
+    pub fn try_map<E, F>(&self, replace: &mut F) -> Result<Expr, E>
+    where
+        F: FnMut(&Expr) -> Option<Result<Expr, E>>,
+    {
+        if let Some(node) = replace(self) {
+            return node;
+        }
+        Ok(match self {
+            Expr::Constant(_) | Expr::Variable(_) => self.clone(),
+            Expr::Chain { first, rest } => Expr::chain(
+                first.try_map(replace)?,
+                rest.iter()
+                    .map(|(op, operand)| Ok((*op, operand.try_map(replace)?)))
+                    .collect::<Result<_, E>>()?,
+            ),
+            Expr::Power { base, exponent } => {
+                Expr::power(base.try_map(replace)?, exponent.try_map(replace)?)
+            }
+            Expr::UnaryOp { op, operand } => Expr::unary(*op, operand.try_map(replace)?),
+            Expr::FunctionCall { name, args } => Expr::call(
+                name.clone(),
+                args.iter()
+                    .map(|arg| arg.try_map(replace))
+                    .collect::<Result<_, E>>()?,
+            ),
+            Expr::Conditional {
+                condition,
+                true_expr,
+                false_expr,
+            } => Expr::if_then_else(
+                condition.try_map(replace)?,
+                true_expr.try_map(replace)?,
+                false_expr.try_map(replace)?,
+            ),
+            Expr::MatrixSum { matrix, expression } => {
+                Expr::matrix_sum(matrix.clone(), expression.try_map(replace)?)
+            }
+        })
+    }
+
     /// Whether the tree holds a `matrix_sum`, which only a model writes as
     /// a formula the JIT compiles.
     pub fn reads_matrix_sum(&self) -> bool {
@@ -389,6 +436,29 @@ impl Expr {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_map_replaces_the_nodes_it_gives_and_rebuilds_the_others() {
+        let tree = Expr::matrix_sum(
+            "M",
+            Expr::binary(
+                BinaryOperator::Div,
+                Expr::variable("B"),
+                Expr::variable("x"),
+            ),
+        );
+        let renamed = tree.try_map(&mut |node| match node {
+            Expr::Variable(name) if name == "x" => Some(Ok::<_, ()>(Expr::variable("y"))),
+            _ => None,
+        });
+        let failed = tree.try_map(&mut |node| match node {
+            Expr::Variable(name) if name == "B" => Some(Err(name.clone())),
+            _ => None,
+        });
+
+        assert_eq!(renamed.unwrap().to_string(), "matrix_sum(M, B / y)");
+        assert_eq!(failed, Err("B".to_string()));
+    }
 
     #[test]
     fn a_tree_prints_as_a_formula_with_its_groups() {

@@ -32,22 +32,30 @@ from tests.support import (
     build,
 )
 
-VALUES = {"g1": {"g1": 2.0, "g2": 1.0}, "g2": {"g1": 1.0, "g2": 3.0}}
-"""Rows ``g1`` 2 and 1, ``g2`` 1 and 3."""
+VALUES = {"g1": {"g1": 2.0, "g2": 0.5}, "g2": {"g1": 1.5, "g2": 3.0}}
+"""Rows ``g1`` 2 and 0.5, ``g2`` 1.5 and 3: not symmetric, so a row read as a
+column gives another flow."""
 
 GROUP = {"group": {"g1": 0.4, "g2": 0.6}}
+
+START = {"A_g1": 300.0, "A_g2": 600.0, "B_g1": 20.0, "B_g2": 80.0}
+"""Amounts whose ``B / total`` differs by group: 1/16 in ``g1``, 2/17 in ``g2``."""
 
 SUM = "matrix_sum(M, B / total)"
 
 
 def _builder(
     stratifications: dict[str, dict[str, float]] = GROUP,
+    compartment_amounts: dict[str, float] | None = None,
 ) -> FactoryBuilder:
     builder = a_to_b_builder(
         parameters={"k": 0.1},
         rate=f"k * {SUM}",
         amounts={"A": 900, "B": 100},
         stratifications=stratifications,
+        compartment_amounts=START
+        if compartment_amounts is None
+        else compartment_amounts,
     )
     builder.add_matrix("M", "group", VALUES)
     return builder
@@ -60,9 +68,6 @@ def _flows(state: dict[str, float]) -> dict[str, float]:
         f"A_{i}": 0.1 * state[f"A_{i}"] * sum(VALUES[i][j] * b[j] for j in VALUES)
         for i in VALUES
     }
-
-
-START = {"A_g1": 360.0, "A_g2": 540.0, "B_g1": 40.0, "B_g2": 60.0}
 
 
 def test_a_rate_reads_the_sum_over_the_categories_through_the_matrix() -> None:
@@ -93,6 +98,7 @@ def test_a_rate_reads_the_sum_over_the_categories_through_the_matrix() -> None:
             Aggregate(
                 bin_amounts={"A": 900, "B": 100},
                 stratification_fractions=GROUP,
+                compartment_amounts=START,
             ),
             engine="DifferenceEquations",
         )
@@ -102,7 +108,9 @@ def test_a_rate_reads_the_sum_over_the_categories_through_the_matrix() -> None:
 
     for compartment, flow in _flows(START).items():
         assert math.isclose(run[compartment][1], START[compartment] - flow)
-    assert math.isclose(_flows(START)["A_g1"], 0.1 * 360 * (2 * 0.1 + 1 * 0.1))
+    assert math.isclose(
+        _flows(START)["A_g1"], 0.1 * 300 * (2 * 20 / 320 + 0.5 * 80 / 680)
+    )
 
 
 def test_a_differential_model_moves_at_the_rate_of_the_sum() -> None:
@@ -137,9 +145,24 @@ def test_the_mean_of_a_stochastic_engine_is_its_mean_field_run(
     assert abs(mean - mean_field["B_g1"][0]) < 4.5 * spread / math.sqrt(300)
 
 
+SPLIT = {
+    "A_g1_s1": 100.0,
+    "A_g1_s2": 200.0,
+    "A_g2_s1": 450.0,
+    "A_g2_s2": 150.0,
+    "B_g1_s1": 5.0,
+    "B_g1_s2": 15.0,
+    "B_g2_s1": 60.0,
+    "B_g2_s2": 20.0,
+}
+"""Amounts that differ in each compartment, so one compartment read for the
+sum of its group gives another flow."""
+
+
 def test_a_split_group_reads_the_sum_of_its_compartments() -> None:
     builder = _builder(
         stratifications={**GROUP, "sub": {"s1": 0.5, "s2": 0.5}},
+        compartment_amounts=SPLIT,
     )
 
     run = Simulation(build(builder)).run(1)

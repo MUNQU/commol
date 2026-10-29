@@ -6,14 +6,17 @@
 //! compartment of category `i`, `matrix_sum(M, e)` is
 //! `Σ_j <M>_<i>_<j> * (e_j)`, where `e_j` is `e` with each bin read as its
 //! amount in category `j` and `total` as the total of category `j`
-//! ([`MatrixSums::resolve`]). A term whose entry is 0 is left out. The
-//! amounts are found by label: one compartment is its name, several are the
+//! ([`MatrixSums::resolve`]). A term whose entry is 0 is left out, unless
+//! every entry of the row is 0: then the first term stays, so the rate keeps
+//! its unit and its value is 0. The amounts are found by label: one compartment is its name, several are the
 //! subgroup total that sums exactly them, or their sum.
 
 use std::collections::{HashMap, HashSet};
+use std::convert::Infallible;
 
 use commol_core::math_expression::jit::ast::{BinaryOperator, Expr};
 use commol_core::math_expression::jit::parser::parse_expression;
+use commol_core::math_expression::language::variables;
 use commol_core::{
     CategoryMatrix, MATRIX_SUM, NEIGHBORS, NEIGHBORS_PREFIX, Process, SPECIAL_VAR_TOTAL,
 };
@@ -22,7 +25,8 @@ use commol_statistics::linear_algebra::spectral_radius;
 use crate::builder::subgroup_totals_by_compartments;
 use crate::layout::CompartmentLayout;
 
-/// A variable that a matrix gives every formula of a model.
+/// A variable that a matrix gives the rates and the formula parameters of a
+/// model.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MatrixVariable {
     /// The name a formula reads: `<M>_<i>_<j>` or `<M>_radius`.
@@ -69,10 +73,10 @@ pub fn matrix_variables(process: &Process) -> Vec<MatrixVariable> {
 /// the process ([`CategoryMatrix::check`]), the id or a variable of a matrix
 /// has the name of a parameter, a bin, an accumulator, a compartment, a
 /// subgroup total or an engine variable (`taken`, by name and what it is),
-/// so that a unit or a description never reads one name as two things, a
-/// rate reads a matrix the
-/// process does not have or reads the neighbors inside a matrix sum, or a
-/// formula parameter reads a matrix sum.
+/// two matrices give one variable, a rate reads a matrix the process does
+/// not have or reads the neighbors inside a matrix sum, or a formula
+/// parameter reads a matrix sum. So the engine, a unit and a description
+/// never read one name as two things.
 pub(crate) fn check_matrices(
     process: &Process,
     rates: &[(&str, &str)],
@@ -92,7 +96,14 @@ pub(crate) fn check_matrices(
         }
         matrix.check(process)?;
     }
+    let mut given: HashMap<String, String> = HashMap::new();
     for variable in matrix_variables(process) {
+        if let Some(other) = given.insert(variable.name.clone(), variable.matrix.clone()) {
+            return Err(format!(
+                "Matrices '{other}' and '{}' both give the variable '{}'; rename one of them",
+                variable.matrix, variable.name
+            ));
+        }
         if let Some(kind) = taken.get(variable.name.as_str()) {
             return Err(format!(
                 "Matrix '{}' gives the variable '{}', which is also the name of {kind}; \
@@ -110,7 +121,7 @@ pub(crate) fn check_matrices(
                      is not a matrix of the process; its matrices are {ids:?}"
                 ));
             }
-            if let Some(term) = read_variables(&expression)
+            if let Some(term) = variables(&expression)
                 .into_iter()
                 .find(|name| name == NEIGHBORS || name.starts_with(NEIGHBORS_PREFIX))
             {
@@ -151,41 +162,15 @@ fn matrix_sums(formula: &str) -> Vec<(String, Expr)> {
     out
 }
 
-/// The variables a tree reads.
-fn read_variables(expr: &Expr) -> Vec<String> {
-    fn collect(expr: &Expr, out: &mut Vec<String>) {
-        if let Expr::Variable(name) = expr {
-            out.push(name.clone());
-        }
-        for operand in expr.operands() {
-            collect(operand, out);
-        }
-    }
-    let mut out = Vec::new();
-    collect(expr, &mut out);
-    out
-}
-
-/// The variables a rate reads outside its matrix sums, which decide whether
-/// the rate is absolute: the expression of a matrix sum reads the amounts of
-/// other categories, as the neighbors of a unit do.
-pub(crate) fn variables_outside_matrix_sums(rate: &str) -> Vec<String> {
-    fn collect(expr: &Expr, out: &mut Vec<String>) {
-        match expr {
-            Expr::Variable(name) => out.push(name.clone()),
-            Expr::MatrixSum { .. } => {}
-            _ => {
-                for operand in expr.operands() {
-                    collect(operand, out);
-                }
-            }
-        }
-    }
-    let mut out = Vec::new();
-    if let Ok(tree) = parse_expression(rate) {
-        collect(&tree, &mut out);
-    }
-    out
+/// The variables the tree of a rate reads outside its matrix sums, which
+/// decide whether the rate is absolute: the expression of a matrix sum reads
+/// the amounts of other categories, as the neighbors of a unit do.
+pub(crate) fn variables_outside_matrix_sums(rate: &Expr) -> Vec<String> {
+    let Ok(outside) = rate.try_map(&mut |node| match node {
+        Expr::MatrixSum { .. } => Some(Ok::<_, Infallible>(Expr::Constant(0.0))),
+        _ => None,
+    });
+    variables(&outside)
 }
 
 /// Writes the matrix sums of the rates of a process as the sums they are.
@@ -211,8 +196,9 @@ impl<'a> MatrixSums<'a> {
         }
     }
 
-    /// `rate` with each of its matrix sums written as the sum it is in the
-    /// compartment `start`; `rate` itself when it reads none.
+    /// `rate`, whose tree is `tree` (None when it does not parse), with each
+    /// of its matrix sums written as the sum it is in the compartment
+    /// `start`; `rate` itself when it reads none.
     ///
     /// # Errors
     ///
@@ -222,50 +208,26 @@ impl<'a> MatrixSums<'a> {
     pub(crate) fn resolve(
         &self,
         rate: &str,
+        tree: Option<&Expr>,
         start: usize,
         transition_id: &str,
     ) -> Result<String, String> {
-        match parse_expression(rate) {
-            Ok(tree) if tree.reads_matrix_sum() => {
-                Ok(self.rewrite(&tree, start, transition_id)?.to_string())
-            }
+        match tree {
+            Some(tree) if tree.reads_matrix_sum() => Ok(tree
+                .try_map(&mut |node| match node {
+                    Expr::MatrixSum { matrix, expression } => {
+                        Some(self.sum(matrix, expression, start, transition_id))
+                    }
+                    _ => None,
+                })?
+                .to_string()),
             _ => Ok(rate.to_string()),
         }
     }
 
-    /// `expr` with each matrix sum written as its sum in `start`.
-    fn rewrite(&self, expr: &Expr, start: usize, transition_id: &str) -> Result<Expr, String> {
-        let rewrite = |operand: &Expr| self.rewrite(operand, start, transition_id);
-        Ok(match expr {
-            Expr::Constant(_) | Expr::Variable(_) => expr.clone(),
-            Expr::Chain { first, rest } => Expr::chain(
-                rewrite(first)?,
-                rest.iter()
-                    .map(|(op, operand)| Ok((*op, rewrite(operand)?)))
-                    .collect::<Result<_, String>>()?,
-            ),
-            Expr::Power { base, exponent } => Expr::power(rewrite(base)?, rewrite(exponent)?),
-            Expr::UnaryOp { op, operand } => Expr::unary(*op, rewrite(operand)?),
-            Expr::FunctionCall { name, args } => Expr::call(
-                name.clone(),
-                args.iter().map(rewrite).collect::<Result<_, String>>()?,
-            ),
-            Expr::Conditional {
-                condition,
-                true_expr,
-                false_expr,
-            } => Expr::if_then_else(
-                rewrite(condition)?,
-                rewrite(true_expr)?,
-                rewrite(false_expr)?,
-            ),
-            Expr::MatrixSum { matrix, expression } => {
-                self.sum(matrix, expression, start, transition_id)?
-            }
-        })
-    }
-
-    /// `Σ_j <M>_<i>_<j> * (e_j)` in the compartment `start`, of category `i`.
+    /// `Σ_j <M>_<i>_<j> * (e_j)` in the compartment `start`, of category `i`,
+    /// without the terms of a zero entry; the first term alone when every
+    /// entry of the row is 0.
     fn sum(
         &self,
         matrix: &str,
@@ -288,29 +250,28 @@ impl<'a> MatrixSums<'a> {
                 self.layout.name(start)
             ));
         };
-        let terms: Vec<Expr> = matrix
-            .categories(self.process)
+        // `own` is a category of the stratification, so the row has a column.
+        let categories = matrix.categories(self.process);
+        let mut columns: Vec<&String> = categories
             .iter()
             .filter(|column| matrix.value(own, column) != 0.0)
-            .map(|column| {
-                Expr::binary(
-                    BinaryOperator::Mul,
-                    Expr::variable(matrix.entry_name(own, column)),
-                    self.in_category(expression, matrix, column),
-                )
-            })
             .collect();
-        let mut terms = terms.into_iter();
-        Ok(match terms.next() {
-            None => Expr::Constant(0.0),
-            Some(first) => {
-                let rest: Vec<_> = terms.map(|term| (BinaryOperator::Add, term)).collect();
-                if rest.is_empty() {
-                    first
-                } else {
-                    Expr::chain(first, rest)
-                }
-            }
+        if columns.is_empty() {
+            columns.push(&categories[0]);
+        }
+        let mut terms = columns.into_iter().map(|column| {
+            Expr::binary(
+                BinaryOperator::Mul,
+                Expr::variable(matrix.entry_name(own, column)),
+                self.in_category(expression, matrix, column),
+            )
+        });
+        let first = terms.next().expect("the row has a column");
+        let rest: Vec<_> = terms.map(|term| (BinaryOperator::Add, term)).collect();
+        Ok(if rest.is_empty() {
+            first
+        } else {
+            Expr::chain(first, rest)
         })
     }
 
@@ -325,15 +286,16 @@ impl<'a> MatrixSums<'a> {
                 .collect();
             self.amount(compartments)
         };
-        substitute(expression, &|name| {
-            if name == SPECIAL_VAR_TOTAL {
-                Some(amount(None))
-            } else if self.process.bins.iter().any(|bin| bin.id == name) {
-                Some(amount(Some(name)))
-            } else {
-                None
+        let Ok(read) = expression.try_map(&mut |node| match node {
+            Expr::Variable(name) if name == SPECIAL_VAR_TOTAL => {
+                Some(Ok::<_, Infallible>(amount(None)))
             }
-        })
+            Expr::Variable(name) if self.process.bins.iter().any(|bin| &bin.id == name) => {
+                Some(Ok(amount(Some(name))))
+            }
+            _ => None,
+        });
+        read
     }
 
     /// The amount of a set of compartments: 0 for none, the name of one, the
@@ -355,35 +317,6 @@ impl<'a> MatrixSums<'a> {
                         .collect(),
                 ),
             },
-        }
-    }
-}
-
-/// `expr` with each variable that `replace` gives a node for replaced by it.
-fn substitute(expr: &Expr, replace: &dyn Fn(&str) -> Option<Expr>) -> Expr {
-    let go = |operand: &Expr| substitute(operand, replace);
-    match expr {
-        Expr::Constant(_) => expr.clone(),
-        Expr::Variable(name) => replace(name).unwrap_or_else(|| expr.clone()),
-        Expr::Chain { first, rest } => Expr::chain(
-            go(first),
-            rest.iter()
-                .map(|(op, operand)| (*op, go(operand)))
-                .collect(),
-        ),
-        Expr::Power { base, exponent } => Expr::power(go(base), go(exponent)),
-        Expr::UnaryOp { op, operand } => Expr::unary(*op, go(operand)),
-        Expr::FunctionCall { name, args } => {
-            Expr::call(name.clone(), args.iter().map(go).collect())
-        }
-        Expr::Conditional {
-            condition,
-            true_expr,
-            false_expr,
-        } => Expr::if_then_else(go(condition), go(true_expr), go(false_expr)),
-        Expr::MatrixSum { .. } => {
-            // coverage: the check of the language rejects a matrix sum inside a matrix sum
-            unreachable!("a matrix sum holds no matrix sum")
         }
     }
 }

@@ -27,6 +27,9 @@ class TestSummary:
         builder = abc_builder(
             name="ABC", stratifications={"group": {"g1": 0.5, "g2": 0.5}}
         )
+        builder.add_matrix(
+            "M", "group", {"g1": {"g1": 1, "g2": 0}, "g2": {"g1": 0, "g2": 1}}
+        )
 
         assert builder.get_summary() == {
             "name": "ABC",
@@ -36,6 +39,8 @@ class TestSummary:
             "bin_ids": ["A", "B", "C"],
             "stratifications_count": 1,
             "stratification_ids": ["group"],
+            "matrices_count": 1,
+            "matrix_ids": ["M"],
             "transitions_count": 2,
             "transition_ids": ["ab", "bc"],
             "parameters_count": 2,

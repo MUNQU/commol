@@ -134,7 +134,7 @@ fn a_set_of_compartments_that_no_subgroup_total_sums_alone_reads_as_their_sum() 
 }
 
 #[test]
-fn a_term_of_a_zero_entry_is_left_out() {
+fn a_term_of_a_zero_entry_is_left_out_and_a_zero_row_keeps_its_first_term() {
     let mut model = model("matrix_sum(M, B)", "");
     model.process.matrices[0].values["g1"]["g2"] = 0.0;
     model.process.matrices[0].values["g2"]["g1"] = 0.0;
@@ -142,7 +142,8 @@ fn a_term_of_a_zero_entry_is_left_out() {
 
     let rates: Vec<String> = flows(&model).into_iter().map(|flow| flow.1).collect();
 
-    assert_eq!(rates, ["M_g1_g1 * B_g1", "0"]);
+    // The row of `g2` is 0: its first term keeps the unit of the rate.
+    assert_eq!(rates, ["M_g1_g1 * B_g1", "M_g2_g1 * B_g1"]);
 }
 
 #[test]
@@ -322,5 +323,27 @@ fn a_matrix_sum_inside_any_node_is_written_out_in_place() {
     assert_eq!(
         flows(&model)[0].1,
         "if(step > 0, -max(M_g1_g1 * (2 * B_g1) + M_g1_g2 * (2 * B_g2), 1) ^ 2, 0)"
+    );
+}
+
+#[test]
+fn two_matrices_that_give_one_variable_are_rejected() {
+    // `M` on `x` and `y_z` and `M_x` on `y` and `z` both give `M_x_y_z`.
+    let mut model = model(
+        "k1",
+        r#",{"id":"left","categories":["x","y_z"]},{"id":"right","categories":["y","z"]}"#,
+    );
+    let mut first = model.process.matrices[0].clone();
+    first.stratification = "left".to_string();
+    first.values = serde_json::from_str(r#"{"x":{"x":1,"y_z":1},"y_z":{"x":1,"y_z":1}}"#).unwrap();
+    let mut second = first.clone();
+    second.id = "M_x".to_string();
+    second.stratification = "right".to_string();
+    second.values = serde_json::from_str(r#"{"y":{"y":1,"z":1},"z":{"y":1,"z":1}}"#).unwrap();
+    model.process.matrices = vec![first, second];
+
+    assert_eq!(
+        rejection(&model),
+        "Matrices 'M' and 'M_x' both give the variable 'M_x_y_z'; rename one of them"
     );
 }

@@ -1,5 +1,5 @@
-//! The linear algebra that a model and a calibration share: the spectral
-//! radius of a square matrix.
+//! The linear algebra of commol: the spectral radius of a square matrix,
+//! which the model compiler gives each matrix between categories.
 //!
 //! The eigenvalues come from the real Schur decomposition of `nalgebra`, so
 //! they hold for any finite matrix: a complex pair as well as two moduli

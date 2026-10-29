@@ -435,7 +435,8 @@ def subgroup_total_names(process: "Process") -> list[str]:
 
 def matrix_variables(process: "Process") -> list[tuple[str, str, float, bool]]:
     """
-    The variables the matrices of a process give every formula.
+    The variables the matrices of a process give its rates and formula
+    parameters.
 
     Parameters
     ----------
