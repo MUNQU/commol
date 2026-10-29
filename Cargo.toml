@@ -28,6 +28,7 @@ argmin = { git = "https://github.com/MUNQU/argmin", branch = "development" }
 argmin-math = { git = "https://github.com/MUNQU/argmin", branch = "development" }
 finitediff = { git = "https://github.com/MUNQU/argmin", branch = "development" }
 libm = "0.2.15"
+nalgebra = { version = "0.35.0", default-features = false, features = ["std"] }
 pyo3 = { version = "0.29.3", features = ["extension-module", "serde"] }
 rayon = "1.11"
 serde = { version = "1.0", features = ["derive"] }

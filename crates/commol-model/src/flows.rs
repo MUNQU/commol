@@ -10,8 +10,7 @@
 use std::collections::{HashMap, HashSet};
 
 use commol_core::{
-    NEIGHBORS_PREFIX, Neighbors, Process, RateMathExpression, SPECIAL_VAR_TOTAL, Stratification,
-    Transition,
+    NEIGHBORS_PREFIX, Neighbors, Process, SPECIAL_VAR_TOTAL, Stratification, Transition,
 };
 
 use crate::builder::{
@@ -22,6 +21,7 @@ use crate::helpers::{
     category_overrides, get_rate_string_for_compartment, replace_bin_in_rate, target_categories,
 };
 use crate::layout::CompartmentLayout;
+use crate::matrices::{MatrixSums, variables_outside_matrix_sums};
 use crate::types::AccumulatorOutputRef;
 
 /// One planned flow of a transition.
@@ -37,7 +37,8 @@ pub(crate) struct PlannedFlow {
     /// `(source, target)` compartments of each piece. `None` on one side for
     /// source-less or target-less transitions.
     pub(crate) pieces: Vec<(Option<usize>, Option<usize>)>,
-    /// Rate expression, with bin names replaced by compartment names when the
+    /// Rate expression, with each matrix sum written as its sum over the
+    /// categories, and bin names replaced by compartment names when the
     /// transition is `per_compartment`.
     pub(crate) rate: String,
     /// Whether the rate is an absolute flow rather than a proportional rate.
@@ -123,8 +124,9 @@ fn driving_compartments(
 /// category transition does not have exactly one source and one target, when
 /// a stratified rate matches no compartment the transition starts from, when a
 /// transition without a source has a `to` condition, when a transition with
-/// several sources has a proportional rate, or when a flow ends
-/// in categories no compartment has.
+/// several sources has a proportional rate, when a flow ends
+/// in categories no compartment has, or when a matrix does not fit the
+/// process or a matrix sum cannot be written ([`MatrixSums::resolve`]).
 pub(crate) fn plan_transition_flows(
     process: &Process,
     neighbors: Option<&Neighbors>,
@@ -136,12 +138,15 @@ pub(crate) fn plan_transition_flows(
     let compartment_names: HashSet<&str> = layout.names().iter().map(String::as_str).collect();
     let is_absolute = |rate: &str, explicit: Option<bool>| {
         explicit.unwrap_or_else(|| {
-            RateMathExpression::from_string(rate.to_string())
-                .get_variables()
+            variables_outside_matrix_sums(rate)
                 .iter()
                 .any(|v| compartment_names.contains(v.as_str()) || subgroup_total_names.contains(v))
         })
     };
+    for matrix in &process.matrices {
+        matrix.check(process)?;
+    }
+    let matrix_sums = MatrixSums::new(process, layout);
 
     let mut flows = Vec::new();
     for transition in &process.transitions {
@@ -207,7 +212,10 @@ pub(crate) fn plan_transition_flows(
                 ));
             };
 
-            let mut rate = matched.rate_string.clone();
+            let explicit_absolute = matched.stratified_rate.and_then(|sr| sr.absolute);
+            let absolute =
+                sources.is_empty() || is_absolute(&matched.rate_string, explicit_absolute);
+            let mut rate = matrix_sums.resolve(&matched.rate_string, start, &transition.id)?;
             if transition.per_compartment.unwrap_or(false) && matches!(kind, TransitionKind::Bins) {
                 for (bin, idx) in source_bins.iter().zip(&sources) {
                     rate = replace_bin_in_rate(&rate, bin, layout.name(*idx));
@@ -216,9 +224,6 @@ pub(crate) fn plan_transition_flows(
                     rate = replace_bin_in_rate(&rate, bin, layout.name(*idx));
                 }
             }
-
-            let explicit_absolute = matched.stratified_rate.and_then(|sr| sr.absolute);
-            let absolute = sources.is_empty() || is_absolute(&rate, explicit_absolute);
             let rate = resolve_neighbors(&rate, start, &transition.id, process, neighbors, layout)?;
             if !absolute && sources.len() > 1 {
                 return Err(format!(

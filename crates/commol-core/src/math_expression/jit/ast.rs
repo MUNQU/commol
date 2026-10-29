@@ -15,6 +15,8 @@ use std::fmt;
 
 use serde::Serialize;
 
+use crate::math_expression::language::MATRIX_SUM;
+
 /// A node of the tree of a formula.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Expr {
@@ -67,6 +69,19 @@ pub enum Expr {
         true_expr: Box<Expr>,
         /// The value when the condition is false.
         false_expr: Box<Expr>,
+    },
+
+    /// `matrix_sum(matrix, expression)`: in a compartment of category `i`
+    /// of the stratification of the matrix, `Σ_j matrix[i, j] · e_j`, where
+    /// `e_j` is the expression with each bin read as its amount in category
+    /// `j` and `total` as the total of category `j`. A model writes it as
+    /// that sum before the JIT compiles the rate
+    /// (`commol_model`, module `matrices`).
+    MatrixSum {
+        /// The id of the matrix: not a variable.
+        matrix: String,
+        /// The expression read for each category `j`.
+        expression: Box<Expr>,
     },
 }
 
@@ -169,7 +184,8 @@ impl Expr {
             Expr::Constant(_)
             | Expr::Variable(_)
             | Expr::FunctionCall { .. }
-            | Expr::Conditional { .. } => Binding::Primary,
+            | Expr::Conditional { .. }
+            | Expr::MatrixSum { .. } => Binding::Primary,
         }
     }
 }
@@ -241,6 +257,9 @@ impl fmt::Display for Expr {
                 true_expr,
                 false_expr,
             } => write!(f, "if({condition}, {true_expr}, {false_expr})"),
+            Expr::MatrixSum { matrix, expression } => {
+                write!(f, "{MATRIX_SUM}({matrix}, {expression})")
+            }
         }
     }
 }
@@ -328,6 +347,24 @@ impl Expr {
         }
     }
 
+    /// `matrix_sum(matrix, expression)`.
+    pub fn matrix_sum(matrix: impl Into<String>, expression: Expr) -> Self {
+        Expr::MatrixSum {
+            matrix: matrix.into(),
+            expression: Box::new(expression),
+        }
+    }
+
+    /// Whether the tree holds a `matrix_sum`, which only a model writes as
+    /// a formula the JIT compiles.
+    pub fn reads_matrix_sum(&self) -> bool {
+        matches!(self, Expr::MatrixSum { .. })
+            || self
+                .operands()
+                .into_iter()
+                .any(|operand| operand.reads_matrix_sum())
+    }
+
     /// The operands of the tree one level down, in the order the formula
     /// writes them.
     pub fn operands(&self) -> Vec<&Expr> {
@@ -344,6 +381,7 @@ impl Expr {
                 true_expr,
                 false_expr,
             } => vec![condition, true_expr, false_expr],
+            Expr::MatrixSum { expression, .. } => vec![expression],
         }
     }
 }

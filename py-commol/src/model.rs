@@ -172,6 +172,33 @@ fn subgroup_total_names(process: &str) -> PyResult<Vec<String>> {
     Ok(commol_model::subgroup_total_names(&self::process(process)?))
 }
 
+/// The variables of the matrices of a process: for each matrix, its
+/// entries `<M>_<i>_<j>` row by row, then its spectral radius `<M>_radius`
+///
+/// Args:
+///     process: The JSON of the process of the model
+///
+/// Returns:
+///     (name, matrix id, value, whether it is the radius) of each variable,
+///     in that order
+///
+/// Raises:
+///     ValueError: If the JSON is not a process
+#[pyfunction]
+fn matrix_variables(process: &str) -> PyResult<Vec<(String, String, f64, bool)>> {
+    Ok(commol_model::matrix_variables(&self::process(process)?)
+        .into_iter()
+        .map(|variable| {
+            (
+                variable.name,
+                variable.matrix,
+                variable.value,
+                variable.radius,
+            )
+        })
+        .collect())
+}
+
 /// The error of a value outside its rule, with the message of the rule.
 fn value_error(message: String) -> PyErr {
     PyErr::new::<pyo3::exceptions::PyValueError, _>(message)
@@ -261,6 +288,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(transition_flows, m)?)?;
     m.add_function(wrap_pyfunction!(check_model, m)?)?;
     m.add_function(wrap_pyfunction!(subgroup_total_names, m)?)?;
+    m.add_function(wrap_pyfunction!(matrix_variables, m)?)?;
     m.add_function(wrap_pyfunction!(check_bin_amounts, m)?)?;
     m.add_function(wrap_pyfunction!(check_compartment_amounts, m)?)?;
     m.add_function(wrap_pyfunction!(check_fractions, m)?)?;

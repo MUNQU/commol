@@ -16,6 +16,7 @@ from commol._model.formula_tree import (
     Conditional,
     Constant,
     FunctionCall,
+    MatrixSum,
     Node,
     Power,
     UnaryOp,
@@ -296,9 +297,7 @@ def _operand(node: Node, values: Mapping[str, Operand]) -> Operand:
         case Constant(value):
             return _Literal(value)
         case Variable(name):
-            if name not in values:
-                raise ValueError(f"the variable '{name}' has no unit")
-            return values[name]
+            return _unit_of("variable", name, values)
         case Chain(first, rest):
             result = _operand(first, values)
             for op, operand in rest:
@@ -316,6 +315,17 @@ def _operand(node: Node, values: Mapping[str, Operand]) -> Operand:
                 _operand(true_expr, values),
                 _operand(false_expr, values),
             )
+        case MatrixSum(matrix, expression):
+            # A term of the sum is an entry, in the unit of the matrix, times
+            # the expression read in a category, in its own unit.
+            return _unit_of("matrix", matrix, values) * _operand(expression, values)
+
+
+def _unit_of(kind: str, name: str, values: Mapping[str, Operand]) -> Operand:
+    """The quantity of the variable or the matrix `name` in its unit."""
+    if name not in values:
+        raise ValueError(f"the {kind} '{name}' has no unit")
+    return values[name]
 
 
 def _unary(op: str, operand: Node, values: Mapping[str, Operand]) -> Operand:
@@ -340,6 +350,8 @@ def formula_unit(tree: Node, variable_units: Mapping[str, str]) -> pint.Quantity
     ``cbrt`` takes the cube root of a unit, ``abs`` and ``round`` keep it,
     and the other functions take and give numbers without a unit. ``pi`` and
     ``e`` are numbers without a unit.
+    ``matrix_sum(M, e)`` has the unit of ``M``, which `variable_units`
+    holds under the id of the matrix, times the unit of ``e``.
 
     Parameters
     ----------

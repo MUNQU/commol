@@ -4,6 +4,7 @@ use crate::flows::{PlannedFlow, plan_transition_flows};
 use crate::helpers::stratification_conditions_met;
 use crate::labels::OutputLabels;
 use crate::layout::CompartmentLayout;
+use crate::matrices::{check_matrices, matrix_variables};
 use crate::types::{
     AccumulatorOutputRef, CompiledModel, FAST_STACK_DEPTH, FastRateExpression, FastRateOp,
     FlowChange, GeneratedAccumulatorOutput, ImpulseFlow, ImpulseSchedule, SeriesParameter,
@@ -138,6 +139,11 @@ impl CompiledModel {
                     fixed_parameters.insert(p.id.clone());
                 }
             }
+        }
+        // The entries and the spectral radius of each matrix do not change
+        // during a run.
+        for variable in matrix_variables(process) {
+            constant_parameters.insert(variable.name, variable.value);
         }
 
         // Initialize expression context with constant parameters
@@ -840,6 +846,25 @@ fn build_subgroup_total_mappings(
         .collect()
 }
 
+/// The subgroup total that sums each set of compartments, by the sorted
+/// indices of the set. When two names sum one set, the first in sorted order
+/// is kept, so the choice does not depend on the order of a map.
+pub(crate) fn subgroup_totals_by_compartments(
+    layout: &CompartmentLayout,
+    process: &Process,
+) -> HashMap<Vec<usize>, String> {
+    let mut mappings = build_subgroup_total_mappings(layout, process);
+    mappings.sort_unstable_by(|a, b| a.parameter_name.cmp(&b.parameter_name));
+    let mut totals: HashMap<Vec<usize>, String> = HashMap::new();
+    for mapping in mappings {
+        let mut compartments = mapping.contributing_compartment_indices;
+        compartments.sort_unstable();
+        compartments.dedup();
+        totals.entry(compartments).or_insert(mapping.parameter_name);
+    }
+    totals
+}
+
 /// Names of the subgroup totals a rate expression may reference.
 pub(crate) fn subgroup_total_name_set(
     layout: &CompartmentLayout,
@@ -986,12 +1011,46 @@ pub fn check_model(model: &Model) -> Result<(), String> {
         ));
     }
 
+    // A later kind names a name that is also of an earlier kind: a bin is
+    // also its bin total, and a compartment of no category is its bin.
+    let taken: HashMap<&str, &str> = subgroup_totals
+        .iter()
+        .map(|name| (name.as_str(), "a subgroup total"))
+        .chain(compartments.iter().map(|&name| (name, "a compartment")))
+        .chain(process.bins.iter().map(|bin| (bin.id.as_str(), "a bin")))
+        .chain(
+            process
+                .accumulators
+                .iter()
+                .map(|accumulator| (accumulator.id.as_str(), "an accumulator")),
+        )
+        .chain(parameter_ids.iter().map(|&id| (id, "a parameter")))
+        .chain(
+            ENGINE_VARIABLES
+                .iter()
+                .map(|&name| (name, "an engine variable")),
+        )
+        .collect();
+    let of = |owner: &str| -> Vec<(&str, &str)> {
+        formulas
+            .iter()
+            .filter(|formula| formula.owner == owner)
+            .map(|formula| (formula.id, formula.text))
+            .collect()
+    };
+    check_matrices(process, &of("transition"), &of("parameter"), &taken)?;
+    let matrix_names: Vec<String> = matrix_variables(process)
+        .into_iter()
+        .map(|variable| variable.name)
+        .collect();
+
     let defined: HashSet<&str> = parameter_ids
         .iter()
         .copied()
         .chain(compartments.iter().copied())
         .chain(subgroup_totals.iter().map(String::as_str))
         .chain(process.bins.iter().map(|bin| bin.id.as_str()))
+        .chain(matrix_names.iter().map(String::as_str))
         .chain(ENGINE_VARIABLES)
         .chain(std::iter::once(NEIGHBORS))
         .collect();
@@ -1655,7 +1714,10 @@ fn push_fast_ops_from_ast(
                 });
             }
         }
-        Expr::Power { .. } | Expr::FunctionCall { .. } | Expr::Conditional { .. } => return None,
+        Expr::Power { .. }
+        | Expr::FunctionCall { .. }
+        | Expr::Conditional { .. }
+        | Expr::MatrixSum { .. } => return None,
     }
     Some(())
 }
@@ -1779,6 +1841,7 @@ mod tests {
                 ],
                 accumulators: vec![],
                 stratifications,
+                matrices: vec![],
                 transitions: vec![],
             },
             structure: ModelStructure::Aggregate(Aggregate {

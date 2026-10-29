@@ -41,7 +41,7 @@ crates/commol-difference/    the discrete step: X += derivatives
 crates/commol-differential/  the ODE engine: diffsol integrates derivatives
 crates/commol-stochastic/    the stochastic engines of whole units
 crates/commol-random/        the generator, replicate seeds, samplers
-crates/commol-statistics/    numerical helpers, log densities, the one quantile
+crates/commol-statistics/    numerical helpers, log densities, the one quantile, the spectral radius
 crates/commol-calibration/   the problem in layers, optimizers (argmin fork), starts
 crates/commol-inference/     parameter sample, predictive, scores
 ```
@@ -59,7 +59,7 @@ crates/commol-inference/     parameter sample, predictive, scores
 | Two Rust stochastic engines of whole units: events in continuous time (direct method, tau-leaping) and the chain binomial | `crates/commol-stochastic/` |
 | Reproducible random numbers for stochastic engines and inference methods: the generator, replicate seeds, samplers, and a sum tree of rates that the stochastic engine of the test kind uses | `crates/commol-random/` |
 | A JIT compiler for rate expressions | `crates/commol-core/src/math_expression/jit/` (Cranelift) |
-| One copy of each numerical helper, log density and weighted statistic that calibration and inference share: `log Σ exp`, the special functions, the normal, log-normal and Student t densities, the one quantile, the weighted summary | `crates/commol-statistics/` |
+| One copy of each numerical helper, log density and weighted statistic that calibration and inference share: `log Σ exp`, the special functions, the normal, log-normal and Student t densities, the one quantile, the weighted summary, the spectral radius of a matrix | `crates/commol-statistics/` |
 | A calibration problem in layers: the forward model, the observation operator, feasibility, the discrepancy and the optimization objective; optimizers from one or several starts | `crates/commol-calibration/`, `py-commol/commol/_calibration/calibrator.py` |
 | What every uncertainty method returns or reads: a weighted parameter sample, its predictive, scores, one entry point | `crates/commol-inference/`, `py-commol/commol/uncertainty/`, `py-commol/commol/scores/`, one module per family of methods (`py-commol/commol/resampling/`, …) |
 

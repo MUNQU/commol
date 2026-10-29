@@ -25,6 +25,7 @@
 
 use super::ast::{BinaryOperator, Expr, Level, UnaryOperator};
 use crate::math_expression::error::MathExpressionError;
+use crate::math_expression::language::MATRIX_SUM;
 
 /// The deepest a formula may nest: parentheses, calls, signs and powers,
 /// one level each. A walk of a tree at this depth fits the stack of a
@@ -425,8 +426,18 @@ fn nothing() -> String {
 }
 
 /// The call of `name` with `args`: `if` with three arguments is a
-/// conditional.
+/// conditional, and `matrix_sum` with the id of a matrix and an expression
+/// is a matrix sum.
 fn call(name: &str, args: Vec<Expr>) -> Result<Expr, String> {
+    if name == MATRIX_SUM {
+        return match <[Expr; 2]>::try_from(args) {
+            Ok([Expr::Variable(matrix), expression]) => Ok(Expr::matrix_sum(matrix, expression)),
+            _ => Err(format!(
+                "{MATRIX_SUM} takes the id of a matrix and an expression, as in \
+                 {MATRIX_SUM}(M, B / total)"
+            )),
+        };
+    }
     if name != "if" {
         return Ok(Expr::call(name, args));
     }
@@ -588,6 +599,7 @@ mod tests {
             "(x ^ 2) ^ 3",
             "2 ^ -x",
             "(x < 1) < 2",
+            "k * matrix_sum(M, x / total) ^ 2",
         ] {
             let tree = parse(formula);
             assert_eq!(parse(&tree.to_string()), tree, "{formula}");

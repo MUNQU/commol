@@ -259,6 +259,7 @@ name = "commol-model"
 version = "0.1.0"
 dependencies = [
  "commol-core",
+ "commol-statistics",
  "serde_json",
 ]
 
@@ -277,6 +278,7 @@ name = "commol-statistics"
 version = "0.1.0"
 dependencies = [
  "libm",
+ "nalgebra",
 ]
 
 [[package]]

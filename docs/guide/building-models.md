@@ -75,9 +75,9 @@ Every `add_*` method returns the builder, so calls chain. The other methods:
 | Method | Returns | What it does |
 |---|---|---|
 | `build(structure, engine, settings=None)` | `Model` of the class of `structure` | Joins the process with a [structure](#the-structure-aggregate) and an engine, validates the model and returns it. The engine must run the kind of the structure: `"DifferenceEquations"` (discrete time), `"DifferentialEquations"` (continuous time), `"StochasticEvents"` and `"StochasticSteps"` ([at random](stochastic.md)) run `Aggregate`. `settings` are the settings of that engine (`ODESolver` for `"DifferentialEquations"`, `StochasticEventsSettings` and `StochasticStepsSettings` for the stochastic engines); None uses its defaults. One builder builds the model for each engine and each structure. See [Differential equations](simulations.md#differential-equations). |
-| `process()` | `Process` | The bins, accumulators, stratifications and transitions written so far. |
+| `process()` | `Process` | The bins, accumulators, stratifications, matrices and transitions written so far. |
 | `clone()` | `ModelBuilder` | A deep copy of everything, accumulators included, to build variants of one model. |
-| `reset()` | `ModelBuilder` | Removes bins, accumulators, stratifications, transitions and parameters; keeps the name, description, version, `bin_unit`, `step_unit` and `origin`. |
+| `reset()` | `ModelBuilder` | Removes bins, accumulators, stratifications, matrices, transitions and parameters; keeps the name, description, version, `bin_unit`, `step_unit` and `origin`. |
 | `get_summary()` | `dict` | The name, description, version, and the count and ids of the bins, stratifications, transitions and parameters added so far. |
 
 ```python
@@ -276,6 +276,42 @@ category=<category>)`, and may only name a stratification declared before this o
 See [Core Concepts](core-concepts.md#stratifications) for worked examples, and
 [Transitions](transitions.md#stratified-rates) for rates that depend on the
 category.
+
+## Matrices between categories
+
+A matrix holds one value for each pair of categories of a stratification. A
+rate reads it with `matrix_sum`, which couples the categories:
+
+```python
+builder = builder.add_matrix(
+    id="M",
+    stratification="group",
+    values={"g1": {"g1": 2.0, "g2": 1.0}, "g2": {"g1": 1.0, "g2": 3.0}},
+    unit="1/day",
+    description="Coupling between the groups",
+)
+```
+
+| Argument | Type | Default | Meaning |
+|---|---|---|---|
+| `id` | `str` | required | The id `matrix_sum` reads, and the start of the names of its variables. |
+| `stratification` | `str` | required | The stratification whose categories are its rows and its columns. |
+| `values` | `Mapping[str, Mapping[str, float]]` | required | `values[i][j]`, the value of row `i` and column `j`. |
+| `unit` | `str | None` | `None` | The unit of its values. The [unit check](units-and-equations.md) needs it once the model has units. |
+| `description` | `str | None` | `None` | A free-text description. |
+
+| What it gives | Meaning |
+|---|---|
+| `matrix_sum(M, e)` in a transition rate | In a compartment of category `i`, `Σ_j M[i, j] · e_j`, with each bin of `e` read in category `j`. See [Matrix sums](mathematical-expressions.md#matrix-sums) |
+| `M_<i>_<j>` in any formula | The value of row `i` and column `j`, as `M_g1_g2` |
+| `M_radius` in any formula | The spectral radius: the largest modulus of its eigenvalues |
+
+`build` raises `ValueError` when the stratification is not one of the
+process, a row or a value of a category is missing, a row or a column names
+no category, a value is not finite, or the id or a variable of the matrix has
+the name of another id or variable of the model. Each message names the
+matrix and the category. `Model.describe` lists each matrix with its values
+and its spectral radius under the parameters.
 
 ## Accumulators
 

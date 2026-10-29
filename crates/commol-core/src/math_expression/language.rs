@@ -1,18 +1,24 @@
 //! The language of formulas: its functions and the check of a formula.
 //!
 //! A formula is a number: numbers, variables, the arithmetic operators
-//! `+ - * / % ^` (`**` is `^`), the sign `-`, the calls of [`FUNCTIONS`] and
-//! `if(condition, a, b)`. A condition is a comparison of two numbers
-//! (`< > <= >= == !=`) or `!` of a condition, and it is the only place a
-//! comparison or `!` may be. The check of a formula
-//! ([`MathExpression::check`](crate::MathExpression::check)) reads the tree the JIT compiles
-//! ([`Expr`]), so a formula it accepts compiles, and the JIT compiles the
-//! functions of [`FUNCTIONS`] and no other.
+//! `+ - * / % ^` (`**` is `^`), the sign `-`, the calls of [`FUNCTIONS`],
+//! `if(condition, a, b)` and `matrix_sum(matrix, e)`. A condition is a
+//! comparison of two numbers (`< > <= >= == !=`) or `!` of a condition, and
+//! it is the only place a comparison or `!` may be. A matrix sum holds no
+//! other matrix sum. The check of a formula
+//! ([`MathExpression::check`](crate::MathExpression::check)) reads the tree
+//! the JIT compiles ([`Expr`]), so a formula it accepts compiles, and the JIT
+//! compiles the functions of [`FUNCTIONS`] and no other. A formula that holds
+//! a matrix sum compiles once a model writes each matrix sum as the sum over
+//! the categories it is.
 
 use std::collections::HashSet;
 
 use super::jit::ast::{BinaryOperator, Expr, Level, UnaryOperator};
 use super::jit::parser::MAX_NODES;
+
+/// The name of the matrix sum: `matrix_sum(matrix, e)` ([`Expr::MatrixSum`]).
+pub const MATRIX_SUM: &str = "matrix_sum";
 
 /// How many arguments a function takes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -201,7 +207,7 @@ fn number(expr: &Expr, nodes: &mut usize) -> Result<(), String> {
             let Some(function) = function(name) else {
                 return Err(format!(
                     "'{name}' is not a function of the language, whose functions are \
-                     {}, and if(condition, a, b)",
+                     {}, if(condition, a, b) and {MATRIX_SUM}(matrix, e)",
                     function_names()
                 ));
             };
@@ -222,6 +228,15 @@ fn number(expr: &Expr, nodes: &mut usize) -> Result<(), String> {
             condition(test, nodes)?;
             number(true_expr, nodes)?;
             number(false_expr, nodes)
+        }
+        Expr::MatrixSum { expression, .. } => {
+            if expression.reads_matrix_sum() {
+                return Err(format!(
+                    "a {MATRIX_SUM} holds another {MATRIX_SUM}; write each one outside the \
+                     others"
+                ));
+            }
+            number(expression, nodes)
         }
     }
 }

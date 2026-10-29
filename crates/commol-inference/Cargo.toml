@@ -21,7 +21,7 @@ anyhow = "1.0"
 argmin = { workspace = true }
 finitediff = { workspace = true }
 libm = { workspace = true }
-nalgebra = { version = "0.35.0", default-features = false, features = ["std"] }
+nalgebra = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 

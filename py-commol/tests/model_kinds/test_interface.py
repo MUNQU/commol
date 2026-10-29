@@ -282,6 +282,7 @@ def test_the_process_of_a_model_is_saved_apart_from_its_structure() -> None:
         "bins",
         "accumulators",
         "stratifications",
+        "matrices",
         "transitions",
     }
     assert "bins" not in data["structure"]

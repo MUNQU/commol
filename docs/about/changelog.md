@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   predictive, the scores, the figures and the `observed` block of a report
   (`scales`) read it. See
   [Observations](../guide/calibration-observations.md#known-shares-scales).
+- `ModelBuilder.add_matrix(id, stratification, values, unit, description)`
+  adds a matrix between the categories of a stratification, and a
+  transition rate reads it with `matrix_sum(M, e)`: in a compartment of
+  category `i`, `Σ_j M[i, j] · e_j`, with each bin of `e` read as its amount
+  in category `j` and `total` as the total of `j`. Every engine runs it. Every
+  formula reads the entries as `M_<i>_<j>` and the spectral radius of the
+  matrix as `M_radius`. The unit check, the equations and `Model.describe`
+  read the matrix. See
+  [Matrix sums](../guide/mathematical-expressions.md#matrix-sums).
 - `GibbsResult` and `ConformalResult` give `block_length` and
   `block_length_estimates`, as the bootstraps, the jackknife and the sandwich
   do: the length a method ran with, and with `block_length="auto"` the

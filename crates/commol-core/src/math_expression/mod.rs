@@ -31,6 +31,10 @@
 //!   `atanh`, `exp`, `log` and `ln` (natural), `log10`, `log2`, `sqrt`,
 //!   `cbrt`, `pow(x, y)`, `hypot(x, y)`, `min` and `max` (two arguments or
 //!   more), `abs`, `floor`, `ceil`, `round`.
+//! - `matrix_sum(matrix, e)`: in the rate of a compartment of category `i`,
+//!   `Σ_j matrix[i, j] · e_j`, with each bin of `e` read as its amount in
+//!   category `j` and `total` as the total of `j`; a model writes it as that
+//!   sum ([`Expr::MatrixSum`]).
 //! - `if(condition, a, b)`: `a` when the condition holds, else `b`. A
 //!   condition is a comparison (`<`, `>`, `<=`, `>=`, `==`, `!=`) of two
 //!   numbers, or `!` of a condition; a comparison or `!` is nowhere else.
@@ -56,7 +60,7 @@ pub use context::MathExpressionContext;
 pub use error::MathExpressionError;
 pub use jit::parser::{MAX_NESTING, MAX_NODES};
 pub use jit::{JITCompiler, JITFunction};
-pub use language::{Arguments, FUNCTIONS, Function};
+pub use language::{Arguments, FUNCTIONS, Function, MATRIX_SUM};
 pub use variables::{ENGINE_VARIABLES, SPECIAL_VAR_TOTAL, SUBGROUP_TOTAL_PREFIX};
 
 use jit::ast::Expr;
@@ -158,7 +162,9 @@ impl MathExpression {
 
     /// Check that the formula is in the language of formulas, and count the
     /// nodes of its tree: numbers, variables, operators and calls, `if`
-    /// among them. A formula that passes the check compiles.
+    /// among them. A formula that passes the check compiles; one that holds
+    /// a `matrix_sum` compiles once a model writes each matrix sum as its
+    /// sum over the categories.
     ///
     /// # Errors
     ///
@@ -177,7 +183,11 @@ impl MathExpression {
         };
         let tree = jit::parser::tree(&self.formula).map_err(outside)?;
         let nodes = language::check(&tree).map_err(outside)?;
-        self.jit()?;
+        // A model writes each matrix sum as its sum over the categories, and
+        // compiles that formula.
+        if !tree.reads_matrix_sum() {
+            self.jit()?;
+        }
         Ok(nodes)
     }
 

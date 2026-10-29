@@ -27,11 +27,16 @@ class ModelCompartmentHelper:
     # ------------------------------------------------------------------
 
     def has_all_units(self) -> bool:
-        """True when every bin and every constant parameter has a unit."""
-        return all(b.unit for b in self._model.process.bins) and all(
-            p.unit is not None
-            for p in self._model.parameters
-            if not isinstance(p.value, str)
+        """True when every bin, matrix and constant parameter has a unit."""
+        process = self._model.process
+        return (
+            all(b.unit for b in process.bins)
+            and all(m.unit for m in process.matrices)
+            and all(
+                p.unit is not None
+                for p in self._model.parameters
+                if not isinstance(p.value, str)
+            )
         )
 
     def build_variable_units(self) -> dict[str, str]:
@@ -43,6 +48,7 @@ class ModelCompartmentHelper:
 
     def _add_base_variable_units(self, variable_units: dict[str, str]) -> None:
         self._add_parameter_units(variable_units)
+        self._add_matrix_units(variable_units)
         self._add_bin_units(variable_units)
         self._add_compartment_units(variable_units)
         self._add_predefined_variable_units(variable_units)
@@ -52,6 +58,18 @@ class ModelCompartmentHelper:
         for param in self._model.parameters:
             if param.unit:
                 variable_units[param.id] = param.unit
+
+    def _add_matrix_units(self, variable_units: dict[str, str]) -> None:
+        """
+        The unit of a matrix, under its id for ``matrix_sum``, and of the
+        variables it gives: its entries and its spectral radius.
+        """
+        process = self._model.process
+        units = {matrix.id: matrix.unit for matrix in process.matrices if matrix.unit}
+        variable_units.update(units)
+        for name, matrix, _, _ in engine_state.matrix_variables(process):
+            if matrix in units:
+                variable_units[name] = units[matrix]
 
     def _add_bin_units(self, variable_units: dict[str, str]) -> None:
         for state in self._model.process.bins:
@@ -206,9 +224,11 @@ class ModelCompartmentHelper:
         return f"{annotated_rate}{unit_suffix}"
 
     def register_custom_units(self) -> None:
-        """Define the units of the bins, parameters and step that pint lacks."""
+        """Define the units of the bins, parameters, matrices and step that pint
+        lacks."""
         units = [b.unit for b in self._model.process.bins if b.unit]
         units += [p.unit for p in self._model.parameters if p.unit]
+        units += [m.unit for m in self._model.process.matrices if m.unit]
         if self._model.step_unit:
             units.append(self._model.step_unit)
         for unit in units:

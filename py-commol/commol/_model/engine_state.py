@@ -433,6 +433,26 @@ def subgroup_total_names(process: "Process") -> list[str]:
     return commol_rs.model.subgroup_total_names(engine_json(process))
 
 
+def matrix_variables(process: "Process") -> list[tuple[str, str, float, bool]]:
+    """
+    The variables the matrices of a process give every formula.
+
+    Parameters
+    ----------
+    process : Process
+        The process of the model.
+
+    Returns
+    -------
+    list[tuple[str, str, float, bool]]
+        ``(name, matrix id, value, whether it is the radius)`` of each
+        variable: for each matrix, its entries ``<M>_<i>_<j>`` row by row,
+        then its spectral radius ``<M>_radius``, as the engine names and
+        computes them.
+    """
+    return commol_rs.model.matrix_variables(engine_json(process))
+
+
 @lru_cache(maxsize=1024)
 def formula_tree(formula: str) -> Node:
     """

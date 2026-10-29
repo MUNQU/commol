@@ -55,7 +55,7 @@ fn a_function_outside_the_guide_is_rejected() {
             rejection(formula),
             format!(
                 "Formula '{formula}': '{name}' is not a function of the language, whose \
-                 functions are {functions}, and if(condition, a, b)"
+                 functions are {functions}, if(condition, a, b) and matrix_sum(matrix, e)"
             )
         );
     }
@@ -320,4 +320,43 @@ fn a_chain_of_powers_groups_from_the_right() {
     assert_eq!(tree("-x ^ 2"), tree("-(x ^ 2)"));
     assert_eq!(tree("(2 ^ 3) ^ 2").to_string(), "(2 ^ 3) ^ 2");
     assert_eq!(tree("2 ^ (3 ^ 2)").to_string(), "2 ^ 3 ^ 2");
+}
+
+#[test]
+fn a_matrix_sum_is_in_the_language_and_compiles_only_once_a_model_writes_it() {
+    let expression = MathExpression::new("k1 * matrix_sum(M, B / total)".to_string());
+
+    assert_eq!(expression.check().unwrap(), 6);
+    assert_eq!(expression.get_variables(), ["k1", "B"]);
+    assert_eq!(
+        expression
+            .evaluate(&mut MathExpressionContext::new())
+            .unwrap_err()
+            .to_string(),
+        "Invalid expression: 'k1 * matrix_sum(M, B / total)' does not compile: Invalid \
+         expression: matrix_sum reads the category of a compartment, so only the rate of a \
+         transition reads it, and the model writes it as a sum over the categories"
+    );
+}
+
+#[test]
+fn a_matrix_sum_takes_a_matrix_and_an_expression_and_holds_no_other() {
+    let takes = "matrix_sum takes the id of a matrix and an expression, as in \
+                 matrix_sum(M, B / total)";
+    for (formula, reason) in [
+        ("matrix_sum(M)", takes.to_string()),
+        ("matrix_sum(2, B)", takes.to_string()),
+        ("matrix_sum(M, B, total)", takes.to_string()),
+        (
+            "matrix_sum(M, matrix_sum(N, B))",
+            "a matrix_sum holds another matrix_sum; write each one outside the others".to_string(),
+        ),
+        (
+            "matrix_sum(M, B > 1)",
+            "the comparison '>' is only allowed in the condition of if(condition, a, b)"
+                .to_string(),
+        ),
+    ] {
+        assert_eq!(rejection(formula), format!("Formula '{formula}': {reason}"));
+    }
 }
