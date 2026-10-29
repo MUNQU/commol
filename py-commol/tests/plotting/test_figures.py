@@ -15,7 +15,7 @@ import pytest
 from matplotlib.colors import to_rgba
 from matplotlib.figure import Figure
 
-from commol import ObservedDataPoint, Simulation
+from commol import Calibrator, ObservedDataPoint, Simulation
 from commol._simulation.results import SimulationResults
 from commol.plotting import PlotConfig, figures, plot_compared
 from commol._simulation import plots as simulation_plots
@@ -29,6 +29,8 @@ from commol.sensitivity.results import (
     SobolResult,
 )
 from commol.sensitivity import plots as sensitivity_plots
+from commol.sensitivity import InputSpace, SensitivityAnalysis
+from commol.uncertainty import Predictive
 from commol.uncertainty import plots as predictive_plots
 from commol.uncertainty.plots import PredictivePlot
 from tests.suite.public_surface import EXPORTS
@@ -42,6 +44,7 @@ from tests.support.plotted import (
     BINS,
     TITLES,
     fit,
+    factor_predictive_of,
     predictive_of,
     scatter,
     visible,
@@ -349,6 +352,58 @@ class TestObservationOperator:
 
         with pytest.raises(ValueError, match="Invalid factor_id 'f'"):
             getattr(predictive.plot, figure)(observed_data=observed)
+
+    @pytest.mark.parametrize(
+        ("factor_id", "message"),
+        [
+            ("g", "Invalid factor_id 'g'"),
+            ("k1", "'k1' referenced as factor_id but is not a Factor parameter"),
+        ],
+    )
+    def test_a_predictive_cumulative_figure_checks_its_factors_in_the_engine(
+        self, factor_id: str, message: str
+    ) -> None:
+        observed = [
+            ObservedDataPoint(at=10, output="events", value=1.0, factor_id=factor_id)
+        ]
+
+        with pytest.raises(ValueError, match=message):
+            factor_predictive_of([0.02, 0.1]).plot.cumulative(observed_data=observed)
+
+    def test_the_cumulative_figure_of_an_analysis_refuses_a_factor(self) -> None:
+        of_calibration = predictive_of([0.02, 0.1])
+        calibrator = of_calibration.source
+        assert isinstance(calibrator, Calibrator)
+        analysis = SensitivityAnalysis(
+            calibrator.simulation,
+            InputSpace.from_sample(
+                of_calibration.sample, calibrator.problem.parameters
+            ),
+            seed=1,
+        )
+        predictive = Predictive(analysis, of_calibration.sample, list(range(41)))
+        observed = [ObservedDataPoint(at=10, output="events", value=1.0, factor_id="f")]
+
+        with pytest.raises(ValueError, match="Invalid factor_id 'f'"):
+            predictive.plot.cumulative(observed_data=observed)
+
+    def test_a_predictive_cumulative_figure_runs_no_draw_to_check_a_factor(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        predictive = factor_predictive_of([0.02, 0.1])
+        observed = [
+            ObservedDataPoint(at=step, output="events", value=1.0, factor_id="f")
+            for step in (10, 20)
+        ]
+
+        def no_run(*_: object) -> None:
+            raise AssertionError("the check ran the draws")
+
+        monkeypatch.setattr(Calibrator, "_observation_draws", no_run)
+        fig = predictive.plot.cumulative(observed_data=observed, series=["events"])
+
+        # Each observation divided by the weighted median of f, 0.5.
+        np.testing.assert_allclose(scatter(fig.axes[0])[:, 1], [2.0, 4.0])
 
     def test_points_of_different_factors_are_each_read_through_their_own(
         self, run: SimulationResults

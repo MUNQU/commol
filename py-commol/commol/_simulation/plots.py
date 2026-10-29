@@ -237,9 +237,9 @@ class ResultsPlot:
         observation through its own operator (the sum of its outputs, its
         window, its scale and its factor), as the loss reads it. A value with
         a window is a total over ``(at - window, at]``, drawn as a step over
-        its window with a marker at ``at``. A value with no window is a marker, joined
-        to the next only as a guide. The run along the whole axis is
-        `series`, on the same figure with ``axes=``.
+        its window with a marker at ``at``. A value with no window is a
+        marker, joined to the next only as a guide. The run along the whole
+        axis is `series`, on the same figure with ``axes=``.
 
         Parameters
         ----------

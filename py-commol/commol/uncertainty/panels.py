@@ -152,21 +152,18 @@ def predictive_observation_panels(
 
 def _check_factors(predictive: "Predictive", observed: list[ObservedDataPoint]) -> None:
     """
-    Read the first observation of each factor through the operator of the
-    engine, which raises `ValueError` for a factor the problem does not have,
-    as the band of a series with that factor does.
+    Check the observations with a factor against the source of the predictive,
+    with no run: the engine refuses an unknown factor, or a parameter that is
+    not a factor, as the band of a series with that factor does.
 
     Raises
     ------
     ValueError
         With the message of the engine.
     """
-    firsts: dict[str, ObservedDataPoint] = {}
-    for point in observed:
-        if point.factor_id is not None:
-            firsts.setdefault(point.factor_id, point)
-    if firsts:
-        predictive.at_observations(list(firsts.values()), NoNoise())
+    with_factor = [point for point in observed if point.factor_id is not None]
+    if with_factor:
+        predictive.source._check_observations(with_factor)
 
 
 def _draws_band(band: "SeriesBand") -> Band:

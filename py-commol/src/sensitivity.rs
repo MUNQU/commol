@@ -172,6 +172,26 @@ impl PyForwardAnalysis {
         .map(|inner| PyObservationDraws { inner })
         .map_err(method_error)
     }
+
+    /// Check `observations` against the analysis, with no run: the positions
+    /// the engine accepts and what the observation operator reads
+    /// (`ForwardModel::with_observations`)
+    ///
+    /// Args:
+    ///     observations: The JSON of the observations
+    ///
+    /// Raises:
+    ///     ValueError: If the engine rejects a position, or an observation
+    ///         names an unknown output or a factor: an analysis has no factor
+    fn check_observations(&self, observations: &str) -> PyResult<()> {
+        let observations =
+            commol_calibration::observed_data(&crate::json::read::<Vec<_>>(observations)?);
+        self.inner
+            .forward()
+            .with_observations(&observations)
+            .map(|_| ())
+            .map_err(value_error)
+    }
 }
 
 /// Monte Carlo propagation: the draws, the quantities and weight of each

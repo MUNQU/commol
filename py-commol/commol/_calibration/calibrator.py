@@ -217,6 +217,23 @@ class Calibrator:
             sample._rust, engine_json(observed_data), engine_json(noise)
         )
 
+    def _check_observations(self, observed_data: list[ObservedDataPoint]) -> None:
+        """
+        Check `observed_data` against the problem in Rust, with no run.
+
+        Parameters
+        ----------
+        observed_data : list[ObservedDataPoint]
+            The observations.
+
+        Raises
+        ------
+        ValueError
+            If the engine rejects a position, or an observation names an
+            unknown output or factor, or a parameter that is not a factor.
+        """
+        self._engine_problem.check_observations(engine_json(observed_data))
+
     def _log_score(
         self, sample: ParameterSample, observed_data: list[ObservedDataPoint]
     ) -> list[float]:

@@ -69,9 +69,8 @@ class PredictivePlot:
 
         Each draw is read through the observation operator of the problem
         (the sums, windows, scales and factors of the observations of the
-        series,
-        each at its own position when they do not share one operator with no
-        window), then the draws are reduced with their weights.
+        series, each at its own position when they do not share one operator
+        with no window), then the draws are reduced with their weights.
 
         Parameters
         ----------

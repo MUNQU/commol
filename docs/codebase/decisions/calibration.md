@@ -140,18 +140,24 @@ figures of a `SimulationResults` and of its replicates have no calibration
 problem to read: they repeat scale times factor in Python (`model_multiplier`
 of `plotting/panels.py`). The cumulative figures of a run, of its replicates
 and of a predictive divide each observation by it in Python, a predictive with
-the weighted median of the factor. A target that copies the first observation of its series (conformal
-`targets`, the dense design of finite differences) keeps its scale. Not a
-`factor` with equal bounds: `CalibrationParameter` refuses them, and a
-parameter that nothing fits would enter every method that reads the parameter
-vector. Not a scale of the series: `factor_id`, `window` and `trials` change
-by observation, and a loss has no observation model.
+the weighted median of the factor; a predictive checks the factors of its
+observations in the engine first, with no run
+(`ForwardModel::with_observations`, the binding `check_observations`). A
+target that copies the first observation of its series (conformal `targets`,
+the dense design of finite differences) keeps its scale. Not a `factor` with
+equal bounds: `CalibrationParameter` refuses them, and a parameter that
+nothing fits would enter every method that reads the parameter vector. Not a
+scale of the series: `factor_id`, `window` and `trials` change by
+observation, and a loss has no observation model.
 
 **Guards:** `observation::tests::a_scale_and_a_factor_multiply`,
 `tests/calibration/test_observations.py::test_an_observation_reads_the_model_times_its_scale`,
 `tests/uncertainty/test_profiles.py::TestPredictionProfiles::test_a_prediction_profile_reads_the_scale_of_its_prediction`,
 `tests/plotting/test_figures.py::TestObservationOperator::test_a_scale_multiplies_the_line_and_each_point_of_its_own`,
-`tests/plotting/test_run_figures.py::TestRunFigures::test_cumulative_observations_are_divided_by_their_scale`.
+`tests/plotting/test_run_figures.py::TestRunFigures::test_cumulative_observations_are_divided_by_their_scale`,
+`tests/plotting/test_figures.py::TestObservationOperator::test_a_missing_factor_warns_once_per_factor`,
+`tests/plotting/test_figures.py::TestObservationOperator::test_a_predictive_refuses_a_factor_the_problem_lacks`,
+`tests/plotting/test_figures.py::TestObservationOperator::test_a_predictive_cumulative_figure_runs_no_draw_to_check_a_factor`.
 
 ## Constraints bound the support
 
