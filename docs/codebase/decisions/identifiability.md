@@ -37,21 +37,24 @@ The error of the runs of an engine that integrates with a tolerance enters
 the estimated error of the sensitivities, so it can hide a singular value
 that a tighter tolerance resolves. `structural_rank` asks the source for the
 accuracy of its runs (`SensitivitySource::accuracy`, an `Accuracy` of
-`commol-core`) and for the same source at a tighter one (`SensitivitySource::at_accuracy`, which
-`FiniteDifferences` builds from `ForwardModel::at_accuracy` and
-`SimulationEngine::at_accuracy`; `None` for an engine whose accuracy no
-setting sets). Each point whose rank is below the number of parameters is
-evaluated once more, at each accuracy divided by `TIGHTENING` (100), no
-lower than `TIGHTEST` (1e-14); the verdicts are computed again with the
-ranks and null spaces there. A parameter whose verdict changes has no
-verdict (`None`), as a profile whose structure is undetermined. When a point
-cannot run at the tighter accuracy, every parameter that is not identifiable
-has no verdict, and `unchecked` says why. The section keeps the generic
-rank, the projections and the combinations at the accuracy of the engine,
-and the generic rank at the tighter one; a combination that holds a
-parameter with no verdict goes. The engine names the settings of its
-accuracy (`SimulationEngine::accuracy_settings`: `ODESolver.rtol` and
-`ODESolver.atol`), and the reason names them.
+`commol-core`), for the settings that set it
+(`SensitivitySource::accuracy_settings`, from
+`SimulationEngine::accuracy_settings`: `ODESolver.rtol` and `ODESolver.atol`)
+and for the same source at a tighter accuracy
+(`SensitivitySource::at_accuracy`, which `FiniteDifferences` builds from
+`ForwardModel::at_accuracy` and `SimulationEngine::at_accuracy`). It tightens
+only when both are `Some`, and `StructuralAnalysis::tighter` holds the
+tighter accuracy with its settings (`Tightening`), so a verdict left out at
+the tighter accuracy always has settings for its reason to name. A point of
+rank below the number of parameters differentiated runs once more, at each
+accuracy divided by `TIGHTENING` (100), no lower than `TIGHTEST` (1e-14); the
+verdicts are computed again with the ranks and null spaces there. A parameter
+whose verdict changes has no verdict (`None`), as a profile whose structure
+is undetermined. When a point cannot run at the tighter accuracy, every
+parameter that is not identifiable has no verdict, and `unchecked` says why.
+The section keeps the generic rank, the projections and the combinations at
+the accuracy of the engine, and the generic rank at the tighter one; a
+combination that holds a parameter with no verdict goes.
 
 | Alternative | Why not |
 |---|---|
@@ -61,12 +64,45 @@ accuracy (`SimulationEngine::accuracy_settings`: `ODESolver.rtol` and
 | A factor of 1,000 or more | Each run costs more as the tolerance tightens; the reason already tells the user to go further. |
 | A verdict name such as `unresolved` | A second way to say what a profile says with no verdict, and one more case in `merge` and the reports. |
 | Rebuild the model in Python at the tighter tolerances | The sensitivities run in Rust, and Python would need to know which engines integrate with a tolerance. |
+| The settings and the tighter source as two separate answers | A source could give one and not the other, and the reason of a verdict left out would have no settings to name. |
 
 **Guards:** `crates/commol-inference/tests/test_identifiability.rs`
 (`a_rank_lost_to_the_accuracy_gives_no_verdict`,
 `a_point_that_fails_at_the_tighter_accuracy_leaves_the_rank_unchecked`,
 `an_exact_engine_is_not_evaluated_again`),
 `tests/uncertainty/test_identifiability_tolerance.py`.
+
+## Noise parameters are left out of the sensitivities
+
+A noise parameter of an observation model (`CalibrationParameterType::Noise`)
+changes the likelihood and never a prediction, so its column of the
+sensitivities is zero: it would lower the rank and make every subset that
+holds it collinear. `structural_rank` and `collinearity` differentiate only
+the other parameters (`SensitivitySource::scaled_jacobian` with their
+columns; `FiniteDifferences::jacobian_of` runs no difference of the
+others). `StructuralAnalysis::parameters` and `Collinearity::parameters` name
+them by index; the projections, the verdicts, the sensitivity measures and
+the pair indices follow that order, and the combinations, the subsets and
+`collinear_with` name parameters by their index in the problem. A point is
+evaluated again at a tighter accuracy when its rank is below the number of
+parameters differentiated. The sections name the parameters left out in
+`left_out`; a noise parameter has the structural verdict `None`, with the
+reason, and no practical verdict from collinearity. A problem with no other
+parameter is an error.
+
+| Alternative | Why not |
+|---|---|
+| Keep the noise parameters with a verdict that says the method does not apply | The zero column still lowers the rank and gives infinite pair indices, so every count and subset needs a special case. |
+| Judge them by the sensitivities of the likelihood (the Fisher information) | A different method, with its own threshold. |
+| `FiniteDifferences` leaves them out | The local approximations read the same source, and their curvature needs the noise parameters. |
+| A verdict name such as `not_applicable` | A third way to say that a method gives no verdict, beside `None` here and in a profile. |
+
+**Guards:** `crates/commol-inference/tests/test_identifiability.rs`
+(`a_noise_parameter_is_left_out_of_the_structural_rank`,
+`a_noise_parameter_is_left_out_of_the_collinearity`,
+`a_rank_with_only_noise_parameters_is_an_error`),
+`tests/uncertainty/test_identifiability_noise.py`,
+`tests/uncertainty/test_identifiability_report.py::TestReport::test_a_noise_parameter_leaves_the_verdicts_of_the_others_alone`.
 
 ## Two verdicts per parameter
 

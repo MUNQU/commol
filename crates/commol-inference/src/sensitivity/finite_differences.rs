@@ -214,6 +214,16 @@ impl<E: SimulationEngine + Send + Sync> SensitivitySource for FiniteDifferences<
     }
 
     fn jacobian(&self, values: &[f64]) -> Result<Sensitivities, SensitivityError> {
+        let all: Vec<usize> = (0..values.len()).collect();
+        self.jacobian_of(values, &all)
+    }
+
+    /// Differences of the parameters `columns` only.
+    fn jacobian_of(
+        &self,
+        values: &[f64],
+        columns: &[usize],
+    ) -> Result<Sensitivities, SensitivityError> {
         let mut workspace = Workspace::default();
         let center = self
             .run(values, &mut workspace)
@@ -224,9 +234,9 @@ impl<E: SimulationEngine + Send + Sync> SensitivitySource for FiniteDifferences<
                 EvaluationError::Failed(message) => SensitivityError::Failed(message),
             })?;
         let steps = self.steps(values);
-        let columns: Vec<(Vec<f64>, Vec<f64>)> = (0..values.len())
-            .into_par_iter()
-            .map(|j| self.column(values, &center, j, steps[j]))
+        let columns: Vec<(Vec<f64>, Vec<f64>)> = columns
+            .par_iter()
+            .map(|&j| self.column(values, &center, j, steps[j]))
             .collect::<Result<_, _>>()?;
         let rows = center.len();
         let jacobian = Matrix::from_fn(rows, columns.len(), |i, j| columns[j].0[i]);

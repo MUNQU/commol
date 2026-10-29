@@ -35,7 +35,7 @@ from commol.identifiability.results import (
 from commol.profiles.results import RESET_REASON
 
 if TYPE_CHECKING:
-    from commol.commol_rs._commol_rs import AccuracyProtocol
+    from commol.commol_rs._commol_rs import AccuracyProtocol, TighteningProtocol
     from commol.identifiability.methods import (
         Collinearity,
         ProfileIdentifiability,
@@ -43,6 +43,22 @@ if TYPE_CHECKING:
         StartsIdentifiability,
         StructuralRank,
     )
+
+
+_NOISE_PARAMETER = (
+    "a noise parameter of an observation model, which no prediction reads"
+)
+"""Why `StructuralRank` and `Collinearity` leave a parameter out."""
+
+
+def _left_out(names: list[str], differentiated: list[int]) -> dict[str, str]:
+    """The parameters of `names` that are not `differentiated`, by index,
+    each with the reason."""
+    return {
+        name: _NOISE_PARAMETER
+        for index, name in enumerate(names)
+        if index not in differentiated
+    }
 
 
 def _power(name: str, exponent: float) -> str:
@@ -92,11 +108,13 @@ def _at(accuracy: Accuracy, settings: tuple[str, str]) -> str:
     return f"{relative} = {accuracy.relative:g}, {absolute} = {accuracy.absolute:g}"
 
 
-def _unresolved_reason(section: StructuralSection, settings: tuple[str, str]) -> str:
+def _unresolved_reason(
+    section: StructuralSection, tightening: "TighteningProtocol"
+) -> str:
     """Why the structural rank gives no verdict: the points whose rank
     changes at the tighter accuracy, and why a point could not run there."""
-    tighter = section.tighter
-    assert tighter is not None, "only a tighter accuracy leaves a verdict out"
+    tighter = _accuracy(tightening.accuracy)
+    settings = tightening.settings
     changes = [
         f"{point.rank} to {point.tighter.rank}"
         for point in section.points
@@ -123,6 +141,7 @@ def run_structural_rank(
     analysis = commol_rs.inference.structural_rank(
         calibrator._engine_problem, engine_json(method)
     )
+    differentiated = [names[index] for index in analysis.parameters]
     negative = {p.id for p in calibrator.problem.parameters if p.min_bound < 0}
     combinations = []
     for pairs in analysis.combinations:
@@ -132,7 +151,8 @@ def run_structural_rank(
                 exponents=exponents, text=_combination_text(exponents, negative)
             )
         )
-    verdicts = dict(zip(names, analysis.verdicts, strict=True))
+    verdicts = dict(zip(differentiated, analysis.verdicts, strict=True))
+    tightening = analysis.tighter
     section = StructuralSection(
         design=method.design,
         points=[
@@ -154,38 +174,47 @@ def run_structural_rank(
             for point in analysis.points
         ],
         skipped=analysis.skipped,
+        left_out=_left_out(names, analysis.parameters),
         generic_rank=analysis.generic_rank,
-        projections=dict(zip(names, analysis.projections, strict=True)),
+        projections=dict(zip(differentiated, analysis.projections, strict=True)),
         verdicts=verdicts,
         combinations=combinations,
         accuracy=_accuracy(analysis.accuracy),
-        tighter=None if analysis.tighter is None else _accuracy(analysis.tighter),
+        tighter=None if tightening is None else _accuracy(tightening.accuracy),
         tighter_generic_rank=analysis.tighter_generic_rank,
         unchecked=analysis.unchecked,
     )
     if method.design == "dense":
         return _report(calibrator, structural=[section])
-    settings = analysis.accuracy_settings
-    rank = f"generic rank {analysis.generic_rank} of {len(names)}"
-    tighter_rank = section.tighter_generic_rank
-    if tighter_rank is not None and tighter_rank != section.generic_rank:
-        assert section.tighter is not None and settings is not None
-        rank += f"; {tighter_rank} at {_at(section.tighter, settings)}"
-    structural: dict[str, StructuralVerdict] = {}
-    for name in names:
+    rank = f"generic rank {analysis.generic_rank} of {len(differentiated)}"
+    unresolved: list[str] = []
+    if tightening is not None:
+        unresolved.append(_unresolved_reason(section, tightening))
+        tighter_rank = section.tighter_generic_rank
+        if tighter_rank is not None and tighter_rank != section.generic_rank:
+            at = _at(_accuracy(tightening.accuracy), tightening.settings)
+            rank += f"; {tighter_rank} at {at}"
+    structural: dict[str, StructuralVerdict] = {
+        name: StructuralVerdict(
+            verdict=None,
+            reasons=[f"Structural rank on the observations: left out, {why}."],
+        )
+        for name, why in section.left_out.items()
+    }
+    for name in differentiated:
         verdict = verdicts[name]
         if verdict is None:
-            assert settings is not None, "only a setting of the accuracy tightens it"
-            reason = _unresolved_reason(section, settings)
+            # The engine leaves a verdict out only at a tighter accuracy.
+            reasons = unresolved
         else:
             projection = section.projections[name]
-            reason = (
+            reasons = [
                 f"Structural rank on the observations ({rank}): its projection "
                 f"on the null space is {projection:.2f}."
-            )
+            ]
         structural[name] = StructuralVerdict(
             verdict=verdict,
-            reasons=[reason],
+            reasons=reasons,
             combinations=[c.text for c in combinations if name in c.exponents],
         )
     return _report(calibrator, structural_verdicts=structural, structural=[section])
@@ -199,6 +228,7 @@ def run_collinearity(
     analysis = commol_rs.inference.collinearity(
         calibrator._engine_problem, engine_json(method), **engine_handles(method)
     )
+    differentiated = [names[index] for index in analysis.parameters]
 
     def subsets(entries: Sequence[tuple[list[int], float, float]]) -> list[SubsetIndex]:
         return [
@@ -211,20 +241,21 @@ def run_collinearity(
         ]
 
     pair_gamma = {
-        name: dict(zip(names, row, strict=True))
-        for name, row in zip(names, analysis.pair_gamma, strict=True)
+        name: dict(zip(differentiated, row, strict=True))
+        for name, row in zip(differentiated, analysis.pair_gamma, strict=True)
     }
     section = CollinearitySection(
         threshold=method.threshold,
         points=analysis.points,
         skipped=analysis.skipped,
-        sensitivity=dict(zip(names, analysis.sensitivity, strict=True)),
+        left_out=_left_out(names, analysis.parameters),
+        sensitivity=dict(zip(differentiated, analysis.sensitivity, strict=True)),
         pair_gamma=pair_gamma,
         best_by_size=subsets(analysis.best_by_size),
         admissible=subsets(analysis.admissible),
     )
     practical: dict[str, PracticalVerdict] = {}
-    for name, verdict in zip(names, analysis.verdicts, strict=True):
+    for name, verdict in zip(differentiated, analysis.verdicts, strict=True):
         if verdict.insensitive:
             reason = "Collinearity: no observation is sensitive to it."
         elif verdict.collinear_with:

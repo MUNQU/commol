@@ -78,6 +78,7 @@ class StructuralSectionData(TypedDict):
     design: "StructuralDesign"
     points: list[PointRankData]
     skipped: list[str]
+    left_out: dict[str, str]
     generic_rank: int
     projections: dict[str, float]
     verdicts: "dict[str, StructuralVerdictName | None]"
@@ -102,6 +103,7 @@ class CollinearitySectionData(TypedDict):
     threshold: float
     points: int
     skipped: list[str]
+    left_out: dict[str, str]
     sensitivity: dict[str, float]
     pair_gamma: dict[str, dict[str, float]]
     best_by_size: list[SubsetIndexData]

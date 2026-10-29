@@ -50,7 +50,8 @@ class StructuralVerdict(_FrozenResult):
         ``non_identifiable``: it lies in the null space, or nothing the data
         read depends on it. ``conflicting``: two reports disagree. ``None``:
         the evidence gives no verdict, as when the accuracy of the runs, not
-        the structure, may set the structural rank; the reasons say why.
+        the structure, may set the structural rank, or for a noise parameter,
+        which the structural rank leaves out; the reasons say why.
     reasons : list[str]
         Why, one per piece of evidence.
     combinations : list[str]
@@ -93,9 +94,11 @@ class ParameterVerdicts(_FrozenResult):
         a flat profile. ``None`` when no method that ran speaks to the
         structure of the parameter. A `StructuralVerdict` whose ``verdict``
         is ``None`` is evidence with no verdict: the structural rank ran, but
-        the accuracy of the runs may set its rank; its reasons say why.
+        the accuracy of the runs may set its rank, or the parameter is a
+        noise parameter, which it leaves out; its reasons say why.
     practical : PracticalVerdict | None
-        From collinearity, a sample or the starts.
+        From collinearity, a sample or the starts. Collinearity gives none to
+        a noise parameter.
     """
 
     structural: StructuralVerdict | None = None
@@ -149,7 +152,7 @@ class TighterRank(_FrozenResult):
     accuracy : Accuracy
         The accuracy of the runs.
     singular_values : list[float]
-        The singular values, largest first.
+        The singular values, largest first, one per parameter differentiated.
     threshold : float
         The norm of the estimated errors of the sensitivities, which a
         singular value must pass to count.
@@ -170,11 +173,11 @@ class PointRank(_FrozenResult):
     Attributes
     ----------
     values : dict[str, float]
-        The point.
+        The point, with a value of every parameter.
     accuracy : Accuracy
         The accuracy of the runs of the engine.
     singular_values : list[float]
-        The singular values, largest first.
+        The singular values, largest first, one per parameter differentiated.
     threshold : float
         The norm of the estimated errors of the sensitivities, which a
         singular value must pass to count.
@@ -182,11 +185,11 @@ class PointRank(_FrozenResult):
         How many pass it.
     tighter : TighterRank | None
         The rank at a tighter accuracy, when the rank is below the number of
-        parameters and a setting of the engine sets its accuracy. ``None``
-        when the rank is that number, when no setting sets the accuracy (an
-        engine exact up to rounding), when the accuracy is already the
-        tightest (1e-14), or when the point could not run at the tighter
-        accuracy (``StructuralSection.unchecked`` says why).
+        parameters differentiated and a setting of the engine sets its
+        accuracy. ``None`` when the rank is that number, when no setting sets
+        the accuracy (an engine exact up to rounding), when the accuracy is
+        already the tightest (1e-14), or when the point could not run at the
+        tighter accuracy (``StructuralSection.unchecked`` says why).
     """
 
     values: dict[str, float]
@@ -210,25 +213,30 @@ class StructuralSection(_FrozenResult):
         Each feasible point.
     skipped : list[str]
         Why each infeasible point was skipped.
+    left_out : dict[str, str]
+        The parameters left out, each with the reason: a noise parameter of
+        an observation model, which no prediction reads. Every other
+        parameter is differentiated.
     generic_rank : int
-        The rank at most points, at the accuracy of the engine.
+        The rank at most points, at the accuracy of the engine; at most the
+        number of parameters differentiated.
     projections : dict[str, float]
-        The norm of the projection of each parameter on the null space,
-        averaged over the points of generic rank, at the accuracy of the
-        engine.
+        The norm of the projection of each parameter differentiated on the
+        null space, averaged over the points of generic rank, at the accuracy
+        of the engine.
     verdicts : dict[str, StructuralVerdictName | None]
-        The verdict of each parameter on this design; ``None`` when the
-        verdict changes at the tighter accuracy, or a point could not run
-        there and the parameter is not identifiable.
+        The verdict of each parameter differentiated on this design; ``None``
+        when the verdict changes at the tighter accuracy, or a point could
+        not run there and the parameter is not identifiable.
     combinations : list[Combination]
         The identifiable combinations.
     accuracy : Accuracy
         The accuracy of the runs of the engine.
     tighter : Accuracy | None
-        The accuracy a point of rank below the number of parameters is
-        evaluated again at: each accuracy of the engine divided by 100, no
-        lower than 1e-14. ``None`` when no setting sets the accuracy of the
-        engine, or it is already the tightest.
+        The accuracy a point of rank below the number of parameters
+        differentiated is evaluated again at: each accuracy of the engine
+        divided by 100, no lower than 1e-14. ``None`` when no setting sets the
+        accuracy of the engine, or it is already the tightest.
     tighter_generic_rank : int | None
         The rank at most points with each point evaluated again at the
         tighter accuracy in place of its rank at the accuracy of the engine;
@@ -241,6 +249,7 @@ class StructuralSection(_FrozenResult):
     design: StructuralDesign
     points: list[PointRank]
     skipped: list[str]
+    left_out: dict[str, str]
     generic_rank: int
     projections: dict[str, float]
     verdicts: dict[str, StructuralVerdictName | None]
@@ -284,10 +293,16 @@ class CollinearitySection(_FrozenResult):
         sample.
     skipped : list[str]
         Why each infeasible point was skipped.
+    left_out : dict[str, str]
+        The parameters left out, each with the reason: a noise parameter of
+        an observation model, which no prediction reads. Every other
+        parameter is differentiated.
     sensitivity : dict[str, float]
-        The weighted median of Brun's sensitivity measure of each parameter.
+        The weighted median of Brun's sensitivity measure of each parameter
+        differentiated.
     pair_gamma : dict[str, dict[str, float]]
-        The weighted median of the index of each pair.
+        The weighted median of the index of each pair of parameters
+        differentiated.
     best_by_size : list[SubsetIndex]
         The subset of lowest index of each size.
     admissible : list[SubsetIndex]
@@ -297,6 +312,7 @@ class CollinearitySection(_FrozenResult):
     threshold: float
     points: int
     skipped: list[str]
+    left_out: dict[str, str]
     sensitivity: dict[str, float]
     pair_gamma: dict[str, dict[str, float]]
     best_by_size: list[SubsetIndex]

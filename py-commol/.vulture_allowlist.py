@@ -13,6 +13,7 @@ ParameterSampleProtocol
 CalibrationResultProtocol
 ObservationDrawsProtocol
 AccuracyProtocol
+TighteningProtocol
 BootstrapRunProtocol
 DistributionProtocol
 SMCRunProtocol

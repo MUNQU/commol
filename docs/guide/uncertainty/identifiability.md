@@ -121,6 +121,8 @@ hand.
 Every method runs through `Calibrator.identifiability(method)` and returns an
 `IdentifiabilityReport`. A threshold or a tolerance has no default: it is a
 modelling judgment, and the table gives the range the literature uses.
+`StructuralRank` and `Collinearity` differentiate the predictions, so they
+leave out the [noise parameters](#noise-parameters).
 
 | Method | Needs | Answers | Engine |
 |---|---|---|---|
@@ -172,15 +174,16 @@ model, not in the design.
 The estimated error of `S` grows with the tolerance of an ODE solver, and it
 can hide a singular value that a tighter tolerance resolves. With
 `DifferentialEquations`, each point whose rank is below the number of
-parameters is evaluated again at `rtol / 100` and `atol / 100`, no lower than
-`1e-14`, and the verdicts are computed again with those ranks. A parameter
-whose verdict changes there has no structural verdict: its `verdict` is
-`None`, and its reason names `ODESolver.rtol` and `ODESolver.atol`. When a
-point cannot run at the tighter tolerances, every parameter that is not
-`identifiable` has no verdict, and the section lists why in `unchecked`. A
-parameter that no observation reads stays `non_identifiable` at any
-tolerance, when every point runs at the tighter tolerances. `DifferenceEquations` runs are exact up to rounding: no point is
-evaluated again.
+parameters differentiated is evaluated again at `rtol / 100` and
+`atol / 100`, no lower than `1e-14`, and the verdicts are computed again with
+those ranks. A parameter whose verdict changes there has no structural
+verdict: its `verdict` is `None`, and its reason names `ODESolver.rtol` and
+`ODESolver.atol`. When a point cannot run at the tighter tolerances, every
+parameter that is not `identifiable` has no verdict, and the section lists
+why in `unchecked`. A parameter that no observation reads stays
+`non_identifiable` when every point runs at the tighter tolerances.
+`DifferenceEquations` runs are exact up to rounding: no point is evaluated
+again.
 
 | Field of `PointRank` | Meaning |
 |---|---|
@@ -188,8 +191,8 @@ evaluated again.
 | `rank` | The rank at that accuracy |
 | `tighter` | The `accuracy`, the singular values, the `threshold` and the `rank` at the tighter tolerances; `None` when the point was not evaluated again |
 
-The section gives `tighter_generic_rank`, the generic rank with each point
-evaluated again at its tighter rank, and the reason of a verdict that stays
+The section gives `tighter_generic_rank`, the generic rank with the tighter
+rank of each point evaluated again, and the reason of a verdict that stays
 names it when it differs from `generic_rank`.
 
 A verdict of `None` says that the result depends on the tolerance. Tighten
@@ -217,6 +220,48 @@ computed at every draw and summarized by its weighted median, and
 
 A parameter is `poorly_determined` when a pair that holds it has an index at
 or above the threshold, or no observation is sensitive to it.
+
+### Noise parameters
+
+A noise parameter of an [observation model](observation-models.md#noise-parameters)
+(`parameter_type="noise"`), such as the `overdispersion` of
+`NegativeBinomialObservations`, changes the likelihood and never a
+prediction: its column of the sensitivities is zero. `StructuralRank` and
+`Collinearity` leave it out.
+
+| Method | A noise parameter |
+|---|---|
+| `StructuralRank` | Not in the rank, the singular values, `projections` or `verdicts` of the section; its structural `verdict` is `None`, with the reason. The generic rank is at most the number of the other parameters |
+| `Collinearity` | Not in `sensitivity`, `pair_gamma` or a subset; no other parameter is collinear with it; no practical verdict. `max_subset_size` is at most the number of the other parameters |
+
+Each section names the parameters it leaves out in `left_out`, each with the
+reason. The verdict of a noise parameter comes from the methods that read the
+fit: `StartsIdentifiability`, `SampleIdentifiability` and the profiles. A
+problem whose calibrated parameters are all noise parameters has nothing to
+differentiate: both methods raise a `ValueError`.
+
+```python
+from commol.observations import NegativeBinomialObservations
+
+counts = CalibrationProblem(
+    observed_data=[
+        ObservedDataPoint(at=point.at, output="B", value=float(round(point.value)))
+        for point in problem.observed_data
+    ],
+    parameters=[
+        CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.1, max_bound=1.0),
+        CalibrationParameter(id="phi", parameter_type="noise", min_bound=0.0, max_bound=1.0),
+    ],
+    observation_models={"B": NegativeBinomialObservations(overdispersion="phi")},
+    optimization_config=NelderMeadConfig(max_iterations=2000),
+    seed=1,
+)
+with_noise = Calibrator(Simulation(basic_model(None, 1.0, 0.1)), counts)
+rank = with_noise.identifiability(StructuralRank(points=5, design="observations"))
+print(rank.structural[0].generic_rank, rank.structural[0].left_out)
+# 1 {'phi': 'a noise parameter of an observation model, which no prediction reads'}
+print(rank.verdicts["phi"].structural.verdict)  # None
+```
 
 ### A sample
 
@@ -289,8 +334,9 @@ other parameters to their fitted values breaks it, and `non_identifiable`
 when nothing the data read depends on the parameter
 ([Profile Likelihood](profiles.md#verdicts-and-the-identifiability-report)). `merge` joins reports: a
 verdict the reports agree on stays, with every reason; one they disagree on is
-`conflicting`, with both reasons. A structural verdict of `None` adds its
-reasons and leaves the verdicts of the other reports. `report.report()` gives it as plain data
+`conflicting`, with both reasons. A structural verdict of `None`, as that of
+a noise parameter, adds its reasons and leaves the verdicts of the other
+reports. `report.report()` gives it as plain data
 ([Reports](../reports.md#the-report-of-an-identifiability-analysis)).
 
 ```python

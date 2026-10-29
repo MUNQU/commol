@@ -138,7 +138,9 @@ A noise argument is a number, or the id of a calibration parameter of type
 others, and never reaches the engine; `Model.apply_calibration_parameters`
 skips it, as it skips a factor. Its bounds must lie in the domain of the
 argument: above 0 for `sd`, `sigma`, `scale` and `df`, at least 0 for
-`overdispersion`.
+`overdispersion`. No prediction reads a noise parameter, so `StructuralRank`
+and `Collinearity` leave it out
+([Identifiability](identifiability.md#noise-parameters)).
 
 | Rule | Error |
 |---|---|

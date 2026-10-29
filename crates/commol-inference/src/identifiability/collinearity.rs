@@ -12,6 +12,11 @@
 //! Over several points (the draws of a sample), each index is computed at
 //! each point and summarized by its weighted median.
 //!
+//! The columns are those of the parameters that are not noise parameters: a
+//! noise parameter of an observation model changes the likelihood and never
+//! a prediction, so its zero column would make every subset that holds it
+//! collinear.
+//!
 //! A parameter is poorly determined when no observation is sensitive to it
 //! (its sensitivity measure is 0), or when a pair that holds it has an index
 //! at or above the threshold; otherwise it is determined.
@@ -19,7 +24,7 @@
 use commol_statistics::statistics::quantiles;
 use rayon::prelude::*;
 
-use super::{PracticalVerdict, skippable};
+use super::{PracticalVerdict, differentiated, skippable};
 use crate::error::MethodError;
 use crate::sensitivity::{Matrix, SensitivitySource};
 
@@ -30,7 +35,7 @@ const EXHAUSTIVE: usize = 6;
 /// A subset of parameters and its collinearity index.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Subset {
-    /// The parameter indices, ascending.
+    /// The parameter indices in the problem, ascending.
     pub parameters: Vec<usize>,
     /// The weighted median of its index over the points.
     pub gamma: f64,
@@ -47,17 +52,23 @@ pub struct CollinearityVerdict {
     pub verdict: PracticalVerdict,
     /// No observation is sensitive to it: its sensitivity measure is 0.
     pub insensitive: bool,
-    /// The other parameters, ascending, whose pair with it has an index at
-    /// or above the threshold.
+    /// The other parameters, by index in the problem, ascending, whose pair
+    /// with it has an index at or above the threshold.
     pub collinear_with: Vec<usize>,
 }
 
 /// The result of [`collinearity`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct Collinearity {
-    /// The weighted median of `δ_msqr` of each parameter.
+    /// The parameters differentiated, by index in the problem: every
+    /// parameter that is not a noise parameter. `sensitivity`, `pair_gamma`
+    /// and `verdicts` hold one entry per parameter differentiated, in this
+    /// order; the others are left out.
+    pub parameters: Vec<usize>,
+    /// The weighted median of `δ_msqr` of each parameter differentiated.
     pub sensitivity: Vec<f64>,
-    /// The weighted median of `γ` of each pair, `[j][k]`; 1 on the diagonal.
+    /// The weighted median of `γ` of each pair of parameters differentiated,
+    /// `[j][k]`; 1 on the diagonal.
     pub pair_gamma: Vec<Vec<f64>>,
     /// The subset of lowest index of each size from 2 to the largest
     /// evaluated, by size.
@@ -65,7 +76,7 @@ pub struct Collinearity {
     /// The largest subsets whose index is below the threshold; single
     /// parameters when no pair is.
     pub admissible: Vec<Subset>,
-    /// The verdict of each parameter.
+    /// The verdict of each parameter differentiated.
     pub verdicts: Vec<CollinearityVerdict>,
     /// How many points were used.
     pub points: usize,
@@ -103,16 +114,19 @@ fn index_of_normalized(normalized: &Matrix) -> f64 {
 }
 
 /// Brun's indices of `source` at `points`, with weights `weights`, for
-/// subsets up to `max_subset_size` parameters, against `threshold`.
+/// subsets up to `max_subset_size` parameters, against `threshold`, over the
+/// parameters that are not noise parameters.
 ///
 /// # Errors
 ///
-/// [`MethodError::Invalid`] when there is no point, the weights do
-/// not match the points, `threshold` is outside its range
-/// ([`crate::ranges::THRESHOLD`]), or `max_subset_size` is outside its range
-/// ([`crate::ranges::MAX_SUBSET_SIZE`]) or above the number of parameters; [`MethodError::NoFeasiblePoint`] when every point
-/// is infeasible; [`MethodError::Sensitivity`] when the
-/// sensitivities fail for another reason.
+/// [`MethodError::Invalid`] when there is no point, the weights do not match
+/// the points, `threshold` is outside its range
+/// ([`crate::ranges::THRESHOLD`]), every parameter is a noise parameter, or
+/// `max_subset_size` is outside its range
+/// ([`crate::ranges::MAX_SUBSET_SIZE`]) or above the number of parameters
+/// that are not noise parameters; [`MethodError::NoFeasiblePoint`] when every
+/// point is infeasible; [`MethodError::Sensitivity`] when the sensitivities
+/// fail for another reason.
 pub fn collinearity<S: SensitivitySource>(
     source: &S,
     points: &[Vec<f64>],
@@ -120,7 +134,6 @@ pub fn collinearity<S: SensitivitySource>(
     max_subset_size: usize,
     threshold: f64,
 ) -> Result<Collinearity, MethodError> {
-    let count = source.parameters().len();
     crate::ranges::THRESHOLD
         .check(threshold)
         .map_err(MethodError::Invalid)?;
@@ -131,16 +144,28 @@ pub fn collinearity<S: SensitivitySource>(
             weights.len()
         )));
     }
+    let parameters = source.parameters();
+    let differentiated = differentiated(parameters, "Collinearity")?;
+    let count = differentiated.len();
     crate::ranges::MAX_SUBSET_SIZE
         .at_most(count)
         .check(max_subset_size)
-        .map_err(MethodError::Invalid)?;
+        .map_err(|message| {
+            MethodError::Invalid(if count < parameters.len() {
+                format!(
+                    "{message}: {count} of the {} parameters are not noise parameters",
+                    parameters.len()
+                )
+            } else {
+                message
+            })
+        })?;
     let mut columns: Vec<Matrix> = Vec::new();
     let mut used_weights = Vec::new();
     let mut sensitivity_draws: Vec<Vec<f64>> = vec![Vec::new(); count];
     let mut skipped = Vec::new();
     for (values, &weight) in points.iter().zip(weights) {
-        let scaled = match source.scaled_jacobian(values) {
+        let scaled = match source.scaled_jacobian(values, &differentiated) {
             Ok(sensitivities) => sensitivities.jacobian,
             Err(error) if skippable(&error) => {
                 skipped.push(error.to_string());
@@ -243,8 +268,34 @@ pub fn collinearity<S: SensitivitySource>(
         }
         best_by_size.push(best);
     }
-    let verdicts = verdicts(&sensitivity, &pair_gamma, threshold);
+    let in_problem = |subsets: Vec<Subset>| -> Vec<Subset> {
+        subsets
+            .into_iter()
+            .map(|subset| Subset {
+                parameters: subset
+                    .parameters
+                    .iter()
+                    .map(|&j| differentiated[j])
+                    .collect(),
+                ..subset
+            })
+            .collect()
+    };
+    let best_by_size = in_problem(best_by_size);
+    let admissible = in_problem(admissible);
+    let verdicts = verdicts(&sensitivity, &pair_gamma, threshold)
+        .into_iter()
+        .map(|verdict| CollinearityVerdict {
+            collinear_with: verdict
+                .collinear_with
+                .iter()
+                .map(|&k| differentiated[k])
+                .collect(),
+            ..verdict
+        })
+        .collect();
     Ok(Collinearity {
+        parameters: differentiated,
         sensitivity,
         pair_gamma,
         best_by_size,

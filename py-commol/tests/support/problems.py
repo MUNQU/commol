@@ -12,7 +12,7 @@ from commol import (
     Simulation,
 )
 from commol.engines import ODESolver
-from commol.observations import NormalObservations
+from commol.observations import NegativeBinomialObservations, NormalObservations
 from commol.observations.models import _ObservationModel
 from commol.sensitivity import InputSpace
 
@@ -221,6 +221,42 @@ def rare_flow_calibrator(
         seed=seed,
     )
     return Calibrator(model(settings), problem)
+
+
+def overdispersed_calibrator(*, noise_only: bool = False) -> Calibrator:
+    """
+    ``abc_builder`` at ``k1 = 0.4``, ``k2 = 0.1``, observed in B at 5, 10, …,
+    60 with an error of ±5 %, rounded, with a negative binomial model whose
+    ``overdispersion`` is the noise parameter ``phi`` in ``[0, 1]``; ``k1`` in
+    ``[0.1, 1]`` and ``k2`` in ``[0.01, 0.5]``, seed 1. With `noise_only`,
+    ``k1`` and ``k2`` stay at their values and only ``phi`` is calibrated.
+    """
+    rates = {"k1": 0.4, "k2": 0.1}
+    truth = Simulation(build(abc_builder(parameters=rates))).run(60)
+    observations = [
+        ObservedDataPoint(
+            at=step,
+            output="B",
+            value=float(round(truth["B"][step] * (1 + 0.05 * (-1) ** step))),
+        )
+        for step in range(5, 61, 5)
+    ]
+    rate_parameters = [bounded("k1", 0.1, 1.0), bounded("k2", 0.01, 0.5)]
+    problem = CalibrationProblem(
+        observed_data=observations,
+        parameters=[
+            *([] if noise_only else rate_parameters),
+            bounded("phi", 0.0, 1.0, kind="noise"),
+        ],
+        observation_models={"B": NegativeBinomialObservations(overdispersion="phi")},
+        optimization_config=NelderMeadConfig(max_iterations=2000),
+        seed=1,
+    )
+    model_rates: dict[str, float | None] = (
+        dict(rates) if noise_only else {"k1": None, "k2": None}
+    )
+    model = build(abc_builder(parameters=model_rates))
+    return Calibrator(Simulation(model), problem)
 
 
 TWO_WELLS_FIT = 2.492033

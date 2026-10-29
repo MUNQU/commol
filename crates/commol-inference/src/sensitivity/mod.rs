@@ -49,6 +49,21 @@ pub struct Sensitivities {
 }
 
 impl Sensitivities {
+    /// The same sensitivities restricted to the parameters `columns`, by
+    /// index, in that order.
+    ///
+    /// # Panics
+    ///
+    /// Panics when an index of `columns` is not a column.
+    pub fn columns(&self, columns: &[usize]) -> Self {
+        Self {
+            predictions: self.predictions.clone(),
+            jacobian: self.jacobian.select_columns(columns),
+            errors: self.errors.select_columns(columns),
+            labels: self.labels.clone(),
+        }
+    }
+
     /// The scaled sensitivities `S_ij = J_ij · θ̃_j / s_i`, with
     /// `θ̃_j = |θ_j|`, or the width of its bounds when `θ_j = 0`; the errors
     /// scale in the same way.
@@ -170,15 +185,42 @@ pub trait SensitivitySource: Sync {
         None
     }
 
-    /// The scaled Jacobian at `values` ([`Sensitivities::scaled`]).
+    /// The Jacobian at `values` of the parameters `columns`, by index, in
+    /// that order: one column each. By default the columns of
+    /// [`Self::jacobian`]; a source that differentiates one parameter at a
+    /// time differentiates only these.
     ///
     /// # Errors
     ///
     /// As [`Self::jacobian`].
-    fn scaled_jacobian(&self, values: &[f64]) -> Result<Sensitivities, SensitivityError> {
-        let sensitivities = self.jacobian(values)?;
+    fn jacobian_of(
+        &self,
+        values: &[f64],
+        columns: &[usize],
+    ) -> Result<Sensitivities, SensitivityError> {
+        Ok(self.jacobian(values)?.columns(columns))
+    }
+
+    /// The scaled Jacobian at `values` of the parameters `columns`, by
+    /// index, in that order ([`Self::jacobian_of`],
+    /// [`Sensitivities::scaled`]).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::jacobian`].
+    fn scaled_jacobian(
+        &self,
+        values: &[f64],
+        columns: &[usize],
+    ) -> Result<Sensitivities, SensitivityError> {
+        let sensitivities = self.jacobian_of(values, columns)?;
         let scales = self.scales(&sensitivities);
-        Ok(sensitivities.scaled(values, self.parameters(), &scales))
+        let parameters: Vec<CalibrationParameter> = columns
+            .iter()
+            .map(|&j| self.parameters()[j].clone())
+            .collect();
+        let values: Vec<f64> = columns.iter().map(|&j| values[j]).collect();
+        Ok(sensitivities.scaled(&values, &parameters, &scales))
     }
 }
 
