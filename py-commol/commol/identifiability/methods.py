@@ -56,15 +56,17 @@ class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked)
     The sensitivities come from finite differences, with a step and an error
     set by the accuracy of the engine; a singular value counts when it is
     above the norm of that error. The engine must be deterministic. The
-    points come from the seed of the calibrator, ``Calibrator.seed``.
+    points come from the seed of the calibrator, ``Calibrator.seed``. A noise
+    parameter of an observation model (``parameter_type="noise"``) changes
+    no prediction: it is left out of the rank and gets the verdict ``None``.
 
     With an engine that integrates with tolerances, such as
     ``DifferentialEquations``, each point whose rank is below the number of
-    parameters runs again at a hundredth of ``ODESolver.rtol`` and
-    ``ODESolver.atol``, which costs a second, slower evaluation of that point;
-    a parameter whose verdict changes there gets the verdict ``None``, with a
-    reason. See "When the solver tolerance sets the rank" in the guide page
-    Identifiability.
+    parameters differentiated runs again at a hundredth of ``ODESolver.rtol``
+    and ``ODESolver.atol``, no lower than 1e-14, which costs a second, slower
+    evaluation of that point; a parameter whose verdict changes there gets
+    the verdict ``None``, with a reason. See "When the solver tolerance sets
+    the rank" in the guide page Identifiability.
 
     Attributes
     ----------
@@ -90,7 +92,9 @@ class Collinearity(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
 
     The index of a subset is 1 when its sensitivities are orthogonal and grows
     without bound as they approach linear dependence. The literature puts the
-    threshold between 5 and 20. The engine must be deterministic.
+    threshold between 5 and 20. The engine must be deterministic. A noise
+    parameter of an observation model (``parameter_type="noise"``) changes
+    no prediction: it is left out, and gets no verdict.
 
     Attributes
     ----------
@@ -98,7 +102,8 @@ class Collinearity(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
         Where to evaluate: the best point of a fit, or each draw of a sample,
         summarized by the weighted median.
     max_subset_size : int
-        The largest subset, at least 2 and at most the number of parameters.
+        The largest subset, at least 2 and at most the number of parameters
+        that are not noise parameters, of which there must be at least 2.
         Every subset up to 6 parameters is evaluated; a greedy search adds
         parameters above.
     threshold : float

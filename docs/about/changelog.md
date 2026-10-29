@@ -244,17 +244,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reason that names `ODESolver.rtol` and `ODESolver.atol`. Before, the rank
   lost to the tolerance read as `non_identifiable` or `in_combination`. A
   parameter that no observation reads stays `non_identifiable` when every
-  point runs at the tighter tolerances.
-  `StructuralVerdict.verdict` and the values of `StructuralSection.verdicts`
-  can be `None`, and `merge` keeps the verdicts of the other reports;
-  `PointRank` holds the `accuracy` of its runs and the `tighter` rank;
-  `StructuralSection` holds the `accuracy`, the `tighter` accuracy, the
-  generic rank there (`tighter_generic_rank`) and the points that could not
-  run there (`unchecked`). In Rust, `SimulationEngine::accuracy` returns an
-  `Accuracy` in place of `output_accuracy` and `output_absolute_accuracy`. Migration: read a `None`
+  point runs at the tighter tolerances. `StructuralVerdict.verdict` and the
+  values of `StructuralSection.verdicts` can be `None`, and `merge` keeps the
+  verdicts of the other reports; `PointRank` holds the `accuracy` of its runs
+  and the `tighter` rank; `StructuralSection` holds the `accuracy`, the
+  `tighter` accuracy, the generic rank there (`tighter_generic_rank`) and the
+  points that could not run there (`unchecked`). In Rust,
+  `SimulationEngine::accuracy` returns an `Accuracy` in place of
+  `output_accuracy` and `output_absolute_accuracy`. Migration: read a `None`
   verdict as no verdict, and tighten `ODESolver.rtol` and `ODESolver.atol`
   until the rank stops changing. See
   [When the solver tolerance sets the rank](../guide/uncertainty/identifiability.md#when-the-solver-tolerance-sets-the-rank).
+- **Breaking:** `StructuralRank` and `Collinearity` leave out the noise
+  parameters of the observation models (`parameter_type="noise"`), which no
+  prediction reads. Before, the zero sensitivities of a noise parameter
+  lowered the generic rank, made it `non_identifiable`, and made every other
+  parameter `poorly_determined`, collinear with it; a `merge` then read
+  `conflicting`. Now the rank counts only the other parameters, a noise
+  parameter has the structural verdict `None` with a reason, collinearity
+  gives it no practical verdict, and no parameter is collinear with it.
+  `StructuralSection.projections` and `verdicts`, and
+  `CollinearitySection.sensitivity` and `pair_gamma`, have no entry for a
+  noise parameter; both sections name it in the new field `left_out`, with
+  the reason, and `IdentifiabilityReport.report()` gives `left_out` after
+  `skipped`. `Collinearity(max_subset_size=...)` is at most the number of
+  parameters that are not noise parameters, `Collinearity` needs at least 2
+  of them, and a problem whose calibrated parameters are all noise
+  parameters is a `ValueError` for both methods.
+  Migration: read the verdict of a noise parameter from
+  `StartsIdentifiability`, `SampleIdentifiability` or the profiles; read
+  `left_out` for the parameters a section leaves out; lower a
+  `max_subset_size` above the number of the other parameters. See
+  [Noise parameters](../guide/uncertainty/identifiability.md#noise-parameters).
 
 ### Removed
 

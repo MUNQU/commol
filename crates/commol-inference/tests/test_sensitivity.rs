@@ -125,6 +125,29 @@ fn jacobian_of_decay_matches_the_closed_form() {
 }
 
 #[test]
+fn the_jacobian_of_some_parameters_is_their_columns_of_the_jacobian() {
+    let problem = problem(
+        difference(&[]),
+        observed(&[1.0, 2.0, 3.0], &[400.0, 320.0, 256.0]),
+        vec![
+            CalibrationParameter::new("k".to_string(), 0.0, 1.0),
+            factor("f", 0.1, 2.0),
+        ],
+    );
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+    let every = source.jacobian(&[0.2, 0.5]).unwrap();
+
+    let f = source.jacobian_of(&[0.2, 0.5], &[1]).unwrap();
+    let scaled = source.scaled_jacobian(&[0.2, 0.5], &[1]).unwrap();
+    let scaled_every = source.scaled_jacobian(&[0.2, 0.5], &[0, 1]).unwrap();
+
+    assert_eq!(f.jacobian, every.jacobian.columns(1, 1));
+    assert_eq!(f.errors, every.errors.columns(1, 1));
+    assert_eq!(f.predictions, every.predictions);
+    assert_eq!(scaled.jacobian, scaled_every.jacobian.columns(1, 1));
+}
+
+#[test]
 fn an_unread_parameter_gives_a_zero_column() {
     let problem = problem(
         difference(&["u"]),
@@ -401,11 +424,11 @@ fn the_scaled_jacobian_does_not_depend_on_units() {
     );
     let per_day = FiniteDifferences::new(&days, Design::Observations)
         .unwrap()
-        .scaled_jacobian(&[0.1, 0.5])
+        .scaled_jacobian(&[0.1, 0.5], &[0, 1])
         .unwrap();
     let per_week = FiniteDifferences::new(&weeks, Design::Observations)
         .unwrap()
-        .scaled_jacobian(&[0.7, 0.5])
+        .scaled_jacobian(&[0.7, 0.5], &[0, 1])
         .unwrap();
 
     for i in 0..3 {

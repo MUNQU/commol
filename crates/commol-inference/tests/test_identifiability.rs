@@ -1,10 +1,13 @@
 //! Structural rank, collinearity indices and the identifiability of a sample.
 
-use commol_calibration::{CalibrationParameter, CalibrationProblem, LossConfig, ObservedDataPoint};
-use commol_core::{Accuracy, Model};
+use commol_calibration::{
+    CalibrationParameter, CalibrationParameterType, CalibrationProblem, LossConfig,
+    ObservedDataPoint,
+};
+use commol_core::{Accuracy, AccuracySettings, Model};
 use commol_difference::DifferenceEquations;
 use commol_inference::identifiability::{
-    PracticalVerdict, Reference, StructuralVerdict, collinearity, collinearity_index,
+    PracticalVerdict, Reference, StructuralVerdict, Tightening, collinearity, collinearity_index,
     sample_identifiability, structural_rank,
 };
 use commol_inference::sensitivity::{
@@ -279,10 +282,22 @@ struct Fixed {
 
 impl Fixed {
     fn new(jacobians: Vec<Matrix>) -> Self {
+        Self::with_noise(jacobians, &[])
+    }
+
+    /// The parameters `noise`, by index, are noise parameters.
+    fn with_noise(jacobians: Vec<Matrix>, noise: &[usize]) -> Self {
         let columns = jacobians[0].ncols();
         Self {
             parameters: (0..columns)
-                .map(|j| CalibrationParameter::new(format!("k{j}"), 0.0, 1.0))
+                .map(|j| {
+                    let kind = if noise.contains(&j) {
+                        CalibrationParameterType::Noise
+                    } else {
+                        CalibrationParameterType::Parameter
+                    };
+                    CalibrationParameter::with_type(format!("k{j}"), kind, 0.0, 1.0)
+                })
                 .collect(),
             jacobians,
         }
@@ -314,8 +329,12 @@ impl SensitivitySource for Fixed {
         vec![1.0; sensitivities.jacobian.nrows()]
     }
 
-    fn scaled_jacobian(&self, values: &[f64]) -> Result<Sensitivities, SensitivityError> {
-        self.jacobian(values)
+    fn scaled_jacobian(
+        &self,
+        values: &[f64],
+        columns: &[usize],
+    ) -> Result<Sensitivities, SensitivityError> {
+        self.jacobian_of(values, columns)
     }
 }
 
@@ -356,13 +375,20 @@ fn a_failure_of_the_sensitivities_stops_the_structural_rank() {
 
 /// A source of the scaled sensitivities `diag(1, 10⁻³)` whose entries all
 /// carry an error equal to the relative accuracy of its runs; at an
-/// accuracy below `fails_below` every run fails.
+/// accuracy below `fails_below` every run fails. `settings` set its
+/// accuracy.
 #[derive(Clone)]
 struct Tolerant {
     parameters: Vec<CalibrationParameter>,
     accuracy: Accuracy,
     fails_below: f64,
+    settings: Option<AccuracySettings>,
 }
+
+const TOLERANCES: AccuracySettings = AccuracySettings {
+    relative: "Solver.rtol",
+    absolute: "Solver.atol",
+};
 
 impl Tolerant {
     fn new(relative: f64, fails_below: f64) -> Self {
@@ -376,6 +402,7 @@ impl Tolerant {
                 absolute: relative,
             },
             fails_below,
+            settings: Some(TOLERANCES),
         }
     }
 }
@@ -401,12 +428,20 @@ impl SensitivitySource for Tolerant {
         vec![1.0; 2]
     }
 
-    fn scaled_jacobian(&self, values: &[f64]) -> Result<Sensitivities, SensitivityError> {
-        self.jacobian(values)
+    fn scaled_jacobian(
+        &self,
+        values: &[f64],
+        columns: &[usize],
+    ) -> Result<Sensitivities, SensitivityError> {
+        self.jacobian_of(values, columns)
     }
 
     fn accuracy(&self) -> Accuracy {
         self.accuracy
+    }
+
+    fn accuracy_settings(&self) -> Option<AccuracySettings> {
+        self.settings
     }
 
     fn at_accuracy(&self, accuracy: Accuracy) -> Option<Self> {
@@ -426,7 +461,13 @@ fn a_rank_lost_to_the_accuracy_gives_no_verdict() {
         relative: 1e-5,
         absolute: 1e-5,
     };
-    assert_eq!(analysis.tighter, Some(tighter));
+    assert_eq!(
+        analysis.tighter,
+        Some(Tightening {
+            accuracy: tighter,
+            settings: TOLERANCES
+        })
+    );
     for point in &analysis.points {
         assert_eq!(point.rank, 1);
         let again = point.tighter.as_ref().expect("evaluated again");
@@ -439,8 +480,26 @@ fn a_rank_lost_to_the_accuracy_gives_no_verdict() {
         [Some(StructuralVerdict::Identifiable), None]
     );
     assert!(analysis.unchecked.is_empty());
-    // The source names no setting of its accuracy.
-    assert_eq!(analysis.accuracy_settings, None);
+}
+
+#[test]
+fn a_source_that_names_no_setting_of_its_accuracy_is_not_evaluated_again() {
+    // It runs at other accuracies, but no setting sets them.
+    let source = Tolerant {
+        settings: None,
+        ..Tolerant::new(1e-3, 0.0)
+    };
+    let analysis = structural_rank(&source, 3, 7).unwrap();
+
+    assert_eq!(analysis.tighter, None);
+    assert!(analysis.points.iter().all(|point| point.tighter.is_none()));
+    assert_eq!(
+        analysis.verdicts,
+        [
+            Some(StructuralVerdict::Identifiable),
+            Some(StructuralVerdict::NonIdentifiable)
+        ]
+    );
 }
 
 #[test]
@@ -461,7 +520,7 @@ fn the_tighter_accuracy_is_no_lower_than_the_tightest() {
     let tightest = structural_rank(&Tolerant::new(1e-14, 0.0), 1, 7).unwrap();
 
     assert_eq!(
-        near.tighter,
+        near.tighter.map(|tighter| tighter.accuracy),
         Some(Accuracy {
             relative: 1e-14,
             absolute: 1e-14
@@ -660,5 +719,112 @@ fn a_structural_rank_needs_a_point_and_collinearity_a_feasible_one() {
         matches!(&infeasible, MethodError::NoFeasiblePoint { points: 2, reasons }
             if reasons.len() == 2),
         "{infeasible:?}"
+    );
+}
+
+/// `k0` and `k2` read at 60 degrees, and `k1`, a noise parameter, read by
+/// no observation.
+fn sixty_degrees_and_noise() -> Fixed {
+    let sine = 0.75f64.sqrt();
+    let jacobian = Matrix::from_row_slice(2, 3, &[1.0, 0.0, 0.5, 0.0, 0.0, sine]);
+    Fixed::with_noise(vec![jacobian], &[1])
+}
+
+#[test]
+fn a_noise_parameter_is_left_out_of_the_structural_rank() {
+    let analysis = structural_rank(&sixty_degrees_and_noise(), 3, 7).unwrap();
+
+    assert_eq!(analysis.parameters, [0, 2]);
+    assert_eq!(analysis.generic_rank, 2);
+    assert!(
+        analysis
+            .points
+            .iter()
+            .all(|point| point.singular_values.len() == 2 && point.values.len() == 3)
+    );
+    assert_eq!(
+        analysis.verdicts,
+        [Some(StructuralVerdict::Identifiable); 2]
+    );
+    assert_eq!(analysis.projections.len(), 2);
+}
+
+#[test]
+fn a_combination_names_the_parameters_by_their_index_in_the_problem() {
+    // k0 and k2 read as one column; k1 is a noise parameter.
+    let jacobian = Matrix::from_row_slice(2, 3, &[1.0, 0.0, 1.0, 1.0, 0.0, 1.0]);
+    let source = Fixed::with_noise(vec![jacobian], &[1]);
+
+    let analysis = structural_rank(&source, 3, 7).unwrap();
+
+    assert_eq!(analysis.generic_rank, 1);
+    assert_eq!(analysis.combinations.len(), 1);
+    assert_eq!(analysis.combinations[0].exponents, [(0, 1.0), (2, 1.0)]);
+}
+
+#[test]
+fn a_rank_with_only_noise_parameters_is_an_error() {
+    let jacobian = Matrix::zeros(2, 2);
+    let source = Fixed::with_noise(vec![jacobian], &[0, 1]);
+
+    let rank = structural_rank(&source, 3, 7).unwrap_err();
+    let indices = collinearity(&source, &[vec![0.0; 2]], &[1.0], 2, 10.0).unwrap_err();
+
+    for (error, method) in [(rank, "StructuralRank"), (indices, "Collinearity")] {
+        assert_eq!(
+            error,
+            MethodError::Invalid(format!(
+                "{method} has no parameter to differentiate: every calibrated parameter is a \
+                 noise parameter of an observation model, which no prediction reads"
+            ))
+        );
+    }
+}
+
+#[test]
+fn a_noise_parameter_is_left_out_of_the_collinearity() {
+    let result = collinearity(&sixty_degrees_and_noise(), &[vec![0.0; 3]], &[1.0], 2, 1.2).unwrap();
+
+    assert_eq!(result.parameters, [0, 2]);
+    assert_eq!(result.sensitivity.len(), 2);
+    // The pair (k0, k2) has the index √2, at or above 1.2.
+    assert!((result.pair_gamma[0][1] - 2f64.sqrt()).abs() < 1e-12);
+    assert_eq!(result.best_by_size[0].parameters, [0, 2]);
+    let admissible: Vec<_> = result.admissible.iter().map(|s| &s.parameters).collect();
+    assert_eq!(admissible, [&[0], &[2]]);
+    assert_eq!(result.verdicts.len(), 2);
+    assert_eq!(result.verdicts[0].collinear_with, [2]);
+    assert_eq!(result.verdicts[1].collinear_with, [0]);
+    assert!(result.verdicts.iter().all(|v| !v.insensitive));
+}
+
+#[test]
+fn a_subset_larger_than_the_differentiated_parameters_is_an_error() {
+    let error =
+        collinearity(&sixty_degrees_and_noise(), &[vec![0.0; 3]], &[1.0], 3, 10.0).unwrap_err();
+
+    assert_eq!(
+        error,
+        MethodError::Invalid(
+            "max_subset_size is a whole number from 2 to 2, got 3: 2 of the 3 parameters are \
+             not noise parameters"
+                .to_string()
+        )
+    );
+}
+
+#[test]
+fn collinearity_needs_two_parameters_that_are_not_noise_parameters() {
+    let jacobian = Matrix::from_row_slice(2, 2, &[1.0, 0.0, 0.0, 0.0]);
+    let source = Fixed::with_noise(vec![jacobian], &[1]);
+
+    let error = collinearity(&source, &[vec![0.0; 2]], &[1.0], 2, 10.0).unwrap_err();
+
+    assert_eq!(
+        error,
+        MethodError::Invalid(
+            "Collinearity needs at least 2 parameters that are not noise parameters, got 1"
+                .to_string()
+        )
     );
 }

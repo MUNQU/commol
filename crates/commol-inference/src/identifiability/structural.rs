@@ -1,11 +1,13 @@
 //! Structural identifiability, local and numerical.
 //!
 //! The scaled sensitivities are evaluated at the rows of a Latin hypercube
-//! over the bounds. At each point the numerical rank counts the singular
-//! values above `‖E‖_F`, the Frobenius norm of the estimated errors of the
-//! scaled sensitivities: by Weyl's inequality, an error `E` moves no
-//! singular value by more than `‖E‖₂ ≤ ‖E‖_F`. The generic rank is the rank
-//! at most points.
+//! over the bounds, with one column per parameter that is not a noise
+//! parameter: a noise parameter of an observation model changes the
+//! likelihood and never a prediction, so it is left out. At each point the
+//! numerical rank counts the singular values above `‖E‖_F`, the Frobenius
+//! norm of the estimated errors of the scaled sensitivities: by Weyl's
+//! inequality, an error `E` moves no singular value by more than
+//! `‖E‖₂ ≤ ‖E‖_F`. The generic rank is the rank at most points.
 //!
 //! A parameter is identifiable when the null space has no component on it,
 //! non-identifiable when it lies in the null space, and identifiable only in
@@ -16,14 +18,14 @@
 //!
 //! The error of the runs of an engine that integrates with a tolerance can
 //! hide singular values that a tighter tolerance resolves. A point whose rank
-//! is below the number of parameters is evaluated once more with the engine
-//! at a tighter accuracy ([`TIGHTENING`], no lower than [`TIGHTEST`]), and a
-//! parameter whose verdict changes there has no verdict: the accuracy, not
-//! the structure, sets it.
+//! is below the number of parameters differentiated is evaluated once more
+//! with the engine at a tighter accuracy ([`TIGHTENING`], no lower than
+//! [`TIGHTEST`]), and a parameter whose verdict changes there has no verdict:
+//! the accuracy, not the structure, sets it.
 
 use commol_calibration::start_points;
 
-use super::skippable;
+use super::{differentiated_columns, skippable};
 use crate::error::MethodError;
 use commol_core::{Accuracy, AccuracySettings};
 
@@ -55,11 +57,11 @@ pub enum StructuralVerdict {
 /// The rank of the scaled sensitivities at one point.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PointRank {
-    /// The parameter values of the point.
+    /// The parameter values of the point, one per parameter.
     pub values: Vec<f64>,
     /// The accuracy of the runs the sensitivities come from.
     pub accuracy: Accuracy,
-    /// The singular values, largest first, one per parameter.
+    /// The singular values, largest first, one per parameter differentiated.
     pub singular_values: Vec<f64>,
     /// The threshold `‖E‖_F` a singular value must pass.
     pub threshold: f64,
@@ -76,12 +78,22 @@ pub struct PointRank {
 pub struct TighterRank {
     /// The accuracy of the runs.
     pub accuracy: Accuracy,
-    /// The singular values, largest first, one per parameter.
+    /// The singular values, largest first, one per parameter differentiated.
     pub singular_values: Vec<f64>,
     /// The threshold `‖E‖_F` a singular value must pass.
     pub threshold: f64,
     /// How many singular values pass it.
     pub rank: usize,
+}
+
+/// The tighter accuracy a point is evaluated again at, and the settings of
+/// the engine that set it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Tightening {
+    /// The accuracy of the runs.
+    pub accuracy: Accuracy,
+    /// The settings that set it, as a user writes them.
+    pub settings: AccuracySettings,
 }
 
 /// A combination of parameters the data determine: the product of each
@@ -99,34 +111,37 @@ pub struct StructuralAnalysis {
     pub points: Vec<PointRank>,
     /// Why each infeasible point was skipped.
     pub skipped: Vec<String>,
+    /// The parameters differentiated, by index: every parameter that is not
+    /// a noise parameter. `projections` and `verdicts` hold one entry per
+    /// parameter differentiated, in this order; the others are left out.
+    pub parameters: Vec<usize>,
     /// The rank at most points (the lowest on a tie), at the accuracy of the
     /// engine.
     pub generic_rank: usize,
-    /// The norm of the projection of each parameter on the null space,
-    /// averaged over the points of generic rank, at the accuracy of the
-    /// engine: 0 when the null space has no component on it, 1 when it lies
-    /// in the null space.
+    /// The norm of the projection of each parameter differentiated on the
+    /// null space, averaged over the points of generic rank, at the accuracy
+    /// of the engine: 0 when the null space has no component on it, 1 when
+    /// it lies in the null space.
     pub projections: Vec<f64>,
-    /// The verdict of each parameter; `None` when the verdict changes at the
-    /// tighter accuracy, or a point could not be evaluated there and the
-    /// parameter is not identifiable.
+    /// The verdict of each parameter differentiated; `None` when the verdict
+    /// changes at the tighter accuracy, or a point could not be evaluated
+    /// there and the parameter is not identifiable.
     pub verdicts: Vec<Option<StructuralVerdict>>,
     /// The identifiable combinations of the parameters
     /// [`StructuralVerdict::InCombination`], at the first point of generic
-    /// rank.
+    /// rank; each exponent is of a parameter by its index in the problem.
     pub combinations: Vec<Combination>,
     /// The accuracy of the runs of the engine.
     pub accuracy: Accuracy,
     /// The tighter accuracy a point of rank below the number of parameters
-    /// is evaluated again at; `None` when no setting sets the accuracy of
-    /// the runs, or the accuracy is already the tightest.
-    pub tighter: Option<Accuracy>,
+    /// differentiated is evaluated again at, with the settings that set it;
+    /// `None` when no setting sets the accuracy of the runs, or the accuracy
+    /// is already the tightest.
+    pub tighter: Option<Tightening>,
     /// The rank at most points with each point evaluated again at the
     /// tighter accuracy in place of its rank at the accuracy of the engine;
     /// `None` when no point was evaluated again.
     pub tighter_generic_rank: Option<usize>,
-    /// The settings that set the accuracy of the runs, or `None`.
-    pub accuracy_settings: Option<AccuracySettings>,
     /// Why each point that the tighter accuracy should check could not be
     /// evaluated there.
     pub unchecked: Vec<String>,
@@ -168,16 +183,20 @@ fn tighter_than(accuracy: Accuracy) -> Option<Accuracy> {
 }
 
 /// The structural rank of `source` at `points` rows of a Latin hypercube over
-/// the bounds, drawn from `seed`.
+/// the bounds, drawn from `seed`, over the parameters that are not noise
+/// parameters.
 ///
-/// When the source runs at an accuracy a setting sets
+/// When a setting sets the accuracy of the runs of the source
+/// ([`SensitivitySource::accuracy_settings`]) and the source runs at another
 /// ([`SensitivitySource::at_accuracy`]), each point whose rank is below the
-/// number of parameters is evaluated again at a tighter accuracy, and the
-/// verdicts are compared with those of the points at that accuracy.
+/// number of parameters differentiated is evaluated again at a tighter
+/// accuracy, and the verdicts are compared with those of the points at that
+/// accuracy.
 ///
 /// # Errors
 ///
-/// [`MethodError::Invalid`] when `points` is 0;
+/// [`MethodError::Invalid`] when `points` is 0 or every parameter is a noise
+/// parameter;
 /// [`MethodError::NoFeasiblePoint`] when every point is infeasible;
 /// [`MethodError::Sensitivity`] when the sensitivities fail for
 /// another reason.
@@ -190,9 +209,13 @@ pub fn structural_rank<S: SensitivitySource>(
         .check(points)
         .map_err(MethodError::Invalid)?;
     let parameters = source.parameters();
+    let differentiated = differentiated_columns(parameters, "StructuralRank")?;
     let accuracy = source.accuracy();
-    let tighter = tighter_than(accuracy)
-        .and_then(|tighter| source.at_accuracy(tighter).map(|source| (tighter, source)));
+    let tighter = source.accuracy_settings().and_then(|settings| {
+        let accuracy = tighter_than(accuracy)?;
+        let source = source.at_accuracy(accuracy)?;
+        Some((Tightening { accuracy, settings }, source))
+    });
     let mut ranks = Vec::with_capacity(points);
     let mut evaluations = Vec::with_capacity(points);
     let mut tighter_evaluations = Vec::with_capacity(points);
@@ -202,7 +225,7 @@ pub fn structural_rank<S: SensitivitySource>(
         .into_iter()
         .skip(1)
     {
-        let sensitivities = match source.scaled_jacobian(&values) {
+        let sensitivities = match source.scaled_jacobian(&values, &differentiated) {
             Ok(sensitivities) => sensitivities,
             Err(error) if skippable(&error) => {
                 skipped.push(error.to_string());
@@ -212,9 +235,9 @@ pub fn structural_rank<S: SensitivitySource>(
         };
         let evaluation = Evaluation::of(&sensitivities);
         let again = match &tighter {
-            Some((tighter, source)) if evaluation.rank < parameters.len() => {
-                match source.scaled_jacobian(&values) {
-                    Ok(sensitivities) => Some((*tighter, Evaluation::of(&sensitivities))),
+            Some((tighter, source)) if evaluation.rank < differentiated.len() => {
+                match source.scaled_jacobian(&values, &differentiated) {
+                    Ok(sensitivities) => Some((tighter.accuracy, Evaluation::of(&sensitivities))),
                     Err(error) => {
                         unchecked.push(error.to_string());
                         None
@@ -246,14 +269,14 @@ pub fn structural_rank<S: SensitivitySource>(
         });
     }
     let loose: Vec<&Evaluation> = evaluations.iter().collect();
-    let (generic_rank, projections, generic) = projections_of(&loose, parameters.len());
+    let (generic_rank, projections, generic) = projections_of(&loose, differentiated.len());
     let verdicts = verdicts_of(&projections);
     let tight: Vec<&Evaluation> = evaluations
         .iter()
         .zip(&tighter_evaluations)
         .map(|(loose, tight)| tight.as_ref().unwrap_or(loose))
         .collect();
-    let (tight_rank, tight_projections, _) = projections_of(&tight, parameters.len());
+    let (tight_rank, tight_projections, _) = projections_of(&tight, differentiated.len());
     let tight_verdicts = verdicts_of(&tight_projections);
     let tighter_generic_rank = tighter_evaluations
         .iter()
@@ -267,7 +290,7 @@ pub fn structural_rank<S: SensitivitySource>(
             (verdict == tight && checked).then_some(verdict)
         })
         .collect();
-    let combined: Vec<usize> = (0..parameters.len())
+    let combined: Vec<usize> = (0..differentiated.len())
         .filter(|&j| verdicts[j] == StructuralVerdict::InCombination)
         .collect();
     let combinations = combinations(&evaluations[generic].null_space, &combined)
@@ -278,10 +301,18 @@ pub fn structural_rank<S: SensitivitySource>(
                 .iter()
                 .all(|&(j, _)| resolved[j].is_some())
         })
+        .map(|combination| Combination {
+            exponents: combination
+                .exponents
+                .into_iter()
+                .map(|(j, exponent)| (differentiated[j], exponent))
+                .collect(),
+        })
         .collect();
     Ok(StructuralAnalysis {
         points: ranks,
         skipped,
+        parameters: differentiated,
         generic_rank,
         projections,
         verdicts: resolved,
@@ -289,7 +320,6 @@ pub fn structural_rank<S: SensitivitySource>(
         accuracy,
         tighter: tighter.map(|(tighter, _)| tighter),
         tighter_generic_rank,
-        accuracy_settings: source.accuracy_settings(),
         unchecked,
     })
 }

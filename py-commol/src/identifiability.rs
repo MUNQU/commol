@@ -125,29 +125,41 @@ pub struct PyStructuralAnalysis {
     points: Vec<PyPointRank>,
     /// Why each infeasible point was skipped
     skipped: Vec<String>,
+    /// The parameters differentiated, by index: those that are not noise
+    /// parameters
+    parameters: Vec<usize>,
     /// The rank at most points
     generic_rank: usize,
-    /// The projection of each parameter on the null space
+    /// The projection of each parameter differentiated on the null space
     projections: Vec<f64>,
     /// "identifiable", "in_combination" or "non_identifiable", per
-    /// parameter; None when the accuracy of the runs may set it
+    /// parameter differentiated; None when the accuracy of the runs may set
+    /// it
     verdicts: Vec<Option<String>>,
     /// Each identifiable combination as `(parameter index, exponent)` pairs
     combinations: Vec<Vec<(usize, f64)>>,
     /// The accuracy of the runs of the engine
     accuracy: PyAccuracy,
     /// The tighter accuracy a point of rank below the number of parameters
-    /// is evaluated again at, or None
-    tighter: Option<PyAccuracy>,
+    /// differentiated is evaluated again at, with the settings that set it,
+    /// or None
+    tighter: Option<PyTightening>,
     /// The rank at most points with each point evaluated again at the
     /// tighter accuracy, or None when no point was
     tighter_generic_rank: Option<usize>,
-    /// The names of the settings of the relative and the absolute accuracy,
-    /// or None when no setting sets them
-    accuracy_settings: Option<(String, String)>,
     /// Why each point that the tighter accuracy should check could not be
     /// evaluated there
     unchecked: Vec<String>,
+}
+
+/// The tighter accuracy of a structural rank and the settings that set it
+#[pyclass(name = "Tightening", frozen, get_all, skip_from_py_object)]
+#[derive(Clone)]
+pub struct PyTightening {
+    /// The accuracy of the runs
+    accuracy: PyAccuracy,
+    /// The names of the settings of the relative and the absolute accuracy
+    settings: (String, String),
 }
 
 /// The accuracy of the runs of an engine
@@ -214,6 +226,7 @@ fn structural_rank(
             })
             .collect(),
         skipped: analysis.skipped,
+        parameters: analysis.parameters,
         generic_rank: analysis.generic_rank,
         projections: analysis.projections,
         verdicts: analysis
@@ -236,11 +249,14 @@ fn structural_rank(
             .map(|combination| combination.exponents)
             .collect(),
         accuracy: analysis.accuracy.into(),
-        tighter: analysis.tighter.map(PyAccuracy::from),
+        tighter: analysis.tighter.map(|tighter| PyTightening {
+            accuracy: tighter.accuracy.into(),
+            settings: (
+                tighter.settings.relative.to_string(),
+                tighter.settings.absolute.to_string(),
+            ),
+        }),
         tighter_generic_rank: analysis.tighter_generic_rank,
-        accuracy_settings: analysis
-            .accuracy_settings
-            .map(|settings| (settings.relative.to_string(), settings.absolute.to_string())),
         unchecked: analysis.unchecked,
     })
 }
@@ -253,8 +269,8 @@ pub struct PyCollinearityVerdict {
     verdict: String,
     /// No observation is sensitive to it
     insensitive: bool,
-    /// The other parameters, by index, whose pair with it has an index at
-    /// or above the threshold
+    /// The other parameters, by index in the problem, whose pair with it has
+    /// an index at or above the threshold
     collinear_with: Vec<usize>,
 }
 
@@ -271,16 +287,22 @@ impl From<CollinearityVerdict> for PyCollinearityVerdict {
 /// Brun's collinearity analysis of a problem
 #[pyclass(name = "CollinearityAnalysis", frozen, get_all)]
 pub struct PyCollinearityAnalysis {
+    /// The parameters differentiated, by index: those that are not noise
+    /// parameters
+    parameters: Vec<usize>,
     /// The weighted median of the sensitivity measure of each parameter
+    /// differentiated
     sensitivity: Vec<f64>,
-    /// The weighted median of the index of each pair
+    /// The weighted median of the index of each pair of parameters
+    /// differentiated
     pair_gamma: Vec<Vec<f64>>,
     /// The subset of lowest index of each size, as
-    /// `(parameters, gamma, share below the threshold)`
+    /// `(parameters by index in the problem, gamma, share below the
+    /// threshold)`
     best_by_size: Vec<(Vec<usize>, f64, f64)>,
     /// The largest subsets whose index is below the threshold, as above
     admissible: Vec<(Vec<usize>, f64, f64)>,
-    /// The verdict of each parameter
+    /// The verdict of each parameter differentiated
     verdicts: Vec<PyCollinearityVerdict>,
     /// How many points were used
     points: usize,
@@ -354,6 +376,7 @@ fn collinearity(
     })?
     .map_err(method_error)?;
     Ok(PyCollinearityAnalysis {
+        parameters: analysis.parameters,
         sensitivity: analysis.sensitivity,
         pair_gamma: analysis.pair_gamma,
         best_by_size: subsets(analysis.best_by_size),
@@ -511,6 +534,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyPointRank>()?;
     m.add_class::<PyTighterRank>()?;
     m.add_class::<PyAccuracy>()?;
+    m.add_class::<PyTightening>()?;
     m.add_class::<PyStructuralAnalysis>()?;
     m.add_class::<PyCollinearityVerdict>()?;
     m.add_class::<PyCollinearityAnalysis>()?;

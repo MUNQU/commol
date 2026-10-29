@@ -205,8 +205,10 @@ print(list(band_report["series"]["A"]))  # ['mean', 'median', 'ci_lower', 'ci_up
 `parameters` (each parameter, in problem order, with its `structural` and
 `practical` verdicts, their reasons and combinations, or `None`; a
 structural `verdict` is `None`, with its reasons, when the solver tolerance
-may set the rank) and `sections` (the evidence of each method that ran, by
-section name).
+may set the rank or the parameter is a noise parameter) and `sections` (the
+evidence of each method that ran, by section name; the sections of
+`structural` and `collinearity` name in `left_out` the noise parameters they
+leave out).
 
 ## Checklist
 

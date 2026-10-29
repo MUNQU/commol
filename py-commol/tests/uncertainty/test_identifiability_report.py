@@ -13,7 +13,11 @@ from commol import (
     Simulation,
 )
 from commol.engines import ODESolver
-from commol.identifiability import StructuralRank
+from commol.identifiability import (
+    Collinearity,
+    StartsIdentifiability,
+    StructuralRank,
+)
 from commol.identifiability.results import (
     CollinearitySection,
     IdentifiabilityReport,
@@ -30,6 +34,7 @@ from tests.support import (
     abc_builder,
     bounded,
     build_stochastic,
+    overdispersed_calibrator,
     rare_flow_calibrator,
 )
 
@@ -172,6 +177,44 @@ class TestReport:
         assert merged.verdicts["k2"].practical == PracticalVerdict(
             verdict="determined", reasons=["starts"]
         )
+
+    def test_a_noise_parameter_leaves_the_verdicts_of_the_others_alone(
+        self,
+    ) -> None:
+        calibrator = overdispersed_calibrator()
+        result = calibrator.run(starts=6)
+        reports = [
+            calibrator.identifiability(method)
+            for method in (
+                StructuralRank(points=5, design="observations"),
+                Collinearity(at=result, max_subset_size=2, threshold=10),
+                StartsIdentifiability(
+                    result=result, parameter_tolerance=0.05, loss_tolerance=0.01
+                ),
+            )
+        ]
+
+        merged = reports[0].merge(*reports[1:])
+
+        verdicts = {
+            name: (
+                None if v.structural is None else v.structural.verdict,
+                None if v.practical is None else v.practical.verdict,
+            )
+            for name, v in merged.verdicts.items()
+        }
+        assert verdicts == {
+            "k1": ("identifiable", "determined"),
+            "k2": ("identifiable", "determined"),
+            "phi": (None, "determined"),
+        }
+        sections = merged.report()["sections"]
+        left_out = {
+            "phi": "a noise parameter of an observation model, which no "
+            "prediction reads"
+        }
+        assert sections["structural"][0]["left_out"] == left_out
+        assert sections["collinearity"][0]["left_out"] == left_out
 
     def test_reports_of_other_parameters_do_not_merge(self) -> None:
         other = IdentifiabilityReport(
