@@ -3746,7 +3746,7 @@
 <tbody>
 <tr>
 <td><code>crates/commol-core/src/types/</code></td>
-<td>The model data types shared by all crates and serialized from Python: <code>Model</code> (header, <code>engine</code>, <code>process</code>, <code>structure</code>), <code>Process</code> (<code>process.rs</code>: bins, accumulators, stratifications, transitions; the names <code>NEIGHBORS</code> and <code>NEIGHBORS_PREFIX</code>), <code>ModelStructure</code> (one variant per kind, tagged by <code>kind</code>), <code>Aggregate</code> (<code>aggregate.rs</code>: <code>InitialConditions</code>, <code>Neighbors</code> and their checks, <code>AggregateVariant</code>), <code>Transition</code> (<code>transitions.rs</code>), …; <code>types/test_kind.rs</code> only with the <code>test-kind</code> feature.</td>
+<td>The model data types shared by all crates and serialized from Python: <code>Model</code> (header, <code>engine</code>, <code>process</code>, <code>structure</code>), <code>Process</code> (<code>process.rs</code>: bins, accumulators, stratifications, matrices (<code>CategoryMatrix</code> and its check against the process), transitions; the names <code>NEIGHBORS</code> and <code>NEIGHBORS_PREFIX</code>), <code>ModelStructure</code> (one variant per kind, tagged by <code>kind</code>), <code>Aggregate</code> (<code>aggregate.rs</code>: <code>InitialConditions</code>, <code>Neighbors</code> and their checks, <code>AggregateVariant</code>), <code>Transition</code> (<code>transitions.rs</code>), …; <code>types/test_kind.rs</code> only with the <code>test-kind</code> feature.</td>
 <td>Engine behavior.</td>
 </tr>
 <tr>
@@ -3795,6 +3795,11 @@
 <td>A second copy of a helper or a density; anything of a model.</td>
 </tr>
 <tr>
+<td><code>crates/commol-statistics/src/linear_algebra.rs</code></td>
+<td>The linear algebra of commol: <code>spectral_radius</code>, the largest modulus of the eigenvalues of a square matrix, from the real Schur decomposition of <code>nalgebra</code>, which the model compiler reads for each matrix between categories.</td>
+<td>A second eigenvalue routine.</td>
+</tr>
+<tr>
 <td><code>crates/commol-model/src/builder.rs</code></td>
 <td>Expansion of the bins and accumulators of a process over its stratifications (<code>expand</code>, <code>expand_compartments</code>, <code>expand_accumulators</code>), the initial state (<code>initial_state</code>), the checks of an aggregate model (<code>check_model</code>: variant, neighbors, names, whole units for a stochastic engine; <code>as_whole</code>), the subgroup total names (<code>subgroup_total_names</code>), impulse schedules and the compilation into <code>CompiledModel</code> (<code>try_from_model</code>).</td>
 <td>Flow planning; stepping.</td>
@@ -3821,13 +3826,18 @@
 </tr>
 <tr>
 <td><code>crates/commol-model/src/flows.rs</code></td>
-<td>Transition flow planning (<code>plan_transition_flows</code>), the sums the neighbors of a unit are (<code>resolve_neighbors</code>), and the description of the flows for Python (<code>describe_flows</code>).</td>
+<td>Transition flow planning (<code>plan_transition_flows</code>), the sums the neighbors of a unit are (<code>resolve_neighbors</code>), the sums a matrix sum is (<code>MatrixSums</code>, from <code>crates/commol-model/src/matrices.rs</code>), and the description of the flows for Python (<code>describe_flows</code>).</td>
 <td>Rate evaluation at run time.</td>
 </tr>
 <tr>
 <td><code>crates/commol-model/src/helpers.rs</code></td>
 <td>Stratified-rate resolution and rate rewriting helpers.</td>
 <td>New public API.</td>
+</tr>
+<tr>
+<td><code>crates/commol-model/src/matrices.rs</code></td>
+<td>The matrices between the categories of a stratification: their variables (<code>matrix_variables</code>: the entries <code>&lt;M&gt;_&lt;i&gt;_&lt;j&gt;</code> and the spectral radius <code>&lt;M&gt;_radius</code>), their checks against the model (<code>check_matrices</code>), the variables of a rate outside its matrix sums (<code>variables_outside_matrix_sums</code>) and the writing of <code>matrix_sum(M, e)</code> as the sum over the categories of a compartment (<code>MatrixSums::resolve</code>).</td>
+<td>A check of a matrix against its stratification (<code>CategoryMatrix::check</code>, commol-core).</td>
 </tr>
 <tr>
 <td><code>crates/commol-model/src/rates.rs</code></td>
@@ -4212,8 +4222,13 @@ table, and <code>tests/suite/test_architecture.py</code> checks it.</p>
 </tr>
 <tr>
 <td><code>_model/process.py</code></td>
-<td><code>Process</code>: bins, accumulators, stratifications and transitions, and the checks of the process by itself.</td>
+<td><code>Process</code>: bins, accumulators, stratifications, matrices and transitions, and the checks of the process by itself.</td>
 <td>Checks that depend on a structure.</td>
+</tr>
+<tr>
+<td><code>_model/matrix.py</code></td>
+<td><code>CategoryMatrix</code>: a matrix between the categories of a stratification, with its unit and description.</td>
+<td>Its checks against the process (the engine).</td>
 </tr>
 <tr>
 <td><code>_model/structure.py</code></td>
@@ -4503,9 +4518,9 @@ results.</p>
 <td><code>crates/commol-core/src/types/structure.rs</code>, <code>crates/commol-core/src/types/engine.rs</code> (<code>ModelKind</code>), <code>py-commol/src/engine.rs</code>, the checklist "Model kind" in <code>docs/codebase/maintainer-playbook.md</code></td>
 </tr>
 <tr>
-<td>Change how a rate reads the neighbors of a unit</td>
-<td><code>crates/commol-model/src/flows.rs</code> (<code>resolve_neighbors</code>)</td>
-<td><code>crates/commol-core/src/types/aggregate.rs</code> (<code>Neighbors</code>), <code>builder.rs</code> (<code>check_model</code>), <code>py-commol/commol/_model/neighbors.py</code></td>
+<td>Change how a rate reads the neighbors of a unit, or a matrix between categories (<code>matrix_sum</code>, <code>&lt;M&gt;_radius</code>)</td>
+<td><code>crates/commol-model/src/flows.rs</code> (<code>resolve_neighbors</code>); <code>crates/commol-model/src/matrices.rs</code> (<code>MatrixSums</code>, <code>matrix_variables</code>, <code>check_matrices</code>)</td>
+<td><code>crates/commol-core/src/types/aggregate.rs</code> (<code>Neighbors</code>), <code>builder.rs</code> (<code>check_model</code>), <code>py-commol/commol/_model/neighbors.py</code>; for a matrix <code>crates/commol-core/src/types/process.rs</code> (<code>CategoryMatrix</code>), <code>jit/ast.rs</code> (<code>Expr::MatrixSum</code>), <code>crates/commol-statistics/src/linear_algebra.rs</code> (<code>spectral_radius</code>), <code>py-commol/commol/_model/matrix.py</code>, <code>_model/builder.py</code> (<code>add_matrix</code>), <code>_model/formula_tree.py</code>, <code>_model/unit_checks.py</code>, <code>_model/equations.py</code></td>
 </tr>
 <tr>
 <td>Change impulses</td>

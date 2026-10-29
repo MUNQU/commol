@@ -70,6 +70,7 @@ An id starts with a letter or `_` and can hold digits after it, such as `e1` or 
 | A bin id, with stratifications     | The total of all its compartments                                                                                                                                                                                                                                             |
 | `total`                            | The total: the sum of every compartment, accumulators excluded                                                                                                                                                                                                                |
 | `neighbors_<bin>`, `neighbors`     | In a transition rate only: what the neighbors of a unit hold, of one bin or of every bin. The structure says who they are; a rate that reads them and no compartment is proportional. See [Neighbors](https://munqu.github.io/commol/latest/guide/building-models/#neighbors) |
+| `<M>_<i>_<j>`, `<M>_radius`        | The entry of row `i` and column `j` of the matrix `M`, and its spectral radius. See [Matrix sums](#matrix-sums)                                                                                                                                                               |
 | `t`                                | The current position on the axis. A difference model reads it at each step, so there it equals `step`; a differential model reads it anywhere                                                                                                                                 |
 | `step`                             | The step that holds the current position, `floor(t)`: 0, 1, 2, … It is constant on each unit interval of a differential model; see [Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step)                                          |
 | `pi`, `e`                          | π and e                                                                                                                                                                                                                                                                       |
@@ -126,6 +127,66 @@ print(value_of("A_t1 + 0"))     # 300.0  = 600 x 0.5
 | `total_…` out of order, as in `total_t1_g1`                   | `build` fails and lists the valid `total_…` names   |
 | A combination that a conditional stratification never creates | `build` fails for `total_…`; `<bin>_…` is not found |
 
+### Matrix sums
+
+A matrix between the categories of a stratification (`ModelBuilder.add_matrix`, see [Matrices between categories](https://munqu.github.io/commol/latest/guide/building-models/#matrices-between-categories)) couples the categories in one rate. In the rate of a compartment of category `i`, `matrix_sum(M, e)` is
+
+```text
+Σ_j M[i, j] · e_j
+```
+
+where `e_j` is the expression `e` read in category `j` of the stratification of `M`:
+
+| In `e`                                                      | Reads in category `j`                                                                                                                     |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| A bin id, such as `B`                                       | The amount of the bin in `j`: the compartment `B_j`, or the sum of the compartments of `B` in `j` when a later stratification splits them |
+| `total`                                                     | The total of `j`, `total_j`                                                                                                               |
+| Anything else: a parameter, a compartment, a subgroup total | The same value as outside the sum                                                                                                         |
+
+```python
+coupled = (
+    ModelBuilder(name="Coupled groups")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_stratification(id="group", categories=["g1", "g2"])
+    .add_matrix(
+        id="M",
+        stratification="group",
+        values={"g1": {"g1": 2, "g2": 1}, "g2": {"g1": 1, "g2": 3}},
+    )
+    .add_parameter(id="k1", value=0.1)
+    .add_transition(
+        id="t_ab", source=["A"], target=["B"], rate="k1 * matrix_sum(M, B / total)"
+    )
+    .build(
+        Aggregate(
+            bin_amounts={"A": 900, "B": 100},
+            stratification_fractions={"group": {"g1": 0.4, "g2": 0.6}},
+        ),
+        engine="DifferenceEquations",
+    )
+)
+
+coupled_run = Simulation(coupled).run(num_steps=1)
+# A_g1 starts at 360: k1 x 360 x (2 x 40 / 400 + 1 x 60 / 600) = 10.8 moves.
+print(coupled_run["A_g1"][1])  # 349.2
+```
+
+The engine writes each matrix sum as the sum it is before it compiles the rate, so every engine runs it: in `g1` the rate above is `k1 * (M_g1_g1 * (B_g1 / total_g1) + M_g1_g2 * (B_g2 / total_g2))`, and `Model.describe` shows that sum. A term whose entry is 0 is left out. A row of zeros is `if(M_g1_g1 != 0, M_g1_g1 * (B_g1 / total_g1), 0)` in `g1`: its value is 0, even where `B_g1 / total_g1` is not a number, and it keeps the unit of the sum.
+
+| Rule                                                                                           | Why                                                                                                                                                                                                                                                                                                                               |
+| ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| What `e` reads does not make the rate absolute; what the rate reads outside the sum does       | `k1 * matrix_sum(M, B / total)` is a rate per unit of its source, as a rate that reads the neighbors of a unit is. `k1 * A_g1 * matrix_sum(M, B / total)` reads a compartment, so it is absolute. See [Absolute and proportional rates](https://munqu.github.io/commol/latest/guide/transitions/#absolute-and-proportional-rates) |
+| Only a transition rate reads `matrix_sum`                                                      | A formula parameter or a constraint has no compartment, so no category `i`                                                                                                                                                                                                                                                        |
+| A matrix sum holds no other matrix sum, and `e` does not read `neighbors_<bin>` or `neighbors` | Each sum has one category `j`                                                                                                                                                                                                                                                                                                     |
+| Each compartment of the transition has a category of the stratification of `M`                 | Else the row `i` is not defined; a conditional stratification can leave a compartment without one                                                                                                                                                                                                                                 |
+
+A rate or a formula parameter reads the entries of `M` as `M_<i>_<j>` (`M_g1_g2` is 1 above) and its spectral radius as `M_radius`: the largest modulus of its eigenvalues, real or complex. The engine computes it once, when it builds the model, from the values of the matrix. Above, `M_radius` is `(5 + √5) / 2`, about 3.618. A calibration constraint does not read these variables. A rate scaled by `1 / M_radius` reads the matrix normalized to a spectral radius of 1, so its scale follows a change of the values:
+
+```python
+normalized = "k1 / M_radius * matrix_sum(M, B / total)"
+```
+
 ## Functions
 
 | Group                     | Functions                                                                                      |
@@ -137,6 +198,7 @@ print(value_of("A_t1 + 0"))     # 300.0  = 600 x 0.5
 | Comparison                | `min(a, b, ...)`, `max(a, b, ...)` (two arguments or more), `abs`                              |
 | Rounding                  | `floor`, `ceil`, `round` (halves round away from zero: `round(2.5)` is 3, `round(-2.5)` is -3) |
 | Conditional               | `if(condition, value_if_true, value_if_false)`                                                 |
+| Matrix                    | `matrix_sum(M, e)`, in a transition rate: see [Matrix sums](#matrix-sums)                      |
 
 No other function is in the language: `erf(x)` or `trunc(x)` is rejected.
 
@@ -163,7 +225,7 @@ To keep a rate readable, move part of it into a formula parameter: `add_paramete
 
 ## Rejected expressions
 
-The engine checks each expression when it is added: a transition rate, a stratified rate, a formula parameter, a calibration constraint or an axis pattern. An expression outside the language of this page fails with a `ValueError` that names the expression and its first part outside the language: an unknown function, a call with the wrong number of arguments, `&&` or `||`, or a comparison or `!` outside the condition of an `if`.
+The engine checks each expression when it is added: a transition rate, a stratified rate, a formula parameter, a calibration constraint or an axis pattern. An expression outside the language of this page fails with a `ValueError` that names the expression and its first part outside the language: an unknown function, a call with the wrong number of arguments, `&&` or `||`, a comparison or `!` outside the condition of an `if`, or a `matrix_sum` that does not name a matrix and an expression, or that holds another one.
 
 ```python
 try:
@@ -172,7 +234,7 @@ except ValueError as error:
     print(error)  # ... Parameter 'k2': Formula 'k1 * (step > 30)': the comparison '>' ...
 ```
 
-When the model is built, the engine checks the variables each rate and each formula parameter reads. A variable that no parameter, bin, compartment, subgroup total or engine variable defines fails the build, with a message that names the transition or the parameter, the expression, the undefined variables, and the parameters and bins of the model: `Undefined variables in transition 'bc' rate 'k9 * B': k9. Available parameters: k1, k2. Available bins: A, B, C.` A category id, such as `g1`, is not a variable: write `total_g1` for its compartments.
+When the model is built, the engine checks the variables each rate and each formula parameter reads. A variable that no parameter, bin, compartment, subgroup total, variable of a matrix or engine variable defines fails the build, with a message that names the transition or the parameter, the expression, the undefined variables, and the parameters and bins of the model: `Undefined variables in transition 'bc' rate 'k9 * B': k9. Available parameters: k1, k2. Available bins: A, B, C.` A category id, such as `g1`, is not a variable: write `total_g1` for its compartments.
 
 ## Limits of the parser
 

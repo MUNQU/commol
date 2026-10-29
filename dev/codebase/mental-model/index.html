@@ -3733,7 +3733,7 @@ Rust engine builds and runs it.</p>
 </span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>crates/commol-differential/  the ODE engine: diffsol integrates derivatives
 </span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>crates/commol-stochastic/    the stochastic engines of whole units
 </span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>crates/commol-random/        the generator, replicate seeds, samplers
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>crates/commol-statistics/    numerical helpers, log densities, the one quantile
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>crates/commol-statistics/    numerical helpers, log densities, the one quantile, the spectral radius
 </span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>crates/commol-calibration/   the problem in layers, optimizers (argmin fork), starts
 </span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>crates/commol-inference/     parameter sample, predictive, scores
 </span></code></pre></div>
@@ -3783,7 +3783,7 @@ Rust engine builds and runs it.</p>
 <td><code>crates/commol-core/src/math_expression/jit/</code> (Cranelift)</td>
 </tr>
 <tr>
-<td>One copy of each numerical helper, log density and weighted statistic that calibration and inference share: <code>log Σ exp</code>, the special functions, the normal, log-normal and Student t densities, the one quantile, the weighted summary</td>
+<td>One copy of each numerical helper, log density and weighted statistic that calibration and inference share: <code>log Σ exp</code>, the special functions, the normal, log-normal and Student t densities, the one quantile, the weighted summary; and the spectral radius of a matrix, which the model compiler reads</td>
 <td><code>crates/commol-statistics/</code></td>
 </tr>
 <tr>

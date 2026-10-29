@@ -825,10 +825,10 @@ Every `add_*` method returns the builder, so calls chain. The other methods:
 | Method                                    | Returns                             | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | ----------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `build(structure, engine, settings=None)` | `Model` of the class of `structure` | Joins the process with a [structure](#the-structure-aggregate) and an engine, validates the model and returns it. The engine must run the kind of the structure: `"DifferenceEquations"` (discrete time), `"DifferentialEquations"` (continuous time), `"StochasticEvents"` and `"StochasticSteps"` ([at random](https://munqu.github.io/commol/latest/guide/stochastic/index.md)) run `Aggregate`. `settings` are the settings of that engine (`ODESolver` for `"DifferentialEquations"`, `StochasticEventsSettings` and `StochasticStepsSettings` for the stochastic engines); None uses its defaults. One builder builds the model for each engine and each structure. See [Differential equations](https://munqu.github.io/commol/latest/guide/simulations/#differential-equations). |
-| `process()`                               | `Process`                           | The bins, accumulators, stratifications and transitions written so far.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `process()`                               | `Process`                           | The bins, accumulators, stratifications, matrices and transitions written so far.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `clone()`                                 | `ModelBuilder`                      | A deep copy of everything, accumulators included, to build variants of one model.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `reset()`                                 | `ModelBuilder`                      | Removes bins, accumulators, stratifications, transitions and parameters; keeps the name, description, version, `bin_unit`, `step_unit` and `origin`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `get_summary()`                           | `dict`                              | The name, description, version, and the count and ids of the bins, stratifications, transitions and parameters added so far.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `reset()`                                 | `ModelBuilder`                      | Removes bins, accumulators, stratifications, matrices, transitions and parameters; keeps the name, description, version, `bin_unit`, `step_unit` and `origin`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `get_summary()`                           | `dict`                              | The name, description, version, and the count and ids of the bins, stratifications, matrices, transitions and parameters added so far.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 ```python
 variant = builder.clone()
@@ -885,15 +885,18 @@ builder = (
 
 The engine sets these variables, so `build` rejects a parameter with one of these ids (`Aggregate.check_model` and `check_model` in `crates/commol-model/src/builder.rs`):
 
-| Name                                                                     | Example                                       |
-| ------------------------------------------------------------------------ | --------------------------------------------- |
-| `total`, `step`, `t`, `pi`, `e`                                          | `total`                                       |
-| `neighbors` and `neighbors_<bin>`, the [neighbors of a unit](#neighbors) | `neighbors_A`                                 |
-| A bin id                                                                 | `A`                                           |
-| An expanded compartment                                                  | `A_g1`                                        |
-| A subgroup total                                                         | `total_g1`, `A_t1` (with two stratifications) |
+| Name                                                                                      | Example                                       |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `total`, `step`, `t`, `pi`, `e`                                                           | `total`                                       |
+| `neighbors` and `neighbors_<bin>`, the [neighbors of a unit](#neighbors)                  | `neighbors_A`                                 |
+| A bin id                                                                                  | `A`                                           |
+| An expanded compartment                                                                   | `A_g1`                                        |
+| A subgroup total                                                                          | `total_g1`, `A_t1` (with two stratifications) |
+| The variables of a [matrix](#matrices-between-categories) `M`: `M_<i>_<j>` and `M_radius` | `M_g1_g2`, `M_radius`                         |
 
 A bin or an accumulator cannot take an id of the first two rows either, because the engine variable would hide it. A bin whose names read as a subgroup total is rejected too: a bin `total_y` stratified by `group = [y, o]` and `type = [y, o]` expands into `total_y_y`, which is also the total of the `y` of both stratifications.
+
+A matrix may not take the id of a parameter, a bin, an accumulator, a compartment, a subgroup total or an engine variable, nor may one of its variables, and two matrices may not give one variable nor a variable that is the id of a matrix (`check_matrices` in `crates/commol-model/src/matrices.rs`).
 
 An id that starts with `total_` but names no subgroup total, such as `total_max`, is accepted. `N` is not reserved, so a bin or a parameter may use it.
 
@@ -998,6 +1001,36 @@ Each condition is `StratificationCondition(stratification=<id>, category=<catego
 | Case                       | Names are case-sensitive: `A_g1` is not `A_G1`.                                            |
 
 See [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/#stratifications) for worked examples, and [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#stratified-rates) for rates that depend on the category.
+
+## Matrices between categories
+
+A matrix holds one value for each pair of categories of a stratification. A rate reads it with `matrix_sum`, which couples the categories:
+
+```python
+builder = builder.add_matrix(
+    id="M",
+    stratification="group",
+    values={"g1": {"g1": 2.0, "g2": 1.0}, "g2": {"g1": 1.0, "g2": 3.0}},
+    unit="1/day",
+    description="Coupling between the groups",
+)
+```
+
+| Argument         | Type                                | Default  | Meaning                                                                 |
+| ---------------- | ----------------------------------- | -------- | ----------------------------------------------------------------------- |
+| `id`             | `str`                               | required | The id `matrix_sum` reads, and the start of the names of its variables. |
+| `stratification` | `str`                               | required | The stratification whose categories are its rows and its columns.       |
+| `values`         | `Mapping[str, Mapping[str, float]]` | required | `values[i][j]`, the value of row `i` and column `j`.                    |
+| `unit`           | \`str                               | None\`   | `None`                                                                  |
+| `description`    | \`str                               | None\`   | `None`                                                                  |
+
+| What it gives                                | Meaning                                                                                                                                                                                                |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `matrix_sum(M, e)` in a transition rate      | In a compartment of category `i`, `Σ_j M[i, j] · e_j`, with each bin of `e` read in category `j`. See [Matrix sums](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#matrix-sums) |
+| `M_<i>_<j>` in a rate or a formula parameter | The value of row `i` and column `j`, as `M_g1_g2`                                                                                                                                                      |
+| `M_radius` in a rate or a formula parameter  | The spectral radius: the largest modulus of its eigenvalues                                                                                                                                            |
+
+`build` raises `ValueError` when the stratification is not one of the process, a row or a value of a category is missing, a row or a column names no category, a value is not finite, or the id or a variable of the matrix has the name of another id or variable of the model. Each message names the matrix and the category. `Model.describe` lists each matrix with its values and its spectral radius under the parameters.
 
 ## Accumulators
 
@@ -1254,12 +1287,12 @@ A rate is a formula (a string), a number, or a [`AxisPattern`](https://munqu.git
 
 The engine decides for each flow whether its rate is the flow itself or a rate per member of the source:
 
-| Case                                                              | Kind         | Flow            |
-| ----------------------------------------------------------------- | ------------ | --------------- |
-| The rate names a compartment, a bin total or a `total_…` variable | Absolute     | `rate`          |
-| No source                                                         | Absolute     | `rate`          |
-| A stratified rate sets `"absolute": True` or `False`              | As set       | —               |
-| Otherwise                                                         | Proportional | `rate × source` |
+| Case                                                                                           | Kind         | Flow            |
+| ---------------------------------------------------------------------------------------------- | ------------ | --------------- |
+| The rate names, outside every `matrix_sum`, a compartment, a bin total or a `total_…` variable | Absolute     | `rate`          |
+| No source                                                                                      | Absolute     | `rate`          |
+| A stratified rate sets `"absolute": True` or `False`                                           | As set       | —               |
+| Otherwise                                                                                      | Proportional | `rate × source` |
 
 A rate that reads `total` and no compartment, such as `k1 / total`, is proportional (`plan_transition_flows` in `crates/commol-model/src/flows.rs`).
 
@@ -1703,6 +1736,7 @@ An id starts with a letter or `_` and can hold digits after it, such as `e1` or 
 | A bin id, with stratifications     | The total of all its compartments                                                                                                                                                                                                                                             |
 | `total`                            | The total: the sum of every compartment, accumulators excluded                                                                                                                                                                                                                |
 | `neighbors_<bin>`, `neighbors`     | In a transition rate only: what the neighbors of a unit hold, of one bin or of every bin. The structure says who they are; a rate that reads them and no compartment is proportional. See [Neighbors](https://munqu.github.io/commol/latest/guide/building-models/#neighbors) |
+| `<M>_<i>_<j>`, `<M>_radius`        | The entry of row `i` and column `j` of the matrix `M`, and its spectral radius. See [Matrix sums](#matrix-sums)                                                                                                                                                               |
 | `t`                                | The current position on the axis. A difference model reads it at each step, so there it equals `step`; a differential model reads it anywhere                                                                                                                                 |
 | `step`                             | The step that holds the current position, `floor(t)`: 0, 1, 2, … It is constant on each unit interval of a differential model; see [Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step)                                          |
 | `pi`, `e`                          | π and e                                                                                                                                                                                                                                                                       |
@@ -1759,6 +1793,66 @@ print(value_of("A_t1 + 0"))     # 300.0  = 600 x 0.5
 | `total_…` out of order, as in `total_t1_g1`                   | `build` fails and lists the valid `total_…` names   |
 | A combination that a conditional stratification never creates | `build` fails for `total_…`; `<bin>_…` is not found |
 
+### Matrix sums
+
+A matrix between the categories of a stratification (`ModelBuilder.add_matrix`, see [Matrices between categories](https://munqu.github.io/commol/latest/guide/building-models/#matrices-between-categories)) couples the categories in one rate. In the rate of a compartment of category `i`, `matrix_sum(M, e)` is
+
+```text
+Σ_j M[i, j] · e_j
+```
+
+where `e_j` is the expression `e` read in category `j` of the stratification of `M`:
+
+| In `e`                                                      | Reads in category `j`                                                                                                                     |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| A bin id, such as `B`                                       | The amount of the bin in `j`: the compartment `B_j`, or the sum of the compartments of `B` in `j` when a later stratification splits them |
+| `total`                                                     | The total of `j`, `total_j`                                                                                                               |
+| Anything else: a parameter, a compartment, a subgroup total | The same value as outside the sum                                                                                                         |
+
+```python
+coupled = (
+    ModelBuilder(name="Coupled groups")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_stratification(id="group", categories=["g1", "g2"])
+    .add_matrix(
+        id="M",
+        stratification="group",
+        values={"g1": {"g1": 2, "g2": 1}, "g2": {"g1": 1, "g2": 3}},
+    )
+    .add_parameter(id="k1", value=0.1)
+    .add_transition(
+        id="t_ab", source=["A"], target=["B"], rate="k1 * matrix_sum(M, B / total)"
+    )
+    .build(
+        Aggregate(
+            bin_amounts={"A": 900, "B": 100},
+            stratification_fractions={"group": {"g1": 0.4, "g2": 0.6}},
+        ),
+        engine="DifferenceEquations",
+    )
+)
+
+coupled_run = Simulation(coupled).run(num_steps=1)
+# A_g1 starts at 360: k1 x 360 x (2 x 40 / 400 + 1 x 60 / 600) = 10.8 moves.
+print(coupled_run["A_g1"][1])  # 349.2
+```
+
+The engine writes each matrix sum as the sum it is before it compiles the rate, so every engine runs it: in `g1` the rate above is `k1 * (M_g1_g1 * (B_g1 / total_g1) + M_g1_g2 * (B_g2 / total_g2))`, and `Model.describe` shows that sum. A term whose entry is 0 is left out. A row of zeros is `if(M_g1_g1 != 0, M_g1_g1 * (B_g1 / total_g1), 0)` in `g1`: its value is 0, even where `B_g1 / total_g1` is not a number, and it keeps the unit of the sum.
+
+| Rule                                                                                           | Why                                                                                                                                                                                                                                                                                                                               |
+| ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| What `e` reads does not make the rate absolute; what the rate reads outside the sum does       | `k1 * matrix_sum(M, B / total)` is a rate per unit of its source, as a rate that reads the neighbors of a unit is. `k1 * A_g1 * matrix_sum(M, B / total)` reads a compartment, so it is absolute. See [Absolute and proportional rates](https://munqu.github.io/commol/latest/guide/transitions/#absolute-and-proportional-rates) |
+| Only a transition rate reads `matrix_sum`                                                      | A formula parameter or a constraint has no compartment, so no category `i`                                                                                                                                                                                                                                                        |
+| A matrix sum holds no other matrix sum, and `e` does not read `neighbors_<bin>` or `neighbors` | Each sum has one category `j`                                                                                                                                                                                                                                                                                                     |
+| Each compartment of the transition has a category of the stratification of `M`                 | Else the row `i` is not defined; a conditional stratification can leave a compartment without one                                                                                                                                                                                                                                 |
+
+A rate or a formula parameter reads the entries of `M` as `M_<i>_<j>` (`M_g1_g2` is 1 above) and its spectral radius as `M_radius`: the largest modulus of its eigenvalues, real or complex. The engine computes it once, when it builds the model, from the values of the matrix. Above, `M_radius` is `(5 + √5) / 2`, about 3.618. A calibration constraint does not read these variables. A rate scaled by `1 / M_radius` reads the matrix normalized to a spectral radius of 1, so its scale follows a change of the values:
+
+```python
+normalized = "k1 / M_radius * matrix_sum(M, B / total)"
+```
+
 ## Functions
 
 | Group                     | Functions                                                                                      |
@@ -1770,6 +1864,7 @@ print(value_of("A_t1 + 0"))     # 300.0  = 600 x 0.5
 | Comparison                | `min(a, b, ...)`, `max(a, b, ...)` (two arguments or more), `abs`                              |
 | Rounding                  | `floor`, `ceil`, `round` (halves round away from zero: `round(2.5)` is 3, `round(-2.5)` is -3) |
 | Conditional               | `if(condition, value_if_true, value_if_false)`                                                 |
+| Matrix                    | `matrix_sum(M, e)`, in a transition rate: see [Matrix sums](#matrix-sums)                      |
 
 No other function is in the language: `erf(x)` or `trunc(x)` is rejected.
 
@@ -1796,7 +1891,7 @@ To keep a rate readable, move part of it into a formula parameter: `add_paramete
 
 ## Rejected expressions
 
-The engine checks each expression when it is added: a transition rate, a stratified rate, a formula parameter, a calibration constraint or an axis pattern. An expression outside the language of this page fails with a `ValueError` that names the expression and its first part outside the language: an unknown function, a call with the wrong number of arguments, `&&` or `||`, or a comparison or `!` outside the condition of an `if`.
+The engine checks each expression when it is added: a transition rate, a stratified rate, a formula parameter, a calibration constraint or an axis pattern. An expression outside the language of this page fails with a `ValueError` that names the expression and its first part outside the language: an unknown function, a call with the wrong number of arguments, `&&` or `||`, a comparison or `!` outside the condition of an `if`, or a `matrix_sum` that does not name a matrix and an expression, or that holds another one.
 
 ```python
 try:
@@ -1805,7 +1900,7 @@ except ValueError as error:
     print(error)  # ... Parameter 'k2': Formula 'k1 * (step > 30)': the comparison '>' ...
 ```
 
-When the model is built, the engine checks the variables each rate and each formula parameter reads. A variable that no parameter, bin, compartment, subgroup total or engine variable defines fails the build, with a message that names the transition or the parameter, the expression, the undefined variables, and the parameters and bins of the model: `Undefined variables in transition 'bc' rate 'k9 * B': k9. Available parameters: k1, k2. Available bins: A, B, C.` A category id, such as `g1`, is not a variable: write `total_g1` for its compartments.
+When the model is built, the engine checks the variables each rate and each formula parameter reads. A variable that no parameter, bin, compartment, subgroup total, variable of a matrix or engine variable defines fails the build, with a message that names the transition or the parameter, the expression, the undefined variables, and the parameters and bins of the model: `Undefined variables in transition 'bc' rate 'k9 * B': k9. Available parameters: k1, k2. Available bins: A, B, C.` A category id, such as `g1`, is not a variable: write `total_g1` for its compartments.
 
 ## Limits of the parser
 
@@ -2251,14 +2346,15 @@ except UnitConsistencyError as error:
     print(error)
 ```
 
-| Error                                                                       | Cause                                                                                    |
-| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `Unit mismatch: equation '…' has unit 'day * item' but expected 'item/day'` | A rate with the wrong unit                                                               |
-| `Cannot convert from 'item' to 'dimensionless'`                             | A function such as `sin`, `exp` or `log` received a quantity with a unit                 |
-| `The following constant parameters are missing units: …`                    | A constant parameter has no unit                                                         |
-| `The following bins have no unit: …`                                        | A bin has no unit (set `bin_unit`)                                                       |
-| `The model declares no step unit, so it is 'step'`                          | Rates in a unit such as `1/day` without `step_unit`; see [The step unit](#the-step-unit) |
-| `Variable '…' … has no defined unit`                                        | A variable of a rate has no unit                                                         |
+| Error                                                                       | Cause                                                                                                                       |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `Unit mismatch: equation '…' has unit 'day * item' but expected 'item/day'` | A rate with the wrong unit                                                                                                  |
+| `Cannot convert from 'item' to 'dimensionless'`                             | A function such as `sin`, `exp` or `log` received a quantity with a unit                                                    |
+| `The following constant parameters are missing units: …`                    | A constant parameter has no unit                                                                                            |
+| `The following bins have no unit: …`                                        | A bin has no unit (set `bin_unit`)                                                                                          |
+| `The following matrices have no unit: …`                                    | A matrix has no unit (set `unit` in `add_matrix`); a matrix sum has the unit of the matrix times the unit of its expression |
+| `The model declares no step unit, so it is 'step'`                          | Rates in a unit such as `1/day` without `step_unit`; see [The step unit](#the-step-unit)                                    |
+| `Variable '…' … has no defined unit`                                        | A variable of a rate has no unit                                                                                            |
 
 To pass a quantity to a function, make it dimensionless first, for example `sin(2 * pi * step / 365)` or `exp(-decay * step)` with `decay` in `"dimensionless"`, or `sin(2 * pi * t / period)` with `period` in the step unit.
 
@@ -2354,15 +2450,15 @@ In a Jupyter notebook, `model.describe()` as the last line of a cell shows the M
 
 A `ModelDescription` has a `title`, a `layout` and a list of `sections`. Each section has a `key`, a `title` and `blocks`. `Model.describe()` builds the sections every kind shares from the model, and the structure of the model adds the sections of its kind (`ModelStructure.describe`):
 
-| Key              | Content                                                                  | For an `Aggregate` model                                                                       |
-| ---------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| `overview`       | Name, description, version, kind, engine, its settings and the step unit | From `Model`                                                                                   |
-| `entities`       | What holds the state                                                     | Bins, accumulators, stratifications and their categories, the expanded compartments            |
-| `dynamics`       | How the state changes                                                    | The state graphs, the compact and expanded forms of the equations, the impulses, the neighbors |
-| `schedule`       | How the engine advances, and the settings it advances with               | From the engine (`EngineType.schedule`) and `Model.engine.settings`                            |
-| `initialization` | The state the model starts from                                          | Bin amounts, category fractions, overrides, and the initial state the engine builds            |
-| `parameters`     | Every parameter                                                          | Value, unit, whether calibration sets it, description                                          |
-| `outputs`        | What a run returns                                                       | The outputs of each bin and accumulator                                                        |
+| Key              | Content                                                                  | For an `Aggregate` model                                                                                                               |
+| ---------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `overview`       | Name, description, version, kind, engine, its settings and the step unit | From `Model`                                                                                                                           |
+| `entities`       | What holds the state                                                     | Bins, accumulators, stratifications and their categories, the expanded compartments                                                    |
+| `dynamics`       | How the state changes                                                    | The state graphs, the compact and expanded forms of the equations, the impulses, the neighbors                                         |
+| `schedule`       | How the engine advances, and the settings it advances with               | From the engine (`EngineType.schedule`) and `Model.engine.settings`                                                                    |
+| `initialization` | The state the model starts from                                          | Bin amounts, category fractions, overrides, and the initial state the engine builds                                                    |
+| `parameters`     | Every parameter, then each matrix between categories                     | Value, unit, whether calibration sets it, description; for a matrix, its stratification, unit, description, spectral radius and values |
+| `outputs`        | What a run returns                                                       | The outputs of each bin and accumulator                                                                                                |
 
 A section with no blocks is left out of every rendering.
 
@@ -14807,7 +14903,7 @@ Builds a `Model`. A `StratificationCondition` selects the compartments of a cate
 
 A fluent interface that writes the process of a model, once.
 
-The builder adds bins, accumulators, stratifications, transitions and parameters: the process, which is the same for every kind of model. `build` joins it with a structure, which lays the process out (such as `Aggregate`, amounts per compartment), and an engine, which runs it. Each method that adds returns the builder, so the calls chain.
+The builder adds bins, accumulators, stratifications, matrices, transitions and parameters: the process, which is the same for every kind of model. `build` joins it with a structure, which lays the process out (such as `Aggregate`, amounts per compartment), and an engine, which runs it. Each method that adds returns the builder, so the calls chain.
 
 Source code in `commol/_model/builder.py`
 
@@ -14816,10 +14912,11 @@ class ModelBuilder:
     """
     A fluent interface that writes the process of a model, once.
 
-    The builder adds bins, accumulators, stratifications, transitions and
-    parameters: the process, which is the same for every kind of model.
-    `build` joins it with a structure, which lays the process out (such as
-    `Aggregate`, amounts per compartment), and an engine, which runs it.
+    The builder adds bins, accumulators, stratifications, matrices,
+    transitions and parameters: the process, which is the same for every
+    kind of model. `build` joins it with a structure, which lays the process
+    out (such as `Aggregate`, amounts per compartment), and an engine, which
+    runs it.
     Each method that adds returns the builder, so the calls chain.
     """
 
@@ -14873,6 +14970,7 @@ class ModelBuilder:
         self._bins: list[Bin] = []
         self._accumulators: list[Accumulator] = []
         self._stratifications: list[Stratification] = []
+        self._matrices: list[CategoryMatrix] = []
         self._transitions: list[Transition] = []
         self._parameters: list[Parameter] = []
         self._series_counter: int = 0
@@ -14993,6 +15091,64 @@ class ModelBuilder:
             )
         )
         logger.info(f"Added stratification: id='{id}', categories={categories}")
+        return self
+
+    def add_matrix(
+        self,
+        id: str,
+        stratification: str,
+        values: Mapping[str, Mapping[str, float]],
+        unit: str | None = None,
+        description: str | None = None,
+    ) -> Self:
+        """
+        Add a matrix between the categories of a stratification.
+
+        A rate reads it through ``matrix_sum(id, e)``: in the rate of a
+        compartment of category ``i``, ``Σ_j values[i][j] · e_j``, where
+        ``e_j`` is ``e`` with each bin read as its amount in category ``j``
+        and ``total`` as the total of ``j``. A rate or a formula parameter
+        also reads its entries as ``<id>_<i>_<j>`` and its spectral radius, the largest
+        modulus of its eigenvalues, as ``<id>_radius``.
+
+        Parameters
+        ----------
+        id : str
+            Unique identifier for the matrix.
+        stratification : str
+            Id of the stratification whose categories are its rows and its
+            columns.
+        values : Mapping[str, Mapping[str, float]]
+            ``values[i][j]``, the value of row ``i`` and column ``j``: one
+            finite number for each pair of categories of the stratification.
+        unit : str | None, default=None
+            Unit of its values, which the unit check reads.
+        description : str | None, default=None
+            Human-readable description of the matrix.
+
+        Returns
+        -------
+        ModelBuilder
+            Self for method chaining.
+
+        Notes
+        -----
+        `build` checks the matrix against the process: it raises
+        ``ValueError`` when the stratification is not one of the process, a
+        row or a value of a category is missing, a row or a column names no
+        category, a value is not finite, or the id or a variable of the
+        matrix has the name of another id or variable of the model.
+        """
+        self._matrices.append(
+            CategoryMatrix(
+                id=id,
+                stratification=stratification,
+                values={row: dict(columns) for row, columns in values.items()},
+                unit=unit,
+                description=description,
+            )
+        )
+        logger.info(f"Added matrix: id='{id}', stratification='{stratification}'")
         return self
 
     def add_parameter(
@@ -15493,6 +15649,8 @@ class ModelBuilder:
             "bin_ids": [state.id for state in self._bins],
             "stratifications_count": len(self._stratifications),
             "stratification_ids": [strat.id for strat in self._stratifications],
+            "matrices_count": len(self._matrices),
+            "matrix_ids": [matrix.id for matrix in self._matrices],
             "transitions_count": len(self._transitions),
             "transition_ids": [trans.id for trans in self._transitions],
             "parameters_count": len(self._parameters),
@@ -15507,7 +15665,8 @@ class ModelBuilder:
         -------
         ModelBuilder
             A new ModelBuilder instance with the same configuration: every
-            bin, accumulator, stratification, transition and parameter.
+            bin, accumulator, stratification, matrix, transition and
+            parameter.
             Changes to one builder do not affect the other.
         """
         return copy.deepcopy(self)
@@ -15518,7 +15677,8 @@ class ModelBuilder:
 
         The name, description, version, ``bin_unit``, ``step_unit`` and
         ``origin`` are kept. Every bin,
-        accumulator, stratification, transition and parameter is removed.
+        accumulator, stratification, matrix, transition and parameter is
+        removed.
 
         Returns
         -------
@@ -15528,6 +15688,7 @@ class ModelBuilder:
         self._bins.clear()
         self._accumulators.clear()
         self._stratifications.clear()
+        self._matrices.clear()
         self._transitions.clear()
         self._parameters.clear()
         self._series_counter = 0
@@ -15540,7 +15701,8 @@ class ModelBuilder:
         Returns
         -------
         Process
-            The bins, accumulators, stratifications and transitions.
+            The bins, accumulators, stratifications, matrices and
+            transitions.
 
         Raises
         ------
@@ -15552,6 +15714,7 @@ class ModelBuilder:
             bins=self._bins,
             accumulators=self._accumulators,
             stratifications=self._stratifications,
+            matrices=self._matrices,
             transitions=self._transitions,
         )
 
@@ -15696,6 +15859,7 @@ def __init__(
     self._bins: list[Bin] = []
     self._accumulators: list[Accumulator] = []
     self._stratifications: list[Stratification] = []
+    self._matrices: list[CategoryMatrix] = []
     self._transitions: list[Transition] = []
     self._parameters: list[Parameter] = []
     self._series_counter: int = 0
@@ -15902,6 +16066,98 @@ def add_stratification(
         )
     )
     logger.info(f"Added stratification: id='{id}', categories={categories}")
+    return self
+```
+
+#### add_matrix
+
+```python
+add_matrix(id: str, stratification: str, values: Mapping[str, Mapping[str, float]], unit: str | None = None, description: str | None = None) -> Self
+```
+
+Add a matrix between the categories of a stratification.
+
+A rate reads it through `matrix_sum(id, e)`: in the rate of a compartment of category `i`, `Σ_j values[i][j] · e_j`, where `e_j` is `e` with each bin read as its amount in category `j` and `total` as the total of `j`. A rate or a formula parameter also reads its entries as `<id>_<i>_<j>` and its spectral radius, the largest modulus of its eigenvalues, as `<id>_radius`.
+
+Parameters:
+
+| Name             | Type                                | Description                                                                                                         | Default                                         |
+| ---------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `id`             | `str`                               | Unique identifier for the matrix.                                                                                   | *required*                                      |
+| `stratification` | `str`                               | Id of the stratification whose categories are its rows and its columns.                                             | *required*                                      |
+| `values`         | `Mapping[str, Mapping[str, float]]` | values[i][j], the value of row i and column j: one finite number for each pair of categories of the stratification. | *required*                                      |
+| `unit`           | \`str                               | None\`                                                                                                              | Unit of its values, which the unit check reads. |
+| `description`    | \`str                               | None\`                                                                                                              | Human-readable description of the matrix.       |
+
+Returns:
+
+| Type           | Description               |
+| -------------- | ------------------------- |
+| `ModelBuilder` | Self for method chaining. |
+
+Notes
+
+`build` checks the matrix against the process: it raises `ValueError` when the stratification is not one of the process, a row or a value of a category is missing, a row or a column names no category, a value is not finite, or the id or a variable of the matrix has the name of another id or variable of the model.
+
+Source code in `commol/_model/builder.py`
+
+```python
+def add_matrix(
+    self,
+    id: str,
+    stratification: str,
+    values: Mapping[str, Mapping[str, float]],
+    unit: str | None = None,
+    description: str | None = None,
+) -> Self:
+    """
+    Add a matrix between the categories of a stratification.
+
+    A rate reads it through ``matrix_sum(id, e)``: in the rate of a
+    compartment of category ``i``, ``Σ_j values[i][j] · e_j``, where
+    ``e_j`` is ``e`` with each bin read as its amount in category ``j``
+    and ``total`` as the total of ``j``. A rate or a formula parameter
+    also reads its entries as ``<id>_<i>_<j>`` and its spectral radius, the largest
+    modulus of its eigenvalues, as ``<id>_radius``.
+
+    Parameters
+    ----------
+    id : str
+        Unique identifier for the matrix.
+    stratification : str
+        Id of the stratification whose categories are its rows and its
+        columns.
+    values : Mapping[str, Mapping[str, float]]
+        ``values[i][j]``, the value of row ``i`` and column ``j``: one
+        finite number for each pair of categories of the stratification.
+    unit : str | None, default=None
+        Unit of its values, which the unit check reads.
+    description : str | None, default=None
+        Human-readable description of the matrix.
+
+    Returns
+    -------
+    ModelBuilder
+        Self for method chaining.
+
+    Notes
+    -----
+    `build` checks the matrix against the process: it raises
+    ``ValueError`` when the stratification is not one of the process, a
+    row or a value of a category is missing, a row or a column names no
+    category, a value is not finite, or the id or a variable of the
+    matrix has the name of another id or variable of the model.
+    """
+    self._matrices.append(
+        CategoryMatrix(
+            id=id,
+            stratification=stratification,
+            values={row: dict(columns) for row, columns in values.items()},
+            unit=unit,
+            description=description,
+        )
+    )
+    logger.info(f"Added matrix: id='{id}', stratification='{stratification}'")
     return self
 ```
 
@@ -16309,6 +16565,8 @@ def get_summary(self) -> dict[str, str | int | list[str] | None]:
         "bin_ids": [state.id for state in self._bins],
         "stratifications_count": len(self._stratifications),
         "stratification_ids": [strat.id for strat in self._stratifications],
+        "matrices_count": len(self._matrices),
+        "matrix_ids": [matrix.id for matrix in self._matrices],
         "transitions_count": len(self._transitions),
         "transition_ids": [trans.id for trans in self._transitions],
         "parameters_count": len(self._parameters),
@@ -16326,9 +16584,9 @@ Create a deep copy of this ModelBuilder.
 
 Returns:
 
-| Type           | Description                                                                                                                                                                |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ModelBuilder` | A new ModelBuilder instance with the same configuration: every bin, accumulator, stratification, transition and parameter. Changes to one builder do not affect the other. |
+| Type           | Description                                                                                                                                                                        |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ModelBuilder` | A new ModelBuilder instance with the same configuration: every bin, accumulator, stratification, matrix, transition and parameter. Changes to one builder do not affect the other. |
 
 Source code in `commol/_model/builder.py`
 
@@ -16341,7 +16599,8 @@ def clone(self) -> Self:
     -------
     ModelBuilder
         A new ModelBuilder instance with the same configuration: every
-        bin, accumulator, stratification, transition and parameter.
+        bin, accumulator, stratification, matrix, transition and
+        parameter.
         Changes to one builder do not affect the other.
     """
     return copy.deepcopy(self)
@@ -16355,7 +16614,7 @@ reset() -> Self
 
 Reset the builder to empty state.
 
-The name, description, version, `bin_unit`, `step_unit` and `origin` are kept. Every bin, accumulator, stratification, transition and parameter is removed.
+The name, description, version, `bin_unit`, `step_unit` and `origin` are kept. Every bin, accumulator, stratification, matrix, transition and parameter is removed.
 
 Returns:
 
@@ -16372,7 +16631,8 @@ def reset(self) -> Self:
 
     The name, description, version, ``bin_unit``, ``step_unit`` and
     ``origin`` are kept. Every bin,
-    accumulator, stratification, transition and parameter is removed.
+    accumulator, stratification, matrix, transition and parameter is
+    removed.
 
     Returns
     -------
@@ -16382,6 +16642,7 @@ def reset(self) -> Self:
     self._bins.clear()
     self._accumulators.clear()
     self._stratifications.clear()
+    self._matrices.clear()
     self._transitions.clear()
     self._parameters.clear()
     self._series_counter = 0
@@ -16398,9 +16659,9 @@ The process the builder has written so far.
 
 Returns:
 
-| Type      | Description                                              |
-| --------- | -------------------------------------------------------- |
-| `Process` | The bins, accumulators, stratifications and transitions. |
+| Type      | Description                                                        |
+| --------- | ------------------------------------------------------------------ |
+| `Process` | The bins, accumulators, stratifications, matrices and transitions. |
 
 Raises:
 
@@ -16418,7 +16679,8 @@ def process(self) -> Process:
     Returns
     -------
     Process
-        The bins, accumulators, stratifications and transitions.
+        The bins, accumulators, stratifications, matrices and
+        transitions.
 
     Raises
     ------
@@ -16430,6 +16692,7 @@ def process(self) -> Process:
         bins=self._bins,
         accumulators=self._accumulators,
         stratifications=self._stratifications,
+        matrices=self._matrices,
         transitions=self._transitions,
     )
 ```
@@ -17797,12 +18060,13 @@ What changes in a model and how, written once for every structure.
 
 Attributes:
 
-| Name              | Type                   | Description                                                                   |
-| ----------------- | ---------------------- | ----------------------------------------------------------------------------- |
-| `bins`            | `list[Bin]`            | The states of the process. Stratifications expand each one into compartments. |
-| `accumulators`    | `list[Accumulator]`    | Counters of the flow of the transitions that name them.                       |
-| `stratifications` | `list[Stratification]` | Categorical subdivisions of the bins, in expansion order.                     |
-| `transitions`     | `list[Transition]`     | Flows between bins, or between the categories of one stratification.          |
+| Name              | Type                   | Description                                                                               |
+| ----------------- | ---------------------- | ----------------------------------------------------------------------------------------- |
+| `bins`            | `list[Bin]`            | The states of the process. Stratifications expand each one into compartments.             |
+| `accumulators`    | `list[Accumulator]`    | Counters of the flow of the transitions that name them.                                   |
+| `stratifications` | `list[Stratification]` | Categorical subdivisions of the bins, in expansion order.                                 |
+| `matrices`        | `list[CategoryMatrix]` | Matrices between the categories of a stratification, which rates read through matrix_sum. |
+| `transitions`     | `list[Transition]`     | Flows between bins, or between the categories of one stratification.                      |
 
 Source code in `commol/_model/process.py`
 
@@ -17820,6 +18084,9 @@ class Process(BaseModel):
         Counters of the flow of the transitions that name them.
     stratifications : list[Stratification]
         Categorical subdivisions of the bins, in expansion order.
+    matrices : list[CategoryMatrix]
+        Matrices between the categories of a stratification, which rates
+        read through ``matrix_sum``.
     transitions : list[Transition]
         Flows between bins, or between the categories of one stratification.
     """
@@ -17829,6 +18096,7 @@ class Process(BaseModel):
     bins: list[Bin] = Field(default_factory=list)
     accumulators: list[Accumulator] = Field(default_factory=list)
     stratifications: list[Stratification] = Field(default_factory=list)
+    matrices: list[CategoryMatrix] = Field(default_factory=list)
     transitions: list[Transition] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -17932,11 +18200,15 @@ class Process(BaseModel):
         Returns
         -------
         bool
-            True when it has no bin, accumulator, stratification or
+            True when it has no bin, accumulator, stratification, matrix or
             transition.
         """
         return not (
-            self.bins or self.accumulators or self.stratifications or self.transitions
+            self.bins
+            or self.accumulators
+            or self.stratifications
+            or self.matrices
+            or self.transitions
         )
 
     def bin(self, bin_id: str) -> Bin | None:
@@ -17968,9 +18240,9 @@ Whether the process holds nothing.
 
 Returns:
 
-| Type   | Description                                                         |
-| ------ | ------------------------------------------------------------------- |
-| `bool` | True when it has no bin, accumulator, stratification or transition. |
+| Type   | Description                                                                 |
+| ------ | --------------------------------------------------------------------------- |
+| `bool` | True when it has no bin, accumulator, stratification, matrix or transition. |
 
 Source code in `commol/_model/process.py`
 
@@ -17982,11 +18254,15 @@ def is_empty(self) -> bool:
     Returns
     -------
     bool
-        True when it has no bin, accumulator, stratification or
+        True when it has no bin, accumulator, stratification, matrix or
         transition.
     """
     return not (
-        self.bins or self.accumulators or self.stratifications or self.transitions
+        self.bins
+        or self.accumulators
+        or self.stratifications
+        or self.matrices
+        or self.transitions
     )
 ```
 
@@ -36740,6 +37016,7 @@ Model                      name, description, version, step_unit, origin
 │   ├── accumulators: [Accumulator]
 │   ├── stratifications: [Stratification]
 │   │   └── conditions: [StratificationCondition]
+│   ├── matrices: [CategoryMatrix]         (values: {row: {column: value}})
 │   └── transitions: [Transition]          (impulse_at, impulse_every for impulses)
 │       └── stratified_rates: [StratifiedRate]
 │           └── conditions: [StratificationCondition]
@@ -36757,7 +37034,7 @@ In JSON the structure is an object with its `kind`, its `variant` and the fields
   "name": "Model",
   "parameters": [],
   "engine": {"type": "DifferenceEquations", "settings": null},
-  "process": {"bins": [], "accumulators": [], "stratifications": [], "transitions": []},
+  "process": {"bins": [], "accumulators": [], "stratifications": [], "matrices": [], "transitions": []},
   "structure": {
     "kind": "aggregate",
     "variant": null,
@@ -36986,6 +37263,69 @@ class Stratification(BaseModel):
 ```
 
 A condition of a stratification or of a stratified rate, `StratificationCondition`, is documented in [ModelBuilder API](https://munqu.github.io/commol/latest/api/model-builder/index.md).
+
+## Matrices between categories
+
+## CategoryMatrix
+
+Bases: `BaseModel`
+
+A matrix between the categories of a stratification.
+
+`ModelBuilder.add_matrix` adds one to the process.
+
+Attributes:
+
+| Name             | Type                          | Description                                                                                                         |
+| ---------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `id`             | `str`                         | The id that matrix_sum reads, and the start of the names of its variables.                                          |
+| `stratification` | `str`                         | The id of the stratification whose categories are its rows and its columns.                                         |
+| `values`         | `dict[str, dict[str, float]]` | values[i][j], the value of row i and column j: one finite number for each pair of categories of the stratification. |
+| `unit`           | \`str                         | None\`                                                                                                              |
+| `description`    | \`str                         | None\`                                                                                                              |
+
+Source code in `commol/_model/matrix.py`
+
+```python
+class CategoryMatrix(BaseModel):
+    """
+    A matrix between the categories of a stratification.
+
+    ``ModelBuilder.add_matrix`` adds one to the process.
+
+    Attributes
+    ----------
+    id : str
+        The id that ``matrix_sum`` reads, and the start of the names of its
+        variables.
+    stratification : str
+        The id of the stratification whose categories are its rows and its
+        columns.
+    values : dict[str, dict[str, float]]
+        ``values[i][j]``, the value of row ``i`` and column ``j``: one finite
+        number for each pair of categories of the stratification.
+    unit : str | None
+        The unit of its values, which the unit check reads.
+    description : str | None
+        A human-readable description.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(default=..., description="Identifier of the matrix.")
+    stratification: str = Field(
+        default=..., description="Stratification of its rows and columns."
+    )
+    values: dict[str, dict[str, float]] = Field(
+        default=..., description="The value of each row and column, by category."
+    )
+    unit: str | None = Field(default=None, description="Unit of its values.")
+    description: str | None = Field(
+        default=None, description="Human-readable description of the matrix."
+    )
+```
+
+`ModelBuilder.add_matrix` adds one; a rate reads it through `matrix_sum` ([Matrix sums](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#matrix-sums)).
 
 ## Parameters
 
@@ -38176,6 +38516,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 
 - `ObservedDataPoint(scale=...)`: a known positive number, 1 by default, that multiplies the prediction of the observation, with its factor. A count model reads the mean `scale · model`, so counts observed on a known part of what the model describes stay whole. The loss, the likelihood, the predictive, the scores, the figures and the `observed` block of a report (`scales`) read it. See [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#known-shares-scales).
+- `ModelBuilder.add_matrix(id, stratification, values, unit, description)` adds a matrix between the categories of a stratification, and a transition rate reads it with `matrix_sum(M, e)`: in a compartment of category `i`, `Σ_j M[i, j] · e_j`, with each bin of `e` read as its amount in category `j` and `total` as the total of `j`. Every engine runs it. A rate or a formula parameter reads the entries as `M_<i>_<j>` and the spectral radius of the matrix as `M_radius`; a calibration constraint does not (#419). The unit check, the equations and `Model.describe` read the matrix. See [Matrix sums](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#matrix-sums).
 - `GibbsResult` and `ConformalResult` give `block_length` and `block_length_estimates`, as the bootstraps, the jackknife and the sandwich do: the length a method ran with, and with `block_length="auto"` the estimate of each series, by label. `GibbsResult` gives them for `InformationMatchingEta` and `BootstrapCoverageEta`, and `None` for a number `η`; `ConformalResult` for `JackknifePlus` and `EnbPI`, and `None` for the variants without blocks. See [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means) and [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#results-plots-and-reports).
 - `ProfileIdentifiability(result=profiles)` in `commol.identifiability`: the identifiability report of the verdicts of a `ProfileResult`, run through `Calibrator.identifiability` as every identifiability method. It runs no model, and it refuses the profiles of another problem with a `ValueError` that names the parameters of both. See [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#verdicts-and-the-identifiability-report).
 

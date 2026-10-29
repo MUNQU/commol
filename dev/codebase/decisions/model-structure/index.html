@@ -3808,6 +3808,11 @@ a prefix), <code>TestTotalSeries::test_an_output_name_stands_for_itself</code> a
 <h2 id="the-engine-owns-the-variable-names">The engine owns the variable names<a class="headerlink" href="#the-engine-owns-the-variable-names" title="Permanent link">&para;</a></h2>
 <p>The engine sets one variable per expanded compartment and per subgroup total
 (<code>total_&lt;categories&gt;</code>, bin totals and partial bin totals).
+The variables of a matrix between categories (<code>&lt;M&gt;_&lt;i&gt;_&lt;j&gt;</code> and
+<code>&lt;M&gt;_radius</code>) are engine variables too: <code>check_matrices</code>
+(<code>crates/commol-model/src/matrices.rs</code>) rejects a parameter, bin,
+accumulator, compartment, subgroup total or engine variable that has the
+id or a variable name of a matrix, and two matrices that give one variable.
 <code>check_model</code> in <code>crates/commol-model/src/builder.rs</code> rejects a parameter
 id that is one of those names, a parameter, bin or accumulator id that is an
 engine variable (<code>ENGINE_VARIABLES</code>: <code>total</code>, <code>step</code>, <code>t</code>, <code>pi</code>, <code>e</code>) or a

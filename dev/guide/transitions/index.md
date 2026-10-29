@@ -57,12 +57,12 @@ A rate is a formula (a string), a number, or a [`AxisPattern`](https://munqu.git
 
 The engine decides for each flow whether its rate is the flow itself or a rate per member of the source:
 
-| Case                                                              | Kind         | Flow            |
-| ----------------------------------------------------------------- | ------------ | --------------- |
-| The rate names a compartment, a bin total or a `total_…` variable | Absolute     | `rate`          |
-| No source                                                         | Absolute     | `rate`          |
-| A stratified rate sets `"absolute": True` or `False`              | As set       | —               |
-| Otherwise                                                         | Proportional | `rate × source` |
+| Case                                                                                           | Kind         | Flow            |
+| ---------------------------------------------------------------------------------------------- | ------------ | --------------- |
+| The rate names, outside every `matrix_sum`, a compartment, a bin total or a `total_…` variable | Absolute     | `rate`          |
+| No source                                                                                      | Absolute     | `rate`          |
+| A stratified rate sets `"absolute": True` or `False`                                           | As set       | —               |
+| Otherwise                                                                                      | Proportional | `rate × source` |
 
 A rate that reads `total` and no compartment, such as `k1 / total`, is proportional (`plan_transition_flows` in `crates/commol-model/src/flows.rs`).
 

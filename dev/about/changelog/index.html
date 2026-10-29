@@ -5071,6 +5071,16 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   predictive, the scores, the figures and the <code>observed</code> block of a report
   (<code>scales</code>) read it. See
   <a href="../../guide/calibration-observations/#known-shares-scales">Observations</a>.</li>
+<li><code>ModelBuilder.add_matrix(id, stratification, values, unit, description)</code>
+  adds a matrix between the categories of a stratification, and a
+  transition rate reads it with <code>matrix_sum(M, e)</code>: in a compartment of
+  category <code>i</code>, <code>Σ_j M[i, j] · e_j</code>, with each bin of <code>e</code> read as its amount
+  in category <code>j</code> and <code>total</code> as the total of <code>j</code>. Every engine runs it. A rate
+  or a formula parameter reads the entries as <code>M_&lt;i&gt;_&lt;j&gt;</code> and the spectral
+  radius of the matrix as <code>M_radius</code>; a calibration constraint does not
+  (#419). The unit check, the equations and <code>Model.describe</code>
+  read the matrix. See
+  <a href="../../guide/mathematical-expressions/#matrix-sums">Matrix sums</a>.</li>
 <li><code>GibbsResult</code> and <code>ConformalResult</code> give <code>block_length</code> and
   <code>block_length_estimates</code>, as the bootstraps, the jackknife and the sandwich
   do: the length a method ran with, and with <code>block_length="auto"</code> the

@@ -37,15 +37,15 @@ In a Jupyter notebook, `model.describe()` as the last line of a cell shows the M
 
 A `ModelDescription` has a `title`, a `layout` and a list of `sections`. Each section has a `key`, a `title` and `blocks`. `Model.describe()` builds the sections every kind shares from the model, and the structure of the model adds the sections of its kind (`ModelStructure.describe`):
 
-| Key              | Content                                                                  | For an `Aggregate` model                                                                       |
-| ---------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| `overview`       | Name, description, version, kind, engine, its settings and the step unit | From `Model`                                                                                   |
-| `entities`       | What holds the state                                                     | Bins, accumulators, stratifications and their categories, the expanded compartments            |
-| `dynamics`       | How the state changes                                                    | The state graphs, the compact and expanded forms of the equations, the impulses, the neighbors |
-| `schedule`       | How the engine advances, and the settings it advances with               | From the engine (`EngineType.schedule`) and `Model.engine.settings`                            |
-| `initialization` | The state the model starts from                                          | Bin amounts, category fractions, overrides, and the initial state the engine builds            |
-| `parameters`     | Every parameter                                                          | Value, unit, whether calibration sets it, description                                          |
-| `outputs`        | What a run returns                                                       | The outputs of each bin and accumulator                                                        |
+| Key              | Content                                                                  | For an `Aggregate` model                                                                                                               |
+| ---------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `overview`       | Name, description, version, kind, engine, its settings and the step unit | From `Model`                                                                                                                           |
+| `entities`       | What holds the state                                                     | Bins, accumulators, stratifications and their categories, the expanded compartments                                                    |
+| `dynamics`       | How the state changes                                                    | The state graphs, the compact and expanded forms of the equations, the impulses, the neighbors                                         |
+| `schedule`       | How the engine advances, and the settings it advances with               | From the engine (`EngineType.schedule`) and `Model.engine.settings`                                                                    |
+| `initialization` | The state the model starts from                                          | Bin amounts, category fractions, overrides, and the initial state the engine builds                                                    |
+| `parameters`     | Every parameter, then each matrix between categories                     | Value, unit, whether calibration sets it, description; for a matrix, its stratification, unit, description, spectral radius and values |
+| `outputs`        | What a run returns                                                       | The outputs of each bin and accumulator                                                                                                |
 
 A section with no blocks is left out of every rendering.
 

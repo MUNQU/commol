@@ -8,7 +8,7 @@ Builds a `Model`. A `StratificationCondition` selects the compartments of a cate
 
 A fluent interface that writes the process of a model, once.
 
-The builder adds bins, accumulators, stratifications, transitions and parameters: the process, which is the same for every kind of model. `build` joins it with a structure, which lays the process out (such as `Aggregate`, amounts per compartment), and an engine, which runs it. Each method that adds returns the builder, so the calls chain.
+The builder adds bins, accumulators, stratifications, matrices, transitions and parameters: the process, which is the same for every kind of model. `build` joins it with a structure, which lays the process out (such as `Aggregate`, amounts per compartment), and an engine, which runs it. Each method that adds returns the builder, so the calls chain.
 
 Source code in `commol/_model/builder.py`
 
@@ -17,10 +17,11 @@ class ModelBuilder:
     """
     A fluent interface that writes the process of a model, once.
 
-    The builder adds bins, accumulators, stratifications, transitions and
-    parameters: the process, which is the same for every kind of model.
-    `build` joins it with a structure, which lays the process out (such as
-    `Aggregate`, amounts per compartment), and an engine, which runs it.
+    The builder adds bins, accumulators, stratifications, matrices,
+    transitions and parameters: the process, which is the same for every
+    kind of model. `build` joins it with a structure, which lays the process
+    out (such as `Aggregate`, amounts per compartment), and an engine, which
+    runs it.
     Each method that adds returns the builder, so the calls chain.
     """
 
@@ -74,6 +75,7 @@ class ModelBuilder:
         self._bins: list[Bin] = []
         self._accumulators: list[Accumulator] = []
         self._stratifications: list[Stratification] = []
+        self._matrices: list[CategoryMatrix] = []
         self._transitions: list[Transition] = []
         self._parameters: list[Parameter] = []
         self._series_counter: int = 0
@@ -194,6 +196,64 @@ class ModelBuilder:
             )
         )
         logger.info(f"Added stratification: id='{id}', categories={categories}")
+        return self
+
+    def add_matrix(
+        self,
+        id: str,
+        stratification: str,
+        values: Mapping[str, Mapping[str, float]],
+        unit: str | None = None,
+        description: str | None = None,
+    ) -> Self:
+        """
+        Add a matrix between the categories of a stratification.
+
+        A rate reads it through ``matrix_sum(id, e)``: in the rate of a
+        compartment of category ``i``, ``Σ_j values[i][j] · e_j``, where
+        ``e_j`` is ``e`` with each bin read as its amount in category ``j``
+        and ``total`` as the total of ``j``. A rate or a formula parameter
+        also reads its entries as ``<id>_<i>_<j>`` and its spectral radius, the largest
+        modulus of its eigenvalues, as ``<id>_radius``.
+
+        Parameters
+        ----------
+        id : str
+            Unique identifier for the matrix.
+        stratification : str
+            Id of the stratification whose categories are its rows and its
+            columns.
+        values : Mapping[str, Mapping[str, float]]
+            ``values[i][j]``, the value of row ``i`` and column ``j``: one
+            finite number for each pair of categories of the stratification.
+        unit : str | None, default=None
+            Unit of its values, which the unit check reads.
+        description : str | None, default=None
+            Human-readable description of the matrix.
+
+        Returns
+        -------
+        ModelBuilder
+            Self for method chaining.
+
+        Notes
+        -----
+        `build` checks the matrix against the process: it raises
+        ``ValueError`` when the stratification is not one of the process, a
+        row or a value of a category is missing, a row or a column names no
+        category, a value is not finite, or the id or a variable of the
+        matrix has the name of another id or variable of the model.
+        """
+        self._matrices.append(
+            CategoryMatrix(
+                id=id,
+                stratification=stratification,
+                values={row: dict(columns) for row, columns in values.items()},
+                unit=unit,
+                description=description,
+            )
+        )
+        logger.info(f"Added matrix: id='{id}', stratification='{stratification}'")
         return self
 
     def add_parameter(
@@ -694,6 +754,8 @@ class ModelBuilder:
             "bin_ids": [state.id for state in self._bins],
             "stratifications_count": len(self._stratifications),
             "stratification_ids": [strat.id for strat in self._stratifications],
+            "matrices_count": len(self._matrices),
+            "matrix_ids": [matrix.id for matrix in self._matrices],
             "transitions_count": len(self._transitions),
             "transition_ids": [trans.id for trans in self._transitions],
             "parameters_count": len(self._parameters),
@@ -708,7 +770,8 @@ class ModelBuilder:
         -------
         ModelBuilder
             A new ModelBuilder instance with the same configuration: every
-            bin, accumulator, stratification, transition and parameter.
+            bin, accumulator, stratification, matrix, transition and
+            parameter.
             Changes to one builder do not affect the other.
         """
         return copy.deepcopy(self)
@@ -719,7 +782,8 @@ class ModelBuilder:
 
         The name, description, version, ``bin_unit``, ``step_unit`` and
         ``origin`` are kept. Every bin,
-        accumulator, stratification, transition and parameter is removed.
+        accumulator, stratification, matrix, transition and parameter is
+        removed.
 
         Returns
         -------
@@ -729,6 +793,7 @@ class ModelBuilder:
         self._bins.clear()
         self._accumulators.clear()
         self._stratifications.clear()
+        self._matrices.clear()
         self._transitions.clear()
         self._parameters.clear()
         self._series_counter = 0
@@ -741,7 +806,8 @@ class ModelBuilder:
         Returns
         -------
         Process
-            The bins, accumulators, stratifications and transitions.
+            The bins, accumulators, stratifications, matrices and
+            transitions.
 
         Raises
         ------
@@ -753,6 +819,7 @@ class ModelBuilder:
             bins=self._bins,
             accumulators=self._accumulators,
             stratifications=self._stratifications,
+            matrices=self._matrices,
             transitions=self._transitions,
         )
 
@@ -897,6 +964,7 @@ def __init__(
     self._bins: list[Bin] = []
     self._accumulators: list[Accumulator] = []
     self._stratifications: list[Stratification] = []
+    self._matrices: list[CategoryMatrix] = []
     self._transitions: list[Transition] = []
     self._parameters: list[Parameter] = []
     self._series_counter: int = 0
@@ -1103,6 +1171,98 @@ def add_stratification(
         )
     )
     logger.info(f"Added stratification: id='{id}', categories={categories}")
+    return self
+```
+
+#### add_matrix
+
+```python
+add_matrix(id: str, stratification: str, values: Mapping[str, Mapping[str, float]], unit: str | None = None, description: str | None = None) -> Self
+```
+
+Add a matrix between the categories of a stratification.
+
+A rate reads it through `matrix_sum(id, e)`: in the rate of a compartment of category `i`, `Σ_j values[i][j] · e_j`, where `e_j` is `e` with each bin read as its amount in category `j` and `total` as the total of `j`. A rate or a formula parameter also reads its entries as `<id>_<i>_<j>` and its spectral radius, the largest modulus of its eigenvalues, as `<id>_radius`.
+
+Parameters:
+
+| Name             | Type                                | Description                                                                                                         | Default                                         |
+| ---------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `id`             | `str`                               | Unique identifier for the matrix.                                                                                   | *required*                                      |
+| `stratification` | `str`                               | Id of the stratification whose categories are its rows and its columns.                                             | *required*                                      |
+| `values`         | `Mapping[str, Mapping[str, float]]` | values[i][j], the value of row i and column j: one finite number for each pair of categories of the stratification. | *required*                                      |
+| `unit`           | \`str                               | None\`                                                                                                              | Unit of its values, which the unit check reads. |
+| `description`    | \`str                               | None\`                                                                                                              | Human-readable description of the matrix.       |
+
+Returns:
+
+| Type           | Description               |
+| -------------- | ------------------------- |
+| `ModelBuilder` | Self for method chaining. |
+
+Notes
+
+`build` checks the matrix against the process: it raises `ValueError` when the stratification is not one of the process, a row or a value of a category is missing, a row or a column names no category, a value is not finite, or the id or a variable of the matrix has the name of another id or variable of the model.
+
+Source code in `commol/_model/builder.py`
+
+```python
+def add_matrix(
+    self,
+    id: str,
+    stratification: str,
+    values: Mapping[str, Mapping[str, float]],
+    unit: str | None = None,
+    description: str | None = None,
+) -> Self:
+    """
+    Add a matrix between the categories of a stratification.
+
+    A rate reads it through ``matrix_sum(id, e)``: in the rate of a
+    compartment of category ``i``, ``Σ_j values[i][j] · e_j``, where
+    ``e_j`` is ``e`` with each bin read as its amount in category ``j``
+    and ``total`` as the total of ``j``. A rate or a formula parameter
+    also reads its entries as ``<id>_<i>_<j>`` and its spectral radius, the largest
+    modulus of its eigenvalues, as ``<id>_radius``.
+
+    Parameters
+    ----------
+    id : str
+        Unique identifier for the matrix.
+    stratification : str
+        Id of the stratification whose categories are its rows and its
+        columns.
+    values : Mapping[str, Mapping[str, float]]
+        ``values[i][j]``, the value of row ``i`` and column ``j``: one
+        finite number for each pair of categories of the stratification.
+    unit : str | None, default=None
+        Unit of its values, which the unit check reads.
+    description : str | None, default=None
+        Human-readable description of the matrix.
+
+    Returns
+    -------
+    ModelBuilder
+        Self for method chaining.
+
+    Notes
+    -----
+    `build` checks the matrix against the process: it raises
+    ``ValueError`` when the stratification is not one of the process, a
+    row or a value of a category is missing, a row or a column names no
+    category, a value is not finite, or the id or a variable of the
+    matrix has the name of another id or variable of the model.
+    """
+    self._matrices.append(
+        CategoryMatrix(
+            id=id,
+            stratification=stratification,
+            values={row: dict(columns) for row, columns in values.items()},
+            unit=unit,
+            description=description,
+        )
+    )
+    logger.info(f"Added matrix: id='{id}', stratification='{stratification}'")
     return self
 ```
 
@@ -1510,6 +1670,8 @@ def get_summary(self) -> dict[str, str | int | list[str] | None]:
         "bin_ids": [state.id for state in self._bins],
         "stratifications_count": len(self._stratifications),
         "stratification_ids": [strat.id for strat in self._stratifications],
+        "matrices_count": len(self._matrices),
+        "matrix_ids": [matrix.id for matrix in self._matrices],
         "transitions_count": len(self._transitions),
         "transition_ids": [trans.id for trans in self._transitions],
         "parameters_count": len(self._parameters),
@@ -1527,9 +1689,9 @@ Create a deep copy of this ModelBuilder.
 
 Returns:
 
-| Type           | Description                                                                                                                                                                |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ModelBuilder` | A new ModelBuilder instance with the same configuration: every bin, accumulator, stratification, transition and parameter. Changes to one builder do not affect the other. |
+| Type           | Description                                                                                                                                                                        |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ModelBuilder` | A new ModelBuilder instance with the same configuration: every bin, accumulator, stratification, matrix, transition and parameter. Changes to one builder do not affect the other. |
 
 Source code in `commol/_model/builder.py`
 
@@ -1542,7 +1704,8 @@ def clone(self) -> Self:
     -------
     ModelBuilder
         A new ModelBuilder instance with the same configuration: every
-        bin, accumulator, stratification, transition and parameter.
+        bin, accumulator, stratification, matrix, transition and
+        parameter.
         Changes to one builder do not affect the other.
     """
     return copy.deepcopy(self)
@@ -1556,7 +1719,7 @@ reset() -> Self
 
 Reset the builder to empty state.
 
-The name, description, version, `bin_unit`, `step_unit` and `origin` are kept. Every bin, accumulator, stratification, transition and parameter is removed.
+The name, description, version, `bin_unit`, `step_unit` and `origin` are kept. Every bin, accumulator, stratification, matrix, transition and parameter is removed.
 
 Returns:
 
@@ -1573,7 +1736,8 @@ def reset(self) -> Self:
 
     The name, description, version, ``bin_unit``, ``step_unit`` and
     ``origin`` are kept. Every bin,
-    accumulator, stratification, transition and parameter is removed.
+    accumulator, stratification, matrix, transition and parameter is
+    removed.
 
     Returns
     -------
@@ -1583,6 +1747,7 @@ def reset(self) -> Self:
     self._bins.clear()
     self._accumulators.clear()
     self._stratifications.clear()
+    self._matrices.clear()
     self._transitions.clear()
     self._parameters.clear()
     self._series_counter = 0
@@ -1599,9 +1764,9 @@ The process the builder has written so far.
 
 Returns:
 
-| Type      | Description                                              |
-| --------- | -------------------------------------------------------- |
-| `Process` | The bins, accumulators, stratifications and transitions. |
+| Type      | Description                                                        |
+| --------- | ------------------------------------------------------------------ |
+| `Process` | The bins, accumulators, stratifications, matrices and transitions. |
 
 Raises:
 
@@ -1619,7 +1784,8 @@ def process(self) -> Process:
     Returns
     -------
     Process
-        The bins, accumulators, stratifications and transitions.
+        The bins, accumulators, stratifications, matrices and
+        transitions.
 
     Raises
     ------
@@ -1631,6 +1797,7 @@ def process(self) -> Process:
         bins=self._bins,
         accumulators=self._accumulators,
         stratifications=self._stratifications,
+        matrices=self._matrices,
         transitions=self._transitions,
     )
 ```

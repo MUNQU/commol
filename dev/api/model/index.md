@@ -1102,12 +1102,13 @@ What changes in a model and how, written once for every structure.
 
 Attributes:
 
-| Name              | Type                   | Description                                                                   |
-| ----------------- | ---------------------- | ----------------------------------------------------------------------------- |
-| `bins`            | `list[Bin]`            | The states of the process. Stratifications expand each one into compartments. |
-| `accumulators`    | `list[Accumulator]`    | Counters of the flow of the transitions that name them.                       |
-| `stratifications` | `list[Stratification]` | Categorical subdivisions of the bins, in expansion order.                     |
-| `transitions`     | `list[Transition]`     | Flows between bins, or between the categories of one stratification.          |
+| Name              | Type                   | Description                                                                               |
+| ----------------- | ---------------------- | ----------------------------------------------------------------------------------------- |
+| `bins`            | `list[Bin]`            | The states of the process. Stratifications expand each one into compartments.             |
+| `accumulators`    | `list[Accumulator]`    | Counters of the flow of the transitions that name them.                                   |
+| `stratifications` | `list[Stratification]` | Categorical subdivisions of the bins, in expansion order.                                 |
+| `matrices`        | `list[CategoryMatrix]` | Matrices between the categories of a stratification, which rates read through matrix_sum. |
+| `transitions`     | `list[Transition]`     | Flows between bins, or between the categories of one stratification.                      |
 
 Source code in `commol/_model/process.py`
 
@@ -1125,6 +1126,9 @@ class Process(BaseModel):
         Counters of the flow of the transitions that name them.
     stratifications : list[Stratification]
         Categorical subdivisions of the bins, in expansion order.
+    matrices : list[CategoryMatrix]
+        Matrices between the categories of a stratification, which rates
+        read through ``matrix_sum``.
     transitions : list[Transition]
         Flows between bins, or between the categories of one stratification.
     """
@@ -1134,6 +1138,7 @@ class Process(BaseModel):
     bins: list[Bin] = Field(default_factory=list)
     accumulators: list[Accumulator] = Field(default_factory=list)
     stratifications: list[Stratification] = Field(default_factory=list)
+    matrices: list[CategoryMatrix] = Field(default_factory=list)
     transitions: list[Transition] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -1237,11 +1242,15 @@ class Process(BaseModel):
         Returns
         -------
         bool
-            True when it has no bin, accumulator, stratification or
+            True when it has no bin, accumulator, stratification, matrix or
             transition.
         """
         return not (
-            self.bins or self.accumulators or self.stratifications or self.transitions
+            self.bins
+            or self.accumulators
+            or self.stratifications
+            or self.matrices
+            or self.transitions
         )
 
     def bin(self, bin_id: str) -> Bin | None:
@@ -1273,9 +1282,9 @@ Whether the process holds nothing.
 
 Returns:
 
-| Type   | Description                                                         |
-| ------ | ------------------------------------------------------------------- |
-| `bool` | True when it has no bin, accumulator, stratification or transition. |
+| Type   | Description                                                                 |
+| ------ | --------------------------------------------------------------------------- |
+| `bool` | True when it has no bin, accumulator, stratification, matrix or transition. |
 
 Source code in `commol/_model/process.py`
 
@@ -1287,11 +1296,15 @@ def is_empty(self) -> bool:
     Returns
     -------
     bool
-        True when it has no bin, accumulator, stratification or
+        True when it has no bin, accumulator, stratification, matrix or
         transition.
     """
     return not (
-        self.bins or self.accumulators or self.stratifications or self.transitions
+        self.bins
+        or self.accumulators
+        or self.stratifications
+        or self.matrices
+        or self.transitions
     )
 ```
 

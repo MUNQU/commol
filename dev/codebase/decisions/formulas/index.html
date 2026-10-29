@@ -3733,9 +3733,13 @@ case of the JSON of <code>tree.rs</code>, of <code>read_tree</code> and of the w
 <p>One Rust check decides whether an expression is in the language of formulas:
 <code>MathExpression::check</code> (<code>crates/commol-core/src/math_expression/mod.rs</code>,
 <code>language.rs</code>) reads the tree that the JIT compiles, so a formula that passes
-it compiles. It rejects a function that is not in <code>FUNCTIONS</code>, a call with the
+it compiles; the one exception is <code>matrix_sum(M, e)</code>, which only a
+transition rate reads and which the model writes out as a sum before it
+compiles (<a href="../transitions-and-rates/#a-matrix-sum-is-written-out-as-the-sum-it-is">A matrix sum is written out as the sum it is</a>).
+It rejects a function that is not in <code>FUNCTIONS</code>, a call with the
 wrong number of arguments, <code>&amp;&amp;</code> and <code>||</code>, and a comparison or <code>!</code> outside the
-condition of an <code>if</code>, and it counts the nodes of the tree, which <code>MAX_NODES</code>
+condition of an <code>if</code>, a <code>matrix_sum</code> that does not name a matrix or that
+holds another one, and it counts the nodes of the tree, which <code>MAX_NODES</code>
 limits. The JIT compiles the functions of <code>FUNCTIONS</code> and no other, and the
 unit check (<code>_FUNCTION_UNITS</code> in <code>_model/unit_checks.py</code>) has one rule for each
 of them.</p>

@@ -19,6 +19,7 @@ Model                      name, description, version, step_unit, origin
 │   ├── accumulators: [Accumulator]
 │   ├── stratifications: [Stratification]
 │   │   └── conditions: [StratificationCondition]
+│   ├── matrices: [CategoryMatrix]         (values: {row: {column: value}})
 │   └── transitions: [Transition]          (impulse_at, impulse_every for impulses)
 │       └── stratified_rates: [StratifiedRate]
 │           └── conditions: [StratificationCondition]
@@ -36,7 +37,7 @@ In JSON the structure is an object with its `kind`, its `variant` and the fields
   "name": "Model",
   "parameters": [],
   "engine": {"type": "DifferenceEquations", "settings": null},
-  "process": {"bins": [], "accumulators": [], "stratifications": [], "transitions": []},
+  "process": {"bins": [], "accumulators": [], "stratifications": [], "matrices": [], "transitions": []},
   "structure": {
     "kind": "aggregate",
     "variant": null,
@@ -265,6 +266,69 @@ class Stratification(BaseModel):
 ```
 
 A condition of a stratification or of a stratified rate, `StratificationCondition`, is documented in [ModelBuilder API](https://munqu.github.io/commol/latest/api/model-builder/index.md).
+
+## Matrices between categories
+
+## CategoryMatrix
+
+Bases: `BaseModel`
+
+A matrix between the categories of a stratification.
+
+`ModelBuilder.add_matrix` adds one to the process.
+
+Attributes:
+
+| Name             | Type                          | Description                                                                                                         |
+| ---------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `id`             | `str`                         | The id that matrix_sum reads, and the start of the names of its variables.                                          |
+| `stratification` | `str`                         | The id of the stratification whose categories are its rows and its columns.                                         |
+| `values`         | `dict[str, dict[str, float]]` | values[i][j], the value of row i and column j: one finite number for each pair of categories of the stratification. |
+| `unit`           | \`str                         | None\`                                                                                                              |
+| `description`    | \`str                         | None\`                                                                                                              |
+
+Source code in `commol/_model/matrix.py`
+
+```python
+class CategoryMatrix(BaseModel):
+    """
+    A matrix between the categories of a stratification.
+
+    ``ModelBuilder.add_matrix`` adds one to the process.
+
+    Attributes
+    ----------
+    id : str
+        The id that ``matrix_sum`` reads, and the start of the names of its
+        variables.
+    stratification : str
+        The id of the stratification whose categories are its rows and its
+        columns.
+    values : dict[str, dict[str, float]]
+        ``values[i][j]``, the value of row ``i`` and column ``j``: one finite
+        number for each pair of categories of the stratification.
+    unit : str | None
+        The unit of its values, which the unit check reads.
+    description : str | None
+        A human-readable description.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(default=..., description="Identifier of the matrix.")
+    stratification: str = Field(
+        default=..., description="Stratification of its rows and columns."
+    )
+    values: dict[str, dict[str, float]] = Field(
+        default=..., description="The value of each row and column, by category."
+    )
+    unit: str | None = Field(default=None, description="Unit of its values.")
+    description: str | None = Field(
+        default=None, description="Human-readable description of the matrix."
+    )
+```
+
+`ModelBuilder.add_matrix` adds one; a rate reads it through `matrix_sum` ([Matrix sums](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#matrix-sums)).
 
 ## Parameters
 

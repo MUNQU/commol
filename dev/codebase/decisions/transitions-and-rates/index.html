@@ -2758,6 +2758,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-matrix-sum-is-written-out-as-the-sum-it-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A matrix sum is written out as the sum it is
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3591,6 +3602,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-matrix-sum-is-written-out-as-the-sum-it-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A matrix sum is written out as the sum it is
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3620,8 +3642,11 @@
 is absolute or proportional; the cases are in the table of
 <a href="../../../guide/transitions/#absolute-and-proportional-rates">Absolute and proportional rates</a>.
 The closure <code>is_absolute</code> reads only the compartment names and the names of
-<code>subgroup_total_names</code> (<code>builder.rs</code>): <code>total</code> is not one of them, so a rate
-that reads <code>total</code> and no compartment stays proportional.</p>
+<code>subgroup_total_names</code> (<code>builder.rs</code>) that the rate reads outside its matrix
+sums (<code>variables_outside_matrix_sums</code> in <code>crates/commol-model/src/matrices.rs</code>):
+<code>total</code> is not one of them, so a rate that reads <code>total</code> and no compartment
+stays proportional, and so does <code>k1 * matrix_sum(M, B / total)</code>, whose <code>B</code> is
+the amount of other categories.</p>
 <p>A transition with several sources and a proportional rate is rejected, because
 it has no single source to multiply. <code>Model.describe</code> shows the planned flows,
 so a proportional rate prints as <code>k1 * A</code>.</p>
@@ -3650,6 +3675,72 @@ formula to one compiled function for the life of the process. The
 same formula always runs the same machine code, so results are reproducible.</p>
 <p><strong>Rule:</strong> do not invalidate or bypass the cache.</p>
 <p><strong>Guard:</strong> <code>crates/commol-core/src/math_expression/mod.rs::one_formula_compiles_to_one_function</code>.</p>
+<h2 id="a-matrix-sum-is-written-out-as-the-sum-it-is">A matrix sum is written out as the sum it is<a class="headerlink" href="#a-matrix-sum-is-written-out-as-the-sum-it-is" title="Permanent link">&para;</a></h2>
+<p>A matrix between the categories of a stratification (<code>CategoryMatrix</code>,
+<code>crates/commol-core/src/types/process.rs</code>) is a data object of the process,
+not a parameter: its values are fixed, and a calibrated scale is a parameter
+that multiplies the matrix sum. A rate reads it through <code>matrix_sum(M, e)</code>,
+a node of the tree (<code>Expr::MatrixSum</code>) whose first argument names the matrix
+and is not a variable. The JIT never compiles that node:
+<code>MatrixSums::resolve</code> (<code>crates/commol-model/src/matrices.rs</code>) writes it, for a
+compartment of category <code>i</code>, as <code>Σ_j &lt;M&gt;_&lt;i&gt;_&lt;j&gt; * (e_j)</code> while
+<code>plan_transition_flows</code> plans the flows. In <code>e_j</code> a bin reads the subgroup
+total of exactly its compartments in <code>j</code> (the explicit sum of them when no
+subgroup total sums that set alone), <code>total</code> reads <code>total_&lt;j&gt;</code>, and every
+other variable is unchanged. The terms of a zero entry are dropped; a row of
+zeros is <code>if(&lt;M&gt;_&lt;i&gt;_&lt;j&gt; != 0, &lt;M&gt;_&lt;i&gt;_&lt;j&gt; * (e_j), 0)</code> of its first column,
+which keeps the unit of the matrix for the unit check and is 0 even where
+<code>e_j</code> is not a number (the JIT compiles <code>if</code> as a select).</p>
+<p>Each entry is the variable <code>&lt;M&gt;_&lt;i&gt;_&lt;j&gt;</code>, a constant parameter of the
+engine (<code>matrix_variables</code>), not a number written into the rate. So the
+planned flow keeps the unit of the matrix for the unit check, <code>describe</code>
+names the entry, and a scale of rows and columns (#419) writes
+<code>a_i * &lt;M&gt;_&lt;i&gt;_&lt;j&gt; * b_j</code> with no other change. The spectral radius,
+<code>&lt;M&gt;_radius</code>, is computed once at the build by <code>spectral_radius</code>
+(<code>crates/commol-statistics/src/linear_algebra.rs</code>, the real Schur
+decomposition of <code>nalgebra</code>), where a calibration can reuse it for each
+parameter vector.</p>
+<p>Whether the rate is absolute is decided on the variables outside the matrix
+sums (<code>variables_outside_matrix_sums</code>), as for the neighbors of a unit: what
+<code>e</code> reads is a quantity of the other categories, not of the source.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A variable per category, <code>&lt;M&gt;_&lt;bin&gt;_&lt;i&gt;</code>, made by the builder</td>
+<td>It fixes the expression to one form, a bin over a total.</td>
+</tr>
+<tr>
+<td>A new kind of transition</td>
+<td>The coupling is part of a rate, not a flow of its own.</td>
+</tr>
+<tr>
+<td>The matrix sum compiled by the JIT</td>
+<td>The JIT has no compartment, so no category <code>i</code>; each engine would need the layout at run time.</td>
+</tr>
+<tr>
+<td>The entries written as numbers into the rate</td>
+<td>The unit check and the description lose the matrix, and a scale by parameters needs a rewrite of every rate.</td>
+</tr>
+<tr>
+<td>Each entry a parameter</td>
+<td><code>n²</code> parameters for a matrix of fixed values, the common case; one entry can be calibrated today as a parameter.</td>
+</tr>
+<tr>
+<td>A function <code>radius(M)</code></td>
+<td>The value does not change during a run, so a variable computed once at the build is enough.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guard:</strong> <code>crates/commol-model/tests/matrices.rs</code>,
+<code>crates/commol-model/tests/rates.rs::a_rate_reads_the_largest_eigenvalue_of_a_matrix</code>,
+<code>py-commol/tests/rates/test_matrices.py</code>,
+<code>py-commol/tests/units/test_matrices.py::test_a_matrix_sum_has_the_unit_of_the_matrix_times_the_expression</code>.</p>
 
 
 
