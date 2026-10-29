@@ -3931,8 +3931,8 @@ and <code>window</code>. It must not be empty.</p>
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">calibrate_k1</span><span class="p">(</span><span class="n">weighted</span><span class="p">,</span> <span class="n">normalize_observations</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>  <span class="c1"># 0.4</span>
 </span></code></pre></div>
 <h2 id="partial-observations-factors">Partial observations: factors<a class="headerlink" href="#partial-observations-factors" title="Permanent link">&para;</a></h2>
-<p>When the data sees only part of an output, for example a fixed share of it, a
-<code>factor</code> unknown multiplies the prediction before the comparison. Link
+<p>When the data sees only part of an output, an unknown share of it, an unknown
+<code>factor</code> multiplies the prediction before the comparison. Link
 observations to it with <code>factor_id</code>:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">seen</span> <span class="o">=</span> <span class="mf">0.3</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">partial</span> <span class="o">=</span> <span class="p">[</span>
@@ -3969,7 +3969,7 @@ observations to it with <code>factor_id</code>:</p>
 </tr>
 <tr>
 <td>Plots</td>
-<td>Pass <code>calibration_result=</code> to <code>results.plot.series</code> or <code>results.plot.observations</code>; it applies the calibrated factors to the comparison.</td>
+<td>Pass <code>calibration_result=</code> to <code>results.plot.series</code>, <code>results.plot.observations</code> or <code>results.plot.cumulative</code>; it applies the calibrated factors to the comparison (<a href="../simulations/#plotting">Plotting</a>).</td>
 </tr>
 <tr>
 <td>Identifiability</td>
@@ -4003,7 +4003,7 @@ can change from one observation to the next.</p>
 </tr>
 <tr>
 <td>Every reader</td>
-<td>The loss, the likelihood, the predictive (<code>at_observations</code>), the scores, the resampling and conformal methods, the figures and the reports read an observation with its scale.</td>
+<td>The loss, the likelihood, the predictive (<code>at_observations</code>), the scores, the resampling and conformal methods, the prediction profiles (<code>PredictionSpec(scale=...)</code>), the figures and the reports read an observation with its scale.</td>
 </tr>
 <tr>
 <td>Figures</td>

@@ -110,7 +110,7 @@ The mean of every model is the prediction of the observation (its sums, window, 
 
 A `BinomialObservations` takes its trials from `trials=n`, for every observation of the series, or with no argument from `ObservedDataPoint.trials` of each observation, for trials that change from one observation to the next. A series has one source; both or neither raise a `ValueError` that names the observation.
 
-A count observed on a known part of what the model describes, such as a sample of a known size, keeps its own value: give the part as [`scale`](https://munqu.github.io/commol/latest/guide/calibration-observations/#known-shares-scales), and the model reads the mean `scale · μ`. Dividing the count by the part instead gives a value that is not whole, and a count multiplied by `1/scale` has the wrong Poisson variance.
+A count observed on a known share of the model output, such as a sample of a known size, keeps its own value: give the share as [`scale`](https://munqu.github.io/commol/latest/guide/calibration-observations/#known-shares-scales), and the model reads the mean `scale · μ`. Dividing the count by the share instead gives a value that is not whole, and a count multiplied by `1/scale` has the wrong Poisson variance.
 
 ## Noise parameters
 

@@ -4641,12 +4641,12 @@ only their outputs, and a bin or accumulator id raises <code>ValueError</code>.<
 <tr>
 <td><code>observed_data</code></td>
 <td><code>None</code></td>
-<td><a href="../calibration-observations/"><code>ObservedDataPoint</code></a>s to draw on the panel of their <code>label</code>, at their positions (a differential model may observe between integers). When the observations of a series share one sum of outputs and one factor and have no window, the model line covers every position of the results. Otherwise the line joins the model value of each observation at its position, read through its own outputs, <code>window</code> and factor as the loss reads it (<code>ValueError</code> when the results have no value at a position or a window start). A predictive reads each draw through the same operator.</td>
+<td><a href="../calibration-observations/"><code>ObservedDataPoint</code></a>s to draw on the panel of their <code>label</code>, at their positions (a differential model may observe between integers). When the observations of a series share one sum of outputs, one factor and one <code>scale</code> and have no window, the model line covers every position of the results. Otherwise the line joins the model value of each observation at its position, read through its own outputs, <code>window</code>, <code>scale</code> and factor as the loss reads it (<code>ValueError</code> when the results have no value at a position or a window start). A predictive reads each draw through the same operator.</td>
 </tr>
 <tr>
 <td><code>calibration_result</code></td>
 <td><code>None</code></td>
-<td>Runs and replicates only. A <a href="../calibration/#results"><code>CalibrationResult</code></a> gives the values of the <a href="../calibration-observations/#partial-observations-factors">factors</a> that scale the model. A predictive reads the factors of each draw.</td>
+<td>Runs and replicates only. A <a href="../calibration/#results"><code>CalibrationResult</code></a> gives the values of the <a href="../calibration-observations/#partial-observations-factors">factors</a> that multiply the model; without it, each factor counts as 1, with one warning for each factor. The <code>scale</code> of each observation applies in both cases. A predictive reads the factors of each draw.</td>
 </tr>
 <tr>
 <td><code>confidence_level</code></td>
@@ -4894,9 +4894,10 @@ draws one panel per entry of <code>series</code>.</p>
 <p>With <code>panels="observations"</code>, <code>series</code> and <code>window</code> raise <code>ValueError</code>: the
 labels of <code>observed_data</code> set the panels, and each observation sets its own
 window. An empty <code>observed_data</code>, or a result with no value at the position of
-an observation or at the start of its window, also raises <code>ValueError</code>. <code>plot_compared</code> takes no
-<code>calibration_result</code>: a run or replicates read an observation with a factor
-unscaled, and log a warning. A predictive reads the factors of each draw.</p>
+an observation or at the start of its window, also raises <code>ValueError</code>.
+<code>plot_compared</code> takes no <code>calibration_result</code>: a run or replicates read an
+observation with a factor as if the factor were 1, and log one warning for
+each factor. A predictive reads the factors of each draw.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

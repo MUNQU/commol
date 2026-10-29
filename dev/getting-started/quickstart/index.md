@@ -157,7 +157,7 @@ fitted.plot.series(series=["B"], observed_data=observed_data, output_file="fit.p
 | `Calibrator(...).run()`                               | Runs the optimizer in Rust and returns a `CalibrationResult` (`best_parameters`, `final_loss`, `converged`, …). |
 | `Model.apply_calibration_parameters(result, problem)` | Writes the calibrated values into the model.                                                                    |
 
-See [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md) for initial conditions, constraints, scale factors and the optimizers.
+See [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md) for initial conditions, constraints, factors and the optimizers.
 
 ## Log messages
 

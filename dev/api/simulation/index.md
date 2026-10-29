@@ -1791,11 +1791,12 @@ class ResultsPlot:
             Path to save the figure to. If None, the figure is only returned.
         observed_data : list[ObservedDataPoint] | None
             Observations, each drawn as a point on the panel of its label.
-            When the observations of a series share one sum of outputs and
-            one factor and have no window, the line covers every position of
-            the results. Otherwise the model of each observation is read
-            through its own operator (outputs, window, factor) at its own
-            position, as the loss reads it, and the line joins these values.
+            When the observations of a series share one sum of outputs, one
+            factor and one scale and have no window, the line covers every
+            position of the results. Otherwise the model of each observation
+            is read through its own operator (outputs, window, scale, factor)
+            at its own position, as the loss reads it, and the line joins
+            these values.
         calibration_result : CalibrationResult | None
             Its ``best_parameters`` give the values of the factors of the
             observations, which multiply the line; observed values stay in
@@ -1886,10 +1887,11 @@ class ResultsPlot:
             Path to save the figure to. If None, the figure is only returned.
         observed_data : list[ObservedDataPoint] | None
             Observations, drawn as their running total on the panel of their
-            label. An observation with a factor is divided by the value of
-            its factor in ``calibration_result``.
+            label. Each observation is divided by its scale and by the value
+            of its factor in ``calibration_result``.
         calibration_result : CalibrationResult | None
-            Its ``best_parameters`` give the values of the factors.
+            Its ``best_parameters`` give the values of the factors. A factor
+            it does not have counts as 1, with one warning for each factor.
         config : PlotConfig | None
             Layout, size and style. If None, the defaults.
         series : list[str] | None
@@ -1945,11 +1947,11 @@ class ResultsPlot:
 
         The model is read only at the observations: the value of each
         observation through its own operator (the sum of its outputs, its
-        window and its factor), as the loss reads it. A value with a window is
-        a total over ``(at - window, at]``, drawn as a step over its window
-        with a marker at ``at``. A value with no window is a marker, joined
-        to the next only as a guide. The run along the whole axis is
-        `series`, on the same figure with ``axes=``.
+        window, its scale and its factor), as the loss reads it. A value with
+        a window is a total over ``(at - window, at]``, drawn as a step over
+        its window with a marker at ``at``. A value with no window is a
+        marker, joined to the next only as a guide. The run along the whole
+        axis is `series`, on the same figure with ``axes=``.
 
         Parameters
         ----------
@@ -2087,20 +2089,20 @@ Draw each series along the axis, one panel per series.
 
 Parameters:
 
-| Name                   | Type                       | Description                          | Default                                                                                                                                                                                                                                                                                                                                                                                    |
-| ---------------------- | -------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `output_file`          | \`str                      | None\`                               | Path to save the figure to. If None, the figure is only returned.                                                                                                                                                                                                                                                                                                                          |
-| `observed_data`        | \`list[ObservedDataPoint]  | None\`                               | Observations, each drawn as a point on the panel of its label. When the observations of a series share one sum of outputs and one factor and have no window, the line covers every position of the results. Otherwise the model of each observation is read through its own operator (outputs, window, factor) at its own position, as the loss reads it, and the line joins these values. |
-| `calibration_result`   | \`CalibrationResult        | None\`                               | Its best_parameters give the values of the factors of the observations, which multiply the line; observed values stay in their own units.                                                                                                                                                                                                                                                  |
-| `config`               | \`PlotConfig               | None\`                               | Layout and style. If None, the defaults.                                                                                                                                                                                                                                                                                                                                                   |
-| `series`               | \`list[str]                | None\`                               | What to draw, one panel each: an output name (such as A_g1), or a bin or accumulator id, which draws the sum of its outputs. An exact output name wins over an id. If None, every output.                                                                                                                                                                                                  |
-| `show_legend`          | `bool`                     | Whether each panel shows its legend. | `True`                                                                                                                                                                                                                                                                                                                                                                                     |
-| `position_label`       | \`Callable\[[float], str\] | None\`                               | Turns a position on the axis into a tick label. If None, a model with an origin (ModelBuilder(origin=...)) labels each tick with its date: 2020-01-02, with the time when it is not midnight. Otherwise the ticks show the position.                                                                                                                                                       |
-| `tick_every`           | \`float                    | None\`                               | Labels the plotted positions tick_every apart, counted from the first plotted position. If None, every plotted position, or the ticks matplotlib places on a dated axis.                                                                                                                                                                                                                   |
-| `x_label`              | `str`                      | The label of the x axis.             | `'Step'`                                                                                                                                                                                                                                                                                                                                                                                   |
-| `prediction_intervals` | \`PredictionIntervalsData  | None\`                               | Prediction intervals of a conformal method (ConformalResult.intervals). The panel of each of their series, by label, shows the band between their lower and upper ends and their point prediction, dashed; an unbounded interval is left out of the band.                                                                                                                                  |
-| `axes`                 | \`Figure                   | None\`                               | A figure of commol to draw on: each series is drawn on its panel, the Axes whose label is the id of the series. If None, a new figure.                                                                                                                                                                                                                                                     |
-| `**kwargs`             | \`str                      | int                                  | float                                                                                                                                                                                                                                                                                                                                                                                      |
+| Name                   | Type                       | Description                          | Default                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------- | -------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `output_file`          | \`str                      | None\`                               | Path to save the figure to. If None, the figure is only returned.                                                                                                                                                                                                                                                                                                                                            |
+| `observed_data`        | \`list[ObservedDataPoint]  | None\`                               | Observations, each drawn as a point on the panel of its label. When the observations of a series share one sum of outputs, one factor and one scale and have no window, the line covers every position of the results. Otherwise the model of each observation is read through its own operator (outputs, window, scale, factor) at its own position, as the loss reads it, and the line joins these values. |
+| `calibration_result`   | \`CalibrationResult        | None\`                               | Its best_parameters give the values of the factors of the observations, which multiply the line; observed values stay in their own units.                                                                                                                                                                                                                                                                    |
+| `config`               | \`PlotConfig               | None\`                               | Layout and style. If None, the defaults.                                                                                                                                                                                                                                                                                                                                                                     |
+| `series`               | \`list[str]                | None\`                               | What to draw, one panel each: an output name (such as A_g1), or a bin or accumulator id, which draws the sum of its outputs. An exact output name wins over an id. If None, every output.                                                                                                                                                                                                                    |
+| `show_legend`          | `bool`                     | Whether each panel shows its legend. | `True`                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `position_label`       | \`Callable\[[float], str\] | None\`                               | Turns a position on the axis into a tick label. If None, a model with an origin (ModelBuilder(origin=...)) labels each tick with its date: 2020-01-02, with the time when it is not midnight. Otherwise the ticks show the position.                                                                                                                                                                         |
+| `tick_every`           | \`float                    | None\`                               | Labels the plotted positions tick_every apart, counted from the first plotted position. If None, every plotted position, or the ticks matplotlib places on a dated axis.                                                                                                                                                                                                                                     |
+| `x_label`              | `str`                      | The label of the x axis.             | `'Step'`                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `prediction_intervals` | \`PredictionIntervalsData  | None\`                               | Prediction intervals of a conformal method (ConformalResult.intervals). The panel of each of their series, by label, shows the band between their lower and upper ends and their point prediction, dashed; an unbounded interval is left out of the band.                                                                                                                                                    |
+| `axes`                 | \`Figure                   | None\`                               | A figure of commol to draw on: each series is drawn on its panel, the Axes whose label is the id of the series. If None, a new figure.                                                                                                                                                                                                                                                                       |
+| `**kwargs`             | \`str                      | int                                  | float                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 Returns:
 
@@ -2143,11 +2145,12 @@ def series(
         Path to save the figure to. If None, the figure is only returned.
     observed_data : list[ObservedDataPoint] | None
         Observations, each drawn as a point on the panel of its label.
-        When the observations of a series share one sum of outputs and
-        one factor and have no window, the line covers every position of
-        the results. Otherwise the model of each observation is read
-        through its own operator (outputs, window, factor) at its own
-        position, as the loss reads it, and the line joins these values.
+        When the observations of a series share one sum of outputs, one
+        factor and one scale and have no window, the line covers every
+        position of the results. Otherwise the model of each observation
+        is read through its own operator (outputs, window, scale, factor)
+        at its own position, as the loss reads it, and the line joins
+        these values.
     calibration_result : CalibrationResult | None
         Its ``best_parameters`` give the values of the factors of the
         observations, which multiply the line; observed values stay in
@@ -2230,15 +2233,15 @@ Draw the running total of each series, one panel per series.
 
 Parameters:
 
-| Name                 | Type                      | Description | Default                                                                                                                                                           |
-| -------------------- | ------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `output_file`        | \`str                     | None\`      | Path to save the figure to. If None, the figure is only returned.                                                                                                 |
-| `observed_data`      | \`list[ObservedDataPoint] | None\`      | Observations, drawn as their running total on the panel of their label. An observation with a factor is divided by the value of its factor in calibration_result. |
-| `calibration_result` | \`CalibrationResult       | None\`      | Its best_parameters give the values of the factors.                                                                                                               |
-| `config`             | \`PlotConfig              | None\`      | Layout, size and style. If None, the defaults.                                                                                                                    |
-| `series`             | \`list[str]               | None\`      | What to draw, one panel each, as in series. If None, every output.                                                                                                |
-| `axes`               | \`Figure                  | None\`      | A figure of commol to draw on, as in series.                                                                                                                      |
-| `**kwargs`           | \`str                     | int         | float                                                                                                                                                             |
+| Name                 | Type                      | Description | Default                                                                                                                                                                |
+| -------------------- | ------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `output_file`        | \`str                     | None\`      | Path to save the figure to. If None, the figure is only returned.                                                                                                      |
+| `observed_data`      | \`list[ObservedDataPoint] | None\`      | Observations, drawn as their running total on the panel of their label. Each observation is divided by its scale and by the value of its factor in calibration_result. |
+| `calibration_result` | \`CalibrationResult       | None\`      | Its best_parameters give the values of the factors. A factor it does not have counts as 1, with one warning for each factor.                                           |
+| `config`             | \`PlotConfig              | None\`      | Layout, size and style. If None, the defaults.                                                                                                                         |
+| `series`             | \`list[str]               | None\`      | What to draw, one panel each, as in series. If None, every output.                                                                                                     |
+| `axes`               | \`Figure                  | None\`      | A figure of commol to draw on, as in series.                                                                                                                           |
+| `**kwargs`           | \`str                     | int         | float                                                                                                                                                                  |
 
 Returns:
 
@@ -2276,10 +2279,11 @@ def cumulative(
         Path to save the figure to. If None, the figure is only returned.
     observed_data : list[ObservedDataPoint] | None
         Observations, drawn as their running total on the panel of their
-        label. An observation with a factor is divided by the value of
-        its factor in ``calibration_result``.
+        label. Each observation is divided by its scale and by the value
+        of its factor in ``calibration_result``.
     calibration_result : CalibrationResult | None
-        Its ``best_parameters`` give the values of the factors.
+        Its ``best_parameters`` give the values of the factors. A factor
+        it does not have counts as 1, with one warning for each factor.
     config : PlotConfig | None
         Layout, size and style. If None, the defaults.
     series : list[str] | None
@@ -2325,7 +2329,7 @@ observations(observed_data: list[ObservedDataPoint], output_file: str | None = N
 
 Draw each observed series with the model read through its observation operator, one panel per label.
 
-The model is read only at the observations: the value of each observation through its own operator (the sum of its outputs, its window and its factor), as the loss reads it. A value with a window is a total over `(at - window, at]`, drawn as a step over its window with a marker at `at`. A value with no window is a marker, joined to the next only as a guide. The run along the whole axis is `series`, on the same figure with `axes=`.
+The model is read only at the observations: the value of each observation through its own operator (the sum of its outputs, its window, its scale and its factor), as the loss reads it. A value with a window is a total over `(at - window, at]`, drawn as a step over its window with a marker at `at`. A value with no window is a marker, joined to the next only as a guide. The run along the whole axis is `series`, on the same figure with `axes=`.
 
 Parameters:
 
@@ -2378,11 +2382,11 @@ def observations(
 
     The model is read only at the observations: the value of each
     observation through its own operator (the sum of its outputs, its
-    window and its factor), as the loss reads it. A value with a window is
-    a total over ``(at - window, at]``, drawn as a step over its window
-    with a marker at ``at``. A value with no window is a marker, joined
-    to the next only as a guide. The run along the whole axis is
-    `series`, on the same figure with ``axes=``.
+    window, its scale and its factor), as the loss reads it. A value with
+    a window is a total over ``(at - window, at]``, drawn as a step over
+    its window with a marker at ``at``. A value with no window is a
+    marker, joined to the next only as a guide. The run along the whole
+    axis is `series`, on the same figure with ``axes=``.
 
     Parameters
     ----------

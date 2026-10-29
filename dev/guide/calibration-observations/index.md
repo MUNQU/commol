@@ -117,7 +117,7 @@ print(calibrate_k1(weighted, normalize_observations=True))  # 0.4
 
 ## Partial observations: factors
 
-When the data sees only part of an output, for example a fixed share of it, a `factor` unknown multiplies the prediction before the comparison. Link observations to it with `factor_id`:
+When the data sees only part of an output, an unknown share of it, an unknown `factor` multiplies the prediction before the comparison. Link observations to it with `factor_id`:
 
 ```python
 seen = 0.3
@@ -138,12 +138,12 @@ scaled_result = Calibrator(Simulation(model(0.4)), problem).run()
 print(round(scaled_result.best_parameters["share_seen"], 3))  # 0.3
 ```
 
-| Fact                  | Detail                                                                                                                                                                                                                 |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Several factors       | Each observation names its own `factor_id`, so outputs can have different shares.                                                                                                                                      |
-| Not part of the model | `apply_calibration_parameters` skips `factor` values.                                                                                                                                                                  |
-| Plots                 | Pass `calibration_result=` to `results.plot.series` or `results.plot.observations`; it applies the calibrated factors to the comparison.                                                                               |
-| Identifiability       | A rate and a share can explain the same data. Fit them together only when the data can tell them apart: [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md) checks it. |
+| Fact                  | Detail                                                                                                                                                                                                                                              |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Several factors       | Each observation names its own `factor_id`, so outputs can have different shares.                                                                                                                                                                   |
+| Not part of the model | `apply_calibration_parameters` skips `factor` values.                                                                                                                                                                                               |
+| Plots                 | Pass `calibration_result=` to `results.plot.series`, `results.plot.observations` or `results.plot.cumulative`; it applies the calibrated factors to the comparison ([Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting)). |
+| Identifiability       | A rate and a share can explain the same data. Fit them together only when the data can tell them apart: [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md) checks it.                              |
 
 ## Known shares: scales
 
@@ -160,7 +160,7 @@ print(calibrate_k1(known))  # 0.4
 | Fact         | Detail                                                                                                                                                                                                                                                                                                                                          |
 | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Counts       | A count model reads the mean `scale · model`, so the observed counts stay whole and keep their own size: a negative binomial of the counts seen on 1 unit in 40 reads `0.025 · model`, not the counts multiplied by 40. See [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#choosing-a-model). |
-| Every reader | The loss, the likelihood, the predictive (`at_observations`), the scores, the resampling and conformal methods, the figures and the reports read an observation with its scale.                                                                                                                                                                 |
+| Every reader | The loss, the likelihood, the predictive (`at_observations`), the scores, the resampling and conformal methods, the prediction profiles (`PredictionSpec(scale=...)`), the figures and the reports read an observation with its scale.                                                                                                          |
 | Figures      | `plot.series` and `plot.observations` draw the model times the scale; `plot.cumulative` divides each observed value by its scale and its factor.                                                                                                                                                                                                |
 | Reports      | The `observed` block of a report gives `scales` when a scale is not 1.0 ([Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)).                                                                                                                                                                                              |
 | Range        | A scale of 0, below 0, infinite or NaN raises `ValidationError` that names `scale`.                                                                                                                                                                                                                                                             |

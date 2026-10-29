@@ -3906,7 +3906,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/observation.rs</code></td>
-<td><code>ObservationOperator</code>: one prediction per observation from the rows of a run (rows, sums of outputs, windows, factors); <code>index_at</code>, the row of a position within the tolerance of the axis; the arithmetic of every window: <code>window_start</code> and <code>check_window_end</code>, the window of an observation; <code>window_increments</code>, which <code>windowed_totals</code> also reads; the grid of windows that results, figures and reports read (<code>window_bounds</code>, <code>window_index</code>, <code>window_ends</code>, <code>windows_in</code>).</td>
+<td><code>ObservationOperator</code>: one prediction per observation from the rows of a run (rows, sums of outputs, windows, scales, factors); <code>index_at</code>, the row of a position within the tolerance of the axis; the arithmetic of every window: <code>window_start</code> and <code>check_window_end</code>, the window of an observation; <code>window_increments</code>, which <code>windowed_totals</code> also reads; the grid of windows that results, figures and reports read (<code>window_bounds</code>, <code>window_index</code>, <code>window_ends</code>, <code>windows_in</code>).</td>
 <td>Comparison with data.</td>
 </tr>
 <tr>
@@ -3996,7 +3996,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/sensitivity/</code></td>
-<td><code>SensitivitySource</code>, the port of derivatives of the predicted observations; <code>FiniteDifferences</code> on the design of the observations or a dense one; the scaled sensitivities and <code>observation_scales</code>.</td>
+<td><code>SensitivitySource</code>, the port of derivatives of the predicted observations; <code>FiniteDifferences</code> on the design of the observations or a dense one; the scaled sensitivities and <code>observation_rms</code>, the root mean square of each observed series, which divides them.</td>
 <td>Ranks, verdicts.</td>
 </tr>
 <tr>

@@ -2995,6 +2995,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#a-subproblem-holds-one-quantity-fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A subproblem holds one quantity fixed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-profile-steps-with-the-adaptive-step-of-raue" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3548,6 +3559,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#a-subproblem-holds-one-quantity-fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A subproblem holds one quantity fixed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-profile-steps-with-the-adaptive-step-of-raue" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3613,8 +3635,61 @@
 
 <h1 id="profiles">Profiles<a class="headerlink" href="#profiles" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
-<p>How a profile steps away from the fit, which threshold reads its statistic,
-and when its shape gives a verdict.</p>
+<p>How a subproblem holds the quantity of a profile, how a profile steps away
+from the fit, which threshold reads its statistic, and when its shape gives a
+verdict.</p>
+<h2 id="a-subproblem-holds-one-quantity-fixed">A subproblem holds one quantity fixed<a class="headerlink" href="#a-subproblem-holds-one-quantity-fixed" title="Permanent link">&para;</a></h2>
+<p><code>Subproblem</code> (<code>crates/commol-calibration/src/subproblem.rs</code>) holds one
+parameter or one prediction while <code>optimize_subproblem</code> (<code>optimization.rs</code>)
+fits the others with the problem's own optimizer. A held parameter leaves the
+search space (<code>SearchSpace</code>): the optimizer searches one dimension less, and
+the cost puts the fixed value back before it scores a point. A held
+prediction <code>g(θ) = c</code> is an equality constraint met by the augmented
+Lagrangian of the argmin fork, whose factory builds the problem's optimizer
+at each outer iteration: Nelder-Mead on the sine transform, from the point of
+the iteration before, or a swarm seeded by <code>replicate_seed(seed, k)</code>. The
+prediction is read through the observation operator of a copy of the problem
+whose runs also report at its positions (<code>CalibrationProblem::observing</code>), so
+one run gives the objective and the constraint, and the cost keeps the
+constraint of the last point each thread scored (the augmented Lagrangian
+asks for both on one thread; a swarm scores its particles on several). A
+point that is not feasible keeps its penalty and a constraint of 0. Each point
+starts from Algencan's scaled penalty; the multiplier is the warm start.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bounds <code>[v, v]</code> for a held parameter</td>
+<td>Nelder-Mead keeps a vertex for a dimension that moves nothing.</td>
+</tr>
+<tr>
+<td>A growing quadratic penalty on <code>g − c</code></td>
+<td>It meets the constraint only as <code>μ → ∞</code>, and a large <code>μ</code> makes a narrow valley where Nelder-Mead stops early.</td>
+</tr>
+<tr>
+<td>A second run for the prediction</td>
+<td>Twice the model runs of each evaluation.</td>
+</tr>
+<tr>
+<td><code>μ = 100·|Δλ/Δc|</code> from the two points before</td>
+<td>In the experiment of #132 (the ABC model of <code>tests/support/</code> with a normal model, the problem of <code>the_multiplier_of_a_prediction_profile_is_minus_its_slope</code>), B at 30 took 5465 evaluations against 3179 with Algencan's <code>μ₀</code>, C at 24 5405 against 3175, for the same intervals and a mean error of the multipliers of 0.8e-4 against 1.2e-4; <code>10⁴·|Δλ/Δc|</code> gained 4 %. The stop rule reads <code>‖g − c‖</code>, which a small <code>μ</code> leaves large.</td>
+</tr>
+</tbody>
+</table>
+<p>The augmented Lagrangian stops only when an inner run converged. A swarm
+without a stop rule runs each outer iteration to its <code>max_iterations</code>, so a
+held prediction stops at the outer limit and never reports convergence; with
+the improvement rule, it stops when the constraint holds.</p>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_profiles.rs</code>
+(<code>fixing_a_parameter_at_the_fit_keeps_the_loss</code>,
+<code>fixing_a_prediction_at_the_fit_keeps_the_parameters</code>,
+<code>a_problem_observing_more_positions_scores_as_the_problem</code>,
+<code>a_swarm_fits_a_subproblem_and_repeats_from_its_seed</code>).</p>
 <h2 id="a-profile-steps-with-the-adaptive-step-of-raue">A profile steps with the adaptive step of Raue<a class="headerlink" href="#a-profile-steps-with-the-adaptive-step-of-raue" title="Permanent link">&para;</a></h2>
 <p><code>ProfileTracer</code> (<code>crates/commol-inference/src/profiles/tracer.rs</code>) walks each
 side of each quantity from the fit, all in parallel. It knows no optimizer and

@@ -122,10 +122,10 @@ Every method runs through `Calibrator.identifiability(method)` and returns an `I
 
 `StructuralRank` evaluates the sensitivities of the predicted observations at `points` rows of a Latin hypercube over the bounds, drawn from the seed of the calibrator (`Calibrator.seed`), so `problem.seed` repeats them. The sensitivity of observation `i` to parameter `j` is scaled to a relative change of both, `S_ij = (∂y_i/∂θ_j) · θ_j / s_i`, where `s_i` is the root mean square of the series of observation `i`, so the answer does not depend on units.
 
-| `design`         | Positions and outputs                                                                                             | Question                                           |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `"observations"` | Those of the problem's observations; their values are ignored                                                     | Can this design determine the parameters?          |
-| `"dense"`        | Every observed series, with its outputs, factor and window, at every unit position from 0 to the last observation | Can denser data of the same series determine them? |
+| `design`         | Positions and outputs                                                                                                    | Question                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
+| `"observations"` | Those of the problem's observations; their values are ignored                                                            | Can this design determine the parameters?          |
+| `"dense"`        | Every observed series, with its outputs, factor, scale and window, at every unit position from 0 to the last observation | Can denser data of the same series determine them? |
 
 At each point the rank counts the singular values of `S` above the norm of the estimated error of `S`. The **generic rank** is the rank at most points; each point's singular values are in `report.structural[0].points`. A parameter is:
 
@@ -241,9 +241,9 @@ print(data["parameters"]["k2"]["practical"]["verdict"])  # determined
 
 ## Next steps
 
-| To learn                                    | Read                                                                                             |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Several starts of an optimizer              | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts) |
-| Scale factors, which often pair with a rate | [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md)    |
-| What a sample is                            | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/#the-parameter-sample)     |
-| Intervals and verdicts from profiles        | [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md)  |
+| To learn                              | Read                                                                                             |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Several starts of an optimizer        | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts) |
+| Factors, which often pair with a rate | [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md)    |
+| What a sample is                      | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/#the-parameter-sample)     |
+| Intervals and verdicts from profiles  | [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md)  |

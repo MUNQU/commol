@@ -88,7 +88,7 @@ print(round(steps["C"][-1]), round(flows["C"][-1]))  # the amount of C in each m
 | A description of a model: equations, state graphs, the ODD protocol (text, Markdown, LaTeX)           | [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md)              |
 | One process run as difference equations or differential equations; results read, plotted and compared | [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md)                   |
 | The same process as a stochastic process of whole units, with seeds and replicates                    | [Stochastic Simulation](https://munqu.github.io/commol/latest/guide/stochastic/index.md)                  |
-| Calibration of parameters, initial conditions and scale factors                                       | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)                     |
+| Calibration of parameters, initial conditions and factors                                             | [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)                     |
 | Parameter samples, predictive bands, scenarios and scores                                             | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)                           |
 | JSON-ready reports                                                                                    | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                                   |
 | Parallel starts, replicates, particles and draws, on the threads you choose                           | [Threads and Parallelism](https://munqu.github.io/commol/latest/guide/parallelism/index.md)               |
@@ -336,7 +336,7 @@ fitted.plot.series(series=["B"], observed_data=observed_data, output_file="fit.p
 | `Calibrator(...).run()`                               | Runs the optimizer in Rust and returns a `CalibrationResult` (`best_parameters`, `final_loss`, `converged`, …). |
 | `Model.apply_calibration_parameters(result, problem)` | Writes the calibrated values into the model.                                                                    |
 
-See [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md) for initial conditions, constraints, scale factors and the optimizers.
+See [Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md) for initial conditions, constraints, factors and the optimizers.
 
 ## Log messages
 
@@ -3040,19 +3040,19 @@ results.plot.series(
 )
 ```
 
-| Argument                                  | Default                                        | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| ----------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `output_file`                             | `None`                                         | Where to save the figure. `None` only returns it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `series`                                  | `None` (every output)                          | What to draw, one panel each: an output name (`B_g1`) or a bin or accumulator id (`B`), which draws the sum of its outputs (`ModelStructure.outputs_by_source`). An exact output name wins. An unknown entry raises `ValueError`.                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `observed_data`                           | `None`                                         | [`ObservedDataPoint`](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md)s to draw on the panel of their `label`, at their positions (a differential model may observe between integers). When the observations of a series share one sum of outputs and one factor and have no window, the model line covers every position of the results. Otherwise the line joins the model value of each observation at its position, read through its own outputs, `window` and factor as the loss reads it (`ValueError` when the results have no value at a position or a window start). A predictive reads each draw through the same operator. |
-| `calibration_result`                      | `None`                                         | Runs and replicates only. A [`CalibrationResult`](https://munqu.github.io/commol/latest/guide/calibration/#results) gives the values of the [factors](https://munqu.github.io/commol/latest/guide/calibration-observations/#partial-observations-factors) that scale the model. A predictive reads the factors of each draw.                                                                                                                                                                                                                                                                                                                                        |
-| `confidence_level`                        | `0.95`                                         | Replicates and predictives only. The level of the band.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `prediction_intervals`                    | `None`                                         | `plot.series` only. The `PredictionIntervals` of a [conformal method](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md): the panel of each of their series, by label, shows the band from `lower` to `upper` and the point prediction, dashed. An unbounded interval is left out of the band.                                                                                                                                                                                                                                                                                                                                             |
-| `axes`                                    | `None`                                         | A `Figure` of commol to draw on ([several results on one figure](#several-results-on-one-figure)).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `config`                                  | `PlotConfig()`                                 | Figure size, dpi, layout and matplotlib style.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `show_legend`                             | `True`                                         | `plot.series` only.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `x_label`, `tick_every`, `position_label` | `"Step"`, every plotted position, the position | `plot.series` only. Label the x axis, for example in weeks. The x axis shows `results.positions`. With no `position_label`, a model with an [origin](https://munqu.github.io/commol/latest/guide/units-and-equations/#dates-on-the-axis) labels each tick with its date (`2020-01-08`, with the time when it is not midnight): at the plotted positions `tick_every` apart, or at the ticks matplotlib places when `tick_every` is `None`.                                                                                                                                                                                                                          |
-| other keyword arguments                   | —                                              | Passed to `Axes.plot` for the line of the model, such as `linewidth` or `alpha`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Argument                                  | Default                                        | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ----------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `output_file`                             | `None`                                         | Where to save the figure. `None` only returns it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `series`                                  | `None` (every output)                          | What to draw, one panel each: an output name (`B_g1`) or a bin or accumulator id (`B`), which draws the sum of its outputs (`ModelStructure.outputs_by_source`). An exact output name wins. An unknown entry raises `ValueError`.                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `observed_data`                           | `None`                                         | [`ObservedDataPoint`](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md)s to draw on the panel of their `label`, at their positions (a differential model may observe between integers). When the observations of a series share one sum of outputs, one factor and one `scale` and have no window, the model line covers every position of the results. Otherwise the line joins the model value of each observation at its position, read through its own outputs, `window`, `scale` and factor as the loss reads it (`ValueError` when the results have no value at a position or a window start). A predictive reads each draw through the same operator. |
+| `calibration_result`                      | `None`                                         | Runs and replicates only. A [`CalibrationResult`](https://munqu.github.io/commol/latest/guide/calibration/#results) gives the values of the [factors](https://munqu.github.io/commol/latest/guide/calibration-observations/#partial-observations-factors) that multiply the model; without it, each factor counts as 1, with one warning for each factor. The `scale` of each observation applies in both cases. A predictive reads the factors of each draw.                                                                                                                                                                                                                             |
+| `confidence_level`                        | `0.95`                                         | Replicates and predictives only. The level of the band.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `prediction_intervals`                    | `None`                                         | `plot.series` only. The `PredictionIntervals` of a [conformal method](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md): the panel of each of their series, by label, shows the band from `lower` to `upper` and the point prediction, dashed. An unbounded interval is left out of the band.                                                                                                                                                                                                                                                                                                                                                                   |
+| `axes`                                    | `None`                                         | A `Figure` of commol to draw on ([several results on one figure](#several-results-on-one-figure)).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `config`                                  | `PlotConfig()`                                 | Figure size, dpi, layout and matplotlib style.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `show_legend`                             | `True`                                         | `plot.series` only.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `x_label`, `tick_every`, `position_label` | `"Step"`, every plotted position, the position | `plot.series` only. Label the x axis, for example in weeks. The x axis shows `results.positions`. With no `position_label`, a model with an [origin](https://munqu.github.io/commol/latest/guide/units-and-equations/#dates-on-the-axis) labels each tick with its date (`2020-01-08`, with the time when it is not midnight): at the plotted positions `tick_every` apart, or at the ticks matplotlib places when `tick_every` is `None`.                                                                                                                                                                                                                                                |
+| other keyword arguments                   | —                                              | Passed to `Axes.plot` for the line of the model, such as `linewidth` or `alpha`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 | `PlotConfig` field | Default            | Values                                                                                                                                                                                                                                                            |
 | ------------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -3163,7 +3163,7 @@ checked = plot_compared(
 print([ax.get_label() for ax in checked.axes if ax.get_visible()])  # ['cum_ab', 'B_and_C', 'B']
 ```
 
-With `panels="observations"`, `series` and `window` raise `ValueError`: the labels of `observed_data` set the panels, and each observation sets its own window. An empty `observed_data`, or a result with no value at the position of an observation or at the start of its window, also raises `ValueError`. `plot_compared` takes no `calibration_result`: a run or replicates read an observation with a factor unscaled, and log a warning. A predictive reads the factors of each draw.
+With `panels="observations"`, `series` and `window` raise `ValueError`: the labels of `observed_data` set the panels, and each observation sets its own window. An empty `observed_data`, or a result with no value at the position of an observation or at the start of its window, also raises `ValueError`. `plot_compared` takes no `calibration_result`: a run or replicates read an observation with a factor as if the factor were 1, and log one warning for each factor. A predictive reads the factors of each draw.
 
 ## Next steps
 
@@ -3418,18 +3418,18 @@ print(0.05 < result.best_parameters["k2"] < 0.2)  # True: near 0.1
 
 [Back to Home](https://munqu.github.io/commol/latest/index.md)
 
-Calibration finds the parameter values (and, if you want, initial conditions and observation scale factors) that make a model reproduce observed data. You describe the observations and the unknowns in a `CalibrationProblem`, and a `Calibrator` runs an optimizer in the Rust engine.
+Calibration finds the parameter values (and, if you want, initial conditions and the factors of observations) that make a model reproduce observed data. You describe the observations and the unknowns in a `CalibrationProblem`, and a `Calibrator` runs an optimizer in the Rust engine.
 
-| Topic                                                              | Page                                                                                                                  |
-| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| The workflow, the problem, losses and results                      | This page                                                                                                             |
-| Maximum likelihood with a model of the noise of each series        | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md)             |
-| Calibrating initial conditions                                     | [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md) |
-| Several outputs, aggregates, weights, scale factors, windowed data | [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md)                         |
-| Nelder-Mead and particle swarm settings                            | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md)                             |
-| Relations the result must respect                                  | [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/index.md)                           |
-| Reports of a calibrated model and run                              | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                                               |
-| Samples, predictive bands and scores                               | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)                                       |
+| Topic                                                                      | Page                                                                                                                  |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| The workflow, the problem, losses and results                              | This page                                                                                                             |
+| Maximum likelihood with a model of the noise of each series                | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md)             |
+| Calibrating initial conditions                                             | [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md) |
+| Several outputs, aggregates, weights, factors, known scales, windowed data | [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md)                         |
+| Nelder-Mead and particle swarm settings                                    | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md)                             |
+| Relations the result must respect                                          | [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/index.md)                           |
+| Reports of a calibrated model and run                                      | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                                               |
+| Samples, predictive bands and scores                                       | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)                                       |
 
 ## Quick path
 
@@ -3515,7 +3515,7 @@ A `Simulation` follows its model: after `apply_calibration_parameters` or `updat
 
 ### Observations
 
-An `ObservedDataPoint(at=..., output=..., value=...)` is one observed value of an output at a position on the axis. Its other fields observe a sum of outputs, weigh it, scale the prediction by a factor or compare a gain over a window: [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md) lists them all.
+An `ObservedDataPoint(at=..., output=..., value=...)` is one observed value of an output at a position on the axis. Its other fields observe a sum of outputs, weigh it, multiply the prediction by an unknown factor or a known scale, or compare a gain over a window: [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md) lists them all.
 
 ### Unknowns
 
@@ -3963,7 +3963,7 @@ print(calibrate_k1(weighted, normalize_observations=True))  # 0.4
 
 ## Partial observations: factors
 
-When the data sees only part of an output, for example a fixed share of it, a `factor` unknown multiplies the prediction before the comparison. Link observations to it with `factor_id`:
+When the data sees only part of an output, an unknown share of it, an unknown `factor` multiplies the prediction before the comparison. Link observations to it with `factor_id`:
 
 ```python
 seen = 0.3
@@ -3984,12 +3984,12 @@ scaled_result = Calibrator(Simulation(model(0.4)), problem).run()
 print(round(scaled_result.best_parameters["share_seen"], 3))  # 0.3
 ```
 
-| Fact                  | Detail                                                                                                                                                                                                                 |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Several factors       | Each observation names its own `factor_id`, so outputs can have different shares.                                                                                                                                      |
-| Not part of the model | `apply_calibration_parameters` skips `factor` values.                                                                                                                                                                  |
-| Plots                 | Pass `calibration_result=` to `results.plot.series` or `results.plot.observations`; it applies the calibrated factors to the comparison.                                                                               |
-| Identifiability       | A rate and a share can explain the same data. Fit them together only when the data can tell them apart: [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md) checks it. |
+| Fact                  | Detail                                                                                                                                                                                                                                              |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Several factors       | Each observation names its own `factor_id`, so outputs can have different shares.                                                                                                                                                                   |
+| Not part of the model | `apply_calibration_parameters` skips `factor` values.                                                                                                                                                                                               |
+| Plots                 | Pass `calibration_result=` to `results.plot.series`, `results.plot.observations` or `results.plot.cumulative`; it applies the calibrated factors to the comparison ([Plotting](https://munqu.github.io/commol/latest/guide/simulations/#plotting)). |
+| Identifiability       | A rate and a share can explain the same data. Fit them together only when the data can tell them apart: [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md) checks it.                              |
 
 ## Known shares: scales
 
@@ -4006,7 +4006,7 @@ print(calibrate_k1(known))  # 0.4
 | Fact         | Detail                                                                                                                                                                                                                                                                                                                                          |
 | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Counts       | A count model reads the mean `scale · model`, so the observed counts stay whole and keep their own size: a negative binomial of the counts seen on 1 unit in 40 reads `0.025 · model`, not the counts multiplied by 40. See [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#choosing-a-model). |
-| Every reader | The loss, the likelihood, the predictive (`at_observations`), the scores, the resampling and conformal methods, the figures and the reports read an observation with its scale.                                                                                                                                                                 |
+| Every reader | The loss, the likelihood, the predictive (`at_observations`), the scores, the resampling and conformal methods, the prediction profiles (`PredictionSpec(scale=...)`), the figures and the reports read an observation with its scale.                                                                                                          |
 | Figures      | `plot.series` and `plot.observations` draw the model times the scale; `plot.cumulative` divides each observed value by its scale and its factor.                                                                                                                                                                                                |
 | Reports      | The `observed` block of a report gives `scales` when a scale is not 1.0 ([Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)).                                                                                                                                                                                              |
 | Range        | A scale of 0, below 0, infinite or NaN raises `ValidationError` that names `scale`.                                                                                                                                                                                                                                                             |
@@ -4910,7 +4910,7 @@ The mean of every model is the prediction of the observation (its sums, window, 
 
 A `BinomialObservations` takes its trials from `trials=n`, for every observation of the series, or with no argument from `ObservedDataPoint.trials` of each observation, for trials that change from one observation to the next. A series has one source; both or neither raise a `ValueError` that names the observation.
 
-A count observed on a known part of what the model describes, such as a sample of a known size, keeps its own value: give the part as [`scale`](https://munqu.github.io/commol/latest/guide/calibration-observations/#known-shares-scales), and the model reads the mean `scale · μ`. Dividing the count by the part instead gives a value that is not whole, and a count multiplied by `1/scale` has the wrong Poisson variance.
+A count observed on a known share of the model output, such as a sample of a known size, keeps its own value: give the share as [`scale`](https://munqu.github.io/commol/latest/guide/calibration-observations/#known-shares-scales), and the model reads the mean `scale · μ`. Dividing the count by the share instead gives a value that is not whole, and a count multiplied by `1/scale` has the wrong Poisson variance.
 
 ## Noise parameters
 
@@ -5100,10 +5100,10 @@ Every method runs through `Calibrator.identifiability(method)` and returns an `I
 
 `StructuralRank` evaluates the sensitivities of the predicted observations at `points` rows of a Latin hypercube over the bounds, drawn from the seed of the calibrator (`Calibrator.seed`), so `problem.seed` repeats them. The sensitivity of observation `i` to parameter `j` is scaled to a relative change of both, `S_ij = (∂y_i/∂θ_j) · θ_j / s_i`, where `s_i` is the root mean square of the series of observation `i`, so the answer does not depend on units.
 
-| `design`         | Positions and outputs                                                                                             | Question                                           |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `"observations"` | Those of the problem's observations; their values are ignored                                                     | Can this design determine the parameters?          |
-| `"dense"`        | Every observed series, with its outputs, factor and window, at every unit position from 0 to the last observation | Can denser data of the same series determine them? |
+| `design`         | Positions and outputs                                                                                                    | Question                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
+| `"observations"` | Those of the problem's observations; their values are ignored                                                            | Can this design determine the parameters?          |
+| `"dense"`        | Every observed series, with its outputs, factor, scale and window, at every unit position from 0 to the last observation | Can denser data of the same series determine them? |
 
 At each point the rank counts the singular values of `S` above the norm of the estimated error of `S`. The **generic rank** is the rank at most points; each point's singular values are in `report.structural[0].points`. A parameter is:
 
@@ -5219,12 +5219,12 @@ print(data["parameters"]["k2"]["practical"]["verdict"])  # determined
 
 ## Next steps
 
-| To learn                                    | Read                                                                                             |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Several starts of an optimizer              | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts) |
-| Scale factors, which often pair with a rate | [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md)    |
-| What a sample is                            | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/#the-parameter-sample)     |
-| Intervals and verdicts from profiles        | [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md)  |
+| To learn                              | Read                                                                                             |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Several starts of an optimizer        | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts) |
+| Factors, which often pair with a rate | [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md)    |
+| What a sample is                      | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/#the-parameter-sample)     |
+| Intervals and verdicts from profiles  | [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md)  |
 
 # Resampling: Bootstraps and the Jackknife
 
@@ -6065,7 +6065,7 @@ Every side of every quantity runs in parallel. A held parameter leaves the value
 
 ## Prediction profiles
 
-`PredictionProfile(specs, threshold)` profiles the value of each prediction: a `PredictionSpec` reads an output, or a sum of outputs, at a position, with a `window` and a `factor_id`, as an observation does. Its interval is the set of values the data do not reject (Kreutz et al. 2012); specs at several positions give a band. A prediction past the data has a wider interval, as `B at 50` shows in the [quick path](#quick-path). The intervals are pointwise: a band of them is not a joint region.
+`PredictionProfile(specs, threshold)` profiles the value of each prediction: a `PredictionSpec` reads an output, or a sum of outputs, at a position, with a `window`, a `factor_id` and a known `scale`, as an observation does. Its interval is the set of values the data do not reject (Kreutz et al. 2012); specs at several positions give a band. A prediction past the data has a wider interval, as `B at 50` shows in the [quick path](#quick-path). The intervals are pointwise: a band of them is not a joint region.
 
 ## Verdicts and the identifiability report
 
@@ -6327,7 +6327,7 @@ print(widths)  # [6.3, 5.2]
 
 ## Split conformal
 
-`SplitConformal(calibration_data, score, by, confidence_level, positions, sample=None, starts=1)` fits the problem's observations (`Calibrator.run(starts)`), or reads a `sample`, scores `calibration_data` and gives intervals at `positions` for each series of `calibration_data`. A series of `calibration_data` is read as its observations define it: its outputs, factor and window.
+`SplitConformal(calibration_data, score, by, confidence_level, positions, sample=None, starts=1)` fits the problem's observations (`Calibrator.run(starts)`), or reads a `sample`, scores `calibration_data` and gives intervals at `positions` for each series of `calibration_data`. A series of `calibration_data` is read as its observations define it: its outputs, factor, scale and window.
 
 ## Rolling origins
 
@@ -9965,6 +9965,23 @@ class Calibrator:
             sample._rust, engine_json(observed_data), engine_json(noise)
         )
 
+    def _check_observations(self, observed_data: list[ObservedDataPoint]) -> None:
+        """
+        Check `observed_data` against the problem in Rust, with no run.
+
+        Parameters
+        ----------
+        observed_data : list[ObservedDataPoint]
+            The observations.
+
+        Raises
+        ------
+        ValueError
+            If the engine rejects a position, or an observation names an
+            unknown output or factor, or a parameter that is not a factor.
+        """
+        self._engine_problem.check_observations(engine_json(observed_data))
+
     def _log_score(
         self, sample: ParameterSample, observed_data: list[ObservedDataPoint]
     ) -> list[float]:
@@ -11028,18 +11045,18 @@ An observation compares one output, or the sum of several outputs, with an obser
 
 Attributes:
 
-| Name        | Type        | Description                                                                                                                                                                                                                                                                                                              |
-| ----------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `at`        | `float`     | Position of the observation on the axis. The engine decides which positions its model type accepts: a DifferentialEquations model any non-negative position, a DifferenceEquations model only an integer step.                                                                                                           |
-| `output`    | \`str       | None\`                                                                                                                                                                                                                                                                                                                   |
-| `outputs`   | \`list[str] | None\`                                                                                                                                                                                                                                                                                                                   |
-| `label`     | `str`       | Name of the observed series, used by reports, plots and the per-series normalization. Defaults to output.                                                                                                                                                                                                                |
-| `value`     | `float`     | Observed value                                                                                                                                                                                                                                                                                                           |
-| `weight`    | `float`     | How much this observation counts in the loss (default: 1.0). Every loss multiplies the squared or absolute residual by it: sse is Σ w·r², rmse is √(Σ w·r² / Σ w), mae is Σ w·                                                                                                                                           |
-| `factor_id` | \`str       | None\`                                                                                                                                                                                                                                                                                                                   |
-| `scale`     | `float`     | A known positive number that multiplies the model output, with the factor if there is one, before comparison (default: 1.0): the known part of what the model describes that the observation reads, such as the share of the units that report. A count model then reads the observed count with the mean scale · model. |
-| `window`    | \`float     | None\`                                                                                                                                                                                                                                                                                                                   |
-| `trials`    | \`int       | None\`                                                                                                                                                                                                                                                                                                                   |
+| Name        | Type        | Description                                                                                                                                                                                                                                                                                                      |
+| ----------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `at`        | `float`     | Position of the observation on the axis. The engine decides which positions its model type accepts: a DifferentialEquations model any non-negative position, a DifferenceEquations model only an integer step.                                                                                                   |
+| `output`    | \`str       | None\`                                                                                                                                                                                                                                                                                                           |
+| `outputs`   | \`list[str] | None\`                                                                                                                                                                                                                                                                                                           |
+| `label`     | `str`       | Name of the observed series, used by reports, plots and the per-series normalization. Defaults to output.                                                                                                                                                                                                        |
+| `value`     | `float`     | Observed value                                                                                                                                                                                                                                                                                                   |
+| `weight`    | `float`     | How much this observation counts in the loss (default: 1.0). Every loss multiplies the squared or absolute residual by it: sse is Σ w·r², rmse is √(Σ w·r² / Σ w), mae is Σ w·                                                                                                                                   |
+| `factor_id` | \`str       | None\`                                                                                                                                                                                                                                                                                                           |
+| `scale`     | `float`     | A known positive number that multiplies the model output, with the factor if there is one, before comparison (default: 1.0): the known share of the model output that the observation sees, such as the share of the units that report. A count model then reads the observed count with the mean scale · model. |
+| `window`    | \`float     | None\`                                                                                                                                                                                                                                                                                                           |
+| `trials`    | \`int       | None\`                                                                                                                                                                                                                                                                                                           |
 
 Source code in `commol/_problem/problem.py`
 
@@ -11081,8 +11098,8 @@ class ObservedDataPoint(RangeChecked):
     scale : float
         A known positive number that multiplies the model output, with the
         factor if there is one, before comparison (default: 1.0): the known
-        part of what the model describes that the observation reads, such as
-        the share of the units that report. A count model then reads the
+        share of the model output that the observation sees, such as the
+        share of the units that report. A count model then reads the
         observed count with the mean ``scale · model``.
     window : float | None
         Optional window length for a cumulative output: the prediction is the
@@ -23196,14 +23213,15 @@ A prediction to profile: an output, or a sum of outputs, at a position, read as 
 
 Attributes:
 
-| Name        | Type        | Description                                                   |
-| ----------- | ----------- | ------------------------------------------------------------- |
-| `at`        | `float`     | The position.                                                 |
-| `output`    | \`str       | None\`                                                        |
-| `outputs`   | \`list[str] | None\`                                                        |
-| `label`     | `str`       | The name of the prediction in the result; defaults to output. |
-| `window`    | \`float     | None\`                                                        |
-| `factor_id` | \`str       | None\`                                                        |
+| Name        | Type        | Description                                                                                                                  |
+| ----------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `at`        | `float`     | The position.                                                                                                                |
+| `output`    | \`str       | None\`                                                                                                                       |
+| `outputs`   | \`list[str] | None\`                                                                                                                       |
+| `label`     | `str`       | The name of the prediction in the result; defaults to output.                                                                |
+| `window`    | \`float     | None\`                                                                                                                       |
+| `factor_id` | \`str       | None\`                                                                                                                       |
+| `scale`     | `float`     | A known positive number that multiplies the prediction, with the factor, as the scale of an observation does (default: 1.0). |
 
 Source code in `commol/profiles/methods.py`
 
@@ -23228,6 +23246,9 @@ class PredictionSpec(RangeChecked):
         output at ``at - window``.
     factor_id : str | None
         A factor parameter that multiplies the prediction.
+    scale : float
+        A known positive number that multiplies the prediction, with the
+        factor, as the scale of an observation does (default: 1.0).
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -23240,6 +23261,7 @@ class PredictionSpec(RangeChecked):
         default=None,
     )
     factor_id: str | None = None
+    scale: float = 1.0
 
     def as_observation(self) -> ObservedDataPoint:
         """
@@ -23263,6 +23285,7 @@ class PredictionSpec(RangeChecked):
             value=0.0,
             window=self.window,
             factor_id=self.factor_id,
+            scale=self.scale,
         )
 ```
 
@@ -23313,6 +23336,7 @@ def as_observation(self) -> ObservedDataPoint:
         value=0.0,
         window=self.window,
         factor_id=self.factor_id,
+        scale=self.scale,
     )
 ```
 
@@ -26488,6 +26512,23 @@ class SensitivityAnalysis:
                 "the observations with NoNoise()."
             )
         return self._rust.observation_draws(sample._rust, engine_json(observed_data))
+
+    def _check_observations(self, observed_data: list[ObservedDataPoint]) -> None:
+        """
+        Check `observed_data` against the analysis in Rust, with no run.
+
+        Parameters
+        ----------
+        observed_data : list[ObservedDataPoint]
+            The observations.
+
+        Raises
+        ------
+        ValueError
+            If the engine rejects a position, or an observation names an
+            unknown output or a factor: an analysis has no factor.
+        """
+        self._rust.check_observations(engine_json(observed_data))
 
     def _log_score(
         self,
@@ -30492,11 +30533,12 @@ class ResultsPlot:
             Path to save the figure to. If None, the figure is only returned.
         observed_data : list[ObservedDataPoint] | None
             Observations, each drawn as a point on the panel of its label.
-            When the observations of a series share one sum of outputs and
-            one factor and have no window, the line covers every position of
-            the results. Otherwise the model of each observation is read
-            through its own operator (outputs, window, factor) at its own
-            position, as the loss reads it, and the line joins these values.
+            When the observations of a series share one sum of outputs, one
+            factor and one scale and have no window, the line covers every
+            position of the results. Otherwise the model of each observation
+            is read through its own operator (outputs, window, scale, factor)
+            at its own position, as the loss reads it, and the line joins
+            these values.
         calibration_result : CalibrationResult | None
             Its ``best_parameters`` give the values of the factors of the
             observations, which multiply the line; observed values stay in
@@ -30587,10 +30629,11 @@ class ResultsPlot:
             Path to save the figure to. If None, the figure is only returned.
         observed_data : list[ObservedDataPoint] | None
             Observations, drawn as their running total on the panel of their
-            label. An observation with a factor is divided by the value of
-            its factor in ``calibration_result``.
+            label. Each observation is divided by its scale and by the value
+            of its factor in ``calibration_result``.
         calibration_result : CalibrationResult | None
-            Its ``best_parameters`` give the values of the factors.
+            Its ``best_parameters`` give the values of the factors. A factor
+            it does not have counts as 1, with one warning for each factor.
         config : PlotConfig | None
             Layout, size and style. If None, the defaults.
         series : list[str] | None
@@ -30646,11 +30689,11 @@ class ResultsPlot:
 
         The model is read only at the observations: the value of each
         observation through its own operator (the sum of its outputs, its
-        window and its factor), as the loss reads it. A value with a window is
-        a total over ``(at - window, at]``, drawn as a step over its window
-        with a marker at ``at``. A value with no window is a marker, joined
-        to the next only as a guide. The run along the whole axis is
-        `series`, on the same figure with ``axes=``.
+        window, its scale and its factor), as the loss reads it. A value with
+        a window is a total over ``(at - window, at]``, drawn as a step over
+        its window with a marker at ``at``. A value with no window is a
+        marker, joined to the next only as a guide. The run along the whole
+        axis is `series`, on the same figure with ``axes=``.
 
         Parameters
         ----------
@@ -30788,20 +30831,20 @@ Draw each series along the axis, one panel per series.
 
 Parameters:
 
-| Name                   | Type                       | Description                          | Default                                                                                                                                                                                                                                                                                                                                                                                    |
-| ---------------------- | -------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `output_file`          | \`str                      | None\`                               | Path to save the figure to. If None, the figure is only returned.                                                                                                                                                                                                                                                                                                                          |
-| `observed_data`        | \`list[ObservedDataPoint]  | None\`                               | Observations, each drawn as a point on the panel of its label. When the observations of a series share one sum of outputs and one factor and have no window, the line covers every position of the results. Otherwise the model of each observation is read through its own operator (outputs, window, factor) at its own position, as the loss reads it, and the line joins these values. |
-| `calibration_result`   | \`CalibrationResult        | None\`                               | Its best_parameters give the values of the factors of the observations, which multiply the line; observed values stay in their own units.                                                                                                                                                                                                                                                  |
-| `config`               | \`PlotConfig               | None\`                               | Layout and style. If None, the defaults.                                                                                                                                                                                                                                                                                                                                                   |
-| `series`               | \`list[str]                | None\`                               | What to draw, one panel each: an output name (such as A_g1), or a bin or accumulator id, which draws the sum of its outputs. An exact output name wins over an id. If None, every output.                                                                                                                                                                                                  |
-| `show_legend`          | `bool`                     | Whether each panel shows its legend. | `True`                                                                                                                                                                                                                                                                                                                                                                                     |
-| `position_label`       | \`Callable\[[float], str\] | None\`                               | Turns a position on the axis into a tick label. If None, a model with an origin (ModelBuilder(origin=...)) labels each tick with its date: 2020-01-02, with the time when it is not midnight. Otherwise the ticks show the position.                                                                                                                                                       |
-| `tick_every`           | \`float                    | None\`                               | Labels the plotted positions tick_every apart, counted from the first plotted position. If None, every plotted position, or the ticks matplotlib places on a dated axis.                                                                                                                                                                                                                   |
-| `x_label`              | `str`                      | The label of the x axis.             | `'Step'`                                                                                                                                                                                                                                                                                                                                                                                   |
-| `prediction_intervals` | \`PredictionIntervalsData  | None\`                               | Prediction intervals of a conformal method (ConformalResult.intervals). The panel of each of their series, by label, shows the band between their lower and upper ends and their point prediction, dashed; an unbounded interval is left out of the band.                                                                                                                                  |
-| `axes`                 | \`Figure                   | None\`                               | A figure of commol to draw on: each series is drawn on its panel, the Axes whose label is the id of the series. If None, a new figure.                                                                                                                                                                                                                                                     |
-| `**kwargs`             | \`str                      | int                                  | float                                                                                                                                                                                                                                                                                                                                                                                      |
+| Name                   | Type                       | Description                          | Default                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------- | -------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `output_file`          | \`str                      | None\`                               | Path to save the figure to. If None, the figure is only returned.                                                                                                                                                                                                                                                                                                                                            |
+| `observed_data`        | \`list[ObservedDataPoint]  | None\`                               | Observations, each drawn as a point on the panel of its label. When the observations of a series share one sum of outputs, one factor and one scale and have no window, the line covers every position of the results. Otherwise the model of each observation is read through its own operator (outputs, window, scale, factor) at its own position, as the loss reads it, and the line joins these values. |
+| `calibration_result`   | \`CalibrationResult        | None\`                               | Its best_parameters give the values of the factors of the observations, which multiply the line; observed values stay in their own units.                                                                                                                                                                                                                                                                    |
+| `config`               | \`PlotConfig               | None\`                               | Layout and style. If None, the defaults.                                                                                                                                                                                                                                                                                                                                                                     |
+| `series`               | \`list[str]                | None\`                               | What to draw, one panel each: an output name (such as A_g1), or a bin or accumulator id, which draws the sum of its outputs. An exact output name wins over an id. If None, every output.                                                                                                                                                                                                                    |
+| `show_legend`          | `bool`                     | Whether each panel shows its legend. | `True`                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `position_label`       | \`Callable\[[float], str\] | None\`                               | Turns a position on the axis into a tick label. If None, a model with an origin (ModelBuilder(origin=...)) labels each tick with its date: 2020-01-02, with the time when it is not midnight. Otherwise the ticks show the position.                                                                                                                                                                         |
+| `tick_every`           | \`float                    | None\`                               | Labels the plotted positions tick_every apart, counted from the first plotted position. If None, every plotted position, or the ticks matplotlib places on a dated axis.                                                                                                                                                                                                                                     |
+| `x_label`              | `str`                      | The label of the x axis.             | `'Step'`                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `prediction_intervals` | \`PredictionIntervalsData  | None\`                               | Prediction intervals of a conformal method (ConformalResult.intervals). The panel of each of their series, by label, shows the band between their lower and upper ends and their point prediction, dashed; an unbounded interval is left out of the band.                                                                                                                                                    |
+| `axes`                 | \`Figure                   | None\`                               | A figure of commol to draw on: each series is drawn on its panel, the Axes whose label is the id of the series. If None, a new figure.                                                                                                                                                                                                                                                                       |
+| `**kwargs`             | \`str                      | int                                  | float                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 Returns:
 
@@ -30844,11 +30887,12 @@ def series(
         Path to save the figure to. If None, the figure is only returned.
     observed_data : list[ObservedDataPoint] | None
         Observations, each drawn as a point on the panel of its label.
-        When the observations of a series share one sum of outputs and
-        one factor and have no window, the line covers every position of
-        the results. Otherwise the model of each observation is read
-        through its own operator (outputs, window, factor) at its own
-        position, as the loss reads it, and the line joins these values.
+        When the observations of a series share one sum of outputs, one
+        factor and one scale and have no window, the line covers every
+        position of the results. Otherwise the model of each observation
+        is read through its own operator (outputs, window, scale, factor)
+        at its own position, as the loss reads it, and the line joins
+        these values.
     calibration_result : CalibrationResult | None
         Its ``best_parameters`` give the values of the factors of the
         observations, which multiply the line; observed values stay in
@@ -30931,15 +30975,15 @@ Draw the running total of each series, one panel per series.
 
 Parameters:
 
-| Name                 | Type                      | Description | Default                                                                                                                                                           |
-| -------------------- | ------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `output_file`        | \`str                     | None\`      | Path to save the figure to. If None, the figure is only returned.                                                                                                 |
-| `observed_data`      | \`list[ObservedDataPoint] | None\`      | Observations, drawn as their running total on the panel of their label. An observation with a factor is divided by the value of its factor in calibration_result. |
-| `calibration_result` | \`CalibrationResult       | None\`      | Its best_parameters give the values of the factors.                                                                                                               |
-| `config`             | \`PlotConfig              | None\`      | Layout, size and style. If None, the defaults.                                                                                                                    |
-| `series`             | \`list[str]               | None\`      | What to draw, one panel each, as in series. If None, every output.                                                                                                |
-| `axes`               | \`Figure                  | None\`      | A figure of commol to draw on, as in series.                                                                                                                      |
-| `**kwargs`           | \`str                     | int         | float                                                                                                                                                             |
+| Name                 | Type                      | Description | Default                                                                                                                                                                |
+| -------------------- | ------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `output_file`        | \`str                     | None\`      | Path to save the figure to. If None, the figure is only returned.                                                                                                      |
+| `observed_data`      | \`list[ObservedDataPoint] | None\`      | Observations, drawn as their running total on the panel of their label. Each observation is divided by its scale and by the value of its factor in calibration_result. |
+| `calibration_result` | \`CalibrationResult       | None\`      | Its best_parameters give the values of the factors. A factor it does not have counts as 1, with one warning for each factor.                                           |
+| `config`             | \`PlotConfig              | None\`      | Layout, size and style. If None, the defaults.                                                                                                                         |
+| `series`             | \`list[str]               | None\`      | What to draw, one panel each, as in series. If None, every output.                                                                                                     |
+| `axes`               | \`Figure                  | None\`      | A figure of commol to draw on, as in series.                                                                                                                           |
+| `**kwargs`           | \`str                     | int         | float                                                                                                                                                                  |
 
 Returns:
 
@@ -30977,10 +31021,11 @@ def cumulative(
         Path to save the figure to. If None, the figure is only returned.
     observed_data : list[ObservedDataPoint] | None
         Observations, drawn as their running total on the panel of their
-        label. An observation with a factor is divided by the value of
-        its factor in ``calibration_result``.
+        label. Each observation is divided by its scale and by the value
+        of its factor in ``calibration_result``.
     calibration_result : CalibrationResult | None
-        Its ``best_parameters`` give the values of the factors.
+        Its ``best_parameters`` give the values of the factors. A factor
+        it does not have counts as 1, with one warning for each factor.
     config : PlotConfig | None
         Layout, size and style. If None, the defaults.
     series : list[str] | None
@@ -31026,7 +31071,7 @@ observations(observed_data: list[ObservedDataPoint], output_file: str | None = N
 
 Draw each observed series with the model read through its observation operator, one panel per label.
 
-The model is read only at the observations: the value of each observation through its own operator (the sum of its outputs, its window and its factor), as the loss reads it. A value with a window is a total over `(at - window, at]`, drawn as a step over its window with a marker at `at`. A value with no window is a marker, joined to the next only as a guide. The run along the whole axis is `series`, on the same figure with `axes=`.
+The model is read only at the observations: the value of each observation through its own operator (the sum of its outputs, its window, its scale and its factor), as the loss reads it. A value with a window is a total over `(at - window, at]`, drawn as a step over its window with a marker at `at`. A value with no window is a marker, joined to the next only as a guide. The run along the whole axis is `series`, on the same figure with `axes=`.
 
 Parameters:
 
@@ -31079,11 +31124,11 @@ def observations(
 
     The model is read only at the observations: the value of each
     observation through its own operator (the sum of its outputs, its
-    window and its factor), as the loss reads it. A value with a window is
-    a total over ``(at - window, at]``, drawn as a step over its window
-    with a marker at ``at``. A value with no window is a marker, joined
-    to the next only as a guide. The run along the whole axis is
-    `series`, on the same figure with ``axes=``.
+    window, its scale and its factor), as the loss reads it. A value with
+    a window is a total over ``(at - window, at]``, drawn as a step over
+    its window with a marker at ``at``. A value with no window is a
+    marker, joined to the next only as a guide. The run along the whole
+    axis is `series`, on the same figure with ``axes=``.
 
     Parameters
     ----------
@@ -35336,7 +35381,7 @@ class SeriesBand(ResultModel):
 
 Every draw's value of a set of observations.
 
-The values are read through the observation operator of the calibration problem (sums of outputs, windows, factors), the one the loss uses. Without observation noise their interval is a band of the model, not a prediction interval.
+The values are read through the observation operator of the calibration problem (sums of outputs, windows, scales, factors), the one the loss uses. Without observation noise their interval is a band of the model, not a prediction interval.
 
 Source code in `commol/uncertainty/predictive.py`
 
@@ -35346,9 +35391,9 @@ class ObservationDraws:
     Every draw's value of a set of observations.
 
     The values are read through the observation operator of the calibration
-    problem (sums of outputs, windows, factors), the one the loss uses. Without
-    observation noise their interval is a band of the model, not a prediction
-    interval.
+    problem (sums of outputs, windows, scales, factors), the one the loss
+    uses. Without observation noise their interval is a band of the model,
+    not a prediction interval.
     """
 
     def __init__(
@@ -35586,9 +35631,9 @@ class PredictivePlot:
         one panel per series.
 
         Each draw is read through the observation operator of the problem
-        (the sums, windows and factors of the observations of the series,
-        each at its own position when they do not share one operator with no
-        window), then the draws are reduced with their weights.
+        (the sums, windows, scales and factors of the observations of the
+        series, each at its own position when they do not share one operator
+        with no window), then the draws are reduced with their weights.
 
         Parameters
         ----------
@@ -35673,8 +35718,8 @@ class PredictivePlot:
             Path to save the figure to. If None, the figure is only returned.
         observed_data : list[ObservedDataPoint] | None
             Observations, drawn as their running total on the panel of their
-            label. An observation with a factor is divided by the weighted
-            median of that factor in the sample.
+            label. Each observation is divided by its scale and by the
+            weighted median of its factor in the sample.
         config : PlotConfig | None
             Layout, size and style. If None, the defaults.
         series : list[str] | None
@@ -35694,8 +35739,9 @@ class PredictivePlot:
         Raises
         ------
         ValueError
-            If the confidence level is out of range, or ``axes`` has no panel
-            of a series.
+            If an observation names a factor the problem does not have, the
+            confidence level is out of range, or ``axes`` has no panel of a
+            series.
         KeyError
             If an entry of ``series`` is neither an output nor a bin or
             accumulator id of the model.
@@ -35733,7 +35779,8 @@ class PredictivePlot:
 
         The values are those of ``at_observations(observed_data, NoNoise())``:
         each draw's value of each observation through its own operator (the
-        sum of its outputs, its window and the draw's value of its factor),
+        sum of its outputs, its window, its scale and the draw's value of its
+        factor),
         the values the loss compares. A value with a window is drawn as a
         step over its window with a marker at ``at``, and its band as a
         rectangle over the same window; a value with no window is a marker,
@@ -35871,7 +35918,7 @@ series(output_file: str | None = None, observed_data: list[ObservedDataPoint] | 
 
 Draw the weighted median of the draws of each series and their band, one panel per series.
 
-Each draw is read through the observation operator of the problem (the sums, windows and factors of the observations of the series, each at its own position when they do not share one operator with no window), then the draws are reduced with their weights.
+Each draw is read through the observation operator of the problem (the sums, windows, scales and factors of the observations of the series, each at its own position when they do not share one operator with no window), then the draws are reduced with their weights.
 
 Parameters:
 
@@ -35927,9 +35974,9 @@ def series(
     one panel per series.
 
     Each draw is read through the observation operator of the problem
-    (the sums, windows and factors of the observations of the series,
-    each at its own position when they do not share one operator with no
-    window), then the draws are reduced with their weights.
+    (the sums, windows, scales and factors of the observations of the
+    series, each at its own position when they do not share one operator
+    with no window), then the draws are reduced with their weights.
 
     Parameters
     ----------
@@ -36005,15 +36052,15 @@ Draw the weighted median and the band of the running total of each series across
 
 Parameters:
 
-| Name               | Type                      | Description                                      | Default                                                                                                                                                              |
-| ------------------ | ------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `output_file`      | \`str                     | None\`                                           | Path to save the figure to. If None, the figure is only returned.                                                                                                    |
-| `observed_data`    | \`list[ObservedDataPoint] | None\`                                           | Observations, drawn as their running total on the panel of their label. An observation with a factor is divided by the weighted median of that factor in the sample. |
-| `config`           | \`PlotConfig              | None\`                                           | Layout, size and style. If None, the defaults.                                                                                                                       |
-| `series`           | \`list[str]               | None\`                                           | What to draw, as in ResultsPlot.series.                                                                                                                              |
-| `confidence_level` | `float`                   | The level of the band, strictly between 0 and 1. | `0.95`                                                                                                                                                               |
-| `axes`             | \`Figure                  | None\`                                           | A figure of commol to draw on, as in ResultsPlot.series.                                                                                                             |
-| `**kwargs`         | \`str                     | int                                              | float                                                                                                                                                                |
+| Name               | Type                      | Description                                      | Default                                                                                                                                                                  |
+| ------------------ | ------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `output_file`      | \`str                     | None\`                                           | Path to save the figure to. If None, the figure is only returned.                                                                                                        |
+| `observed_data`    | \`list[ObservedDataPoint] | None\`                                           | Observations, drawn as their running total on the panel of their label. Each observation is divided by its scale and by the weighted median of its factor in the sample. |
+| `config`           | \`PlotConfig              | None\`                                           | Layout, size and style. If None, the defaults.                                                                                                                           |
+| `series`           | \`list[str]               | None\`                                           | What to draw, as in ResultsPlot.series.                                                                                                                                  |
+| `confidence_level` | `float`                   | The level of the band, strictly between 0 and 1. | `0.95`                                                                                                                                                                   |
+| `axes`             | \`Figure                  | None\`                                           | A figure of commol to draw on, as in ResultsPlot.series.                                                                                                                 |
+| `**kwargs`         | \`str                     | int                                              | float                                                                                                                                                                    |
 
 Returns:
 
@@ -36023,11 +36070,11 @@ Returns:
 
 Raises:
 
-| Type          | Description                                                                          |
-| ------------- | ------------------------------------------------------------------------------------ |
-| `ValueError`  | If the confidence level is out of range, or axes has no panel of a series.           |
-| `KeyError`    | If an entry of series is neither an output nor a bin or accumulator id of the model. |
-| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                         |
+| Type          | Description                                                                                                                         |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError`  | If an observation names a factor the problem does not have, the confidence level is out of range, or axes has no panel of a series. |
+| `KeyError`    | If an entry of series is neither an output nor a bin or accumulator id of the model.                                                |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                                                        |
 
 Source code in `commol/uncertainty/plots.py`
 
@@ -36052,8 +36099,8 @@ def cumulative(
         Path to save the figure to. If None, the figure is only returned.
     observed_data : list[ObservedDataPoint] | None
         Observations, drawn as their running total on the panel of their
-        label. An observation with a factor is divided by the weighted
-        median of that factor in the sample.
+        label. Each observation is divided by its scale and by the
+        weighted median of its factor in the sample.
     config : PlotConfig | None
         Layout, size and style. If None, the defaults.
     series : list[str] | None
@@ -36073,8 +36120,9 @@ def cumulative(
     Raises
     ------
     ValueError
-        If the confidence level is out of range, or ``axes`` has no panel
-        of a series.
+        If an observation names a factor the problem does not have, the
+        confidence level is out of range, or ``axes`` has no panel of a
+        series.
     KeyError
         If an entry of ``series`` is neither an output nor a bin or
         accumulator id of the model.
@@ -36101,7 +36149,7 @@ observations(observed_data: list[ObservedDataPoint], output_file: str | None = N
 
 Draw each observed series with the weighted median of the draws and their band, read through its observation operator, one panel per label.
 
-The values are those of `at_observations(observed_data, NoNoise())`: each draw's value of each observation through its own operator (the sum of its outputs, its window and the draw's value of its factor), the values the loss compares. A value with a window is drawn as a step over its window with a marker at `at`, and its band as a rectangle over the same window; a value with no window is a marker, joined only as a guide. The band is a band of the model, with no observation noise, not a prediction interval, and its legend says so.
+The values are those of `at_observations(observed_data, NoNoise())`: each draw's value of each observation through its own operator (the sum of its outputs, its window, its scale and the draw's value of its factor), the values the loss compares. A value with a window is drawn as a step over its window with a marker at `at`, and its band as a rectangle over the same window; a value with no window is a marker, joined only as a guide. The band is a band of the model, with no observation noise, not a prediction interval, and its legend says so.
 
 Parameters:
 
@@ -36154,7 +36202,8 @@ def observations(
 
     The values are those of ``at_observations(observed_data, NoNoise())``:
     each draw's value of each observation through its own operator (the
-    sum of its outputs, its window and the draw's value of its factor),
+    sum of its outputs, its window, its scale and the draw's value of its
+    factor),
     the values the loss compares. A value with a window is drawn as a
     step over its window with a marker at ``at``, and its band as a
     rectangle over the same window; a value with no window is a marker,
@@ -38515,7 +38564,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-- `ObservedDataPoint(scale=...)`: a known positive number, 1 by default, that multiplies the prediction of the observation, with its factor. A count model reads the mean `scale · model`, so counts observed on a known part of what the model describes stay whole. The loss, the likelihood, the predictive, the scores, the figures and the `observed` block of a report (`scales`) read it. See [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#known-shares-scales).
+- `ObservedDataPoint(scale=...)`: a known positive number, 1 by default, that multiplies the prediction of the observation, with its factor. A count model reads the mean `scale · model`, so a count observed on a known share of the model output stays whole. The loss, the likelihood, the predictive, the scores, the figures, the `observed` block of a report (`scales`) and a `PredictionSpec(scale=...)` of a prediction profile read it. See [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#known-shares-scales).
 - `ModelBuilder.add_matrix(id, stratification, values, unit, description)` adds a matrix between the categories of a stratification, and a transition rate reads it with `matrix_sum(M, e)`: in a compartment of category `i`, `Σ_j M[i, j] · e_j`, with each bin of `e` read as its amount in category `j` and `total` as the total of `j`. Every engine runs it. A rate or a formula parameter reads the entries as `M_<i>_<j>` and the spectral radius of the matrix as `M_radius`; a calibration constraint does not (#419). The unit check, the equations and `Model.describe` read the matrix. See [Matrix sums](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#matrix-sums).
 - `GibbsResult` and `ConformalResult` give `block_length` and `block_length_estimates`, as the bootstraps, the jackknife and the sandwich do: the length a method ran with, and with `block_length="auto"` the estimate of each series, by label. `GibbsResult` gives them for `InformationMatchingEta` and `BootstrapCoverageEta`, and `None` for a number `η`; `ConformalResult` for `JackknifePlus` and `EnbPI`, and `None` for the variants without blocks. See [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means) and [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#results-plots-and-reports).
 - `ProfileIdentifiability(result=profiles)` in `commol.identifiability`: the identifiability report of the verdicts of a `ProfileResult`, run through `Calibrator.identifiability` as every identifiability method. It runs no model, and it refuses the profiles of another problem with a `ValueError` that names the parameters of both. See [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#verdicts-and-the-identifiability-report).
@@ -38552,6 +38601,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- A figure of a run, or of its replicates, logs one warning for each factor of its observations that `calibration_result` does not have, and counts the factor as 1. Before, it logged the warning once for each observation and each replicate. The cumulative figure of a `Predictive` raises the `ValueError` of its other figures for a factor that the problem does not have; before, it drew the observation as if the factor were 1.
 - A number that is not finite in a model or in the settings of an engine reached the engine as `null`. An infinite tolerance of `ODESolver` raised a message about the type of the setting, and an infinite parameter value failed when the model ran, with a message about a parameter index. Such a number now reaches the engine as its text, as every setting does: `ODESolver(atol=float("inf"))` raises `atol is a finite number greater than 0, got inf`, and the infinite parameter value is rejected when the engine is built, with the name of the parameter.
 - The flow of a proportional rate is the whole rate times its source, in the description and in the unit check: a rate `k1 + k2` from `B` is `(k1 + k2) * B`; before, both read `k1 + k2 * B`, and the unit check of such a model failed. In LaTeX, a division followed by a product is a fraction times the product: the flow of a proportional rate `a / b` from `B` is `\frac{a}{b} \cdot B`, no longer `\frac{a}{b \cdot B}`.
 

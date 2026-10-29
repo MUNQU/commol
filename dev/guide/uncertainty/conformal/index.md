@@ -150,7 +150,7 @@ print(widths)  # [6.3, 5.2]
 
 ## Split conformal
 
-`SplitConformal(calibration_data, score, by, confidence_level, positions, sample=None, starts=1)` fits the problem's observations (`Calibrator.run(starts)`), or reads a `sample`, scores `calibration_data` and gives intervals at `positions` for each series of `calibration_data`. A series of `calibration_data` is read as its observations define it: its outputs, factor and window.
+`SplitConformal(calibration_data, score, by, confidence_level, positions, sample=None, starts=1)` fits the problem's observations (`Calibrator.run(starts)`), or reads a `sample`, scores `calibration_data` and gives intervals at `positions` for each series of `calibration_data`. A series of `calibration_data` is read as its observations define it: its outputs, factor, scale and window.
 
 ## Rolling origins
 

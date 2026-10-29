@@ -172,6 +172,23 @@ class SensitivityAnalysis:
             )
         return self._rust.observation_draws(sample._rust, engine_json(observed_data))
 
+    def _check_observations(self, observed_data: list[ObservedDataPoint]) -> None:
+        """
+        Check `observed_data` against the analysis in Rust, with no run.
+
+        Parameters
+        ----------
+        observed_data : list[ObservedDataPoint]
+            The observations.
+
+        Raises
+        ------
+        ValueError
+            If the engine rejects a position, or an observation names an
+            unknown output or a factor: an analysis has no factor.
+        """
+        self._rust.check_observations(engine_json(observed_data))
+
     def _log_score(
         self,
         sample: ParameterSample,  # noqa: ARG002

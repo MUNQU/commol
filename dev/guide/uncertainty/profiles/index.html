@@ -4004,11 +4004,11 @@ held prediction to its <code>max_iterations</code>, or until one of its
 <h2 id="prediction-profiles">Prediction profiles<a class="headerlink" href="#prediction-profiles" title="Permanent link">&para;</a></h2>
 <p><code>PredictionProfile(specs, threshold)</code> profiles the value of each prediction: a
 <code>PredictionSpec</code> reads an output, or a sum of outputs, at a position, with a
-<code>window</code> and a <code>factor_id</code>, as an observation does. Its interval is the set of
-values the data do not reject (Kreutz et al. 2012); specs at several positions
-give a band. A prediction past the data has a wider interval, as <code>B at 50</code>
-shows in the <a href="#quick-path">quick path</a>. The intervals are pointwise: a band of
-them is not a joint region.</p>
+<code>window</code>, a <code>factor_id</code> and a known <code>scale</code>, as an observation does. Its
+interval is the set of values the data do not reject (Kreutz et al. 2012);
+specs at several positions give a band. A prediction past the data has a wider
+interval, as <code>B at 50</code> shows in the <a href="#quick-path">quick path</a>. The intervals
+are pointwise: a band of them is not a joint region.</p>
 <h2 id="verdicts-and-the-identifiability-report">Verdicts and the identifiability report<a class="headerlink" href="#verdicts-and-the-identifiability-report" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

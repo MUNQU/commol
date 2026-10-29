@@ -5066,10 +5066,11 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <ul>
 <li><code>ObservedDataPoint(scale=...)</code>: a known positive number, 1 by default, that
   multiplies the prediction of the observation, with its factor. A count
-  model reads the mean <code>scale · model</code>, so counts observed on a known part of
-  what the model describes stay whole. The loss, the likelihood, the
-  predictive, the scores, the figures and the <code>observed</code> block of a report
-  (<code>scales</code>) read it. See
+  model reads the mean <code>scale · model</code>, so a count observed on a known share
+  of the model output stays whole. The loss, the likelihood, the
+  predictive, the scores, the figures, the <code>observed</code> block of a report
+  (<code>scales</code>) and a <code>PredictionSpec(scale=...)</code> of a prediction profile read
+  it. See
   <a href="../../guide/calibration-observations/#known-shares-scales">Observations</a>.</li>
 <li><code>ModelBuilder.add_matrix(id, stratification, values, unit, description)</code>
   adds a matrix between the categories of a stratification, and a
@@ -5330,6 +5331,12 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>A figure of a run, or of its replicates, logs one warning for each factor of
+  its observations that <code>calibration_result</code> does not have, and counts the
+  factor as 1. Before, it logged the warning once for each observation and
+  each replicate. The cumulative figure of a <code>Predictive</code> raises the
+  <code>ValueError</code> of its other figures for a factor that the problem does not
+  have; before, it drew the observation as if the factor were 1.</li>
 <li>A number that is not finite in a model or in the settings of an engine
   reached the engine as <code>null</code>. An infinite tolerance of <code>ODESolver</code> raised
   a message about the type of the setting, and an infinite parameter value

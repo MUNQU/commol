@@ -3760,7 +3760,7 @@
 <h1 id="model-calibration">Model Calibration<a class="headerlink" href="#model-calibration" title="Permanent link">&para;</a></h1>
 <p><a href="../../">Back to Home</a></p>
 <p>Calibration finds the parameter values (and, if you want, initial conditions
-and observation scale factors) that make a model reproduce observed data. You
+and the factors of observations) that make a model reproduce observed data. You
 describe the observations and the unknowns in a <code>CalibrationProblem</code>, and a
 <code>Calibrator</code> runs an optimizer in the Rust engine.</p>
 <table>
@@ -3784,7 +3784,7 @@ describe the observations and the unknowns in a <code>CalibrationProblem</code>,
 <td><a href="../calibration-initial-conditions/">Calibrating Initial Conditions</a></td>
 </tr>
 <tr>
-<td>Several outputs, aggregates, weights, scale factors, windowed data</td>
+<td>Several outputs, aggregates, weights, factors, known scales, windowed data</td>
 <td><a href="../calibration-observations/">Observations</a></td>
 </tr>
 <tr>
@@ -3952,8 +3952,8 @@ also when it was created while a parameter was <code>None</code>. See
 <h3 id="observations">Observations<a class="headerlink" href="#observations" title="Permanent link">&para;</a></h3>
 <p>An <code>ObservedDataPoint(at=..., output=..., value=...)</code> is one observed value of
 an output at a position on the axis. Its other fields observe a sum of
-outputs, weigh it, scale the prediction by a factor or compare a gain over a
-window: <a href="../calibration-observations/">Observations</a> lists them all.</p>
+outputs, weigh it, multiply the prediction by an unknown factor or a known
+scale, or compare a gain over a window: <a href="../calibration-observations/">Observations</a> lists them all.</p>
 <h3 id="unknowns">Unknowns<a class="headerlink" href="#unknowns" title="Permanent link">&para;</a></h3>
 <table>
 <thead>

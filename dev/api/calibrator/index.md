@@ -187,6 +187,23 @@ class Calibrator:
             sample._rust, engine_json(observed_data), engine_json(noise)
         )
 
+    def _check_observations(self, observed_data: list[ObservedDataPoint]) -> None:
+        """
+        Check `observed_data` against the problem in Rust, with no run.
+
+        Parameters
+        ----------
+        observed_data : list[ObservedDataPoint]
+            The observations.
+
+        Raises
+        ------
+        ValueError
+            If the engine rejects a position, or an observation names an
+            unknown output or factor, or a parameter that is not a factor.
+        """
+        self._engine_problem.check_observations(engine_json(observed_data))
+
     def _log_score(
         self, sample: ParameterSample, observed_data: list[ObservedDataPoint]
     ) -> list[float]:
@@ -1250,18 +1267,18 @@ An observation compares one output, or the sum of several outputs, with an obser
 
 Attributes:
 
-| Name        | Type        | Description                                                                                                                                                                                                                                                                                                              |
-| ----------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `at`        | `float`     | Position of the observation on the axis. The engine decides which positions its model type accepts: a DifferentialEquations model any non-negative position, a DifferenceEquations model only an integer step.                                                                                                           |
-| `output`    | \`str       | None\`                                                                                                                                                                                                                                                                                                                   |
-| `outputs`   | \`list[str] | None\`                                                                                                                                                                                                                                                                                                                   |
-| `label`     | `str`       | Name of the observed series, used by reports, plots and the per-series normalization. Defaults to output.                                                                                                                                                                                                                |
-| `value`     | `float`     | Observed value                                                                                                                                                                                                                                                                                                           |
-| `weight`    | `float`     | How much this observation counts in the loss (default: 1.0). Every loss multiplies the squared or absolute residual by it: sse is Σ w·r², rmse is √(Σ w·r² / Σ w), mae is Σ w·                                                                                                                                           |
-| `factor_id` | \`str       | None\`                                                                                                                                                                                                                                                                                                                   |
-| `scale`     | `float`     | A known positive number that multiplies the model output, with the factor if there is one, before comparison (default: 1.0): the known part of what the model describes that the observation reads, such as the share of the units that report. A count model then reads the observed count with the mean scale · model. |
-| `window`    | \`float     | None\`                                                                                                                                                                                                                                                                                                                   |
-| `trials`    | \`int       | None\`                                                                                                                                                                                                                                                                                                                   |
+| Name        | Type        | Description                                                                                                                                                                                                                                                                                                      |
+| ----------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `at`        | `float`     | Position of the observation on the axis. The engine decides which positions its model type accepts: a DifferentialEquations model any non-negative position, a DifferenceEquations model only an integer step.                                                                                                   |
+| `output`    | \`str       | None\`                                                                                                                                                                                                                                                                                                           |
+| `outputs`   | \`list[str] | None\`                                                                                                                                                                                                                                                                                                           |
+| `label`     | `str`       | Name of the observed series, used by reports, plots and the per-series normalization. Defaults to output.                                                                                                                                                                                                        |
+| `value`     | `float`     | Observed value                                                                                                                                                                                                                                                                                                   |
+| `weight`    | `float`     | How much this observation counts in the loss (default: 1.0). Every loss multiplies the squared or absolute residual by it: sse is Σ w·r², rmse is √(Σ w·r² / Σ w), mae is Σ w·                                                                                                                                   |
+| `factor_id` | \`str       | None\`                                                                                                                                                                                                                                                                                                           |
+| `scale`     | `float`     | A known positive number that multiplies the model output, with the factor if there is one, before comparison (default: 1.0): the known share of the model output that the observation sees, such as the share of the units that report. A count model then reads the observed count with the mean scale · model. |
+| `window`    | \`float     | None\`                                                                                                                                                                                                                                                                                                           |
+| `trials`    | \`int       | None\`                                                                                                                                                                                                                                                                                                           |
 
 Source code in `commol/_problem/problem.py`
 
@@ -1303,8 +1320,8 @@ class ObservedDataPoint(RangeChecked):
     scale : float
         A known positive number that multiplies the model output, with the
         factor if there is one, before comparison (default: 1.0): the known
-        part of what the model describes that the observation reads, such as
-        the share of the units that report. A count model then reads the
+        share of the model output that the observation sees, such as the
+        share of the units that report. A count model then reads the
         observed count with the mean ``scale · model``.
     window : float | None
         Optional window length for a cumulative output: the prediction is the
