@@ -55,9 +55,9 @@ pub use simulation_engine::{
 // Re-export all public types from the types module for convenient access
 pub use types::{
     Accumulator, Aggregate, AggregateVariant, Bin, CategoryMatrix, DynamicsForm, EngineSettings,
-    EngineType, EventMethod, InitialConditions, Model, ModelEngine, ModelKind, ModelStructure,
-    ModelValueType, NEIGHBORS, NEIGHBORS_PREFIX, Neighbors, OdeMethod, OdeSolver, Parameter,
-    ParameterValue, Process, RateKeeps, RateMeaning, Rounding, SeriesMode,
+    EngineType, EventMethod, InitialConditions, MatrixScale, Model, ModelEngine, ModelKind,
+    ModelStructure, ModelValueType, NEIGHBORS, NEIGHBORS_PREFIX, Neighbors, OdeMethod, OdeSolver,
+    Parameter, ParameterValue, Process, RateKeeps, RateMeaning, Rounding, ScaledMatrix, SeriesMode,
     StochasticEventsSettings, StochasticStepsSettings, Stratification, StratificationCondition,
     StratifiedRate, Transition,
 };

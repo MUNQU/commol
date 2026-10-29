@@ -4,7 +4,7 @@ use crate::flows::{PlannedFlow, plan_transition_flows};
 use crate::helpers::stratification_conditions_met;
 use crate::labels::OutputLabels;
 use crate::layout::CompartmentLayout;
-use crate::matrices::{check_matrices, matrix_variables};
+use crate::matrices::{check_matrices, matrix_variables, scaled_matrices, variable_values};
 use crate::types::{
     AccumulatorOutputRef, CompiledModel, FAST_STACK_DEPTH, FastRateExpression, FastRateOp,
     FlowChange, GeneratedAccumulatorOutput, ImpulseFlow, ImpulseSchedule, SeriesParameter,
@@ -141,9 +141,13 @@ impl CompiledModel {
             }
         }
         // The entries and the spectral radius of each matrix do not change
-        // during a run.
-        for variable in matrix_variables(process) {
-            constant_parameters.insert(variable.name, variable.value);
+        // during a run; `set_parameter` writes them again when a caller sets
+        // a scale. A matrix with a scale to calibrate has them once it is set.
+        let matrices = scaled_matrices(model);
+        for matrix in &matrices {
+            if let Some(values) = variable_values(matrix) {
+                constant_parameters.extend(matrix.names().map(str::to_string).zip(values));
+            }
         }
 
         // Initialize expression context with constant parameters
@@ -174,7 +178,12 @@ impl CompiledModel {
                         .map(|m| m.parameter_name.clone()),
                 )
                 .chain(series_payloads.iter().map(|payload| payload.name.clone()))
-                .chain(formula_parameters.iter().map(|(name, _)| name.clone())),
+                .chain(formula_parameters.iter().map(|(name, _)| name.clone()))
+                .chain(
+                    matrices
+                        .iter()
+                        .flat_map(|matrix| matrix.names().map(str::to_string)),
+                ),
         );
         let total_parameter_index = expression_context
             .parameter_index(SPECIAL_VAR_TOTAL)
@@ -304,6 +313,7 @@ impl CompiledModel {
             subgroup_total_mappings,
             formula_parameters,
             series_parameters,
+            matrices,
             settable_parameters: fixed_parameters,
             total_parameter_index,
             t_parameter_index,
@@ -1043,8 +1053,8 @@ pub fn check_model(model: &Model) -> Result<(), String> {
             .map(|formula| (formula.id, formula.text))
             .collect()
     };
-    check_matrices(process, &of("transition"), &of("parameter"), &taken)?;
-    let matrix_names: Vec<String> = matrix_variables(process)
+    check_matrices(model, &of("transition"), &of("parameter"), &taken)?;
+    let matrix_names: Vec<String> = matrix_variables(model)
         .into_iter()
         .map(|variable| variable.name)
         .collect();

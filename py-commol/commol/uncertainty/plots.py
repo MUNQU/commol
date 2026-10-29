@@ -176,8 +176,10 @@ class PredictivePlot:
         Raises
         ------
         ValueError
-            If an observation names a factor the problem does not have, the
-            confidence level is out of range, or ``axes`` has no panel of a
+            If an observation with a factor names a factor the problem does
+            not have, a parameter that is not a factor, an unknown output, or
+            a position or a window start the engine does not accept; the
+            confidence level is out of range; or ``axes`` has no panel of a
             series.
         KeyError
             If an entry of ``series`` is neither an output nor a bin or

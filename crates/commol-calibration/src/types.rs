@@ -518,12 +518,15 @@ impl Replicates {
 ///
 /// **Parameter-only constraints** (`at: None`):
 /// - Evaluated once before simulation starts
-/// - Can only reference calibration parameter IDs
+/// - Can reference calibration parameter IDs and the entries `<M>_<i>_<j>`
+///   and spectral radius `<M>_radius` of a matrix between categories, scaled
+///   by the values of the point ([`crate::Feasibility::new`])
 /// - Use for relationships between parameters
 ///
 /// **Constraints at positions** (`at: Some(vec)`):
 /// - Evaluated at the given positions during simulation
-/// - Can reference both parameter IDs AND compartment names
+/// - Can reference what a constraint without positions does AND compartment
+///   names
 /// - Use for constraining compartment values or dynamic relationships
 ///
 /// # Examples
@@ -575,14 +578,17 @@ pub struct CalibrationConstraint {
 
     /// Mathematical expression that must evaluate >= 0 for constraint satisfaction
     ///
-    /// The expression can reference calibration parameters by their IDs.
-    /// When `at` is specified, the expression can also reference output
-    /// values (A, B, C, etc.) at those positions.
+    /// The expression can reference calibration parameters by their IDs and
+    /// the variables of a matrix between categories (`<M>_<i>_<j>`,
+    /// `<M>_radius`) at the values of the point. When `at` is specified, the
+    /// expression can also reference output values (A, B, C, etc.) at those
+    /// positions.
     ///
     /// Examples:
     /// - "5.0 - k1/k2" → k1/k2 must be <= 5
     /// - "k1 - k2" → k1 >= k2
     /// - "1.0 - (param1 + param2)" → param1 + param2 <= 1.0
+    /// - "2 - k * M_radius" → k times the spectral radius of `M` <= 2
     /// - "500.0 - B" (with `at`) → B <= 500 at those positions
     pub expression: String,
 

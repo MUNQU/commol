@@ -192,3 +192,49 @@ def test_a_matrix_sum_is_a_node_of_the_tree_and_writes_back() -> None:
     assert latex_rate_expression(tree) == (
         "k \\cdot \\sum_{j} {M}_{i,j} \\left(\\frac{B}{total}\\right)_{j}"
     )
+
+
+SCALED = {"g1": {"g1": 2.0, "g2": 1.0}, "g2": {"g1": 1.0, "g2": 3.0}}
+"""Rows ``g1`` 2 and 1, ``g2`` 1 and 3: eigenvalues ``(5 ± √5) / 2``."""
+
+
+def _scaled(rate: str, a1: float | None):
+    """A → B at `rate` in ``g1`` and ``g2``, with the matrix `SCALED` whose row
+    of ``g1`` the parameter ``a1`` scales; ``a1`` is None to calibrate."""
+    builder = a_to_b_builder(
+        parameters={"k": 0.1, "a1": a1},
+        rate=rate,
+        amounts={"A": 900, "B": 100},
+        stratifications=GROUP,
+        compartment_amounts=START,
+    )
+    builder.add_matrix("M", "group", SCALED, row_scales={"g1": "a1"})
+    return build(builder)
+
+
+def test_a_row_scale_multiplies_the_sum_of_its_category() -> None:
+    model = _scaled(f"k * {SUM}", None)
+    model.update_parameters({"a1": 2.0})
+
+    run = Simulation(model).run(1)
+
+    b = {g: START[f"B_{g}"] / (START[f"A_{g}"] + START[f"B_{g}"]) for g in SCALED}
+    flows = {
+        "A_g1": 0.1 * START["A_g1"] * 2 * (2 * b["g1"] + 1 * b["g2"]),
+        "A_g2": 0.1 * START["A_g2"] * (1 * b["g1"] + 3 * b["g2"]),
+    }
+    for compartment, flow in flows.items():
+        assert math.isclose(run[compartment][1], START[compartment] - flow)
+
+
+@pytest.mark.parametrize(("a1", "radius"), [(1.0, (5 + math.sqrt(5)) / 2), (2.0, 5.0)])
+def test_a_rate_reads_the_radius_at_the_parameters_of_the_run(
+    a1: float, radius: float
+) -> None:
+    # A rate of `0.01 * M_radius` moves the same fraction of A at each step.
+    run = Simulation(_scaled("0.01 * M_radius", a1)).run(2)
+
+    for compartment in ("A_g1", "A_g2"):
+        a = run[compartment]
+        assert math.isclose(a[1], a[0] * (1 - 0.01 * radius))
+        assert math.isclose(a[2], a[1] * (1 - 0.01 * radius))

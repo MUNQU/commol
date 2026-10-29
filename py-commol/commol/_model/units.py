@@ -140,7 +140,7 @@ class UnitChecker:
         the unit of the bin of its source compartment, or of its target
         compartment when it has no source.
         """
-        errors: list[str] = []
+        errors = self._scale_unit_errors(variable_units)
         process = self._model.process
         impulses = {t.id for t in process.transitions if t.is_impulse}
         bin_units = {bin_item.id: bin_item.unit for bin_item in process.bins}
@@ -169,6 +169,23 @@ class UnitChecker:
             if error is not None:
                 errors.append(error)
 
+        return errors
+
+    def _scale_unit_errors(self, variable_units: dict[str, str]) -> list[str]:
+        """
+        A scale of a matrix has no unit, so the entries keep the unit of the
+        matrix whatever its value.
+        """
+        errors: list[str] = []
+        for matrix in self._model.process.matrices:
+            for side, category, parameter in matrix.scales():
+                unit = variable_units[parameter]
+                if not ureg.parse_units(unit).dimensionless:
+                    errors.append(
+                        f"Matrix '{matrix.id}' scales the {side} of '{category}' by "
+                        f"'{parameter}' in '{unit}'; a scale is dimensionless, so the "
+                        f"entries keep the unit of the matrix"
+                    )
         return errors
 
     def _step_unit(self) -> str:

@@ -8,7 +8,8 @@
 
 use std::collections::HashSet;
 
-use commol_core::{MathExpression, MathExpressionContext};
+use commol_core::{MathExpression, MathExpressionContext, ScaledMatrix};
+use commol_statistics::linear_algebra::spectral_radius;
 
 use crate::types::{CalibrationConstraint, CalibrationParameter};
 
@@ -108,6 +109,9 @@ pub struct Feasibility {
     non_state_outputs: Vec<(String, usize)>,
     /// Named sums of outputs a constraint may read.
     output_sums: Vec<(String, Vec<usize>)>,
+    /// The matrices between categories whose entries or spectral radius a
+    /// constraint reads, each with the value of its scales in the model.
+    matrices: Vec<ScaledMatrix>,
 }
 
 #[derive(Debug, Clone)]
@@ -128,22 +132,32 @@ pub(crate) fn constraint_positions(constraints: &[CalibrationConstraint]) -> Vec
 
 impl Feasibility {
     /// The feasibility of `parameters` under `constraints`, on a run at
-    /// `positions` whose rows have the outputs `output_names`.
+    /// `positions` whose rows have the outputs `output_names`, of a model
+    /// with the matrices between categories `matrices`
+    /// ([`SimulationEngine::matrices`](commol_core::SimulationEngine::matrices)).
+    ///
+    /// A constraint reads the entries `<M>_<i>_<j>` and the spectral radius
+    /// `<M>_radius` of a matrix at each point: the matrix scaled by the
+    /// values of the point for the scales it calibrates, and by the values
+    /// of the model for the others.
     ///
     /// # Errors
     ///
     /// Returns a message that names the constraint when its expression is
     /// not in the language of formulas ([`MathExpression::check`]), names an
-    /// unknown variable, or reads an output without positions.
+    /// unknown variable, reads an output without positions, or reads a
+    /// matrix with a scale that has no value and is not calibrated.
     pub fn new(
         parameters: &[CalibrationParameter],
         constraints: &[CalibrationConstraint],
         output_names: &[String],
         state_outputs: usize,
         output_sums: Vec<(String, Vec<usize>)>,
+        matrices: Vec<ScaledMatrix>,
         positions: &[f64],
     ) -> Result<Self, String> {
         let parameter_ids: HashSet<&str> = parameters.iter().map(|p| p.id.as_str()).collect();
+        let mut read_matrices: Vec<ScaledMatrix> = Vec::new();
         let outputs: HashSet<&str> = output_names
             .iter()
             .map(String::as_str)
@@ -166,10 +180,26 @@ impl Feasibility {
             for variable in expression.get_variables() {
                 let is_parameter = parameter_ids.contains(variable.as_str());
                 let is_output = outputs.contains(variable.as_str());
-                if !is_parameter && !is_output {
+                let matrix = matrices
+                    .iter()
+                    .find(|matrix| matrix.names().any(|name| name == variable));
+                if let Some(matrix) = matrix {
+                    if let Err(scale) =
+                        matrix.entries(|id| parameter_ids.contains(id).then_some(1.0))
+                    {
+                        return Err(format!(
+                            "Constraint '{}' reads '{variable}', but the scale '{}' of matrix \
+                             '{}' has no value; calibrate it or give it a value",
+                            constraint.id, scale.parameter, matrix.id
+                        ));
+                    }
+                    if !read_matrices.iter().any(|read| read.id == matrix.id) {
+                        read_matrices.push(matrix.clone());
+                    }
+                } else if !is_parameter && !is_output {
                     return Err(format!(
-                        "Constraint '{}' references unknown variable '{}' (not a parameter or \
-                         simulation output)",
+                        "Constraint '{}' references unknown variable '{}' (not a parameter, a \
+                         variable of a matrix or a simulation output)",
                         constraint.id, variable
                     ));
                 }
@@ -212,6 +242,7 @@ impl Feasibility {
                 .map(|(index, name)| (name.clone(), index))
                 .collect(),
             output_sums,
+            matrices: read_matrices,
         })
     }
 
@@ -249,10 +280,27 @@ impl Feasibility {
         }
     }
 
+    /// The parameters at `values`, and the variables of each matrix a
+    /// constraint reads, scaled by them.
     fn context(&self, values: &[f64]) -> MathExpressionContext {
         let mut context = MathExpressionContext::new();
         for ((id, _, _), &value) in self.parameters.iter().zip(values) {
             context.set_parameter(id.clone(), value);
+        }
+        let value_of = |parameter: &str| {
+            self.parameters
+                .iter()
+                .position(|(id, _, _)| id == parameter)
+                .map(|index| values[index])
+        };
+        for matrix in &self.matrices {
+            let entries = matrix
+                .entries(value_of)
+                .expect("Feasibility::new checks that each scale of the matrix has a value");
+            let radius = spectral_radius(&entries, matrix.size());
+            for (name, value) in matrix.names().zip(entries.into_iter().chain([radius])) {
+                context.set_parameter_str(name, value);
+            }
         }
         context
     }
@@ -333,7 +381,16 @@ mod tests {
             CalibrationParameter::new("k2".to_string(), 0.0, 2.0),
         ];
         let names = vec!["A".to_string(), "B".to_string()];
-        Feasibility::new(&parameters, constraints, &names, 2, vec![], &[1.0, 2.0]).unwrap()
+        Feasibility::new(
+            &parameters,
+            constraints,
+            &names,
+            2,
+            vec![],
+            vec![],
+            &[1.0, 2.0],
+        )
+        .unwrap()
     }
 
     #[test]

@@ -1,7 +1,7 @@
 //! A matrix between the categories of a stratification: its variables, the
 //! matrix sums of a rate as the flows hold them, and what a build rejects.
 
-use commol_core::{Model, Neighbors, ParameterValue};
+use commol_core::{Model, Neighbors, Parameter, ParameterValue, SeriesMode};
 use commol_model::{CompiledModel, MatrixVariable, check_model, describe_flows, matrix_variables};
 
 /// A model of bins A and B stratified by `group` into `g1` and `g2`, and by
@@ -38,7 +38,7 @@ fn flows(model: &Model) -> Vec<(String, String, bool)> {
 
 #[test]
 fn a_matrix_gives_its_entries_and_its_radius() {
-    let names: Vec<(String, f64)> = matrix_variables(&model("k1", "").process)
+    let names: Vec<(String, Option<f64>)> = matrix_variables(&model("k1", ""))
         .into_iter()
         .map(
             |MatrixVariable {
@@ -57,14 +57,14 @@ fn a_matrix_gives_its_entries_and_its_radius() {
     assert_eq!(
         names,
         [
-            ("M_g1_g1".to_string(), 2.0),
-            ("M_g1_g2".to_string(), 1.0),
-            ("M_g2_g1".to_string(), 1.0),
-            ("M_g2_g2".to_string(), 3.0),
+            ("M_g1_g1".to_string(), Some(2.0)),
+            ("M_g1_g2".to_string(), Some(1.0)),
+            ("M_g2_g1".to_string(), Some(1.0)),
+            ("M_g2_g2".to_string(), Some(3.0)),
             ("M_radius".to_string(), names[4].1),
         ]
     );
-    assert!((names[4].1 - (5.0 + 5.0_f64.sqrt()) / 2.0).abs() < 1e-12);
+    assert!((names[4].1.unwrap() - (5.0 + 5.0_f64.sqrt()) / 2.0).abs() < 1e-12);
 }
 
 #[test]
@@ -383,5 +383,147 @@ fn a_variable_of_a_matrix_is_not_the_id_of_another() {
         rejection(&model),
         "Matrix 'M' gives the variable 'M_radius', which is also the id of a matrix; rename \
          one of them"
+    );
+}
+
+/// `model` with the rate `rate`, the row of `g1` of `M` scaled by `a1` of
+/// value `a1` (`None` to calibrate) and the column of `g2` by `b2` at 1.
+fn scaled(rate: &str, a1: Option<f64>) -> Model {
+    let mut model = model(rate, "");
+    for (id, value) in [("a1", a1), ("b2", Some(1.0))] {
+        model.parameters.push(Parameter {
+            id: id.to_string(),
+            value: value.map(ParameterValue::Constant),
+            description: None,
+        });
+    }
+    let matrix = &mut model.process.matrices[0];
+    matrix.row_scales.insert("g1".to_string(), "a1".to_string());
+    matrix
+        .column_scales
+        .insert("g2".to_string(), "b2".to_string());
+    model
+}
+
+/// The value of each variable of the matrices of `model`, by name.
+fn values(model: &Model) -> Vec<(String, Option<f64>)> {
+    matrix_variables(model)
+        .into_iter()
+        .map(|variable| (variable.name, variable.value))
+        .collect()
+}
+
+#[test]
+fn a_scale_multiplies_the_entries_and_the_radius_follows_it() {
+    let rate = "k1 * matrix_sum(M, B / total)";
+    let model = scaled(rate, Some(2.0));
+    let radius = |a1: f64| {
+        // The radius of [[2 a1, a1], [1, 3]].
+        let (trace, det) = (2.0 * a1 + 3.0, 6.0 * a1 - a1);
+        (trace + (trace * trace - 4.0 * det).sqrt()) / 2.0
+    };
+    assert_eq!(
+        values(&model)[..4],
+        [
+            ("M_g1_g1".to_string(), Some(4.0)),
+            ("M_g1_g2".to_string(), Some(2.0)),
+            ("M_g2_g1".to_string(), Some(1.0)),
+            ("M_g2_g2".to_string(), Some(3.0)),
+        ]
+    );
+    assert!((values(&model)[4].1.unwrap() - radius(2.0)).abs() < 1e-12);
+
+    let mut compiled = CompiledModel::try_from_model(&model).unwrap();
+    let state = [400.0, 500.0, 60.0, 40.0];
+    let (b1, b2) = (60.0 / 460.0, 40.0 / 540.0);
+    let mut rates = vec![0.0; 2];
+    compiled
+        .transition_rates(0.0, 0.0, &state, &mut rates)
+        .unwrap();
+    assert_eq!(
+        rates,
+        [0.3 * (4.0 * b1 + 2.0 * b2), 0.3 * (1.0 * b1 + 3.0 * b2)]
+    );
+
+    // Setting the scale writes the entries and the radius again.
+    compiled.set_parameter("a1", 1.0).unwrap();
+    compiled
+        .transition_rates(0.0, 0.0, &state, &mut rates)
+        .unwrap();
+    assert_eq!(
+        rates,
+        [0.3 * (2.0 * b1 + 1.0 * b2), 0.3 * (1.0 * b1 + 3.0 * b2)]
+    );
+    let radius_rate = scaled("M_radius", Some(2.0));
+    let mut compiled = CompiledModel::try_from_model(&radius_rate).unwrap();
+    compiled.set_parameter("a1", 1.0).unwrap();
+    compiled
+        .transition_rates(0.0, 0.0, &state, &mut rates)
+        .unwrap();
+    assert!((rates[0] - radius(1.0)).abs() < 1e-12);
+    // A parameter that scales no matrix leaves the matrices as they are.
+    compiled.set_parameter("k1", 0.5).unwrap();
+    assert_eq!(
+        compiled.matrices()[0].entries(|_| None),
+        Ok(vec![2.0, 1.0, 1.0, 3.0])
+    );
+}
+
+#[test]
+fn a_scale_to_calibrate_gives_the_matrix_its_values_once_it_is_set() {
+    let model = scaled("k1 * matrix_sum(M, B / total)", None);
+    assert!(values(&model).iter().all(|(_, value)| value.is_none()));
+
+    let mut compiled = CompiledModel::try_from_model(&model).unwrap();
+    assert_eq!(
+        compiled.matrices()[0]
+            .entries(|_| None)
+            .unwrap_err()
+            .parameter,
+        "a1"
+    );
+    compiled.set_parameter("a1", 2.0).unwrap();
+    assert_eq!(
+        compiled.matrices()[0].entries(|_| None),
+        Ok(vec![4.0, 2.0, 1.0, 3.0])
+    );
+    let state = [400.0, 500.0, 60.0, 40.0];
+    let (b1, b2) = (60.0 / 460.0, 40.0 / 540.0);
+    let mut rates = vec![0.0; 2];
+    compiled
+        .transition_rates(0.0, 0.0, &state, &mut rates)
+        .unwrap();
+    assert_eq!(rates[0], 0.3 * (4.0 * b1 + 2.0 * b2));
+}
+
+#[test]
+fn a_scale_is_a_constant_or_a_parameter_to_calibrate() {
+    let mut unknown = scaled("k1", Some(2.0));
+    unknown.process.matrices[0]
+        .row_scales
+        .insert("g2".to_string(), "a9".to_string());
+    assert_eq!(
+        check_model(&unknown).unwrap_err(),
+        "Matrix 'M' scales the row of 'g2' by 'a9', which is not a parameter of the model; \
+         a scale is a constant or a parameter to calibrate, which does not change during a run"
+    );
+
+    let mut formula = scaled("k1", Some(2.0));
+    formula.parameters[1].value = Some(ParameterValue::Formula("2 * k1".to_string()));
+    assert_eq!(
+        rejection(&formula),
+        "Matrix 'M' scales the row of 'g1' by 'a1', a formula parameter; a scale is a \
+         constant or a parameter to calibrate, which does not change during a run"
+    );
+
+    let mut series = scaled("k1", Some(2.0));
+    series.parameters[2].value = Some(ParameterValue::Series {
+        data: vec![(0.0, 1.0), (1.0, 2.0)],
+        mode: SeriesMode::Linear,
+    });
+    assert_eq!(
+        check_model(&series).unwrap_err(),
+        "Matrix 'M' scales the column of 'g2' by 'b2', a series parameter; a scale is a \
+         constant or a parameter to calibrate, which does not change during a run"
     );
 }

@@ -25,6 +25,7 @@ from commol._model.description import (
     Text,
     _Block,
 )
+from commol._model.matrix import CategoryMatrix
 from commol._model.parameter import SeriesValue
 from commol.commol_rs import _commol_rs as commol_rs
 
@@ -197,7 +198,7 @@ def matrix_blocks(model: "Model") -> list[_Block]:
     process = model.process
     radius = {
         matrix: (name, value)
-        for name, matrix, value, is_radius in engine_state.matrix_variables(process)
+        for name, matrix, value, is_radius in engine_state.matrix_variables(model)
         if is_radius
     }
     blocks: list[_Block] = []
@@ -209,16 +210,18 @@ def matrix_blocks(model: "Model") -> list[_Block]:
         )
         unit = f" in {matrix.unit}" if matrix.unit else ""
         about = f" {matrix.description}." if matrix.description else ""
+        name, value = radius[matrix.id]
+        at = "at the values of its scales" if value is None else f"{value:.6g}"
         blocks.append(
             Text(
                 heading=f"Matrix {matrix.id}",
                 text=(
                     f"Between the categories of '{matrix.stratification}'{unit}."
-                    f"{about} A rate reads matrix_sum({matrix.id}, e); a rate or "
-                    "a formula parameter reads its entries as "
-                    f"{matrix.id}_<row>_<column> "
-                    f"and its spectral radius, {radius[matrix.id][1]:.6g}, as "
-                    f"{radius[matrix.id][0]}."
+                    f"{about}{_scales_text(matrix)} A rate reads "
+                    f"matrix_sum({matrix.id}, e); a rate, a formula parameter or a "
+                    "calibration constraint reads its entries as "
+                    f"{matrix.id}_<row>_<column> and its spectral radius, {at}, "
+                    f"as {name}."
                 ),
             )
         )
@@ -233,6 +236,21 @@ def matrix_blocks(model: "Model") -> list[_Block]:
             )
         )
     return blocks
+
+
+def _scales_text(matrix: CategoryMatrix) -> str:
+    """The parameters that scale the rows and the columns of a matrix, and
+    what its values below are; empty for a matrix without scales."""
+    scales = [
+        f"the {side} of '{category}' by {parameter}"
+        for side, category, parameter in matrix.scales()
+    ]
+    if not scales:
+        return ""
+    return (
+        f" A parameter scales {', '.join(scales)}; the values below are before "
+        "the scales."
+    )
 
 
 def _parameter_table(model: "Model") -> list[_Block]:

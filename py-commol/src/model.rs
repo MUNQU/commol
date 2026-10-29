@@ -172,21 +172,28 @@ fn subgroup_total_names(process: &str) -> PyResult<Vec<String>> {
     Ok(commol_model::subgroup_total_names(&self::process(process)?))
 }
 
-/// The variables of the matrices of a process: for each matrix, its
-/// entries `<M>_<i>_<j>` row by row, then its spectral radius `<M>_radius`
+/// A variable of a matrix as Python reads it: its name, the id of the
+/// matrix, its value (None while a scale has no value) and whether it is the
+/// spectral radius.
+type MatrixVariableRow = (String, String, Option<f64>, bool);
+
+/// The variables of the matrices of a model: for each matrix, its entries
+/// `<M>_<i>_<j>` row by row, then its spectral radius `<M>_radius`, of the
+/// matrix scaled by the values of the parameters of its rows and columns
 ///
 /// Args:
-///     process: The JSON of the process of the model
+///     model: The JSON of the model
 ///
 /// Returns:
 ///     (name, matrix id, value, whether it is the radius) of each variable,
-///     in that order
+///     in that order; the value is None while a scale is a parameter
+///     without a value
 ///
 /// Raises:
-///     ValueError: If the JSON is not a process
+///     ValueError: If the JSON is not a model
 #[pyfunction]
-fn matrix_variables(process: &str) -> PyResult<Vec<(String, String, f64, bool)>> {
-    Ok(commol_model::matrix_variables(&self::process(process)?)
+fn matrix_variables(model: &str) -> PyResult<Vec<MatrixVariableRow>> {
+    Ok(commol_model::matrix_variables(&self::model(model)?)
         .into_iter()
         .map(|variable| {
             (

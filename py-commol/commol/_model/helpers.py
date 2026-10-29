@@ -67,7 +67,7 @@ class ModelCompartmentHelper:
         process = self._model.process
         units = {matrix.id: matrix.unit for matrix in process.matrices if matrix.unit}
         variable_units.update(units)
-        for name, matrix, _, _ in engine_state.matrix_variables(process):
+        for name, matrix, _, _ in engine_state.matrix_variables(self._model):
             if matrix in units:
                 variable_units[name] = units[matrix]
 

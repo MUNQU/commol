@@ -66,3 +66,21 @@ def test_a_row_of_zeros_keeps_the_unit_of_the_matrix_sum() -> None:
 
     rates = [flow.rate for flow in transition_flows(model.process, model.structure)]
     assert rates[0] == "k * if(M_g1_g1 != 0, M_g1_g1 * (B_g1 / total_g1), 0)"
+
+
+@pytest.mark.parametrize(("unit", "error"), [("dimensionless", None), ("1/day", "a1")])
+def test_a_scale_of_a_matrix_has_no_unit(unit: str, error: str | None) -> None:
+    builder = _builder("k * matrix_sum(M, B / total)", "1/day")
+    builder.add_parameter("a1", 2.0, unit=unit)
+    builder.add_matrix("N", "group", VALUES, unit="1/day", row_scales={"g1": "a1"})
+    model = build(builder)
+
+    if error is None:
+        model.check_unit_consistency()
+    else:
+        with pytest.raises(
+            UnitConsistencyError,
+            match="Matrix 'N' scales the row of 'g1' by 'a1' in '1/day'; a scale is "
+            "dimensionless",
+        ):
+            model.check_unit_consistency()

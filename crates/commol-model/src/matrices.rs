@@ -2,7 +2,10 @@
 //! matrix, and the matrix sums of a rate written as the sums they are.
 //!
 //! A matrix `M` gives a rate one variable per entry, `<M>_<i>_<j>`, and its
-//! spectral radius, `<M>_radius` ([`matrix_variables`]). In the rate of a
+//! spectral radius, `<M>_radius` ([`matrix_variables`]), both of the matrix
+//! scaled by the parameters of its rows and columns ([`ScaledMatrix`]), so
+//! the engine writes them again when a caller sets a scale
+//! ([`variable_values`]). In the rate of a
 //! compartment of category `i`, `matrix_sum(M, e)` is
 //! `Σ_j <M>_<i>_<j> * (e_j)`, where `e_j` is `e` with each bin read as its
 //! amount in category `j` and `total` as the total of category `j`
@@ -19,7 +22,8 @@ use commol_core::math_expression::jit::ast::{BinaryOperator, Expr};
 use commol_core::math_expression::jit::parser::parse_expression;
 use commol_core::math_expression::language::variables;
 use commol_core::{
-    CategoryMatrix, MATRIX_SUM, NEIGHBORS, NEIGHBORS_PREFIX, Process, SPECIAL_VAR_TOTAL,
+    CategoryMatrix, MATRIX_SUM, Model, NEIGHBORS, NEIGHBORS_PREFIX, ParameterValue, Process,
+    SPECIAL_VAR_TOTAL, ScaledMatrix,
 };
 use commol_statistics::linear_algebra::spectral_radius;
 
@@ -34,57 +38,86 @@ pub struct MatrixVariable {
     pub name: String,
     /// The id of the matrix.
     pub matrix: String,
-    /// Its value: the entry, or the spectral radius.
-    pub value: f64,
+    /// Its value at the values of the scales of the matrix: the entry, or
+    /// the spectral radius; `None` while a scale has no value, such as a
+    /// parameter to calibrate.
+    pub value: Option<f64>,
     /// Whether it is the spectral radius rather than an entry.
     pub radius: bool,
 }
 
-/// The variables of the matrices of a process: for each matrix, its entries
-/// row by row in the order of the categories, then its spectral radius.
-pub fn matrix_variables(process: &Process) -> Vec<MatrixVariable> {
+/// The matrices of a model, each scale at the value of its parameter: the
+/// constant, or none for a parameter to calibrate.
+pub fn scaled_matrices(model: &Model) -> Vec<ScaledMatrix> {
+    let constant = |id: &str| {
+        model
+            .parameters
+            .iter()
+            .find(|parameter| parameter.id == id)
+            .and_then(|parameter| match parameter.value {
+                Some(ParameterValue::Constant(value)) => Some(value),
+                _ => None,
+            })
+    };
+    model
+        .process
+        .matrices
+        .iter()
+        .map(|matrix| ScaledMatrix::new(matrix, &model.process, constant))
+        .collect()
+}
+
+/// The values of the variables of `matrix` at the values of its scales,
+/// parallel to [`ScaledMatrix::names`]: its entries row by row, then the
+/// spectral radius of those entries. `None` while a scale has no value.
+pub fn variable_values(matrix: &ScaledMatrix) -> Option<Vec<f64>> {
+    let mut values = matrix.entries(|_| None).ok()?;
+    values.push(spectral_radius(&values, matrix.size()));
+    Some(values)
+}
+
+/// The variables of the matrices of a model: for each matrix, its entries
+/// row by row in the order of the categories, then its spectral radius, at
+/// the values of its scales ([`scaled_matrices`]).
+pub fn matrix_variables(model: &Model) -> Vec<MatrixVariable> {
     let mut variables = Vec::new();
-    for matrix in &process.matrices {
-        let categories = matrix.categories(process);
-        for row in categories {
-            for column in categories {
-                variables.push(MatrixVariable {
-                    name: matrix.entry_name(row, column),
-                    matrix: matrix.id.clone(),
-                    value: matrix.value(row, column),
-                    radius: false,
-                });
-            }
+    for matrix in scaled_matrices(model) {
+        let values = variable_values(&matrix);
+        let count = matrix.entry_names.len();
+        for (index, name) in matrix.names().enumerate() {
+            variables.push(MatrixVariable {
+                name: name.to_string(),
+                matrix: matrix.id.clone(),
+                value: values.as_ref().map(|values| values[index]),
+                radius: index == count,
+            });
         }
-        variables.push(MatrixVariable {
-            name: matrix.radius_name(),
-            matrix: matrix.id.clone(),
-            value: spectral_radius(&matrix.rows(process), categories.len()),
-            radius: true,
-        });
     }
     variables
 }
 
-/// Check the matrices of a process and the matrix sums of its formulas.
+/// Check the matrices of a model, their scales and the matrix sums of its
+/// formulas.
 ///
 /// # Errors
 ///
 /// Returns a message when two matrices share an id, a matrix does not fit
-/// the process ([`CategoryMatrix::check`]), the id or a variable of a matrix
-/// has the name of a parameter, a bin, an accumulator, a compartment, a
-/// subgroup total or an engine variable (`taken`, by name and what it is),
-/// two matrices give one variable, a variable of a matrix is the id of a
-/// matrix, a rate reads a matrix the process does
-/// not have or reads the neighbors inside a matrix sum, or a formula
-/// parameter reads a matrix sum. So the engine, a unit and a description
-/// never read one name as two things.
+/// the process ([`CategoryMatrix::check`]), a scale names a parameter the
+/// model does not have or a formula or a series parameter, the id or a
+/// variable of a matrix has the name of a parameter, a bin, an accumulator,
+/// a compartment, a subgroup total or an engine variable (`taken`, by name
+/// and what it is), two matrices give one variable, a variable of a matrix
+/// is the id of a matrix, a rate reads a matrix the process does not have or
+/// reads the neighbors inside a matrix sum, or a formula parameter reads a
+/// matrix sum. So the engine, a unit and a description never read one name
+/// as two things.
 pub(crate) fn check_matrices(
-    process: &Process,
+    model: &Model,
     rates: &[(&str, &str)],
     formula_parameters: &[(&str, &str)],
     taken: &HashMap<&str, &str>,
 ) -> Result<(), String> {
+    let process = &model.process;
     let mut ids = HashSet::new();
     for matrix in &process.matrices {
         if !ids.insert(matrix.id.as_str()) {
@@ -97,9 +130,10 @@ pub(crate) fn check_matrices(
             ));
         }
         matrix.check(process)?;
+        check_scales(model, matrix)?;
     }
     let mut given: HashMap<String, String> = HashMap::new();
-    for variable in matrix_variables(process) {
+    for variable in matrix_variables(model) {
         if ids.contains(variable.name.as_str()) {
             return Err(format!(
                 "Matrix '{}' gives the variable '{}', which is also the id of a matrix; \
@@ -149,6 +183,27 @@ pub(crate) fn check_matrices(
                  compartment of a rate; only the rate of a transition reads it"
             ));
         }
+    }
+    Ok(())
+}
+
+/// Check that each scale of `matrix` names a constant or a parameter to
+/// calibrate of `model`: a value that does not change during a run.
+fn check_scales(model: &Model, matrix: &CategoryMatrix) -> Result<(), String> {
+    for (side, category, parameter) in matrix.scales() {
+        let what = match model.parameters.iter().find(|p| p.id == parameter) {
+            None => "which is not a parameter of the model",
+            Some(found) => match found.value {
+                Some(ParameterValue::Formula(_)) => "a formula parameter",
+                Some(ParameterValue::Series { .. }) => "a series parameter",
+                Some(ParameterValue::Constant(_)) | None => continue,
+            },
+        };
+        return Err(format!(
+            "Matrix '{}' scales the {side} of '{category}' by '{parameter}', {what}; a scale \
+             is a constant or a parameter to calibrate, which does not change during a run",
+            matrix.id
+        ));
     }
     Ok(())
 }

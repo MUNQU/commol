@@ -221,16 +221,24 @@ class ModelBuilder:
         values: Mapping[str, Mapping[str, float]],
         unit: str | None = None,
         description: str | None = None,
+        row_scales: Mapping[str, str] | None = None,
+        column_scales: Mapping[str, str] | None = None,
     ) -> Self:
         """
         Add a matrix between the categories of a stratification.
 
-        A rate reads it through ``matrix_sum(id, e)``: in the rate of a
-        compartment of category ``i``, ``Σ_j values[i][j] · e_j``, where
-        ``e_j`` is ``e`` with each bin read as its amount in category ``j``
-        and ``total`` as the total of ``j``. A rate or a formula parameter
-        also reads its entries as ``<id>_<i>_<j>`` and its spectral radius, the largest
-        modulus of its eigenvalues, as ``<id>_radius``.
+        A parameter may scale the row and the column of each category: the
+        matrix that rates and calibration constraints read is
+        ``M[i][j] = a_i · values[i][j] · b_j``, where ``a_i`` is the value
+        of ``row_scales[i]`` and ``b_j`` of ``column_scales[j]`` (1 for a
+        category without one). A rate reads it through ``matrix_sum(id, e)``:
+        in the rate of a compartment of category ``i``, ``Σ_j M[i][j] · e_j``,
+        where ``e_j`` is ``e`` with each bin read as its amount in category
+        ``j`` and ``total`` as the total of ``j``. A rate, a formula
+        parameter and a calibration constraint also read its entries
+        ``M[i][j]`` as ``<id>_<i>_<j>`` and its spectral radius, the largest
+        modulus of its eigenvalues, as ``<id>_radius``, at the values of the
+        scales of the run or of the point.
 
         Parameters
         ----------
@@ -246,6 +254,12 @@ class ModelBuilder:
             Unit of its values, which the unit check reads.
         description : str | None, default=None
             Human-readable description of the matrix.
+        row_scales : Mapping[str, str] | None, default=None
+            The id of the parameter that multiplies the row of a category, by
+            category: a constant or a parameter to calibrate, without unit.
+        column_scales : Mapping[str, str] | None, default=None
+            The id of the parameter that multiplies the column of a category,
+            by category: a constant or a parameter to calibrate, without unit.
 
         Returns
         -------
@@ -256,9 +270,11 @@ class ModelBuilder:
         -----
         `build` checks the matrix against the process: it raises
         ``ValueError`` when the stratification is not one of the process, a
-        row or a value of a category is missing, a row or a column names no
-        category, a value is not finite, or the id or a variable of the
-        matrix has the name of another id or variable of the model.
+        row or a value of a category is missing, a row, a column or a scale
+        names no category, a value is not finite, a scale names a parameter
+        the model does not have or a formula or a series parameter, or the id
+        or a variable of the matrix has the name of another id or variable of
+        the model.
         """
         self._matrices.append(
             CategoryMatrix(
@@ -267,6 +283,8 @@ class ModelBuilder:
                 values={row: dict(columns) for row, columns in values.items()},
                 unit=unit,
                 description=description,
+                row_scales=dict(row_scales or {}),
+                column_scales=dict(column_scales or {}),
             )
         )
         logger.info(f"Added matrix: id='{id}', stratification='{stratification}'")

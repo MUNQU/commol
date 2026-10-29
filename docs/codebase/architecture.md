@@ -82,8 +82,9 @@ Every box uses `commol-core` (shared types, rate formulas, the
 `SimulationEngine` trait). The stochastic engines and calibration also use
 `commol-random` (random numbers), and so does inference. Calibration and
 inference also use `commol-statistics`, whose quantile the summary of the
-replicates and every method of inference take; the model compiler uses its
-spectral radius for the matrices of a process. Calibration works
+replicates and every method of inference take; the model compiler and the
+calibration constraints use its spectral radius for the matrices of a
+process. Calibration works
 through the `SimulationEngine` trait, so it does not depend on a specific
 engine; inference reaches an engine only through the forward model of a
 calibration problem.

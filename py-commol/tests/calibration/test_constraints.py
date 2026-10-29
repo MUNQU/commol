@@ -1,6 +1,9 @@
 """Constraints keep the fitted parameters and outputs inside stated limits."""
 
+import math
 import re
+
+import numpy as np
 
 import pytest
 from pydantic import ValidationError
@@ -14,7 +17,14 @@ from commol import (
     Simulation,
 )
 from commol._model.model import Model
-from tests.support import abc_builder, assert_accepted, bounded, build, observed
+from tests.support import (
+    a_to_b_builder,
+    abc_builder,
+    assert_accepted,
+    bounded,
+    build,
+    observed,
+)
 
 SEED = 42
 
@@ -214,3 +224,74 @@ class TestPositions:
     ) -> None:
         with pytest.raises(ValidationError, match=message):
             CalibrationConstraint(id="cap", expression="500.0 - B", at=at)
+
+
+class TestMatrixConstraints:
+    """A constraint reads the spectral radius of a matrix whose row a
+    calibrated parameter scales, at each point."""
+
+    VALUES = {"g1": {"g1": 2.0, "g2": 1.0}, "g2": {"g1": 1.0, "g2": 3.0}}
+
+    @staticmethod
+    def _model(k: float | None, a1: float | None) -> Model:
+        builder = a_to_b_builder(
+            parameters={"k": k, "a1": a1},
+            rate="k * matrix_sum(M, B / total)",
+            amounts={"A": 900, "B": 100},
+            stratifications={"group": {"g1": 0.4, "g2": 0.6}},
+        )
+        builder.add_matrix(
+            "M", "group", TestMatrixConstraints.VALUES, row_scales={"g1": "a1"}
+        )
+        return build(builder)
+
+    @staticmethod
+    def _growth(fitted: dict[str, float]) -> float:
+        """``k · ρ(diag(a1, 1) · M)`` at the fitted values."""
+        matrix = np.array([[2.0 * fitted["a1"], fitted["a1"]], [1.0, 3.0]])
+        return fitted["k"] * float(max(abs(np.linalg.eigvals(matrix))))
+
+    def _fit(self, constraints: list[CalibrationConstraint]) -> dict[str, float]:
+        # The truth grows by k · ρ = 0.05 · 5 = 0.25.
+        run = Simulation(self._model(0.05, 2.0)).run(20)
+        problem = CalibrationProblem(
+            observed_data=[
+                *observed(run, "B_g1", range(2, 21, 2)),
+                *observed(run, "B_g2", range(2, 21, 2)),
+            ],
+            parameters=[
+                bounded("k", 0.0, 0.2, initial_guess=0.02),
+                bounded("a1", 0.25, 8.0, initial_guess=1.0),
+            ],
+            constraints=constraints,
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=400, verbose=False),
+            seed=SEED,
+        )
+        calibrator = Calibrator(Simulation(self._model(None, None)), problem)
+        return calibrator.run().best_parameters
+
+    def test_a_constraint_bounds_the_radius_of_a_scaled_matrix(self) -> None:
+        free = self._fit([])
+        bounded_fit = self._fit(
+            [CalibrationConstraint(id="growth", expression="0.2 - k * M_radius")]
+        )
+
+        assert math.isclose(self._growth(free), 0.25, rel_tol=1e-3)
+        assert self._growth(bounded_fit) <= 0.2 + 1e-6
+
+    def test_a_constraint_on_a_matrix_with_a_scale_without_value_is_refused(
+        self,
+    ) -> None:
+        run = Simulation(self._model(0.05, 2.0)).run(5)
+        problem = CalibrationProblem(
+            observed_data=observed(run, "B_g1", range(1, 6)),
+            parameters=[bounded("k", 0.0, 0.2)],
+            constraints=[CalibrationConstraint(id="c", expression="1 - M_radius")],
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(),
+            seed=SEED,
+        )
+
+        with pytest.raises(ValueError, match="the scale 'a1' of matrix 'M' has no"):
+            Calibrator(Simulation(self._model(None, None)), problem)

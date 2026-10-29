@@ -131,6 +131,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             &output_names,
             base_engine.state_outputs(),
             base_engine.output_sums(),
+            base_engine.matrices(),
             &schedule,
         )?;
         let discrepancy = Discrepancy::new(discrepancy, &observed_data, &parameters)?;

@@ -1,6 +1,8 @@
 //! The right-hand side of a compiled model, and its accessors.
 
-use commol_core::{MathExpressionContext, SPECIAL_VAR_T, SPECIAL_VAR_TOTAL, same_position};
+use commol_core::{
+    MathExpressionContext, SPECIAL_VAR_T, SPECIAL_VAR_TOTAL, ScaledMatrix, same_position,
+};
 
 use crate::labels::OutputLabels;
 
@@ -41,6 +43,12 @@ impl CompiledModel {
     /// [`Self::output_names`].
     pub fn output_labels(&self) -> &[OutputLabels] {
         &self.output_labels
+    }
+
+    /// The matrices between categories, each with the current value of its
+    /// scales.
+    pub fn matrices(&self) -> &[ScaledMatrix] {
+        &self.matrices
     }
 
     /// The sum of the initial amounts the model states, before any calibrated
@@ -84,7 +92,9 @@ impl CompiledModel {
     }
 
     /// Set the value of a parameter: a constant, or a parameter to
-    /// calibrate.
+    /// calibrate. When it scales a row or a column of a matrix, the entries
+    /// and the spectral radius of that matrix are written again at the new
+    /// value ([`crate::variable_values`]).
     ///
     /// # Errors
     ///
@@ -94,6 +104,15 @@ impl CompiledModel {
         self.check_parameter(parameter_id)?;
         self.expression_context
             .set_parameter_str(parameter_id, value);
+        for matrix in &mut self.matrices {
+            if matrix.set_scale(parameter_id, value)
+                && let Some(values) = crate::variable_values(matrix)
+            {
+                for (name, value) in matrix.names().zip(values) {
+                    self.expression_context.set_parameter_str(name, value);
+                }
+            }
+        }
         Ok(())
     }
 

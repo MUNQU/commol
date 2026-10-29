@@ -96,8 +96,8 @@ the parser of the engine checks it when the constraint is built, within the
 
 | Kind | Can name | Checked |
 |---|---|---|
-| Without `at` | The calibration unknowns only | Once per evaluation, before the simulation |
-| With `at` | The unknowns and the simulation outputs (compartments, accumulators and the total of a bin over its categories, such as `B` of a stratified model) | At each listed position of the simulation, in every replicate of a stochastic engine |
+| Without `at` | The calibration unknowns and the variables of a [matrix](#a-bound-on-a-matrix) | Once per evaluation, before the simulation |
+| With `at` | The same, and the simulation outputs (compartments, accumulators and the total of a bin over its categories, such as `B` of a stratified model) | At each listed position of the simulation, in every replicate of a stochastic engine |
 
 A constraint cannot name a model parameter that is not calibrated, and an
 expression that names an output without `at` is rejected when the
@@ -110,6 +110,73 @@ best = calibrate(
 peak = max(Simulation(model(best["k1"], best["k2"])).run(num_steps=50)["B"])
 print(round(peak))  # 300: the best fit whose B never exceeds 300
 ```
+
+## A bound on a matrix
+
+A constraint reads the entries `M_<i>_<j>` and the spectral radius `M_radius`
+of a [matrix between categories](building-models.md#matrices-between-categories)
+`M`. When calibrated parameters scale its rows or its columns, the constraint
+reads the scaled matrix at the values of each point; a scale that is not
+calibrated keeps its value in the model. So a bound on the growth factor of a
+coupling, `k1 · ρ(diag(a) · M)`, is one constraint:
+
+```python
+import numpy as np
+
+from commol import NelderMeadConfig
+
+def coupled_model(k1: float | None, a1: float | None):
+    return (
+        ModelBuilder(name="Coupled")
+        .add_bin(id="A", name="State A")
+        .add_bin(id="B", name="State B")
+        .add_stratification(id="group", categories=["g1", "g2"])
+        .add_parameter(id="k1", value=k1)
+        .add_parameter(id="a1", value=a1)
+        .add_matrix(
+            id="M",
+            stratification="group",
+            values={"g1": {"g1": 2.0, "g2": 1.0}, "g2": {"g1": 1.0, "g2": 3.0}},
+            row_scales={"g1": "a1"},
+        )
+        .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * matrix_sum(M, B / total)")
+        .build(
+            Aggregate(
+                bin_amounts={"A": 900, "B": 100},
+                stratification_fractions={"group": {"g1": 0.4, "g2": 0.6}},
+            ),
+            engine="DifferenceEquations",
+        )
+    )
+
+# The data come from k1 = 0.05 and a1 = 2: k1 · ρ = 0.05 × 5 = 0.25
+coupled_truth = Simulation(coupled_model(0.05, 2.0)).run(num_steps=20)
+coupled_problem = CalibrationProblem(
+    observed_data=[
+        ObservedDataPoint(at=step, output=output, value=coupled_truth[output][step])
+        for output in ("B_g1", "B_g2")
+        for step in range(2, 21, 2)
+    ],
+    parameters=[
+        CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=0.2, initial_guess=0.02),
+        CalibrationParameter(id="a1", parameter_type="parameter", min_bound=0.25, max_bound=8.0, initial_guess=1.0),
+    ],
+    constraints=[CalibrationConstraint(id="growth", expression="0.2 - k1 * M_radius")],
+    loss_function="sse",
+    optimization_config=NelderMeadConfig(max_iterations=400),
+    seed=3,
+)
+coupled_best = Calibrator(Simulation(coupled_model(None, None)), coupled_problem).run().best_parameters
+a1 = coupled_best["a1"]
+growth = coupled_best["k1"] * max(abs(np.linalg.eigvals([[2.0 * a1, a1], [1.0, 3.0]])))
+print(growth <= 0.2 + 1e-6)  # True: the fit keeps k1 · ρ at or below 0.2
+```
+
+| Rule | Why |
+|---|---|
+| The radius is that of `diag(a) · values · diag(b)` at the point | The rates of the run read the same matrix (`ScaledMatrix` in `crates/commol-core/src/types/process.rs`), so the bound holds for the run it allows |
+| It is computed once per point, before the run | The matrix does not change during a run |
+| A scale with no value that the calibration does not set is refused when the calibration starts | The constraint would have no matrix to read |
 
 ## How a violation counts
 
@@ -135,7 +202,7 @@ only ranks violations against each other.
 
 - [ ] Each expression is `>= 0` when the condition holds.
 - [ ] Expressions that name outputs have `at`.
-- [ ] Expressions name only calibration unknowns (and outputs).
+- [ ] Expressions name only calibration unknowns, variables of a matrix and, with `at`, outputs.
 - [ ] The constraints do not contradict each other, such as `k1 - 0.5` and `0.4 - k1`.
 - [ ] The search box contains points that satisfy every constraint.
 

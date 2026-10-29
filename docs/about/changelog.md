@@ -25,10 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   category `i`, `Σ_j M[i, j] · e_j`, with each bin of `e` read as its amount
   in category `j` and `total` as the total of `j`. Every engine runs it. A rate
   or a formula parameter reads the entries as `M_<i>_<j>` and the spectral
-  radius of the matrix as `M_radius`; a calibration constraint does not
-  (#419). The unit check, the equations and `Model.describe`
-  read the matrix. See
+  radius of the matrix as `M_radius`. The unit check, the equations and
+  `Model.describe` read the matrix. See
   [Matrix sums](../guide/mathematical-expressions.md#matrix-sums).
+- `ModelBuilder.add_matrix(row_scales=..., column_scales=...)`: a constant or
+  a parameter to calibrate multiplies the row or the column of a category, so
+  the model reads `diag(a) · values · diag(b)`. A calibration constraint reads
+  `M_<i>_<j>` and `M_radius` of the scaled matrix at the values of each point,
+  so a bound such as `2 - k * M_radius` is one constraint; a rate reads them at
+  the values of its run. See
+  [Constraints](../guide/calibration-constraints.md#a-bound-on-a-matrix).
 - `GibbsResult` and `ConformalResult` give `block_length` and
   `block_length_estimates`, as the bootstraps, the jackknife and the sandwich
   do: the length a method ran with, and with `block_length="auto"` the

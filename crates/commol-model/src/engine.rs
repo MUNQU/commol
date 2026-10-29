@@ -69,7 +69,8 @@ pub trait CompartmentalEngine: SimulationEngine {
 /// takes from its compiled model ([`CompartmentalEngine::model`]), to write
 /// in its `impl SimulationEngine` block: the type `ValuePlan`
 /// ([`crate::InitialConditionPlan`]), `output_names`, `state_outputs` (the
-/// compartments), `output_sums` ([`crate::output_sums`]), `plan_values`,
+/// compartments), `output_sums` ([`crate::output_sums`]), `matrices`
+/// ([`CompiledModel::matrices`]), `plan_values`,
 /// `apply_values` and `set_parameter` ([`CompiledModel::set_parameter`]).
 ///
 /// A trait cannot give a default to a method of its supertrait, so the
@@ -101,6 +102,10 @@ macro_rules! delegate_to_compiled_model {
 
         fn output_sums(&self) -> Vec<(String, Vec<usize>)> {
             $crate::output_sums($crate::CompartmentalEngine::model(self).output_labels())
+        }
+
+        fn matrices(&self) -> Vec<::commol_core::ScaledMatrix> {
+            $crate::CompartmentalEngine::model(self).matrices().to_vec()
         }
 
         fn plan_values(
