@@ -220,8 +220,8 @@ pub fn window_increments(
 }
 
 /// How each observation reads a run: the outputs it sums, the row of its
-/// position, the row its window starts at, and the factor that multiplies
-/// it.
+/// position, the row its window starts at, and its scale and the factor that
+/// multiply it.
 ///
 /// The rows are those of a run at the positions of the schedule the operator
 /// was built with ([`ObservationOperator::new`]).
@@ -235,6 +235,8 @@ pub struct ObservationOperator {
     window_rows: Vec<Option<usize>>,
     /// Index of the factor parameter of each observation, if it has one.
     factors: Vec<Option<usize>>,
+    /// The known scale of each observation.
+    scales: Vec<f64>,
 }
 
 impl ObservationOperator {
@@ -355,6 +357,7 @@ impl ObservationOperator {
             rows: observed_data.iter().map(|obs| row_of(obs.at)).collect(),
             window_rows: starts.iter().map(|start| start.map(row_of)).collect(),
             factors,
+            scales: observed_data.iter().map(|obs| obs.scale).collect(),
         })
     }
 
@@ -364,7 +367,8 @@ impl ObservationOperator {
     }
 
     /// Write the prediction of each observation into `out`: the sum of its
-    /// outputs, its increment over its window, times its factor.
+    /// outputs, or its increment over its window, times its scale and times
+    /// its factor.
     ///
     /// `rows` are the rows of a run at the schedule; `parameters` are the
     /// values of the calibration parameters, which hold the factors.
@@ -386,9 +390,10 @@ impl ObservationOperator {
                 Some(start) => current - sum_at(start, outputs),
                 None => current,
             };
+            let scaled = predicted * self.scales[index];
             *slot = match self.factors[index] {
-                Some(factor) => predicted * parameters[factor],
-                None => predicted,
+                Some(factor) => scaled * parameters[factor],
+                None => scaled,
             };
         }
     }

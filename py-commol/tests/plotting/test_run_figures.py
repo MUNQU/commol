@@ -219,6 +219,22 @@ class TestRunFigures:
 
         np.testing.assert_allclose(scatter(fig.axes[0])[:, 1], [20.0, 40.0, 50.0, 60.0])
 
+    def test_cumulative_observations_are_divided_by_their_scale(
+        self, run: SimulationResults
+    ) -> None:
+        observed = [
+            ObservedDataPoint(at=10, output="B", value=10.0, scale=0.5),
+            ObservedDataPoint(
+                at=20, output="B", value=10.0, scale=0.5, factor_id="rate"
+            ),
+        ]
+
+        fig = run.plot.cumulative(
+            observed_data=observed, calibration_result=fit(rate=0.5), series=["B"]
+        )
+
+        np.testing.assert_allclose(scatter(fig.axes[0])[:, 1], [20.0, 60.0])
+
     def test_layout(self) -> None:
         assert figures._layout(1) == (1, 1)
         assert figures._layout(2) == (1, 2)

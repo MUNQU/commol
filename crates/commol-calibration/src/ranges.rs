@@ -22,6 +22,9 @@ pub const WINDOW: Real = Real::positive("window");
 pub const WINDOW_INDEX: Count = Count::at_least("index", 0);
 /// The last position the ends of the grid of windows cover.
 pub const GRID_END: Real = Real::finite("end");
+/// The known scale of an observation: the number its prediction is
+/// multiplied by.
+pub const SCALE: Real = Real::positive("scale");
 /// The trials of a binomial observation.
 pub const TRIALS: Count = Count::at_least("trials", 0);
 

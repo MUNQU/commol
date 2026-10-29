@@ -271,8 +271,8 @@ fn reason(violation: &Violation) -> String {
     }
 }
 
-/// Every series of `observed_data` (its label, outputs, factor and window)
-/// at every unit position from 0 up to the last observation, and at the
+/// Every series of `observed_data` (its label, outputs, factor and window,
+/// with the scale of its first observation) at every unit position from 0 up to the last observation, and at the
 /// positions of the observations; a series with a window starts once a whole
 /// window fits.
 fn dense_observations(observed_data: &[ObservedDataPoint]) -> Vec<ObservedDataPoint> {

@@ -4,8 +4,8 @@
 
 An `ObservedDataPoint` says what the model must reproduce: an output at a
 position on the axis. This page shows how to observe several outputs, sums of
-outputs, partial observations (factors), counts per period (windows) and
-positions between integers, and how to weigh them.
+outputs, partial observations (factors and known scales), counts per period
+(windows) and positions between integers, and how to weigh them.
 
 ## Quick path
 
@@ -80,6 +80,7 @@ plots and the per-series normalization; it defaults to `output`.
 | `value` | `float` | required | The observed value, zero or more. |
 | `weight` | `float` | `1.0` | Above zero. How much the observation counts in every loss, and the power of its term of a likelihood; see [Losses](calibration.md#losses). |
 | `factor_id` | `str \| None` | `None` | A `factor` unknown that multiplies the prediction. |
+| `scale` | `float` | `1.0` | Above zero and finite. A known number that multiplies the prediction, with the factor; see [Known shares: scales](#known-shares-scales). |
 | `window` | `float \| None` | `None` | Compares with the gain over `(at − window, at]` instead of the value. |
 | `trials` | `int \| None` | `None` | The trials of the observation, for a `BinomialObservations()` model that reads them from each observation. See [Observation Models](uncertainty/observation-models.md). |
 
@@ -154,6 +155,30 @@ print(round(scaled_result.best_parameters["share_seen"], 3))  # 0.3
 | Not part of the model | `apply_calibration_parameters` skips `factor` values. |
 | Plots | Pass `calibration_result=` to `results.plot.series` or `results.plot.observations`; it applies the calibrated factors to the comparison. |
 | Identifiability | A rate and a share can explain the same data. Fit them together only when the data can tell them apart: [Identifiability](uncertainty/identifiability.md) checks it. |
+
+## Known shares: scales
+
+When the share an observation sees is known, give it as `scale`. The
+prediction is the sum of its outputs, or their gain over its window, times
+`scale` and times its factor, if it has one. The scale is a number, not an
+unknown: no method fits it, samples it or judges its identifiability, and it
+can change from one observation to the next.
+
+```python
+known = [
+    ObservedDataPoint(at=step, output="B", value=0.3 * truth["B"][step], scale=0.3)
+    for step in range(5, 51, 5)
+]
+print(calibrate_k1(known))  # 0.4
+```
+
+| Fact | Detail |
+|---|---|
+| Counts | A count model reads the mean `scale · model`, so the observed counts stay whole and keep their own size: a negative binomial of the counts seen on 1 unit in 40 reads `0.025 · model`, not the counts multiplied by 40. See [Observation Models](uncertainty/observation-models.md#choosing-a-model). |
+| Every reader | The loss, the likelihood, the predictive (`at_observations`), the scores, the resampling and conformal methods, the figures and the reports read an observation with its scale. |
+| Figures | `plot.series` and `plot.observations` draw the model times the scale; `plot.cumulative` divides each observed value by its scale and its factor. |
+| Reports | The `observed` block of a report gives `scales` when a scale is not 1.0 ([Reports](reports.md)). |
+| Range | A scale of 0, below 0, infinite or NaN raises `ValidationError` that names `scale`. |
 
 ## Counts per period: windows
 
@@ -243,6 +268,7 @@ Observe expanded outputs by name, such as `B_g1`, or sum them with
 - [ ] Every `output` (and every entry of `outputs`) is an output name; a sum has a `label`.
 - [ ] Weights say how much each observation counts, in every loss.
 - [ ] Every `factor_id` has a `CalibrationParameter` with `parameter_type="factor"`.
+- [ ] A known share is a `scale`, not a `factor` with narrow bounds.
 - [ ] Windowed observations use a cumulative output and a window that starts at 0 or later.
 
 ## Next steps

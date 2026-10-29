@@ -299,3 +299,19 @@ class TestReaders:
             weights,
         )
         assert leaf["mean"] == pytest.approx(expected["mean"])
+
+
+def test_a_predictive_draws_an_observation_with_its_scale(
+    calibrator: Calibrator,
+) -> None:
+    predictive = Predictive(calibrator, _sample([[0.1, 0.05], [0.12, 0.06]]), POSITIONS)
+    points = [
+        ObservedDataPoint(at=at, output="B", value=1.0, scale=scale)
+        for scale in (1.0, 0.5)
+        for at in (10, 20)
+    ]
+
+    draws = predictive.at_observations(points, NoNoise()).values
+
+    for draw in draws:
+        assert draw[2:] == pytest.approx([0.5 * value for value in draw[:2]], rel=1e-12)

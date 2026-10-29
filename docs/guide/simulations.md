@@ -557,7 +557,7 @@ results.plot.series(output_file="with_data.png", observed_data=observed)
 `plot.observations(observed_data, …)` checks a model against its data: one
 panel per `label` of the observations, in the order of its first observation.
 The model is read only at the observations, through the observation operator
-of each one (the sum of its `outputs`, its `window` and its factor): the
+of each one (the sum of its `outputs`, its `window`, its `scale` and its factor): the
 values the loss compares. An observed series that sums some outputs, such as
 `B + C`, has its own panel, which no series of `plot.series` gives.
 
@@ -658,7 +658,7 @@ print([float(at) for at in weekly.axes[0].lines[0].get_xdata()][:3])  # [7.0, 14
 `panels="observations"` draws one panel per `label` of `observed_data`, as
 [`plot.observations`](#a-panel-per-observed-series) draws one result: each
 result is read only at the observations, through the observation operator of
-each one (the sum of its `outputs`, its `window` and its factor). Each result
+each one (the sum of its `outputs`, its `window`, its `scale` and its factor). Each result
 has the steps, markers and band of `plot.observations` in the color of its
 key, and the observations are drawn once. The default, `panels="series"`,
 draws one panel per entry of `series`.

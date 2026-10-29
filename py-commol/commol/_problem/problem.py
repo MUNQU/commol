@@ -55,6 +55,12 @@ class ObservedDataPoint(RangeChecked):
     factor_id : str | None
         Optional factor parameter ID that multiplies the model output before
         comparison
+    scale : float
+        A known positive number that multiplies the model output, with the
+        factor if there is one, before comparison (default: 1.0): the known
+        part of what the model describes that the observation reads, such as
+        the share of the units that report. A count model then reads the
+        observed count with the mean ``scale · model``.
     window : float | None
         Optional window length for a cumulative output: the prediction is the
         output at `at` minus the output at ``at - window``.
@@ -85,6 +91,10 @@ class ObservedDataPoint(RangeChecked):
     factor_id: str | None = Field(
         default=None,
         description="Optional factor parameter ID that multiplies the model output",
+    )
+    scale: float = Field(
+        default=1.0,
+        description="Known positive number that multiplies the model output",
     )
     window: float | None = Field(
         default=None,

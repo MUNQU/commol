@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ObservedDataPoint(scale=...)`: a known positive number, 1 by default, that
+  multiplies the prediction of the observation, with its factor. A count
+  model reads the mean `scale · model`, so counts observed on a known part of
+  what the model describes stay whole. The loss, the likelihood, the
+  predictive, the scores, the figures and the `observed` block of a report
+  (`scales`) read it. See
+  [Observations](../guide/calibration-observations.md#known-shares-scales).
 - `GibbsResult` and `ConformalResult` give `block_length` and
   `block_length_estimates`, as the bootstraps, the jackknife and the sandwich
   do: the length a method ran with, and with `block_length="auto"` the

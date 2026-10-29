@@ -20,7 +20,7 @@ from commol.plotting.panels import (
     PanelOutputs,
     Trace,
     cumulative_observed,
-    factor_value,
+    model_multiplier,
     group_observed,
     observation_panel,
     observation_positions,
@@ -126,7 +126,8 @@ def cumulative_panels(
 ) -> list[Panel]:
     """
     The panels of the running total of each series of a run, and of its
-    observations, each divided by the fitted value of its factor.
+    observations, each divided by its scale and by the fitted value of its
+    factor.
     """
     outputs = PanelOutputs(results, results.model)
     factors = calibration_result.best_parameters if calibration_result else {}
@@ -237,11 +238,10 @@ def _at_observations(
 ) -> list[float]:
     """
     The model value of each observation in one run, through its own
-    operator: the sum of its outputs, its window and its factor.
+    operator: the sum of its outputs, its window, its scale and its factor.
     """
     return [
-        _read(results, point.observed_outputs, point)
-        * factor_value(point.factor_id, factors)
+        _read(results, point.observed_outputs, point) * model_multiplier(point, factors)
         for point in observed
     ]
 
@@ -272,9 +272,9 @@ def _model_line(
     When the observations of the series do not share one operator with no
     window, each observation is read through its own operator, as the loss
     reads it: the sum of its outputs at its position, or its increment over
-    its window (`windowed_totals`), times its factor. Otherwise the sum of the
-    outputs of their operator at every position of the results, times its
-    factor.
+    its window (`windowed_totals`), times its scale and its factor. Otherwise
+    the sum of the outputs of their operator at every position of the results,
+    times its scale and its factor.
 
     Raises
     ------
@@ -285,7 +285,7 @@ def _model_line(
     if reads_each_observation(observed):
         return [point.at for point in observed], [
             _read(results, point.outputs or outputs.components(series_id), point)
-            * factor_value(point.factor_id, factors)
+            * model_multiplier(point, factors)
             for point in observed
         ]
     components = (
@@ -293,9 +293,9 @@ def _model_line(
         if observed and observed[0].outputs
         else outputs.components(series_id)
     )
-    factor = factor_value(observed[0].factor_id if observed else None, factors)
+    multiplier = model_multiplier(observed[0] if observed else None, factors)
     return list(results.positions), [
-        value * factor for value in total_series(results, components)
+        value * multiplier for value in total_series(results, components)
     ]
 
 

@@ -34,6 +34,7 @@ class ObservedSeries(TypedDict):
 
     values: list[float | None]
     weights: NotRequired[list[float | None]]
+    scales: NotRequired[list[float | None]]
     outputs: NotRequired[list[str]]
     factor_id: NotRequired[str]
 
@@ -131,9 +132,9 @@ def _observed_report(
     where there is no observation, so it lines up index for index with the
     windowed accumulator series. An observation goes to the window that holds
     its position (`window_index` of the engine, as `AxisUnits.window_index`
-    gives it). ``weights``, ``outputs``
-    and ``factor_id`` appear only on series that use them; a series whose
-    weights are all 1.0 omits them.
+    gives it). ``weights``, ``scales``, ``outputs`` and ``factor_id`` appear
+    only on series that use them; a series whose weights, or scales, are all
+    1.0 omits them.
     """
     series: dict[str, ObservedSeries] = {}
     for point in observed_data:
@@ -142,6 +143,7 @@ def _observed_report(
             {
                 "values": [None] * num_windows,
                 "weights": [None] * num_windows,
+                "scales": [None] * num_windows,
             },
         )
         index = commol_rs.calibration.window_index(point.at, window)
@@ -149,14 +151,16 @@ def _observed_report(
             continue
         entry["values"][index] = point.value
         entry["weights"][index] = point.weight
+        entry["scales"][index] = point.scale
         if point.outputs:
             entry["outputs"] = list(point.outputs)
         if point.factor_id:
             entry["factor_id"] = point.factor_id
 
     for entry in series.values():
-        if all(weight in (None, 1.0) for weight in entry["weights"]):
-            del entry["weights"]
+        for key in ("weights", "scales"):
+            if all(value in (None, 1.0) for value in entry[key]):
+                del entry[key]
     return series
 
 

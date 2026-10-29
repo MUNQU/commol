@@ -1,4 +1,7 @@
-"""Scale factors fit observations that see only a share of an output."""
+"""Factors and known scales read observations that see only a share of an
+output."""
+
+import math
 
 import pytest
 from pydantic import ValidationError
@@ -13,6 +16,7 @@ from commol import (
     Simulation,
 )
 from commol._model.model import Model
+from commol.observations import NegativeBinomialObservations
 from tests.support import (
     a_to_b_builder,
     abc_builder,
@@ -223,3 +227,43 @@ class TestPositionsAndEngines:
 
         with pytest.raises(ValueError, match="Constraint 'cap': .*1.5 is not one"):
             Calibrator(Simulation(model), problem)
+
+
+def _count_calibrator(scale: float) -> Calibrator:
+    """
+    A negative binomial fit of a flow ``c`` from A to B (``c`` per step, 10⁶
+    in A), observed as 7 units of B over the first step with `scale`.
+    """
+    model = build(
+        a_to_b_builder(
+            parameters={"c": None}, rate="c * A / A", amounts={"A": 1e6, "B": 0}
+        )
+    )
+    problem = CalibrationProblem(
+        observed_data=[
+            ObservedDataPoint(at=1, output="B", value=7.0, window=1, scale=scale)
+        ],
+        parameters=[bounded("c", 1.0, 1000.0)],
+        observation_models={"B": NegativeBinomialObservations(overdispersion=0.1)},
+        optimization_config=NelderMeadConfig(max_iterations=1),
+    )
+    return Calibrator(Simulation(model), problem)
+
+
+def test_an_observation_reads_the_model_times_its_scale() -> None:
+    scaled = _count_calibrator(0.025)._engine_problem
+    unscaled = _count_calibrator(1.0)._engine_problem
+
+    [[[prediction]]] = scaled.predict_observations([[400.0]])
+
+    # The negative binomial reads the mean 10 = 0.025 · 400.
+    assert prediction == pytest.approx(10.0, rel=1e-12)
+    assert scaled.pointwise_log_likelihood([400.0]) == pytest.approx(
+        unscaled.pointwise_log_likelihood([10.0]), rel=1e-12
+    )
+
+
+@pytest.mark.parametrize("scale", [0.0, -0.5, math.inf, math.nan])
+def test_a_scale_that_is_not_positive_is_refused(scale: float) -> None:
+    with pytest.raises(ValidationError, match="scale is a finite number"):
+        ObservedDataPoint(at=1, output="B", value=1.0, scale=scale)

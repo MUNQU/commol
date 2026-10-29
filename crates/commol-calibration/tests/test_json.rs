@@ -15,7 +15,7 @@ fn problem_json(swarm: &str, problem: &str) -> String {
     format!(
         r#"{{
         "observed_data": [{{"at": 1.0, "output": "B", "outputs": null, "label": "B",
-            "value": 2.0, "weight": 1.0, "factor_id": null, "window": null, "trials": null}}],
+            "value": 2.0, "weight": 1.0, "factor_id": null, "scale": 1.0, "window": null, "trials": null}}],
         "parameters": [{{"id": "k", "parameter_type": "parameter", "min_bound": 0.0,
             "max_bound": 1.0, "initial_guess": null}}],
         "constraints": [],
@@ -303,7 +303,7 @@ fn a_noise_argument_is_a_number_or_a_parameter() {
 fn observation(output: &str, outputs: &str, label: &str) -> Result<(), String> {
     let text = format!(
         r#"{{"at": 1.0, "output": {output}, "outputs": {outputs}, "label": "{label}",
-        "value": 2.0, "weight": 1.0, "factor_id": null, "window": null, "trials": null}}"#
+        "value": 2.0, "weight": 1.0, "factor_id": null, "scale": 1.0, "window": null, "trials": null}}"#
     );
     json::read::<Observation>(&text).map(|_| ())
 }

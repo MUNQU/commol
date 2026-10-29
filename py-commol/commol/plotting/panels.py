@@ -619,8 +619,9 @@ def cumulative_observed(
     observed: list[ObservedDataPoint], factors: Mapping[str, float]
 ) -> Trace | None:
     """
-    The running total of the observations of a series, each divided by the
-    value of its factor when `factors` has it.
+    The running total of the observations of a series, each divided by its
+    scale and by the value of its factor when `factors` has it
+    (`model_multiplier`).
     """
     if not observed:
         return None
@@ -628,36 +629,45 @@ def cumulative_observed(
         [point.at for point in observed],
         list(
             itertools.accumulate(
-                point.value / factors[point.factor_id]
-                if point.factor_id is not None and point.factor_id in factors
-                else point.value
-                for point in observed
+                point.value / model_multiplier(point, factors) for point in observed
             )
         ),
         "Observed (Cumulative)",
     )
 
 
-def factor_value(factor_id: str | None, factors: Mapping[str, float]) -> float:
-    """The value of a factor, or 1 for none or one the factors lack."""
-    if factor_id is None:
+def model_multiplier(
+    point: ObservedDataPoint | None,
+    factors: Mapping[str, float],
+) -> float:
+    """
+    The number an observation multiplies the model by, as its operator in the
+    engine reads it: its scale times the value of its factor. A factor that
+    `factors` lacks counts as 1, with a warning; no observation is 1.
+    """
+    if point is None:
         return 1.0
+    factor_id = point.factor_id
+    if factor_id is None:
+        return point.scale
     if factor_id not in factors:
         logger.warning(
             f"Factor parameter '{factor_id}' not found in calibration result; "
-            "leaving model predictions unscaled."
+            "leaving model predictions unscaled by it."
         )
-        return 1.0
-    return factors[factor_id]
+        return point.scale
+    return point.scale * factors[factor_id]
 
 
 def reads_each_observation(observed: list[ObservedDataPoint]) -> bool:
     """
     Whether the model of a series is read at each observation: when one has
-    a window, or the observations differ in outputs or factor.
+    a window, or the observations differ in outputs, factor or scale.
 
     Otherwise one operator reads every observation, and the model line covers
     every position of the results.
     """
-    operators = {(tuple(point.outputs or ()), point.factor_id) for point in observed}
+    operators = {
+        (tuple(point.outputs or ()), point.factor_id, point.scale) for point in observed
+    }
     return any(point.window for point in observed) or len(operators) > 1

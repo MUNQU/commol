@@ -34,7 +34,7 @@ use crate::ranges::{
     ALPHA, AT, COGNITIVE, COGNITIVE_FINAL, COGNITIVE_INITIAL, GAMMA, HEADER_INTERVAL,
     IMPROVEMENT_TOL_ABS, IMPROVEMENT_TOL_REL, IMPROVEMENT_WINDOW, INERTIA_FACTOR, INERTIA_MAX,
     INERTIA_MIN, INITIAL_SIMPLEX_SIZE, ITERATIONS, MAX_ITERATIONS, MUTATION_PROBABILITY,
-    MUTATION_SCALE, PARTICLES, RADIUS_TOL, REPLICATES, RHO, SD_TOLERANCE, SIGMA, SOCIAL,
+    MUTATION_SCALE, PARTICLES, RADIUS_TOL, REPLICATES, RHO, SCALE, SD_TOLERANCE, SIGMA, SOCIAL,
     SOCIAL_FINAL, SOCIAL_INITIAL, TRIALS, VALUE, VELOCITY_CLAMP_FACTOR,
     VELOCITY_MUTATION_THRESHOLD, WEIGHT, WINDOW,
 };
@@ -61,6 +61,8 @@ pub struct Observation {
     pub weight: f64,
     /// The id of a factor that multiplies the prediction, if any.
     pub factor_id: Option<String>,
+    /// The known number that multiplies the prediction.
+    pub scale: f64,
     /// The length of the window of a cumulative output, if any.
     pub window: Option<f64>,
     /// The trials of a binomial observation model that reads them here.
@@ -74,6 +76,7 @@ checked!(
         Rule::Real(AT),
         Rule::Real(VALUE),
         Rule::Real(WEIGHT),
+        Rule::Real(SCALE),
         Rule::Real(WINDOW),
         Rule::Count(TRIALS),
     ],
@@ -117,6 +120,7 @@ impl From<&Observation> for ObservedDataPoint {
             value: observation.value,
             weight: observation.weight,
             factor_id: observation.factor_id.clone(),
+            scale: observation.scale,
             window: observation.window,
             trials: observation.trials,
         }
