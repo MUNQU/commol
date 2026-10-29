@@ -3977,6 +3977,10 @@ with <code>k</code> in <code>"1/day"</code> is a flow and fails with <code>expec
 <td>A matrix has no unit (set <code>unit</code> in <code>add_matrix</code>); a matrix sum has the unit of the matrix times the unit of its expression</td>
 </tr>
 <tr>
+<td><code>Matrix '…' scales the row of '…' by '…' in '…'; a scale is dimensionless</code></td>
+<td>A parameter that scales a row or a column of a matrix has a unit; the scaled entries keep the unit of the matrix</td>
+</tr>
+<tr>
 <td><code>The model declares no step unit, so it is 'step'</code></td>
 <td>Rates in a unit such as <code>1/day</code> without <code>step_unit</code>; see <a href="#the-step-unit">The step unit</a></td>
 </tr>

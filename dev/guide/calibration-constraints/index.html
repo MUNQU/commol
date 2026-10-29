@@ -1197,6 +1197,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-bound-on-a-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A bound on a matrix
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#how-a-violation-counts" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3605,6 +3616,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-bound-on-a-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A bound on a matrix
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#how-a-violation-counts" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3816,12 +3838,12 @@ the parser of the engine checks it when the constraint is built, within the
 <tbody>
 <tr>
 <td>Without <code>at</code></td>
-<td>The calibration unknowns only</td>
+<td>The calibration unknowns and the variables of a <a href="#a-bound-on-a-matrix">matrix</a></td>
 <td>Once per evaluation, before the simulation</td>
 </tr>
 <tr>
 <td>With <code>at</code></td>
-<td>The unknowns and the simulation outputs (compartments, accumulators and the total of a bin over its categories, such as <code>B</code> of a stratified model)</td>
+<td>The same, and the simulation outputs (compartments, accumulators and the total of a bin over its categories, such as <code>B</code> of a stratified model)</td>
 <td>At each listed position of the simulation, in every replicate of a stochastic engine</td>
 </tr>
 </tbody>
@@ -3835,12 +3857,91 @@ calibration starts.</p>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">peak</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="n">best</span><span class="p">[</span><span class="s2">&quot;k1&quot;</span><span class="p">],</span> <span class="n">best</span><span class="p">[</span><span class="s2">&quot;k2&quot;</span><span class="p">]))</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">50</span><span class="p">)[</span><span class="s2">&quot;B&quot;</span><span class="p">])</span>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">peak</span><span class="p">))</span>  <span class="c1"># 300: the best fit whose B never exceeds 300</span>
 </span></code></pre></div>
+<h2 id="a-bound-on-a-matrix">A bound on a matrix<a class="headerlink" href="#a-bound-on-a-matrix" title="Permanent link">&para;</a></h2>
+<p>A constraint reads the entries <code>M_&lt;i&gt;_&lt;j&gt;</code> and the spectral radius <code>M_radius</code>
+of a <a href="../building-models/#matrices-between-categories">matrix between categories</a>
+<code>M</code>. When calibrated parameters scale its rows or its columns, the constraint
+reads the scaled matrix at the values of each point; a scale that is not
+calibrated keeps its value in the model. So a bound on the growth factor of a
+coupling, <code>k1 · ρ(diag(a) · M)</code>, is one constraint:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">NelderMeadConfig</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">coupled_model</span><span class="p">(</span><span class="n">k1</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">a1</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">):</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">return</span> <span class="p">(</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Coupled&quot;</span><span class="p">)</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>        <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State A&quot;</span><span class="p">)</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="o">.</span><span class="n">add_bin</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;B&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;State B&quot;</span><span class="p">)</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>        <span class="o">.</span><span class="n">add_stratification</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;group&quot;</span><span class="p">,</span> <span class="n">categories</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;g1&quot;</span><span class="p">,</span> <span class="s2">&quot;g2&quot;</span><span class="p">])</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">k1</span><span class="p">)</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>        <span class="o">.</span><span class="n">add_parameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;a1&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">a1</span><span class="p">)</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>        <span class="o">.</span><span class="n">add_matrix</span><span class="p">(</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>            <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;M&quot;</span><span class="p">,</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>            <span class="n">stratification</span><span class="o">=</span><span class="s2">&quot;group&quot;</span><span class="p">,</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>            <span class="n">values</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;g1&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;g1&quot;</span><span class="p">:</span> <span class="mf">2.0</span><span class="p">,</span> <span class="s2">&quot;g2&quot;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">},</span> <span class="s2">&quot;g2&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;g1&quot;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s2">&quot;g2&quot;</span><span class="p">:</span> <span class="mf">3.0</span><span class="p">}},</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>            <span class="n">row_scales</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;g1&quot;</span><span class="p">:</span> <span class="s2">&quot;a1&quot;</span><span class="p">},</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>        <span class="p">)</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>        <span class="o">.</span><span class="n">add_transition</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;t_ab&quot;</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">],</span> <span class="n">target</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;B&quot;</span><span class="p">],</span> <span class="n">rate</span><span class="o">=</span><span class="s2">&quot;k1 * matrix_sum(M, B / total)&quot;</span><span class="p">)</span>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>        <span class="o">.</span><span class="n">build</span><span class="p">(</span>
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>            <span class="n">Aggregate</span><span class="p">(</span>
+</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>                <span class="n">bin_amounts</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;A&quot;</span><span class="p">:</span> <span class="mi">900</span><span class="p">,</span> <span class="s2">&quot;B&quot;</span><span class="p">:</span> <span class="mi">100</span><span class="p">},</span>
+</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>                <span class="n">stratification_fractions</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;group&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;g1&quot;</span><span class="p">:</span> <span class="mf">0.4</span><span class="p">,</span> <span class="s2">&quot;g2&quot;</span><span class="p">:</span> <span class="mf">0.6</span><span class="p">}},</span>
+</span><span id="__span-2-24"><a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>            <span class="p">),</span>
+</span><span id="__span-2-25"><a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>            <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;DifferenceEquations&quot;</span><span class="p">,</span>
+</span><span id="__span-2-26"><a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>        <span class="p">)</span>
+</span><span id="__span-2-27"><a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>    <span class="p">)</span>
+</span><span id="__span-2-28"><a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>
+</span><span id="__span-2-29"><a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a><span class="c1"># The data come from k1 = 0.05 and a1 = 2: k1 · ρ = 0.05 × 5 = 0.25</span>
+</span><span id="__span-2-30"><a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a><span class="n">coupled_truth</span> <span class="o">=</span> <span class="n">Simulation</span><span class="p">(</span><span class="n">coupled_model</span><span class="p">(</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">))</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">num_steps</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</span><span id="__span-2-31"><a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a><span class="n">coupled_problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
+</span><span id="__span-2-32"><a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-2-33"><a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a>        <span class="n">ObservedDataPoint</span><span class="p">(</span><span class="n">at</span><span class="o">=</span><span class="n">step</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="n">output</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">coupled_truth</span><span class="p">[</span><span class="n">output</span><span class="p">][</span><span class="n">step</span><span class="p">])</span>
+</span><span id="__span-2-34"><a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a>        <span class="k">for</span> <span class="n">output</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;B_g1&quot;</span><span class="p">,</span> <span class="s2">&quot;B_g2&quot;</span><span class="p">)</span>
+</span><span id="__span-2-35"><a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a>        <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">21</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+</span><span id="__span-2-36"><a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a>    <span class="p">],</span>
+</span><span id="__span-2-37"><a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a>    <span class="n">parameters</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-2-38"><a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">initial_guess</span><span class="o">=</span><span class="mf">0.02</span><span class="p">),</span>
+</span><span id="__span-2-39"><a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;a1&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">8.0</span><span class="p">,</span> <span class="n">initial_guess</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
+</span><span id="__span-2-40"><a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a>    <span class="p">],</span>
+</span><span id="__span-2-41"><a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a>    <span class="n">constraints</span><span class="o">=</span><span class="p">[</span><span class="n">CalibrationConstraint</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;growth&quot;</span><span class="p">,</span> <span class="n">expression</span><span class="o">=</span><span class="s2">&quot;0.2 - k1 * M_radius&quot;</span><span class="p">)],</span>
+</span><span id="__span-2-42"><a id="__codelineno-2-42" name="__codelineno-2-42" href="#__codelineno-2-42"></a>    <span class="n">loss_function</span><span class="o">=</span><span class="s2">&quot;sse&quot;</span><span class="p">,</span>
+</span><span id="__span-2-43"><a id="__codelineno-2-43" name="__codelineno-2-43" href="#__codelineno-2-43"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">NelderMeadConfig</span><span class="p">(</span><span class="n">max_iterations</span><span class="o">=</span><span class="mi">400</span><span class="p">),</span>
+</span><span id="__span-2-44"><a id="__codelineno-2-44" name="__codelineno-2-44" href="#__codelineno-2-44"></a>    <span class="n">seed</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+</span><span id="__span-2-45"><a id="__codelineno-2-45" name="__codelineno-2-45" href="#__codelineno-2-45"></a><span class="p">)</span>
+</span><span id="__span-2-46"><a id="__codelineno-2-46" name="__codelineno-2-46" href="#__codelineno-2-46"></a><span class="n">coupled_best</span> <span class="o">=</span> <span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">coupled_model</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)),</span> <span class="n">coupled_problem</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span><span class="o">.</span><span class="n">best_parameters</span>
+</span><span id="__span-2-47"><a id="__codelineno-2-47" name="__codelineno-2-47" href="#__codelineno-2-47"></a><span class="n">a1</span> <span class="o">=</span> <span class="n">coupled_best</span><span class="p">[</span><span class="s2">&quot;a1&quot;</span><span class="p">]</span>
+</span><span id="__span-2-48"><a id="__codelineno-2-48" name="__codelineno-2-48" href="#__codelineno-2-48"></a><span class="n">growth</span> <span class="o">=</span> <span class="n">coupled_best</span><span class="p">[</span><span class="s2">&quot;k1&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="nb">max</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">eigvals</span><span class="p">([[</span><span class="mf">2.0</span> <span class="o">*</span> <span class="n">a1</span><span class="p">,</span> <span class="n">a1</span><span class="p">],</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">]])))</span>
+</span><span id="__span-2-49"><a id="__codelineno-2-49" name="__codelineno-2-49" href="#__codelineno-2-49"></a><span class="nb">print</span><span class="p">(</span><span class="n">growth</span> <span class="o">&lt;=</span> <span class="mf">0.2</span> <span class="o">+</span> <span class="mf">1e-6</span><span class="p">)</span>  <span class="c1"># True: the fit keeps k1 · ρ at or below 0.2</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The radius is that of <code>diag(a) · values · diag(b)</code> at the point</td>
+<td>The rates of the run read the same matrix (<code>ScaledMatrix</code> in <code>crates/commol-core/src/scaled_matrix.rs</code>), so the bound holds for the run it allows</td>
+</tr>
+<tr>
+<td>It is computed once per point, before the run</td>
+<td>The matrix does not change during a run</td>
+</tr>
+<tr>
+<td>A scale with no value that the calibration does not set is refused when the calibration starts</td>
+<td>The constraint would have no matrix to read</td>
+</tr>
+</tbody>
+</table>
 <h2 id="how-a-violation-counts">How a violation counts<a class="headerlink" href="#how-a-violation-counts" title="Permanent link">&para;</a></h2>
 <p>A violated constraint does not add a small cost to the fit: it <strong>replaces</strong> the
 loss with a penalty much larger than any fit, so the optimizer moves away from
 it:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>loss = P × (1 + Σ weight × |violation|)
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>P    = max(1000 × n × (largest observed value)², 1e10)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>loss = P × (1 + Σ weight × |violation|)
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>P    = max(1000 × n × (largest observed value)², 1e10)
 </span></code></pre></div>
 <p>where the sum runs over the violated constraints (and, for a constraint with
 <code>at</code>, over its positions) and <code>n</code> is the number of observations. With
@@ -3854,7 +3955,7 @@ only ranks violations against each other.</p>
 <ul>
 <li>[ ] Each expression is <code>&gt;= 0</code> when the condition holds.</li>
 <li>[ ] Expressions that name outputs have <code>at</code>.</li>
-<li>[ ] Expressions name only calibration unknowns (and outputs).</li>
+<li>[ ] Expressions name only calibration unknowns, variables of a matrix and, with <code>at</code>, outputs.</li>
 <li>[ ] The constraints do not contradict each other, such as <code>k1 - 0.5</code> and <code>0.4 - k1</code>.</li>
 <li>[ ] The search box contains points that satisfy every constraint.</li>
 </ul>

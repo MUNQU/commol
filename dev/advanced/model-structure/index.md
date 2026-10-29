@@ -19,7 +19,7 @@ Model                      name, description, version, step_unit, origin
 │   ├── accumulators: [Accumulator]
 │   ├── stratifications: [Stratification]
 │   │   └── conditions: [StratificationCondition]
-│   ├── matrices: [CategoryMatrix]         (values: {row: {column: value}})
+│   ├── matrices: [CategoryMatrix]         (values: {row: {column: value}}, row_scales, column_scales)
 │   └── transitions: [Transition]          (impulse_at, impulse_every for impulses)
 │       └── stratified_rates: [StratifiedRate]
 │           └── conditions: [StratificationCondition]
@@ -279,13 +279,15 @@ A matrix between the categories of a stratification.
 
 Attributes:
 
-| Name             | Type                          | Description                                                                                                         |
-| ---------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `id`             | `str`                         | The id that matrix_sum reads, and the start of the names of its variables.                                          |
-| `stratification` | `str`                         | The id of the stratification whose categories are its rows and its columns.                                         |
-| `values`         | `dict[str, dict[str, float]]` | values[i][j], the value of row i and column j: one finite number for each pair of categories of the stratification. |
-| `unit`           | \`str                         | None\`                                                                                                              |
-| `description`    | \`str                         | None\`                                                                                                              |
+| Name             | Type                          | Description                                                                                                             |
+| ---------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `id`             | `str`                         | The id that matrix_sum reads, and the start of the names of its variables.                                              |
+| `stratification` | `str`                         | The id of the stratification whose categories are its rows and its columns.                                             |
+| `values`         | `dict[str, dict[str, float]]` | values[i][j], the value of row i and column j: one finite number for each pair of categories of the stratification.     |
+| `unit`           | \`str                         | None\`                                                                                                                  |
+| `description`    | \`str                         | None\`                                                                                                                  |
+| `row_scales`     | `dict[str, str]`              | The id of the parameter that multiplies the row of a category, by category; a category without one keeps its row.       |
+| `column_scales`  | `dict[str, str]`              | The id of the parameter that multiplies the column of a category, by category; a category without one keeps its column. |
 
 Source code in `commol/_model/matrix.py`
 
@@ -311,6 +313,12 @@ class CategoryMatrix(BaseModel):
         The unit of its values, which the unit check reads.
     description : str | None
         A human-readable description.
+    row_scales : dict[str, str]
+        The id of the parameter that multiplies the row of a category, by
+        category; a category without one keeps its row.
+    column_scales : dict[str, str]
+        The id of the parameter that multiplies the column of a category, by
+        category; a category without one keeps its column.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -326,6 +334,56 @@ class CategoryMatrix(BaseModel):
     description: str | None = Field(
         default=None, description="Human-readable description of the matrix."
     )
+    row_scales: dict[str, str] = Field(
+        default_factory=dict,
+        description="The parameter that multiplies the row of each category.",
+    )
+    column_scales: dict[str, str] = Field(
+        default_factory=dict,
+        description="The parameter that multiplies the column of each category.",
+    )
+
+    def scales(self) -> list[tuple[str, str, str]]:
+        """
+        Each scale, as ``("row" or "column", category, parameter id)``: the
+        rows first, then the columns.
+        """
+        return [
+            (side, category, parameter)
+            for side, scales in (
+                ("row", self.row_scales),
+                ("column", self.column_scales),
+            )
+            for category, parameter in scales.items()
+        ]
+```
+
+### Methods:
+
+#### scales
+
+```python
+scales() -> list[tuple[str, str, str]]
+```
+
+Each scale, as `("row" or "column", category, parameter id)`: the rows first, then the columns.
+
+Source code in `commol/_model/matrix.py`
+
+```python
+def scales(self) -> list[tuple[str, str, str]]:
+    """
+    Each scale, as ``("row" or "column", category, parameter id)``: the
+    rows first, then the columns.
+    """
+    return [
+        (side, category, parameter)
+        for side, scales in (
+            ("row", self.row_scales),
+            ("column", self.column_scales),
+        )
+        for category, parameter in scales.items()
+    ]
 ```
 
 `ModelBuilder.add_matrix` adds one; a rate reads it through `matrix_sum` ([Matrix sums](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#matrix-sums)).

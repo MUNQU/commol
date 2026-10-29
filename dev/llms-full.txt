@@ -1023,14 +1023,31 @@ builder = builder.add_matrix(
 | `values`         | `Mapping[str, Mapping[str, float]]` | required | `values[i][j]`, the value of row `i` and column `j`.                    |
 | `unit`           | \`str                               | None\`   | `None`                                                                  |
 | `description`    | \`str                               | None\`   | `None`                                                                  |
+| `row_scales`     | \`Mapping[str, str]                 | None\`   | `None`                                                                  |
+| `column_scales`  | \`Mapping[str, str]                 | None\`   | `None`                                                                  |
 
-| What it gives                                | Meaning                                                                                                                                                                                                |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `matrix_sum(M, e)` in a transition rate      | In a compartment of category `i`, `Σ_j M[i, j] · e_j`, with each bin of `e` read in category `j`. See [Matrix sums](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#matrix-sums) |
-| `M_<i>_<j>` in a rate or a formula parameter | The value of row `i` and column `j`, as `M_g1_g2`                                                                                                                                                      |
-| `M_radius` in a rate or a formula parameter  | The spectral radius: the largest modulus of its eigenvalues                                                                                                                                            |
+A scale makes the matrix `M` that the model reads `diag(a) · values · diag(b)`: `M[i, j] = a_i · values[i][j] · b_j`, where `a_i` is the value of the parameter of the row of `i` and `b_j` of the column of `j`, and 1 for a category without one. A scale is a constant or a parameter to calibrate, whose value does not change during a run; the unit check needs it dimensionless. When a calibration sets a scale, every variable below follows it, at each point (`CompiledModel::set_parameter` in `crates/commol-model/src/system.rs`).
 
-`build` raises `ValueError` when the stratification is not one of the process, a row or a value of a category is missing, a row or a column names no category, a value is not finite, or the id or a variable of the matrix has the name of another id or variable of the model. Each message names the matrix and the category. `Model.describe` lists each matrix with its values and its spectral radius under the parameters.
+```python
+scaled_builder = (
+    builder.clone()
+    .add_parameter(id="a1", value=None)
+    .add_matrix(
+        id="N",
+        stratification="group",
+        values={"g1": {"g1": 2.0, "g2": 1.0}, "g2": {"g1": 1.0, "g2": 3.0}},
+        row_scales={"g1": "a1"},
+    )
+)
+```
+
+| What it gives                                                                                                                                                      | Meaning                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `matrix_sum(M, e)` in a transition rate                                                                                                                            | In a compartment of category `i`, `Σ_j M[i, j] · e_j`, with each bin of `e` read in category `j`. See [Matrix sums](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#matrix-sums) |
+| `M_<i>_<j>` in a rate, a formula parameter or a [calibration constraint](https://munqu.github.io/commol/latest/guide/calibration-constraints/#a-bound-on-a-matrix) | The entry of row `i` and column `j`, scaled, as `M_g1_g2`                                                                                                                                              |
+| `M_radius` in a rate, a formula parameter or a calibration constraint                                                                                              | The spectral radius of the scaled matrix: the largest modulus of its eigenvalues                                                                                                                       |
+
+`build` raises `ValueError` when the stratification is not one of the process, a row or a value of a category is missing, a row, a column or a scale names no category, a value is not finite, a scale names a parameter the model does not have or a formula or a series parameter, or the id or a variable of the matrix has the name of another id or variable of the model. Each message names the matrix and the category. `Model.describe` lists each matrix with its scales, its values before them and its spectral radius at the values of the scales under the parameters.
 
 ## Accumulators
 
@@ -1736,7 +1753,7 @@ An id starts with a letter or `_` and can hold digits after it, such as `e1` or 
 | A bin id, with stratifications     | The total of all its compartments                                                                                                                                                                                                                                             |
 | `total`                            | The total: the sum of every compartment, accumulators excluded                                                                                                                                                                                                                |
 | `neighbors_<bin>`, `neighbors`     | In a transition rate only: what the neighbors of a unit hold, of one bin or of every bin. The structure says who they are; a rate that reads them and no compartment is proportional. See [Neighbors](https://munqu.github.io/commol/latest/guide/building-models/#neighbors) |
-| `<M>_<i>_<j>`, `<M>_radius`        | The entry of row `i` and column `j` of the matrix `M`, and its spectral radius. See [Matrix sums](#matrix-sums)                                                                                                                                                               |
+| `<M>_<i>_<j>`, `<M>_radius`        | The entry of row `i` and column `j` of the matrix `M`, and its spectral radius, both scaled by the parameters of its rows and columns. See [Matrix sums](#matrix-sums)                                                                                                        |
 | `t`                                | The current position on the axis. A difference model reads it at each step, so there it equals `step`; a differential model reads it anywhere                                                                                                                                 |
 | `step`                             | The step that holds the current position, `floor(t)`: 0, 1, 2, … It is constant on each unit interval of a differential model; see [Time inside a step](https://munqu.github.io/commol/latest/guide/simulations/#time-inside-a-step)                                          |
 | `pi`, `e`                          | π and e                                                                                                                                                                                                                                                                       |
@@ -1847,7 +1864,7 @@ The engine writes each matrix sum as the sum it is before it compiles the rate, 
 | A matrix sum holds no other matrix sum, and `e` does not read `neighbors_<bin>` or `neighbors` | Each sum has one category `j`                                                                                                                                                                                                                                                                                                     |
 | Each compartment of the transition has a category of the stratification of `M`                 | Else the row `i` is not defined; a conditional stratification can leave a compartment without one                                                                                                                                                                                                                                 |
 
-A rate or a formula parameter reads the entries of `M` as `M_<i>_<j>` (`M_g1_g2` is 1 above) and its spectral radius as `M_radius`: the largest modulus of its eigenvalues, real or complex. The engine computes it once, when it builds the model, from the values of the matrix. Above, `M_radius` is `(5 + √5) / 2`, about 3.618. A calibration constraint does not read these variables. A rate scaled by `1 / M_radius` reads the matrix normalized to a spectral radius of 1, so its scale follows a change of the values:
+A rate, a formula parameter or a calibration constraint reads the entries of `M` as `M_<i>_<j>` (`M_g1_g2` is 1 above) and its spectral radius as `M_radius`: the largest modulus of its eigenvalues, real or complex. When parameters [scale the rows or the columns](https://munqu.github.io/commol/latest/guide/building-models/#matrices-between-categories) of `M`, the sum, the entries and the radius are those of the scaled matrix. The engine computes them when it builds the model and again when a caller sets a scale, such as a calibration at each point; they do not change during a run. Above, `M_radius` is `(5 + √5) / 2`, about 3.618. A [constraint](https://munqu.github.io/commol/latest/guide/calibration-constraints/#a-bound-on-a-matrix) reads them at the values of the point it checks. A rate scaled by `1 / M_radius` reads the matrix normalized to a spectral radius of 1, so its scale follows a change of the values:
 
 ```python
 normalized = "k1 / M_radius * matrix_sum(M, B / total)"
@@ -2353,6 +2370,7 @@ except UnitConsistencyError as error:
 | `The following constant parameters are missing units: …`                    | A constant parameter has no unit                                                                                            |
 | `The following bins have no unit: …`                                        | A bin has no unit (set `bin_unit`)                                                                                          |
 | `The following matrices have no unit: …`                                    | A matrix has no unit (set `unit` in `add_matrix`); a matrix sum has the unit of the matrix times the unit of its expression |
+| `Matrix '…' scales the row of '…' by '…' in '…'; a scale is dimensionless`  | A parameter that scales a row or a column of a matrix has a unit; the scaled entries keep the unit of the matrix            |
 | `The model declares no step unit, so it is 'step'`                          | Rates in a unit such as `1/day` without `step_unit`; see [The step unit](#the-step-unit)                                    |
 | `Variable '…' … has no defined unit`                                        | A variable of a rate has no unit                                                                                            |
 
@@ -2450,15 +2468,15 @@ In a Jupyter notebook, `model.describe()` as the last line of a cell shows the M
 
 A `ModelDescription` has a `title`, a `layout` and a list of `sections`. Each section has a `key`, a `title` and `blocks`. `Model.describe()` builds the sections every kind shares from the model, and the structure of the model adds the sections of its kind (`ModelStructure.describe`):
 
-| Key              | Content                                                                  | For an `Aggregate` model                                                                                                               |
-| ---------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `overview`       | Name, description, version, kind, engine, its settings and the step unit | From `Model`                                                                                                                           |
-| `entities`       | What holds the state                                                     | Bins, accumulators, stratifications and their categories, the expanded compartments                                                    |
-| `dynamics`       | How the state changes                                                    | The state graphs, the compact and expanded forms of the equations, the impulses, the neighbors                                         |
-| `schedule`       | How the engine advances, and the settings it advances with               | From the engine (`EngineType.schedule`) and `Model.engine.settings`                                                                    |
-| `initialization` | The state the model starts from                                          | Bin amounts, category fractions, overrides, and the initial state the engine builds                                                    |
-| `parameters`     | Every parameter, then each matrix between categories                     | Value, unit, whether calibration sets it, description; for a matrix, its stratification, unit, description, spectral radius and values |
-| `outputs`        | What a run returns                                                       | The outputs of each bin and accumulator                                                                                                |
+| Key              | Content                                                                  | For an `Aggregate` model                                                                                                                                                                |
+| ---------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `overview`       | Name, description, version, kind, engine, its settings and the step unit | From `Model`                                                                                                                                                                            |
+| `entities`       | What holds the state                                                     | Bins, accumulators, stratifications and their categories, the expanded compartments                                                                                                     |
+| `dynamics`       | How the state changes                                                    | The state graphs, the compact and expanded forms of the equations, the impulses, the neighbors                                                                                          |
+| `schedule`       | How the engine advances, and the settings it advances with               | From the engine (`EngineType.schedule`) and `Model.engine.settings`                                                                                                                     |
+| `initialization` | The state the model starts from                                          | Bin amounts, category fractions, overrides, and the initial state the engine builds                                                                                                     |
+| `parameters`     | Every parameter, then each matrix between categories                     | Value, unit, whether calibration sets it, description; for a matrix, its stratification, unit, description, scales, spectral radius at the values of the scales, and values before them |
+| `outputs`        | What a run returns                                                       | The outputs of each bin and accumulator                                                                                                                                                 |
 
 A section with no blocks is left out of every rendering.
 
@@ -4434,10 +4452,10 @@ Move every term to one side, so that the expression is `>= 0` when it holds:
 
 The expression uses the [expression syntax](https://munqu.github.io/commol/latest/guide/mathematical-expressions/index.md), and the parser of the engine checks it when the constraint is built, within the [limits of the parser](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#limits-of-the-parser).
 
-| Kind         | Can name                                                                                                                                           | Checked                                                                              |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Without `at` | The calibration unknowns only                                                                                                                      | Once per evaluation, before the simulation                                           |
-| With `at`    | The unknowns and the simulation outputs (compartments, accumulators and the total of a bin over its categories, such as `B` of a stratified model) | At each listed position of the simulation, in every replicate of a stochastic engine |
+| Kind         | Can name                                                                                                                                        | Checked                                                                              |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Without `at` | The calibration unknowns and the variables of a [matrix](#a-bound-on-a-matrix)                                                                  | Once per evaluation, before the simulation                                           |
+| With `at`    | The same, and the simulation outputs (compartments, accumulators and the total of a bin over its categories, such as `B` of a stratified model) | At each listed position of the simulation, in every replicate of a stochastic engine |
 
 A constraint cannot name a model parameter that is not calibrated, and an expression that names an output without `at` is rejected when the calibration starts.
 
@@ -4448,6 +4466,68 @@ best = calibrate(
 peak = max(Simulation(model(best["k1"], best["k2"])).run(num_steps=50)["B"])
 print(round(peak))  # 300: the best fit whose B never exceeds 300
 ```
+
+## A bound on a matrix
+
+A constraint reads the entries `M_<i>_<j>` and the spectral radius `M_radius` of a [matrix between categories](https://munqu.github.io/commol/latest/guide/building-models/#matrices-between-categories) `M`. When calibrated parameters scale its rows or its columns, the constraint reads the scaled matrix at the values of each point; a scale that is not calibrated keeps its value in the model. So a bound on the growth factor of a coupling, `k1 · ρ(diag(a) · M)`, is one constraint:
+
+```python
+import numpy as np
+
+from commol import NelderMeadConfig
+
+def coupled_model(k1: float | None, a1: float | None):
+    return (
+        ModelBuilder(name="Coupled")
+        .add_bin(id="A", name="State A")
+        .add_bin(id="B", name="State B")
+        .add_stratification(id="group", categories=["g1", "g2"])
+        .add_parameter(id="k1", value=k1)
+        .add_parameter(id="a1", value=a1)
+        .add_matrix(
+            id="M",
+            stratification="group",
+            values={"g1": {"g1": 2.0, "g2": 1.0}, "g2": {"g1": 1.0, "g2": 3.0}},
+            row_scales={"g1": "a1"},
+        )
+        .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * matrix_sum(M, B / total)")
+        .build(
+            Aggregate(
+                bin_amounts={"A": 900, "B": 100},
+                stratification_fractions={"group": {"g1": 0.4, "g2": 0.6}},
+            ),
+            engine="DifferenceEquations",
+        )
+    )
+
+# The data come from k1 = 0.05 and a1 = 2: k1 · ρ = 0.05 × 5 = 0.25
+coupled_truth = Simulation(coupled_model(0.05, 2.0)).run(num_steps=20)
+coupled_problem = CalibrationProblem(
+    observed_data=[
+        ObservedDataPoint(at=step, output=output, value=coupled_truth[output][step])
+        for output in ("B_g1", "B_g2")
+        for step in range(2, 21, 2)
+    ],
+    parameters=[
+        CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=0.2, initial_guess=0.02),
+        CalibrationParameter(id="a1", parameter_type="parameter", min_bound=0.25, max_bound=8.0, initial_guess=1.0),
+    ],
+    constraints=[CalibrationConstraint(id="growth", expression="0.2 - k1 * M_radius")],
+    loss_function="sse",
+    optimization_config=NelderMeadConfig(max_iterations=400),
+    seed=3,
+)
+coupled_best = Calibrator(Simulation(coupled_model(None, None)), coupled_problem).run().best_parameters
+a1 = coupled_best["a1"]
+growth = coupled_best["k1"] * max(abs(np.linalg.eigvals([[2.0 * a1, a1], [1.0, 3.0]])))
+print(growth <= 0.2 + 1e-6)  # True: the fit keeps k1 · ρ at or below 0.2
+```
+
+| Rule                                                                                           | Why                                                                                                                                               |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The radius is that of `diag(a) · values · diag(b)` at the point                                | The rates of the run read the same matrix (`ScaledMatrix` in `crates/commol-core/src/scaled_matrix.rs`), so the bound holds for the run it allows |
+| It is computed once per point, before the run                                                  | The matrix does not change during a run                                                                                                           |
+| A scale with no value that the calibration does not set is refused when the calibration starts | The constraint would have no matrix to read                                                                                                       |
 
 ## How a violation counts
 
@@ -4464,7 +4544,7 @@ where the sum runs over the violated constraints (and, for a constraint with `at
 
 - [ ] Each expression is `>= 0` when the condition holds.
 - [ ] Expressions that name outputs have `at`.
-- [ ] Expressions name only calibration unknowns (and outputs).
+- [ ] Expressions name only calibration unknowns, variables of a matrix and, with `at`, outputs.
 - [ ] The constraints do not contradict each other, such as `k1 - 0.5` and `0.4 - k1`.
 - [ ] The search box contains points that satisfy every constraint.
 
@@ -11318,13 +11398,13 @@ Constraints are mathematical expressions that must evaluate to >= 0 for the cons
 
 Attributes:
 
-| Name          | Type          | Description                                                                                                                                                                                                                |
-| ------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`          | `str`         | Unique identifier for this constraint                                                                                                                                                                                      |
-| `expression`  | `str`         | Mathematical expression that must evaluate >= 0 for constraint satisfaction. Can reference calibration parameters by their IDs. When at is specified, can also reference output values (A, B, C, etc.) at those positions. |
-| `description` | \`str         | None\`                                                                                                                                                                                                                     |
-| `weight`      | `float`       | Penalty weight multiplier (default: 1.0). Higher values make this constraint more important relative to others. The amount of a violation of this constraint is weight \*                                                  |
-| `at`          | \`list[float] | None\`                                                                                                                                                                                                                     |
+| Name          | Type          | Description                                                                                                                                                                                                                                                                                                                                                   |
+| ------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`          | `str`         | Unique identifier for this constraint                                                                                                                                                                                                                                                                                                                         |
+| `expression`  | `str`         | Mathematical expression that must evaluate >= 0 for constraint satisfaction. Can reference calibration parameters by their IDs, and the entries <M>_<i>_<j> and the spectral radius <M>\_radius of a matrix between categories, scaled by the values of the point. When at is specified, can also reference output values (A, B, C, etc.) at those positions. |
+| `description` | \`str         | None\`                                                                                                                                                                                                                                                                                                                                                        |
+| `weight`      | `float`       | Penalty weight multiplier (default: 1.0). Higher values make this constraint more important relative to others. The amount of a violation of this constraint is weight \*                                                                                                                                                                                     |
+| `at`          | \`list[float] | None\`                                                                                                                                                                                                                                                                                                                                                        |
 
 Examples:
 
@@ -11382,8 +11462,11 @@ class CalibrationConstraint(RangeChecked):
         Unique identifier for this constraint
     expression : str
         Mathematical expression that must evaluate >= 0 for constraint satisfaction.
-        Can reference calibration parameters by their IDs. When `at` is specified,
-        can also reference output values (A, B, C, etc.) at those positions.
+        Can reference calibration parameters by their IDs, and the entries
+        ``<M>_<i>_<j>`` and the spectral radius ``<M>_radius`` of a matrix
+        between categories, scaled by the values of the point. When `at` is
+        specified, can also reference output values (A, B, C, etc.) at those
+        positions.
     description : str | None
         Human-readable description of the constraint (optional)
     weight : float
@@ -11396,8 +11479,9 @@ class CalibrationConstraint(RangeChecked):
         Optional positions on the axis at which to evaluate this constraint.
         The engine decides which positions its model type accepts: a
         DifferenceEquations model only integer steps. If None, the constraint
-        is evaluated once before simulation using parameter values only. If
-        given, it is evaluated at each position and can reference output values.
+        is evaluated once before simulation from the parameter values and the
+        matrices at them. If given, it is evaluated at each position and can
+        reference output values.
 
     Examples
     --------
@@ -15174,16 +15258,24 @@ class ModelBuilder:
         values: Mapping[str, Mapping[str, float]],
         unit: str | None = None,
         description: str | None = None,
+        row_scales: Mapping[str, str] | None = None,
+        column_scales: Mapping[str, str] | None = None,
     ) -> Self:
         """
         Add a matrix between the categories of a stratification.
 
-        A rate reads it through ``matrix_sum(id, e)``: in the rate of a
-        compartment of category ``i``, ``Σ_j values[i][j] · e_j``, where
-        ``e_j`` is ``e`` with each bin read as its amount in category ``j``
-        and ``total`` as the total of ``j``. A rate or a formula parameter
-        also reads its entries as ``<id>_<i>_<j>`` and its spectral radius, the largest
-        modulus of its eigenvalues, as ``<id>_radius``.
+        A parameter may scale the row and the column of each category: the
+        matrix that rates and calibration constraints read is
+        ``M[i][j] = a_i · values[i][j] · b_j``, where ``a_i`` is the value
+        of ``row_scales[i]`` and ``b_j`` of ``column_scales[j]`` (1 for a
+        category without one). A rate reads it through ``matrix_sum(id, e)``:
+        in the rate of a compartment of category ``i``, ``Σ_j M[i][j] · e_j``,
+        where ``e_j`` is ``e`` with each bin read as its amount in category
+        ``j`` and ``total`` as the total of ``j``. A rate, a formula
+        parameter and a calibration constraint also read its entries
+        ``M[i][j]`` as ``<id>_<i>_<j>`` and its spectral radius, the largest
+        modulus of its eigenvalues, as ``<id>_radius``, at the values of the
+        scales of the run or of the point.
 
         Parameters
         ----------
@@ -15199,6 +15291,12 @@ class ModelBuilder:
             Unit of its values, which the unit check reads.
         description : str | None, default=None
             Human-readable description of the matrix.
+        row_scales : Mapping[str, str] | None, default=None
+            The id of the parameter that multiplies the row of a category, by
+            category: a constant or a parameter to calibrate, without unit.
+        column_scales : Mapping[str, str] | None, default=None
+            The id of the parameter that multiplies the column of a category,
+            by category: a constant or a parameter to calibrate, without unit.
 
         Returns
         -------
@@ -15209,9 +15307,11 @@ class ModelBuilder:
         -----
         `build` checks the matrix against the process: it raises
         ``ValueError`` when the stratification is not one of the process, a
-        row or a value of a category is missing, a row or a column names no
-        category, a value is not finite, or the id or a variable of the
-        matrix has the name of another id or variable of the model.
+        row or a value of a category is missing, a row, a column or a scale
+        names no category, a value is not finite, a scale names a parameter
+        the model does not have or a formula or a series parameter, or the id
+        or a variable of the matrix has the name of another id or variable of
+        the model.
         """
         self._matrices.append(
             CategoryMatrix(
@@ -15220,6 +15320,8 @@ class ModelBuilder:
                 values={row: dict(columns) for row, columns in values.items()},
                 unit=unit,
                 description=description,
+                row_scales=dict(row_scales or {}),
+                column_scales=dict(column_scales or {}),
             )
         )
         logger.info(f"Added matrix: id='{id}', stratification='{stratification}'")
@@ -16146,22 +16248,24 @@ def add_stratification(
 #### add_matrix
 
 ```python
-add_matrix(id: str, stratification: str, values: Mapping[str, Mapping[str, float]], unit: str | None = None, description: str | None = None) -> Self
+add_matrix(id: str, stratification: str, values: Mapping[str, Mapping[str, float]], unit: str | None = None, description: str | None = None, row_scales: Mapping[str, str] | None = None, column_scales: Mapping[str, str] | None = None) -> Self
 ```
 
 Add a matrix between the categories of a stratification.
 
-A rate reads it through `matrix_sum(id, e)`: in the rate of a compartment of category `i`, `Σ_j values[i][j] · e_j`, where `e_j` is `e` with each bin read as its amount in category `j` and `total` as the total of `j`. A rate or a formula parameter also reads its entries as `<id>_<i>_<j>` and its spectral radius, the largest modulus of its eigenvalues, as `<id>_radius`.
+A parameter may scale the row and the column of each category: the matrix that rates and calibration constraints read is `M[i][j] = a_i · values[i][j] · b_j`, where `a_i` is the value of `row_scales[i]` and `b_j` of `column_scales[j]` (1 for a category without one). A rate reads it through `matrix_sum(id, e)`: in the rate of a compartment of category `i`, `Σ_j M[i][j] · e_j`, where `e_j` is `e` with each bin read as its amount in category `j` and `total` as the total of `j`. A rate, a formula parameter and a calibration constraint also read its entries `M[i][j]` as `<id>_<i>_<j>` and its spectral radius, the largest modulus of its eigenvalues, as `<id>_radius`, at the values of the scales of the run or of the point.
 
 Parameters:
 
-| Name             | Type                                | Description                                                                                                         | Default                                         |
-| ---------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| `id`             | `str`                               | Unique identifier for the matrix.                                                                                   | *required*                                      |
-| `stratification` | `str`                               | Id of the stratification whose categories are its rows and its columns.                                             | *required*                                      |
-| `values`         | `Mapping[str, Mapping[str, float]]` | values[i][j], the value of row i and column j: one finite number for each pair of categories of the stratification. | *required*                                      |
-| `unit`           | \`str                               | None\`                                                                                                              | Unit of its values, which the unit check reads. |
-| `description`    | \`str                               | None\`                                                                                                              | Human-readable description of the matrix.       |
+| Name             | Type                                | Description                                                                                                         | Default                                                                                                                              |
+| ---------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`             | `str`                               | Unique identifier for the matrix.                                                                                   | *required*                                                                                                                           |
+| `stratification` | `str`                               | Id of the stratification whose categories are its rows and its columns.                                             | *required*                                                                                                                           |
+| `values`         | `Mapping[str, Mapping[str, float]]` | values[i][j], the value of row i and column j: one finite number for each pair of categories of the stratification. | *required*                                                                                                                           |
+| `unit`           | \`str                               | None\`                                                                                                              | Unit of its values, which the unit check reads.                                                                                      |
+| `description`    | \`str                               | None\`                                                                                                              | Human-readable description of the matrix.                                                                                            |
+| `row_scales`     | \`Mapping[str, str]                 | None\`                                                                                                              | The id of the parameter that multiplies the row of a category, by category: a constant or a parameter to calibrate, without unit.    |
+| `column_scales`  | \`Mapping[str, str]                 | None\`                                                                                                              | The id of the parameter that multiplies the column of a category, by category: a constant or a parameter to calibrate, without unit. |
 
 Returns:
 
@@ -16171,7 +16275,7 @@ Returns:
 
 Notes
 
-`build` checks the matrix against the process: it raises `ValueError` when the stratification is not one of the process, a row or a value of a category is missing, a row or a column names no category, a value is not finite, or the id or a variable of the matrix has the name of another id or variable of the model.
+`build` checks the matrix against the process: it raises `ValueError` when the stratification is not one of the process, a row or a value of a category is missing, a row, a column or a scale names no category, a value is not finite, a scale names a parameter the model does not have or a formula or a series parameter, or the id or a variable of the matrix has the name of another id or variable of the model.
 
 Source code in `commol/_model/builder.py`
 
@@ -16183,16 +16287,24 @@ def add_matrix(
     values: Mapping[str, Mapping[str, float]],
     unit: str | None = None,
     description: str | None = None,
+    row_scales: Mapping[str, str] | None = None,
+    column_scales: Mapping[str, str] | None = None,
 ) -> Self:
     """
     Add a matrix between the categories of a stratification.
 
-    A rate reads it through ``matrix_sum(id, e)``: in the rate of a
-    compartment of category ``i``, ``Σ_j values[i][j] · e_j``, where
-    ``e_j`` is ``e`` with each bin read as its amount in category ``j``
-    and ``total`` as the total of ``j``. A rate or a formula parameter
-    also reads its entries as ``<id>_<i>_<j>`` and its spectral radius, the largest
-    modulus of its eigenvalues, as ``<id>_radius``.
+    A parameter may scale the row and the column of each category: the
+    matrix that rates and calibration constraints read is
+    ``M[i][j] = a_i · values[i][j] · b_j``, where ``a_i`` is the value
+    of ``row_scales[i]`` and ``b_j`` of ``column_scales[j]`` (1 for a
+    category without one). A rate reads it through ``matrix_sum(id, e)``:
+    in the rate of a compartment of category ``i``, ``Σ_j M[i][j] · e_j``,
+    where ``e_j`` is ``e`` with each bin read as its amount in category
+    ``j`` and ``total`` as the total of ``j``. A rate, a formula
+    parameter and a calibration constraint also read its entries
+    ``M[i][j]`` as ``<id>_<i>_<j>`` and its spectral radius, the largest
+    modulus of its eigenvalues, as ``<id>_radius``, at the values of the
+    scales of the run or of the point.
 
     Parameters
     ----------
@@ -16208,6 +16320,12 @@ def add_matrix(
         Unit of its values, which the unit check reads.
     description : str | None, default=None
         Human-readable description of the matrix.
+    row_scales : Mapping[str, str] | None, default=None
+        The id of the parameter that multiplies the row of a category, by
+        category: a constant or a parameter to calibrate, without unit.
+    column_scales : Mapping[str, str] | None, default=None
+        The id of the parameter that multiplies the column of a category,
+        by category: a constant or a parameter to calibrate, without unit.
 
     Returns
     -------
@@ -16218,9 +16336,11 @@ def add_matrix(
     -----
     `build` checks the matrix against the process: it raises
     ``ValueError`` when the stratification is not one of the process, a
-    row or a value of a category is missing, a row or a column names no
-    category, a value is not finite, or the id or a variable of the
-    matrix has the name of another id or variable of the model.
+    row or a value of a category is missing, a row, a column or a scale
+    names no category, a value is not finite, a scale names a parameter
+    the model does not have or a formula or a series parameter, or the id
+    or a variable of the matrix has the name of another id or variable of
+    the model.
     """
     self._matrices.append(
         CategoryMatrix(
@@ -16229,6 +16349,8 @@ def add_matrix(
             values={row: dict(columns) for row, columns in values.items()},
             unit=unit,
             description=description,
+            row_scales=dict(row_scales or {}),
+            column_scales=dict(column_scales or {}),
         )
     )
     logger.info(f"Added matrix: id='{id}', stratification='{stratification}'")
@@ -35796,8 +35918,10 @@ class PredictivePlot:
         Raises
         ------
         ValueError
-            If an observation names a factor the problem does not have, the
-            confidence level is out of range, or ``axes`` has no panel of a
+            If an observation with a factor names a factor the problem does
+            not have, a parameter that is not a factor, an unknown output, or
+            a position or a window start the engine does not accept; the
+            confidence level is out of range; or ``axes`` has no panel of a
             series.
         KeyError
             If an entry of ``series`` is neither an output nor a bin or
@@ -36127,11 +36251,11 @@ Returns:
 
 Raises:
 
-| Type          | Description                                                                                                                         |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError`  | If an observation names a factor the problem does not have, the confidence level is out of range, or axes has no panel of a series. |
-| `KeyError`    | If an entry of series is neither an output nor a bin or accumulator id of the model.                                                |
-| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                                                        |
+| Type          | Description                                                                                                                                                                                                                                                        |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ValueError`  | If an observation with a factor names a factor the problem does not have, a parameter that is not a factor, an unknown output, or a position or a window start the engine does not accept; the confidence level is out of range; or axes has no panel of a series. |
+| `KeyError`    | If an entry of series is neither an output nor a bin or accumulator id of the model.                                                                                                                                                                               |
+| `ImportError` | If matplotlib is not installed (pip install 'commol[plot]').                                                                                                                                                                                                       |
 
 Source code in `commol/uncertainty/plots.py`
 
@@ -36177,8 +36301,10 @@ def cumulative(
     Raises
     ------
     ValueError
-        If an observation names a factor the problem does not have, the
-        confidence level is out of range, or ``axes`` has no panel of a
+        If an observation with a factor names a factor the problem does
+        not have, a parameter that is not a factor, an unknown output, or
+        a position or a window start the engine does not accept; the
+        confidence level is out of range; or ``axes`` has no panel of a
         series.
     KeyError
         If an entry of ``series`` is neither an output nor a bin or
@@ -37122,7 +37248,7 @@ Model                      name, description, version, step_unit, origin
 │   ├── accumulators: [Accumulator]
 │   ├── stratifications: [Stratification]
 │   │   └── conditions: [StratificationCondition]
-│   ├── matrices: [CategoryMatrix]         (values: {row: {column: value}})
+│   ├── matrices: [CategoryMatrix]         (values: {row: {column: value}}, row_scales, column_scales)
 │   └── transitions: [Transition]          (impulse_at, impulse_every for impulses)
 │       └── stratified_rates: [StratifiedRate]
 │           └── conditions: [StratificationCondition]
@@ -37382,13 +37508,15 @@ A matrix between the categories of a stratification.
 
 Attributes:
 
-| Name             | Type                          | Description                                                                                                         |
-| ---------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `id`             | `str`                         | The id that matrix_sum reads, and the start of the names of its variables.                                          |
-| `stratification` | `str`                         | The id of the stratification whose categories are its rows and its columns.                                         |
-| `values`         | `dict[str, dict[str, float]]` | values[i][j], the value of row i and column j: one finite number for each pair of categories of the stratification. |
-| `unit`           | \`str                         | None\`                                                                                                              |
-| `description`    | \`str                         | None\`                                                                                                              |
+| Name             | Type                          | Description                                                                                                             |
+| ---------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `id`             | `str`                         | The id that matrix_sum reads, and the start of the names of its variables.                                              |
+| `stratification` | `str`                         | The id of the stratification whose categories are its rows and its columns.                                             |
+| `values`         | `dict[str, dict[str, float]]` | values[i][j], the value of row i and column j: one finite number for each pair of categories of the stratification.     |
+| `unit`           | \`str                         | None\`                                                                                                                  |
+| `description`    | \`str                         | None\`                                                                                                                  |
+| `row_scales`     | `dict[str, str]`              | The id of the parameter that multiplies the row of a category, by category; a category without one keeps its row.       |
+| `column_scales`  | `dict[str, str]`              | The id of the parameter that multiplies the column of a category, by category; a category without one keeps its column. |
 
 Source code in `commol/_model/matrix.py`
 
@@ -37414,6 +37542,12 @@ class CategoryMatrix(BaseModel):
         The unit of its values, which the unit check reads.
     description : str | None
         A human-readable description.
+    row_scales : dict[str, str]
+        The id of the parameter that multiplies the row of a category, by
+        category; a category without one keeps its row.
+    column_scales : dict[str, str]
+        The id of the parameter that multiplies the column of a category, by
+        category; a category without one keeps its column.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -37429,6 +37563,56 @@ class CategoryMatrix(BaseModel):
     description: str | None = Field(
         default=None, description="Human-readable description of the matrix."
     )
+    row_scales: dict[str, str] = Field(
+        default_factory=dict,
+        description="The parameter that multiplies the row of each category.",
+    )
+    column_scales: dict[str, str] = Field(
+        default_factory=dict,
+        description="The parameter that multiplies the column of each category.",
+    )
+
+    def scales(self) -> list[tuple[str, str, str]]:
+        """
+        Each scale, as ``("row" or "column", category, parameter id)``: the
+        rows first, then the columns.
+        """
+        return [
+            (side, category, parameter)
+            for side, scales in (
+                ("row", self.row_scales),
+                ("column", self.column_scales),
+            )
+            for category, parameter in scales.items()
+        ]
+```
+
+### Methods:
+
+#### scales
+
+```python
+scales() -> list[tuple[str, str, str]]
+```
+
+Each scale, as `("row" or "column", category, parameter id)`: the rows first, then the columns.
+
+Source code in `commol/_model/matrix.py`
+
+```python
+def scales(self) -> list[tuple[str, str, str]]:
+    """
+    Each scale, as ``("row" or "column", category, parameter id)``: the
+    rows first, then the columns.
+    """
+    return [
+        (side, category, parameter)
+        for side, scales in (
+            ("row", self.row_scales),
+            ("column", self.column_scales),
+        )
+        for category, parameter in scales.items()
+    ]
 ```
 
 `ModelBuilder.add_matrix` adds one; a rate reads it through `matrix_sum` ([Matrix sums](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#matrix-sums)).
@@ -38622,7 +38806,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 
 - `ObservedDataPoint(scale=...)`: a known positive number, 1 by default, that multiplies the prediction of the observation, with its factor. A count model reads the mean `scale · model`, so a count observed on a known share of the model output stays whole. The loss, the likelihood, the predictive, the scores, the figures, the `observed` block of a report (`scales`) and a `PredictionSpec(scale=...)` of a prediction profile read it. See [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#known-shares-scales).
-- `ModelBuilder.add_matrix(id, stratification, values, unit, description)` adds a matrix between the categories of a stratification, and a transition rate reads it with `matrix_sum(M, e)`: in a compartment of category `i`, `Σ_j M[i, j] · e_j`, with each bin of `e` read as its amount in category `j` and `total` as the total of `j`. Every engine runs it. A rate or a formula parameter reads the entries as `M_<i>_<j>` and the spectral radius of the matrix as `M_radius`; a calibration constraint does not (#419). The unit check, the equations and `Model.describe` read the matrix. See [Matrix sums](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#matrix-sums).
+- `ModelBuilder.add_matrix(id, stratification, values, unit, description)` adds a matrix between the categories of a stratification, and a transition rate reads it with `matrix_sum(M, e)`: in a compartment of category `i`, `Σ_j M[i, j] · e_j`, with each bin of `e` read as its amount in category `j` and `total` as the total of `j`. Every engine runs it. A rate or a formula parameter reads the entries as `M_<i>_<j>` and the spectral radius of the matrix as `M_radius`. The unit check, the equations and `Model.describe` read the matrix. See [Matrix sums](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#matrix-sums).
+- `ModelBuilder.add_matrix(row_scales=..., column_scales=...)`: a constant or a parameter to calibrate multiplies the row or the column of a category, so the model reads `diag(a) · values · diag(b)`. A calibration constraint reads `M_<i>_<j>` and `M_radius` of the scaled matrix at the values of each point, so a bound such as `2 - k * M_radius` is one constraint; a rate reads them at the values of its run. See [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/#a-bound-on-a-matrix).
 - `GibbsResult` and `ConformalResult` give `block_length` and `block_length_estimates`, as the bootstraps, the jackknife and the sandwich do: the length a method ran with, and with `block_length="auto"` the estimate of each series, by label. `GibbsResult` gives them for `InformationMatchingEta` and `BootstrapCoverageEta`, and `None` for a number `η`; `ConformalResult` for `JackknifePlus` and `EnbPI`, and `None` for the variants without blocks. See [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means) and [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#results-plots-and-reports).
 - `ProfileIdentifiability(result=profiles)` in `commol.identifiability`: the identifiability report of the verdicts of a `ProfileResult`, run through `Calibrator.identifiability` as every identifiability method. It runs no model, and it refuses the profiles of another problem with a `ValueError` that names the parameters of both. See [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#verdicts-and-the-identifiability-report).
 

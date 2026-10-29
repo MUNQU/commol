@@ -2904,6 +2904,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-constraint-reads-a-matrix-at-its-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A constraint reads a matrix at its point
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-result-records-its-seed" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3680,6 +3691,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-constraint-reads-a-matrix-at-its-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A constraint reads a matrix at its point
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-result-records-its-seed" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3918,6 +3940,30 @@ edge of the support: its log density is <code>−∞</code> (<code>discrepancy_i
 <p><strong>Guards:</strong> <code>feasibility::tests</code>,
 <code>crates/commol-calibration/tests/test_infeasible_runs.rs</code>,
 <code>crates/commol-calibration/tests/test_likelihood.rs::the_penalty_is_above_every_feasible_cost</code>.</p>
+<h2 id="a-constraint-reads-a-matrix-at-its-point">A constraint reads a matrix at its point<a class="headerlink" href="#a-constraint-reads-a-matrix-at-its-point" title="Permanent link">&para;</a></h2>
+<p>A constraint reads <code>&lt;M&gt;_&lt;i&gt;_&lt;j&gt;</code> and <code>&lt;M&gt;_radius</code> of a matrix between
+categories. <code>Feasibility::new</code> keeps the matrices it reads from
+<code>SimulationEngine::matrices</code> and refuses one with a scale that has no value
+and is not calibrated. Once per evaluation, before the run,
+<code>Feasibility::context</code> scales each by the point (<code>ScaledMatrix::variables</code>);
+one no calibrated parameter scales keeps its model values. The run reads the
+same values (<code>CompiledModel::set_parameter</code>), so a radius bound holds for it.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Read the radius from the engine configured at the point, or from <code>commol-model</code></td>
+<td>The parameter constraints run before that copy of the engine exists; calibration works through <code>SimulationEngine</code> only.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_constraints.rs</code>,
+<code>py-commol/tests/calibration/test_constraints.py::TestMatrixConstraints</code>.</p>
 <h2 id="a-result-records-its-seed">A result records its seed<a class="headerlink" href="#a-result-records-its-seed" title="Permanent link">&para;</a></h2>
 <p>Every random number of a calibration and of its uncertainty methods comes from
 <code>Calibrator.seed</code>: <code>problem.seed</code>, or the seed the engine draws when the

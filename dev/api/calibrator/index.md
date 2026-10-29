@@ -1506,13 +1506,13 @@ Constraints are mathematical expressions that must evaluate to >= 0 for the cons
 
 Attributes:
 
-| Name          | Type          | Description                                                                                                                                                                                                                |
-| ------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`          | `str`         | Unique identifier for this constraint                                                                                                                                                                                      |
-| `expression`  | `str`         | Mathematical expression that must evaluate >= 0 for constraint satisfaction. Can reference calibration parameters by their IDs. When at is specified, can also reference output values (A, B, C, etc.) at those positions. |
-| `description` | \`str         | None\`                                                                                                                                                                                                                     |
-| `weight`      | `float`       | Penalty weight multiplier (default: 1.0). Higher values make this constraint more important relative to others. The amount of a violation of this constraint is weight \*                                                  |
-| `at`          | \`list[float] | None\`                                                                                                                                                                                                                     |
+| Name          | Type          | Description                                                                                                                                                                                                                                                                                                                                                   |
+| ------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`          | `str`         | Unique identifier for this constraint                                                                                                                                                                                                                                                                                                                         |
+| `expression`  | `str`         | Mathematical expression that must evaluate >= 0 for constraint satisfaction. Can reference calibration parameters by their IDs, and the entries <M>_<i>_<j> and the spectral radius <M>\_radius of a matrix between categories, scaled by the values of the point. When at is specified, can also reference output values (A, B, C, etc.) at those positions. |
+| `description` | \`str         | None\`                                                                                                                                                                                                                                                                                                                                                        |
+| `weight`      | `float`       | Penalty weight multiplier (default: 1.0). Higher values make this constraint more important relative to others. The amount of a violation of this constraint is weight \*                                                                                                                                                                                     |
+| `at`          | \`list[float] | None\`                                                                                                                                                                                                                                                                                                                                                        |
 
 Examples:
 
@@ -1570,8 +1570,11 @@ class CalibrationConstraint(RangeChecked):
         Unique identifier for this constraint
     expression : str
         Mathematical expression that must evaluate >= 0 for constraint satisfaction.
-        Can reference calibration parameters by their IDs. When `at` is specified,
-        can also reference output values (A, B, C, etc.) at those positions.
+        Can reference calibration parameters by their IDs, and the entries
+        ``<M>_<i>_<j>`` and the spectral radius ``<M>_radius`` of a matrix
+        between categories, scaled by the values of the point. When `at` is
+        specified, can also reference output values (A, B, C, etc.) at those
+        positions.
     description : str | None
         Human-readable description of the constraint (optional)
     weight : float
@@ -1584,8 +1587,9 @@ class CalibrationConstraint(RangeChecked):
         Optional positions on the axis at which to evaluate this constraint.
         The engine decides which positions its model type accepts: a
         DifferenceEquations model only integer steps. If None, the constraint
-        is evaluated once before simulation using parameter values only. If
-        given, it is evaluated at each position and can reference output values.
+        is evaluated once before simulation from the parameter values and the
+        matrices at them. If given, it is evaluated at each position and can
+        reference output values.
 
     Examples
     --------

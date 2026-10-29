@@ -5078,10 +5078,16 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   category <code>i</code>, <code>Σ_j M[i, j] · e_j</code>, with each bin of <code>e</code> read as its amount
   in category <code>j</code> and <code>total</code> as the total of <code>j</code>. Every engine runs it. A rate
   or a formula parameter reads the entries as <code>M_&lt;i&gt;_&lt;j&gt;</code> and the spectral
-  radius of the matrix as <code>M_radius</code>; a calibration constraint does not
-  (#419). The unit check, the equations and <code>Model.describe</code>
-  read the matrix. See
+  radius of the matrix as <code>M_radius</code>. The unit check, the equations and
+  <code>Model.describe</code> read the matrix. See
   <a href="../../guide/mathematical-expressions/#matrix-sums">Matrix sums</a>.</li>
+<li><code>ModelBuilder.add_matrix(row_scales=..., column_scales=...)</code>: a constant or
+  a parameter to calibrate multiplies the row or the column of a category, so
+  the model reads <code>diag(a) · values · diag(b)</code>. A calibration constraint reads
+  <code>M_&lt;i&gt;_&lt;j&gt;</code> and <code>M_radius</code> of the scaled matrix at the values of each point,
+  so a bound such as <code>2 - k * M_radius</code> is one constraint; a rate reads them at
+  the values of its run. See
+  <a href="../../guide/calibration-constraints/#a-bound-on-a-matrix">Constraints</a>.</li>
 <li><code>GibbsResult</code> and <code>ConformalResult</code> give <code>block_length</code> and
   <code>block_length_estimates</code>, as the bootstraps, the jackknife and the sandwich
   do: the length a method ran with, and with <code>block_length="auto"</code> the

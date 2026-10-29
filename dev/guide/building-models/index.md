@@ -265,14 +265,31 @@ builder = builder.add_matrix(
 | `values`         | `Mapping[str, Mapping[str, float]]` | required | `values[i][j]`, the value of row `i` and column `j`.                    |
 | `unit`           | \`str                               | None\`   | `None`                                                                  |
 | `description`    | \`str                               | None\`   | `None`                                                                  |
+| `row_scales`     | \`Mapping[str, str]                 | None\`   | `None`                                                                  |
+| `column_scales`  | \`Mapping[str, str]                 | None\`   | `None`                                                                  |
 
-| What it gives                                | Meaning                                                                                                                                                                                                |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `matrix_sum(M, e)` in a transition rate      | In a compartment of category `i`, `Σ_j M[i, j] · e_j`, with each bin of `e` read in category `j`. See [Matrix sums](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#matrix-sums) |
-| `M_<i>_<j>` in a rate or a formula parameter | The value of row `i` and column `j`, as `M_g1_g2`                                                                                                                                                      |
-| `M_radius` in a rate or a formula parameter  | The spectral radius: the largest modulus of its eigenvalues                                                                                                                                            |
+A scale makes the matrix `M` that the model reads `diag(a) · values · diag(b)`: `M[i, j] = a_i · values[i][j] · b_j`, where `a_i` is the value of the parameter of the row of `i` and `b_j` of the column of `j`, and 1 for a category without one. A scale is a constant or a parameter to calibrate, whose value does not change during a run; the unit check needs it dimensionless. When a calibration sets a scale, every variable below follows it, at each point (`CompiledModel::set_parameter` in `crates/commol-model/src/system.rs`).
 
-`build` raises `ValueError` when the stratification is not one of the process, a row or a value of a category is missing, a row or a column names no category, a value is not finite, or the id or a variable of the matrix has the name of another id or variable of the model. Each message names the matrix and the category. `Model.describe` lists each matrix with its values and its spectral radius under the parameters.
+```python
+scaled_builder = (
+    builder.clone()
+    .add_parameter(id="a1", value=None)
+    .add_matrix(
+        id="N",
+        stratification="group",
+        values={"g1": {"g1": 2.0, "g2": 1.0}, "g2": {"g1": 1.0, "g2": 3.0}},
+        row_scales={"g1": "a1"},
+    )
+)
+```
+
+| What it gives                                                                                                                                                      | Meaning                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `matrix_sum(M, e)` in a transition rate                                                                                                                            | In a compartment of category `i`, `Σ_j M[i, j] · e_j`, with each bin of `e` read in category `j`. See [Matrix sums](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#matrix-sums) |
+| `M_<i>_<j>` in a rate, a formula parameter or a [calibration constraint](https://munqu.github.io/commol/latest/guide/calibration-constraints/#a-bound-on-a-matrix) | The entry of row `i` and column `j`, scaled, as `M_g1_g2`                                                                                                                                              |
+| `M_radius` in a rate, a formula parameter or a calibration constraint                                                                                              | The spectral radius of the scaled matrix: the largest modulus of its eigenvalues                                                                                                                       |
+
+`build` raises `ValueError` when the stratification is not one of the process, a row or a value of a category is missing, a row, a column or a scale names no category, a value is not finite, a scale names a parameter the model does not have or a formula or a series parameter, or the id or a variable of the matrix has the name of another id or variable of the model. Each message names the matrix and the category. `Model.describe` lists each matrix with its scales, its values before them and its spectral radius at the values of the scales under the parameters.
 
 ## Accumulators
 

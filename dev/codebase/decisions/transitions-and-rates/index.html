@@ -3678,8 +3678,10 @@ same formula always runs the same machine code, so results are reproducible.</p>
 <h2 id="a-matrix-sum-is-written-out-as-the-sum-it-is">A matrix sum is written out as the sum it is<a class="headerlink" href="#a-matrix-sum-is-written-out-as-the-sum-it-is" title="Permanent link">&para;</a></h2>
 <p>A matrix between the categories of a stratification (<code>CategoryMatrix</code>,
 <code>crates/commol-core/src/types/process.rs</code>) is a data object of the process,
-not a parameter: its values are fixed, and a calibrated scale is a parameter
-that multiplies the matrix sum. A rate reads it through <code>matrix_sum(M, e)</code>,
+not a parameter: its values are fixed, and a parameter, constant or
+calibrated, may scale the row and the column of each category
+(<code>row_scales</code>, <code>column_scales</code>), so the model reads
+<code>diag(a) · values · diag(b)</code>. A rate reads it through <code>matrix_sum(M, e)</code>,
 a node of the tree (<code>Expr::MatrixSum</code>) whose first argument names the matrix
 and is not a variable. The JIT never compiles that node:
 <code>MatrixSums::resolve</code> (<code>crates/commol-model/src/matrices.rs</code>) writes it, for a
@@ -3691,15 +3693,24 @@ other variable is unchanged. The terms of a zero entry are dropped; a row of
 zeros is <code>if(&lt;M&gt;_&lt;i&gt;_&lt;j&gt; != 0, &lt;M&gt;_&lt;i&gt;_&lt;j&gt; * (e_j), 0)</code> of its first column,
 which keeps the unit of the matrix for the unit check and is 0 even where
 <code>e_j</code> is not a number (the JIT compiles <code>if</code> as a select).</p>
-<p>Each entry is the variable <code>&lt;M&gt;_&lt;i&gt;_&lt;j&gt;</code>, a constant parameter of the
-engine (<code>matrix_variables</code>), not a number written into the rate. So the
-planned flow keeps the unit of the matrix for the unit check, <code>describe</code>
-names the entry, and a scale of rows and columns (#419) writes
-<code>a_i * &lt;M&gt;_&lt;i&gt;_&lt;j&gt; * b_j</code> with no other change. The spectral radius,
-<code>&lt;M&gt;_radius</code>, is computed once at the build by <code>spectral_radius</code>
-(<code>crates/commol-statistics/src/linear_algebra.rs</code>, the real Schur
-decomposition of <code>nalgebra</code>), where a calibration can reuse it for each
-parameter vector.</p>
+<p>Each entry is the variable <code>&lt;M&gt;_&lt;i&gt;_&lt;j&gt;</code>, a parameter of the engine
+(<code>matrix_variables</code>), not a number written into the rate. So the planned
+flow keeps the unit of the matrix for the unit check and <code>describe</code> names the
+entry. The variable holds the scaled entry <code>a_i · values[i][j] · b_j</code>, and
+<code>&lt;M&gt;_radius</code> the spectral radius of the scaled matrix (<code>spectral_radius</code>,
+<code>crates/commol-statistics/src/linear_algebra.rs</code>, the real Schur
+decomposition of <code>nalgebra</code>). The engine keeps each matrix with the values of
+its scales (<code>ScaledMatrix</code>, <code>crates/commol-core/src/scaled_matrix.rs</code>) and
+writes its variables at the build and again when a caller sets a scale
+(<code>CompiledModel::set_parameter</code>, <code>ScaledMatrix::variables</code>): once per parameter
+vector, never during a run. A matrix with a scale to calibrate has no values
+until the scale is set. So <code>matrix_sum</code>, <code>&lt;M&gt;_&lt;i&gt;_&lt;j&gt;</code>, <code>&lt;M&gt;_radius</code> and a
+calibration constraint
+(<a href="../calibration/#a-constraint-reads-a-matrix-at-its-point">A constraint reads a matrix at its point</a>)
+read one matrix. A scale is a constant or a parameter to calibrate
+(<code>check_matrices</code>): a formula or a series parameter changes during a run. The
+unit check needs it dimensionless, so the entries keep the unit of the
+matrix (<code>UnitChecker._scale_unit_errors</code>).</p>
 <p>Whether the rate is absolute is decided on the variables outside the matrix
 sums (<code>variables_outside_matrix_sums</code>), as for the neighbors of a unit: what
 <code>e</code> reads is a quantity of the other categories, not of the source.</p>
@@ -3728,18 +3739,32 @@ sums (<code>variables_outside_matrix_sums</code>), as for the neighbors of a uni
 <td>The unit check and the description lose the matrix, and a scale by parameters needs a rewrite of every rate.</td>
 </tr>
 <tr>
+<td>The scales written into the rate, <code>a_i * &lt;M&gt;_&lt;i&gt;_&lt;j&gt; * b_j</code>, with the entries unscaled</td>
+<td><code>&lt;M&gt;_&lt;i&gt;_&lt;j&gt;</code> would read another matrix than <code>matrix_sum</code> and <code>&lt;M&gt;_radius</code>.</td>
+</tr>
+<tr>
+<td>Any expression of parameters per entry</td>
+<td><code>n²</code> expressions to check and evaluate at each point; the common case is a scale of the rows or the columns of a fixed matrix.</td>
+</tr>
+<tr>
 <td>Each entry a parameter</td>
 <td><code>n²</code> parameters for a matrix of fixed values, the common case; one entry can be calibrated today as a parameter.</td>
 </tr>
 <tr>
 <td>A function <code>radius(M)</code></td>
-<td>The value does not change during a run, so a variable computed once at the build is enough.</td>
+<td>The value does not change during a run, so a variable computed once per parameter vector is enough.</td>
+</tr>
+<tr>
+<td>Power iteration for the radius</td>
+<td>It converges slowly when the two largest moduli are close, and fails when the largest is a complex pair; a matrix may hold any finite values.</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Guard:</strong> <code>crates/commol-model/tests/matrices.rs</code>,
+<p><strong>Guard:</strong> <code>crates/commol-model/tests/matrices.rs</code> (with
+<code>a_scale_multiplies_the_entries_and_the_radius_follows_it</code>),
 <code>crates/commol-model/tests/rates.rs::a_rate_reads_the_largest_eigenvalue_of_a_matrix</code>,
 <code>py-commol/tests/rates/test_matrices.py</code>,
+<code>py-commol/tests/units/test_matrices.py::test_a_scale_of_a_matrix_has_no_unit</code>,
 <code>py-commol/tests/units/test_matrices.py::test_a_matrix_sum_has_the_unit_of_the_matrix_times_the_expression</code>.</p>
 
 

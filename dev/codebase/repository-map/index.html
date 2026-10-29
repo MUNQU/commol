@@ -3770,8 +3770,13 @@
 <td>Model-specific variables.</td>
 </tr>
 <tr>
+<td><code>crates/commol-core/src/scaled_matrix.rs</code></td>
+<td><code>ScaledMatrix</code> and <code>MatrixScale</code>: a matrix between categories with the value of each parameter that scales its rows and columns, the state an engine keeps and changes when a caller sets a scale, and its variables at given values (<code>variables</code>: the scaled entries and their spectral radius).</td>
+<td>The matrix as data of the process (<code>CategoryMatrix</code>, <code>types/process.rs</code>).</td>
+</tr>
+<tr>
 <td><code>crates/commol-core/src/simulation_engine.rs</code></td>
-<td>The <code>SimulationEngine</code> trait, for an engine of any kind: runs at positions (<code>check_position</code>), outputs (<code>output_names</code>, <code>state_outputs</code>, <code>output_sums</code>), parameters, reset, the seed of a stochastic engine (<code>set_seed</code>), the entry of the list of engines it runs and whether it draws random numbers (<code>engine_type</code>, <code>is_stochastic</code>), and the values of its kind (<code>plan_values</code>, <code>apply_values</code>, <code>ValuePlan</code>); <code>Trajectory</code>, <code>check_positions</code>, <code>run_replicates</code> (one run per seed, in parallel); the rules <code>NUM_STEPS</code>, <code>REPLICATE_COUNT</code> and <code>SEED</code> (a whole number from 0 to 2^64 - 1, the one rule of every seed). What calibration needs from any engine.</td>
+<td>The <code>SimulationEngine</code> trait, for an engine of any kind: runs at positions (<code>check_position</code>), outputs (<code>output_names</code>, <code>state_outputs</code>, <code>output_sums</code>), the matrices between categories with the values of their scales (<code>matrices</code>), parameters, reset, the seed of a stochastic engine (<code>set_seed</code>), the entry of the list of engines it runs and whether it draws random numbers (<code>engine_type</code>, <code>is_stochastic</code>), and the values of its kind (<code>plan_values</code>, <code>apply_values</code>, <code>ValuePlan</code>); <code>Trajectory</code>, <code>check_positions</code>, <code>run_replicates</code> (one run per seed, in parallel); the rules <code>NUM_STEPS</code>, <code>REPLICATE_COUNT</code> and <code>SEED</code> (a whole number from 0 to 2^64 - 1, the one rule of every seed). What calibration needs from any engine.</td>
 <td>Code for one engine or one kind.</td>
 </tr>
 <tr>
@@ -3836,7 +3841,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-model/src/matrices.rs</code></td>
-<td>The matrices between the categories of a stratification: their variables (<code>matrix_variables</code>: the entries <code>&lt;M&gt;_&lt;i&gt;_&lt;j&gt;</code> and the spectral radius <code>&lt;M&gt;_radius</code>), their checks against the model (<code>check_matrices</code>), the variables of a rate outside its matrix sums (<code>variables_outside_matrix_sums</code>) and the writing of <code>matrix_sum(M, e)</code> as the sum over the categories of a compartment (<code>MatrixSums::resolve</code>).</td>
+<td>The matrices between the categories of a stratification: their variables (<code>matrix_variables</code>: the entries <code>&lt;M&gt;_&lt;i&gt;_&lt;j&gt;</code> and the spectral radius <code>&lt;M&gt;_radius</code> of the scaled matrix, which <code>CompiledModel::set_parameter</code> writes again when a caller sets a scale), their checks against the model (<code>check_matrices</code>, with the parameter of each scale), the variables of a rate outside its matrix sums (<code>variables_outside_matrix_sums</code>) and the writing of <code>matrix_sum(M, e)</code> as the sum over the categories of a compartment (<code>MatrixSums::resolve</code>).</td>
 <td>A check of a matrix against its stratification (<code>CategoryMatrix::check</code>, commol-core).</td>
 </tr>
 <tr>
@@ -3911,7 +3916,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/feasibility.rs</code></td>
-<td><code>Feasibility</code> (bounds, constraints), <code>Violation</code> and <code>EvaluationError</code>.</td>
+<td><code>Feasibility</code> (bounds, constraints, and the entries and spectral radius of a scaled matrix a constraint reads at each point), <code>Violation</code> and <code>EvaluationError</code>.</td>
 <td>Penalties.</td>
 </tr>
 <tr>
