@@ -106,8 +106,8 @@ impl Curvature {
     /// The step of parameter `j` is `h_j = δ^{1/4} · s_j`, which balances the
     /// truncation error of the central second difference, of order `h²`,
     /// with the error `δ/h²` of an objective of relative accuracy `δ`
-    /// ([`SimulationEngine::output_accuracy`]). The scale `s_j` is `dθ/du`,
-    /// the length of a unit step on the unbounded scale, for a parameter
+    /// (the relative [`SimulationEngine::accuracy`]). The scale `s_j` is
+    /// `dθ/du`, the length of a unit step on the unbounded scale, for a parameter
     /// with a bound, and `max(|θ_j|, 1)` for one without: `dθ/du` is below
     /// the distance to each bound, so `θ ± 2h` stays inside them.
     ///
@@ -125,7 +125,7 @@ impl Curvature {
         S: SensitivitySource + ?Sized,
     {
         let expected = Self::gauss_newton(problem, source, fit)?;
-        let accuracy = problem.forward().base_engine().output_accuracy();
+        let accuracy = problem.forward().base_engine().accuracy().relative;
         let factor = accuracy.powf(0.25);
         let steps: Vec<f64> = expected
             .transform

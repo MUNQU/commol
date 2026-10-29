@@ -1,14 +1,14 @@
 //! Structural rank, collinearity indices and the identifiability of a sample.
 
 use commol_calibration::{CalibrationParameter, CalibrationProblem, LossConfig, ObservedDataPoint};
-use commol_core::Model;
+use commol_core::{Accuracy, Model};
 use commol_difference::DifferenceEquations;
 use commol_inference::identifiability::{
     PracticalVerdict, Reference, StructuralVerdict, collinearity, collinearity_index,
     sample_identifiability, structural_rank,
 };
 use commol_inference::sensitivity::{
-    Accuracy, Design, FiniteDifferences, Matrix, Sensitivities, SensitivityError, SensitivitySource,
+    Design, FiniteDifferences, Matrix, Sensitivities, SensitivityError, SensitivitySource,
 };
 use commol_inference::{MethodError, ParameterSample};
 use commol_random::Generator;
@@ -83,9 +83,18 @@ fn an_exact_engine_is_not_evaluated_again() {
     let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
     let analysis = structural_rank(&source, 5, 7).unwrap();
 
-    assert!(problem.forward().at_accuracy(1e-9, 1e-9).is_none());
+    assert!(
+        problem
+            .forward()
+            .at_accuracy(Accuracy {
+                relative: 1e-9,
+                absolute: 1e-9
+            })
+            .is_none()
+    );
     assert_eq!(analysis.accuracy, Accuracy::EXACT);
     assert_eq!(analysis.tighter, None);
+    assert_eq!(analysis.tighter_generic_rank, None);
     assert!(
         analysis
             .points
@@ -424,11 +433,14 @@ fn a_rank_lost_to_the_accuracy_gives_no_verdict() {
         assert_eq!((again.accuracy, again.rank), (tighter, 2));
     }
     assert_eq!(analysis.generic_rank, 1);
+    assert_eq!(analysis.tighter_generic_rank, Some(2));
     assert_eq!(
         analysis.verdicts,
         [Some(StructuralVerdict::Identifiable), None]
     );
     assert!(analysis.unchecked.is_empty());
+    // The source names no setting of its accuracy.
+    assert_eq!(analysis.accuracy_settings, None);
 }
 
 #[test]
@@ -436,6 +448,7 @@ fn a_point_of_full_rank_is_not_evaluated_again() {
     let analysis = structural_rank(&Tolerant::new(1e-5, 0.0), 3, 7).unwrap();
 
     assert!(analysis.points.iter().all(|point| point.tighter.is_none()));
+    assert_eq!(analysis.tighter_generic_rank, None);
     assert_eq!(
         analysis.verdicts,
         [Some(StructuralVerdict::Identifiable); 2]

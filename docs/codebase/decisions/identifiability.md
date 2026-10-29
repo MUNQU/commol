@@ -11,8 +11,8 @@ Every reader of derivatives of the predicted observations asks
 `SensitivitySource` (`crates/commol-inference/src/sensitivity/`); only a source
 knows how its derivatives are made. `FiniteDifferences` is the first: central
 differences, one-sided of second order at a bound, with the step
-`h = η^{1/3} · max(|θ|, w)` (at most `w / 8`), where `η` is the output
-accuracy of the engine (`SimulationEngine::output_accuracy`: machine epsilon,
+`h = η^{1/3} · max(|θ|, w)` (at most `w / 8`), where `η` is the relative
+accuracy of the engine (`SimulationEngine::accuracy`: machine epsilon,
 or the `rtol` of the ODE engine) and `w` the width of the bounds (1 when infinite). Each entry
 carries an estimated error, from the steps `h` and `2h` and the accuracy of
 the runs; the structural rank counts a singular value only above the norm of
@@ -36,8 +36,8 @@ refused: its runs change in jumps with the parameters.
 The error of the runs of an engine that integrates with a tolerance enters
 the estimated error of the sensitivities, so it can hide a singular value
 that a tighter tolerance resolves. `structural_rank` asks the source for the
-accuracy of its runs (`SensitivitySource::accuracy`) and for the same source
-at a tighter one (`SensitivitySource::at_accuracy`, which
+accuracy of its runs (`SensitivitySource::accuracy`, an `Accuracy` of
+`commol-core`) and for the same source at a tighter one (`SensitivitySource::at_accuracy`, which
 `FiniteDifferences` builds from `ForwardModel::at_accuracy` and
 `SimulationEngine::at_accuracy`; `None` for an engine whose accuracy no
 setting sets). Each point whose rank is below the number of parameters is
@@ -47,10 +47,11 @@ ranks and null spaces there. A parameter whose verdict changes has no
 verdict (`None`), as a profile whose structure is undetermined. When a point
 cannot run at the tighter accuracy, every parameter that is not identifiable
 has no verdict, and `unchecked` says why. The section keeps the generic
-rank, the projections and the combinations at the accuracy of the engine;
-a combination that holds a parameter with no verdict goes. The reason names
-`ODESolver.rtol` and `ODESolver.atol`, the only settings that set an
-accuracy today.
+rank, the projections and the combinations at the accuracy of the engine,
+and the generic rank at the tighter one; a combination that holds a
+parameter with no verdict goes. The engine names the settings of its
+accuracy (`SimulationEngine::accuracy_settings`: `ODESolver.rtol` and
+`ODESolver.atol`), and the reason names them.
 
 | Alternative | Why not |
 |---|---|

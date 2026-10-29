@@ -48,8 +48,8 @@ pub use range::{Bound, CONFIDENCE_LEVEL, Count, Ranges, Real, Rule, Setting, che
 
 // Re-export simulation engine trait
 pub use simulation_engine::{
-    ModelValue, NUM_STEPS, REPLICATE_COUNT, SEED, SimulationEngine, SimulationError, Trajectory,
-    ValuePlan, check_positions, run_replicates,
+    Accuracy, AccuracySettings, ModelValue, NUM_STEPS, REPLICATE_COUNT, SEED, SimulationEngine,
+    SimulationError, Trajectory, ValuePlan, check_positions, run_replicates,
 };
 
 // Re-export all public types from the types module for convenient access

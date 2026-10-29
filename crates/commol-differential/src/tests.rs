@@ -2,7 +2,7 @@
 
 use std::time::Instant;
 
-use commol_core::{Model, SimulationEngine};
+use commol_core::{Accuracy, Model, SimulationEngine};
 use commol_difference::DifferenceEquations;
 
 use super::DifferentialEquations;
@@ -915,11 +915,16 @@ fn an_engine_at_another_accuracy_integrates_with_those_tolerances() {
         r#","settings":{"method":"tsit45","rtol":1e-3,"atol":1e-3}"#,
     ));
     loose.set_parameter("k", 0.6).unwrap();
-    let mut tight = loose.at_accuracy(1e-10, 1e-8).unwrap();
+    let accuracy = Accuracy {
+        relative: 1e-10,
+        absolute: 1e-8,
+    };
+    let mut tight = loose.at_accuracy(accuracy).unwrap();
 
+    assert_eq!(tight.accuracy(), accuracy);
     assert_eq!(
-        (tight.output_accuracy(), tight.output_absolute_accuracy()),
-        (1e-10, 1e-8)
+        tight.accuracy_settings().map(|settings| settings.relative),
+        Some("ODESolver.rtol")
     );
     // The parameter stays; the error falls with the tolerances.
     let expected = 1000.0 * (-3.0_f64).exp();

@@ -96,6 +96,7 @@ RESULTS = {
     "ConformalRun",
     "PointRank",
     "TighterRank",
+    "Accuracy",
     "StructuralAnalysis",
     "CollinearityVerdict",
     "CollinearityAnalysis",

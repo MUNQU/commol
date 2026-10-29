@@ -93,6 +93,34 @@ pub fn check_positions(
     Ok(())
 }
 
+/// The accuracy of the outputs of a run ([`SimulationEngine::accuracy`]).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Accuracy {
+    /// The size of the relative error a run may carry.
+    pub relative: f64,
+    /// The error a run may carry on an output near 0, beside `relative`
+    /// times its size.
+    pub absolute: f64,
+}
+
+impl Accuracy {
+    /// Outputs exact up to rounding: machine epsilon, and 0 near 0.
+    pub const EXACT: Self = Self {
+        relative: f64::EPSILON,
+        absolute: 0.0,
+    };
+}
+
+/// The settings that set the accuracy of an engine, as a user writes them
+/// ([`SimulationEngine::accuracy_settings`]), such as `ODESolver.rtol`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AccuracySettings {
+    /// The setting of [`Accuracy::relative`].
+    pub relative: &'static str,
+    /// The setting of [`Accuracy::absolute`].
+    pub absolute: &'static str,
+}
+
 /// A value of the model kind that calibration sets, besides parameters: its
 /// type and its id, such as an initial condition of bin `A`.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -306,32 +334,28 @@ pub trait SimulationEngine: Clone {
         Vec::new()
     }
 
-    /// The relative accuracy of the outputs of a run: the size of the
-    /// relative error a run may carry. Finite differences set their step
-    /// from it. Machine epsilon by default, for an engine whose outputs are
-    /// exact up to rounding; an engine that integrates with a tolerance
-    /// returns that tolerance.
-    fn output_accuracy(&self) -> f64 {
-        f64::EPSILON
+    /// The accuracy of the outputs of a run. Finite differences set their
+    /// step from it. [`Accuracy::EXACT`] by default, for an engine whose
+    /// outputs are exact up to rounding; an engine that integrates with
+    /// tolerances returns them. A solver holds its tolerances at each step,
+    /// not over a run, so an error built on them is an estimate, not a
+    /// bound.
+    fn accuracy(&self) -> Accuracy {
+        Accuracy::EXACT
     }
 
-    /// The absolute accuracy of the outputs of a run: the error a run may
-    /// carry on an output near 0, beside [`Self::output_accuracy`] times its
-    /// size. 0 by default; an engine that integrates with an absolute
-    /// tolerance returns it. A solver holds its tolerances at each step, not
-    /// over a run, so an error built on them is an estimate, not a bound.
-    fn output_absolute_accuracy(&self) -> f64 {
-        0.0
+    /// The settings that set [`Self::accuracy`], or `None` when no setting
+    /// sets it (the default).
+    fn accuracy_settings(&self) -> Option<AccuracySettings> {
+        None
     }
 
-    /// The same engine with its outputs at the relative accuracy `relative`
-    /// and the absolute accuracy `absolute` ([`Self::output_accuracy`],
-    /// [`Self::output_absolute_accuracy`]), both finite and greater than 0:
-    /// its state, position and parameters stay. `None` by default, for an
-    /// engine whose accuracy no setting sets, such as one whose outputs are
-    /// exact up to rounding; an engine that integrates with tolerances
-    /// returns itself with those tolerances.
-    fn at_accuracy(&self, _relative: f64, _absolute: f64) -> Option<Self> {
+    /// The same engine with its outputs at `accuracy`, both parts finite and
+    /// greater than 0: its state, position and parameters stay. `None` when
+    /// no setting sets its accuracy ([`Self::accuracy_settings`], the
+    /// default); an engine that integrates with tolerances returns itself
+    /// with those tolerances.
+    fn at_accuracy(&self, _accuracy: Accuracy) -> Option<Self> {
         None
     }
 

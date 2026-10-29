@@ -17,6 +17,7 @@ use std::fmt;
 
 use commol_calibration::discrepancy::series_rms;
 use commol_calibration::{CalibrationParameter, ObservedDataPoint};
+use commol_core::{Accuracy, AccuracySettings};
 
 /// A dense matrix of `f64`, row-major in meaning: `(observation, parameter)`.
 pub type Matrix = nalgebra::DMatrix<f64>;
@@ -31,28 +32,6 @@ pub enum Design {
     /// at every unit position from 0 up to the last observation: can denser
     /// data of the same series determine them?
     Dense,
-}
-
-/// The accuracy of the runs a source differentiates: the relative error a
-/// run may carry ([`SimulationEngine::output_accuracy`]) and the error on an
-/// output near 0 ([`SimulationEngine::output_absolute_accuracy`]).
-///
-/// [`SimulationEngine::output_accuracy`]: commol_core::SimulationEngine::output_accuracy
-/// [`SimulationEngine::output_absolute_accuracy`]: commol_core::SimulationEngine::output_absolute_accuracy
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Accuracy {
-    /// The relative accuracy.
-    pub relative: f64,
-    /// The absolute accuracy.
-    pub absolute: f64,
-}
-
-impl Accuracy {
-    /// Runs exact up to rounding: machine epsilon, and 0 near 0.
-    pub const EXACT: Self = Self {
-        relative: f64::EPSILON,
-        absolute: 0.0,
-    };
 }
 
 /// The Jacobian of the predicted observations at one point.
@@ -174,6 +153,12 @@ pub trait SensitivitySource: Sync {
     /// [`Accuracy::EXACT`] by default.
     fn accuracy(&self) -> Accuracy {
         Accuracy::EXACT
+    }
+
+    /// The settings that set [`Self::accuracy`], or `None` when no setting
+    /// sets it (the default).
+    fn accuracy_settings(&self) -> Option<AccuracySettings> {
+        None
     }
 
     /// The same source on runs at `accuracy`, or `None` when no setting sets

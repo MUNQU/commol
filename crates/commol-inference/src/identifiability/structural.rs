@@ -25,7 +25,9 @@ use commol_calibration::start_points;
 
 use super::skippable;
 use crate::error::MethodError;
-use crate::sensitivity::{Accuracy, Matrix, SensitivitySource};
+use commol_core::{Accuracy, AccuracySettings};
+
+use crate::sensitivity::{Matrix, SensitivitySource};
 
 /// Below this projection on the null space a parameter is identifiable.
 const IDENTIFIABLE: f64 = 0.05;
@@ -119,6 +121,12 @@ pub struct StructuralAnalysis {
     /// is evaluated again at; `None` when no setting sets the accuracy of
     /// the runs, or the accuracy is already the tightest.
     pub tighter: Option<Accuracy>,
+    /// The rank at most points with each point evaluated again at the
+    /// tighter accuracy in place of its rank at the accuracy of the engine;
+    /// `None` when no point was evaluated again.
+    pub tighter_generic_rank: Option<usize>,
+    /// The settings that set the accuracy of the runs, or `None`.
+    pub accuracy_settings: Option<AccuracySettings>,
     /// Why each point that the tighter accuracy should check could not be
     /// evaluated there.
     pub unchecked: Vec<String>,
@@ -245,7 +253,12 @@ pub fn structural_rank<S: SensitivitySource>(
         .zip(&tighter_evaluations)
         .map(|(loose, tight)| tight.as_ref().unwrap_or(loose))
         .collect();
-    let tight_verdicts = verdicts_of(&projections_of(&tight, parameters.len()).1);
+    let (tight_rank, tight_projections, _) = projections_of(&tight, parameters.len());
+    let tight_verdicts = verdicts_of(&tight_projections);
+    let tighter_generic_rank = tighter_evaluations
+        .iter()
+        .any(Option::is_some)
+        .then_some(tight_rank);
     let resolved: Vec<Option<StructuralVerdict>> = verdicts
         .iter()
         .zip(&tight_verdicts)
@@ -275,6 +288,8 @@ pub fn structural_rank<S: SensitivitySource>(
         combinations,
         accuracy,
         tighter: tighter.map(|(tighter, _)| tighter),
+        tighter_generic_rank,
+        accuracy_settings: source.accuracy_settings(),
         unchecked,
     })
 }

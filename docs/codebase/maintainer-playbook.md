@@ -181,7 +181,7 @@ To add an engine to the list:
       model of another engine. A stochastic engine draws every random number
       from one `commol_random::Generator`, implements `set_seed`, and restores
       the generator in `reset`, so a run repeats from its seed. An engine
-      with tolerances implements [`at_accuracy`](decisions/identifiability.md#a-rank-lost-to-the-accuracy-gives-no-verdict).
+      with tolerances implements `accuracy`, `accuracy_settings` and [`at_accuracy`](decisions/identifiability.md#a-rank-lost-to-the-accuracy-gives-no-verdict).
 - [ ] Add a variant to `Engine` in `py-commol/src/engine.rs`: one arm in
       `build` per kind it runs (the pair of the engine and the kind),
       `engine_type`, `dispatch!`, `at_accuracy`, `plan_values` and

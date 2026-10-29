@@ -43,7 +43,9 @@ mod solve;
 
 pub use solve::SPARSE_THRESHOLD;
 
-use commol_core::{EngineSettings, EngineType, OdeSolver, SimulationError};
+use commol_core::{
+    Accuracy, AccuracySettings, EngineSettings, EngineType, OdeSolver, SimulationError,
+};
 use commol_model::{CompartmentalEngine, CompiledModel};
 
 /// Differential equations simulation engine.
@@ -191,22 +193,27 @@ impl commol_core::SimulationEngine for DifferentialEquations {
         Ok(self.integrate_to(positions, buffer)?)
     }
 
-    /// The relative tolerance of the solver.
-    fn output_accuracy(&self) -> f64 {
-        self.settings.rtol
+    /// The tolerances of the solver.
+    fn accuracy(&self) -> Accuracy {
+        Accuracy {
+            relative: self.settings.rtol,
+            absolute: self.settings.atol,
+        }
     }
 
-    /// The absolute tolerance of the solver.
-    fn output_absolute_accuracy(&self) -> f64 {
-        self.settings.atol
+    fn accuracy_settings(&self) -> Option<AccuracySettings> {
+        Some(AccuracySettings {
+            relative: "ODESolver.rtol",
+            absolute: "ODESolver.atol",
+        })
     }
 
-    /// The same engine with `rtol = relative` and `atol = absolute`.
-    fn at_accuracy(&self, relative: f64, absolute: f64) -> Option<Self> {
+    /// The same engine with `rtol` and `atol` at `accuracy`.
+    fn at_accuracy(&self, accuracy: Accuracy) -> Option<Self> {
         Some(Self {
             settings: OdeSolver {
-                rtol: relative,
-                atol: absolute,
+                rtol: accuracy.relative,
+                atol: accuracy.absolute,
                 ..self.settings
             },
             ..self.clone()

@@ -179,7 +179,7 @@ whose verdict changes there has no structural verdict: its `verdict` is
 point cannot run at the tighter tolerances, every parameter that is not
 `identifiable` has no verdict, and the section lists why in `unchecked`. A
 parameter that no observation reads stays `non_identifiable` at any
-tolerance. `DifferenceEquations` runs are exact up to rounding: no point is
+tolerance, when every point runs at the tighter tolerances. `DifferenceEquations` runs are exact up to rounding: no point is
 evaluated again.
 
 | Field of `PointRank` | Meaning |
@@ -188,10 +188,14 @@ evaluated again.
 | `rank` | The rank at that accuracy |
 | `tighter` | The `accuracy`, the singular values, the `threshold` and the `rank` at the tighter tolerances; `None` when the point was not evaluated again |
 
+The section gives `tighter_generic_rank`, the generic rank with each point
+evaluated again at its tighter rank, and the reason of a verdict that stays
+names it when it differs from `generic_rank`.
+
 A verdict of `None` says that the result depends on the tolerance. Tighten
 `ODESolver.rtol` and `ODESolver.atol` and run `StructuralRank` again, until
-the rank stops changing. The fit does not need these tolerances: only the
-finite differences do.
+the rank stops changing. A fit can reach its loss at looser tolerances; the
+finite differences may not.
 
 ### How to read a combination
 

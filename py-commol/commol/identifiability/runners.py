@@ -35,6 +35,7 @@ from commol.identifiability.results import (
 from commol.profiles.results import RESET_REASON
 
 if TYPE_CHECKING:
+    from commol.commol_rs._commol_rs import AccuracyProtocol
     from commol.identifiability.methods import (
         Collinearity,
         ProfileIdentifiability,
@@ -82,34 +83,35 @@ def _report(
     )
 
 
-def _accuracy(pair: tuple[float, float]) -> Accuracy:
-    relative, absolute = pair
-    return Accuracy(relative=relative, absolute=absolute)
+def _accuracy(accuracy: "AccuracyProtocol") -> Accuracy:
+    return Accuracy(relative=accuracy.relative, absolute=accuracy.absolute)
 
 
-def _settings(accuracy: Accuracy) -> str:
-    return (
-        f"ODESolver.rtol = {accuracy.relative:g}, "
-        f"ODESolver.atol = {accuracy.absolute:g}"
-    )
+def _at(accuracy: Accuracy, settings: tuple[str, str]) -> str:
+    relative, absolute = settings
+    return f"{relative} = {accuracy.relative:g}, {absolute} = {accuracy.absolute:g}"
 
 
-def _unresolved_reason(section: StructuralSection) -> str:
-    """Why the structural rank gives no verdict: how the rank of each point
+def _unresolved_reason(section: StructuralSection, settings: tuple[str, str]) -> str:
+    """Why the structural rank gives no verdict: the points whose rank
     changes at the tighter accuracy, and why a point could not run there."""
     tighter = section.tighter
     assert tighter is not None, "only a tighter accuracy leaves a verdict out"
-    facts = [
-        f"the rank of a point goes from {point.rank} to {point.tighter.rank}"
+    changes = [
+        f"{point.rank} to {point.tighter.rank}"
         for point in section.points
-        if point.tighter is not None
-    ] + [f"a point could not run: {why}" for why in section.unchecked]
+        if point.tighter is not None and point.tighter.rank != point.rank
+    ]
+    count = f"{len(changes)} of {len(section.points)} points"
+    facts = [f"the rank of {count} changes ({', '.join(changes)})"] if changes else []
+    facts += [f"a point could not run: {why}" for why in section.unchecked]
+    found = "; ".join(facts) or "no rank changes, but the null space does"
+    relative, absolute = settings
     return (
         f"Structural rank on the observations: the accuracy of the engine "
-        f"({_settings(section.accuracy)}), not the structure, may set its "
-        f"verdict. Evaluated again at {_settings(tighter)}, "
-        f"{'; '.join(facts)}. Tighten ODESolver.rtol and ODESolver.atol until "
-        f"the rank stops changing."
+        f"({_at(section.accuracy, settings)}), not the structure, may set its "
+        f"verdict. Evaluated again at {_at(tighter, settings)}, {found}. "
+        f"Tighten {relative} and {absolute} until the rank stops changing."
     )
 
 
@@ -158,16 +160,23 @@ def run_structural_rank(
         combinations=combinations,
         accuracy=_accuracy(analysis.accuracy),
         tighter=None if analysis.tighter is None else _accuracy(analysis.tighter),
+        tighter_generic_rank=analysis.tighter_generic_rank,
         unchecked=analysis.unchecked,
     )
     if method.design == "dense":
         return _report(calibrator, structural=[section])
+    settings = analysis.accuracy_settings
     rank = f"generic rank {analysis.generic_rank} of {len(names)}"
+    tighter_rank = section.tighter_generic_rank
+    if tighter_rank is not None and tighter_rank != section.generic_rank:
+        assert section.tighter is not None and settings is not None
+        rank += f"; {tighter_rank} at {_at(section.tighter, settings)}"
     structural: dict[str, StructuralVerdict] = {}
     for name in names:
         verdict = verdicts[name]
         if verdict is None:
-            reason = _unresolved_reason(section)
+            assert settings is not None, "only a setting of the accuracy tightens it"
+            reason = _unresolved_reason(section, settings)
         else:
             projection = section.projections[name]
             reason = (

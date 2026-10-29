@@ -84,6 +84,7 @@ class StructuralSectionData(TypedDict):
     combinations: list[CombinationData]
     accuracy: AccuracyData
     tighter: AccuracyData | None
+    tighter_generic_rank: int | None
     unchecked: list[str]
 
 

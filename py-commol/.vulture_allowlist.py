@@ -12,6 +12,7 @@ CalibrationProblemProtocol
 ParameterSampleProtocol
 CalibrationResultProtocol
 ObservationDrawsProtocol
+AccuracyProtocol
 BootstrapRunProtocol
 DistributionProtocol
 SMCRunProtocol

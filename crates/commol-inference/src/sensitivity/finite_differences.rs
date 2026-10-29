@@ -3,7 +3,7 @@
 //! The step of parameter `j` is `h_j = η^{1/3} · max(|θ_j|, w_j)`, at most
 //! `w_j / 8`, where `w_j` is the width of its bounds (1 when a bound is
 //! infinite, so the step stays finite) and `η` the output
-//! accuracy of the engine ([`SimulationEngine::output_accuracy`]): the step
+//! relative accuracy of the engine ([`SimulationEngine::accuracy`]): the step
 //! that balances the truncation error of a difference of second order with
 //! the error of the runs. The difference is central when `θ_j ± 2h_j` is
 //! inside the bounds, and one-sided of second order towards the inside
@@ -16,12 +16,11 @@ use commol_calibration::{
     CalibrationParameter, CalibrationProblem, EvaluationError, ForwardModel, ObservedDataPoint,
     Violation, Workspace,
 };
-use commol_core::SimulationEngine;
+use commol_core::{Accuracy, AccuracySettings, SimulationEngine};
 use rayon::prelude::*;
 
 use super::{
-    Accuracy, Design, Matrix, Sensitivities, SensitivityError, SensitivitySource,
-    observation_scales,
+    Design, Matrix, Sensitivities, SensitivityError, SensitivitySource, observation_scales,
 };
 use commol_calibration::discrepancy::series_rms;
 
@@ -87,7 +86,7 @@ impl<E: SimulationEngine + Send + Sync> FiniteDifferences<E> {
                 .with_observations(&observed_data)
                 .map_err(SensitivityError::Failed)?,
         };
-        let accuracy = forward.base_engine().output_accuracy();
+        let accuracy = forward.base_engine().accuracy().relative;
         Ok(Self {
             forward,
             observed_data,
@@ -116,7 +115,7 @@ impl<E: SimulationEngine + Send + Sync> FiniteDifferences<E> {
             .forward()
             .with_observations(&observed_data)
             .map_err(SensitivityError::Failed)?;
-        let accuracy = forward.base_engine().output_accuracy();
+        let accuracy = forward.base_engine().accuracy().relative;
         Ok(Self {
             forward,
             observed_data,
@@ -252,23 +251,22 @@ impl<E: SimulationEngine + Send + Sync> SensitivitySource for FiniteDifferences<
     }
 
     fn accuracy(&self) -> Accuracy {
-        let engine = self.forward.base_engine();
-        Accuracy {
-            relative: engine.output_accuracy(),
-            absolute: engine.output_absolute_accuracy(),
-        }
+        self.forward.base_engine().accuracy()
+    }
+
+    fn accuracy_settings(&self) -> Option<AccuracySettings> {
+        self.forward.base_engine().accuracy_settings()
     }
 
     /// The same differences of runs of the engine at `accuracy`
     /// ([`SimulationEngine::at_accuracy`]), whose steps follow it.
     fn at_accuracy(&self, accuracy: Accuracy) -> Option<Self> {
-        let forward = self
-            .forward
-            .at_accuracy(accuracy.relative, accuracy.absolute)?;
+        let forward = self.forward.at_accuracy(accuracy)?;
         Some(Self {
-            accuracy: forward.base_engine().output_accuracy(),
+            accuracy: forward.base_engine().accuracy().relative,
             forward,
-            ..self.clone()
+            observed_data: self.observed_data.clone(),
+            design: self.design,
         })
     }
 }

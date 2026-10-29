@@ -23,10 +23,7 @@ class TestSolverTolerance:
         assert lost is not None
         assert lost.rank == 3
         assert all(point.tighter is None for point in section.points[1:])
-        assert all(
-            verdict not in ("non_identifiable", "in_combination")
-            for verdict in section.verdicts.values()
-        )
+        assert list(section.verdicts.values()) == ["identifiable"] * 3
 
     def test_a_rank_lost_at_most_points_leaves_the_verdicts_out(self) -> None:
         loose = rare_flow_calibrator(ODESolver(rtol=1e-6, atol=1e-6))
@@ -44,8 +41,8 @@ class TestSolverTolerance:
                 "Structural rank on the observations: the accuracy of the engine "
                 "(ODESolver.rtol = 1e-06, ODESolver.atol = 1e-06), not the "
                 "structure, may set its verdict. Evaluated again at "
-                "ODESolver.rtol = 1e-08, ODESolver.atol = 1e-08, the rank of a "
-                "point goes from 2 to 3. Tighten ODESolver.rtol and "
+                "ODESolver.rtol = 1e-08, ODESolver.atol = 1e-08, the rank of 1 "
+                "of 1 points changes (2 to 3). Tighten ODESolver.rtol and "
                 "ODESolver.atol until the rank stops changing."
             ]
 
@@ -61,6 +58,26 @@ class TestSolverTolerance:
         structural = report.verdicts["u"].structural
         assert structural is not None
         assert structural.verdict == "non_identifiable"
+
+    def test_a_verdict_that_stays_names_the_generic_rank_at_both_tolerances(
+        self,
+    ) -> None:
+        calibrator = rare_flow_calibrator(ODESolver(), unread=True)
+
+        report = calibrator.identifiability(
+            StructuralRank(points=1, design="observations")
+        )
+
+        section = report.structural[0]
+        assert (section.generic_rank, section.tighter_generic_rank) == (2, 3)
+        structural = report.verdicts["u"].structural
+        assert structural is not None
+        assert structural.verdict == "non_identifiable"
+        assert structural.reasons == [
+            "Structural rank on the observations (generic rank 2 of 4; 3 at "
+            "ODESolver.rtol = 1e-08, ODESolver.atol = 1e-08): its projection on "
+            "the null space is 1.00."
+        ]
 
     def test_a_point_evaluated_again_holds_both_ranks(self) -> None:
         loose = rare_flow_calibrator(ODESolver(rtol=1e-6, atol=1e-5))

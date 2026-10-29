@@ -89,7 +89,11 @@ class ParameterVerdicts(_FrozenResult):
     Attributes
     ----------
     structural : StructuralVerdict | None
-        From the structural rank on the design of the observations.
+        From the structural rank on the design of the observations, and from
+        a flat profile. ``None`` when no method that ran speaks to the
+        structure of the parameter. A `StructuralVerdict` whose ``verdict``
+        is ``None`` is evidence with no verdict: the structural rank ran, but
+        the accuracy of the runs may set its rank; its reasons say why.
     practical : PracticalVerdict | None
         From collinearity, a sample or the starts.
     """
@@ -178,8 +182,11 @@ class PointRank(_FrozenResult):
         How many pass it.
     tighter : TighterRank | None
         The rank at a tighter accuracy, when the rank is below the number of
-        parameters and a setting of the engine sets its accuracy; ``None``
-        otherwise.
+        parameters and a setting of the engine sets its accuracy. ``None``
+        when the rank is that number, when no setting sets the accuracy (an
+        engine exact up to rounding), when the accuracy is already the
+        tightest (1e-14), or when the point could not run at the tighter
+        accuracy (``StructuralSection.unchecked`` says why).
     """
 
     values: dict[str, float]
@@ -222,6 +229,10 @@ class StructuralSection(_FrozenResult):
         evaluated again at: each accuracy of the engine divided by 100, no
         lower than 1e-14. ``None`` when no setting sets the accuracy of the
         engine, or it is already the tightest.
+    tighter_generic_rank : int | None
+        The rank at most points with each point evaluated again at the
+        tighter accuracy in place of its rank at the accuracy of the engine;
+        ``None`` when no point was evaluated again.
     unchecked : list[str]
         Why each point that the tighter accuracy should check could not run
         there.
@@ -236,6 +247,7 @@ class StructuralSection(_FrozenResult):
     combinations: list[Combination]
     accuracy: Accuracy
     tighter: Accuracy | None
+    tighter_generic_rank: int | None
     unchecked: list[str]
 
 
