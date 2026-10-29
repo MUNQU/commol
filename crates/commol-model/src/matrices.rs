@@ -6,9 +6,10 @@
 //! compartment of category `i`, `matrix_sum(M, e)` is
 //! `Σ_j <M>_<i>_<j> * (e_j)`, where `e_j` is `e` with each bin read as its
 //! amount in category `j` and `total` as the total of category `j`
-//! ([`MatrixSums::resolve`]). A term whose entry is 0 is left out, unless
-//! every entry of the row is 0: then the first term stays, so the rate keeps
-//! its unit and its value is 0. The amounts are found by label: one compartment is its name, several are the
+//! ([`MatrixSums::resolve`]). A term whose entry is 0 is left out. A row of
+//! zeros is `if(<M>_<i>_<j> != 0, <M>_<i>_<j> * (e_j), 0)` of its first
+//! column: 0, in the unit of the sum, even where `e_j` is not a number. The
+//! amounts are found by label: one compartment is its name, several are the
 //! subgroup total that sums exactly them, or their sum.
 
 use std::collections::{HashMap, HashSet};
@@ -73,7 +74,8 @@ pub fn matrix_variables(process: &Process) -> Vec<MatrixVariable> {
 /// the process ([`CategoryMatrix::check`]), the id or a variable of a matrix
 /// has the name of a parameter, a bin, an accumulator, a compartment, a
 /// subgroup total or an engine variable (`taken`, by name and what it is),
-/// two matrices give one variable, a rate reads a matrix the process does
+/// two matrices give one variable, a variable of a matrix is the id of a
+/// matrix, a rate reads a matrix the process does
 /// not have or reads the neighbors inside a matrix sum, or a formula
 /// parameter reads a matrix sum. So the engine, a unit and a description
 /// never read one name as two things.
@@ -98,6 +100,13 @@ pub(crate) fn check_matrices(
     }
     let mut given: HashMap<String, String> = HashMap::new();
     for variable in matrix_variables(process) {
+        if ids.contains(variable.name.as_str()) {
+            return Err(format!(
+                "Matrix '{}' gives the variable '{}', which is also the id of a matrix; \
+                 rename one of them",
+                variable.matrix, variable.name
+            ));
+        }
         if let Some(other) = given.insert(variable.name.clone(), variable.matrix.clone()) {
             return Err(format!(
                 "Matrices '{other}' and '{}' both give the variable '{}'; rename one of them",
@@ -226,8 +235,8 @@ impl<'a> MatrixSums<'a> {
     }
 
     /// `Σ_j <M>_<i>_<j> * (e_j)` in the compartment `start`, of category `i`,
-    /// without the terms of a zero entry; the first term alone when every
-    /// entry of the row is 0.
+    /// without the terms of a zero entry; for a row of zeros, the term of its
+    /// first column when its entry is not 0, else 0.
     fn sum(
         &self,
         matrix: &str,
@@ -250,23 +259,31 @@ impl<'a> MatrixSums<'a> {
                 self.layout.name(start)
             ));
         };
-        // `own` is a category of the stratification, so the row has a column.
-        let categories = matrix.categories(self.process);
-        let mut columns: Vec<&String> = categories
-            .iter()
-            .filter(|column| matrix.value(own, column) != 0.0)
-            .collect();
-        if columns.is_empty() {
-            columns.push(&categories[0]);
-        }
-        let mut terms = columns.into_iter().map(|column| {
+        let term = |column: &String| {
             Expr::binary(
                 BinaryOperator::Mul,
                 Expr::variable(matrix.entry_name(own, column)),
                 self.in_category(expression, matrix, column),
             )
-        });
-        let first = terms.next().expect("the row has a column");
+        };
+        // `own` is a category of the stratification, so the row has a column.
+        let categories = matrix.categories(self.process);
+        let mut terms = categories
+            .iter()
+            .filter(|column| matrix.value(own, column) != 0.0)
+            .map(term);
+        let Some(first) = terms.next() else {
+            // A row of zeros: `if(<M>_<i>_<j> != 0, <M>_<i>_<j> * (e_j), 0)` of
+            // the first column has the unit of the sum, and it is 0 even
+            // where `e_j` is not a number.
+            let column = &categories[0];
+            let entry = Expr::variable(matrix.entry_name(own, column));
+            return Ok(Expr::if_then_else(
+                Expr::binary(BinaryOperator::Ne, entry, Expr::Constant(0.0)),
+                term(column),
+                Expr::Constant(0.0),
+            ));
+        };
         let rest: Vec<_> = terms.map(|term| (BinaryOperator::Add, term)).collect();
         Ok(if rest.is_empty() {
             first

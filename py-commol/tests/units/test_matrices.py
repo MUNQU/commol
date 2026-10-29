@@ -65,4 +65,4 @@ def test_a_row_of_zeros_keeps_the_unit_of_the_matrix_sum() -> None:
     model.check_unit_consistency()
 
     rates = [flow.rate for flow in transition_flows(model.process, model.structure)]
-    assert rates[0] == "k * (M_g1_g1 * (B_g1 / total_g1))"
+    assert rates[0] == "k * if(M_g1_g1 != 0, M_g1_g1 * (B_g1 / total_g1), 0)"

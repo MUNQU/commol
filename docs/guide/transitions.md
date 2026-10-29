@@ -66,8 +66,7 @@ per member of the source:
 
 | Case | Kind | Flow |
 |---|---|---|
-| The rate names a compartment, a bin total or a `total_…` variable | Absolute | `rate` |
-| A name only inside a `matrix_sum(M, e)`, as in `k1 * matrix_sum(M, B / total)` | Does not count, as `e` reads the amounts of other categories: this rate is proportional | — |
+| The rate names, outside every `matrix_sum`, a compartment, a bin total or a `total_…` variable | Absolute | `rate` |
 | No source | Absolute | `rate` |
 | A stratified rate sets `"absolute": True` or `False` | As set | — |
 | Otherwise | Proportional | `rate × source` |

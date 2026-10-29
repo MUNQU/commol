@@ -142,8 +142,12 @@ fn a_term_of_a_zero_entry_is_left_out_and_a_zero_row_keeps_its_first_term() {
 
     let rates: Vec<String> = flows(&model).into_iter().map(|flow| flow.1).collect();
 
-    // The row of `g2` is 0: its first term keeps the unit of the rate.
-    assert_eq!(rates, ["M_g1_g1 * B_g1", "M_g2_g1 * B_g1"]);
+    // The row of `g2` is 0: the term of its first column, under a condition
+    // that is false, keeps the unit of the rate.
+    assert_eq!(
+        rates,
+        ["M_g1_g1 * B_g1", "if(M_g2_g1 != 0, M_g2_g1 * B_g1, 0)"]
+    );
 }
 
 #[test]
@@ -345,5 +349,39 @@ fn two_matrices_that_give_one_variable_are_rejected() {
     assert_eq!(
         rejection(&model),
         "Matrices 'M' and 'M_x' both give the variable 'M_x_y_z'; rename one of them"
+    );
+}
+
+#[test]
+fn a_row_of_zeros_is_zero_where_its_first_category_is_empty() {
+    let mut model = model("k1 * matrix_sum(M, B / total)", "");
+    let values = &mut model.process.matrices[0].values;
+    values["g1"]["g1"] = 0.0;
+    values["g2"]["g1"] = 0.0;
+    values["g2"]["g2"] = 0.0;
+    let mut compiled = CompiledModel::try_from_model(&model).unwrap();
+    // A_g1, A_g2, B_g1, B_g2: `g1` is empty, so `B_g1 / total_g1` is NaN.
+    let state = [0.0, 500.0, 0.0, 40.0];
+    let mut rates = vec![0.0; 2];
+
+    compiled
+        .transition_rates(0.0, 0.0, &state, &mut rates)
+        .unwrap();
+
+    assert!((rates[0] - 0.3 * 40.0 / 540.0).abs() < 1e-15);
+    assert_eq!(rates[1], 0.0);
+}
+
+#[test]
+fn a_variable_of_a_matrix_is_not_the_id_of_another() {
+    let mut model = model("k1", "");
+    let mut other = model.process.matrices[0].clone();
+    other.id = "M_radius".to_string();
+    model.process.matrices.push(other);
+
+    assert_eq!(
+        rejection(&model),
+        "Matrix 'M' gives the variable 'M_radius', which is also the id of a matrix; rename \
+         one of them"
     );
 }

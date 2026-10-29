@@ -197,9 +197,10 @@ print(coupled_run["A_g1"][1])  # 349.2
 The engine writes each matrix sum as the sum it is before it compiles the
 rate, so every engine runs it: in `g1` the rate above is
 `k1 * (M_g1_g1 * (B_g1 / total_g1) + M_g1_g2 * (B_g2 / total_g2))`, and
-`Model.describe` shows that sum. A term whose entry is 0 is left out; when
-every entry of the row is 0, the first term stays, with the value 0, so the
-rate keeps its unit.
+`Model.describe` shows that sum. A term whose entry is 0 is left out. A row
+of zeros is `if(M_g1_g1 != 0, M_g1_g1 * (B_g1 / total_g1), 0)` in `g1`: its
+value is 0, even where `B_g1 / total_g1` is not a number, and it keeps the
+unit of the sum.
 
 | Rule | Why |
 |---|---|
@@ -209,12 +210,11 @@ rate keeps its unit.
 | Each compartment of the transition has a category of the stratification of `M` | Else the row `i` is not defined; a conditional stratification can leave a compartment without one |
 
 A rate or a formula parameter reads the entries of `M` as `M_<i>_<j>`
-(`M_g1_g2` is 1 above) and its spectral radius as `M_radius`: the largest modulus of its
-eigenvalues, real or complex. The engine computes it once, when it builds the
-model, from the values of the matrix. Above, `M_radius` is `(5 + √5) / 2`,
-about 3.618. A calibration constraint does not read these variables; #419
-proposes a radius that follows calibrated scales of the rows and columns.
-about 3.618. A rate scaled by `1 / M_radius` reads the matrix normalized to a
+(`M_g1_g2` is 1 above) and its spectral radius as `M_radius`: the largest
+modulus of its eigenvalues, real or complex. The engine computes it once,
+when it builds the model, from the values of the matrix. Above, `M_radius` is
+`(5 + √5) / 2`, about 3.618. A calibration constraint does not read these
+variables. A rate scaled by `1 / M_radius` reads the matrix normalized to a
 spectral radius of 1, so its scale follows a change of the values:
 
 ```python

@@ -71,8 +71,10 @@ compartment of category `i`, as `Σ_j <M>_<i>_<j> * (e_j)` while
 `plan_transition_flows` plans the flows. In `e_j` a bin reads the subgroup
 total of exactly its compartments in `j` (the explicit sum of them when no
 subgroup total sums that set alone), `total` reads `total_<j>`, and every
-other variable is unchanged. The terms of a zero entry are dropped, but a row
-of zeros keeps its first term, with the value 0, for the unit check.
+other variable is unchanged. The terms of a zero entry are dropped; a row of
+zeros is `if(<M>_<i>_<j> != 0, <M>_<i>_<j> * (e_j), 0)` of its first column,
+which keeps the unit of the matrix for the unit check and is 0 even where
+`e_j` is not a number (the JIT compiles `if` as a select).
 
 Each entry is the variable `<M>_<i>_<j>`, a constant parameter of the
 engine (`matrix_variables`), not a number written into the rate. So the

@@ -155,7 +155,8 @@ stratifications.
 
 A matrix may not take the id of a parameter, a bin, an accumulator, a
 compartment, a subgroup total or an engine variable, nor may one of its
-variables, and two matrices may not give one variable
+variables, and two matrices may not give one variable nor a variable that is
+the id of a matrix
 (`check_matrices` in `crates/commol-model/src/matrices.rs`).
 
 An id that starts with `total_` but names no subgroup total, such as

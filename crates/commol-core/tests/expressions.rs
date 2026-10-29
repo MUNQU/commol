@@ -3,6 +3,7 @@
 
 use std::collections::BTreeSet;
 
+use commol_core::math_expression::jit::ast::Expr;
 use commol_core::math_expression::{MAX_NESTING, MAX_NODES};
 use commol_core::{FUNCTIONS, MathExpression, MathExpressionContext};
 
@@ -269,6 +270,8 @@ fn every_level_of_operators_at_the_limit_reads_on_a_worker_thread() {
             MathExpression::new(tree.to_string()).tree().unwrap(),
             tree.clone()
         );
+        let mapped: Result<Expr, ()> = tree.try_map(&mut |_| None);
+        assert_eq!(mapped, Ok(tree.clone()));
     });
 }
 

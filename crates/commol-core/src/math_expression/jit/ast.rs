@@ -369,37 +369,40 @@ impl Expr {
         if let Some(node) = replace(self) {
             return node;
         }
-        Ok(match self {
+        // One loop over the operands keeps each level of the recursion one
+        // small frame, so a tree at the nesting limit maps on a worker thread.
+        let operands = self.operands();
+        let mut mapped = Vec::with_capacity(operands.len());
+        for operand in operands {
+            mapped.push(operand.try_map(replace)?);
+        }
+        Ok(self.with_operands(mapped))
+    }
+
+    /// The node with its operands, in the order of [`Self::operands`],
+    /// replaced by `operands`.
+    fn with_operands(&self, operands: Vec<Expr>) -> Expr {
+        let mut operands = operands.into_iter();
+        let mut next = || {
+            operands
+                .next()
+                .expect("one operand for each operand of the node")
+        };
+        match self {
             Expr::Constant(_) | Expr::Variable(_) => self.clone(),
-            Expr::Chain { first, rest } => Expr::chain(
-                first.try_map(replace)?,
-                rest.iter()
-                    .map(|(op, operand)| Ok((*op, operand.try_map(replace)?)))
-                    .collect::<Result<_, E>>()?,
-            ),
-            Expr::Power { base, exponent } => {
-                Expr::power(base.try_map(replace)?, exponent.try_map(replace)?)
+            Expr::Chain { rest, .. } => {
+                let first = next();
+                let rest = rest.iter().map(|(op, _)| (*op, next())).collect();
+                Expr::chain(first, rest)
             }
-            Expr::UnaryOp { op, operand } => Expr::unary(*op, operand.try_map(replace)?),
-            Expr::FunctionCall { name, args } => Expr::call(
-                name.clone(),
-                args.iter()
-                    .map(|arg| arg.try_map(replace))
-                    .collect::<Result<_, E>>()?,
-            ),
-            Expr::Conditional {
-                condition,
-                true_expr,
-                false_expr,
-            } => Expr::if_then_else(
-                condition.try_map(replace)?,
-                true_expr.try_map(replace)?,
-                false_expr.try_map(replace)?,
-            ),
-            Expr::MatrixSum { matrix, expression } => {
-                Expr::matrix_sum(matrix.clone(), expression.try_map(replace)?)
+            Expr::Power { .. } => Expr::power(next(), next()),
+            Expr::UnaryOp { op, .. } => Expr::unary(*op, next()),
+            Expr::FunctionCall { name, args } => {
+                Expr::call(name.clone(), args.iter().map(|_| next()).collect())
             }
-        })
+            Expr::Conditional { .. } => Expr::if_then_else(next(), next(), next()),
+            Expr::MatrixSum { matrix, .. } => Expr::matrix_sum(matrix.clone(), next()),
+        }
     }
 
     /// Whether the tree holds a `matrix_sum`, which only a model writes as
