@@ -667,10 +667,10 @@ overridden.structure.update_bin_amounts({"A": 8500, "B": 1500})
 overridden.structure.update_stratification_fractions({"g1": 0.7})  # g2 becomes 0.3
 ```
 
-| Method                            | Rule                                                                                                                                                                                                                                                                                   |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `update_bin_amounts`              | Each amount is finite and not negative, or `None` for calibration. The other bins keep their amounts.                                                                                                                                                                                  |
-| `update_stratification_fractions` | Within each stratification you may omit one category; it receives what remains of 1, or 0 when the given fractions pass 1. Omitting two raises. Each fraction is from 0 to 1 and the fractions sum to 1 within 1e-6, with the rule of the engine; a rejected call changes no fraction. |
+| Method                            | Rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `update_bin_amounts`              | Each amount is finite and not negative, or `None` for calibration. The other bins keep their amounts.                                                                                                                                                                                                                                                                                                                                                                         |
+| `update_stratification_fractions` | Within each stratification you may omit one category; it receives what remains of 1, or 0 when the given fractions pass 1. Omitting two raises. Each fraction is from 0 to 1 and the fractions sum to 1 within 1e-6, with the rule of the engine; a rejected call changes no fraction. A stratification whose fractions [differ by category](https://munqu.github.io/commol/latest/guide/building-models/#fractions-that-differ-by-category) takes the values in every split. |
 
 A category name that two stratifications declare must be qualified with its stratification, as in `{"group:g1": 0.5}`. Calibration writes its results back through these same methods.
 
@@ -1101,25 +1101,72 @@ structure = Aggregate(
 )
 ```
 
-| Argument                   | Type                          | Default  | Meaning                                                                                                                                                                            |
-| -------------------------- | ----------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bin_amounts`              | `dict[str, float \| None]`    | required | The amount of each bin at the start, in the unit of the bin: a count, a mass or a concentration. An amount may be `None` when calibration finds it.                                |
-| `stratification_fractions` | `dict[str, dict[str, float]]` | `{}`     | For each stratification, the fraction in each category: the split of the amount of every bin it applies to. For a conditional stratification, the split of the subgroup it splits. |
-| `compartment_amounts`      | `dict[str, float]`            | `{}`     | Overrides single expanded compartments with an amount in the unit of their bin.                                                                                                    |
-| `neighbors`                | `Complete \| Groups \| None`  | `None`   | Who the [neighbors](#neighbors) of a unit are. Required when a rate reads them.                                                                                                    |
+| Argument                   | Type                                                                | Default  | Meaning                                                                                                                                                                                                                                                                                                           |
+| -------------------------- | ------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bin_amounts`              | `dict[str, float \| None]`                                          | required | The amount of each bin at the start, in the unit of the bin: a count, a mass or a concentration. An amount may be `None` when calibration finds it.                                                                                                                                                               |
+| `stratification_fractions` | `dict[str, dict[str, float] \| dict[str, str \| dict[str, float]]]` | `{}`     | For each stratification, the fraction in each category: the split of the amount of every bin it applies to. For a conditional stratification, the split of the subgroup it splits. A stratification may instead [split each category of an earlier one](#fractions-that-differ-by-category) by its own fractions. |
+| `compartment_amounts`      | `dict[str, float]`                                                  | `{}`     | Overrides single expanded compartments with an amount in the unit of their bin.                                                                                                                                                                                                                                   |
+| `neighbors`                | `Complete \| Groups \| None`                                        | `None`   | Who the [neighbors](#neighbors) of a unit are. Required when a rate reads them.                                                                                                                                                                                                                                   |
 
-| Rule                                                                                                                                                                           | Checked when                                                |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
-| Every amount is finite and not negative; `0` is an amount. The engine holds the rule (`check_bin_amount` and `check_compartment_amount` in `crates/commol-model/src/rules.rs`) | `Aggregate(...)` and each update of an amount               |
-| Every bin has an amount, and no other id                                                                                                                                       | `build`                                                     |
-| Every stratification has a fraction for each of its categories, and no other category                                                                                          | `build`                                                     |
-| Every fraction is from 0 to 1, and the fractions of a stratification sum to 1 within 1e-6. The engine holds the rule (`check_fractions` in `crates/commol-model/src/rules.rs`) | `Aggregate(...)` and each `update_stratification_fractions` |
-| Override names are expanded compartments                                                                                                                                       | `build`                                                     |
-| With a stochastic engine, the amount of each bin is a whole number                                                                                                             | `build`                                                     |
+| Rule                                                                                                                                                                                                                                                                                 | Checked when                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| Every amount is finite and not negative; `0` is an amount. The engine holds the rule (`check_bin_amount` and `check_compartment_amount` in `crates/commol-model/src/rules.rs`)                                                                                                       | `Aggregate(...)` and each update of an amount               |
+| Every bin has an amount, and no other id                                                                                                                                                                                                                                             | `build`                                                     |
+| Every stratification has a fraction for each of its categories, and no other category; a split by category has one split for each category of the stratification it differs by. The engine holds the rule (`check_stratification_fractions` in `crates/commol-model/src/builder.rs`) | `build`                                                     |
+| Every fraction is from 0 to 1, and each split sums to 1 within 1e-6. The engine holds the rule (`check_fractions` in `crates/commol-model/src/rules.rs`)                                                                                                                             | `Aggregate(...)` and each `update_stratification_fractions` |
+| Override names are expanded compartments                                                                                                                                                                                                                                             | `build`                                                     |
+| With a stochastic engine, the amount of each bin is a whole number                                                                                                                                                                                                                   | `build`                                                     |
 
 The initial amount of a compartment is `bin amount × the fraction of each of its categories`, unless an override names it. `model.structure.initial_state(model.process)` shows the result. To change amounts or fractions on a built model, see [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/#updating-the-initial-state-after-building).
 
 A structure that states `total`, `bin_fractions` or `compartment_fractions` is rejected, and the message names `bin_amounts` and `compartment_amounts`.
+
+### Fractions that differ by category
+
+The share of a stratification can differ by the category of a stratification declared before it. Name that stratification under `"by"`, and give one split for each of its categories:
+
+```python
+by_group = (
+    ModelBuilder(name="Split by group")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_stratification(id="group", categories=["g1", "g2"])
+    .add_stratification(id="type", categories=["t1", "t2"])
+    .add_parameter(id="k1", value=0.1)
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1 * A_g1 / total_g1")
+    .build(
+        Aggregate(
+            bin_amounts={"A": 1000, "B": 0},
+            stratification_fractions={
+                "group": {"g1": 0.4, "g2": 0.6},
+                "type": {
+                    "by": "group",
+                    "g1": {"t1": 0.25, "t2": 0.75},
+                    "g2": {"t1": 0.5, "t2": 0.5},
+                },
+            },
+        ),
+        engine="DifferenceEquations",
+    )
+)
+
+state = by_group.structure.initial_state(by_group.process)
+print({c.name: c.amount for c in state if c.bin == "A"})
+# {'A_g1_t1': 100.0, 'A_g1_t2': 300.0, 'A_g2_t1': 300.0, 'A_g2_t2': 300.0}
+```
+
+The amount of `A_g1_t1` is `1000 × 0.4 × 0.25`. The two stratifications stay apart: a rate reads `A_g1` and `total_g1`, and a condition names `g1`, with no category that joins `g1` and `t1`.
+
+| Rule                             | Effect                                                                                                                                                                                              |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"by"`                           | Names a stratification declared before this one. Every compartment of this stratification must have a category of it, so a conditional stratification that leaves some of them out cannot be named. |
+| Splits                           | One split for each category of the `"by"` stratification, each with every category of this one. The message of a wrong split names the stratification and the category.                             |
+| A calibrated bin amount          | Its compartments keep the split, also when the amount is `None` before calibration.                                                                                                                 |
+| Reading one fraction             | `get_category_fraction` raises `ValueError` for such a stratification: it has one fraction per split.                                                                                               |
+| Setting a fraction               | `update_stratification_fractions({"t1": 0.3})` sets `t1` to 0.3 in every split.                                                                                                                     |
+| Calibrating a category of it     | A category value of `type`, such as `t1`, takes its value in every split, so the write-back sets every split.                                                                                       |
+| Calibrating a category of `"by"` | A category value of `group`, such as `g1`, splits each bin between `g1` and `g2`, and each side keeps the split of `type` and of any stratification split by `type`, also a side that starts at 0.  |
+| A category named `by`            | Takes a fraction in one split, where `"by"` holds a number. The stratification a split by category names cannot have a category named `by`, because that key names it.                              |
 
 ### Bins of different units
 
@@ -3740,12 +3787,12 @@ Here `B` is calibrated, and `A`, the remainder, takes what `B` leaves of the 100
 
 ## What an id can name
 
-| `id`                                      | Example                | The value is                                                                                                                               |
-| ----------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| A bin                                     | `"B"`                  | The amount of the bin, in its unit. Its compartments share it in the proportions of the initial state, also when the `Simulation` has run. |
-| A bin prefix (a bin and some categories)  | `"B_g1"`               | The amount in those compartments, shared in the same way. Compartments are matched by label, so `B_g1` never covers a bin `B_g1x`.         |
-| An expanded compartment                   | `"B_g1_t2"`            | The amount of that compartment alone, in the unit of its bin.                                                                              |
-| A category of a **binary** stratification | `"g1"` or `"group:g1"` | The split: every `(g1, g2)` pair of compartments keeps its total and gives `g1` this fraction.                                             |
+| `id`                                      | Example                | The value is                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A bin                                     | `"B"`                  | The amount of the bin, in its unit. Its compartments share it in the proportions of the initial state, also when the `Simulation` has run; compartments that start at 0, as those of a bin left `None`, share it as the stratification fractions split them, [split by category](https://munqu.github.io/commol/latest/guide/building-models/#fractions-that-differ-by-category) included. A prefix such as `"A_g1"` whose fraction is 0 still takes the split of the later stratifications. |
+| A bin prefix (a bin and some categories)  | `"B_g1"`               | The amount in those compartments, shared in the same way. Compartments are matched by label, so `B_g1` never covers a bin `B_g1x`.                                                                                                                                                                                                                                                                                                                                                           |
+| An expanded compartment                   | `"B_g1_t2"`            | The amount of that compartment alone, in the unit of its bin.                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| A category of a **binary** stratification | `"g1"` or `"group:g1"` | The split: every `(g1, g2)` pair of compartments keeps its total and gives `g1` this fraction. When a later stratification is split by `group`, directly or through another, each side keeps that split, also a side that starts at 0.                                                                                                                                                                                                                                                       |
 
 A category that two stratifications share is written with its stratification, as in `"group:g1"` ([the same rule](https://munqu.github.io/commol/latest/guide/core-concepts/#updating-the-initial-state-after-building) as for the initial state); a bare name is rejected as ambiguous.
 
@@ -3766,7 +3813,7 @@ Without help, calibrated values change the sum of the amounts. Name a compartmen
 | It is not calibrated                             | It takes the sum of the amounts the model states, less every other compartment.                                                                                                                                |
 | It keeps the sum of what the values and it cover | A compartment that no value covers keeps its amount, so it does not change the remainder. A bin left `None` for calibration counts as 0, so the remainder states the sum: `A` holds 1000 while `B` is unknown. |
 | It has the unit of every amount it gives         | The `Calibrator` rejects a calibrated bin, prefix or compartment whose unit is not the unit of the remainder, and names both. A category split has no unit.                                                    |
-| It keeps its own split                           | A bin remainder shares what it takes across its compartments in the proportions of the initial state.                                                                                                          |
+| It keeps its own split                           | A bin remainder shares what it takes across its compartments in the proportions of the initial state, or of the stratification fractions when they start at 0.                                                 |
 | It must not overlap a calibrated id              | Building the problem rejects it otherwise.                                                                                                                                                                     |
 | A value that would make it negative is penalized | The optimizer moves away from it.                                                                                                                                                                              |
 
@@ -3844,7 +3891,7 @@ print({c.name: round(c.amount, 1) for c in composite.structure.initial_state(com
 1. Each bin whose every compartment a value or the remainder sets gets the amount the engine gave it, in the unit of the bin, and each category gets the split the engine applied, so the definition stays readable.
 1. Every compartment whose amount still differs from the scored one is pinned as a `compartment_amounts` override.
 
-So an expanded-compartment id always becomes an override, and so does a bin or category value that overlaps an existing override. A bin of which a value sets only some compartments keeps its amount. Reloading the saved model gives the scored state exactly. A calibrated category split is written with `update_stratification_fractions`: the named category gets the value and its complement the rest.
+So an expanded-compartment id always becomes an override, and so does a bin or category value that overlaps an existing override. A bin of which a value sets only some compartments keeps its amount. Reloading the saved model gives the scored state exactly. A calibrated category split is written with `update_stratification_fractions`: the named category gets the value and its complement the rest, in every split of a stratification whose fractions [differ by category](https://munqu.github.io/commol/latest/guide/building-models/#fractions-that-differ-by-category).
 
 ## Checklist
 
@@ -7019,16 +7066,16 @@ print(sorted(run_report))  # ['accumulators', 'observed', 'series']
 | `problem`                    | Optional. Adds the calibrated `factor` and `noise` parameters, which the model does not hold.                                           |
 | `sample`, `confidence_level` | Optional. A `ParameterSample`: each entry gains its weighted statistics (`ParameterSample.summary`). A sample needs a confidence level. |
 
-| Entry                                            | Rule                                                                                                                                                                                                      |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Parameters                                       | Only numeric parameters: formulas and series are inputs, not fitted values.                                                                                                                               |
-| `initial_amounts`                                | One row per bin and per overridden compartment: the `amount` the engine builds, overrides included, and the `unit` of its bin. No row is a share of a total, so bins of different units sit side by side. |
-| `category_splits`                                | One row per category: its `fraction` of the group it splits. A category has no amount, because it can split bins of different units.                                                                      |
-| `group`                                          | The conditioning categories of a conditional stratification, or `[]` when it splits every bin.                                                                                                            |
-| An uncalibrated bin (`None` amount)              | `amount` is `null`.                                                                                                                                                                                       |
-| A bin with no unit                               | `unit` is `null`.                                                                                                                                                                                         |
-| A category name that two stratifications declare | Its row is under the qualified id, such as `group:g1`.                                                                                                                                                    |
-| A `sample`                                       | Each entry gains an `interval` block (`mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max`, `std`, all weighted), and the report starts with `confidence_level`.                                        |
+| Entry                                            | Rule                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Parameters                                       | Only numeric parameters: formulas and series are inputs, not fitted values.                                                                                                                                                                                                                                                                |
+| `initial_amounts`                                | One row per bin and per overridden compartment: the `amount` the engine builds, overrides included, and the `unit` of its bin. No row is a share of a total, so bins of different units sit side by side.                                                                                                                                  |
+| `category_splits`                                | One row per category: its `fraction` of the group it splits. A category has no amount, because it can split bins of different units.                                                                                                                                                                                                       |
+| `group`                                          | The conditioning categories of a conditional stratification, or `[]` when it splits every bin. A stratification whose fractions [differ by category](https://munqu.github.io/commol/latest/guide/building-models/#fractions-that-differ-by-category) adds the category of each split: its rows are under `t1 of g1`, with `g1` in `group`. |
+| An uncalibrated bin (`None` amount)              | `amount` is `null`.                                                                                                                                                                                                                                                                                                                        |
+| A bin with no unit                               | `unit` is `null`.                                                                                                                                                                                                                                                                                                                          |
+| A category name that two stratifications declare | Its row is under the qualified id, such as `group:g1`.                                                                                                                                                                                                                                                                                     |
+| A `sample`                                       | Each entry gains an `interval` block (`mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max`, `std`, all weighted), and the report starts with `confidence_level`.                                                                                                                                                                         |
 
 The key order of each entry is fixed (`value`, `calibrated`, then `interval`; `amount`, `unit`, `calibrated`, then `interval`; `group`, `fraction`, `calibrated`, then `interval`), so saved JSON files stay comparable. An interval is in the unit of its entry: an amount in the unit of its bin, a split as a fraction of its group.
 
@@ -17491,7 +17538,9 @@ class Model(BaseModel, Generic[StructureT]):
         some of its compartments. ``category_splits`` gives each category its
         ``fraction`` of the group it splits, and that ``group``: the
         categories a conditional stratification is conditioned on, empty when
-        it splits every bin.
+        it splits every bin. A stratification whose fractions differ by the
+        category of an earlier one gives a row per split, under the key
+        ``t1 of g1``, with that category in its ``group``.
 
         With a `sample` each entry gains an ``interval`` holding the weighted
         statistics of its draws (`ParameterSample.summary`). Every entry is in
@@ -17938,7 +17987,7 @@ Call it on the model **after** `apply_calibration_parameters`. Each entry carrie
 
 Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` and `noise` parameters have no place in the model, so they are reported from `problem` when it is given.
 
-`initial_amounts` gives each bin and each overridden compartment of an aggregate model its `amount` the engine builds and the `unit` of its bin, so bins of different units are reported side by side; no row is a share of a total. A bin left uncalibrated keeps a `None` amount as its "needs calibration" marker even when overrides touch some of its compartments. `category_splits` gives each category its `fraction` of the group it splits, and that `group`: the categories a conditional stratification is conditioned on, empty when it splits every bin.
+`initial_amounts` gives each bin and each overridden compartment of an aggregate model its `amount` the engine builds and the `unit` of its bin, so bins of different units are reported side by side; no row is a share of a total. A bin left uncalibrated keeps a `None` amount as its "needs calibration" marker even when overrides touch some of its compartments. `category_splits` gives each category its `fraction` of the group it splits, and that `group`: the categories a conditional stratification is conditioned on, empty when it splits every bin. A stratification whose fractions differ by the category of an earlier one gives a row per split, under the key `t1 of g1`, with that category in its `group`.
 
 With a `sample` each entry gains an `interval` holding the weighted statistics of its draws (`ParameterSample.summary`). Every entry is in the unit it was calibrated in: a parameter in its own, an amount in the unit of its bin, and a category split as a fraction of its group.
 
@@ -17996,7 +18045,9 @@ def applied_parameters(
     some of its compartments. ``category_splits`` gives each category its
     ``fraction`` of the group it splits, and that ``group``: the
     categories a conditional stratification is conditioned on, empty when
-    it splits every bin.
+    it splits every bin. A stratification whose fractions differ by the
+    category of an earlier one gives a row per split, under the key
+    ``t1 of g1``, with that category in its ``group``.
 
     With a `sample` each entry gains an ``interval`` holding the weighted
     statistics of its draws (`ParameterSample.summary`). Every entry is in
@@ -19355,14 +19406,14 @@ The bins of the process expand over its stratifications into compartments. `bin_
 
 Attributes:
 
-| Name                       | Type                          | Description                                                                                                                                                                                                                   |
-| -------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `kind`                     | `Literal['aggregate']`        | The model kind.                                                                                                                                                                                                               |
-| `variant`                  | \`str                         | None\`                                                                                                                                                                                                                        |
-| `bin_amounts`              | \`dict\[str, float            | None\]\`                                                                                                                                                                                                                      |
-| `stratification_fractions` | `dict[str, dict[str, float]]` | The fraction of each category, by stratification id, such as {"group": {"g1": 0.3, "g2": 0.7}}: the split of the amount of every bin it applies to. A conditional stratification splits only the group its conditions select. |
-| `compartment_amounts`      | `dict[str, float]`            | Amounts of single expanded compartments, such as {"A_g1": 0.0}, applied after the expansion. The names are checked against the engine when the model is built.                                                                |
-| `neighbors`                | \`Complete                    | Groups                                                                                                                                                                                                                        |
+| Name                       | Type                   | Description                                                                                                                                                                                                                                                                                           |
+| -------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kind`                     | `Literal['aggregate']` | The model kind.                                                                                                                                                                                                                                                                                       |
+| `variant`                  | \`str                  | None\`                                                                                                                                                                                                                                                                                                |
+| `bin_amounts`              | \`dict\[str, float     | None\]\`                                                                                                                                                                                                                                                                                              |
+| `stratification_fractions` | `dict[str, dict]`      | The fraction of each category, by stratification id, a dict[str, float] such as {"group": {"g1": 0.3, "g2": 0.7}}: the split of the amount of every bin it applies to. A stratification may instead split each category of a stratification declared before it by its own fractions, a dict\[str, str |
+| `compartment_amounts`      | `dict[str, float]`     | Amounts of single expanded compartments, such as {"A_g1": 0.0}, applied after the expansion. The names are checked against the engine when the model is built.                                                                                                                                        |
+| `neighbors`                | \`Complete             | Groups                                                                                                                                                                                                                                                                                                |
 
 Source code in `commol/_model/aggregate.py`
 
@@ -19390,11 +19441,17 @@ class Aggregate(ModelStructure, InitialConditions):
         The amount of each bin at the start, by bin id, in the unit of the
         bin, such as ``{"A": 990, "B": 10, "C": 1e5}``; finite and not
         negative. None leaves an amount for calibration.
-    stratification_fractions : dict[str, dict[str, float]]
-        The fraction of each category, by stratification id, such as
-        ``{"group": {"g1": 0.3, "g2": 0.7}}``: the split of the amount of
-        every bin it applies to. A conditional stratification splits only the
-        group its conditions select.
+    stratification_fractions : dict[str, dict]
+        The fraction of each category, by stratification id, a
+        ``dict[str, float]`` such as ``{"group": {"g1": 0.3, "g2": 0.7}}``:
+        the split of the amount of every bin it applies to. A stratification
+        may instead split each category of a stratification declared before
+        it by its own fractions, a ``dict[str, str | dict[str, float]]`` such
+        as ``{"type": {"by": "group", "g1": {"t1": 0.25, "t2": 0.75},
+        "g2": {"t1": 0.5, "t2": 0.5}}}``: the compartment ``A_g1_t1`` then
+        starts with the amount of ``A`` times 0.3 times 0.25. Every
+        compartment of ``type`` needs a category of ``group``. A conditional
+        stratification splits only the group its conditions select.
     compartment_amounts : dict[str, float]
         Amounts of single expanded compartments, such as ``{"A_g1": 0.0}``,
         applied after the expansion. The names are checked against the engine
@@ -19420,11 +19477,13 @@ class Aggregate(ModelStructure, InitialConditions):
         Check the structure against the process and the parameters.
 
         The process needs a bin and a transition, the amounts must name every
-        bin and the fractions every category of the process, and the engine
-        must plan every transition, accept every id (no parameter id is an
-        engine variable, a bin, a compartment or a subgroup total), resolve
-        the neighbors, find every variable a rate or a formula parameter
-        reads, and build the initial state.
+        bin, and the engine must check the fractions against the
+        stratifications (every stratification and category named, a split by
+        category by a stratification declared before it), plan every
+        transition, accept every id (no parameter id is an engine variable, a
+        bin, a compartment or a subgroup total), resolve the neighbors, find
+        every variable a rate or a formula parameter reads, and build the
+        initial state.
 
         Parameters
         ----------
@@ -19442,7 +19501,6 @@ class Aggregate(ModelStructure, InitialConditions):
         if not process.transitions:
             raise ValueError("At least one transition must be defined.")
         self._check_bin_amounts(process)
-        self._check_stratification_fractions(process)
         engine_state.transition_flows(process, self)
         engine_state.check_model(model)
         if self.compartment_amounts:
@@ -19831,34 +19889,6 @@ class Aggregate(ModelStructure, InitialConditions):
                 f"Missing ids: {sorted(expected_bins - actual_bins)}, "
                 f"Extra ids: {sorted(actual_bins - expected_bins)}."
             )
-
-    def _check_stratification_fractions(self, process: Process) -> None:
-        """Check that the fractions name each stratification and its
-        categories; the rule of their values is the engine's, checked when the
-        structure is built."""
-        strat_map = {strat.id: strat for strat in process.stratifications}
-        actual_strat = set(self.stratification_fractions)
-        expected_strat = set(strat_map)
-        if actual_strat != expected_strat:
-            raise ValueError(
-                f"Initial stratification fractions keys must exactly match "
-                f"stratification ids. "
-                f"Missing ids: {sorted(expected_strat - actual_strat)}, "
-                f"Extra ids: {sorted(actual_strat - expected_strat)}."
-            )
-
-        for strat_id, fractions in self.stratification_fractions.items():
-            strat_instance = strat_map[strat_id]
-
-            expected = set(strat_instance.categories)
-            actual = set(fractions)
-            if actual != expected:
-                raise ValueError(
-                    f"Categories for stratification '{strat_id}' must exactly "
-                    f"match defined categories in instance '{strat_instance.id}'. "
-                    f"Missing categories: {sorted(expected - actual)}, "
-                    f"Extra categories: {sorted(actual - expected)}."
-                )
 ```
 
 ### Methods:
@@ -19871,7 +19901,7 @@ check_model(model: Model[Self]) -> None
 
 Check the structure against the process and the parameters.
 
-The process needs a bin and a transition, the amounts must name every bin and the fractions every category of the process, and the engine must plan every transition, accept every id (no parameter id is an engine variable, a bin, a compartment or a subgroup total), resolve the neighbors, find every variable a rate or a formula parameter reads, and build the initial state.
+The process needs a bin and a transition, the amounts must name every bin, and the engine must check the fractions against the stratifications (every stratification and category named, a split by category by a stratification declared before it), plan every transition, accept every id (no parameter id is an engine variable, a bin, a compartment or a subgroup total), resolve the neighbors, find every variable a rate or a formula parameter reads, and build the initial state.
 
 Parameters:
 
@@ -19893,11 +19923,13 @@ def check_model(self, model: "Model[Self]") -> None:
     Check the structure against the process and the parameters.
 
     The process needs a bin and a transition, the amounts must name every
-    bin and the fractions every category of the process, and the engine
-    must plan every transition, accept every id (no parameter id is an
-    engine variable, a bin, a compartment or a subgroup total), resolve
-    the neighbors, find every variable a rate or a formula parameter
-    reads, and build the initial state.
+    bin, and the engine must check the fractions against the
+    stratifications (every stratification and category named, a split by
+    category by a stratification declared before it), plan every
+    transition, accept every id (no parameter id is an engine variable, a
+    bin, a compartment or a subgroup total), resolve the neighbors, find
+    every variable a rate or a formula parameter reads, and build the
+    initial state.
 
     Parameters
     ----------
@@ -19915,7 +19947,6 @@ def check_model(self, model: "Model[Self]") -> None:
     if not process.transitions:
         raise ValueError("At least one transition must be defined.")
     self._check_bin_amounts(process)
-    self._check_stratification_fractions(process)
     engine_state.transition_flows(process, self)
     engine_state.check_model(model)
     if self.compartment_amounts:
@@ -25076,7 +25107,7 @@ Call it on the model **after** `apply_calibration_parameters`. Each entry carrie
 
 Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` and `noise` parameters have no place in the model, so they are reported from `problem` when it is given.
 
-`initial_amounts` gives each bin and each overridden compartment of an aggregate model its `amount` the engine builds and the `unit` of its bin, so bins of different units are reported side by side; no row is a share of a total. A bin left uncalibrated keeps a `None` amount as its "needs calibration" marker even when overrides touch some of its compartments. `category_splits` gives each category its `fraction` of the group it splits, and that `group`: the categories a conditional stratification is conditioned on, empty when it splits every bin.
+`initial_amounts` gives each bin and each overridden compartment of an aggregate model its `amount` the engine builds and the `unit` of its bin, so bins of different units are reported side by side; no row is a share of a total. A bin left uncalibrated keeps a `None` amount as its "needs calibration" marker even when overrides touch some of its compartments. `category_splits` gives each category its `fraction` of the group it splits, and that `group`: the categories a conditional stratification is conditioned on, empty when it splits every bin. A stratification whose fractions differ by the category of an earlier one gives a row per split, under the key `t1 of g1`, with that category in its `group`.
 
 With a `sample` each entry gains an `interval` holding the weighted statistics of its draws (`ParameterSample.summary`). Every entry is in the unit it was calibrated in: a parameter in its own, an amount in the unit of its bin, and a category split as a fraction of its group.
 
@@ -25134,7 +25165,9 @@ def applied_parameters(
     some of its compartments. ``category_splits`` gives each category its
     ``fraction`` of the group it splits, and that ``group``: the
     categories a conditional stratification is conditioned on, empty when
-    it splits every bin.
+    it splits every bin. A stratification whose fractions differ by the
+    category of an earlier one gives a row per split, under the key
+    ``t1 of g1``, with that category in its ``group``.
 
     With a `sample` each entry gains an ``interval`` holding the weighted
     statistics of its draws (`ParameterSample.summary`). Every entry is in
@@ -37254,7 +37287,8 @@ Model                      name, description, version, step_unit, origin
 │           └── conditions: [StratificationCondition]
 └── structure: Aggregate                   (kind: "aggregate", variant: None)
     ├── bin_amounts: {bin: amount | None}          (in the unit of the bin)
-    ├── stratification_fractions: {stratification: {category: fraction}}
+    ├── stratification_fractions: {stratification: {category: fraction}
+    │                                  | {"by": stratification, category: {category: fraction}}}
     ├── compartment_amounts: {compartment: amount}
     └── neighbors: Complete | Groups | None
 ```
@@ -38100,11 +38134,11 @@ Every amount is in the unit of its bin, so bins of different units, such as a co
 
 Attributes:
 
-| Name                       | Type                          | Description                                                                                                                                                                                                                                                   |
-| -------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bin_amounts`              | \`dict\[str, float            | None\]\`                                                                                                                                                                                                                                                      |
-| `stratification_fractions` | `dict[str, dict[str, float]]` | The fraction of each category, by stratification id and category: the split of the amount of every bin the stratification applies to; each from 0 to 1, and a sum of 1 within 1e-6. A conditional stratification splits only the group its conditions select. |
-| `compartment_amounts`      | `dict[str, float]`            | Amounts of single expanded compartments, by compartment name, applied after the expansion.                                                                                                                                                                    |
+| Name                       | Type               | Description                                                                                                                                                                                                                        |
+| -------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bin_amounts`              | \`dict\[str, float | None\]\`                                                                                                                                                                                                                           |
+| `stratification_fractions` | `dict[str, dict]`  | The split of each stratification, by stratification id: a dict[str, float], the fraction of each category, such as {"t1": 0.4, "t2": 0.6}, the split of the amount of every bin the stratification applies to; or a dict\[str, str |
+| `compartment_amounts`      | `dict[str, float]` | Amounts of single expanded compartments, by compartment name, applied after the expansion.                                                                                                                                         |
 
 Source code in `commol/_model/initial_conditions.py`
 
@@ -38124,11 +38158,17 @@ class InitialConditions(BaseModel):
     bin_amounts : dict[str, float | None]
         The amount of each bin at the start, by bin id, in the unit of the
         bin; finite and not negative. None leaves an amount for calibration.
-    stratification_fractions : dict[str, dict[str, float]]
-        The fraction of each category, by stratification id and category: the
-        split of the amount of every bin the stratification applies to; each
-        from 0 to 1, and a sum of 1 within 1e-6. A conditional stratification
-        splits only the group its conditions select.
+    stratification_fractions : dict[str, dict]
+        The split of each stratification, by stratification id: a
+        ``dict[str, float]``, the fraction of each category, such as
+        ``{"t1": 0.4, "t2": 0.6}``, the split of the amount of every bin the
+        stratification applies to; or a
+        ``dict[str, str | dict[str, float]]``, a split per category of a
+        stratification declared before it, such as
+        ``{"by": "group", "g1": {"t1": 0.25, "t2": 0.75}, "g2": {"t1": 0.5,
+        "t2": 0.5}}``. Each fraction is from 0 to 1, and each split sums to 1
+        within 1e-6. A conditional stratification splits only the group its
+        conditions select.
     compartment_amounts : dict[str, float]
         Amounts of single expanded compartments, by compartment name, applied
         after the expansion.
@@ -38143,9 +38183,12 @@ class InitialConditions(BaseModel):
             "leaves an amount for calibration."
         ),
     )
-    stratification_fractions: dict[str, dict[str, float]] = Field(
+    stratification_fractions: dict[str, _Fractions] = Field(
         default_factory=dict,
-        description="The fraction of each category, by stratification id.",
+        description=(
+            "The fraction of each category, by stratification id, or a split "
+            "per category of an earlier stratification under 'by'."
+        ),
     )
     compartment_amounts: dict[str, float] = Field(
         default_factory=dict,
@@ -38188,8 +38231,8 @@ class InitialConditions(BaseModel):
     @field_validator("stratification_fractions")
     @classmethod
     def _validate_stratification_fractions(
-        cls, value: dict[str, dict[str, float]]
-    ) -> dict[str, dict[str, float]]:
+        cls, value: dict[str, _Fractions]
+    ) -> dict[str, _Fractions]:
         """Check the fractions of every stratification with the rule of the
         engine."""
         _check_fractions(value)
@@ -38220,14 +38263,15 @@ class InitialConditions(BaseModel):
         Returns
         -------
         set[str]
-            Category names collected from ``stratification_fractions``. A
+            Category names collected from ``stratification_fractions``, the
+            categories of each split of a split by category included. A
             category declared on a stratification but absent from the initial
             conditions is not included.
         """
         return {
             category
-            for categories in self.stratification_fractions.values()
-            for category in categories
+            for fractions in self.stratification_fractions.values()
+            for category in split_categories(fractions)
         }
 
     def resolve_category(self, category: str) -> tuple[str, str]:
@@ -38255,9 +38299,9 @@ class InitialConditions(BaseModel):
         stratification_id, separator, name = category.rpartition(CATEGORY_SEPARATOR)
         owners = [
             stratification
-            for stratification, categories in self.stratification_fractions.items()
+            for stratification, fractions in self.stratification_fractions.items()
             if (not separator or stratification == stratification_id)
-            and name in categories
+            and name in split_categories(fractions)
         ]
         if len(owners) > 1:
             qualified = " or ".join(
@@ -38292,8 +38336,8 @@ class InitialConditions(BaseModel):
             stratification declares a category of the same name.
         """
         declaring = sum(
-            category in categories
-            for categories in self.stratification_fractions.values()
+            category in split_categories(fractions)
+            for fractions in self.stratification_fractions.values()
         )
         if declaring > 1:
             return f"{stratification}{CATEGORY_SEPARATOR}{category}"
@@ -38317,27 +38361,35 @@ class InitialConditions(BaseModel):
         Raises
         ------
         ValueError
-            If the category is not found or a bare name is ambiguous.
+            If the category is not found, a bare name is ambiguous, or the
+            fractions of its stratification differ by the category of an
+            earlier one.
         """
         stratification, name = self.resolve_category(category)
-        return self.stratification_fractions[stratification][name]
+        fractions = self.stratification_fractions[stratification]
+        by = split_by(fractions)
+        if by is not None:
+            raise ValueError(
+                f"The fractions of stratification '{stratification}' differ by "
+                f"the category of '{by}': read them in stratification_fractions."
+            )
+        return category_splits(fractions)[0][1][name]
 
     def _updated_fractions(
         self, stratification: str, named: Mapping[str, float]
-    ) -> dict[str, float]:
+    ) -> _Fractions:
         """The fractions of a single stratification after an update that
-        names ``named``; the one category left unnamed takes the rest."""
-        categories = self.stratification_fractions[stratification]
-        unnamed = [category for category in categories if category not in named]
-        if len(unnamed) > 1:
-            raise ValueError(
-                f"Cannot update stratification '{stratification}': "
-                f"categories {sorted(unnamed)} were left unnamed. At most one "
-                f"category may be omitted, so that it can take the remaining "
-                f"fraction."
-            )
-        remainder = max(0.0, 1.0 - sum(named.values()))
-        return {category: named.get(category, remainder) for category in categories}
+        names ``named``: in each split, the named categories take their
+        values and the one category left unnamed takes the rest."""
+        fractions = self.stratification_fractions[stratification]
+        splits = {
+            of: _updated_split(stratification, split, named)
+            for of, split in category_splits(fractions)
+        }
+        by = split_by(fractions)
+        if by is None:
+            return splits[None]
+        return {FRACTIONS_BY: by, **{str(of): split for of, split in splits.items()}}
 
     def update_stratification_fractions(self, fractions: Mapping[str, float]) -> None:
         """
@@ -38348,6 +38400,8 @@ class InitialConditions(BaseModel):
         qualified with its stratification, as in ``group:g1``. Within each
         stratification, at most one category may be omitted; the omitted
         category receives the rest of 1, or 0 when the given values pass 1.
+        A stratification whose fractions differ by the category of an earlier
+        one takes the values in every split, as a calibrated category does.
         The fractions of every stratification are checked with the rule of the
         engine before any of them changes.
 
@@ -38362,8 +38416,8 @@ class InitialConditions(BaseModel):
         ValueError
             If a category is not found or is ambiguous, or a stratification
             has more than one category omitted; with the message of the
-            engine, if a fraction is not from 0 to 1 or the fractions of a
-            stratification do not sum to 1 within 1e-6.
+            engine, if a fraction is not from 0 to 1 or a split does not sum
+            to 1 within 1e-6.
         """
         by_stratification: dict[str, dict[str, float]] = {}
         for category, value in fractions.items():
@@ -38375,8 +38429,7 @@ class InitialConditions(BaseModel):
             for stratification, named in by_stratification.items()
         }
         _check_fractions(updated)
-        for stratification, categories in updated.items():
-            self.stratification_fractions[stratification].update(categories)
+        self.stratification_fractions.update(updated)
 
     def _upsert_compartment_amounts(self, amounts: Mapping[str, float]) -> None:
         """
@@ -38468,9 +38521,9 @@ Get the categories that have a declared initial fraction.
 
 Returns:
 
-| Type       | Description                                                                                                                                             |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `set[str]` | Category names collected from stratification_fractions. A category declared on a stratification but absent from the initial conditions is not included. |
+| Type       | Description                                                                                                                                                                                                           |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `set[str]` | Category names collected from stratification_fractions, the categories of each split of a split by category included. A category declared on a stratification but absent from the initial conditions is not included. |
 
 Source code in `commol/_model/initial_conditions.py`
 
@@ -38482,14 +38535,15 @@ def get_categories_with_fractions(self) -> set[str]:
     Returns
     -------
     set[str]
-        Category names collected from ``stratification_fractions``. A
+        Category names collected from ``stratification_fractions``, the
+        categories of each split of a split by category included. A
         category declared on a stratification but absent from the initial
         conditions is not included.
     """
     return {
         category
-        for categories in self.stratification_fractions.values()
-        for category in categories
+        for fractions in self.stratification_fractions.values()
+        for category in split_categories(fractions)
     }
 ```
 
@@ -38549,9 +38603,9 @@ def resolve_category(self, category: str) -> tuple[str, str]:
     stratification_id, separator, name = category.rpartition(CATEGORY_SEPARATOR)
     owners = [
         stratification
-        for stratification, categories in self.stratification_fractions.items()
+        for stratification, fractions in self.stratification_fractions.items()
         if (not separator or stratification == stratification_id)
-        and name in categories
+        and name in split_categories(fractions)
     ]
     if len(owners) > 1:
         qualified = " or ".join(
@@ -38611,8 +38665,8 @@ def category_id(self, stratification: str, category: str) -> str:
         stratification declares a category of the same name.
     """
     declaring = sum(
-        category in categories
-        for categories in self.stratification_fractions.values()
+        category in split_categories(fractions)
+        for fractions in self.stratification_fractions.values()
     )
     if declaring > 1:
         return f"{stratification}{CATEGORY_SEPARATOR}{category}"
@@ -38641,9 +38695,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                               |
-| ------------ | --------------------------------------------------------- |
-| `ValueError` | If the category is not found or a bare name is ambiguous. |
+| Type         | Description                                                                                                                              |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If the category is not found, a bare name is ambiguous, or the fractions of its stratification differ by the category of an earlier one. |
 
 Source code in `commol/_model/initial_conditions.py`
 
@@ -38666,10 +38720,19 @@ def get_category_fraction(self, category: str) -> float:
     Raises
     ------
     ValueError
-        If the category is not found or a bare name is ambiguous.
+        If the category is not found, a bare name is ambiguous, or the
+        fractions of its stratification differ by the category of an
+        earlier one.
     """
     stratification, name = self.resolve_category(category)
-    return self.stratification_fractions[stratification][name]
+    fractions = self.stratification_fractions[stratification]
+    by = split_by(fractions)
+    if by is not None:
+        raise ValueError(
+            f"The fractions of stratification '{stratification}' differ by "
+            f"the category of '{by}': read them in stratification_fractions."
+        )
+    return category_splits(fractions)[0][1][name]
 ```
 
 #### update_stratification_fractions
@@ -38680,7 +38743,7 @@ update_stratification_fractions(fractions: Mapping[str, float]) -> None
 
 Update stratification category fractions by category name.
 
-Categories belonging to several stratifications may be given in one call. A category name declared by more than one stratification must be qualified with its stratification, as in `group:g1`. Within each stratification, at most one category may be omitted; the omitted category receives the rest of 1, or 0 when the given values pass 1. The fractions of every stratification are checked with the rule of the engine before any of them changes.
+Categories belonging to several stratifications may be given in one call. A category name declared by more than one stratification must be qualified with its stratification, as in `group:g1`. Within each stratification, at most one category may be omitted; the omitted category receives the rest of 1, or 0 when the given values pass 1. A stratification whose fractions differ by the category of an earlier one takes the values in every split, as a calibrated category does. The fractions of every stratification are checked with the rule of the engine before any of them changes.
 
 Parameters:
 
@@ -38690,9 +38753,9 @@ Parameters:
 
 Raises:
 
-| Type         | Description                                                                                                                                                                                                                            |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If a category is not found or is ambiguous, or a stratification has more than one category omitted; with the message of the engine, if a fraction is not from 0 to 1 or the fractions of a stratification do not sum to 1 within 1e-6. |
+| Type         | Description                                                                                                                                                                                                    |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If a category is not found or is ambiguous, or a stratification has more than one category omitted; with the message of the engine, if a fraction is not from 0 to 1 or a split does not sum to 1 within 1e-6. |
 
 Source code in `commol/_model/initial_conditions.py`
 
@@ -38706,6 +38769,8 @@ def update_stratification_fractions(self, fractions: Mapping[str, float]) -> Non
     qualified with its stratification, as in ``group:g1``. Within each
     stratification, at most one category may be omitted; the omitted
     category receives the rest of 1, or 0 when the given values pass 1.
+    A stratification whose fractions differ by the category of an earlier
+    one takes the values in every split, as a calibrated category does.
     The fractions of every stratification are checked with the rule of the
     engine before any of them changes.
 
@@ -38720,8 +38785,8 @@ def update_stratification_fractions(self, fractions: Mapping[str, float]) -> Non
     ValueError
         If a category is not found or is ambiguous, or a stratification
         has more than one category omitted; with the message of the
-        engine, if a fraction is not from 0 to 1 or the fractions of a
-        stratification do not sum to 1 within 1e-6.
+        engine, if a fraction is not from 0 to 1 or a split does not sum
+        to 1 within 1e-6.
     """
     by_stratification: dict[str, dict[str, float]] = {}
     for category, value in fractions.items():
@@ -38733,8 +38798,7 @@ def update_stratification_fractions(self, fractions: Mapping[str, float]) -> Non
         for stratification, named in by_stratification.items()
     }
     _check_fractions(updated)
-    for stratification, categories in updated.items():
-        self.stratification_fractions[stratification].update(categories)
+    self.stratification_fractions.update(updated)
 ```
 
 #### update_bin_amounts
@@ -38810,9 +38874,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `ModelBuilder.add_matrix(row_scales=..., column_scales=...)`: a constant or a parameter to calibrate multiplies the row or the column of a category, so the model reads `diag(a) · values · diag(b)`. A calibration constraint reads `M_<i>_<j>` and `M_radius` of the scaled matrix at the values of each point, so a bound such as `2 - k * M_radius` is one constraint; a rate reads them at the values of its run. See [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/#a-bound-on-a-matrix).
 - `GibbsResult` and `ConformalResult` give `block_length` and `block_length_estimates`, as the bootstraps, the jackknife and the sandwich do: the length a method ran with, and with `block_length="auto"` the estimate of each series, by label. `GibbsResult` gives them for `InformationMatchingEta` and `BootstrapCoverageEta`, and `None` for a number `η`; `ConformalResult` for `JackknifePlus` and `EnbPI`, and `None` for the variants without blocks. See [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means) and [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#results-plots-and-reports).
 - `ProfileIdentifiability(result=profiles)` in `commol.identifiability`: the identifiability report of the verdicts of a `ProfileResult`, run through `Calibrator.identifiability` as every identifiability method. It runs no model, and it refuses the profiles of another problem with a `ValueError` that names the parameters of both. See [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#verdicts-and-the-identifiability-report).
+- The fractions of a stratification can differ by the category of a stratification declared before it: `stratification_fractions={"type": {"by": "group", "g1": {"t1": 0.25, "t2": 0.75}, "g2": {"t1": 0.5, "t2": 0.5}}}`. The stratifications stay apart, so a rate reads `A_g1` and a condition names `g1`. The engine checks that `by` is declared before, that every compartment of the stratification has a category of it, and each split, with a message that names the stratification and the category. See [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#fractions-that-differ-by-category).
 
 ### Changed
 
+- The engine checks that the fractions name every stratification and each of its categories, from `check_model`; the messages list the ids as the engine writes them, `Missing ids: ["g"], Extra ids: []`, and the message of the categories reads `The fractions of stratification 'g' must name exactly its categories. Missing categories: ["g2"], Extra categories: ["g3"].`
 - **Breaking:** `Calibrator.delta_band(result, positions, confidence_level)` is `LocalResult.delta_band(calibrator, positions, confidence_level)`, a method of the result of `Laplace` and of `Sandwich`. `DeltaBand` is documented with `commol.local`. Migration: `calibrator.delta_band(laplace, [10, 20], 0.9)` is `laplace.delta_band(calibrator, [10, 20], 0.9)`. See [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/index.md).
 - **Breaking:** `ProfileResult.identifiability()` is removed. Migration: `profiles.identifiability()` is `calibrator.identifiability(ProfileIdentifiability(result=profiles))`.
 - **Breaking:** each public name outside the main flow lives in the module of its page of the guide, and the root `commol` holds only the main flow: build (`ModelBuilder`, `Model`, `StratificationCondition`, `StratifiedRate`, `SeriesValue`, `AxisUnits`, `AxisPattern`), the structures (`Aggregate`, `Complete`, `Groups`), simulate (`Simulation`, `InfeasibleStateError`), calibrate (`Calibrator`, `CalibrationProblem`, `CalibrationParameter`, `CalibrationConstraint`, `ObservedDataPoint`, `NelderMeadConfig`, `ParticleSwarmConfig`, `Quantile`) and `build_info`. The modules are `commol.engines`, `commol.plotting`, `commol.parallelism`, `commol.distributions`, `commol.quantities`, `commol.observations`, `commol.uncertainty`, `commol.scores`, `commol.resampling`, `commol.profiles`, `commol.local`, `commol.smc`, `commol.conformal`, `commol.identifiability` and `commol.sensitivity`; the [API Reference](https://munqu.github.io/commol/latest/api/index.md) lists the names of each. The packages `commol.api`, `commol.context` and `commol.utils` and the module `commol.constants` are removed: the code is in the package of its module, and the code of the root in private packages. Migration: `from commol import BayesianBootstrap, Predictive` is `from commol.resampling import BayesianBootstrap` and `from commol.uncertainty import Predictive`; `commol.threads(2)` is `commol.parallelism.threads(2)`.
@@ -38845,6 +38911,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 
 - A figure of a run, or of its replicates, logs one warning for each factor of its observations that `calibration_result` does not have, and counts the factor as 1. Before, it logged the warning once for each observation and each replicate. The cumulative figure of a `Predictive` raises the `ValueError` of its other figures for a factor that the problem does not have; before, it drew the observation as if the factor were 1.
+- A calibrated amount of a bin whose amount is `None`, or of a remainder whose compartments start at `0`, split evenly among its compartments. It now splits by the stratification fractions, as the amount of the model does, also within a prefix whose own fraction is 0.
 - A number that is not finite in a model or in the settings of an engine reached the engine as `null`. An infinite tolerance of `ODESolver` raised a message about the type of the setting, and an infinite parameter value failed when the model ran, with a message about a parameter index. Such a number now reaches the engine as its text, as every setting does: `ODESolver(atol=float("inf"))` raises `atol is a finite number greater than 0, got inf`, and the infinite parameter value is rejected when the engine is built, with the name of the parameter.
 - The flow of a proportional rate is the whole rate times its source, in the description and in the unit check: a rate `k1 + k2` from `B` is `(k1 + k2) * B`; before, both read `k1 + k2 * B`, and the unit check of such a model failed. In LaTeX, a division followed by a product is a fraction times the product: the flow of a proportional rate `a / b` from `B` is `\frac{a}{b} \cdot B`, no longer `\frac{a}{b \cdot B}`.
 

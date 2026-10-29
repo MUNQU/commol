@@ -5103,9 +5103,23 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   model, and it refuses the profiles of another problem with a <code>ValueError</code>
   that names the parameters of both. See
   <a href="../../guide/uncertainty/profiles/#verdicts-and-the-identifiability-report">Profile Likelihood</a>.</li>
+<li>The fractions of a stratification can differ by the category of a
+  stratification declared before it:
+  <code>stratification_fractions={"type": {"by": "group", "g1": {"t1": 0.25,
+  "t2": 0.75}, "g2": {"t1": 0.5, "t2": 0.5}}}</code>. The stratifications stay
+  apart, so a rate reads <code>A_g1</code> and a condition names <code>g1</code>. The engine checks
+  that <code>by</code> is declared before, that every compartment of the stratification
+  has a category of it, and each split, with a message that names the
+  stratification and the category. See
+  <a href="../../guide/building-models/#fractions-that-differ-by-category">Building Models</a>.</li>
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>The engine checks that the fractions name every stratification and each of
+  its categories, from <code>check_model</code>; the messages list the ids as the engine
+  writes them, <code>Missing ids: ["g"], Extra ids: []</code>, and the message of the
+  categories reads <code>The fractions of stratification 'g' must name exactly its
+  categories. Missing categories: ["g2"], Extra categories: ["g3"].</code></li>
 <li><strong>Breaking:</strong> <code>Calibrator.delta_band(result, positions, confidence_level)</code>
   is <code>LocalResult.delta_band(calibrator, positions, confidence_level)</code>, a
   method of the result of <code>Laplace</code> and of <code>Sandwich</code>. <code>DeltaBand</code>
@@ -5364,6 +5378,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   each replicate. The cumulative figure of a <code>Predictive</code> raises the
   <code>ValueError</code> of its other figures for a factor that the problem does not
   have; before, it drew the observation as if the factor were 1.</li>
+<li>A calibrated amount of a bin whose amount is <code>None</code>, or of a remainder whose
+  compartments start at <code>0</code>, split evenly among its compartments. It now
+  splits by the stratification fractions, as the amount of the model does,
+  also within a prefix whose own fraction is 0.</li>
 <li>A number that is not finite in a model or in the settings of an engine
   reached the engine as <code>null</code>. An infinite tolerance of <code>ODESolver</code> raised
   a message about the type of the setting, and an infinite parameter value

@@ -4311,7 +4311,7 @@ the expansion of the process before they are stored.</p>
 </tr>
 <tr>
 <td><code>update_stratification_fractions</code></td>
-<td>Within each stratification you may omit one category; it receives what remains of 1, or 0 when the given fractions pass 1. Omitting two raises. Each fraction is from 0 to 1 and the fractions sum to 1 within 1e-6, with the rule of the engine; a rejected call changes no fraction.</td>
+<td>Within each stratification you may omit one category; it receives what remains of 1, or 0 when the given fractions pass 1. Omitting two raises. Each fraction is from 0 to 1 and the fractions sum to 1 within 1e-6, with the rule of the engine; a rejected call changes no fraction. A stratification whose fractions <a href="../building-models/#fractions-that-differ-by-category">differ by category</a> takes the values in every split.</td>
 </tr>
 </tbody>
 </table>

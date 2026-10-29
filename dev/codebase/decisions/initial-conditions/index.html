@@ -2754,6 +2754,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-split-can-differ-by-the-category-of-an-earlier-stratification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A split can differ by the category of an earlier stratification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-compartment-amount-overrides-the-expansion" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3559,6 +3570,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-split-can-differ-by-the-category-of-an-earlier-stratification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A split can differ by the category of an earlier stratification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-compartment-amount-overrides-the-expansion" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3628,6 +3650,66 @@ the engine builds, overrides included, and
 (<code>_model/aggregate.py</code>).</p>
 <p><strong>Guard:</strong> <code>tests/simulation/test_outputs.py::TestSubgroupTotal</code> compares the
 result with the state the engine starts from.</p>
+<h2 id="a-split-can-differ-by-the-category-of-an-earlier-stratification">A split can differ by the category of an earlier stratification<a class="headerlink" href="#a-split-can-differ-by-the-category-of-an-earlier-stratification" title="Permanent link">&para;</a></h2>
+<p>The fractions of a stratification are one split
+(<code>StratificationFractions::Split</code>) or one split per category of a
+stratification declared before it (<code>StratificationFractions::ByCategory</code>, in
+<code>crates/commol-core/src/types/aggregate.rs</code>). Its JSON names that
+stratification under <code>"by"</code>, next to the splits:
+<code>{"by": "group", "g1": {"t1": 0.25, "t2": 0.75}, "g2": {...}}</code>. The fraction
+of a compartment is the fraction in the category of <code>by</code> it has
+(<code>StratificationFractions::fraction</code>), so <code>A_g1_t1</code> starts with
+<code>bin amount × fraction(g1) × fraction(t1 in g1)</code>, and the stratifications
+stay apart in names, rates and conditions.</p>
+<p><strong>Rule:</strong> the engine checks the fractions against the stratifications
+(<code>check_stratification_fractions</code> in <code>builder.rs</code>, from <code>check_model</code> and
+<code>initial_state</code>): each stratification and each category named once, <code>by</code>
+declared before the stratification it splits, every compartment of that
+stratification with a category of <code>by</code>, one split per category of <code>by</code>. A
+field <code>"by"</code> that holds a text is the stratification, so a category may be
+named <code>by</code> in one split, and the stratification <code>by</code> names cannot have a
+category named <code>by</code>, whose split would take the key. Python sends the data and
+reads the splits (<code>split_by</code>, <code>category_splits</code> in
+<code>_model/initial_conditions.py</code>); an update of a category writes it into every
+split, as the engine writes a calibrated category.</p>
+<p><strong>Rule:</strong> a calibrated category keeps every split by category
+(<code>paired_category</code> in <code>crates/commol-model/src/initial_conditions.rs</code>, from
+<code>CompiledModel::splits_by</code>). A category of the split stratification takes its
+value inside every category of <code>by</code>. A category of <code>by</code> pairs the groups of
+compartments that differ only in <code>by</code> and in the stratifications split by it,
+directly or through another, so each side keeps the split of those
+stratifications. Pairing one compartment with one would mix the splits of
+<code>g1</code> and <code>g2</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A new field of <code>Aggregate</code></td>
+<td>The split of <code>type</code> belongs where the reader looks for the fractions of <code>type</code>.</td>
+</tr>
+<tr>
+<td>Keys that join the categories (<code>"g1:t1"</code>)</td>
+<td>A nested split checks the sum of each category on its own, and leaves room for a split by two stratifications.</td>
+</tr>
+<tr>
+<td>One stratification of every pair (<code>g1_t1</code>, …)</td>
+<td>A rate of <code>g1</code> then sums every pair of it, and a condition names each pair.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong>
+<code>crates/commol-model/tests/initial_conditions.rs::a_split_by_category_names_an_earlier_stratification</code>,
+<code>crates/commol-model/tests/initial_conditions.rs::the_fractions_of_each_category_sum_to_one</code>,
+<code>crates/commol-model/tests/initial_conditions.rs::a_category_of_the_stratification_a_split_differs_by_keeps_the_split</code>,
+<code>crates/commol-model/tests/initial_conditions.rs::a_category_keeps_a_chain_of_splits_that_differ_by_it</code>,
+<code>crates/commol-model/tests/initial_conditions.rs::a_side_that_starts_empty_keeps_its_declared_split</code>,
+<code>tests/calibration/test_initial_conditions.py::test_the_write_back_of_a_split_by_category_rebuilds_the_scored_state</code>,
+<code>tests/initial_conditions/test_stratification_fractions.py::test_a_stratification_splits_each_category_of_an_earlier_one</code>.</p>
 <h2 id="a-compartment-amount-overrides-the-expansion">A compartment amount overrides the expansion<a class="headerlink" href="#a-compartment-amount-overrides-the-expansion" title="Permanent link">&para;</a></h2>
 <p><code>compartment_amounts</code> (<code>Aggregate</code>, and <code>InitialConditions</code> in
 <code>crates/commol-core/src/types/aggregate.rs</code>) sets the amount of one expanded
@@ -3696,9 +3778,19 @@ stratifications declare is an error that names the qualified ids.</p>
 (<code>CompartmentalEngine::initial_state</code>), never its current state: the split of
 a bin, a prefix or the remainder and the pair totals of a category. A
 <code>Calibrator</code> takes the engine of its <code>Simulation</code>, which holds the last state
-of a run.</p>
+of a run. Compartments that start with nothing, such as those of a bin left
+<code>None</code>, or a side of a category whose fraction is 0, split a value as the
+fractions declare it within them: the product of the fractions that differ
+between them (<code>CompiledModel::fractions</code>, <code>weights</code> in
+<code>crates/commol-model/src/initial_conditions.rs</code>). A fraction they all take
+scales every share alike, and when it is 0 it would empty them all, so it
+does not count. They split evenly only when that product gives them
+nothing.</p>
 <p><strong>Guards:</strong>
 <code>crates/commol-model/tests/initial_conditions.rs::a_bin_and_the_remainder_keep_the_split_of_the_initial_state_after_a_run</code>,
+<code>crates/commol-model/tests/initial_conditions.rs::a_bin_left_for_calibration_splits_a_value_by_its_fractions</code>,
+<code>crates/commol-model/tests/initial_conditions.rs::a_prefix_that_starts_empty_keeps_its_declared_split</code>,
+<code>tests/calibration/test_initial_conditions.py::test_a_calibrated_amount_keeps_the_split_by_category</code>,
 <code>crates/commol-model/src/initial_conditions.rs::category_shared_by_two_stratifications_is_ambiguous</code>,
 <code>tests/calibration/test_initial_conditions.py::test_a_calibrator_on_a_simulation_that_has_run_splits_a_bin_by_the_initial_state</code>.</p>
 <h2 id="the-remainder-keeps-the-sum-the-model-declares">The remainder keeps the sum the model declares<a class="headerlink" href="#the-remainder-keeps-the-sum-the-model-declares" title="Permanent link">&para;</a></h2>

@@ -3746,7 +3746,7 @@
 <tbody>
 <tr>
 <td><code>crates/commol-core/src/types/</code></td>
-<td>The model data types shared by all crates and serialized from Python: <code>Model</code> (header, <code>engine</code>, <code>process</code>, <code>structure</code>), <code>Process</code> (<code>process.rs</code>: bins, accumulators, stratifications, matrices (<code>CategoryMatrix</code> and its check against the process), transitions; the names <code>NEIGHBORS</code> and <code>NEIGHBORS_PREFIX</code>), <code>ModelStructure</code> (one variant per kind, tagged by <code>kind</code>), <code>Aggregate</code> (<code>aggregate.rs</code>: <code>InitialConditions</code>, <code>Neighbors</code> and their checks, <code>AggregateVariant</code>), <code>Transition</code> (<code>transitions.rs</code>), …; <code>types/test_kind.rs</code> only with the <code>test-kind</code> feature.</td>
+<td>The model data types shared by all crates and serialized from Python: <code>Model</code> (header, <code>engine</code>, <code>process</code>, <code>structure</code>), <code>Process</code> (<code>process.rs</code>: bins, accumulators, stratifications, matrices (<code>CategoryMatrix</code> and its check against the process), transitions; the names <code>NEIGHBORS</code> and <code>NEIGHBORS_PREFIX</code>), <code>ModelStructure</code> (one variant per kind, tagged by <code>kind</code>), <code>Aggregate</code> (<code>aggregate.rs</code>: <code>InitialConditions</code>, <code>StratificationFractions</code> and the name <code>FRACTIONS_BY</code>, <code>Neighbors</code> and their checks, <code>AggregateVariant</code>), <code>Transition</code> (<code>transitions.rs</code>), …; <code>types/test_kind.rs</code> only with the <code>test-kind</code> feature.</td>
 <td>Engine behavior.</td>
 </tr>
 <tr>
@@ -3806,7 +3806,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-model/src/builder.rs</code></td>
-<td>Expansion of the bins and accumulators of a process over its stratifications (<code>expand</code>, <code>expand_compartments</code>, <code>expand_accumulators</code>), the initial state (<code>initial_state</code>), the checks of an aggregate model (<code>check_model</code>: variant, neighbors, names, whole units for a stochastic engine; <code>as_whole</code>), the subgroup total names (<code>subgroup_total_names</code>), impulse schedules and the compilation into <code>CompiledModel</code> (<code>try_from_model</code>).</td>
+<td>Expansion of the bins and accumulators of a process over its stratifications (<code>expand</code>, <code>expand_compartments</code>, <code>expand_accumulators</code>), the initial state (<code>initial_state</code>), the checks of an aggregate model (<code>check_model</code>: variant, neighbors, stratification fractions (<code>check_stratification_fractions</code>), names, whole units for a stochastic engine; <code>as_whole</code>), the subgroup total names (<code>subgroup_total_names</code>), impulse schedules and the compilation into <code>CompiledModel</code> (<code>try_from_model</code>).</td>
 <td>Flow planning; stepping.</td>
 </tr>
 <tr>
@@ -4098,7 +4098,7 @@
 </tr>
 <tr>
 <td><code>py-commol/src/model.rs</code></td>
-<td>The queries of <code>commol_rs.model</code> on a process and its aggregate structure: <code>initial_state</code>, <code>expanded_outputs</code>, <code>transition_flows</code>, <code>subgroup_total_names</code>; <code>check_model</code> on a model; the rules of the values of a model (<code>check_bin_amounts</code>, <code>check_compartment_amounts</code>, <code>check_fractions</code>, <code>check_impulse</code>, <code>check_series</code>); the names <code>NEIGHBORS</code> and <code>NEIGHBORS_PREFIX</code>.</td>
+<td>The queries of <code>commol_rs.model</code> on a process and its aggregate structure: <code>initial_state</code>, <code>expanded_outputs</code>, <code>transition_flows</code>, <code>subgroup_total_names</code>; <code>check_model</code> on a model; the rules of the values of a model (<code>check_bin_amounts</code>, <code>check_compartment_amounts</code>, <code>check_fractions</code>, <code>check_impulse</code>, <code>check_series</code>); the names <code>FRACTIONS_BY</code>, <code>NEIGHBORS</code> and <code>NEIGHBORS_PREFIX</code>.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
@@ -4555,7 +4555,7 @@ results.</p>
 <tr>
 <td>Change initial conditions</td>
 <td><code>py-commol/commol/_model/initial_conditions.py</code></td>
-<td><code>crates/commol-model/src/builder.rs</code> (<code>initial_state</code>), <code>crates/commol-model/src/rules.rs</code> (the rule of an amount or a fraction), <code>py-commol/commol/_model/aggregate.py</code>, <code>docs/guide/building-models.md</code></td>
+<td><code>crates/commol-model/src/builder.rs</code> (<code>initial_state</code>, <code>check_stratification_fractions</code>), <code>crates/commol-core/src/types/aggregate.rs</code> (<code>StratificationFractions</code>), <code>crates/commol-model/src/rules.rs</code> (the rule of an amount or a fraction), <code>py-commol/commol/_model/aggregate.py</code>, <code>docs/guide/building-models.md</code></td>
 </tr>
 <tr>
 <td>Change a stochastic engine (events, chain binomial, whole units), seeds or samplers</td>

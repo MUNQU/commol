@@ -3778,7 +3778,7 @@ compartment. The Rust engine applies the values in a fixed order, and a
 <tr>
 <td>A bin</td>
 <td><code>"B"</code></td>
-<td>The amount of the bin, in its unit. Its compartments share it in the proportions of the initial state, also when the <code>Simulation</code> has run.</td>
+<td>The amount of the bin, in its unit. Its compartments share it in the proportions of the initial state, also when the <code>Simulation</code> has run; compartments that start at 0, as those of a bin left <code>None</code>, share it as the stratification fractions split them, <a href="../building-models/#fractions-that-differ-by-category">split by category</a> included. A prefix such as <code>"A_g1"</code> whose fraction is 0 still takes the split of the later stratifications.</td>
 </tr>
 <tr>
 <td>A bin prefix (a bin and some categories)</td>
@@ -3793,7 +3793,7 @@ compartment. The Rust engine applies the values in a fixed order, and a
 <tr>
 <td>A category of a <strong>binary</strong> stratification</td>
 <td><code>"g1"</code> or <code>"group:g1"</code></td>
-<td>The split: every <code>(g1, g2)</code> pair of compartments keeps its total and gives <code>g1</code> this fraction.</td>
+<td>The split: every <code>(g1, g2)</code> pair of compartments keeps its total and gives <code>g1</code> this fraction. When a later stratification is split by <code>group</code>, directly or through another, each side keeps that split, also a side that starts at 0.</td>
 </tr>
 </tbody>
 </table>
@@ -3852,7 +3852,7 @@ values leave of the amounts the model states:</p>
 </tr>
 <tr>
 <td>It keeps its own split</td>
-<td>A bin remainder shares what it takes across its compartments in the proportions of the initial state.</td>
+<td>A bin remainder shares what it takes across its compartments in the proportions of the initial state, or of the stratification fractions when they start at 0.</td>
 </tr>
 <tr>
 <td>It must not overlap a calibrated id</td>
@@ -3945,7 +3945,8 @@ category value that overlaps an existing override. A bin of which a value sets
 only some compartments keeps its amount. Reloading the saved model
 gives the scored state exactly. A calibrated category split is written
 with <code>update_stratification_fractions</code>: the named category gets the value and
-its complement the rest.</p>
+its complement the rest, in every split of a stratification whose fractions
+<a href="../building-models/#fractions-that-differ-by-category">differ by category</a>.</p>
 <h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
 <ul>
 <li>[ ] Each unknown amount is <code>None</code> in the model, and the bounds are amounts in

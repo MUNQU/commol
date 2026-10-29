@@ -16,7 +16,7 @@ Call it on the model **after** `apply_calibration_parameters`. Each entry carrie
 
 Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` and `noise` parameters have no place in the model, so they are reported from `problem` when it is given.
 
-`initial_amounts` gives each bin and each overridden compartment of an aggregate model its `amount` the engine builds and the `unit` of its bin, so bins of different units are reported side by side; no row is a share of a total. A bin left uncalibrated keeps a `None` amount as its "needs calibration" marker even when overrides touch some of its compartments. `category_splits` gives each category its `fraction` of the group it splits, and that `group`: the categories a conditional stratification is conditioned on, empty when it splits every bin.
+`initial_amounts` gives each bin and each overridden compartment of an aggregate model its `amount` the engine builds and the `unit` of its bin, so bins of different units are reported side by side; no row is a share of a total. A bin left uncalibrated keeps a `None` amount as its "needs calibration" marker even when overrides touch some of its compartments. `category_splits` gives each category its `fraction` of the group it splits, and that `group`: the categories a conditional stratification is conditioned on, empty when it splits every bin. A stratification whose fractions differ by the category of an earlier one gives a row per split, under the key `t1 of g1`, with that category in its `group`.
 
 With a `sample` each entry gains an `interval` holding the weighted statistics of its draws (`ParameterSample.summary`). Every entry is in the unit it was calibrated in: a parameter in its own, an amount in the unit of its bin, and a category split as a fraction of its group.
 
@@ -74,7 +74,9 @@ def applied_parameters(
     some of its compartments. ``category_splits`` gives each category its
     ``fraction`` of the group it splits, and that ``group``: the
     categories a conditional stratification is conditioned on, empty when
-    it splits every bin.
+    it splits every bin. A stratification whose fractions differ by the
+    category of an earlier one gives a row per split, under the key
+    ``t1 of g1``, with that category in its ``group``.
 
     With a `sample` each entry gains an ``interval`` holding the weighted
     statistics of its draws (`ParameterSample.summary`). Every entry is in

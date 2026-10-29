@@ -337,7 +337,9 @@ class Model(BaseModel, Generic[StructureT]):
         some of its compartments. ``category_splits`` gives each category its
         ``fraction`` of the group it splits, and that ``group``: the
         categories a conditional stratification is conditioned on, empty when
-        it splits every bin.
+        it splits every bin. A stratification whose fractions differ by the
+        category of an earlier one gives a row per split, under the key
+        ``t1 of g1``, with that category in its ``group``.
 
         With a `sample` each entry gains an ``interval`` holding the weighted
         statistics of its draws (`ParameterSample.summary`). Every entry is in
@@ -784,7 +786,7 @@ Call it on the model **after** `apply_calibration_parameters`. Each entry carrie
 
 Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` and `noise` parameters have no place in the model, so they are reported from `problem` when it is given.
 
-`initial_amounts` gives each bin and each overridden compartment of an aggregate model its `amount` the engine builds and the `unit` of its bin, so bins of different units are reported side by side; no row is a share of a total. A bin left uncalibrated keeps a `None` amount as its "needs calibration" marker even when overrides touch some of its compartments. `category_splits` gives each category its `fraction` of the group it splits, and that `group`: the categories a conditional stratification is conditioned on, empty when it splits every bin.
+`initial_amounts` gives each bin and each overridden compartment of an aggregate model its `amount` the engine builds and the `unit` of its bin, so bins of different units are reported side by side; no row is a share of a total. A bin left uncalibrated keeps a `None` amount as its "needs calibration" marker even when overrides touch some of its compartments. `category_splits` gives each category its `fraction` of the group it splits, and that `group`: the categories a conditional stratification is conditioned on, empty when it splits every bin. A stratification whose fractions differ by the category of an earlier one gives a row per split, under the key `t1 of g1`, with that category in its `group`.
 
 With a `sample` each entry gains an `interval` holding the weighted statistics of its draws (`ParameterSample.summary`). Every entry is in the unit it was calibrated in: a parameter in its own, an amount in the unit of its bin, and a category split as a fraction of its group.
 
@@ -842,7 +844,9 @@ def applied_parameters(
     some of its compartments. ``category_splits`` gives each category its
     ``fraction`` of the group it splits, and that ``group``: the
     categories a conditional stratification is conditioned on, empty when
-    it splits every bin.
+    it splits every bin. A stratification whose fractions differ by the
+    category of an earlier one gives a row per split, under the key
+    ``t1 of g1``, with that category in its ``group``.
 
     With a `sample` each entry gains an ``interval`` holding the weighted
     statistics of its draws (`ParameterSample.summary`). Every entry is in
@@ -2201,14 +2205,14 @@ The bins of the process expand over its stratifications into compartments. `bin_
 
 Attributes:
 
-| Name                       | Type                          | Description                                                                                                                                                                                                                   |
-| -------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `kind`                     | `Literal['aggregate']`        | The model kind.                                                                                                                                                                                                               |
-| `variant`                  | \`str                         | None\`                                                                                                                                                                                                                        |
-| `bin_amounts`              | \`dict\[str, float            | None\]\`                                                                                                                                                                                                                      |
-| `stratification_fractions` | `dict[str, dict[str, float]]` | The fraction of each category, by stratification id, such as {"group": {"g1": 0.3, "g2": 0.7}}: the split of the amount of every bin it applies to. A conditional stratification splits only the group its conditions select. |
-| `compartment_amounts`      | `dict[str, float]`            | Amounts of single expanded compartments, such as {"A_g1": 0.0}, applied after the expansion. The names are checked against the engine when the model is built.                                                                |
-| `neighbors`                | \`Complete                    | Groups                                                                                                                                                                                                                        |
+| Name                       | Type                   | Description                                                                                                                                                                                                                                                                                           |
+| -------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kind`                     | `Literal['aggregate']` | The model kind.                                                                                                                                                                                                                                                                                       |
+| `variant`                  | \`str                  | None\`                                                                                                                                                                                                                                                                                                |
+| `bin_amounts`              | \`dict\[str, float     | None\]\`                                                                                                                                                                                                                                                                                              |
+| `stratification_fractions` | `dict[str, dict]`      | The fraction of each category, by stratification id, a dict[str, float] such as {"group": {"g1": 0.3, "g2": 0.7}}: the split of the amount of every bin it applies to. A stratification may instead split each category of a stratification declared before it by its own fractions, a dict\[str, str |
+| `compartment_amounts`      | `dict[str, float]`     | Amounts of single expanded compartments, such as {"A_g1": 0.0}, applied after the expansion. The names are checked against the engine when the model is built.                                                                                                                                        |
+| `neighbors`                | \`Complete             | Groups                                                                                                                                                                                                                                                                                                |
 
 Source code in `commol/_model/aggregate.py`
 
@@ -2236,11 +2240,17 @@ class Aggregate(ModelStructure, InitialConditions):
         The amount of each bin at the start, by bin id, in the unit of the
         bin, such as ``{"A": 990, "B": 10, "C": 1e5}``; finite and not
         negative. None leaves an amount for calibration.
-    stratification_fractions : dict[str, dict[str, float]]
-        The fraction of each category, by stratification id, such as
-        ``{"group": {"g1": 0.3, "g2": 0.7}}``: the split of the amount of
-        every bin it applies to. A conditional stratification splits only the
-        group its conditions select.
+    stratification_fractions : dict[str, dict]
+        The fraction of each category, by stratification id, a
+        ``dict[str, float]`` such as ``{"group": {"g1": 0.3, "g2": 0.7}}``:
+        the split of the amount of every bin it applies to. A stratification
+        may instead split each category of a stratification declared before
+        it by its own fractions, a ``dict[str, str | dict[str, float]]`` such
+        as ``{"type": {"by": "group", "g1": {"t1": 0.25, "t2": 0.75},
+        "g2": {"t1": 0.5, "t2": 0.5}}}``: the compartment ``A_g1_t1`` then
+        starts with the amount of ``A`` times 0.3 times 0.25. Every
+        compartment of ``type`` needs a category of ``group``. A conditional
+        stratification splits only the group its conditions select.
     compartment_amounts : dict[str, float]
         Amounts of single expanded compartments, such as ``{"A_g1": 0.0}``,
         applied after the expansion. The names are checked against the engine
@@ -2266,11 +2276,13 @@ class Aggregate(ModelStructure, InitialConditions):
         Check the structure against the process and the parameters.
 
         The process needs a bin and a transition, the amounts must name every
-        bin and the fractions every category of the process, and the engine
-        must plan every transition, accept every id (no parameter id is an
-        engine variable, a bin, a compartment or a subgroup total), resolve
-        the neighbors, find every variable a rate or a formula parameter
-        reads, and build the initial state.
+        bin, and the engine must check the fractions against the
+        stratifications (every stratification and category named, a split by
+        category by a stratification declared before it), plan every
+        transition, accept every id (no parameter id is an engine variable, a
+        bin, a compartment or a subgroup total), resolve the neighbors, find
+        every variable a rate or a formula parameter reads, and build the
+        initial state.
 
         Parameters
         ----------
@@ -2288,7 +2300,6 @@ class Aggregate(ModelStructure, InitialConditions):
         if not process.transitions:
             raise ValueError("At least one transition must be defined.")
         self._check_bin_amounts(process)
-        self._check_stratification_fractions(process)
         engine_state.transition_flows(process, self)
         engine_state.check_model(model)
         if self.compartment_amounts:
@@ -2677,34 +2688,6 @@ class Aggregate(ModelStructure, InitialConditions):
                 f"Missing ids: {sorted(expected_bins - actual_bins)}, "
                 f"Extra ids: {sorted(actual_bins - expected_bins)}."
             )
-
-    def _check_stratification_fractions(self, process: Process) -> None:
-        """Check that the fractions name each stratification and its
-        categories; the rule of their values is the engine's, checked when the
-        structure is built."""
-        strat_map = {strat.id: strat for strat in process.stratifications}
-        actual_strat = set(self.stratification_fractions)
-        expected_strat = set(strat_map)
-        if actual_strat != expected_strat:
-            raise ValueError(
-                f"Initial stratification fractions keys must exactly match "
-                f"stratification ids. "
-                f"Missing ids: {sorted(expected_strat - actual_strat)}, "
-                f"Extra ids: {sorted(actual_strat - expected_strat)}."
-            )
-
-        for strat_id, fractions in self.stratification_fractions.items():
-            strat_instance = strat_map[strat_id]
-
-            expected = set(strat_instance.categories)
-            actual = set(fractions)
-            if actual != expected:
-                raise ValueError(
-                    f"Categories for stratification '{strat_id}' must exactly "
-                    f"match defined categories in instance '{strat_instance.id}'. "
-                    f"Missing categories: {sorted(expected - actual)}, "
-                    f"Extra categories: {sorted(actual - expected)}."
-                )
 ```
 
 ### Methods:
@@ -2717,7 +2700,7 @@ check_model(model: Model[Self]) -> None
 
 Check the structure against the process and the parameters.
 
-The process needs a bin and a transition, the amounts must name every bin and the fractions every category of the process, and the engine must plan every transition, accept every id (no parameter id is an engine variable, a bin, a compartment or a subgroup total), resolve the neighbors, find every variable a rate or a formula parameter reads, and build the initial state.
+The process needs a bin and a transition, the amounts must name every bin, and the engine must check the fractions against the stratifications (every stratification and category named, a split by category by a stratification declared before it), plan every transition, accept every id (no parameter id is an engine variable, a bin, a compartment or a subgroup total), resolve the neighbors, find every variable a rate or a formula parameter reads, and build the initial state.
 
 Parameters:
 
@@ -2739,11 +2722,13 @@ def check_model(self, model: "Model[Self]") -> None:
     Check the structure against the process and the parameters.
 
     The process needs a bin and a transition, the amounts must name every
-    bin and the fractions every category of the process, and the engine
-    must plan every transition, accept every id (no parameter id is an
-    engine variable, a bin, a compartment or a subgroup total), resolve
-    the neighbors, find every variable a rate or a formula parameter
-    reads, and build the initial state.
+    bin, and the engine must check the fractions against the
+    stratifications (every stratification and category named, a split by
+    category by a stratification declared before it), plan every
+    transition, accept every id (no parameter id is an engine variable, a
+    bin, a compartment or a subgroup total), resolve the neighbors, find
+    every variable a rate or a formula parameter reads, and build the
+    initial state.
 
     Parameters
     ----------
@@ -2761,7 +2746,6 @@ def check_model(self, model: "Model[Self]") -> None:
     if not process.transitions:
         raise ValueError("At least one transition must be defined.")
     self._check_bin_amounts(process)
-    self._check_stratification_fractions(process)
     engine_state.transition_flows(process, self)
     engine_state.check_model(model)
     if self.compartment_amounts:
