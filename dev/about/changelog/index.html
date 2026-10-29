@@ -5064,6 +5064,13 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><code>ObservedDataPoint(scale=...)</code>: a known positive number, 1 by default, that
+  multiplies the prediction of the observation, with its factor. A count
+  model reads the mean <code>scale · model</code>, so counts observed on a known part of
+  what the model describes stay whole. The loss, the likelihood, the
+  predictive, the scores, the figures and the <code>observed</code> block of a report
+  (<code>scales</code>) read it. See
+  <a href="../../guide/calibration-observations/#known-shares-scales">Observations</a>.</li>
 <li><code>GibbsResult</code> and <code>ConformalResult</code> give <code>block_length</code> and
   <code>block_length_estimates</code>, as the bootstraps, the jackknife and the sandwich
   do: the length a method ran with, and with <code>block_length="auto"</code> the

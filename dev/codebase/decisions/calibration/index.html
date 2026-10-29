@@ -2882,6 +2882,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-known-scale-is-a-number-of-the-observation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A known scale is a number of the observation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#constraints-bound-the-support" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3658,6 +3669,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-known-scale-is-a-number-of-the-observation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A known scale is a number of the observation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#constraints-bound-the-support" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3803,10 +3825,10 @@ message with no prefix.</p>
 <h2 id="one-observation-operator">One observation operator<a class="headerlink" href="#one-observation-operator" title="Permanent link">&para;</a></h2>
 <p><code>ObservationOperator</code> (<code>crates/commol-calibration/src/observation.rs</code>) is the
 only code that turns a run into observed quantities: the row of each
-observation, the sum of its outputs, its increment over its window and its
-factor. The loss, the predictions of <code>PyCalibrationProblem</code>, the predictive's
-<code>at_observations</code> and every score read it, and the figures read a windowed or
-scaled series of a predictive through it. The calibration problem is split
+observation, the sum of its outputs, its increment over its window, its
+scale and its factor. The loss, the predictions of <code>PyCalibrationProblem</code>, the
+predictive's <code>at_observations</code> and every score read it, and the figures read
+a windowed or scaled series of a predictive through it. The calibration problem is split
 into one layer per job, each in its own module: <code>ForwardModel</code> (<code>forward.rs</code>)
 is the only code that clones, resets, writes values to or runs the engine;
 <code>Feasibility</code> (<code>feasibility.rs</code>) checks bounds and constraints; <code>Discrepancy</code>
@@ -3847,6 +3869,17 @@ read a position with the same <code>index_at</code>.</p>
 <code>tests/uncertainty/test_predictive.py::TestObservations</code>,
 <code>crates/commol-inference/tests/test_global_sensitivity.rs::a_gain_reads_its_start_exactly</code>,
 <code>tests/uncertainty/test_propagation.py::TestPropagation::test_a_gain_reads_its_start_exactly</code>.</p>
+<h2 id="a-known-scale-is-a-number-of-the-observation">A known scale is a number of the observation<a class="headerlink" href="#a-known-scale-is-a-number-of-the-observation" title="Permanent link">&para;</a></h2>
+<p>A known part of what an observation reads, such as the share of the units
+that report, is <code>ObservedDataPoint.scale</code> (1 by default). The operator
+multiplies the prediction by it with the factor, so every reader applies it
+with no code of its own; a target that copies the first observation of its
+series (conformal <code>targets</code>, the dense design of finite differences) keeps
+its scale. Not a <code>factor</code> with equal bounds: <code>CalibrationParameter</code> refuses
+them, and a parameter that nothing fits would enter every method that reads
+the parameter vector. Not a scale of the series: <code>factor_id</code>, <code>window</code> and
+<code>trials</code> change by observation, and a loss has no observation model.</p>
+<p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_series.rs::a_scale_and_a_factor_multiply</code>, <code>tests/calibration/test_observations.py::test_an_observation_reads_the_model_times_its_scale</code>.</p>
 <h2 id="constraints-bound-the-support">Constraints bound the support<a class="headerlink" href="#constraints-bound-the-support" title="Permanent link">&para;</a></h2>
 <p>A point is feasible, or it violates the problem by an amount: a bound, a
 constraint, an infeasible start or run, a value that is not finite, or a

@@ -442,7 +442,7 @@ results.plot.series(output_file="with_data.png", observed_data=observed)
 
 ### A panel per observed series
 
-`plot.observations(observed_data, …)` checks a model against its data: one panel per `label` of the observations, in the order of its first observation. The model is read only at the observations, through the observation operator of each one (the sum of its `outputs`, its `window` and its factor): the values the loss compares. An observed series that sums some outputs, such as `B + C`, has its own panel, which no series of `plot.series` gives.
+`plot.observations(observed_data, …)` checks a model against its data: one panel per `label` of the observations, in the order of its first observation. The model is read only at the observations, through the observation operator of each one (the sum of its `outputs`, its `window`, its `scale` and its factor): the values the loss compares. An observed series that sums some outputs, such as `B + C`, has its own panel, which no series of `plot.series` gives.
 
 ```python
 observed = [
@@ -517,7 +517,7 @@ weekly = plot_compared({"k1 = 0.3": results, "k1 = 0.5": faster}, series=["cum_a
 print([float(at) for at in weekly.axes[0].lines[0].get_xdata()][:3])  # [7.0, 14.0, 21.0]
 ```
 
-`panels="observations"` draws one panel per `label` of `observed_data`, as [`plot.observations`](#a-panel-per-observed-series) draws one result: each result is read only at the observations, through the observation operator of each one (the sum of its `outputs`, its `window` and its factor). Each result has the steps, markers and band of `plot.observations` in the color of its key, and the observations are drawn once. The default, `panels="series"`, draws one panel per entry of `series`.
+`panels="observations"` draws one panel per `label` of `observed_data`, as [`plot.observations`](#a-panel-per-observed-series) draws one result: each result is read only at the observations, through the observation operator of each one (the sum of its `outputs`, its `window`, its `scale` and its factor). Each result has the steps, markers and band of `plot.observations` in the color of its key, and the observations are drawn once. The default, `panels="series"`, draws one panel per entry of `series`.
 
 ```python
 checked = plot_compared(

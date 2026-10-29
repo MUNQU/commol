@@ -2983,7 +2983,7 @@ results.plot.series(output_file="with_data.png", observed_data=observed)
 
 ### A panel per observed series
 
-`plot.observations(observed_data, …)` checks a model against its data: one panel per `label` of the observations, in the order of its first observation. The model is read only at the observations, through the observation operator of each one (the sum of its `outputs`, its `window` and its factor): the values the loss compares. An observed series that sums some outputs, such as `B + C`, has its own panel, which no series of `plot.series` gives.
+`plot.observations(observed_data, …)` checks a model against its data: one panel per `label` of the observations, in the order of its first observation. The model is read only at the observations, through the observation operator of each one (the sum of its `outputs`, its `window`, its `scale` and its factor): the values the loss compares. An observed series that sums some outputs, such as `B + C`, has its own panel, which no series of `plot.series` gives.
 
 ```python
 observed = [
@@ -3058,7 +3058,7 @@ weekly = plot_compared({"k1 = 0.3": results, "k1 = 0.5": faster}, series=["cum_a
 print([float(at) for at in weekly.axes[0].lines[0].get_xdata()][:3])  # [7.0, 14.0, 21.0]
 ```
 
-`panels="observations"` draws one panel per `label` of `observed_data`, as [`plot.observations`](#a-panel-per-observed-series) draws one result: each result is read only at the observations, through the observation operator of each one (the sum of its `outputs`, its `window` and its factor). Each result has the steps, markers and band of `plot.observations` in the color of its key, and the observations are drawn once. The default, `panels="series"`, draws one panel per entry of `series`.
+`panels="observations"` draws one panel per `label` of `observed_data`, as [`plot.observations`](#a-panel-per-observed-series) draws one result: each result is read only at the observations, through the observation operator of each one (the sum of its `outputs`, its `window`, its `scale` and its factor). Each result has the steps, markers and band of `plot.observations` in the color of its key, and the observations are drawn once. The default, `panels="series"`, draws one panel per entry of `series`.
 
 ```python
 checked = plot_compared(
@@ -3752,7 +3752,7 @@ So an expanded-compartment id always becomes an override, and so does a bin or c
 
 [Back to Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)
 
-An `ObservedDataPoint` says what the model must reproduce: an output at a position on the axis. This page shows how to observe several outputs, sums of outputs, partial observations (factors), counts per period (windows) and positions between integers, and how to weigh them.
+An `ObservedDataPoint` says what the model must reproduce: an output at a position on the axis. This page shows how to observe several outputs, sums of outputs, partial observations (factors and known scales), counts per period (windows) and positions between integers, and how to weigh them.
 
 ## Quick path
 
@@ -3824,6 +3824,7 @@ Each observation compares the model output named in `output` with `value` at the
 | `value`     | `float`             | required | The observed value, zero or more.                                                                                                                                                                                         |
 | `weight`    | `float`             | `1.0`    | Above zero. How much the observation counts in every loss, and the power of its term of a likelihood; see [Losses](https://munqu.github.io/commol/latest/guide/calibration/#losses).                                      |
 | `factor_id` | `str \| None`       | `None`   | A `factor` unknown that multiplies the prediction.                                                                                                                                                                        |
+| `scale`     | `float`             | `1.0`    | Above zero and finite. A known number that multiplies the prediction, with the factor; see [Known shares: scales](#known-shares-scales).                                                                                  |
 | `window`    | `float \| None`     | `None`   | Compares with the gain over `(at − window, at]` instead of the value.                                                                                                                                                     |
 | `trials`    | `int \| None`       | `None`   | The trials of the observation, for a `BinomialObservations()` model that reads them from each observation. See [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md). |
 
@@ -3893,6 +3894,26 @@ print(round(scaled_result.best_parameters["share_seen"], 3))  # 0.3
 | Not part of the model | `apply_calibration_parameters` skips `factor` values.                                                                                                                                                                  |
 | Plots                 | Pass `calibration_result=` to `results.plot.series` or `results.plot.observations`; it applies the calibrated factors to the comparison.                                                                               |
 | Identifiability       | A rate and a share can explain the same data. Fit them together only when the data can tell them apart: [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md) checks it. |
+
+## Known shares: scales
+
+When the share an observation sees is known, give it as `scale`. The prediction is the sum of its outputs, or their gain over its window, times `scale` and times its factor, if it has one. The scale is a number, not an unknown: no method fits it, samples it or judges its identifiability, and it can change from one observation to the next.
+
+```python
+known = [
+    ObservedDataPoint(at=step, output="B", value=0.3 * truth["B"][step], scale=0.3)
+    for step in range(5, 51, 5)
+]
+print(calibrate_k1(known))  # 0.4
+```
+
+| Fact         | Detail                                                                                                                                                                                                                                                                                                                                          |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Counts       | A count model reads the mean `scale · model`, so the observed counts stay whole and keep their own size: a negative binomial of the counts seen on 1 unit in 40 reads `0.025 · model`, not the counts multiplied by 40. See [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#choosing-a-model). |
+| Every reader | The loss, the likelihood, the predictive (`at_observations`), the scores, the resampling and conformal methods, the figures and the reports read an observation with its scale.                                                                                                                                                                 |
+| Figures      | `plot.series` and `plot.observations` draw the model times the scale; `plot.cumulative` divides each observed value by its scale and its factor.                                                                                                                                                                                                |
+| Reports      | The `observed` block of a report gives `scales` when a scale is not 1.0 ([Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)).                                                                                                                                                                                              |
+| Range        | A scale of 0, below 0, infinite or NaN raises `ValidationError` that names `scale`.                                                                                                                                                                                                                                                             |
 
 ## Counts per period: windows
 
@@ -3965,6 +3986,7 @@ Observe expanded outputs by name, such as `B_g1`, or sum them with `outputs`. `S
 - [ ] Every `output` (and every entry of `outputs`) is an output name; a sum has a `label`.
 - [ ] Weights say how much each observation counts, in every loss.
 - [ ] Every `factor_id` has a `CalibrationParameter` with `parameter_type="factor"`.
+- [ ] A known share is a `scale`, not a `factor` with narrow bounds.
 - [ ] Windowed observations use a cumulative output and a window that starts at 0 or later.
 
 ## Next steps
@@ -4538,7 +4560,7 @@ print(weighted_quantiles([0.0, 1.0], levels=[0.5], weights=[1.0, 3.0]))  # [0.75
 | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `band(confidence_level)`                                                                                             | The weighted mean, median and central interval of every output at every position (`PredictiveBand`)                                                                                                                                                                                                                                            |
 | `series_band(outputs, confidence_level, cumulative=False)`                                                           | The band of the sum of some outputs, or of its running total; each draw is reduced first                                                                                                                                                                                                                                                       |
-| `at_observations(observed_data, noise)`                                                                              | Every draw's value of each observation, read through the observation operator the loss uses (sums, windows and factors), with `noise` drawn from the calibrator's seed: `NoNoise()`, `ResidualNoise(...)` or `DistributionNoise()` (`ObservationDraws`)                                                                                        |
+| `at_observations(observed_data, noise)`                                                                              | Every draw's value of each observation, read through the observation operator the loss uses (sums, windows, scales and factors), with `noise` drawn from the calibrator's seed: `NoNoise()`, `ResidualNoise(...)` or `DistributionNoise()` (`ObservationDraws`)                                                                                |
 | `runs()`, `weights`                                                                                                  | The trajectory and weight of every draw                                                                                                                                                                                                                                                                                                        |
 | `quantities(quantities)`                                                                                             | The quantities of interest of every draw, one dict per draw, as `SimulationResults.quantities` reads one run                                                                                                                                                                                                                                   |
 | `draw_seeds`                                                                                                         | The seed of each draw of the sample: `Simulation.replicates(count, seed=draw_seeds[j])` of the model at the values of draw `j` gives its runs                                                                                                                                                                                                  |
@@ -4779,7 +4801,7 @@ print(round(scores.log_score(predictive, held_out, DistributionNoise()).mean, 2)
 
 ## Choosing a model
 
-The mean of every model is the prediction of the observation (its sums, window and factor), except the median of a `LogNormalObservations` with `center="median"`. A model only adds the scatter around it.
+The mean of every model is the prediction of the observation (its sums, window, scale and factor), except the median of a `LogNormalObservations` with `center="median"`. A model only adds the scatter around it.
 
 | Your data                                            | Model                                          | Variance                               | Notes                                                                                             |
 | ---------------------------------------------------- | ---------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------- |
@@ -4791,6 +4813,8 @@ The mean of every model is the prediction of the observation (its sums, window a
 | Successes out of known trials                        | `BinomialObservations(trials)`                 | `μ(1 − μ/n)`                           | The prediction is the expected count `n·p`, not a proportion                                      |
 
 A `BinomialObservations` takes its trials from `trials=n`, for every observation of the series, or with no argument from `ObservedDataPoint.trials` of each observation, for trials that change from one observation to the next. A series has one source; both or neither raise a `ValueError` that names the observation.
+
+A count observed on a known part of what the model describes, such as a sample of a known size, keeps its own value: give the part as [`scale`](https://munqu.github.io/commol/latest/guide/calibration-observations/#known-shares-scales), and the model reads the mean `scale · μ`. Dividing the count by the part instead gives a value that is not whole, and a count multiplied by `1/scale` has the wrong Poisson variance.
 
 ## Noise parameters
 
@@ -6788,11 +6812,11 @@ The key order of each entry is fixed (`value`, `calibrated`, then `interval`; `a
 
 `SimulationResults.report(positions, window, windows, observed_data=(), accumulators=(), prediction_intervals=None)` reports a run on one axis of windows. It reads each value at a position of the results (`results.positions`), so it works for any model type: a differential model reports at non-integer positions once the results hold them ([Reporting at any position](https://munqu.github.io/commol/latest/guide/simulations/#reporting-at-any-position)).
 
-| Block          | Content                                                                                                                                                                                                                                                                                                        |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `observed`     | For each observation label: `values`, padded to `windows`, so it lines up with `windowed` index for index. An observation goes to the window that holds its position (the rule of `AxisUnits.window_index`). `outputs` and `factor_id` appear when a series uses them, and `weights` when a weight is not 1.0. |
-| `series`       | Each output sampled at `positions`, sorted by name, except the outputs of the accumulators in `accumulators`                                                                                                                                                                                                   |
-| `accumulators` | For each accumulator: `total` (its final value), `windowed` (the gain in each window that ends within the results, as the loss compares it) and `cumulative` (sampled at `positions`); each reading as a `total` and `by_output`                                                                               |
+| Block          | Content                                                                                                                                                                                                                                                                                                                                          |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `observed`     | For each observation label: `values`, padded to `windows`, so it lines up with `windowed` index for index. An observation goes to the window that holds its position (the rule of `AxisUnits.window_index`). `outputs` and `factor_id` appear when a series uses them, `weights` when a weight is not 1.0, and `scales` when a scale is not 1.0. |
+| `series`       | Each output sampled at `positions`, sorted by name, except the outputs of the accumulators in `accumulators`                                                                                                                                                                                                                                     |
+| `accumulators` | For each accumulator: `total` (its final value), `windowed` (the gain in each window that ends within the results, as the loss compares it) and `cumulative` (sampled at `positions`); each reading as a `total` and `by_output`                                                                                                                 |
 
 | Argument               | Meaning                                                                                                                                                                                                                                                                                                                       |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -10894,17 +10918,18 @@ An observation compares one output, or the sum of several outputs, with an obser
 
 Attributes:
 
-| Name        | Type        | Description                                                                                                                                                                                                    |
-| ----------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `at`        | `float`     | Position of the observation on the axis. The engine decides which positions its model type accepts: a DifferentialEquations model any non-negative position, a DifferenceEquations model only an integer step. |
-| `output`    | \`str       | None\`                                                                                                                                                                                                         |
-| `outputs`   | \`list[str] | None\`                                                                                                                                                                                                         |
-| `label`     | `str`       | Name of the observed series, used by reports, plots and the per-series normalization. Defaults to output.                                                                                                      |
-| `value`     | `float`     | Observed value                                                                                                                                                                                                 |
-| `weight`    | `float`     | How much this observation counts in the loss (default: 1.0). Every loss multiplies the squared or absolute residual by it: sse is Σ w·r², rmse is √(Σ w·r² / Σ w), mae is Σ w·                                 |
-| `factor_id` | \`str       | None\`                                                                                                                                                                                                         |
-| `window`    | \`float     | None\`                                                                                                                                                                                                         |
-| `trials`    | \`int       | None\`                                                                                                                                                                                                         |
+| Name        | Type        | Description                                                                                                                                                                                                                                                                                                              |
+| ----------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `at`        | `float`     | Position of the observation on the axis. The engine decides which positions its model type accepts: a DifferentialEquations model any non-negative position, a DifferenceEquations model only an integer step.                                                                                                           |
+| `output`    | \`str       | None\`                                                                                                                                                                                                                                                                                                                   |
+| `outputs`   | \`list[str] | None\`                                                                                                                                                                                                                                                                                                                   |
+| `label`     | `str`       | Name of the observed series, used by reports, plots and the per-series normalization. Defaults to output.                                                                                                                                                                                                                |
+| `value`     | `float`     | Observed value                                                                                                                                                                                                                                                                                                           |
+| `weight`    | `float`     | How much this observation counts in the loss (default: 1.0). Every loss multiplies the squared or absolute residual by it: sse is Σ w·r², rmse is √(Σ w·r² / Σ w), mae is Σ w·                                                                                                                                           |
+| `factor_id` | \`str       | None\`                                                                                                                                                                                                                                                                                                                   |
+| `scale`     | `float`     | A known positive number that multiplies the model output, with the factor if there is one, before comparison (default: 1.0): the known part of what the model describes that the observation reads, such as the share of the units that report. A count model then reads the observed count with the mean scale · model. |
+| `window`    | \`float     | None\`                                                                                                                                                                                                                                                                                                                   |
+| `trials`    | \`int       | None\`                                                                                                                                                                                                                                                                                                                   |
 
 Source code in `commol/_problem/problem.py`
 
@@ -10943,6 +10968,12 @@ class ObservedDataPoint(RangeChecked):
     factor_id : str | None
         Optional factor parameter ID that multiplies the model output before
         comparison
+    scale : float
+        A known positive number that multiplies the model output, with the
+        factor if there is one, before comparison (default: 1.0): the known
+        part of what the model describes that the observation reads, such as
+        the share of the units that report. A count model then reads the
+        observed count with the mean ``scale · model``.
     window : float | None
         Optional window length for a cumulative output: the prediction is the
         output at `at` minus the output at ``at - window``.
@@ -10973,6 +11004,10 @@ class ObservedDataPoint(RangeChecked):
     factor_id: str | None = Field(
         default=None,
         description="Optional factor parameter ID that multiplies the model output",
+    )
+    scale: float = Field(
+        default=1.0,
+        description="Known positive number that multiplies the model output",
     )
     window: float | None = Field(
         default=None,
@@ -37993,6 +38028,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- `ObservedDataPoint(scale=...)`: a known positive number, 1 by default, that multiplies the prediction of the observation, with its factor. A count model reads the mean `scale · model`, so counts observed on a known part of what the model describes stay whole. The loss, the likelihood, the predictive, the scores, the figures and the `observed` block of a report (`scales`) read it. See [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#known-shares-scales).
 - `GibbsResult` and `ConformalResult` give `block_length` and `block_length_estimates`, as the bootstraps, the jackknife and the sandwich do: the length a method ran with, and with `block_length="auto"` the estimate of each series, by label. `GibbsResult` gives them for `InformationMatchingEta` and `BootstrapCoverageEta`, and `None` for a number `η`; `ConformalResult` for `JackknifePlus` and `EnbPI`, and `None` for the variants without blocks. See [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means) and [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#results-plots-and-reports).
 - `ProfileIdentifiability(result=profiles)` in `commol.identifiability`: the identifiability report of the verdicts of a `ProfileResult`, run through `Calibrator.identifiability` as every identifiability method. It runs no model, and it refuses the profiles of another problem with a `ValueError` that names the parameters of both. See [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#verdicts-and-the-identifiability-report).
 

@@ -3802,7 +3802,7 @@ model.</p>
 </span></code></pre></div>
 <h2 id="choosing-a-model">Choosing a model<a class="headerlink" href="#choosing-a-model" title="Permanent link">&para;</a></h2>
 <p>The mean of every model is the prediction of the observation (its sums,
-window and factor), except the median of a <code>LogNormalObservations</code> with
+window, scale and factor), except the median of a <code>LogNormalObservations</code> with
 <code>center="median"</code>. A model only adds the scatter around it.</p>
 <table>
 <thead>
@@ -3857,6 +3857,12 @@ observation of the series, or with no argument from <code>ObservedDataPoint.tria
 of each observation, for trials that change from one observation to the
 next. A series has one source; both or neither raise a <code>ValueError</code> that
 names the observation.</p>
+<p>A count observed on a known part of what the model describes, such as a
+sample of a known size, keeps its own value: give the part as
+<a href="../../calibration-observations/#known-shares-scales"><code>scale</code></a>, and the model
+reads the mean <code>scale · μ</code>. Dividing the count by the part instead gives a
+value that is not whole, and a count multiplied by <code>1/scale</code> has the wrong
+Poisson variance.</p>
 <h2 id="noise-parameters">Noise parameters<a class="headerlink" href="#noise-parameters" title="Permanent link">&para;</a></h2>
 <p>A noise argument is a number, or the id of a calibration parameter of type
 <code>"noise"</code>. A noise parameter is fitted, sampled and reported with the
