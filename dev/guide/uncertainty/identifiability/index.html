@@ -1353,6 +1353,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Structural rank">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-the-solver-tolerance-sets-the-rank" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When the solver tolerance sets the rank
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -3686,6 +3703,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Structural rank">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-the-solver-tolerance-sets-the-rank" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When the solver tolerance sets the rank
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -4036,6 +4070,48 @@ parameter; a dense design keeps its verdicts in its section.</p>
 </span></code></pre></div>
 <p>Denser data of <code>B</code> do not split the product either: the deficit is in the
 model, not in the design.</p>
+<h4 id="when-the-solver-tolerance-sets-the-rank">When the solver tolerance sets the rank<a class="headerlink" href="#when-the-solver-tolerance-sets-the-rank" title="Permanent link">&para;</a></h4>
+<p>The estimated error of <code>S</code> grows with the tolerance of an ODE solver, and it
+can hide a singular value that a tighter tolerance resolves. With
+<code>DifferentialEquations</code>, each point whose rank is below the number of
+parameters is evaluated again at <code>rtol / 100</code> and <code>atol / 100</code>, no lower than
+<code>1e-14</code>, and the verdicts are computed again with those ranks. A parameter
+whose verdict changes there has no structural verdict: its <code>verdict</code> is
+<code>None</code>, and its reason names <code>ODESolver.rtol</code> and <code>ODESolver.atol</code>. When a
+point cannot run at the tighter tolerances, every parameter that is not
+<code>identifiable</code> has no verdict, and the section lists why in <code>unchecked</code>. A
+parameter that no observation reads stays <code>non_identifiable</code> at any
+tolerance, when every point runs at the tighter tolerances. <code>DifferenceEquations</code> runs are exact up to rounding: no point is
+evaluated again.</p>
+<table>
+<thead>
+<tr>
+<th>Field of <code>PointRank</code></th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>accuracy</code></td>
+<td><code>relative</code> (<code>rtol</code>) and <code>absolute</code> (<code>atol</code>) accuracy of the runs</td>
+</tr>
+<tr>
+<td><code>rank</code></td>
+<td>The rank at that accuracy</td>
+</tr>
+<tr>
+<td><code>tighter</code></td>
+<td>The <code>accuracy</code>, the singular values, the <code>threshold</code> and the <code>rank</code> at the tighter tolerances; <code>None</code> when the point was not evaluated again</td>
+</tr>
+</tbody>
+</table>
+<p>The section gives <code>tighter_generic_rank</code>, the generic rank with each point
+evaluated again at its tighter rank, and the reason of a verdict that stays
+names it when it differs from <code>generic_rank</code>.</p>
+<p>A verdict of <code>None</code> says that the result depends on the tolerance. Tighten
+<code>ODESolver.rtol</code> and <code>ODESolver.atol</code> and run <code>StructuralRank</code> again, until
+the rank stops changing. A fit can reach its loss at looser tolerances; the
+finite differences may not.</p>
 <h3 id="how-to-read-a-combination">How to read a combination<a class="headerlink" href="#how-to-read-a-combination" title="Permanent link">&para;</a></h3>
 <p>A combination is a product of powers of the parameters that the data
 determine: <code>k1 · alpha</code> means that every pair <code>(k1, alpha)</code> with the same
@@ -4128,7 +4204,8 @@ other parameters to their fitted values breaks it, and <code>non_identifiable</c
 when nothing the data read depends on the parameter
 (<a href="../profiles/#verdicts-and-the-identifiability-report">Profile Likelihood</a>). <code>merge</code> joins reports: a
 verdict the reports agree on stays, with every reason; one they disagree on is
-<code>conflicting</code>, with both reasons. <code>report.report()</code> gives it as plain data
+<code>conflicting</code>, with both reasons. A structural verdict of <code>None</code> adds its
+reasons and leaves the verdicts of the other reports. <code>report.report()</code> gives it as plain data
 (<a href="../../reports/#the-report-of-an-identifiability-analysis">Reports</a>).</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">data</span> <span class="o">=</span> <span class="n">report</span><span class="o">.</span><span class="n">report</span><span class="p">()</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;parameters&quot;</span><span class="p">][</span><span class="s2">&quot;k2&quot;</span><span class="p">][</span><span class="s2">&quot;practical&quot;</span><span class="p">][</span><span class="s2">&quot;verdict&quot;</span><span class="p">])</span>  <span class="c1"># determined</span>
@@ -4141,7 +4218,9 @@ verdict the reports agree on stays, with every reason; one they disagree on is
   equations; they are outside commol.</li>
 <li><strong>Numerical.</strong> The derivatives are finite differences; a singular value
   counts only when it is above their estimated error. The error grows with
-  the tolerance of an ODE solver (<code>rtol</code>).</li>
+  the tolerance of an ODE solver (<code>rtol</code>, <code>atol</code>): a rank that a hundredth of
+  the tolerances raises gives no verdict, but one evaluation at a tighter
+  tolerance cannot show that a yet tighter one changes nothing.</li>
 <li><strong>Generic points.</strong> A point where the rank is lower or higher than at most
   points is special; the generic rank is the rank at most points.</li>
 <li><strong>Deterministic engines.</strong> The runs of a stochastic engine change in jumps

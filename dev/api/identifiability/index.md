@@ -12,6 +12,8 @@ Structural identifiability, local and numerical: the rank of the scaled sensitiv
 
 The sensitivities come from finite differences, with a step and an error set by the accuracy of the engine; a singular value counts when it is above the norm of that error. The engine must be deterministic. The points come from the seed of the calibrator, `Calibrator.seed`.
 
+With an engine that integrates with tolerances, such as `DifferentialEquations`, each point whose rank is below the number of parameters runs again at a hundredth of `ODESolver.rtol` and `ODESolver.atol`, which costs a second, slower evaluation of that point; a parameter whose verdict changes there gets the verdict `None`, with a reason. See "When the solver tolerance sets the rank" in the guide page Identifiability.
+
 Attributes:
 
 | Name     | Type  | Description                                                                                                                                                                                                                                           |
@@ -31,6 +33,14 @@ class StructuralRank(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked)
     set by the accuracy of the engine; a singular value counts when it is
     above the norm of that error. The engine must be deterministic. The
     points come from the seed of the calibrator, ``Calibrator.seed``.
+
+    With an engine that integrates with tolerances, such as
+    ``DifferentialEquations``, each point whose rank is below the number of
+    parameters runs again at a hundredth of ``ODESolver.rtol`` and
+    ``ODESolver.atol``, which costs a second, slower evaluation of that point;
+    a parameter whose verdict changes there gets the verdict ``None``, with a
+    reason. See "When the solver tolerance sets the rank" in the guide page
+    Identifiability.
 
     Attributes
     ----------
@@ -356,7 +366,8 @@ class IdentifiabilityReport(_FrozenResult):
 
         The sections are kept side by side. A verdict that the reports agree
         on stays, with the reasons of each; one they disagree on is
-        ``conflicting``, with every reason.
+        ``conflicting``, with every reason. A structural verdict of ``None``
+        adds its reasons and leaves the verdicts of the other reports.
 
         Parameters
         ----------
@@ -451,7 +462,7 @@ merge(*others: IdentifiabilityReport) -> IdentifiabilityReport
 
 Join this report with others of the same parameters.
 
-The sections are kept side by side. A verdict that the reports agree on stays, with the reasons of each; one they disagree on is `conflicting`, with every reason.
+The sections are kept side by side. A verdict that the reports agree on stays, with the reasons of each; one they disagree on is `conflicting`, with every reason. A structural verdict of `None` adds its reasons and leaves the verdicts of the other reports.
 
 Parameters:
 
@@ -480,7 +491,8 @@ def merge(self, *others: "IdentifiabilityReport") -> "IdentifiabilityReport":
 
     The sections are kept side by side. A verdict that the reports agree
     on stays, with the reasons of each; one they disagree on is
-    ``conflicting``, with every reason.
+    ``conflicting``, with every reason. A structural verdict of ``None``
+    adds its reasons and leaves the verdicts of the other reports.
 
     Parameters
     ----------
@@ -557,7 +569,11 @@ class ParameterVerdicts(_FrozenResult):
     Attributes
     ----------
     structural : StructuralVerdict | None
-        From the structural rank on the design of the observations.
+        From the structural rank on the design of the observations, and from
+        a flat profile. ``None`` when no method that ran speaks to the
+        structure of the parameter. A `StructuralVerdict` whose ``verdict``
+        is ``None`` is evidence with no verdict: the structural rank ran, but
+        the accuracy of the runs may set its rank; its reasons say why.
     practical : PracticalVerdict | None
         From collinearity, a sample or the starts.
     """
@@ -574,11 +590,11 @@ The structural verdict of one parameter.
 
 Attributes:
 
-| Name           | Type                    | Description                                                                                                                                                                                                                                                                                                      |
-| -------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdict`      | `StructuralVerdictName` | identifiable: the null space of the sensitivities has no component on it, or a profile crosses its threshold. in_combination: the data determine it only together with other parameters. non_identifiable: it lies in the null space, or nothing the data read depends on it. conflicting: two reports disagree. |
-| `reasons`      | `list[str]`             | Why, one per piece of evidence.                                                                                                                                                                                                                                                                                  |
-| `combinations` | `list[str]`             | The algebraic combinations that hold the parameter, such as "k1 · s", from the methods that compute them (the structural rank); empty for the verdict of a profile, whose reason names the compensating parameters.                                                                                              |
+| Name           | Type                    | Description                                                                                                                                                                                                         |
+| -------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verdict`      | \`StructuralVerdictName | None\`                                                                                                                                                                                                              |
+| `reasons`      | `list[str]`             | Why, one per piece of evidence.                                                                                                                                                                                     |
+| `combinations` | `list[str]`             | The algebraic combinations that hold the parameter, such as "k1 · s", from the methods that compute them (the structural rank); empty for the verdict of a profile, whose reason names the compensating parameters. |
 
 Source code in `commol/identifiability/results.py`
 
@@ -589,12 +605,14 @@ class StructuralVerdict(_FrozenResult):
 
     Attributes
     ----------
-    verdict : StructuralVerdictName
+    verdict : StructuralVerdictName | None
         ``identifiable``: the null space of the sensitivities has no
         component on it, or a profile crosses its threshold. ``in_combination``:
         the data determine it only together with other parameters.
         ``non_identifiable``: it lies in the null space, or nothing the data
-        read depends on it. ``conflicting``: two reports disagree.
+        read depends on it. ``conflicting``: two reports disagree. ``None``:
+        the evidence gives no verdict, as when the accuracy of the runs, not
+        the structure, may set the structural rank; the reasons say why.
     reasons : list[str]
         Why, one per piece of evidence.
     combinations : list[str]
@@ -604,7 +622,7 @@ class StructuralVerdict(_FrozenResult):
         compensating parameters.
     """
 
-    verdict: StructuralVerdictName
+    verdict: StructuralVerdictName | None
     reasons: list[str] = Field(default_factory=list)
     combinations: list[str] = Field(default_factory=list)
 ```
@@ -650,15 +668,19 @@ The evidence of `StructuralRank`.
 
 Attributes:
 
-| Name           | Type                               | Description                                                                                               |
-| -------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `design`       | `str`                              | The design the sensitivities were evaluated on: "observations" or "dense".                                |
-| `points`       | `list[PointRank]`                  | Each feasible point.                                                                                      |
-| `skipped`      | `list[str]`                        | Why each infeasible point was skipped.                                                                    |
-| `generic_rank` | `int`                              | The rank at most points.                                                                                  |
-| `projections`  | `dict[str, float]`                 | The norm of the projection of each parameter on the null space, averaged over the points of generic rank. |
-| `verdicts`     | `dict[str, StructuralVerdictName]` | The verdict of each parameter on this design.                                                             |
-| `combinations` | `list[Combination]`                | The identifiable combinations.                                                                            |
+| Name                   | Type                               | Description                                                                                                                              |
+| ---------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `design`               | `str`                              | The design the sensitivities were evaluated on: "observations" or "dense".                                                               |
+| `points`               | `list[PointRank]`                  | Each feasible point.                                                                                                                     |
+| `skipped`              | `list[str]`                        | Why each infeasible point was skipped.                                                                                                   |
+| `generic_rank`         | `int`                              | The rank at most points, at the accuracy of the engine.                                                                                  |
+| `projections`          | `dict[str, float]`                 | The norm of the projection of each parameter on the null space, averaged over the points of generic rank, at the accuracy of the engine. |
+| `verdicts`             | \`dict\[str, StructuralVerdictName | None\]\`                                                                                                                                 |
+| `combinations`         | `list[Combination]`                | The identifiable combinations.                                                                                                           |
+| `accuracy`             | `Accuracy`                         | The accuracy of the runs of the engine.                                                                                                  |
+| `tighter`              | \`Accuracy                         | None\`                                                                                                                                   |
+| `tighter_generic_rank` | \`int                              | None\`                                                                                                                                   |
+| `unchecked`            | `list[str]`                        | Why each point that the tighter accuracy should check could not run there.                                                               |
 
 Source code in `commol/identifiability/results.py`
 
@@ -677,14 +699,31 @@ class StructuralSection(_FrozenResult):
     skipped : list[str]
         Why each infeasible point was skipped.
     generic_rank : int
-        The rank at most points.
+        The rank at most points, at the accuracy of the engine.
     projections : dict[str, float]
         The norm of the projection of each parameter on the null space,
-        averaged over the points of generic rank.
-    verdicts : dict[str, StructuralVerdictName]
-        The verdict of each parameter on this design.
+        averaged over the points of generic rank, at the accuracy of the
+        engine.
+    verdicts : dict[str, StructuralVerdictName | None]
+        The verdict of each parameter on this design; ``None`` when the
+        verdict changes at the tighter accuracy, or a point could not run
+        there and the parameter is not identifiable.
     combinations : list[Combination]
         The identifiable combinations.
+    accuracy : Accuracy
+        The accuracy of the runs of the engine.
+    tighter : Accuracy | None
+        The accuracy a point of rank below the number of parameters is
+        evaluated again at: each accuracy of the engine divided by 100, no
+        lower than 1e-14. ``None`` when no setting sets the accuracy of the
+        engine, or it is already the tightest.
+    tighter_generic_rank : int | None
+        The rank at most points with each point evaluated again at the
+        tighter accuracy in place of its rank at the accuracy of the engine;
+        ``None`` when no point was evaluated again.
+    unchecked : list[str]
+        Why each point that the tighter accuracy should check could not run
+        there.
     """
 
     design: StructuralDesign
@@ -692,8 +731,12 @@ class StructuralSection(_FrozenResult):
     skipped: list[str]
     generic_rank: int
     projections: dict[str, float]
-    verdicts: dict[str, StructuralVerdictName]
+    verdicts: dict[str, StructuralVerdictName | None]
     combinations: list[Combination]
+    accuracy: Accuracy
+    tighter: Accuracy | None
+    tighter_generic_rank: int | None
+    unchecked: list[str]
 ```
 
 ## PointRank
@@ -707,9 +750,11 @@ Attributes:
 | Name              | Type               | Description                                                                                       |
 | ----------------- | ------------------ | ------------------------------------------------------------------------------------------------- |
 | `values`          | `dict[str, float]` | The point.                                                                                        |
+| `accuracy`        | `Accuracy`         | The accuracy of the runs of the engine.                                                           |
 | `singular_values` | `list[float]`      | The singular values, largest first.                                                               |
 | `threshold`       | `float`            | The norm of the estimated errors of the sensitivities, which a singular value must pass to count. |
 | `rank`            | `int`              | How many pass it.                                                                                 |
+| `tighter`         | \`TighterRank      | None\`                                                                                            |
 
 Source code in `commol/identifiability/results.py`
 
@@ -722,6 +767,59 @@ class PointRank(_FrozenResult):
     ----------
     values : dict[str, float]
         The point.
+    accuracy : Accuracy
+        The accuracy of the runs of the engine.
+    singular_values : list[float]
+        The singular values, largest first.
+    threshold : float
+        The norm of the estimated errors of the sensitivities, which a
+        singular value must pass to count.
+    rank : int
+        How many pass it.
+    tighter : TighterRank | None
+        The rank at a tighter accuracy, when the rank is below the number of
+        parameters and a setting of the engine sets its accuracy. ``None``
+        when the rank is that number, when no setting sets the accuracy (an
+        engine exact up to rounding), when the accuracy is already the
+        tightest (1e-14), or when the point could not run at the tighter
+        accuracy (``StructuralSection.unchecked`` says why).
+    """
+
+    values: dict[str, float]
+    accuracy: Accuracy
+    singular_values: list[float]
+    threshold: float
+    rank: int
+    tighter: TighterRank | None
+```
+
+## TighterRank
+
+Bases: `_FrozenResult`
+
+The rank of the scaled sensitivities at a point evaluated again at a tighter accuracy.
+
+Attributes:
+
+| Name              | Type          | Description                                                                                       |
+| ----------------- | ------------- | ------------------------------------------------------------------------------------------------- |
+| `accuracy`        | `Accuracy`    | The accuracy of the runs.                                                                         |
+| `singular_values` | `list[float]` | The singular values, largest first.                                                               |
+| `threshold`       | `float`       | The norm of the estimated errors of the sensitivities, which a singular value must pass to count. |
+| `rank`            | `int`         | How many pass it.                                                                                 |
+
+Source code in `commol/identifiability/results.py`
+
+```python
+class TighterRank(_FrozenResult):
+    """
+    The rank of the scaled sensitivities at a point evaluated again at a
+    tighter accuracy.
+
+    Attributes
+    ----------
+    accuracy : Accuracy
+        The accuracy of the runs.
     singular_values : list[float]
         The singular values, largest first.
     threshold : float
@@ -731,10 +829,45 @@ class PointRank(_FrozenResult):
         How many pass it.
     """
 
-    values: dict[str, float]
+    accuracy: Accuracy
     singular_values: list[float]
     threshold: float
     rank: int
+```
+
+## Accuracy
+
+Bases: `_FrozenResult`
+
+The accuracy of the runs the sensitivities come from.
+
+Attributes:
+
+| Name       | Type    | Description                                                                                                                                      |
+| ---------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `relative` | `float` | The relative error a run may carry: ODESolver.rtol for DifferentialEquations, machine epsilon for an engine whose runs are exact up to rounding. |
+| `absolute` | `float` | The error a run may carry on an output near 0: ODESolver.atol, or 0.                                                                             |
+
+Source code in `commol/identifiability/results.py`
+
+```python
+class Accuracy(_FrozenResult):
+    """
+    The accuracy of the runs the sensitivities come from.
+
+    Attributes
+    ----------
+    relative : float
+        The relative error a run may carry: ``ODESolver.rtol`` for
+        ``DifferentialEquations``, machine epsilon for an engine whose runs
+        are exact up to rounding.
+    absolute : float
+        The error a run may carry on an output near 0: ``ODESolver.atol``, or
+        0.
+    """
+
+    relative: float
+    absolute: float
 ```
 
 ## Combination

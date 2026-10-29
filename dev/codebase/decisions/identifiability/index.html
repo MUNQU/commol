@@ -2922,6 +2922,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-rank-lost-to-the-accuracy-gives-no-verdict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A rank lost to the accuracy gives no verdict
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#two-verdicts-per-parameter" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3537,6 +3548,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-rank-lost-to-the-accuracy-gives-no-verdict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A rank lost to the accuracy gives no verdict
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#two-verdicts-per-parameter" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3576,8 +3598,8 @@ verdicts a report gives each parameter.</p>
 <code>SensitivitySource</code> (<code>crates/commol-inference/src/sensitivity/</code>); only a source
 knows how its derivatives are made. <code>FiniteDifferences</code> is the first: central
 differences, one-sided of second order at a bound, with the step
-<code>h = η^{1/3} · max(|θ|, w)</code> (at most <code>w / 8</code>), where <code>η</code> is the output
-accuracy of the engine (<code>SimulationEngine::output_accuracy</code>: machine epsilon,
+<code>h = η^{1/3} · max(|θ|, w)</code> (at most <code>w / 8</code>), where <code>η</code> is the relative
+accuracy of the engine (<code>SimulationEngine::accuracy</code>: machine epsilon,
 or the <code>rtol</code> of the ODE engine) and <code>w</code> the width of the bounds (1 when infinite). Each entry
 carries an estimated error, from the steps <code>h</code> and <code>2h</code> and the accuracy of
 the runs; the structural rank counts a singular value only above the norm of
@@ -3613,6 +3635,65 @@ refused: its runs change in jumps with the parameters.</p>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_sensitivity.rs</code>,
 <code>crates/commol-inference/tests/test_identifiability.rs</code>,
 <code>tests/uncertainty/test_identifiability.py</code>.</p>
+<h2 id="a-rank-lost-to-the-accuracy-gives-no-verdict">A rank lost to the accuracy gives no verdict<a class="headerlink" href="#a-rank-lost-to-the-accuracy-gives-no-verdict" title="Permanent link">&para;</a></h2>
+<p>The error of the runs of an engine that integrates with a tolerance enters
+the estimated error of the sensitivities, so it can hide a singular value
+that a tighter tolerance resolves. <code>structural_rank</code> asks the source for the
+accuracy of its runs (<code>SensitivitySource::accuracy</code>, an <code>Accuracy</code> of
+<code>commol-core</code>) and for the same source at a tighter one (<code>SensitivitySource::at_accuracy</code>, which
+<code>FiniteDifferences</code> builds from <code>ForwardModel::at_accuracy</code> and
+<code>SimulationEngine::at_accuracy</code>; <code>None</code> for an engine whose accuracy no
+setting sets). Each point whose rank is below the number of parameters is
+evaluated once more, at each accuracy divided by <code>TIGHTENING</code> (100), no
+lower than <code>TIGHTEST</code> (1e-14); the verdicts are computed again with the
+ranks and null spaces there. A parameter whose verdict changes has no
+verdict (<code>None</code>), as a profile whose structure is undetermined. When a point
+cannot run at the tighter accuracy, every parameter that is not identifiable
+has no verdict, and <code>unchecked</code> says why. The section keeps the generic
+rank, the projections and the combinations at the accuracy of the engine,
+and the generic rank at the tighter one; a combination that holds a
+parameter with no verdict goes. The engine names the settings of its
+accuracy (<code>SimulationEngine::accuracy_settings</code>: <code>ODESolver.rtol</code> and
+<code>ODESolver.atol</code>), and the reason names them.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Differentiate at one fixed tighter tolerance</td>
+<td><code>1e-9</code> still lost ranks in a model of 15 parameters where <code>1e-12</code> resolved them: no fixed value is enough, and the user would not see that the result depends on it.</td>
+</tr>
+<tr>
+<td>A warning only</td>
+<td>The user cannot tell which verdicts to trust.</td>
+</tr>
+<tr>
+<td>Search until the rank is stable</td>
+<td>Its cost has no bound, and a stiff model may not integrate at the tightest tolerances.</td>
+</tr>
+<tr>
+<td>A factor of 1,000 or more</td>
+<td>Each run costs more as the tolerance tightens; the reason already tells the user to go further.</td>
+</tr>
+<tr>
+<td>A verdict name such as <code>unresolved</code></td>
+<td>A second way to say what a profile says with no verdict, and one more case in <code>merge</code> and the reports.</td>
+</tr>
+<tr>
+<td>Rebuild the model in Python at the tighter tolerances</td>
+<td>The sensitivities run in Rust, and Python would need to know which engines integrate with a tolerance.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_identifiability.rs</code>
+(<code>a_rank_lost_to_the_accuracy_gives_no_verdict</code>,
+<code>a_point_that_fails_at_the_tighter_accuracy_leaves_the_rank_unchecked</code>,
+<code>an_exact_engine_is_not_evaluated_again</code>),
+<code>tests/uncertainty/test_identifiability_tolerance.py</code>.</p>
 <h2 id="two-verdicts-per-parameter">Two verdicts per parameter<a class="headerlink" href="#two-verdicts-per-parameter" title="Permanent link">&para;</a></h2>
 <p>An <code>IdentifiabilityReport</code> gives each parameter a structural verdict (what
 any data of the design of the observations can determine) and a practical

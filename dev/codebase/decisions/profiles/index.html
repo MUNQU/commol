@@ -3713,8 +3713,8 @@ cost (the radius rule reads positions). <code>ν</code> is the noise floor: the 
 of one evaluation of the objective at the fit, propagated from the accuracy
 of a run, <code>Σ |∂ℓᵢ/∂mᵢ| · eᵢ</code> with <code>eᵢ = rtol · |mᵢ| + k · atol</code> for an
 observation that sums <code>k</code> outputs, the term derivatives of
-<code>CalibrationProblem::term_derivatives</code> and the <code>output_accuracy</code> and
-<code>output_absolute_accuracy</code> of the engine (<code>ProfileTracer::noise_floor</code>);
+<code>CalibrationProblem::term_derivatives</code> and the relative and absolute
+<code>accuracy</code> of the engine (<code>ProfileTracer::noise_floor</code>);
 solvers hold their tolerances per step, so <code>ν</code> is an estimate, not a bound. A
 point whose refit has a free parameter on a bound (<code>on_bound</code> of
 <code>transform.rs</code>, the rule of the curvature: <code>1e-8</code> of the width of two finite

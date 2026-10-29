@@ -4079,15 +4079,15 @@ seed of the analysis (<code>Stream</code>, <code>crates/commol-random/src/stream
       reports only at integer steps); <code>check_position</code> is the rule of
       <code>EngineType</code>, <code>engine_type</code> returns its entry (so <code>is_stochastic</code> and
       the messages of a calibration read it), and <code>try_from_model</code> rejects a
-      model of another engine. A
-      stochastic engine draws every random number from one
-      <code>commol_random::Generator</code>, implements <code>set_seed</code>, and restores the
-      generator in <code>reset</code>, so a run repeats from its seed.</li>
+      model of another engine. A stochastic engine draws every random number
+      from one <code>commol_random::Generator</code>, implements <code>set_seed</code>, and restores
+      the generator in <code>reset</code>, so a run repeats from its seed. An engine
+      with tolerances implements <code>accuracy</code>, <code>accuracy_settings</code> and <a href="../decisions/identifiability/#a-rank-lost-to-the-accuracy-gives-no-verdict"><code>at_accuracy</code></a>.</li>
 <li>[ ] Add a variant to <code>Engine</code> in <code>py-commol/src/engine.rs</code>: one arm in
       <code>build</code> per kind it runs (the pair of the engine and the kind),
-      <code>engine_type</code>, <code>dispatch!</code>, <code>plan_values</code> and <code>apply_values</code> (and
-      <code>compartmental!</code> for an engine of the aggregate kind). Add the crate to
-      <code>py-commol/Cargo.toml</code>.</li>
+      <code>engine_type</code>, <code>dispatch!</code>, <code>at_accuracy</code>, <code>plan_values</code> and
+      <code>apply_values</code> (and <code>compartmental!</code> for an engine of the aggregate
+      kind). Add the crate to <code>py-commol/Cargo.toml</code>.</li>
 <li>[ ] Add the name to the <code>EngineName</code> <code>Literal</code> in <code>engines/engine.py</code>; if the
       engine has settings, add their Pydantic class to <code>EngineSettings</code>.</li>
 <li>[ ] Run the tests of <code>crates/commol-core/src/types/engine.rs</code>,

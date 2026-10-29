@@ -5280,6 +5280,26 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <a href="../../guide/simulations/#windowed-totals">Windowed totals</a>.</li>
 <li><strong>Breaking:</strong> the pydantic validators of the public classes are private:
   each name starts with <code>_</code>, such as <code>CalibrationProblem._validate_loss_or_models</code>.</li>
+<li><strong>Breaking:</strong> <code>StructuralRank</code> gives no structural verdict when the
+  tolerance of the ODE solver, not the structure, may set the rank. With
+  <code>DifferentialEquations</code>, a point whose rank is below the number of
+  parameters is evaluated again at <code>rtol / 100</code> and <code>atol / 100</code> (no lower
+  than 1e-14); a parameter whose verdict changes there, or that is not
+  identifiable when a point cannot run there, has the verdict <code>None</code>, with a
+  reason that names <code>ODESolver.rtol</code> and <code>ODESolver.atol</code>. Before, the rank
+  lost to the tolerance read as <code>non_identifiable</code> or <code>in_combination</code>. A
+  parameter that no observation reads stays <code>non_identifiable</code> when every
+  point runs at the tighter tolerances.
+  <code>StructuralVerdict.verdict</code> and the values of <code>StructuralSection.verdicts</code>
+  can be <code>None</code>, and <code>merge</code> keeps the verdicts of the other reports;
+  <code>PointRank</code> holds the <code>accuracy</code> of its runs and the <code>tighter</code> rank;
+  <code>StructuralSection</code> holds the <code>accuracy</code>, the <code>tighter</code> accuracy, the
+  generic rank there (<code>tighter_generic_rank</code>) and the points that could not
+  run there (<code>unchecked</code>). In Rust, <code>SimulationEngine::accuracy</code> returns an
+  <code>Accuracy</code> in place of <code>output_accuracy</code> and <code>output_absolute_accuracy</code>. Migration: read a <code>None</code>
+  verdict as no verdict, and tighten <code>ODESolver.rtol</code> and <code>ODESolver.atol</code>
+  until the rank stops changing. See
+  <a href="../../guide/uncertainty/identifiability/#when-the-solver-tolerance-sets-the-rank">When the solver tolerance sets the rank</a>.</li>
 </ul>
 <h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
 <ul>
