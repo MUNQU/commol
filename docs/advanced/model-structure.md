@@ -27,7 +27,7 @@ Model                      name, description, version, step_unit, origin
 │   ├── accumulators: [Accumulator]
 │   ├── stratifications: [Stratification]
 │   │   └── conditions: [StratificationCondition]
-│   ├── matrices: [CategoryMatrix]         (values: {row: {column: value}})
+│   ├── matrices: [CategoryMatrix]         (values: {row: {column: value}}, row_scales, column_scales)
 │   └── transitions: [Transition]          (impulse_at, impulse_every for impulses)
 │       └── stratified_rates: [StratifiedRate]
 │           └── conditions: [StratificationCondition]

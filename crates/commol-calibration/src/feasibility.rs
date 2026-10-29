@@ -8,7 +8,7 @@
 
 use std::collections::HashSet;
 
-use commol_core::{MathExpression, MathExpressionContext};
+use commol_core::{MathExpression, MathExpressionContext, ScaledMatrix};
 
 use crate::types::{CalibrationConstraint, CalibrationParameter};
 
@@ -108,6 +108,18 @@ pub struct Feasibility {
     non_state_outputs: Vec<(String, usize)>,
     /// Named sums of outputs a constraint may read.
     output_sums: Vec<(String, Vec<usize>)>,
+    /// The matrices between categories whose entries or spectral radius a
+    /// constraint reads.
+    matrices: Vec<ReadMatrix>,
+}
+
+/// A matrix a constraint reads, with the value of its scales in the model.
+#[derive(Debug, Clone)]
+struct ReadMatrix {
+    matrix: ScaledMatrix,
+    /// Its variables when no calibrated parameter scales it: the same at
+    /// every point.
+    fixed: Option<Vec<f64>>,
 }
 
 #[derive(Debug, Clone)]
@@ -128,22 +140,32 @@ pub(crate) fn constraint_positions(constraints: &[CalibrationConstraint]) -> Vec
 
 impl Feasibility {
     /// The feasibility of `parameters` under `constraints`, on a run at
-    /// `positions` whose rows have the outputs `output_names`.
+    /// `positions` whose rows have the outputs `output_names`, of a model
+    /// with the matrices between categories `matrices`
+    /// ([`SimulationEngine::matrices`](commol_core::SimulationEngine::matrices)).
+    ///
+    /// A constraint reads the entries `<M>_<i>_<j>` and the spectral radius
+    /// `<M>_radius` of a matrix at each point: the matrix scaled by the
+    /// values of the point for the scales it calibrates, and by the values
+    /// of the model for the others.
     ///
     /// # Errors
     ///
     /// Returns a message that names the constraint when its expression is
     /// not in the language of formulas ([`MathExpression::check`]), names an
-    /// unknown variable, or reads an output without positions.
+    /// unknown variable, reads an output without positions, or reads a
+    /// matrix with a scale that has no value and is not calibrated.
     pub fn new(
         parameters: &[CalibrationParameter],
         constraints: &[CalibrationConstraint],
         output_names: &[String],
         state_outputs: usize,
         output_sums: Vec<(String, Vec<usize>)>,
+        matrices: Vec<ScaledMatrix>,
         positions: &[f64],
     ) -> Result<Self, String> {
         let parameter_ids: HashSet<&str> = parameters.iter().map(|p| p.id.as_str()).collect();
+        let mut read_matrices: Vec<ReadMatrix> = Vec::new();
         let outputs: HashSet<&str> = output_names
             .iter()
             .map(String::as_str)
@@ -166,10 +188,34 @@ impl Feasibility {
             for variable in expression.get_variables() {
                 let is_parameter = parameter_ids.contains(variable.as_str());
                 let is_output = outputs.contains(variable.as_str());
-                if !is_parameter && !is_output {
+                let matrix = matrices
+                    .iter()
+                    .find(|matrix| matrix.names().any(|name| name == variable));
+                if let Some(matrix) = matrix {
+                    if let Err(scale) =
+                        matrix.entries(|id| parameter_ids.contains(id).then_some(1.0))
+                    {
+                        return Err(format!(
+                            "Constraint '{}' reads '{variable}', but the scale '{}' of matrix \
+                             '{}' has no value; calibrate it or give it a value",
+                            constraint.id, scale.parameter, matrix.id
+                        ));
+                    }
+                    if !read_matrices.iter().any(|read| read.matrix.id == matrix.id) {
+                        let calibrated = parameter_ids.iter().any(|id| matrix.scaled_by(id));
+                        read_matrices.push(ReadMatrix {
+                            matrix: matrix.clone(),
+                            fixed: (!calibrated).then(|| {
+                                matrix
+                                    .variables(|_| None)
+                                    .expect("each scale it has is valued, as checked above")
+                            }),
+                        });
+                    }
+                } else if !is_parameter && !is_output {
                     return Err(format!(
-                        "Constraint '{}' references unknown variable '{}' (not a parameter or \
-                         simulation output)",
+                        "Constraint '{}' references unknown variable '{}' (not a parameter, a \
+                         variable of a matrix or a simulation output)",
                         constraint.id, variable
                     ));
                 }
@@ -212,6 +258,7 @@ impl Feasibility {
                 .map(|(index, name)| (name.clone(), index))
                 .collect(),
             output_sums,
+            matrices: read_matrices,
         })
     }
 
@@ -249,30 +296,56 @@ impl Feasibility {
         }
     }
 
-    fn context(&self, values: &[f64]) -> MathExpressionContext {
+    /// What the constraints read at the point `values`: the parameters, and
+    /// the variables of each matrix a constraint reads, scaled by them
+    /// ([`ScaledMatrix::variables`]); a matrix that no calibrated parameter
+    /// scales keeps the variables it has in the model. Built once per
+    /// evaluation, for [`Self::check_parameters`] and the constraints at
+    /// positions of every replicate; empty when there is no constraint.
+    pub fn context(&self, values: &[f64]) -> MathExpressionContext {
         let mut context = MathExpressionContext::new();
+        if self.parameter_constraints.is_empty() && self.position_constraints.is_empty() {
+            return context;
+        }
         for ((id, _, _), &value) in self.parameters.iter().zip(values) {
             context.set_parameter(id.clone(), value);
+        }
+        let value_of = |parameter: &str| {
+            self.parameters
+                .iter()
+                .position(|(id, _, _)| id == parameter)
+                .map(|index| values[index])
+        };
+        for ReadMatrix { matrix, fixed } in &self.matrices {
+            let variables = match fixed {
+                Some(variables) => variables.clone(),
+                None => matrix
+                    .variables(value_of)
+                    .expect("Feasibility::new checks that each scale of the matrix has a value"),
+            };
+            for (name, value) in matrix.names().zip(variables) {
+                context.set_parameter_str(name, value);
+            }
         }
         context
     }
 
-    /// Check the constraints that read only parameters.
+    /// Check the constraints that read only parameters, in the `context` of
+    /// the point ([`Self::context`]).
     ///
     /// # Errors
     ///
     /// A [`Violation::Constraint`] when one evaluates below zero, or a
     /// failure when one cannot be evaluated.
-    pub fn check_parameters(&self, values: &[f64]) -> Result<(), EvaluationError> {
-        if self.parameter_constraints.is_empty() {
-            return Ok(());
-        }
-        let mut context = self.context(values);
+    pub fn check_parameters(
+        &self,
+        context: &mut MathExpressionContext,
+    ) -> Result<(), EvaluationError> {
         let mut amount = 0.0;
         for constraint in &self.parameter_constraints {
             let value = constraint
                 .expression
-                .evaluate(&mut context)
+                .evaluate(context)
                 .expect("Feasibility::new checks that a constraint compiles and reads parameters");
             if value < 0.0 {
                 amount += constraint.weight * -value;
@@ -281,10 +354,14 @@ impl Feasibility {
         violation(amount)
     }
 
-    /// The constraint amount of the rows of one run: 0 when every
-    /// constraint at positions holds.
-    pub(crate) fn row_violation(&self, values: &[f64], rows: &[Vec<f64>]) -> f64 {
-        let mut context = self.context(values);
+    /// The constraint amount of the rows of one run, in the `context` of
+    /// its point ([`Self::context`]): 0 when every constraint at positions
+    /// holds.
+    pub(crate) fn row_violation(
+        &self,
+        context: &mut MathExpressionContext,
+        rows: &[Vec<f64>],
+    ) -> f64 {
         // Only the state outputs are registered, so `total` stays the sum of
         // the state. Outputs after it are injected by name, with the sums.
         context.init_compartments(self.state_names.clone());
@@ -303,7 +380,7 @@ impl Feasibility {
                     context.set_parameter_str(name, total);
                 }
                 context.set_step(position);
-                let value = constraint.expression.evaluate(&mut context).expect(
+                let value = constraint.expression.evaluate(context).expect(
                     "Feasibility::new checks that a constraint compiles and reads parameters and outputs",
                 );
                 if value < 0.0 {
@@ -333,7 +410,16 @@ mod tests {
             CalibrationParameter::new("k2".to_string(), 0.0, 2.0),
         ];
         let names = vec!["A".to_string(), "B".to_string()];
-        Feasibility::new(&parameters, constraints, &names, 2, vec![], &[1.0, 2.0]).unwrap()
+        Feasibility::new(
+            &parameters,
+            constraints,
+            &names,
+            2,
+            vec![],
+            vec![],
+            &[1.0, 2.0],
+        )
+        .unwrap()
     }
 
     #[test]
@@ -355,13 +441,24 @@ mod tests {
         ];
         let feasibility = feasibility(&constraints);
 
-        assert_eq!(feasibility.check_parameters(&[0.75, 0.5]), Ok(()));
+        let check = |values: &[f64]| feasibility.check_parameters(&mut feasibility.context(values));
+        assert_eq!(check(&[0.75, 0.5]), Ok(()));
         assert_eq!(
-            feasibility.check_parameters(&[0.25, 0.5]),
+            check(&[0.25, 0.5]),
             Err(Violation::Constraint { amount: 0.5 }.into())
         );
         let rows = vec![vec![0.0, 9.0], vec![1.0, 4.0]];
-        assert_eq!(feasibility.row_violation(&[0.25, 0.5], &rows), 1.0);
+        let mut context = feasibility.context(&[0.25, 0.5]);
+        assert_eq!(feasibility.row_violation(&mut context, &rows), 1.0);
+    }
+
+    #[test]
+    fn a_point_without_constraints_has_nothing_to_check() {
+        let free = feasibility(&[]);
+        assert_eq!(
+            free.check_parameters(&mut free.context(&[0.25, 0.5])),
+            Ok(())
+        );
     }
 
     #[test]

@@ -184,6 +184,23 @@ edge of the support: its log density is `−∞` (`discrepancy_in_support` in
 `crates/commol-calibration/tests/test_infeasible_runs.rs`,
 `crates/commol-calibration/tests/test_likelihood.rs::the_penalty_is_above_every_feasible_cost`.
 
+## A constraint reads a matrix at its point
+
+A constraint reads `<M>_<i>_<j>` and `<M>_radius` of a matrix between
+categories. `Feasibility::new` keeps the matrices it reads from
+`SimulationEngine::matrices` and refuses one with a scale that has no value
+and is not calibrated. Once per evaluation, before the run,
+`Feasibility::context` scales each by the point (`ScaledMatrix::variables`);
+one no calibrated parameter scales keeps its model values. The run reads the
+same values (`CompiledModel::set_parameter`), so a radius bound holds for it.
+
+| Alternative | Why not |
+|---|---|
+| Read the radius from the engine configured at the point, or from `commol-model` | The parameter constraints run before that copy of the engine exists; calibration works through `SimulationEngine` only. |
+
+**Guards:** `crates/commol-calibration/tests/test_constraints.rs`,
+`py-commol/tests/calibration/test_constraints.py::TestMatrixConstraints`.
+
 ## A result records its seed
 
 Every random number of a calibration and of its uncertainty methods comes from

@@ -56,8 +56,8 @@ def test_a_model_holds_a_matrix_between_categories() -> None:
     radius = (5 + math.sqrt(5)) / 2
     assert text.text == (
         "Between the categories of 'group' in 1/day. A coupling between the "
-        "groups. A rate reads matrix_sum(M, e); a rate or a formula parameter reads "
-        "its entries as "
+        "groups. A rate reads matrix_sum(M, e); a rate, a formula parameter or a "
+        "calibration constraint reads its entries as "
         f"M_<row>_<column> and its spectral radius, {radius:.6g}, as M_radius."
     )
     assert values == Matrix(
@@ -140,3 +140,73 @@ def test_a_matrix_with_a_missing_category_is_refused(
 ) -> None:
     with pytest.raises(ValueError, match=message.replace("(", r"\(")):
         _build(_builder(values, stratification))
+
+
+def _scaled(a1: float | None, scale: str = "a1") -> ModelBuilder:
+    """`_builder` with the row of ``g1`` scaled by ``scale`` and the column of
+    ``g2`` by ``b2`` at 1; ``a1`` is the value of ``a1``."""
+    builder = _builder()
+    builder.add_parameter("a1", a1).add_parameter("b2", 1.0)
+    builder.add_parameter("f", "2 * k")
+    builder.add_matrix(
+        "N", "group", VALUES, row_scales={"g1": scale}, column_scales={"g2": "b2"}
+    )
+    return builder
+
+
+def test_a_description_names_the_scales_and_the_radius_at_their_values() -> None:
+    blocks = _build(_scaled(2.0)).describe().section("parameters").blocks
+    (text,) = [b for b in blocks if isinstance(b, Text) and b.heading == "Matrix N"]
+
+    # [[4, 2], [1, 3]]: the eigenvalues 5 and 2.
+    assert text.text == (
+        "Between the categories of 'group'. A parameter scales the row of 'g1' by a1, "
+        "the column of 'g2' by b2; the values below are before the scales. A rate "
+        "reads matrix_sum(N, e); a rate, a formula parameter or a calibration "
+        "constraint reads its entries as N_<row>_<column> and its spectral radius, "
+        "5, as N_radius."
+    )
+    blocks = _build(_scaled(None)).describe().section("parameters").blocks
+    (text,) = [b for b in blocks if isinstance(b, Text) and b.heading == "Matrix N"]
+    assert "its spectral radius, at the values of its scales, as N_radius." in text.text
+
+
+def test_a_saved_model_keeps_the_scales_of_its_matrices(tmp_path: Path) -> None:
+    model = _build(_scaled(2.0))
+    model.to_json(tmp_path / "model.json")
+
+    (_, matrix) = Model.from_json(tmp_path / "model.json").process.matrices
+    assert (matrix.row_scales, matrix.column_scales) == ({"g1": "a1"}, {"g2": "b2"})
+    assert matrix.scales() == [("row", "g1", "a1"), ("column", "g2", "b2")]
+
+
+@pytest.mark.parametrize(
+    ("scale", "message"),
+    [
+        (
+            "a9",
+            "Matrix 'N' scales the row of 'g1' by 'a9', which is not a parameter of "
+            "the model; a scale is a constant or a parameter to calibrate",
+        ),
+        (
+            "f",
+            "Matrix 'N' scales the row of 'g1' by 'f', a formula parameter; a scale "
+            "is a constant or a parameter to calibrate",
+        ),
+    ],
+)
+def test_a_scale_of_an_unknown_parameter_is_refused(scale: str, message: str) -> None:
+    with pytest.raises(ValueError, match=message):
+        _build(_scaled(2.0, scale))
+
+
+def test_a_scale_of_a_category_the_stratification_does_not_have_is_refused() -> None:
+    builder = _builder().add_parameter("a1", 2.0)
+    builder.add_matrix("N", "group", VALUES, column_scales={"g3": "a1"})
+
+    with pytest.raises(
+        ValueError,
+        match="Matrix 'N' scales the column of 'g3' by 'a1', but 'g3' is not a "
+        "category of 'group'",
+    ):
+        _build(builder)

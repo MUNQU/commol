@@ -55,7 +55,7 @@ adds the sections of its kind (`ModelStructure.describe`):
 | `dynamics` | How the state changes | The state graphs, the compact and expanded forms of the equations, the impulses, the neighbors |
 | `schedule` | How the engine advances, and the settings it advances with | From the engine (`EngineType.schedule`) and `Model.engine.settings` |
 | `initialization` | The state the model starts from | Bin amounts, category fractions, overrides, and the initial state the engine builds |
-| `parameters` | Every parameter, then each matrix between categories | Value, unit, whether calibration sets it, description; for a matrix, its stratification, unit, description, spectral radius and values |
+| `parameters` | Every parameter, then each matrix between categories | Value, unit, whether calibration sets it, description; for a matrix, its stratification, unit, description, scales, spectral radius at the values of the scales, and values before them |
 | `outputs` | What a run returns | The outputs of each bin and accumulator |
 
 A section with no blocks is left out of every rendering.

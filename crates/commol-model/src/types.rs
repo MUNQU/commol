@@ -3,7 +3,8 @@
 use std::collections::HashSet;
 
 use commol_core::{
-    MathExpression, MathExpressionContext, RateMathExpression, SeriesMode, same_position,
+    MathExpression, MathExpressionContext, RateMathExpression, ScaledMatrix, SeriesMode,
+    same_position,
 };
 
 /// Pre-resolved storage location for a JIT-compiled rate's input variable.
@@ -404,6 +405,10 @@ pub struct CompiledModel {
     /// Parameters defined as empirical series; evaluated via binary search
     /// each time the right-hand side is evaluated
     pub(crate) series_parameters: Vec<SeriesParameter>,
+    /// The matrices between categories, each with the current value of its
+    /// scales; [`CompiledModel::set_parameter`] writes their variables again
+    /// when a caller sets a scale.
+    pub(crate) matrices: Vec<ScaledMatrix>,
     /// The parameters a caller may set ([`CompiledModel::set_parameter`]):
     /// the constants and the parameters to calibrate. The engine writes a
     /// formula or a series parameter itself at each evaluation.

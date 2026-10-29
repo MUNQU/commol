@@ -60,13 +60,19 @@ pub struct Stratification {
 pub const MATRIX_RADIUS_SUFFIX: &str = "_radius";
 
 /// A matrix between the categories of a stratification: one value for each
-/// pair of its categories.
+/// pair of its categories, and a parameter that may scale each row and each
+/// column.
 ///
-/// A rate reads it through `matrix_sum(M, e)`: in a compartment of category
-/// `i`, `Σ_j M[i, j] · e_j`. A rate reads its entry `M[i, j]` as the
-/// variable `<M>_<i>_<j>` ([`Self::entry_name`]) and its spectral radius,
-/// the largest modulus of its eigenvalues, as `<M>_radius`
-/// ([`Self::radius_name`]).
+/// A rate and a calibration constraint read the scaled matrix
+/// `diag(a) · values · diag(b)`, where `a_i` is the value of the parameter
+/// that scales row `i` and `b_j` of the one that scales column `j` (1 for a
+/// row or a column without one). A rate reads it through
+/// `matrix_sum(M, e)`: in a compartment of category `i`,
+/// `Σ_j M[i, j] · e_j`. A rate and a constraint read the entry `M[i, j]` as
+/// the variable `<M>_<i>_<j>` ([`Self::entry_name`]) and the spectral
+/// radius, the largest modulus of the eigenvalues, as `<M>_radius`
+/// ([`Self::radius_name`]); [`crate::ScaledMatrix::variables`] computes
+/// them at the values of the scales.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CategoryMatrix {
     /// Identifier used in `matrix_sum` and in the names of its variables.
@@ -75,9 +81,32 @@ pub struct CategoryMatrix {
     pub stratification: String,
     /// `values[i][j]`, the value of row `i` and column `j`, by category.
     pub values: IndexMap<String, IndexMap<String, f64>>,
+    /// The id of the parameter that multiplies the row of a category, by
+    /// category; a category without one keeps its row.
+    #[serde(default)]
+    pub row_scales: IndexMap<String, String>,
+    /// The id of the parameter that multiplies the column of a category, by
+    /// category; a category without one keeps its column.
+    #[serde(default)]
+    pub column_scales: IndexMap<String, String>,
 }
 
 impl CategoryMatrix {
+    /// Each scale, as `("row" or "column", category, parameter id)`: the
+    /// rows first, then the columns, each in the order the matrix gives
+    /// them.
+    pub fn scales(&self) -> impl Iterator<Item = (&'static str, &str, &str)> {
+        fn of<'a>(
+            side: &'static str,
+            scales: &'a IndexMap<String, String>,
+        ) -> impl Iterator<Item = (&'static str, &'a str, &'a str)> {
+            scales
+                .iter()
+                .map(move |(category, parameter)| (side, category.as_str(), parameter.as_str()))
+        }
+        of("row", &self.row_scales).chain(of("column", &self.column_scales))
+    }
+
     /// The value of row `row` and column `column`; 0 when the matrix has
     /// none, which [`Self::check`] rejects.
     pub fn value(&self, row: &str, column: &str) -> f64 {
@@ -127,8 +156,10 @@ impl CategoryMatrix {
     ///
     /// Returns a message that names the matrix when its stratification is
     /// not one of the process, and that also names the category when a row
-    /// or a value of a category is missing, a row or a column names no
-    /// category of the stratification, or a value is not finite.
+    /// or a value of a category is missing, a row, a column or a scale names
+    /// no category of the stratification, or a value is not finite. The
+    /// parameter of a scale is checked against the model
+    /// (`check_matrices` of `commol-model`).
     pub fn check(&self, process: &Process) -> Result<(), String> {
         let id = &self.id;
         let stratification = &self.stratification;
@@ -161,6 +192,15 @@ impl CategoryMatrix {
             if let Some(column) = values.keys().find(|column| !categories.contains(column)) {
                 return Err(foreign(column));
             }
+        }
+        if let Some((side, category, parameter)) = self
+            .scales()
+            .find(|(_, category, _)| !categories.iter().any(|known| known == category))
+        {
+            return Err(format!(
+                "Matrix '{id}' scales the {side} of '{category}' by '{parameter}', but \
+                 '{category}' is not a category of '{stratification}' ({categories:?})"
+            ));
         }
         for row in categories {
             let Some(values) = self.values.get(row) else {
@@ -258,6 +298,8 @@ mod tests {
                     )
                 })
                 .collect(),
+            row_scales: IndexMap::new(),
+            column_scales: IndexMap::new(),
         }
     }
 
@@ -307,6 +349,13 @@ mod tests {
                 format!("Matrix 'M' names 'g3', which is not a category of 'group' ({categories})"),
             ),
             (
+                scaled(matrix(&FULL), &[], &[("g3", "b3")]),
+                format!(
+                    "Matrix 'M' scales the column of 'g3' by 'b3', but 'g3' is not a \
+                     category of 'group' ({categories})"
+                ),
+            ),
+            (
                 infinite,
                 "Matrix 'M' has inf in row 'g1' and column 'g1'; each value must be a finite \
                  number"
@@ -315,5 +364,40 @@ mod tests {
         ] {
             assert_eq!(matrix.check(&process()), Err(message));
         }
+    }
+
+    fn scaled(
+        mut matrix: CategoryMatrix,
+        rows: &[(&str, &str)],
+        columns: &[(&str, &str)],
+    ) -> CategoryMatrix {
+        let map = |scales: &[(&str, &str)]| {
+            scales
+                .iter()
+                .map(|(category, parameter)| (category.to_string(), parameter.to_string()))
+                .collect()
+        };
+        matrix.row_scales = map(rows);
+        matrix.column_scales = map(columns);
+        matrix
+    }
+
+    #[test]
+    fn a_matrix_lists_its_scales() {
+        let matrix = scaled(matrix(&FULL), &[("g1", "a1")], &[("g2", "b2")]);
+        let mut process = process();
+        process.matrices.push(matrix.clone());
+        assert_eq!(matrix.check(&process), Ok(()));
+        assert_eq!(
+            matrix.scales().collect::<Vec<_>>(),
+            [("row", "g1", "a1"), ("column", "g2", "b2")]
+        );
+    }
+
+    #[test]
+    fn a_matrix_reads_without_scales() {
+        let json = r#"{"id": "M", "stratification": "group", "values": {}}"#;
+        let matrix: CategoryMatrix = serde_json::from_str(json).unwrap();
+        assert!(matrix.row_scales.is_empty() && matrix.column_scales.is_empty());
     }
 }

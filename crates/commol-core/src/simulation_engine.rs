@@ -334,6 +334,14 @@ pub trait SimulationEngine: Clone {
         Vec::new()
     }
 
+    /// The matrices between categories of the model, each with the current
+    /// value of its scales ([`Self::set_parameter`] changes them). A
+    /// calibration constraint reads their entries and spectral radius at
+    /// the values of each point. None by default.
+    fn matrices(&self) -> Vec<crate::ScaledMatrix> {
+        Vec::new()
+    }
+
     /// The accuracy of the outputs of a run. Finite differences set their
     /// step from it. [`Accuracy::EXACT`] by default, for an engine whose
     /// outputs are exact up to rounding; an engine that integrates with

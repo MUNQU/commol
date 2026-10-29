@@ -154,7 +154,9 @@ def _check_factors(predictive: "Predictive", observed: list[ObservedDataPoint]) 
     """
     Check the observations with a factor against the source of the predictive,
     with no run: the engine refuses an unknown factor, or a parameter that is
-    not a factor, as the band of a series with that factor does.
+    not a factor, as the band of a series with that factor does. The check
+    sends each whole observation, so the engine also refuses a position or a
+    window start it does not accept, or an unknown output.
 
     Raises
     ------

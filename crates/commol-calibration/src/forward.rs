@@ -139,7 +139,7 @@ impl<E: SimulationEngine> ForwardModel<E> {
     /// # Errors
     ///
     /// A message when the engine rejects a position, or an observation names
-    /// an unknown output or factor.
+    /// an unknown output or factor, or a parameter that is not a factor.
     pub fn with_observations(&self, observed_data: &[ObservedDataPoint]) -> Result<Self, String> {
         crate::calibration_problem::check_positions(&self.base_engine, observed_data, &[])?;
         let schedule = schedule_of(observed_data, []);

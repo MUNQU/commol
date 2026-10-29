@@ -236,6 +236,10 @@ impl SimulationEngine for Engine {
         dispatch!(self, engine => engine.output_sums())
     }
 
+    fn matrices(&self) -> Vec<commol_core::ScaledMatrix> {
+        dispatch!(self, engine => engine.matrices())
+    }
+
     fn accuracy(&self) -> Accuracy {
         dispatch!(self, engine => engine.accuracy())
     }

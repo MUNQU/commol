@@ -433,25 +433,27 @@ def subgroup_total_names(process: "Process") -> list[str]:
     return commol_rs.model.subgroup_total_names(engine_json(process))
 
 
-def matrix_variables(process: "Process") -> list[tuple[str, str, float, bool]]:
+def matrix_variables(model: "Model") -> list[tuple[str, str, float | None, bool]]:
     """
-    The variables the matrices of a process give its rates and formula
-    parameters.
+    The variables the matrices of a model give its rates, formula parameters
+    and calibration constraints.
 
     Parameters
     ----------
-    process : Process
-        The process of the model.
+    model : Model
+        The model.
 
     Returns
     -------
-    list[tuple[str, str, float, bool]]
+    list[tuple[str, str, float | None, bool]]
         ``(name, matrix id, value, whether it is the radius)`` of each
         variable: for each matrix, its entries ``<M>_<i>_<j>`` row by row,
         then its spectral radius ``<M>_radius``, as the engine names and
-        computes them.
+        computes them at the values of the parameters that scale the matrix.
+        The value is None while such a parameter has none, as a parameter to
+        calibrate.
     """
-    return commol_rs.model.matrix_variables(engine_json(process))
+    return commol_rs.model.matrix_variables(engine_json(model))
 
 
 @lru_cache(maxsize=1024)

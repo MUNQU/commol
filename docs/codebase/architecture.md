@@ -43,7 +43,7 @@ method and gives one series per output. Calibration runs an engine many times
 and compares the series with the observations. Inference reads the
 calibration problem to measure uncertainty. The arrows show this flow, from
 top to bottom. The dashed boxes are shared: the base that every box uses, and
-the statistics that the compiler, calibration and inference use.
+the statistics that the base, the compiler, calibration and inference use.
 
 ```mermaid
 flowchart TB
@@ -56,7 +56,7 @@ flowchart TB
     C["Calibration<br/>the problem in layers, optimizers"]
     I["Inference<br/>parameter sample, predictive, scores,<br/>resampling, conformal, sensitivities, identifiability,<br/>priors, sequential Monte Carlo, global sensitivity"]
     F["Base: commol-core, commol-random<br/>used by every box"]
-    G["Statistics: commol-statistics<br/>used by the compiler, calibration and inference"]
+    G["Statistics: commol-statistics<br/>used by the base, the compiler, calibration and inference"]
     J --> M
     M --> E1 & E2 & E3
     E1 & E2 & E3 --> O
@@ -82,8 +82,9 @@ Every box uses `commol-core` (shared types, rate formulas, the
 `SimulationEngine` trait). The stochastic engines and calibration also use
 `commol-random` (random numbers), and so does inference. Calibration and
 inference also use `commol-statistics`, whose quantile the summary of the
-replicates and every method of inference take; the model compiler uses its
-spectral radius for the matrices of a process. Calibration works
+replicates and every method of inference take; `commol-core` uses its
+spectral radius for the matrices of a process (`ScaledMatrix::variables`),
+which the model compiler and the calibration constraints read. Calibration works
 through the `SimulationEngine` trait, so it does not depend on a specific
 engine; inference reaches an engine only through the forward model of a
 calibration problem.
