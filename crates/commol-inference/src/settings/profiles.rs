@@ -99,6 +99,7 @@ impl PredictionSpec {
             value: 0.0,
             weight: 1.0,
             factor_id: self.factor_id.clone(),
+            scale: 1.0,
             window: self.window,
             trials: None,
         }

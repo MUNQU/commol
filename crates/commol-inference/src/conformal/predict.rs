@@ -94,8 +94,8 @@ where
 
 /// The target points of the intervals: each series of `series`, in order
 /// of first appearance, at each of `positions`. A target copies the first
-/// observation of its series (its outputs, factor and window) with the
-/// position changed.
+/// observation of its series (its outputs, factor, scale and window) with
+/// the position changed.
 pub fn targets(series: &[ObservedDataPoint], positions: &[f64]) -> Vec<ObservedDataPoint> {
     SeriesIndex::new(series)
         .indices()

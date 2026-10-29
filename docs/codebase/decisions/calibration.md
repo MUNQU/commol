@@ -78,10 +78,10 @@ message with no prefix.
 
 `ObservationOperator` (`crates/commol-calibration/src/observation.rs`) is the
 only code that turns a run into observed quantities: the row of each
-observation, the sum of its outputs, its increment over its window and its
-factor. The loss, the predictions of `PyCalibrationProblem`, the predictive's
-`at_observations` and every score read it, and the figures read a windowed or
-scaled series of a predictive through it. The calibration problem is split
+observation, the sum of its outputs, its increment over its window, its
+scale and its factor. The loss, the predictions of `PyCalibrationProblem`, the
+predictive's `at_observations` and every score read it, and the figures read
+a windowed or scaled series of a predictive through it. The calibration problem is split
 into one layer per job, each in its own module: `ForwardModel` (`forward.rs`)
 is the only code that clones, resets, writes values to or runs the engine;
 `Feasibility` (`feasibility.rs`) checks bounds and constraints; `Discrepancy`
@@ -125,6 +125,20 @@ read a position with the same `index_at`.
 `tests/uncertainty/test_predictive.py::TestObservations`,
 `crates/commol-inference/tests/test_global_sensitivity.rs::a_gain_reads_its_start_exactly`,
 `tests/uncertainty/test_propagation.py::TestPropagation::test_a_gain_reads_its_start_exactly`.
+
+## A known scale is a number of the observation
+
+A known part of what an observation reads, such as the share of the units
+that report, is `ObservedDataPoint.scale` (1 by default). The operator
+multiplies the prediction by it with the factor, so every reader applies it
+with no code of its own; a target that copies the first observation of its
+series (conformal `targets`, the dense design of finite differences) keeps
+its scale. Not a `factor` with equal bounds: `CalibrationParameter` refuses
+them, and a parameter that nothing fits would enter every method that reads
+the parameter vector. Not a scale of the series: `factor_id`, `window` and
+`trials` change by observation, and a loss has no observation model.
+
+**Guards:** `crates/commol-calibration/tests/test_series.rs::a_scale_and_a_factor_multiply`, `tests/calibration/test_observations.py::test_an_observation_reads_the_model_times_its_scale`.
 
 ## Constraints bound the support
 

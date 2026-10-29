@@ -89,6 +89,26 @@ class TestObservedReport:
 
         assert observed_report(observed, WINDOW, WINDOWS)["events"]["weights"][0] == 2.0
 
+    def test_scales_of_1_are_omitted_and_others_kept(self) -> None:
+        observed = [
+            ObservedDataPoint(at=5, output="events", value=1.0),
+            ObservedDataPoint(at=5, output="other", value=1.0, scale=0.25),
+        ]
+
+        report = observed_report(observed, WINDOW, WINDOWS)
+
+        assert "scales" not in report["events"]
+        assert report["other"]["scales"] == [
+            0.25,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ]
+
     def test_aggregate_series_records_its_components_and_scale(self) -> None:
         observed = [
             ObservedDataPoint(

@@ -226,7 +226,7 @@ calibration gives for the same values: the remainder and the excess
 |---|---|
 | `band(confidence_level)` | The weighted mean, median and central interval of every output at every position (`PredictiveBand`) |
 | `series_band(outputs, confidence_level, cumulative=False)` | The band of the sum of some outputs, or of its running total; each draw is reduced first |
-| `at_observations(observed_data, noise)` | Every draw's value of each observation, read through the observation operator the loss uses (sums, windows and factors), with `noise` drawn from the calibrator's seed: `NoNoise()`, `ResidualNoise(...)` or `DistributionNoise()` (`ObservationDraws`) |
+| `at_observations(observed_data, noise)` | Every draw's value of each observation, read through the observation operator the loss uses (sums, windows, scales and factors), with `noise` drawn from the calibrator's seed: `NoNoise()`, `ResidualNoise(...)` or `DistributionNoise()` (`ObservationDraws`) |
 | `runs()`, `weights` | The trajectory and weight of every draw |
 | `quantities(quantities)` | The quantities of interest of every draw, one dict per draw, as `SimulationResults.quantities` reads one run |
 | `draw_seeds` | The seed of each draw of the sample: `Simulation.replicates(count, seed=draw_seeds[j])` of the model at the values of draw `j` gives its runs |

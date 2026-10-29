@@ -134,6 +134,22 @@ class TestPredictiveSeries:
             [0.5 * value for value in run["B"]]
         )
 
+    def test_a_band_of_one_scale_covers_every_position(self) -> None:
+        observed = [
+            ObservedDataPoint(at=at, output="B", value=1.0, scale=0.25)
+            for at in (10, 20)
+        ]
+        predictive = self._factor_predictive(observed)
+        run = predictive.runs()[0]
+
+        figure = predictive.plot.series(observed_data=observed, series=["B"])
+
+        line = figure.axes[0].lines[0]
+        assert np.asarray(line.get_xdata(), dtype=float).tolist() == run.positions
+        assert np.asarray(line.get_ydata(), dtype=float).tolist() == pytest.approx(
+            [0.25 * value for value in run["B"]]
+        )
+
     def test_a_band_labels_its_positions(self) -> None:
         predictive = predictive_of([0.05])
 

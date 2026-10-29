@@ -51,6 +51,11 @@ pub struct ObservedDataPoint {
     /// is an unknown proportionality constant.
     pub factor_id: Option<String>,
 
+    /// Known positive number that multiplies the prediction, with the
+    /// factor if there is one: the known part of what the model describes
+    /// that the observation reads (default 1.0).
+    pub scale: f64,
+
     /// Optional window length for cumulative-output observations.
     /// When set, the predicted value is `output(at) - output(at - window)`.
     pub window: Option<f64>,
@@ -70,6 +75,7 @@ impl ObservedDataPoint {
             value,
             weight: 1.0,
             factor_id: None,
+            scale: 1.0,
             window: None,
             trials: None,
         }
@@ -108,18 +114,19 @@ impl ObservedDataPoint {
             .map(|window| crate::observation::window_start(self.at, window))
     }
 
-    /// Check the position, the value, the weight, the window and the trials
-    /// of the observation with their rules ([`crate::ranges`]), as the
+    /// Check the position, the value, the weight, the scale, the window and
+    /// the trials of the observation with their rules ([`crate::ranges`]), as the
     /// observation of the Python API is checked when it is built.
     ///
     /// # Errors
     ///
     /// Returns the message of the first rule that a setting breaks.
     pub fn check_ranges(&self) -> Result<(), String> {
-        use crate::ranges::{AT, TRIALS, VALUE, WEIGHT, WINDOW};
+        use crate::ranges::{AT, SCALE, TRIALS, VALUE, WEIGHT, WINDOW};
         AT.check(self.at)?;
         VALUE.check(self.value)?;
         WEIGHT.check(self.weight)?;
+        SCALE.check(self.scale)?;
         self.window.map_or(Ok(()), |window| WINDOW.check(window))?;
         self.trials.map_or(Ok(()), |trials| TRIALS.check(trials))
     }

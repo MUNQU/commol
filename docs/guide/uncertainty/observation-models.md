@@ -106,7 +106,7 @@ print(round(scores.log_score(predictive, held_out, DistributionNoise()).mean, 2)
 ## Choosing a model
 
 The mean of every model is the prediction of the observation (its sums,
-window and factor), except the median of a `LogNormalObservations` with
+window, scale and factor), except the median of a `LogNormalObservations` with
 `center="median"`. A model only adds the scatter around it.
 
 | Your data | Model | Variance | Notes |
@@ -123,6 +123,13 @@ observation of the series, or with no argument from `ObservedDataPoint.trials`
 of each observation, for trials that change from one observation to the
 next. A series has one source; both or neither raise a `ValueError` that
 names the observation.
+
+A count observed on a known part of what the model describes, such as a
+sample of a known size, keeps its own value: give the part as
+[`scale`](../calibration-observations.md#known-shares-scales), and the model
+reads the mean `scale · μ`. Dividing the count by the part instead gives a
+value that is not whole, and a count multiplied by `1/scale` has the wrong
+Poisson variance.
 
 ## Noise parameters
 

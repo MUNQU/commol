@@ -339,6 +339,24 @@ class TestObservationOperator:
             [0.5 * run["B"][10], 2.0 * run["B"][20], run["B"][30] + run["C"][30]],
         )
 
+    def test_a_scale_multiplies_the_line_and_each_point_of_its_own(
+        self, run: SimulationResults
+    ) -> None:
+        one = [ObservedDataPoint(at=10, output="B", value=1.0, scale=0.5)]
+        each = [
+            ObservedDataPoint(at=10, output="B", value=1.0, scale=0.5),
+            ObservedDataPoint(at=20, output="B", value=1.0, scale=0.25),
+        ]
+
+        line = run.plot.series(observed_data=one, series=["B"]).axes[0].lines[0]
+        points = run.plot.series(observed_data=each, series=["B"]).axes[0].lines[0]
+
+        np.testing.assert_allclose(line.get_ydata(), 0.5 * np.asarray(run["B"]))
+        np.testing.assert_allclose(points.get_xdata(), [10, 20])
+        np.testing.assert_allclose(
+            points.get_ydata(), [0.5 * run["B"][10], 0.25 * run["B"][20]]
+        )
+
 
 class TestSeriesSelection:
     @pytest.fixture

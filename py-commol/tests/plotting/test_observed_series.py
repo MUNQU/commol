@@ -268,3 +268,17 @@ def test_observed_series_draw_on_the_panels_of_a_figure() -> None:
 def test_a_figure_of_observed_series_needs_observations() -> None:
     with pytest.raises(ValueError, match="at least one observation"):
         _events_model().run(5).plot.observations([])
+
+
+def test_the_model_of_an_observed_series_is_read_with_its_scale() -> None:
+    run = _events_model().run(20)
+    observed = [
+        ObservedDataPoint(at=at, output="B", value=1.0, scale=0.5) for at in (10, 20)
+    ]
+
+    fig = run.plot.observations(observed)
+
+    (ax,) = fig.axes
+    unscaled = run.sample(["B"], [10, 20])
+    np.testing.assert_allclose(_model_points(ax)[1], 0.5 * np.asarray(unscaled))
+    np.testing.assert_allclose(scatter(ax)[:, 1], [1.0, 1.0])

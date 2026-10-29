@@ -147,7 +147,7 @@ reports at non-integer positions once the results hold them
 
 | Block | Content |
 |---|---|
-| `observed` | For each observation label: `values`, padded to `windows`, so it lines up with `windowed` index for index. An observation goes to the window that holds its position (the rule of `AxisUnits.window_index`). `outputs` and `factor_id` appear when a series uses them, and `weights` when a weight is not 1.0. |
+| `observed` | For each observation label: `values`, padded to `windows`, so it lines up with `windowed` index for index. An observation goes to the window that holds its position (the rule of `AxisUnits.window_index`). `outputs` and `factor_id` appear when a series uses them, `weights` when a weight is not 1.0, and `scales` when a scale is not 1.0. |
 | `series` | Each output sampled at `positions`, sorted by name, except the outputs of the accumulators in `accumulators` |
 | `accumulators` | For each accumulator: `total` (its final value), `windowed` (the gain in each window that ends within the results, as the loss compares it) and `cumulative` (sampled at `positions`); each reading as a `total` and `by_output` |
 
