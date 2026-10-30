@@ -16,6 +16,10 @@ root, and the others are in the module of their page, such as
 `commol.resampling.BootstrapResult` and `commol.description.ModelDescription`.
 A result is on the page of the object that returns it or of its module, as
 `SimulationResults` is on the Simulation page. A result is the return of its member, not a class to build.
+A result of a calibration or of a method, its sample and its parts write
+themselves to a JSON file with `to_json`, and their class reads the file back
+with `from_json`, as `CalibrationResult.from_json(path)`
+([Saving a result](../guide/calibration.md#saving-a-result)).
 A choice among names is a string, such as `loss_function="sse"`.
 
 ## The root `commol`

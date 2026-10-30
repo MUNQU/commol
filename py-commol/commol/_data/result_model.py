@@ -1,11 +1,14 @@
-"""The base of every result: equality over its values, and the hash of a
-frozen result model."""
+"""The base of every result: equality over its values, the hash of a frozen
+result model, and the JSON file of a result model."""
 
 import math
 from abc import abstractmethod
-from typing import override
+from pathlib import Path
+from typing import Self, override
 
 from pydantic import BaseModel, ConfigDict
+
+from commol._data.serialization import write_json_file
 
 _NAN = object()
 """The canonical form of every NaN: one object, so a NaN equals a NaN."""
@@ -115,9 +118,11 @@ class ResultModel(ComparedByValue, BaseModel):
     (``frozen=True`` in its ``model_config``) has the hash of those values, so
     equal results have equal hashes; a result that can change has no hash.
 
-    The JSON of a result is standard JSON: a number that is not finite is the
-    text ``"Infinity"``, ``"-Infinity"`` or ``"NaN"``, as at the port of the
-    engine (``_data/engine_json.py``), and the result reads it back.
+    A result writes itself to a JSON file (`to_json`), and its class reads the
+    file back to an equal result (`from_json`), so another process can analyze
+    it. The JSON of a result is standard JSON: a number that is not finite is
+    the text ``"Infinity"``, ``"-Infinity"`` or ``"NaN"``, as at the port of
+    the engine (``_data/engine_json.py``), and the result reads it back.
     """
 
     model_config = ConfigDict(ser_json_inf_nan="strings")
@@ -134,3 +139,53 @@ class ResultModel(ComparedByValue, BaseModel):
     def compared_values(self) -> object:
         """The public fields with their values (`_public_fields`)."""
         return _public_fields(self)
+
+    @classmethod
+    def from_json(cls, file_path: str | Path) -> Self:
+        """
+        Read a result of this class from a JSON file that `to_json` wrote.
+
+        The method reads the file as UTF-8, the encoding of JSON. This class
+        validates the fields of the file, so a file whose fields do not fit
+        this class raises the ``pydantic.ValidationError`` that names each
+        field that does not fit. The file holds no name of its class, so a
+        class with the same fields reads it.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            The path to the JSON file.
+
+        Returns
+        -------
+        Self
+            The result, equal to the result that wrote the file.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the file at `file_path` does not exist.
+        pydantic.ValidationError
+            If the fields of the file do not fit this class.
+        """
+        return cls.model_validate_json(Path(file_path).read_text(encoding="utf-8"))
+
+    def to_json(self, file_path: str | Path, indent: int = 2) -> None:
+        """
+        Write the result to a JSON file, which `from_json` of its class reads.
+
+        The method writes UTF-8 and every field, nulls included. A number
+        that is not finite is the text ``"Infinity"``, ``"-Infinity"`` or
+        ``"NaN"``, also in a nested model that is not a result, such as the
+        `InputSpace` of a sensitivity result, so the file is standard JSON.
+        Long numeric arrays, such as the values of a sample, are on one line.
+        The release of commol that wrote a file reads it.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Path of the file to write.
+        indent : int, optional
+            Indentation width for nested structures.
+        """
+        write_json_file(self, file_path, indent=indent)

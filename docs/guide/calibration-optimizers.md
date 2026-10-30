@@ -311,7 +311,9 @@ replicates of a stochastic engine then make the same random choices on every
 run. Without a seed, the engine draws one when the calibrator is built;
 `Calibrator.seed` gives it and the calibrator logs it. The result keeps it in `CalibrationResult.seed`, and the sample of
 each uncertainty method in `sample.method.settings["seed"]`: set it as
-`problem.seed` to repeat the run, also from a result read back from JSON.
+`problem.seed` to repeat the run, also from a result that
+`CalibrationResult.from_json` read back (see
+[Saving a result](calibration.md#saving-a-result)).
 
 ```python
 again = problem.model_copy(update={"seed": result.seed})

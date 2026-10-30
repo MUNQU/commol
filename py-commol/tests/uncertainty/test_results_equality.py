@@ -5,6 +5,7 @@ import json
 import math
 import sys
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from pydantic import BaseModel
@@ -168,16 +169,18 @@ def _reject_constant(name: str) -> float:
 
 
 def test_a_result_saved_to_json_loads_back_equal_with_a_nan(
-    simulation: Simulation,
+    simulation: Simulation, tmp_path: Path
 ) -> None:
+    path = tmp_path / "result.json"
     for result in (_conformal(float("-inf"), {"B": [1.0]}), _nan_prcc(simulation)):
-        text = result.model_dump_json()
+        result.to_json(path)
 
-        json.loads(text, parse_constant=_reject_constant)
-        assert type(result).model_validate_json(text) == result
-    text = _conformal(float("-inf"), {"B": [1.0]}).model_dump_json()
-    assert '"lower":["-Infinity","-Infinity"]' in text
-    assert '"upper":["NaN","Infinity"]' in text
+        json.loads(path.read_text(encoding="utf-8"), parse_constant=_reject_constant)
+        assert type(result).from_json(path) == result
+    _conformal(float("-inf"), {"B": [1.0]}).to_json(path)
+    series = json.loads(path.read_text(encoding="utf-8"))["intervals"]["series"]["B"]
+    assert series["lower"] == ["-Infinity", "-Infinity"]
+    assert series["upper"] == ["NaN", "Infinity"]
 
 
 def test_every_result_writes_a_number_that_is_not_finite_as_its_text() -> None:
@@ -194,14 +197,19 @@ def test_every_result_writes_a_number_that_is_not_finite_as_its_text() -> None:
     } == set()
 
 
-def test_a_result_saved_by_0_10_with_bare_constants_still_loads() -> None:
+def test_a_result_saved_by_0_10_with_bare_constants_still_loads(
+    tmp_path: Path,
+) -> None:
     result = _conformal(float("-inf"), {"B": [1.0]})
+    path = tmp_path / "result.json"
+    result.to_json(path)
     saved = (
-        result.model_dump_json()
+        path.read_text(encoding="utf-8")
         .replace('"-Infinity"', "-Infinity")
         .replace('"Infinity"', "Infinity")
         .replace('"NaN"', "NaN")
     )
+    path.write_text(saved, encoding="utf-8")
 
     assert "NaN" in saved and '"NaN"' not in saved
-    assert ConformalResult.model_validate_json(saved) == result
+    assert ConformalResult.from_json(path) == result

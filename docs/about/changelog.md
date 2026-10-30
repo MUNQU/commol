@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Every result writes itself to a JSON file with `to_json(file_path,
+  indent=2)`, and its class reads it back with `from_json(file_path)`, as
+  `Model` does: `CalibrationResult.from_json("fit.json")` returns a
+  `CalibrationResult` equal to the result written. A result read back feeds
+  the methods that take a result, such as `StartsIdentifiability(result=...)`
+  and `Collinearity(at=...)`, and its sample draws the same members. A file
+  whose fields do not fit the class raises `pydantic.ValidationError`; the
+  file holds no name of its class, so a class with the same fields reads it.
+  `SampleMethod` refuses a setting that is not finite, which JSON cannot
+  hold. See
+  [Saving a result](../guide/calibration.md#saving-a-result).
 - `ParticleSwarmConfig(polish=NelderMeadConfig(...))`: each start runs the
   swarm, then Nelder-Mead from the best point of the swarm of that start.
   The start ends at the point, the loss and the convergence of Nelder-Mead,
@@ -163,7 +174,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `logging.getLogger("commol.resampling")`.
 - **Breaking:** a pickle of an object of commol 0.10 does not load: the path
   of each class changed. Migration: save a model with `Model.to_json` and a
-  result with `model_dump_json`, which do not depend on the path.
+  result with its `to_json`, which do not depend on the path.
 - **Breaking:** `ParticleSwarmConfig` is one class with plain fields, and
   its chained methods `.inertia`, `.acceleration`, `.velocity`, `.mutation`,
   `.improvement_stop` and `.radius_stop` and their `*_config` properties are
@@ -226,7 +237,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   … `` or ``score: unknown variant `other`, expected one of `absolute`,
   `normalized`, `spread` ``. A conformal method without `score` or `by`
   gives ``missing field `score` ``.
-- The JSON of every result (`model_dump_json`) is standard JSON: a number
+- The JSON of every result (`to_json`) is standard JSON: a number
   that is not finite is the text `"Infinity"`, `"-Infinity"` or `"NaN"`, as
   at the port of the engine. Before, `ParameterSample`, `SMCResult`,
   `JackknifeResult`, `ConformalResult`, `PredictionIntervals` and

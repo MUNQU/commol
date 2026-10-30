@@ -15,13 +15,13 @@ from pydantic import (
 )
 
 from commol._data.engine_json import engine_json
+from commol._data.serialization import write_json_file
 from commol._fit.result import CalibrationResult
 from commol._model.axis_units import AxisUnits, Origin, seconds_per_step
 from commol._model.applied_parameters import applied_parameters_report
 from commol.description.blocks import ModelDescription
 from commol._model.parameter import Parameter, SeriesValue
 from commol._model.process import Process
-from commol._model.serialization import render_json
 from commol._model.structure import ModelStructure
 from commol._model.units import DEFAULT_STEP_UNIT
 from commol._problem.problem import CalibrationProblem, calibrated_values
@@ -173,10 +173,7 @@ class Model(BaseModel, Generic[StructureT]):
         indent : int, optional
             Indentation width for nested structures.
         """
-        payload = self.model_dump(mode="json")
-        Path(file_path).write_text(
-            render_json(payload, indent=indent), encoding="utf-8"
-        )
+        write_json_file(self, file_path, indent=indent)
 
     @model_validator(mode="after")
     def _validate_engine_runs_structure(self) -> Self:

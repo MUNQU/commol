@@ -126,7 +126,7 @@ changing it ([Design decisions](decisions/uncertainty.md#methods-plug-into-one-e
 - [ ] The configuration, a subclass of `UncertaintyMethod[YourResult]`, and
       the result, a subclass of `ResultModel`, in the module of its family
       (`resampling/methods.py`, …), which exports the configuration (`PAGES` of `tests/suite/public_surface.py`)
-      and the result with the class of each of its fields (`RESULTS`); a result with draws holds a `ParameterSample`.
+      and the result with the class of each of its fields (`RESULTS`); a result with draws holds a `ParameterSample`; each class has an example from a small run in `EXAMPLES_OF_RESULTS` of `tests/support/results.py`, which a file reads back ([Design decisions](decisions/files.md#a-result-file-is-read-by-its-class)).
 - [ ] A method that fits several times fits its perturbations with
       `ReplicateRunner::fit_all` and checks them with `ReplicateFits::require`;
       its result has `failed` (the entries of `FitUnit::failed`, logged as

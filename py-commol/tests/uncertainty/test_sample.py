@@ -1,6 +1,7 @@
 """The parameter sample: its invariants and its weighted statistics."""
 
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -70,10 +71,17 @@ class TestInvariants:
         assert sample != sample.values
         assert sample == _sample([0.0, 0.0, 1.0])
 
-    def test_a_sample_saved_to_json_loads_back_equal(self) -> None:
-        sample = _sample([0.0, float("-inf"), 1.0])
+    def test_a_setting_that_is_not_finite_is_refused(self) -> None:
+        with pytest.raises(ValidationError) as error:
+            SampleMethod(name="test", settings={"grid": [1.0, {"eps": math.inf}]})
 
-        loaded = ParameterSample.model_validate_json(sample.model_dump_json())
+        assert "settings.grid.1.eps is not finite, got inf" in str(error.value)
+
+    def test_a_sample_saved_to_json_loads_back_equal(self, tmp_path: Path) -> None:
+        sample = _sample([0.0, float("-inf"), 1.0])
+        sample.to_json(tmp_path / "sample.json")
+
+        loaded = ParameterSample.from_json(tmp_path / "sample.json")
 
         assert loaded == sample
         assert loaded.weights == sample.weights

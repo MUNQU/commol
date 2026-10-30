@@ -10,6 +10,7 @@ the information of ``c`` is ``n / sd²``; without windows the prediction at
 
 import logging
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -207,14 +208,17 @@ class TestLaplace:
             half, rel=1e-3
         )
 
-    def test_a_result_read_from_json_gives_the_same_delta_band(self) -> None:
+    def test_a_result_read_from_json_gives_the_same_delta_band(
+        self, tmp_path: Path
+    ) -> None:
         calibrator = flow_calibrator(
             [9.0, 11.0, 10.0],
             windowed=True,
             observation_models={"B": NormalObservations(sd=1.0)},
         )
         result = calibrator.uncertainty(Laplace(draws=10))
-        read = LaplaceResult.model_validate_json(result.model_dump_json())
+        result.to_json(tmp_path / "laplace.json")
+        read = LaplaceResult.from_json(tmp_path / "laplace.json")
 
         band = read.delta_band(calibrator, [1.0, 2.0], 0.9)
 

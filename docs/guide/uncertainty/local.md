@@ -149,8 +149,8 @@ output on the unbounded scale. It runs the model a few times per parameter,
 not once per draw, and for a model linear in its parameters it equals the
 band of the draws
 (`Predictive(calibrator, result.sample, positions).band(confidence_level)`).
-It reads only the fields of the result, so a result read back from JSON
-works.
+It reads only the fields of the result, so a result that
+`LaplaceResult.from_json` read back works.
 
 ```python
 widths = [round(high - low, 2) for low, high in zip(band.lower["B"], band.upper["B"])]

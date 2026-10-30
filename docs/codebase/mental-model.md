@@ -145,7 +145,8 @@ discussion first.
   [Stochastic engines and seeds](decisions/engines.md#stochastic-engines-and-seeds).
 - **What the user saves, the engine reloads.** `Model.to_json` writes every
   field, and calibrated values written back to a model reproduce the
-  state the optimizer scored.
+  state the optimizer scored. A result written with `to_json` reads back
+  equal with `from_json` of its class, and feeds the methods that take it.
 
 ## Checklist
 
