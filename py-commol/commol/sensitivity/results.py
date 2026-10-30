@@ -5,9 +5,9 @@ from typing import TYPE_CHECKING, ClassVar, Self
 
 import numpy as np
 from numpy.typing import ArrayLike
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field
 
-from commol._data.engine_json import engine_json
+from commol._data.engine_json import EngineChecked, engine_json
 from commol._data.result_model import ResultModel
 from commol._problem.problem import CalibrationParameter
 from commol.commol_rs import _commol_rs as commol_rs
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from commol.plotting.config import PlotConfig
 
 
-class InputSpace(BaseModel):
+class InputSpace(EngineChecked):
     """
     What a sensitivity analysis varies.
 
@@ -29,7 +29,9 @@ class InputSpace(BaseModel):
     independent distributions, one per input, truncated to its bounds, or
     are the draws of a sample, with their weights; the inputs of a sample may
     depend on each other, so only the methods that allow it take one. Build
-    it with `independent`, `uniform_on_bounds` or `from_sample`.
+    it with `independent`, `uniform_on_bounds` or `from_sample`: it has
+    distributions or a sample, exactly one, with no default, which
+    `SensitivityAnalysis` checks with the inputs of the sample.
 
     Attributes
     ----------
@@ -49,9 +51,7 @@ class InputSpace(BaseModel):
 
     _engine_handles: ClassVar[tuple[str, ...]] = ("sample",)
 
-    parameters: list[CalibrationParameter] = Field(
-        min_length=1, description="The inputs, in order."
-    )
+    parameters: list[CalibrationParameter] = Field(description="The inputs, in order.")
     distributions: dict[str, _Distribution] | None = Field(
         default=None, description="The distribution of each independent input."
     )
@@ -62,46 +62,6 @@ class InputSpace(BaseModel):
         default=None,
         description="Bin or compartment that takes what the initial conditions leave.",
     )
-
-    @model_validator(mode="after")
-    def _check_inputs(self) -> Self:
-        """Check the inputs against the distributions or the sample."""
-        ids = [parameter.id for parameter in self.parameters]
-        repeated = sorted({i for i in ids if ids.count(i) > 1})
-        if repeated:
-            raise ValueError(f"Inputs repeat the ids {repeated}.")
-        observed = {
-            "factor": ("a factor, which multiplies an observation"),
-            "noise": ("a noise parameter, which belongs to an observation model"),
-        }
-        for parameter in self.parameters:
-            what = observed.get(parameter.parameter_type)
-            if what is not None:
-                raise ValueError(
-                    f"'{parameter.id}' is {what}; a sensitivity analysis has no "
-                    "observations."
-                )
-        if (self.distributions is None) == (self.sample is None):
-            raise ValueError("Give distributions or a sample, not both.")
-        if self.distributions is not None:
-            missing = [i for i in ids if i not in self.distributions]
-            extra = sorted(set(self.distributions) - set(ids))
-            if missing:
-                raise ValueError(
-                    f"The inputs {missing} have no distribution: give one per "
-                    "input, or InputSpace.uniform_on_bounds(parameters)."
-                )
-            if extra:
-                raise ValueError(f"The distributions of {extra} name no input.")
-        if self.sample is not None:
-            bounds = [(p.min_bound, p.max_bound) for p in self.parameters]
-            if self.sample.names != ids or list(self.sample.bounds) != bounds:
-                raise ValueError(
-                    f"The sample has the inputs {self.sample.names} with the bounds "
-                    f"{list(self.sample.bounds)}; the parameters are {ids} with the "
-                    f"bounds {bounds}, in this order."
-                )
-        return self
 
     @classmethod
     def independent(
@@ -200,10 +160,10 @@ class InputSpace(BaseModel):
         InputSpace
             The input space.
 
-        Raises
-        ------
-        ValueError
-            If the sample's names or bounds are not the parameters'.
+        Notes
+        -----
+        `SensitivityAnalysis` checks that the sample's names and bounds are
+        the parameters'.
         """
         return cls(
             parameters=list(parameters),
@@ -330,15 +290,11 @@ class PropagationResult(ResultModel):
                 f"The mask has one boolean per run: {len(self.values)} runs, got "
                 f"an array of {keep.dtype} with the shape {keep.shape}"
             )
-        weights = np.asarray(self.weights, dtype=float)[keep]
-        if weights.sum() <= 0.0:
-            raise ValueError(
-                "The mask keeps no run of positive weight: a summary needs at least one"
-            )
+        kept = [weight for weight, kept in zip(self.weights, keep) if kept]
         return self.model_copy(
             update={
                 "values": [row for row, kept in zip(self.values, keep) if kept],
-                "weights": (weights / weights.sum()).tolist(),
+                "weights": commol_rs.inference.normalized_weights(kept),
             }
         )
 

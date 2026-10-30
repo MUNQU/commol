@@ -911,20 +911,6 @@ fn every_replicate_method_counts_the_same_fits() {
 }
 
 #[test]
-fn a_bootstrap_of_a_parameter_named_twice_has_no_sample() {
-    // The problem takes two parameters 'k'; a sample names each column once.
-    let problem = problem(sine, &[("k", 0.0, 1.0), ("k", 0.0, 1.0)], &[0.0, 0.5, 0.8]);
-    let config = config();
-    let runner = ReplicateRunner::new(&problem, &config, &[0.5, 0.5], 1, 2).unwrap();
-    let scheme = BlockScheme::new(problem.observed_data(), 1).unwrap();
-    let resampler = BayesianBootstrap::new(problem.observed_data(), &scheme);
-
-    let error = bootstrap(&runner, &resampler, 2).unwrap_err().to_string();
-
-    assert_eq!(error, "A sample names 'k' twice; one name per column");
-}
-
-#[test]
 fn a_block_length_is_a_number_or_auto() {
     use commol_inference::settings::BlockLength;
 

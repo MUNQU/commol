@@ -828,3 +828,63 @@ fn collinearity_needs_two_parameters_that_are_not_noise_parameters() {
         )
     );
 }
+
+#[test]
+fn the_priors_of_a_sample_identifiability_match_its_reference() {
+    use commol_inference::settings::identifiability::SampleIdentifiabilitySettings;
+
+    let read = |reference: &str, priors: &str| {
+        commol_core::json::read::<SampleIdentifiabilitySettings>(&format!(
+            r#"{{"reference": "{reference}", "correlation_threshold": 0.9, "priors": {priors}}}"#
+        ))
+    };
+    let names = ["k".to_string()];
+
+    assert!(
+        read("prior", "null")
+            .unwrap_err()
+            .starts_with("reference='prior' needs priors")
+    );
+    assert!(
+        read("bounds", r#"{"distributions": null}"#)
+            .unwrap_err()
+            .starts_with("priors are read only with reference='prior'")
+    );
+    let bounds = read("bounds", "null").unwrap();
+    assert_eq!(bounds.reference_priors(&names, &[(0.0, 1.0)]), Ok(None));
+    let prior = read("prior", r#"{"distributions": null}"#).unwrap();
+    assert!(
+        prior
+            .reference_priors(&names, &[(0.0, 1.0)])
+            .unwrap()
+            .is_some()
+    );
+}
+
+#[test]
+fn a_measure_over_the_bounds_refuses_an_infinite_bound() {
+    let problem = problem(decay("k", &["k"]), &[("k", 0.05, f64::INFINITY)]);
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+    let half_line = ParameterSample::new(
+        vec!["k".to_string()],
+        vec![(0.0, f64::INFINITY)],
+        vec![vec![0.2], vec![0.4], vec![0.3]],
+        &[0.0; 3],
+        None,
+    )
+    .unwrap();
+
+    assert_eq!(
+        structural_rank(&source, 3, 7).unwrap_err().to_string(),
+        "StructuralRank evaluates points of a Latin hypercube over the bounds, so they must \
+         be finite: parameter 'k' has the bounds [0.05, inf]. Give it finite bounds"
+    );
+    assert_eq!(
+        sample_identifiability(&half_line, Reference::Bounds, 0.9)
+            .unwrap_err()
+            .to_string(),
+        "reference='bounds' measures the contraction against the uniform distribution on \
+         the bounds, so they must be finite: parameter 'k' has the bounds [0, inf]. Give \
+         reference='prior' with the priors of the sample"
+    );
+}

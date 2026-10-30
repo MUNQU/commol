@@ -293,7 +293,9 @@ The `reference` of the contraction is `"bounds"`, the uniform distribution on
 the bounds, or `"prior"` with `priors`, the prior of each parameter: the
 sample of a [Gibbs posterior or ABC](smc.md) contracts its priors by how much
 the data inform each parameter, and a sample drawn from the priors themselves
-has a contraction near 0.
+has a contraction near 0. `"prior"` without `priors`, or `"bounds"` with
+them, raises a `ValueError`: the engine never measures against a reference you
+did not choose.
 
 ```python
 from commol.distributions import Priors, Uniform

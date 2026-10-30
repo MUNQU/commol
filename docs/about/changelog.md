@@ -99,6 +99,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`Model.applied_parameters`, `ModelStructure.report_sections`) holds its
   `EntrySpread` under the key `spread`, not `interval`. A report saved as JSON
   before this change has the key `interval`: read `spread`.
+- **Breaking:** the engine holds every rule of a calibration problem and of
+  an uncertainty method, and Python holds no copy: each class sends its JSON
+  to the engine when it is built and raises the message of the engine. A
+  problem or a method written as JSON meets the same rules. Several messages
+  change: two parameters with one id say `Two parameters have the id 'k'`,
+  a loss with observation models says `not both`, a problem with neither
+  says `There is no default`, and a list of names in a message is written
+  as Rust writes it, `["k1"]`. See
+  [Calibration](../guide/calibration.md#unknowns).
+- **Breaking:** a `CalibrationParameter` with a NaN bound, `max_bound` not
+  above `min_bound`, or an `initial_guess` that is not finite or outside its
+  bounds is refused by the engine too, so a problem in JSON can no longer
+  calibrate a parameter of zero width. An infinite bound stays valid for a
+  prior; every run of an optimizer refuses it with a message that names the
+  parameter (before, a swarm panicked and Nelder-Mead named no parameter),
+  and so do `StructuralRank` and `SampleIdentifiability(reference="bounds")`,
+  which gave a contraction of 1 and the verdict `determined`. See
+  [Infinite bounds](../guide/calibration.md#infinite-bounds).
+- **Breaking:** an `InputSpace` with neither distributions nor a sample is
+  refused when `SensitivityAnalysis` reads it; before, the engine drew each
+  input uniform on its bounds. One with both is refused; before, the engine
+  ignored the distributions. The check of the names and the bounds of a
+  sample moves from `InputSpace.from_sample` to `SensitivityAnalysis`, and a
+  `Uniform()` on an infinite bound is refused by `InputSpace.uniform_on_bounds`.
+  See [Input spaces](../guide/uncertainty/sensitivity.md).
+- **Breaking:** the engine writes the default label of a quantity of
+  interest: a very small or very large position has an exponent with no
+  sign or zero, `1e-7` and `2.5e16`, not `1e-07` and `2.5e+16`. Two
+  quantities with one label are refused with a message that names the
+  label.
+- `score="spread"` without a sample is refused when a `SplitConformal` or an
+  `AdaptiveConformal` runs, before it fits, not when it is built.
+
 - **Breaking:** a split by category names exactly the categories of `by` that
   the compartments of its stratification have. A `type` on `g2` only, split by
   `group`, gives the split of `g2` alone, and a split of `g1`, which no
@@ -440,6 +473,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are removed: no part of commol reads them, and the engine names every
   value a run lacks. Migration: read `parameter.value is None` and
   `structure.bin_amounts`, or run the model and read the message.
+- **Breaking:** the quantities of interest lose the methods that copied
+  rules of the engine: `ValueAt.default_label()` and that of the other
+  quantities, `Level.text`, `Increments.text`, `Increments.check_ends()` and
+  `output_name`. `labels()` and `axes()` give what the engine names.
 - **Breaking:** `commol.utils.security` is removed, with `SecurityConfig`,
   `SecurityError`, `validate_expression_security` and the `config=` argument
   of `AxisPattern.combine` and `AxisPattern.from_formula`. The parser of the
@@ -456,6 +493,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Limits of the parser](../guide/mathematical-expressions.md#limits-of-the-parser).
 
 ### Fixed
+
+- `Collinearity` at a point where a parameter with an infinite bound is 0
+  scaled its column by an infinite width: an infinite sensitivity and an
+  index below 1, with no error. The magnitude of the parameter there is now
+  1, as the step of finite differences takes it.
+- A `SampleIdentifiability(reference="prior")` without priors, or
+  `reference="bounds"` with priors, written as JSON measured the sample
+  against the bounds with no error; the engine now refuses it.
+- An empty list of settings is refused with a message that names the
+  field: the `at` of a constraint (before, the constraint was never
+  evaluated), the `origins` of a `RollingConformal` (before, `Every origin
+  failed: 0 of 0`), the `positions` of a conformal method, the `stream` of an
+  `AdaptiveConformal`, the `parameters` of a `ProfileLikelihood` and the
+  `specs` of a `PredictionProfile` (before, an empty result). A parameter
+  profiled twice, or two predictions with one label, are refused; before,
+  one profile overwrote the other.
+- The positions of a quantity of interest in JSON must ascend, each once;
+  before, the engine read unsorted positions in their given order, and the
+  first position of a peak depended on it.
 
 - A figure of a run, or of its replicates, logs one warning for each factor of
   its observations that `calibration_result` does not have, and counts the

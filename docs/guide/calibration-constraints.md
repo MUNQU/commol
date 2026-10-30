@@ -74,7 +74,7 @@ print(round(best["k1"] / best["k2"], 2))  # 3.0: the best fit that respects k1 /
 | `expression` | `str` | required | Must evaluate to `>= 0` when the constraint holds. |
 | `description` | `str \| None` | `None` | A free-text description. |
 | `weight` | `float` | `1.0` | Above zero. Multiplies the amount of a violation in the penalty. |
-| `at` | `list[float] \| None` | `None` | The positions on the axis at which to evaluate it. Required when the expression names an output. The engine accepts the positions it accepts for [observations](calibration-observations.md#positions-between-integers). |
+| `at` | `list[float] \| None` | `None` | The positions on the axis at which to evaluate it, at least one. Required when the expression names an output; an empty list is refused, because the constraint would never be evaluated. The engine accepts the positions it accepts for [observations](calibration-observations.md#positions-between-integers). |
 
 ## Writing the expression
 

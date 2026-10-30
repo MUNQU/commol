@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING, ClassVar, Self
 from pydantic import Field, JsonValue, model_validator
 
 from commol._calibration.method import IdentifiabilityMethod
+from commol._data.engine_json import EngineChecked
 from commol._data.ranges import RangeChecked
 from commol._fit.result import CalibrationResult
 from commol.distributions.distributions import Priors, coerce_priors
@@ -120,7 +121,9 @@ class Collinearity(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
     threshold: float = Field()
 
 
-class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
+class SampleIdentifiability(
+    IdentifiabilityMethod[IdentifiabilityReport], EngineChecked, RangeChecked
+):
     """
     Practical identifiability from any parameter sample: how much it contracts
     each parameter, which parameters move together, and which marginals have
@@ -158,20 +161,6 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeC
         if isinstance(data, Mapping) and data.get("priors") is not None:
             return {**data, "priors": coerce_priors(data["priors"])}
         return data
-
-    @model_validator(mode="after")
-    def _check_priors(self) -> Self:
-        """The priors go with ``reference="prior"``, and only with it."""
-        if self.reference == "prior" and self.priors is None:
-            raise ValueError(
-                "reference='prior' needs priors: the prior of each parameter."
-            )
-        if self.reference == "bounds" and self.priors is not None:
-            raise ValueError(
-                "priors are read only with reference='prior'; with "
-                "reference='bounds' leave them out."
-            )
-        return self
 
 
 class StartsIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):

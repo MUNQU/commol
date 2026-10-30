@@ -23,10 +23,44 @@ pub enum NonconformityScore {
     Spread,
 }
 
+/// Why `score="spread"` needs a sample.
+const NO_SPREAD: &str = "score=\"spread\" divides by the spread of the predictions, and a fit has \
+                         none: give a sample, whose predictive gives the prediction and its spread";
+
 impl NonconformityScore {
     /// The score of `observed` against `predicted` on the scale `scale`.
     pub fn of(self, observed: f64, predicted: f64, scale: f64) -> f64 {
         (observed - predicted).abs() / scale
+    }
+
+    /// Check that a predictor with a spread or without one (a fit) gives the
+    /// scale of this score: `"spread"` needs the spread of a sample.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the fix.
+    pub fn check_spread(self, has_spread: bool) -> Result<(), String> {
+        if self == Self::Spread && !has_spread {
+            return Err(NO_SPREAD.to_string());
+        }
+        Ok(())
+    }
+
+    /// Check that a method that refits once per origin, so has no spread,
+    /// takes this score.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the scores it takes, for `"spread"`.
+    pub fn check_rolling(self) -> Result<(), String> {
+        if self == Self::Spread {
+            return Err(
+                "RollingConformal fits once per origin, so its predictions have no spread for \
+                 score=\"spread\"; use \"absolute\" or \"normalized\""
+                    .to_string(),
+            );
+        }
+        Ok(())
     }
 }
 
@@ -153,9 +187,9 @@ fn scale_values(
                 .collect()
         }
         NonconformityScore::Spread => {
-            let spread = spread.ok_or_else(|| {
-                "score=\"spread\" needs a spread of the predictions: give a sample".to_string()
-            })?;
+            let Some(spread) = spread else {
+                return Err(NO_SPREAD.to_string());
+            };
             points
                 .iter()
                 .zip(spread)

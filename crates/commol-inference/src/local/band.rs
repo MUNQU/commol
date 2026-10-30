@@ -29,18 +29,23 @@ pub struct DeltaBand {
 }
 
 /// The band of `confidence_level` of every output of `problem` at
-/// `positions`, linearized at `fit`, for a normal of `covariance` on the
-/// unbounded scale, or a Student t with `degrees_of_freedom`.
+/// `positions`, linearized at `fit`, the value of each parameter by name,
+/// for a normal of `covariance` on the unbounded scale, or a Student t with
+/// `degrees_of_freedom`. The rows and the columns of `covariance` are the
+/// parameters `names`, which are those of the problem, in its order.
 ///
 /// # Errors
 ///
-/// [`MethodError::Invalid`] when the confidence level is not strictly between
-/// 0 and 1, a position is one the engine rejects, or the engine is
+/// [`MethodError::Invalid`] when `names` are not the parameters of the
+/// problem, the fit has no value of one, the covariance has not one row and
+/// one column per parameter, the confidence level is not strictly between 0
+/// and 1, a position is one the engine rejects, or the engine is
 /// stochastic; [`MethodError::Failed`] when the derivatives fail.
 pub fn delta_band<E>(
     problem: &CalibrationProblem<E>,
-    fit: &[f64],
-    covariance: &Matrix,
+    names: &[String],
+    fit: &[(String, f64)],
+    covariance: &[Vec<f64>],
     degrees_of_freedom: Option<f64>,
     positions: &[f64],
     confidence_level: f64,
@@ -48,6 +53,29 @@ pub fn delta_band<E>(
 where
     E: SimulationEngine + Send + Sync,
 {
+    let parameters = problem.parameter_names();
+    if names != parameters.as_slice() {
+        return Err(MethodError::Invalid(format!(
+            "The result has the parameters {names:?}; the problem has {parameters:?}"
+        )));
+    }
+    let fit = parameters
+        .iter()
+        .map(|name| {
+            fit.iter()
+                .find(|(given, _)| given == name)
+                .map(|(_, value)| *value)
+                .ok_or_else(|| MethodError::Invalid(format!("The fit has no value of '{name}'")))
+        })
+        .collect::<Result<Vec<f64>, _>>()?;
+    let p = parameters.len();
+    if covariance.len() != p || covariance.iter().any(|row| row.len() != p) {
+        return Err(MethodError::Invalid(format!(
+            "The covariance needs {p} rows of {p} values, one per parameter"
+        )));
+    }
+    let covariance = Matrix::from_fn(p, p, |j, k| covariance[j][k]);
+    let fit = fit.as_slice();
     CONFIDENCE_LEVEL
         .check(confidence_level)
         .map_err(MethodError::Invalid)?;
@@ -73,7 +101,6 @@ where
         })?;
     let sensitivities = source.jacobian(fit).map_err(MethodError::Sensitivity)?;
     let derivatives = Transform::new(&problem.parameter_bounds()).derivatives(fit);
-    let p = fit.len();
     let table = vec![vec![0.0; outputs.len()]; positions.len()];
     let mut band = Band {
         mean: table.clone(),

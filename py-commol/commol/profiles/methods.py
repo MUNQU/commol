@@ -9,11 +9,12 @@ statistic stays below a threshold (Raue et al. 2009; Kreutz et al. 2012).
 Every interval is pointwise: it holds one quantity, not several at once.
 """
 
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING
 
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field
 
 from commol._calibration.method import UncertaintyMethod
+from commol._data.engine_json import EngineChecked
 from commol._data.ranges import RangeChecked
 from commol._problem.problem import ObservedDataPoint
 from commol.profiles.runners import run_prediction_profile, run_profile_likelihood
@@ -90,7 +91,7 @@ class PredictionSpec(RangeChecked):
         )
 
 
-class ProfileLikelihood(UncertaintyMethod[ProfileResult], RangeChecked):
+class ProfileLikelihood(UncertaintyMethod[ProfileResult], EngineChecked, RangeChecked):
     """
     The profile likelihood of parameters (Raue et al. 2009).
 
@@ -116,7 +117,7 @@ class ProfileLikelihood(UncertaintyMethod[ProfileResult], RangeChecked):
 
     _runner = staticmethod(run_profile_likelihood)
 
-    parameters: list[str] = Field(min_length=1)
+    parameters: list[str] = Field()
     threshold: Threshold
     max_steps: int = Field(
         default=100,
@@ -125,15 +126,8 @@ class ProfileLikelihood(UncertaintyMethod[ProfileResult], RangeChecked):
         default=1,
     )
 
-    @model_validator(mode="after")
-    def _check_unique(self) -> Self:
-        """Each parameter is profiled once."""
-        if len(set(self.parameters)) != len(self.parameters):
-            raise ValueError(f"A parameter is listed twice: {self.parameters}.")
-        return self
 
-
-class PredictionProfile(UncertaintyMethod[ProfileResult], RangeChecked):
+class PredictionProfile(UncertaintyMethod[ProfileResult], EngineChecked, RangeChecked):
     """
     The profile likelihood of predictions (Kreutz et al. 2012).
 
@@ -157,7 +151,7 @@ class PredictionProfile(UncertaintyMethod[ProfileResult], RangeChecked):
 
     _runner = staticmethod(run_prediction_profile)
 
-    specs: list[PredictionSpec] = Field(min_length=1)
+    specs: list[PredictionSpec] = Field()
     threshold: Threshold
     max_steps: int = Field(
         default=100,
@@ -165,13 +159,3 @@ class PredictionProfile(UncertaintyMethod[ProfileResult], RangeChecked):
     starts: int = Field(
         default=1,
     )
-
-    @model_validator(mode="after")
-    def _check_labels(self) -> Self:
-        """Each prediction has a label of its own."""
-        labels = [spec.as_observation().label for spec in self.specs]
-        if len(set(labels)) != len(labels):
-            raise ValueError(
-                f"Each prediction needs a label of its own, got {labels}; set label."
-            )
-        return self

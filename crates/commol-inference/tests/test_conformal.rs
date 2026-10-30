@@ -492,3 +492,62 @@ fn jackknife_plus_of_a_series_with_no_scored_observation_has_no_prediction() {
     assert_eq!(intervals.lower[1], f64::NEG_INFINITY);
     assert_eq!(intervals.upper[1], f64::INFINITY);
 }
+
+#[test]
+fn a_conformal_method_needs_its_lists_and_a_score_it_can_scale() {
+    use commol_inference::settings::conformal::{
+        AdaptiveConformalSettings, RollingConformalSettings, SplitConformalSettings,
+    };
+
+    let rolling = |score: &str, origins: &str, positions: &str| {
+        commol_core::json::read::<RollingConformalSettings>(&format!(
+            r#"{{"score": "{score}", "by": "all", "confidence_level": 0.9,
+            "origins": {origins}, "positions": {positions}, "starts": 1}}"#
+        ))
+    };
+    let split = commol_core::json::read::<SplitConformalSettings>(
+        r#"{"score": "spread", "by": "all", "confidence_level": 0.9,
+        "calibration_data": [], "positions": [1.0], "starts": 1}"#,
+    );
+    let adaptive = commol_core::json::read::<AdaptiveConformalSettings>(
+        r#"{"score": "spread", "by": "all", "confidence_level": 0.9, "step": 0.05,
+        "stream": [], "starts": 1}"#,
+    );
+
+    assert_eq!(
+        rolling("absolute", "[]", "[5.0]").unwrap_err(),
+        "origins is empty: give at least one origin"
+    );
+    assert_eq!(
+        rolling("absolute", "[2.0]", "[]").unwrap_err(),
+        "positions is empty: give at least one position"
+    );
+    assert!(
+        rolling("spread", "[2.0]", "[5.0]")
+            .unwrap_err()
+            .starts_with("RollingConformal fits once per origin")
+    );
+    assert_eq!(
+        split.unwrap_err(),
+        "calibration_data is empty: give at least one held-out observation"
+    );
+    assert_eq!(
+        adaptive.unwrap_err(),
+        "stream is empty: give at least one observation that arrives"
+    );
+    let with_spread = commol_core::json::read::<SplitConformalSettings>(
+        r#"{"score": "spread", "by": "all", "confidence_level": 0.9,
+        "calibration_data": [{"at": 1.0, "output": "B", "outputs": null, "label": "B",
+        "value": 2.0, "weight": 1.0, "factor_id": null, "scale": 1.0, "window": null,
+        "trials": null}], "positions": [1.0], "starts": 1}"#,
+    )
+    .unwrap();
+    assert!(with_spread.check_predictor(true).is_ok());
+    assert!(
+        with_spread
+            .check_predictor(false)
+            .unwrap_err()
+            .to_string()
+            .contains("give a sample")
+    );
+}

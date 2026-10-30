@@ -146,7 +146,7 @@ class TestValidation:
             )
 
     def test_a_parameter_is_fitted_once(self) -> None:
-        with pytest.raises(ValidationError, match=r"Duplicate parameter IDs.*'k1'"):
+        with pytest.raises(ValidationError, match=r"Two parameters have the id 'k1'"):
             CalibrationProblem(
                 observed_data=[ObservedDataPoint(at=0, output="B", value=1.0)],
                 parameters=[bounded("k1"), bounded("k1")],
@@ -290,3 +290,12 @@ class TestProblemAgainstTheModel:
                 [bounded("k1")],
                 [ObservedDataPoint(at=0, output="X", label="series1", value=1.0)],
             )
+
+
+def test_a_subclass_keeps_the_rules_of_the_engine() -> None:
+    class Rate(CalibrationParameter):
+        """A parameter of a rate, with the rules of every parameter."""
+
+    assert Rate(id="k", parameter_type="parameter", min_bound=0, max_bound=1).id == "k"
+    with pytest.raises(ValidationError, match=r"max_bound \(0\) must be greater"):
+        Rate(id="k", parameter_type="parameter", min_bound=1, max_bound=0)

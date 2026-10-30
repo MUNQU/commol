@@ -186,10 +186,11 @@ class TestScores:
 
     @pytest.mark.parametrize("variant", [SplitConformal, AdaptiveConformal])
     def test_the_spread_score_needs_a_sample(self, variant: type) -> None:
-        settings = _variant_settings()[variant]
+        calibrator = flow_calibrator(_amounts(range(1, 21), 1), windowed=False)
+        method = variant(**_variant_settings()[variant], score="spread", by="series")
 
         with pytest.raises(ValueError, match="give a sample"):
-            variant(**settings, score="spread", by="series")
+            calibrator.uncertainty(method)
 
     def test_rolling_origins_have_no_spread(self) -> None:
         settings = _variant_settings()[RollingConformal]

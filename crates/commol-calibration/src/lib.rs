@@ -81,10 +81,10 @@ pub mod subproblem;
 pub mod types;
 pub mod values;
 
-pub use calibration_problem::CalibrationProblem;
+pub use calibration_problem::{CalibrationProblem, check_contents};
 pub use discrepancy::{Discrepancy, DiscrepancyConfig, TermError};
 pub use feasibility::{EvaluationError, Feasibility, Violation};
-pub use forward::{ForwardModel, Workspace, replicate_mean, schedule_of};
+pub use forward::{ForwardModel, Workspace, check_unobserved, replicate_mean, schedule_of};
 pub use likelihood::{
     Argument, Center, Likelihood, Noise, ObservationModel, Term, TermDerivatives,
 };
@@ -111,6 +111,6 @@ pub use subproblem::{ConstraintSettings, Subproblem, SubproblemResult, predict};
 pub use types::{
     CalibrationConstraint, CalibrationEvaluation, CalibrationParameter, CalibrationParameterType,
     CalibrationResult, CalibrationResultWithHistory, LossConfig, ObservedDataPoint,
-    ReplicateSummary, Replicates, crps, weighted_crps,
+    ReplicateSummary, Replicates, check_parameters, crps, first_infinite_bound, weighted_crps,
 };
 pub use values::{check_model_values, configured_engine, plan_model_values};

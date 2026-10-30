@@ -23,7 +23,7 @@
 //! [`TIGHTEST`]), and a parameter whose verdict changes there has no verdict:
 //! the accuracy, not the structure, sets it.
 
-use commol_calibration::start_points;
+use commol_calibration::{first_infinite_bound, start_points};
 
 use super::{differentiated_columns, skippable};
 use crate::error::MethodError;
@@ -195,8 +195,8 @@ fn tighter_than(accuracy: Accuracy) -> Option<Accuracy> {
 ///
 /// # Errors
 ///
-/// [`MethodError::Invalid`] when `points` is 0 or every parameter is a noise
-/// parameter;
+/// [`MethodError::Invalid`] when `points` is 0, a bound is not finite, or
+/// every parameter is a noise parameter;
 /// [`MethodError::NoFeasiblePoint`] when every point is infeasible;
 /// [`MethodError::Sensitivity`] when the sensitivities fail for
 /// another reason.
@@ -209,6 +209,17 @@ pub fn structural_rank<S: SensitivitySource>(
         .check(points)
         .map_err(MethodError::Invalid)?;
     let parameters = source.parameters();
+    if let Some((name, (min, max))) = first_infinite_bound(
+        parameters
+            .iter()
+            .map(|p| (p.id.as_str(), (p.min_bound, p.max_bound))),
+    ) {
+        return Err(MethodError::Invalid(format!(
+            "StructuralRank evaluates points of a Latin hypercube over the bounds, so they \
+             must be finite: parameter '{name}' has the bounds [{min}, {max}]. Give it finite \
+             bounds"
+        )));
+    }
     let differentiated = differentiated_columns(parameters, "StructuralRank")?;
     let accuracy = source.accuracy();
     let tighter = source.accuracy_settings().and_then(|settings| {

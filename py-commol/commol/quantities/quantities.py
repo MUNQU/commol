@@ -19,13 +19,15 @@ Every quantity follows the same rules:
 - the ratio of a run whose denominator is 0 is NaN.
 
 The quantities cross to Rust as the JSON of their classes, and Rust reduces
-each run, through the observation operator of the calibration.
+each run, through the observation operator of the calibration. Rust holds
+every rule of a quantity, checked when it is built, and names each scalar:
+a quantity with no label is named after what it reads.
 `quantity_schedule` gives the positions a run must report at, so the
 results of ``Simulation.run_at(quantity_schedule(quantities))`` give the
 quantities of that run (`SimulationResults.quantities`).
 """
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections.abc import Sequence
 from typing import Annotated, Literal, Self
 
@@ -43,11 +45,6 @@ from commol._data.ranges import RangeChecked
 from commol.commol_rs import _commol_rs as commol_rs
 
 
-def _position_text(at: float) -> str:
-    """`at` as the shortest text that reads back as it: `repr`, with no `.0`."""
-    return repr(at).removesuffix(".0")
-
-
 def _output_list(value: JsonValue) -> JsonValue:
     """One output as a list of one."""
     return [value] if isinstance(value, str) else value
@@ -58,18 +55,13 @@ class _Outputs(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    outputs: list[str] = Field(min_length=1, description="The outputs summed.")
+    outputs: list[str] = Field(description="The outputs summed.")
 
     @field_validator("outputs", mode="before")
     @classmethod
     def _one_output(cls, value: JsonValue) -> JsonValue:
         """One name is a list of one."""
         return _output_list(value)
-
-    @property
-    def output_name(self) -> str:
-        """The outputs as a label reads them."""
-        return " + ".join(self.outputs)
 
 
 class Level(_Outputs):
@@ -90,14 +82,6 @@ class Level(_Outputs):
         self, outputs: str | list[str], *, kind: Literal["level"] = "level"
     ) -> None:
         BaseModel.__init__(self, outputs=outputs, kind=kind)
-
-    @property
-    def text(self) -> str:
-        """The series as a label reads it: the outputs."""
-        return self.output_name
-
-    def check_ends(self, positions: Sequence[float]) -> None:
-        """A level reads any position."""
 
 
 class Increments(_Outputs, RangeChecked):
@@ -131,24 +115,6 @@ class Increments(_Outputs, RangeChecked):
     ) -> None:
         BaseModel.__init__(self, outputs=outputs, window=window, kind=kind)
 
-    @property
-    def text(self) -> str:
-        """The series as a label reads it: the gain over windows of a width."""
-        return f"{self.output_name} gain over windows of {_position_text(self.window)}"
-
-    def check_ends(self, positions: Sequence[float]) -> None:
-        """
-        No window starts before 0, with the rule of the engine
-        (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
-
-        Raises
-        ------
-        ValueError
-            With the message of the engine, if a window starts before 0.
-        """
-        for at in positions:
-            commol_rs.calibration.check_window_end(at, self.window)
-
 
 type _Series = Annotated[Level | Increments, Field(discriminator="kind")]
 """What a quantity reads at each position: a `Level` or `Increments`."""
@@ -176,17 +142,50 @@ class QuantityBase(BaseModel, ABC):
 
     label: str | None = Field(default=None, description="The name of the quantity.")
 
-    @abstractmethod
+    @model_validator(mode="after")
+    def _check_with_engine(self) -> Self:
+        """
+        Check the quantity with the rules of the engine: its positions, its
+        windows and, for a `Ratio`, its operands.
+
+        Returns
+        -------
+        Self
+            The quantity.
+
+        Raises
+        ------
+        ValueError
+            With the message of the engine, if the quantity breaks a rule.
+        """
+        self.labels()
+        return self
+
     def labels(self) -> list[str]:
-        """The label of each scalar this quantity gives."""
+        """
+        The label of each scalar this quantity gives, as the engine names
+        it: `label`, or a name that says what the quantity reads; a
+        `Trajectory` gives its name and each position.
+
+        Returns
+        -------
+        list[str]
+            The labels.
+        """
+        return commol_rs.inference.quantity_labels(engine_json([self]))
 
     def axes(self) -> list[tuple[str, float | None]]:
         """
         The series and the position of each scalar this quantity gives: its
         label and no position, or for a `Trajectory` its name and each
         position.
+
+        Returns
+        -------
+        list[tuple[str, float | None]]
+            The series and the position of each scalar.
         """
-        return [(label, None) for label in self.labels()]
+        return commol_rs.inference.quantity_axes(engine_json([self]))
 
 
 class _OfSeries(QuantityBase):
@@ -201,19 +200,7 @@ class _OfSeries(QuantityBase):
         return _series(value)
 
 
-class _OneScalar(QuantityBase):
-    """A quantity that gives one scalar per run."""
-
-    @abstractmethod
-    def default_label(self) -> str:
-        """The label when none is given."""
-
-    def labels(self) -> list[str]:
-        """The label of the scalar."""
-        return [self.label or self.default_label()]
-
-
-class ValueAt(_OfSeries, _OneScalar, RangeChecked):
+class ValueAt(_OfSeries, RangeChecked):
     """
     The value of a series at a position: the level of the outputs, or their
     gain over the window that ends there.
@@ -232,18 +219,8 @@ class ValueAt(_OfSeries, _OneScalar, RangeChecked):
     kind: Literal["value_at"] = "value_at"
     at: float = Field(description="The position.")
 
-    @model_validator(mode="after")
-    def _window_after_zero(self) -> Self:
-        """The window of increments ends at least its width after 0."""
-        self.series.check_ends([self.at])
-        return self
 
-    def default_label(self) -> str:
-        """The series at `at`."""
-        return f"{self.series.text} at {_position_text(self.at)}"
-
-
-class Gain(_Outputs, _OneScalar, RangeChecked):
+class Gain(_Outputs, QuantityBase, RangeChecked):
     """
     The value at `end` minus the value at `start`: what entered a cumulative
     output over ``(start, end]``, as an observation with the window
@@ -266,45 +243,14 @@ class Gain(_Outputs, _OneScalar, RangeChecked):
     start: float = Field(description="The start of the window.")
     end: float = Field(description="The end of the window.")
 
-    @model_validator(mode="after")
-    def _end_after_start(self) -> Self:
-        """A window ends after it starts."""
-        if self.end <= self.start:
-            raise ValueError(
-                f"A gain ends after it starts, got start {self.start} and end "
-                f"{self.end}"
-            )
-        return self
-
-    def default_label(self) -> str:
-        """The gain of `outputs` over the window."""
-        start, end = _position_text(self.start), _position_text(self.end)
-        return f"{self.output_name} gain over ({start}, {end}]"
-
 
 class _AtPositions(_OfSeries):
     """A quantity that reads a series at several positions."""
 
-    positions: list[float] = Field(
-        min_length=1, description="The positions, ascending."
-    )
-
-    @field_validator("positions")
-    @classmethod
-    def _ascending(cls, value: list[float]) -> list[float]:
-        """The positions ascend, each once."""
-        if any(later <= earlier for earlier, later in zip(value, value[1:])):
-            raise ValueError("positions must ascend, each once")
-        return value
-
-    @model_validator(mode="after")
-    def _windows_after_zero(self) -> Self:
-        """The window of increments ends at least its width after 0."""
-        self.series.check_ends(self.positions)
-        return self
+    positions: list[float] = Field(description="The positions, ascending.")
 
 
-class Peak(_AtPositions, _OneScalar, RangeChecked):
+class Peak(_AtPositions, RangeChecked):
     """
     The largest value of a series at the positions.
 
@@ -326,12 +272,8 @@ class Peak(_AtPositions, _OneScalar, RangeChecked):
 
     kind: Literal["peak"] = "peak"
 
-    def default_label(self) -> str:
-        """The peak of the series."""
-        return f"peak of {self.series.text}"
 
-
-class PeakPosition(_AtPositions, _OneScalar, RangeChecked):
+class PeakPosition(_AtPositions, RangeChecked):
     """
     The first of the positions where the value of a series is largest; NaN
     when the value at a position is NaN.
@@ -348,10 +290,6 @@ class PeakPosition(_AtPositions, _OneScalar, RangeChecked):
     """
 
     kind: Literal["peak_position"] = "peak_position"
-
-    def default_label(self) -> str:
-        """The position of the peak of the series."""
-        return f"position of the peak of {self.series.text}"
 
 
 class Trajectory(_AtPositions, RangeChecked):
@@ -372,18 +310,6 @@ class Trajectory(_AtPositions, RangeChecked):
 
     kind: Literal["trajectory"] = "trajectory"
 
-    def _name(self) -> str:
-        """The name of the series."""
-        return self.label or self.series.text
-
-    def labels(self) -> list[str]:
-        """The name and each position."""
-        return [f"{self._name()} at {_position_text(at)}" for at in self.positions]
-
-    def axes(self) -> list[tuple[str, float | None]]:
-        """Its name and each position."""
-        return [(self._name(), at) for at in self.positions]
-
 
 type _Operand = Annotated[
     ValueAt | Gain | Peak | PeakPosition | Trajectory, Field(discriminator="kind")
@@ -391,7 +317,7 @@ type _Operand = Annotated[
 """A quantity that is not a ratio; a `Ratio` takes the ones of one value."""
 
 
-class Ratio(_OneScalar):
+class Ratio(QuantityBase):
     """
     The ratio of two quantities of one value each, numerator N over
     denominator D.
@@ -429,23 +355,6 @@ class Ratio(_OneScalar):
         description="How the replicates of a stochastic run combine."
     )
 
-    @field_validator("numerator", "denominator")
-    @classmethod
-    def _one_value(cls, value: QuantityBase) -> QuantityBase:
-        """An operand gives one value per run."""
-        if isinstance(value, PeakPosition | Trajectory):
-            raise ValueError(
-                f"A Ratio divides quantities of one value each (ValueAt, Gain, "
-                f"Peak), got the {type(value).__name__} '{value.labels()[0]}'"
-            )
-        return value
-
-    def default_label(self) -> str:
-        """The numerator over the denominator."""
-        numerator = self.numerator.labels()[0]
-        denominator = self.denominator.labels()[0]
-        return f"({numerator}) / ({denominator})"
-
 
 type _Quantity = Annotated[
     ValueAt | Gain | Peak | PeakPosition | Trajectory | Ratio,
@@ -471,17 +380,10 @@ def quantity_labels(quantities: Sequence[QuantityBase]) -> list[str]:
     Raises
     ------
     ValueError
-        If there is no quantity, or two scalars have one label.
+        If there is no quantity, or two scalars have one label; the message
+        is that of the engine, which names the label.
     """
-    if not quantities:
-        raise ValueError("Give at least one quantity of interest.")
-    labels = [label for quantity in quantities for label in quantity.labels()]
-    repeated = sorted({label for label in labels if labels.count(label) > 1})
-    if repeated:
-        raise ValueError(
-            f"Two quantities have the labels {repeated}: give each a label of its own."
-        )
-    return labels
+    return commol_rs.inference.quantity_labels(engine_json(list(quantities)))
 
 
 def quantity_schedule(quantities: Sequence[QuantityBase]) -> list[float]:
@@ -509,6 +411,4 @@ def quantity_schedule(quantities: Sequence[QuantityBase]) -> list[float]:
     ValueError
         If there is no quantity.
     """
-    if not quantities:
-        raise ValueError("Give at least one quantity of interest.")
     return commol_rs.inference.quantity_schedule(engine_json(list(quantities)))

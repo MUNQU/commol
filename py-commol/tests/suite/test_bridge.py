@@ -20,6 +20,8 @@ def test_every_data_class_crosses_as_json(name: str) -> None:
 
     assert type(value).__name__ == name
     assert json.loads(read) == json.loads(sent)
+    # The check of a data object reads the same JSON with the same reader.
+    commol_rs.json.check(name, sent)
 
 
 def test_every_method_crosses_as_json() -> None:
@@ -41,6 +43,8 @@ def test_every_method_crosses_as_json() -> None:
 def test_the_engine_reads_no_class_it_does_not_know() -> None:
     with pytest.raises(ValueError, match="The engine reads no object 'Unknown'"):
         commol_rs.json.as_read("Unknown", "{}")
+    with pytest.raises(ValueError, match="The engine reads no object 'Unknown'"):
+        commol_rs.json.check("Unknown", "{}")
 
 
 def test_an_unknown_field_is_named_with_its_path() -> None:

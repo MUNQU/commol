@@ -168,13 +168,20 @@ impl ParameterSample {
             .collect()
     }
 
+    /// The weighted standard deviation of each parameter: the square root
+    /// of its weighted variance ([`Self::covariance`]).
+    pub fn standard_deviations(&self) -> Vec<f64> {
+        let covariance = self.covariance();
+        (0..covariance.len())
+            .map(|i| covariance[i][i].sqrt())
+            .collect()
+    }
+
     /// The weighted correlation matrix. An entry of a parameter with no
     /// spread is NaN.
     pub fn correlation(&self) -> Vec<Vec<f64>> {
         let covariance = self.covariance();
-        let sd: Vec<f64> = (0..covariance.len())
-            .map(|i| covariance[i][i].sqrt())
-            .collect();
+        let sd = self.standard_deviations();
         covariance
             .iter()
             .enumerate()
@@ -223,6 +230,28 @@ impl ParameterSample {
         ])
     }
 
+    /// Check that a scenario, `name`, which sets the parameters `overrides`
+    /// of the model each draw runs on, sets none that the sample holds:
+    /// each draw sets those, over the value of the scenario.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the scenario and the parameters of the
+    /// sample it sets.
+    pub fn check_scenario(&self, name: &str, overrides: &[String]) -> Result<(), String> {
+        let held: Vec<&String> = overrides
+            .iter()
+            .filter(|parameter| self.names.contains(parameter))
+            .collect();
+        if held.is_empty() {
+            return Ok(());
+        }
+        Err(format!(
+            "Scenario '{name}' sets {held:?}, which the sample holds: each draw sets them. A \
+             scenario overrides only parameters the sample does not hold."
+        ))
+    }
+
     /// Kish's effective sample size of the weights.
     pub fn effective_size(&self) -> f64 {
         statistics::effective_size(&self.weights)
@@ -253,6 +282,29 @@ impl ParameterSample {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_sample_gives_its_standard_deviations_and_refuses_a_scenario_of_its_parameters() {
+        let sample = ParameterSample::new(
+            vec!["a".to_string(), "b".to_string()],
+            vec![(0.0, 10.0), (0.0, 10.0)],
+            vec![vec![1.0, 5.0], vec![3.0, 5.0]],
+            &[0.0, 0.0],
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(sample.standard_deviations(), [2f64.sqrt(), 0.0]);
+        assert_eq!(sample.check_scenario("s", &["c".to_string()]), Ok(()));
+        assert_eq!(
+            sample.check_scenario("s", &["c".to_string(), "b".to_string()]),
+            Err(
+                "Scenario 's' sets [\"b\"], which the sample holds: each draw sets them. A \
+                 scenario overrides only parameters the sample does not hold."
+                    .to_string()
+            )
+        );
+    }
 
     #[test]
     fn a_sample_has_a_bound_per_name_a_draw_and_a_group_per_draw() {

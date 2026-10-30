@@ -192,3 +192,28 @@ fn a_constraint_does_not_read_a_matrix_whose_scale_has_no_value() {
          of a matrix or a simulation output)"
     );
 }
+
+#[test]
+fn an_empty_at_is_refused() {
+    let empty =
+        CalibrationConstraint::new("cap".to_string(), "100 - B".to_string()).with_positions(vec![]);
+    let expected = "Constraint 'cap' has an empty 'at': give the positions to evaluate it at, or \
+                    leave 'at' out for a constraint on the parameters only";
+
+    let built = CalibrationProblem::new(
+        engine(Some(1.0)),
+        vec![ObservedDataPoint::new(1.0, "B".to_string(), 150.0)],
+        parameters(),
+        vec![empty],
+        LossConfig::SumSquaredError,
+    )
+    .err()
+    .unwrap();
+    let read = commol_core::json::read::<CalibrationConstraint>(
+        r#"{"id": "cap", "expression": "100 - B", "description": null, "weight": 1.0, "at": []}"#,
+    )
+    .unwrap_err();
+
+    assert_eq!(built, expected);
+    assert_eq!(read, expected);
+}

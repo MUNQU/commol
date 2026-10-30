@@ -743,6 +743,19 @@ impl PyParameterSample {
         self.inner.correlation()
     }
 
+    /// The weighted standard deviation of each parameter
+    fn standard_deviations(&self) -> Vec<f64> {
+        self.inner.standard_deviations()
+    }
+
+    /// Check that the scenario `name`, which sets `parameters`, sets none
+    /// that the sample holds
+    fn check_scenario(&self, name: &str, parameters: Vec<String>) -> PyResult<()> {
+        self.inner
+            .check_scenario(name, &parameters)
+            .map_err(value_error)
+    }
+
     /// The weighted quantiles: one row per level, one column per parameter
     fn quantiles(&self, levels: Vec<f64>) -> PyResult<Vec<Vec<f64>>> {
         self.inner.quantiles(&levels).map_err(value_error)
@@ -923,6 +936,16 @@ fn weighted_quantiles(values: Vec<f64>, weights: Vec<f64>, levels: Vec<f64>) -> 
         .map_err(|error| value_error(error.to_string()))
 }
 
+/// Weights that sum to 1, each weight divided by their sum
+///
+/// Raises:
+///     ValueError: If a weight is negative or not finite, or none is
+///         positive
+#[pyfunction]
+fn normalized_weights(weights: Vec<f64>) -> PyResult<Vec<f64>> {
+    statistics::normalize(&weights).map_err(value_error)
+}
+
 /// The two quantiles of the central interval of `confidence_level`
 ///
 /// The one check of a confidence level.
@@ -1041,6 +1064,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(quantile_error, m)?)?;
     m.add_function(wrap_pyfunction!(weighted_quantiles, m)?)?;
     m.add_function(wrap_pyfunction!(interval_levels, m)?)?;
+    m.add_function(wrap_pyfunction!(normalized_weights, m)?)?;
     m.add_function(wrap_pyfunction!(check_levels, m)?)?;
     m.add_function(wrap_pyfunction!(by_series, m)?)?;
     m.add_class::<PyWeightedSummary>()?;

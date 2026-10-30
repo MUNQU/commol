@@ -132,9 +132,14 @@ impl ObservedDataPoint {
     }
 }
 
-/// Parameter to be calibrated with its bounds, as the Python API writes it
+/// Parameter to be calibrated with its bounds, as the Python API writes it.
+///
+/// A reader checks it ([`Self::check`]): its bounds are numbers in
+/// increasing order, and its initial guess is a finite number inside them.
+/// A bound may be infinite, for a prior on a half-line; an optimizer that
+/// needs finite bounds refuses it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(remote = "Self", deny_unknown_fields)]
 pub struct CalibrationParameter {
     /// Parameter identifier (parameter ID for parameters, bin ID for initial conditions)
     pub id: String,
@@ -218,6 +223,81 @@ impl CalibrationParameter {
         self.initial_guess
             .unwrap_or_else(|| (self.min_bound + self.max_bound) / 2.0)
     }
+
+    /// The width of the bounds as a scale: the width, or 1 when a bound is
+    /// infinite, for a prior on a half-line. A step of finite differences
+    /// and the magnitude of a parameter at 0 read it.
+    pub fn width_scale(&self) -> f64 {
+        let width = self.max_bound - self.min_bound;
+        if width.is_finite() { width } else { 1.0 }
+    }
+
+    /// Check that the bounds are numbers, `min_bound` below `max_bound`, and
+    /// that the initial guess, if any, is a finite number inside them.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the parameter and the rule it breaks.
+    pub fn check(&self) -> Result<(), String> {
+        let (id, min, max) = (&self.id, self.min_bound, self.max_bound);
+        if min.is_nan() || max.is_nan() {
+            return Err(format!(
+                "The bounds of parameter '{id}' must be numbers, got min_bound {min} and \
+                 max_bound {max}"
+            ));
+        }
+        if max <= min {
+            return Err(format!(
+                "max_bound ({max}) must be greater than min_bound ({min}) for parameter \
+                 '{id}'"
+            ));
+        }
+        match self.initial_guess {
+            Some(guess) if !(guess.is_finite() && min <= guess && guess <= max) => Err(format!(
+                "initial_guess ({guess}) must be a finite number between min_bound \
+                     ({min}) and max_bound ({max}) for parameter '{id}'"
+            )),
+            _ => Ok(()),
+        }
+    }
+}
+
+/// The first name of `bounds`, pairs of a name and its bounds, with a bound
+/// that is not finite, and its bounds: the one search of every caller that
+/// needs a finite box.
+pub fn first_infinite_bound<'a>(
+    bounds: impl IntoIterator<Item = (&'a str, (f64, f64))>,
+) -> Option<(&'a str, (f64, f64))> {
+    bounds
+        .into_iter()
+        .find(|(_, (min, max))| !(min.is_finite() && max.is_finite()))
+}
+
+commol_core::checked!(
+    CalibrationParameter,
+    "CalibrationParameter",
+    [],
+    check = CalibrationParameter::check
+);
+
+/// Check each parameter ([`CalibrationParameter::check`]) and that no two
+/// share an id.
+///
+/// # Errors
+///
+/// Returns the message of the first parameter that breaks its rules, or a
+/// message that names the id two parameters share.
+pub fn check_parameters(parameters: &[CalibrationParameter]) -> Result<(), String> {
+    for (index, parameter) in parameters.iter().enumerate() {
+        parameter.check()?;
+        if parameters[..index].iter().any(|p| p.id == parameter.id) {
+            return Err(format!(
+                "Two parameters have the id '{}': give each parameter an id of its own",
+                parameter.id
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Configuration for loss function calculation.
@@ -619,7 +699,8 @@ commol_core::checked!(
     [
         commol_core::Rule::Real(crate::ranges::WEIGHT),
         commol_core::Rule::Real(crate::ranges::AT)
-    ]
+    ],
+    check = CalibrationConstraint::check
 );
 
 impl CalibrationConstraint {
@@ -644,6 +725,23 @@ impl CalibrationConstraint {
     pub fn with_positions(mut self, at: Vec<f64>) -> Self {
         self.at = Some(at);
         self
+    }
+
+    /// Check that `at`, when given, holds a position: a constraint with no
+    /// position would never be evaluated.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the constraint.
+    pub fn check(&self) -> Result<(), String> {
+        match &self.at {
+            Some(at) if at.is_empty() => Err(format!(
+                "Constraint '{}' has an empty 'at': give the positions to evaluate it at, or \
+                 leave 'at' out for a constraint on the parameters only",
+                self.id
+            )),
+            _ => Ok(()),
+        }
     }
 
     /// Check the weight and each position of the constraint with their rules

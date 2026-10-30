@@ -106,8 +106,10 @@ of 0 works. Nelder-Mead moves in an unbounded coordinate `u`, and the value it
 scores is `lo + (hi − lo)·(sin u + 1)/2` (the transform of MINUIT and lmfit), so every
 value it tries is inside the bounds (`SineTransform` of the argmin fork). An
 optimum exactly at a bound is reached only asymptotically, so it can take more
-iterations. Nelder-Mead needs finite bounds: a run with an infinite bound fails
-with the message `Nelder-Mead needs finite bounds`.
+iterations. Every optimizer needs finite bounds: Nelder-Mead searches through
+their transform, and a particle swarm draws its particles inside them. A run
+with an infinite bound fails with a message that names the parameter,
+`An optimizer searches inside the bounds, so they must be finite`.
 
 ## `converged` and `termination_reason`
 

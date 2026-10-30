@@ -7,6 +7,7 @@ squares and ``η = 1/(2σ²)`` the Gibbs posterior is the normal posterior of a
 mean, ``N(ȳ, σ²/n)``.
 """
 
+import json
 import math
 
 import numpy as np
@@ -34,6 +35,7 @@ from commol.smc import (
     LossDistance,
     SeriesDistance,
 )
+from commol.commol_rs import _commol_rs as commol_rs
 from commol.smc.results import SMCResult
 from tests.support import (
     TWO_WELLS_FIT,
@@ -527,3 +529,23 @@ def test_an_eta_calibration_is_built_from_its_class(
 
     assert type(method.eta) is type(eta)
     assert method.eta == eta
+
+
+def test_the_priors_are_required() -> None:
+    method = {"distance": {"kind": "loss"}, "draws": 10, "quantile": 0.1}
+    hint = "priors is required: give a prior per calibrated parameter, or "
+
+    with pytest.raises(ValueError, match=rf"{hint}Priors\.uniform_on_bounds\(\)"):
+        commol_rs.json.check("ABCRejection", json.dumps(method))
+    for given in [method, method | {"priors": None}]:
+        with pytest.raises(ValueError, match=rf"error, {hint}Priors\.uniform"):
+            ABCRejection.model_validate(given)
+
+    class Rejection(ABCRejection):
+        """A subclass, with the rules of its base."""
+
+    with pytest.raises(ValueError, match=rf"error, {hint}Priors\.uniform"):
+        Rejection.model_validate(method)
+    # A null in JSON names the field once, before the fix.
+    with pytest.raises(ValueError, match=r"^priors: null is not a prior: give a prior"):
+        commol_rs.json.check("ABCRejection", json.dumps(method | {"priors": None}))

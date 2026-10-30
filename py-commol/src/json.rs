@@ -5,7 +5,8 @@
 //!
 //! [`as_read`] reads an object by the name of its Python class and writes
 //! back what it read: a test checks with it that each data class and its
-//! Rust type agree, and a model checks with it a rule that joins its fields.
+//! Rust type agree. [`check`] only reads it: a data object checks with it,
+//! when it is built, every rule that joins its fields.
 
 use commol_calibration::{FitRecord, Observation, OptimizerSettings, ProblemSettings};
 use commol_inference::settings::{
@@ -30,6 +31,13 @@ fn read_back<T: DeserializeOwned + serde::Serialize>(text: &str) -> PyResult<Str
     read::<T>(text).map(|value| commol_core::json::write(&value))
 }
 
+/// The error of a class whose JSON the engine does not read.
+fn unknown(object: &str) -> PyErr {
+    PyValueError::new_err(format!(
+        "The engine reads no object '{object}'; it reads {OBJECTS:?}"
+    ))
+}
+
 /// The Python class of each object the engine reads, and its reader.
 macro_rules! objects {
     ($($name:literal => $type:ty),* $(,)?) => {
@@ -40,9 +48,15 @@ macro_rules! objects {
         fn read_object(object: &str, text: &str) -> PyResult<String> {
             match object {
                 $($name => read_back::<$type>(text),)*
-                _ => Err(PyValueError::new_err(format!(
-                    "The engine reads no object '{object}'; it reads {OBJECTS:?}"
-                ))),
+                _ => Err(unknown(object)),
+            }
+        }
+
+        /// Read `text` as the object of the class `object`.
+        fn check_object(object: &str, text: &str) -> PyResult<()> {
+            match object {
+                $($name => read::<$type>(text).map(drop),)*
+                _ => Err(unknown(object)),
             }
         }
     };
@@ -133,6 +147,21 @@ fn as_read(object: &str, text: &str) -> PyResult<String> {
     read_object(object, text)
 }
 
+/// Check `text` as the engine reads an object of the Python class `object`:
+/// every rule of the object, with no copy written back
+///
+/// Args:
+///     object: The name of the Python class, such as "CalibrationProblem"
+///     text: The JSON of its `model_dump()`
+///
+/// Raises:
+///     ValueError: If the engine reads no such class, or rejects the JSON;
+///         the message names the path of the field
+#[pyfunction]
+fn check(object: &str, text: &str) -> PyResult<()> {
+    check_object(object, text)
+}
+
 /// The names of the Python classes whose JSON the engine reads
 #[pyfunction]
 fn objects() -> Vec<&'static str> {
@@ -142,6 +171,7 @@ fn objects() -> Vec<&'static str> {
 /// Register the functions of the port.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(as_read, m)?)?;
+    m.add_function(wrap_pyfunction!(check, m)?)?;
     m.add_function(wrap_pyfunction!(objects, m)?)?;
     Ok(())
 }

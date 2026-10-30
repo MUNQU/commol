@@ -23,8 +23,8 @@ use commol_core::json::Pairs;
 use commol_core::{Rule, SimulationEngine, checked, tagged};
 use serde::{Deserialize, Serialize};
 
-use crate::calibration_problem::CalibrationProblem;
-use crate::discrepancy::DiscrepancyConfig;
+use crate::calibration_problem::{CalibrationProblem, check_contents};
+use crate::discrepancy::{DiscrepancyConfig, check_normalization};
 use crate::likelihood::ObservationModel;
 use crate::optimization::{
     AccelerationStrategy, ImprovementStop, InertiaWeightStrategy, InitializationStrategy,
@@ -101,7 +101,13 @@ impl Observation {
             _ => return Err("Give exactly one of 'output' and 'outputs'.".to_string()),
         }
         if self.label.is_empty() {
-            return Err("An observation needs a 'label' that names its series.".to_string());
+            return Err(match self.outputs {
+                Some(_) => {
+                    "An observation of several outputs needs a 'label' that names their sum."
+                }
+                None => "An observation needs a 'label' that names its series.",
+            }
+            .to_string());
         }
         self.window.map_or(Ok(()), |window| {
             crate::observation::check_window_end(self.at, window).map(|_| ())
@@ -625,29 +631,67 @@ pub struct ProblemSettings {
 checked!(
     ProblemSettings,
     "CalibrationProblem",
-    [Rule::Count(REPLICATES), Rule::Count(commol_core::SEED)]
+    [Rule::Count(REPLICATES), Rule::Count(commol_core::SEED)],
+    check = ProblemSettings::check
 );
 
 impl ProblemSettings {
+    /// What measures the fit: the loss, or the observation models.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the fix when the problem has both or
+    /// neither.
+    fn discrepancy(&self) -> Result<DiscrepancyConfig, String> {
+        match (&self.loss_function, &self.observation_models) {
+            (Some(loss), None) => Ok(DiscrepancyConfig::Loss(*loss)),
+            (None, Some(models)) => Ok(DiscrepancyConfig::Likelihood(models.0.clone())),
+            (Some(_), Some(_)) => Err(
+                "A problem has a loss_function or observation_models, not both: the fit and the \
+                 posterior would answer different questions"
+                    .to_string(),
+            ),
+            (None, None) => Err(
+                "A problem needs a loss_function (sse, rmse or mae) or observation_models. There \
+                 is no default: what to fit is a modelling choice"
+                    .to_string(),
+            ),
+        }
+    }
+
+    /// Check the rules of the problem that need no engine: a loss or
+    /// observation models, exactly one; a normalization only with a loss;
+    /// and what the problem holds ([`check_contents`]). A bound may be
+    /// infinite: the problem serves a sampler that never fits, and an
+    /// optimizer refuses it when it runs.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the rule, the parameter or the
+    /// constraint that breaks it, and the fix.
+    pub fn check(&self) -> Result<(), String> {
+        self.discrepancy()?;
+        check_normalization(
+            self.normalize_observations,
+            self.observation_models.is_some(),
+        )?;
+        check_contents(
+            self.observed_data.len(),
+            &self.parameters,
+            &self.constraints,
+        )
+    }
+
     /// The calibration problem of these settings on `engine`. The settings
     /// of the replicates go with a loss.
     ///
     /// # Errors
     ///
-    /// Returns a message when the problem has both or neither of a loss and
-    /// observation models, or the problem does not fit the engine.
+    /// Returns the message of [`Self::check`], or a message when the problem
+    /// does not fit the engine.
     pub fn problem<E: SimulationEngine>(&self, engine: E) -> Result<CalibrationProblem<E>, String> {
-        let discrepancy = match (&self.loss_function, &self.observation_models) {
-            (Some(loss), None) => DiscrepancyConfig::Loss(*loss),
-            (None, Some(models)) => DiscrepancyConfig::Likelihood(models.0.clone()),
-            _ => {
-                return Err(
-                    "A calibration problem has a loss or observation models: exactly one of \
-                     them"
-                        .to_string(),
-                );
-            }
-        };
+        self.check()?;
+        let discrepancy = self.discrepancy()?;
         let mut problem = CalibrationProblem::new(
             engine,
             observed_data(&self.observed_data),

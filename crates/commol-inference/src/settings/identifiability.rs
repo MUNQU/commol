@@ -7,6 +7,7 @@ use commol_core::{Rule, checked};
 use serde::{Deserialize, Serialize};
 
 use super::PriorsSettings;
+use crate::priors::Priors;
 use crate::ranges::{
     CORRELATION_THRESHOLD, LOSS_TOLERANCE, MAX_SUBSET_SIZE, PARAMETER_TOLERANCE, POINTS, THRESHOLD,
 };
@@ -80,8 +81,50 @@ pub struct SampleIdentifiabilitySettings {
 checked!(
     SampleIdentifiabilitySettings,
     "SampleIdentifiability",
-    [Rule::Real(CORRELATION_THRESHOLD)]
+    [Rule::Real(CORRELATION_THRESHOLD)],
+    check = SampleIdentifiabilitySettings::check
 );
+
+impl SampleIdentifiabilitySettings {
+    /// Check that the priors go with `reference="prior"`, and only with it.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the fix.
+    pub fn check(&self) -> Result<(), String> {
+        match (self.reference, &self.priors) {
+            (Reference::Prior, None) => Err(
+                "reference='prior' needs priors: the prior of each parameter, which the \
+                 contraction is measured against"
+                    .to_string(),
+            ),
+            (Reference::Bounds, Some(_)) => Err(
+                "priors are read only with reference='prior'; with reference='bounds' leave \
+                 them out"
+                    .to_string(),
+            ),
+            _ => Ok(()),
+        }
+    }
+
+    /// The priors the contraction is measured against, for the parameters
+    /// `names` with `bounds`: None for `reference="bounds"`.
+    ///
+    /// # Errors
+    ///
+    /// The message of [`Self::check`], or of [`PriorsSettings::priors`].
+    pub fn reference_priors(
+        &self,
+        names: &[String],
+        bounds: &[(f64, f64)],
+    ) -> Result<Option<Priors>, String> {
+        self.check()?;
+        self.priors
+            .as_ref()
+            .map(|priors| priors.priors(names, bounds))
+            .transpose()
+    }
+}
 
 /// The identifiability of the starts of a fit, as the Python class
 /// `StartsIdentifiability` writes it.

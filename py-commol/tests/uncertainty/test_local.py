@@ -238,7 +238,9 @@ class TestLaplace:
             observation_models={"B": NormalObservations(sd=1.0)},
         )
 
-        with pytest.raises(ValueError, match=r"parameters \['c', 'sd'\]"):
+        with pytest.raises(
+            ValueError, match=r'parameters \["c", "sd"\]; the problem has \["c"\]'
+        ):
             result.delta_band(calibrator, [1.0], 0.9)
 
     def test_a_band_takes_the_positions_of_the_engine(self) -> None:
@@ -253,7 +255,13 @@ class TestLaplace:
             result.delta_band(calibrator, [0.5], 0.9)
         with pytest.raises(ValueError, match="1 rows of 1 values"):
             commol_rs.inference.delta_band(
-                calibrator._engine_problem, [10.0], [[1.0, 0.0]], None, [1.0], 0.9
+                calibrator._engine_problem,
+                ["c"],
+                [("c", 10.0)],
+                [[1.0, 0.0]],
+                None,
+                [1.0],
+                0.9,
             )
 
     def test_laplace_refuses_a_loss(self) -> None:
@@ -278,7 +286,8 @@ def test_a_delta_band_comes_from_the_local_module() -> None:
 
     outputs, center, lower, upper = commol_rs.inference.delta_band(
         calibrator._engine_problem,
-        [result.fit.best_parameters["c"]],
+        ["c"],
+        [("c", result.fit.best_parameters["c"])],
         result.covariance,
         result.degrees_of_freedom(),
         [1.0, 2.0],

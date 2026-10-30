@@ -1,22 +1,29 @@
 //! The settings of a sensitivity analysis: its inputs and its methods. The
 //! sample of inputs from a sample crosses as a handle, so
-//! [`InputSpaceSettings`] has no field for it.
+//! [`InputSpaceSettings`] has no field for it: [`InputSpaceSettings::inputs`]
+//! takes it.
 
-use commol_calibration::CalibrationParameter;
+use commol_calibration::{CalibrationParameter, check_unobserved};
 use commol_core::json::Pairs;
 use commol_core::{CONFIDENCE_LEVEL, Rule, checked};
 use serde::{Deserialize, Serialize};
 
+use crate::design::InputSpace;
 use crate::distribution::Family;
+use crate::priors::Priors;
 use crate::quantity::Quantity;
 use crate::ranges::{
     DEGREE, DRAWS, LEVELS, MAX_INTERACTION, Q_NORM, TRAJECTORIES, TWO_DRAWS, TWO_REPLICATES,
 };
+use crate::sample::ParameterSample;
 
 /// What a sensitivity analysis varies, as the Python class `InputSpace`
-/// writes it.
+/// writes it, without its sample.
+///
+/// A reader checks the inputs ([`check_unobserved`]) and, for independent
+/// inputs, that each has a distribution that fits its bounds.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(remote = "Self", deny_unknown_fields)]
 pub struct InputSpaceSettings {
     /// The inputs, in order.
     pub parameters: Vec<CalibrationParameter>,
@@ -26,7 +33,57 @@ pub struct InputSpaceSettings {
     pub initial_condition_remainder: Option<String>,
 }
 
+checked!(
+    InputSpaceSettings,
+    "InputSpace",
+    [],
+    check = InputSpaceSettings::check
+);
+
 impl InputSpaceSettings {
+    /// Check the inputs, and the distributions when there are some.
+    ///
+    /// # Errors
+    ///
+    /// The message of [`check_unobserved`] or of [`Priors::of_inputs`].
+    pub fn check(&self) -> Result<(), String> {
+        check_unobserved(&self.parameters)?;
+        self.independent().map(|_| ())
+    }
+
+    /// The distributions of independent inputs, or None without them.
+    fn independent(&self) -> Result<Option<Priors>, String> {
+        self.distributions
+            .as_ref()
+            .map(|Pairs(families)| Priors::of_inputs(&self.names(), &self.bounds(), families))
+            .transpose()
+    }
+
+    /// The inputs: the distributions of the settings, or the draws of
+    /// `sample`, exactly one of them.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the fix when the settings have both or
+    /// neither, or the message of [`Self::check`].
+    pub fn inputs(&self, sample: Option<ParameterSample>) -> Result<InputSpace, String> {
+        match (self.independent()?, sample) {
+            (Some(priors), None) => Ok(InputSpace::Independent(priors)),
+            (None, Some(sample)) => Ok(InputSpace::Sample(sample)),
+            (Some(_), Some(_)) => Err(
+                "Give the inputs distributions or a sample, not both: InputSpace.independent \
+                 or InputSpace.from_sample"
+                    .to_string(),
+            ),
+            (None, None) => Err(
+                "Give the inputs distributions or a sample: InputSpace.independent, \
+                 InputSpace.uniform_on_bounds or InputSpace.from_sample. There is no default: \
+                 how the inputs vary is a modelling choice"
+                    .to_string(),
+            ),
+        }
+    }
+
     /// The name of each input, in order.
     pub fn names(&self) -> Vec<String> {
         self.parameters.iter().map(|p| p.id.clone()).collect()

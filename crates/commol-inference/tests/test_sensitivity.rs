@@ -458,20 +458,6 @@ fn a_zero_series_has_scale_one() {
 }
 
 #[test]
-fn a_parameter_of_no_width_has_a_zero_column() {
-    let problem = problem(
-        difference(&[]),
-        vec![ObservedDataPoint::new(1.0, "A".to_string(), 0.0)],
-        vec![CalibrationParameter::new("k".to_string(), 0.2, 0.2)],
-    );
-    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
-
-    let sensitivities = source.jacobian(&[0.2]).unwrap();
-
-    assert_eq!(sensitivities.jacobian[(0, 0)], 0.0);
-}
-
-#[test]
 fn a_center_that_cannot_be_run_says_why() {
     let observed = vec![ObservedDataPoint::new(1.0, "A".to_string(), 0.0)];
     let jacobian = |model: Model, parameter: CalibrationParameter, at: f64| {
@@ -545,4 +531,32 @@ fn a_difference_whose_run_fails_is_a_failure() {
         matches!(&error, SensitivityError::Failed(message) if message.contains("not a number")),
         "{error:?}"
     );
+}
+
+#[test]
+fn an_infinite_bound_scales_as_a_width_of_one() {
+    let scaled = |max: f64| {
+        let problem = problem(
+            difference(&[]),
+            vec![
+                ObservedDataPoint::new(1.0, "A".to_string(), 800.0),
+                ObservedDataPoint::new(2.0, "A".to_string(), 640.0),
+            ],
+            vec![CalibrationParameter::new("k".to_string(), 0.0, max)],
+        );
+        let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+        // At 0 the magnitude of k is the width of its bounds, and its step
+        // comes from that width.
+        (
+            source.steps(&[0.0]),
+            source.scaled_jacobian(&[0.0], &[0]).unwrap(),
+        )
+    };
+
+    let (unit_steps, unit) = scaled(1.0);
+    let (half_line_steps, half_line) = scaled(f64::INFINITY);
+
+    assert_eq!(half_line_steps, unit_steps);
+    assert_eq!(half_line.jacobian, unit.jacobian);
+    assert!(half_line.jacobian.iter().all(|value| value.is_finite()));
 }

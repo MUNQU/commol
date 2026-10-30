@@ -210,6 +210,7 @@ nav:
               - Time: codebase/decisions/time.md
               - Engines: codebase/decisions/engines.md
               - Calibration: codebase/decisions/calibration.md
+              - Settings: codebase/decisions/settings.md
               - Optimizers: codebase/decisions/optimizers.md
               - Uncertainty: codebase/decisions/uncertainty.md
               - Identifiability: codebase/decisions/identifiability.md

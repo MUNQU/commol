@@ -13,8 +13,8 @@ use commol_inference::identifiability::{
 };
 use commol_inference::sensitivity::{Design, FiniteDifferences};
 use commol_inference::settings::identifiability::{
-    CollinearitySettings, RankDesign, Reference as ReferenceSettings,
-    SampleIdentifiabilitySettings, StartsIdentifiabilitySettings, StructuralRankSettings,
+    CollinearitySettings, RankDesign, SampleIdentifiabilitySettings, StartsIdentifiabilitySettings,
+    StructuralRankSettings,
 };
 use pyo3::prelude::*;
 
@@ -445,14 +445,9 @@ fn sample_identifiability(
 ) -> PyResult<PySampleAnalysis> {
     let settings: SampleIdentifiabilitySettings = crate::json::read(settings)?;
     let sample = problem_sample(problem, sample)?;
-    let priors = match (settings.reference, &settings.priors) {
-        (ReferenceSettings::Prior, Some(priors)) => Some(
-            priors
-                .priors(sample.names(), sample.bounds())
-                .map_err(value_error)?,
-        ),
-        _ => None,
-    };
+    let priors = settings
+        .reference_priors(sample.names(), sample.bounds())
+        .map_err(value_error)?;
     let reference = match &priors {
         Some(priors) => Reference::Prior(priors),
         None => Reference::Bounds,

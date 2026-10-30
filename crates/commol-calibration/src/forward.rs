@@ -10,7 +10,8 @@ use commol_core::{Accuracy, SimulationEngine, SimulationError, ValuePlan};
 use crate::feasibility::{EvaluationError, Violation};
 use crate::observation::ObservationOperator;
 use crate::types::{
-    CalibrationParameter, CalibrationParameterType, ObservedDataPoint, ReplicateSummary, Replicates,
+    CalibrationParameter, CalibrationParameterType, ObservedDataPoint, ReplicateSummary,
+    Replicates, check_parameters,
 };
 use crate::values::ValueWriter;
 
@@ -22,6 +23,36 @@ pub struct Workspace {
     /// Predicted observations, replicate after replicate: the prediction of
     /// observation `i` of replicate `r` is at `r × n_observations + i`.
     pub predictions: Vec<f64>,
+}
+
+/// Check the parameters of a model with no observations: at least one, each
+/// by its rules and with an id of its own ([`check_parameters`]), and none a
+/// factor or a noise parameter, which both belong to observations.
+///
+/// # Errors
+///
+/// Returns a message that names the rule and the parameter that breaks it.
+pub fn check_unobserved(parameters: &[CalibrationParameter]) -> Result<(), String> {
+    if parameters.is_empty() {
+        return Err("Give at least one parameter to vary".to_string());
+    }
+    check_parameters(parameters)?;
+    for parameter in parameters {
+        let what = match parameter.parameter_type {
+            CalibrationParameterType::Factor => "a factor, which multiplies an observation",
+            CalibrationParameterType::Noise => {
+                "a noise parameter, which belongs to an observation model"
+            }
+            CalibrationParameterType::Parameter | CalibrationParameterType::InitialCondition => {
+                continue;
+            }
+        };
+        return Err(format!(
+            "'{}' is {what}; a model with no observations has none",
+            parameter.id
+        ));
+    }
+    Ok(())
 }
 
 /// An engine, the parameters a problem writes into it, and the positions a
@@ -66,8 +97,8 @@ impl<E: SimulationEngine> ForwardModel<E> {
     ///
     /// # Errors
     ///
-    /// Returns a message when there is no parameter, a parameter is a factor
-    /// or a noise parameter (both belong to observations), `replicates` is 0
+    /// Returns the message of [`check_unobserved`], or a message when
+    /// `replicates` is 0
     /// ([`crate::ranges::REPLICATES`]), the engine is stochastic and
     /// `replicates` or `seed` is not set, or the engine does not resolve a
     /// value of its model kind or the remainder.
@@ -78,23 +109,7 @@ impl<E: SimulationEngine> ForwardModel<E> {
         replicates: Option<usize>,
         seed: Option<u64>,
     ) -> Result<Self, String> {
-        if parameters.is_empty() {
-            return Err("No parameters provided".to_string());
-        }
-        for parameter in &parameters {
-            let what = match parameter.parameter_type {
-                CalibrationParameterType::Factor => "a factor, which multiplies an observation",
-                CalibrationParameterType::Noise => {
-                    "a noise parameter, which belongs to an observation model"
-                }
-                CalibrationParameterType::Parameter
-                | CalibrationParameterType::InitialCondition => continue,
-            };
-            return Err(format!(
-                "'{}' is {what}; a model with no observations has none",
-                parameter.id
-            ));
-        }
+        check_unobserved(&parameters)?;
         if let Some(count) = replicates {
             crate::ranges::REPLICATES.check(count)?;
         }

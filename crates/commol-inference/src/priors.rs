@@ -12,28 +12,83 @@ pub struct Priors {
     distributions: Vec<Distribution>,
 }
 
+/// What a set of distributions is of, which sets the words of the message
+/// of a parameter with no distribution or a distribution of no parameter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Role {
+    /// The priors of a sampling method, by calibrated parameter.
+    Priors,
+    /// The inputs of a sensitivity analysis.
+    Inputs,
+}
+
+impl Role {
+    /// The message of `name`, which has no distribution.
+    fn missing(self, name: &str) -> String {
+        match self {
+            Self::Priors => format!(
+                "'{name}' has no prior; give one per calibrated parameter, or use \
+                 Priors.uniform_on_bounds()"
+            ),
+            Self::Inputs => format!(
+                "The input '{name}' has no distribution; give one per input, or use \
+                 InputSpace.uniform_on_bounds(parameters)"
+            ),
+        }
+    }
+
+    /// The message of the distribution of `name`, which is none of `names`.
+    fn extra(self, name: &str, names: &[String]) -> String {
+        match self {
+            Self::Priors => {
+                format!("'{name}' is not a calibrated parameter; the parameters are {names:?}")
+            }
+            Self::Inputs => {
+                format!("The distribution of '{name}' names no input; the inputs are {names:?}")
+            }
+        }
+    }
+}
+
 impl Priors {
-    /// The distributions of the parameters `names` with `bounds`, from the
-    /// family given to each name.
+    /// The priors of the parameters `names` with `bounds`, from the family
+    /// given to each name.
     ///
     /// # Errors
     ///
-    /// Returns a message that names the parameter when one has no
-    /// distribution, a distribution names no parameter (both in the words of
-    /// the priors of a sampling method: a sensitivity analysis checks them in
-    /// Python first), or a family does not fit the bounds of its
+    /// Returns a message that names the parameter when one has no prior, a
+    /// prior names no parameter, or a family does not fit the bounds of its
     /// parameter (the message lists the kinds that fit them).
     pub fn new(
         names: &[String],
         bounds: &[(f64, f64)],
         families: &[(String, Family)],
     ) -> Result<Self, String> {
-        for (name, _) in families {
-            if !names.contains(name) {
-                return Err(format!(
-                    "'{name}' is not a calibrated parameter; the parameters are {names:?}"
-                ));
-            }
+        Self::of(Role::Priors, names, bounds, families)
+    }
+
+    /// The distributions of the inputs `names` of a sensitivity analysis,
+    /// with `bounds`, from the family given to each name.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::new`], in the words of the inputs.
+    pub fn of_inputs(
+        names: &[String],
+        bounds: &[(f64, f64)],
+        families: &[(String, Family)],
+    ) -> Result<Self, String> {
+        Self::of(Role::Inputs, names, bounds, families)
+    }
+
+    fn of(
+        role: Role,
+        names: &[String],
+        bounds: &[(f64, f64)],
+        families: &[(String, Family)],
+    ) -> Result<Self, String> {
+        if let Some((name, _)) = families.iter().find(|(name, _)| !names.contains(name)) {
+            return Err(role.extra(name, names));
         }
         let distributions = names
             .iter()
@@ -43,12 +98,7 @@ impl Priors {
                     .iter()
                     .find(|(given, _)| given == name)
                     .map(|(_, family)| *family)
-                    .ok_or_else(|| {
-                        format!(
-                            "'{name}' has no prior; give one per calibrated parameter, or use \
-                             Priors.uniform_on_bounds()"
-                        )
-                    })?;
+                    .ok_or_else(|| role.missing(name))?;
                 if let Some(problem) = family.bound_problem(lower, upper) {
                     return Err(format!(
                         "The distribution {}() of '{name}' {problem}, and '{name}' has the bounds \
@@ -145,6 +195,29 @@ mod tests {
             extra
                 .unwrap_err()
                 .starts_with("'c' is not a calibrated parameter")
+        );
+    }
+
+    #[test]
+    fn the_distributions_of_inputs_name_inputs() {
+        let bounds = [(0.0, 1.0), (0.0, 2.0)];
+        let missing = Priors::of_inputs(&names(), &bounds, &[("a".to_string(), Family::Uniform)]);
+        assert_eq!(
+            missing.unwrap_err(),
+            "The input 'b' has no distribution; give one per input, or use \
+             InputSpace.uniform_on_bounds(parameters)"
+        );
+        let extra = Priors::of_inputs(
+            &names()[..1],
+            &bounds[..1],
+            &[
+                ("a".to_string(), Family::Uniform),
+                ("c".to_string(), Family::Uniform),
+            ],
+        );
+        assert_eq!(
+            extra.unwrap_err(),
+            "The distribution of 'c' names no input; the inputs are [\"a\"]"
         );
     }
 

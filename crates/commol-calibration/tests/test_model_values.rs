@@ -347,8 +347,14 @@ fn a_problem_has_observations_and_parameters_of_the_model() {
     let mut no_outputs = at_one();
     no_outputs[0].outputs.clear();
 
-    assert_eq!(new(vec![], start_and_k()), "No observed data provided");
-    assert_eq!(new(at_one(), vec![]), "No calibration parameters provided");
+    assert_eq!(
+        new(vec![], start_and_k()),
+        "A calibration problem needs observed_data: at least one observation to fit"
+    );
+    assert_eq!(
+        new(at_one(), vec![]),
+        "A calibration problem needs parameters: at least one value to calibrate"
+    );
     assert_eq!(
         new(no_outputs, start_and_k()),
         "Observation 'x' at 1 has an empty list of outputs"

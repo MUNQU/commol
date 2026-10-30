@@ -127,7 +127,7 @@ class TestSeries:
         assert ValueAt(series="A", at=1).series == Level(["A"])
         assert Peak(series=["A", "B"], positions=[1]).series == Level(["A", "B"])
         assert Gain(outputs="A", start=0, end=1).outputs == ["A"]
-        with pytest.raises(ValueError, match=r"at least 1 item"):
+        with pytest.raises(ValueError, match=r"Quantity 0 has no outputs"):
             ValueAt(series=[], at=1)
 
 
@@ -283,7 +283,7 @@ class TestLabels:
             "B at 1000001",
             "B at 0.1234567",
             "B at 0.1234568",
-            "C gain over (1e-07, 2.5e+16]",
+            "C gain over (1e-7, 2.5e16]",
         ]
 
     def test_a_quantity_reads_a_valid_window_of_positions(self) -> None:
@@ -295,7 +295,7 @@ class TestLabels:
             ValueAt(series="B", at=-1)
 
     def test_quantities_have_labels_of_their_own(self) -> None:
-        with pytest.raises(ValueError, match=r"\['B at 1'\]"):
+        with pytest.raises(ValueError, match=r"Two quantities have the label 'B at 1'"):
             quantity_labels(
                 [ValueAt(series="B", at=1), Trajectory(series="B", positions=[1])]
             )
@@ -383,7 +383,7 @@ class TestFilter:
     def test_a_mask_must_keep_a_row_of_each_run(self) -> None:
         result = _propagation()
 
-        with pytest.raises(ValueError, match=r"keeps no run"):
+        with pytest.raises(ValueError, match=r"No weight is positive"):
             result.where([False] * 4)
         with pytest.raises(ValueError, match=r"one boolean per run: 4 runs"):
             result.where([True] * 3)

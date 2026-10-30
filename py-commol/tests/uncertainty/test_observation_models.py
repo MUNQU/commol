@@ -252,8 +252,13 @@ class TestModels:
         assert {p.id for p in model.parameters} == {"c"}
         assert report["parameters"]["p"]["value"] == fit.best_parameters["p"]
 
-    @pytest.mark.parametrize("given", ["neither", "both"])
-    def test_the_engine_problem_takes_a_loss_or_models(self, given: str) -> None:
+    @pytest.mark.parametrize(
+        ("given", "message"),
+        [("neither", "There is no default"), ("both", "not both")],
+    )
+    def test_the_engine_problem_takes_a_loss_or_models(
+        self, given: str, message: str
+    ) -> None:
         calibrator = flow_calibrator(
             [1.0], windowed=True, observation_models={"B": PoissonObservations()}
         )
@@ -263,7 +268,7 @@ class TestModels:
         else:
             problem["observation_models"] = None
 
-        with pytest.raises(ValueError, match="exactly one of them"):
+        with pytest.raises(ValueError, match=message):
             commol_rs.inference.CalibrationProblem(
                 _flow_simulation().engine, json.dumps(problem)
             )

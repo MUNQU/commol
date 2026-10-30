@@ -83,7 +83,7 @@ def test_each_draw_runs_with_the_overrides_of_its_scenario() -> None:
 @pytest.mark.parametrize(
     ("overrides", "message"),
     [
-        ({"k1": 0.2}, r"Scenario 'bad' sets \['k1'\], which the sample holds"),
+        ({"k1": 0.2}, r'Scenario \'bad\' sets \["k1"\], which the sample holds'),
         ({"k9": 1.0}, "Scenario 'bad': Parameter 'k9' not found in model"),
     ],
     ids=["held by the sample", "not in the model"],

@@ -203,7 +203,7 @@ print(calibrate_k1(windowed))  # 0.4
 
 | Rule | Detail |
 |---|---|
-| The window starts at 0 or later | `at − window`, read as 0 within the rounding of the window; otherwise the observation is rejected when it is created, with the rule of the engine (`check_window_end` in `crates/commol-calibration/src/observation.rs`). |
+| The window starts at 0 or later | `at − window`, read as 0 within the rounding of the window; otherwise the observation is rejected when it is created, with the rule of the engine (`check_window_end` in `crates/commol-calibration/src/observation.rs`, which `Observation::check` calls). |
 | Any output | Usually an accumulator, but any compartment works. |
 | Mixed windows | Observations may use different windows, and positions need not be multiples of the window. |
 | Combinations | Works with `factor_id` and `outputs`. |

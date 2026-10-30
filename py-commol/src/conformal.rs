@@ -143,6 +143,9 @@ fn split_conformal(
 ) -> PyResult<(Option<PyStarts>, PyConformalRun)> {
     let settings: SplitConformalSettings = crate::json::read(settings)?;
     let conformal = settings.conformal().map_err(method_error)?;
+    settings
+        .check_predictor(sample.is_some())
+        .map_err(method_error)?;
     let calibration = observed_data(&settings.calibration_data);
     let mut fit = Vec::new();
     let (starts, predictor) = predictor(py, problem, settings.starts, sample, &mut fit)?;
@@ -315,6 +318,9 @@ fn adaptive_conformal(
 ) -> PyResult<(Option<PyStarts>, PyConformalRun)> {
     let settings: AdaptiveConformalSettings = crate::json::read(settings)?;
     let conformal = settings.conformal().map_err(method_error)?;
+    settings
+        .check_predictor(sample.is_some())
+        .map_err(method_error)?;
     let stream = observed_data(&settings.stream);
     let mut fit = Vec::new();
     let (starts, predictor) = predictor(py, problem, settings.starts, sample, &mut fit)?;

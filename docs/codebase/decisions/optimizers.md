@@ -23,6 +23,31 @@ the verbose one included, goes through `optimization::run`.
 
 **Guards:** `optimization::tests`; `tests/calibration/test_optimizers.py`.
 
+## An optimizer needs finite bounds, a prior does not
+
+A bound may be infinite, for a prior on a half-line; a NaN bound is refused
+(`CalibrationParameter::check`). The settings of a problem keep an infinite
+bound with either optimizer, since the same problem serves a sampler that
+never fits. Every run of an optimizer refuses it first, with a message that
+names the parameter (`SearchSpace::check_finite`): `optimize_particle_swarm`
+and the constrained swarm, because the swarm draws its particles between the
+bounds, and `SearchSpace::transform` for Nelder-Mead, before the
+`SineTransform` of the argmin fork. A method that reads the bounds as a box
+refuses it too: `structural_rank` draws its points in them and
+`sample_identifiability` with `Reference::Bounds` takes the variance of the
+uniform distribution on them.
+
+| Alternative | Why not |
+|---|---|
+| Refuse every infinite bound | A prior on `[0, inf]` is a documented use of a sampler. |
+| Refuse it for a swarm problem when it is built | The problem of a sampler would depend on an optimizer it never runs. |
+| Let the swarm draw | The draw of the argmin fork panics on a bound that is not finite (#445). |
+
+**Guards:** `optimization::tests::a_particle_swarm_refuses_an_infinite_bound`,
+`a_constrained_run_refuses_an_infinite_bound_with_either_optimizer`;
+`crates/commol-inference/tests/test_identifiability.rs::a_measure_over_the_bounds_refuses_an_infinite_bound`;
+`tests/calibration/test_optimizers.py::test_an_optimizer_refuses_an_infinite_bound`.
+
 ## A swarm scores in parallel and keeps the order of its particles
 
 The argmin fork runs with its feature `rayon`, so a particle swarm asks for

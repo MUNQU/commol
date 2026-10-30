@@ -7,14 +7,13 @@ ABC) and keeps a weighted sample of particles. None of them needs a noise
 model.
 """
 
-from collections.abc import Mapping
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from commol._calibration.method import UncertaintyMethod
 from commol._data.ranges import RangeChecked
-from commol.distributions.distributions import WithPriors
+from commol.distributions.distributions import WithPriors, check_required
 from commol.smc.results import (
     GibbsResult,
     SMCResult,
@@ -24,11 +23,6 @@ from commol.smc.runners import (
     run_abc_smc,
     run_bayesian_posterior,
     run_gibbs_posterior,
-)
-
-ETA_CHOICES = (
-    "a number above 0, InformationMatchingEta(block_length=...) or "
-    "BootstrapCoverageEta(replicates=..., block_length=..., confidence_level=...)"
 )
 
 
@@ -141,11 +135,6 @@ type _ABCDistance = Annotated[
 """How far a run is from the observations."""
 
 
-def _require(data: JsonValue, name: str, hint: str) -> None:
-    if isinstance(data, Mapping) and data.get(name) is None:
-        raise ValueError(f"{name} is required: {hint}.")
-
-
 class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult], RangeChecked):
     """
     The Gibbs posterior ``π(θ) ∝ prior(θ) · exp(−η · loss(θ))`` of the
@@ -190,8 +179,8 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult], RangeChecked):
     @model_validator(mode="before")
     @classmethod
     def _require_eta(cls, data: JsonValue) -> JsonValue:
-        """Name the choices of `eta` when it is missing."""
-        _require(data, "eta", f"give {ETA_CHOICES}")
+        """The engine refuses a missing `eta` with the choices it takes."""
+        check_required(cls, data, "eta")
         return data
 
 
