@@ -232,7 +232,7 @@ replicate of each draw.
 | `best_parameters` | `dict[str, float]`: the best value of every unknown, in the order of `problem.parameters` |
 | `final_loss` | The loss at `best_parameters`; with observation models, the negative log-likelihood |
 | `iterations` | The optimizer iterations performed |
-| `converged` | `True` only when the optimizer met its convergence test (a stop rule for a particle swarm); a run that used all `max_iterations` is `False`. See [Optimizers](calibration-optimizers.md#converged-and-termination_reason). |
+| `converged` | `True` only when the optimizer met its convergence test (a stop rule for a particle swarm, or the test of Nelder-Mead for a swarm with a polish); a run that used all `max_iterations` is `False`. See [Optimizers](calibration-optimizers.md#converged-and-termination_reason). |
 | `termination_reason` | Why it stopped |
 | `starts`, `failed` | Every start that finished, and each start that failed with its reason. See [Several starts](calibration-optimizers.md#several-starts). |
 | `seed` | The seed of the calibration's random numbers (`Calibrator.seed`). See [Reproducibility](calibration-optimizers.md#reproducibility). |

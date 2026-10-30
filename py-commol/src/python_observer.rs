@@ -6,7 +6,9 @@
 
 use argmin::core::observers::Observe;
 use argmin::core::{KV, State};
-use commol_calibration::{CalibrationProblem, OptimizationConfig, Starts};
+use commol_calibration::{
+    CalibrationProblem, NelderMeadState, OptimizationConfig, ParticleSwarmState, Progress, Starts,
+};
 use commol_core::SimulationEngine;
 use pyo3::prelude::*;
 
@@ -34,19 +36,21 @@ fn write_optimization_header(header: &str) {
     });
 }
 
-/// Observer that writes optimization progress to Python's sys.stdout in table format
+/// Observer that writes optimization progress to Python's sys.stdout in
+/// table format, one table per stage that `progress` names
+#[derive(Clone)]
 pub struct PythonObserver {
-    /// Number of iterations between header repeats
-    header_interval: u64,
+    /// The iterations between two headers of each stage that writes
+    progress: Progress,
     /// Last iteration where header was printed
     last_header_iter: u64,
 }
 
 impl PythonObserver {
-    /// Create a new Python observer with custom header interval
-    pub fn with_header_interval(header_interval: u64) -> Self {
+    /// An observer that writes the stages of `progress`
+    pub fn new(progress: Progress) -> Self {
         Self {
-            header_interval,
+            progress,
             last_header_iter: 0,
         }
     }
@@ -63,17 +67,44 @@ impl PythonObserver {
     }
 }
 
-impl<I> Observe<I> for PythonObserver
-where
-    I: State,
-    <I as State>::Float: std::fmt::LowerExp,
-{
-    /// Called when observation should occur
-    fn observe_iter(&mut self, state: &I, _kv: &KV) -> Result<(), argmin::core::Error> {
+impl Observe<NelderMeadState> for PythonObserver {
+    fn observe_iter(
+        &mut self,
+        state: &NelderMeadState,
+        _kv: &KV,
+    ) -> Result<(), argmin::core::Error> {
+        if let Some(header_interval) = self.progress.nelder_mead {
+            self.write_row(state, header_interval);
+        }
+        Ok(())
+    }
+}
+
+impl Observe<ParticleSwarmState> for PythonObserver {
+    fn observe_iter(
+        &mut self,
+        state: &ParticleSwarmState,
+        _kv: &KV,
+    ) -> Result<(), argmin::core::Error> {
+        if let Some(header_interval) = self.progress.particle_swarm {
+            self.write_row(state, header_interval);
+        }
+        Ok(())
+    }
+}
+
+impl PythonObserver {
+    /// Write the row of `state`, after a header at its first iteration and
+    /// every `header_interval` iterations
+    fn write_row<I>(&mut self, state: &I, header_interval: u64)
+    where
+        I: State,
+        <I as State>::Float: std::fmt::LowerExp,
+    {
         let iter = state.get_iter();
 
         // Print header at start and every N iterations
-        if iter == 0 || (iter > 0 && (iter - self.last_header_iter) >= self.header_interval) {
+        if iter == 0 || (iter > 0 && (iter - self.last_header_iter) >= header_interval) {
             self.print_header();
             self.last_header_iter = iter;
         }
@@ -96,7 +127,6 @@ where
         );
 
         write_to_python_stdout(&output);
-        Ok(())
     }
 }
 
@@ -111,7 +141,7 @@ pub fn optimize_with_python_observer<E: SimulationEngine + Send + Sync>(
     config: &OptimizationConfig,
     points: Vec<Vec<f64>>,
     seed: u64,
-    header_interval: u64,
+    progress: Progress,
 ) -> Result<Starts, String> {
     let initial_params = problem.initial_parameters();
     let parameter_names = problem.parameter_names();
@@ -143,6 +173,14 @@ pub fn optimize_with_python_observer<E: SimulationEngine + Send + Sync>(
                 ps_config.particles,
                 ps_config.max_iterations
             );
+            if let Some(polish) = &ps_config.polish {
+                header.push_str(&format!(
+                    "Polish: Nelder-Mead from the best point of the swarm\n\
+                     Polish max iterations: {}\n\
+                     Polish SD tolerance: {}\n",
+                    polish.max_iterations, polish.sd_tolerance
+                ));
+            }
             header.push_str("===================================================\n");
             header
         }
@@ -151,7 +189,7 @@ pub fn optimize_with_python_observer<E: SimulationEngine + Send + Sync>(
 
     let starts =
         commol_calibration::optimize_starts_with_observer(problem, config, points, seed, || {
-            PythonObserver::with_header_interval(header_interval)
+            PythonObserver::new(progress)
         })?;
     let result = starts.best();
 

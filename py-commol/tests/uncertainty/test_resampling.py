@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from commol import Calibrator, ObservedDataPoint
+from commol import Calibrator, NelderMeadConfig, ObservedDataPoint, ParticleSwarmConfig
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.conformal import JackknifePlus, RollingConformal
 from commol.conformal.results import ConformalResult
@@ -417,3 +417,28 @@ def test_every_method_lists_its_failed_replicates_in_failed(
         else []
     )
     assert not any(entry in note for entry in failed for note in notes)
+
+
+def test_a_replicate_polishes_as_the_fit() -> None:
+    # The fit of each replicate is a weighted mean of the values: one point,
+    # which Nelder-Mead reaches from any start.
+    base = flow_calibrator(_noisy(20, 2), windowed=True, seed=4)
+    nelder_mead = NelderMeadConfig(max_iterations=1000, sd_tolerance=1e-14)
+
+    def bootstrap(config: NelderMeadConfig | ParticleSwarmConfig) -> BootstrapResult:
+        problem = base.problem.model_copy(update={"optimization_config": config})
+        calibrator = Calibrator(base.simulation, problem)
+        return calibrator.uncertainty(BayesianBootstrap(replicates=6, block_length=2))
+
+    polished = bootstrap(
+        ParticleSwarmConfig(particles=6, max_iterations=3, polish=nelder_mead)
+    )
+    swarm = bootstrap(ParticleSwarmConfig(particles=6, max_iterations=3))
+    local = bootstrap(nelder_mead)
+
+    assert polished.fit.converged
+    assert polished.not_converged == 0
+    assert swarm.not_converged == 6
+    values = np.asarray(polished.sample.values)
+    assert values == pytest.approx(np.asarray(local.sample.values), abs=1e-6)
+    assert np.abs(np.asarray(swarm.sample.values) - values).max() > 1e-3

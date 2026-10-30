@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ParticleSwarmConfig(polish=NelderMeadConfig(...))`: each start runs the
+  swarm, then Nelder-Mead from the best point of the swarm of that start.
+  The start ends at the point, the loss and the convergence of Nelder-Mead,
+  `iterations` counts both stages and `termination_reason` is that of
+  Nelder-Mead. Every fit of the problem polishes: the starts of
+  `Calibrator.run`, which `StartsIdentifiability` reads, the refits of an
+  uncertainty method and the subproblems of a profile. The `verbose` of the
+  polish writes the table of Nelder-Mead. See
+  [Optimizers](../guide/calibration-optimizers.md#polish-with-nelder-mead).
 - `ObservedDataPoint(scale=...)`: a known positive number, 1 by default, that
   multiplies the prediction of the observation, with its factor. A count
   model reads the mean `scale · model`, so a count observed on a known share

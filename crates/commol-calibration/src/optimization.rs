@@ -238,6 +238,11 @@ pub struct ParticleSwarmConfig {
     /// size of the search box, is at most this tolerance (None = disabled).
     /// Must be non-negative.
     pub radius_stop: Option<f64>,
+
+    /// Nelder-Mead from the best point of the swarm, when set: the run ends
+    /// with the point, the loss and the convergence of Nelder-Mead, and its
+    /// iterations count both stages (None = the swarm alone).
+    pub polish: Option<Box<NelderMeadConfig>>,
 }
 
 /// The improvement stop rule of a swarm: the run stops when the best cost
@@ -316,6 +321,9 @@ impl ParticleSwarmConfig {
             .into_iter()
             .filter_map(|(rule, value)| value.map(|value| (rule, value))),
         );
+        if let Some(polish) = &self.polish {
+            polish.check_ranges()?;
+        }
         if let Some(stop) = self.improvement_stop {
             ranges::IMPROVEMENT_WINDOW.check(stop.window)?;
             reals.extend([
@@ -345,6 +353,7 @@ impl Default for ParticleSwarmConfig {
             mutation_application: MutationApplication::None,
             improvement_stop: None,
             radius_stop: None,
+            polish: None,
         }
     }
 }
@@ -501,7 +510,10 @@ impl SearchSpace {
 /// in each outer iteration, stops at the outer limit of the settings.
 ///
 /// A particle swarm takes `seed`; outer iteration `k` of a held prediction
-/// takes `replicate_seed(seed, k)`.
+/// takes `replicate_seed(seed, k)`. A swarm with a polish then runs the
+/// augmented Lagrangian again with Nelder-Mead as its inner solver, from the
+/// end of the swarm and from its multiplier and its penalty, so a held
+/// parameter and a held prediction both end with Nelder-Mead.
 ///
 /// # Errors
 ///
@@ -554,7 +566,7 @@ pub fn optimize_subproblem<E: SimulationEngine + Sync>(
         }
         Fixed::Prediction(held) => {
             let space = SearchSpace::of(problem);
-            let run = run_constrained(
+            let mut run = run_constrained(
                 &space,
                 PredictionCost::new(held),
                 config,
@@ -562,6 +574,30 @@ pub fn optimize_subproblem<E: SimulationEngine + Sync>(
                 seed,
                 &held.settings,
             )?;
+            if let OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
+                polish: Some(polish),
+                ..
+            }) = config
+            {
+                let settings = ConstraintSettings {
+                    multiplier: Some(run.multiplier),
+                    penalty: Some(run.penalty),
+                    ..held.settings.clone()
+                };
+                let swarm = run.fit;
+                let end = run_constrained(
+                    &space,
+                    run.cost,
+                    &OptimizationConfig::NelderMead((**polish).clone()),
+                    &swarm.best_parameters,
+                    seed,
+                    &settings,
+                )?;
+                run = ConstrainedRun {
+                    fit: polished(&swarm, end.fit),
+                    ..end
+                };
+            }
             let (_, prediction) = run
                 .cost
                 .evaluate(&run.fit.best_parameters)
@@ -695,6 +731,10 @@ const NO_COST: &str = "Optimization failed: the solver kept the cost function";
 /// Run the optimizer of `config` on `cost` over `space` from `start`, a
 /// particle swarm with the generator of `seed`, and return the result and
 /// the cost function.
+///
+/// A swarm with a polish then runs Nelder-Mead on the same cost from the
+/// best point of the swarm ([`polished`]); each stage has its own copy of
+/// the observer.
 pub(crate) fn run<C, O>(
     space: &SearchSpace,
     cost: C,
@@ -705,7 +745,7 @@ pub(crate) fn run<C, O>(
 ) -> Result<(CalibrationResult, Option<C>), String>
 where
     C: CostFunction<Param = Vec<f64>, Output = f64> + Sync,
-    O: Observe<NelderMeadState> + Observe<ParticleSwarmState> + 'static,
+    O: Observe<NelderMeadState> + Observe<ParticleSwarmState> + Clone + 'static,
 {
     space.check_start(start)?;
     match config {
@@ -713,8 +753,26 @@ where
             optimize_nelder_mead(space, cost, start, nm_config, observer)
         }
         OptimizationConfig::ParticleSwarm(ps_config) => {
-            optimize_particle_swarm(space, cost, ps_config, seed, observer)
+            let Some(polish) = &ps_config.polish else {
+                return optimize_particle_swarm(space, cost, ps_config, seed, observer);
+            };
+            let polish_observer = observer.clone();
+            let (swarm, cost) = optimize_particle_swarm(space, cost, ps_config, seed, observer)?;
+            let cost = cost.ok_or(NO_COST)?;
+            let (end, cost) =
+                optimize_nelder_mead(space, cost, &swarm.best_parameters, polish, polish_observer)?;
+            Ok((polished(&swarm, end), cost))
         }
+    }
+}
+
+/// The result of a swarm polished by Nelder-Mead: the point, the loss, the
+/// convergence and the reason of `polish`, and the iterations of both
+/// stages.
+fn polished(swarm: &CalibrationResult, polish: CalibrationResult) -> CalibrationResult {
+    CalibrationResult {
+        iterations: swarm.iterations + polish.iterations,
+        ..polish
     }
 }
 
@@ -725,6 +783,7 @@ pub type NelderMeadState = IterState<Vec<f64>, (), (), (), (), f64>;
 pub type ParticleSwarmState = PopulationState<Particle<Vec<f64>, f64>, f64>;
 
 /// An observer that observes nothing, for runs without one.
+#[derive(Clone)]
 pub struct NoObserver;
 
 impl<I> Observe<I> for NoObserver {}

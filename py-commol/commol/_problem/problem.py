@@ -340,7 +340,9 @@ class NelderMeadConfig(RangeChecked):
     sigma : float | None
         Shrink coefficient (default: None, uses argmin's default)
     verbose : bool
-        Enable verbose output during optimization (default: False)
+        Enable verbose output during optimization (default: False). As the
+        `polish` of a `ParticleSwarmConfig`, it writes the table of
+        Nelder-Mead, and the swarm writes its own by its own `verbose`.
     header_interval: int
         Number of iterations between table header repeats in verbose output
         (default: 100)
@@ -480,6 +482,15 @@ class ParticleSwarmConfig(RangeChecked):
         bounds), is at most `radius_tol`, and report ``converged=True``
         (Zielinski and Laur, 2007). Mutation and velocity mutation scatter the
         swarm again, so with them the radius can stay above it.
+    polish : NelderMeadConfig | None
+        Nelder-Mead from the best point of the swarm of each start (default:
+        None, the swarm alone). The start then ends at the point, the loss
+        and the convergence of Nelder-Mead; ``iterations`` counts the
+        iterations of both stages and ``termination_reason`` is that of
+        Nelder-Mead. Every fit of the problem polishes, the refits of an
+        uncertainty method and the subproblems of a profile included. The
+        `verbose` and `header_interval` of the polish set the table of
+        Nelder-Mead, and those of the swarm the table of the swarm.
 
     References
     ----------
@@ -582,6 +593,9 @@ class ParticleSwarmConfig(RangeChecked):
     )
     radius_tol: float | None = Field(
         default=None, description="The tolerance of the radius stop rule"
+    )
+    polish: NelderMeadConfig | None = Field(
+        default=None, description="Nelder-Mead from the best point of the swarm"
     )
 
     @model_validator(mode="after")

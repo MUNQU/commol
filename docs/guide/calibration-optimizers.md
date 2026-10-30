@@ -71,8 +71,9 @@ print(calibrate(ParticleSwarmConfig(particles=30, max_iterations=300)))  # {'k1'
 | Nelder-Mead | Few evaluations; precise near the answer | Local: can stop at a bound or a local minimum | Few unknowns, a good `initial_guess` |
 | Particle swarm | Searches the whole box; robust to local minima | Many evaluations | Several unknowns, no good starting point |
 
-A common pattern: run particle swarm first, then Nelder-Mead from its result
-with `initial_guess`.
+To search the whole box and still end precise, give a swarm a
+[polish](#polish-with-nelder-mead): each start then ends with Nelder-Mead
+from the best point of the swarm.
 
 ## Nelder-Mead
 
@@ -118,8 +119,9 @@ with the message `Nelder-Mead needs finite bounds`.
 
 `converged` comes from `converged` in
 `crates/commol-calibration/src/optimization.rs`. A particle swarm
-without a [stop rule](#stop-rules) always stops at `max_iterations`, so it
-reports `converged=False`; judge it by `final_loss`.
+without a [stop rule](#stop-rules) or a [polish](#polish-with-nelder-mead)
+always stops at `max_iterations`, so it reports `converged=False`; judge it
+by `final_loss`. A polished swarm reports the convergence of Nelder-Mead.
 
 ## Particle swarm
 
@@ -171,6 +173,7 @@ ignored: `ParticleSwarmConfig(inertia_factor=0.5)` fails with
 | `velocity_mutation_threshold` | `None` | Restarts the velocity of particles slower than it (0.001–0.01). |
 | `improvement_window`, `improvement_tol_abs`, `improvement_tol_rel` | `None` | The improvement [stop rule](#stop-rules): all three or none. |
 | `radius_tol` | `None` | The radius [stop rule](#stop-rules). |
+| `polish` | `None` | A `NelderMeadConfig`: each start ends with Nelder-Mead from the best point of the swarm ([Polish with Nelder-Mead](#polish-with-nelder-mead)). |
 
 ### Stop rules
 
@@ -213,6 +216,47 @@ spread, so with them the radius can stay above `radius_tol`. Neither rule
 draws random numbers: with the same seed, a run with a rule is the run without
 it up to the iteration where it stops. In a [profile](uncertainty/profiles.md),
 the improvement rule also sets the tolerance of a swarm.
+
+### Polish with Nelder-Mead
+
+A swarm stops before it converges; Nelder-Mead from its end converges. With
+`polish=NelderMeadConfig(...)`, each start runs the swarm from its point, then
+Nelder-Mead from the best point of the swarm of that start, on the threads of
+the start (`run` in `crates/commol-calibration/src/optimization.rs`).
+
+```python
+polished = ParticleSwarmConfig(
+    particles=20,
+    max_iterations=30,
+    polish=NelderMeadConfig(max_iterations=2000, sd_tolerance=1e-10),
+)
+problem = CalibrationProblem(
+    observed_data=observed_data,
+    parameters=[
+        CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
+        CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
+    ],
+    loss_function="sse",
+    optimization_config=polished,
+    seed=7,
+)
+result = Calibrator(Simulation(model(None, None)), problem).run(starts=4)
+print(all(start.converged for start in result.starts))  # True
+print(result.termination_reason)  # Terminated(SolverConverged)
+print({name: round(value, 4) for name, value in result.best_parameters.items()})  # {'k1': 0.4, 'k2': 0.1}
+```
+
+| What | With a polish |
+|---|---|
+| `StartSummary` | `start` is the start point of the swarm; `end`, `loss` and `converged` are those of Nelder-Mead |
+| `iterations` | The iterations of the swarm and of Nelder-Mead of the best start |
+| `converged`, `termination_reason` | Those of Nelder-Mead |
+| Uncertainty methods | Every fit of the problem polishes: the refits of a bootstrap, the subproblems of a profile, the starts that `StartsIdentifiability` reads |
+| `verbose`, `header_interval` | Those of the swarm write the table of the swarm; those of the polish, the table of Nelder-Mead |
+
+Each start polishes its own end, so the starts stay apart, and
+[`StartsIdentifiability`](uncertainty/identifiability.md#starts) reads the
+spread of the polished ends. A swarm polishes only with Nelder-Mead.
 
 ## Several starts
 
@@ -286,7 +330,7 @@ order. A point the objective penalizes is not kept.
 | Symptom | Try |
 |---|---|
 | A result sits at a bound | Check the bounds, give a better `initial_guess`, or use particle swarm |
-| `converged=False` | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations`; a particle swarm needs a [stop rule](#stop-rules) to converge |
+| `converged=False` | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations`; a particle swarm needs a [stop rule](#stop-rules) or a [polish](#polish-with-nelder-mead) to converge |
 | Different results on each run | Set `seed`; use more particles or iterations |
 | A local minimum | `run(starts=n)` from several points |
 | A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations |

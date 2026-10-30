@@ -212,14 +212,18 @@ where
     /// rule allows at the objective at the fit, `tol_abs + tol_rel · |f̂|`,
     /// since the swarm stops when its best cost improves by less. A swarm
     /// without that rule has no tolerance on the cost; its tolerance is
-    /// `1e-6 · max(1, |f̂|)`.
+    /// `1e-6 · max(1, |f̂|)`. A swarm with a polish ends with Nelder-Mead,
+    /// so its tolerance is the `sd_tolerance` of the polish.
     pub fn optimizer_tolerance(&self) -> f64 {
         match self.config {
             OptimizationConfig::NelderMead(config) => config.sd_tolerance,
-            OptimizationConfig::ParticleSwarm(config) => match config.improvement_stop {
-                Some(stop) => stop.tolerance(self.fit_loss),
-                None => 1e-6 * self.fit_loss.abs().max(1.0),
-            },
+            OptimizationConfig::ParticleSwarm(config) => {
+                match (&config.polish, config.improvement_stop) {
+                    (Some(polish), _) => polish.sd_tolerance,
+                    (None, Some(stop)) => stop.tolerance(self.fit_loss),
+                    (None, None) => 1e-6 * self.fit_loss.abs().max(1.0),
+                }
+            }
         }
     }
 

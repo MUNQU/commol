@@ -188,7 +188,7 @@ pub fn optimize_starts_with_observer<E, O, F>(
 ) -> Result<Starts, String>
 where
     E: SimulationEngine + Send + Sync,
-    O: Observe<NelderMeadState> + Observe<ParticleSwarmState> + 'static,
+    O: Observe<NelderMeadState> + Observe<ParticleSwarmState> + Clone + 'static,
     F: Fn() -> O + Sync,
 {
     let space = SearchSpace::of(problem);

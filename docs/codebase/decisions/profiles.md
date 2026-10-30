@@ -103,7 +103,8 @@ costs of the simplex falls below it; for a swarm with the improvement stop
 rule, `tol_abs + tol_rel · |f̂|`, the improvement the rule allows at the fit,
 since the swarm stops when its best cost improves by less; for a swarm
 without it, `1e-6 · max(1, |f̂|)`, since the swarm has no tolerance on the
-cost (the radius rule reads positions). `ν` is the noise floor: the error
+cost (the radius rule reads positions); for a swarm with a polish, the
+`sd_tolerance` of the polish, since the run ends with Nelder-Mead. `ν` is the noise floor: the error
 of one evaluation of the objective at the fit, propagated from the accuracy
 of a run, `Σ |∂ℓᵢ/∂mᵢ| · eᵢ` with `eᵢ = rtol · |mᵢ| + k · atol` for an
 observation that sums `k` outputs, the term derivatives of

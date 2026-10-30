@@ -14,6 +14,7 @@
 //! | [`Observation`] | `ObservedDataPoint` |
 //! | [`NelderMeadSettings`] | `NelderMeadConfig` |
 //! | [`ParticleSwarmSettings`] | `ParticleSwarmConfig` |
+//! | [`PolishSettings`] | `NelderMeadConfig`, as the `polish` of a `ParticleSwarmConfig` |
 //! | [`OptimizerSettings`] | `NelderMeadConfig \| ParticleSwarmConfig`, by `kind` |
 //! | [`ProblemSettings`] | `CalibrationProblem` |
 //! | [`FitRecord`] | `CalibrationResult` |
@@ -299,7 +300,20 @@ pub struct ParticleSwarmSettings {
     pub improvement_tol_rel: Option<f64>,
     /// The tolerance of the radius stop rule.
     pub radius_tol: Option<f64>,
+    /// Nelder-Mead from the best point of the swarm, if any.
+    pub polish: Option<PolishSettings>,
 }
+
+/// The polish of a swarm: the Python class `NelderMeadConfig`, by its
+/// `kind`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(remote = "Self", rename_all = "snake_case")]
+pub enum PolishSettings {
+    /// Nelder-Mead.
+    NelderMead(NelderMeadSettings),
+}
+
+tagged!(PolishSettings);
 
 checked!(
     ParticleSwarmSettings,
@@ -376,6 +390,10 @@ impl ParticleSwarmSettings {
             },
             improvement_stop: self.improvement_stop()?,
             radius_stop: self.radius_tol,
+            polish: self
+                .polish
+                .as_ref()
+                .map(|PolishSettings::NelderMead(settings)| Box::new(settings.config())),
         })
     }
 
@@ -517,7 +535,7 @@ pub enum OptimizerSettings {
     /// Nelder-Mead.
     NelderMead(NelderMeadSettings),
     /// A particle swarm.
-    ParticleSwarm(ParticleSwarmSettings),
+    ParticleSwarm(Box<ParticleSwarmSettings>),
 }
 
 tagged!(OptimizerSettings);
@@ -535,20 +553,42 @@ impl OptimizerSettings {
         })
     }
 
-    /// Whether the optimizer writes its progress.
-    pub fn verbose(&self) -> bool {
+    /// The progress that each stage of the optimizer writes, each by its own
+    /// `verbose` and `header_interval`: a swarm and its polish are two
+    /// stages.
+    pub fn progress(&self) -> Progress {
+        let table = |verbose: bool, interval: u64| verbose.then_some(interval);
         match self {
-            Self::NelderMead(settings) => settings.verbose,
-            Self::ParticleSwarm(settings) => settings.verbose,
+            Self::NelderMead(settings) => Progress {
+                nelder_mead: table(settings.verbose, settings.header_interval),
+                particle_swarm: None,
+            },
+            Self::ParticleSwarm(settings) => Progress {
+                nelder_mead: settings.polish.as_ref().and_then(
+                    |PolishSettings::NelderMead(polish)| {
+                        table(polish.verbose, polish.header_interval)
+                    },
+                ),
+                particle_swarm: table(settings.verbose, settings.header_interval),
+            },
         }
     }
+}
 
-    /// Iterations between two headers of the progress table.
-    pub fn header_interval(&self) -> u64 {
-        match self {
-            Self::NelderMead(settings) => settings.header_interval,
-            Self::ParticleSwarm(settings) => settings.header_interval,
-        }
+/// The progress table of each stage of an optimizer: the iterations between
+/// two headers, or `None` for a stage that writes nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Progress {
+    /// Nelder-Mead, alone or as the polish of a swarm.
+    pub nelder_mead: Option<u64>,
+    /// The particle swarm.
+    pub particle_swarm: Option<u64>,
+}
+
+impl Progress {
+    /// Whether a stage writes its progress.
+    pub fn any(&self) -> bool {
+        self.nelder_mead.is_some() || self.particle_swarm.is_some()
     }
 }
 

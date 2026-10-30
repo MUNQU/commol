@@ -403,6 +403,83 @@ fn a_swarm_fits_a_subproblem_and_repeats_from_its_seed() {
 }
 
 #[test]
+fn a_polished_swarm_ends_a_subproblem_with_nelder_mead() {
+    let problem = line_problem(&VALUES);
+    let (a, b) = least_squares(&VALUES);
+    let swarm = ParticleSwarmConfig {
+        particles: 10,
+        max_iterations: 5,
+        ..ParticleSwarmConfig::default()
+    };
+    let OptimizationConfig::NelderMead(polish) = config() else {
+        unreachable!("`config` is Nelder-Mead")
+    };
+    let polished = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
+        polish: Some(Box::new(polish)),
+        ..swarm.clone()
+    });
+    let swarm = OptimizationConfig::ParticleSwarm(swarm);
+
+    // A held parameter: Nelder-Mead from the end of the swarm.
+    let fixed = Subproblem::fix_parameter(&problem, 1, b).unwrap();
+    let refit = optimize_subproblem(&fixed, &polished, &[0.0, 0.0], 4).unwrap();
+    let alone = optimize_subproblem(&fixed, &swarm, &[0.0, 0.0], 4).unwrap();
+    let by_hand = optimize_subproblem(&fixed, &config(), &alone.fit.best_parameters, 0).unwrap();
+    assert_eq!(refit.fit.best_parameters, by_hand.fit.best_parameters);
+    assert_eq!(
+        refit.fit.iterations,
+        alone.fit.iterations + by_hand.fit.iterations
+    );
+    assert_eq!(refit.evaluations, alone.evaluations + by_hand.evaluations);
+    assert!(
+        (refit.fit.best_parameters[0] - a).abs() < 1e-6,
+        "{:?}",
+        refit.fit
+    );
+
+    // A held prediction: the augmented Lagrangian again with Nelder-Mead,
+    // from the end, the multiplier and the penalty of the swarm.
+    let target = a + 15.0 * b + 1.0;
+    let spec = ObservedDataPoint::new(15.0, "x".to_string(), 0.0);
+    let settings = ConstraintSettings {
+        tolerance: 1e-6,
+        max_outer_iterations: 6,
+        multiplier: None,
+        penalty: None,
+    };
+    let held = Subproblem::fix_prediction(&problem, &spec, target)
+        .unwrap()
+        .with_settings(settings.clone())
+        .unwrap();
+    let refit = optimize_subproblem(&held, &polished, &[0.0, 0.0], 4).unwrap();
+    let alone = optimize_subproblem(&held, &swarm, &[0.0, 0.0], 4).unwrap();
+    let continued = held
+        .clone()
+        .with_settings(ConstraintSettings {
+            multiplier: alone.multiplier,
+            penalty: alone.penalty,
+            ..settings
+        })
+        .unwrap();
+    let by_hand =
+        optimize_subproblem(&continued, &config(), &alone.fit.best_parameters, 0).unwrap();
+    assert_eq!(refit.fit.best_parameters, by_hand.fit.best_parameters);
+    assert_eq!(
+        refit.fit.iterations,
+        alone.fit.iterations + by_hand.fit.iterations
+    );
+    assert_eq!(refit.fit.termination_reason, by_hand.fit.termination_reason);
+    assert_eq!(refit.multiplier, by_hand.multiplier);
+    // The swarm alone also scores its end once, for its prediction.
+    assert_eq!(
+        refit.evaluations + 1,
+        alone.evaluations + by_hand.evaluations
+    );
+    assert!(refit.fit.converged, "{:?}", refit.fit);
+    assert!((refit.prediction.unwrap() - target).abs() < 1e-6);
+}
+
+#[test]
 fn profile_of_a_linear_model_is_a_parabola() {
     let problem = line_problem(&VALUES);
     let fit = optimize(&problem, &config(), 0).unwrap();
@@ -677,11 +754,21 @@ fn the_tolerance_follows_the_optimizer() {
     // rule: the improvement it allows at the fit; a swarm without it: 1e-6
     // of the objective at the fit, at least 1e-6. All above the noise floor
     // of this line.
+    // A swarm with a polish ends with Nelder-Mead: the sd_tolerance of the
+    // polish.
+    let polished = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
+        polish: Some(Box::new(NelderMeadConfig {
+            sd_tolerance: 1e-13,
+            ..NelderMeadConfig::default()
+        })),
+        ..ParticleSwarmConfig::default()
+    });
     let scale = fit.final_loss.max(1.0);
     for (config, expected) in [
         (&nelder_mead, 1e-14),
         (&stopping, 1e-9 + 1e-7 * fit.final_loss),
         (&swarm, 1e-6 * scale),
+        (&polished, 1e-13),
     ] {
         let tracer = ProfileTracer::new(&problem, config, &fit.best_parameters, 0).unwrap();
         assert!(tracer.noise_floor() < 1e-14, "{}", tracer.noise_floor());

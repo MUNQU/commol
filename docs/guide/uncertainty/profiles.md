@@ -204,7 +204,12 @@ multiplier is minus the slope of the profile (`Profile.multipliers`). With a
 particle swarm, each refit draws from a seed of its own, derived from the
 problem's seed, so a profile repeats; a swarm runs each outer iteration of a
 held prediction to its `max_iterations`, or until one of its
-[stop rules](../calibration-optimizers.md#stop-rules) holds.
+[stop rules](../calibration-optimizers.md#stop-rules) holds. With a
+[polish](../calibration-optimizers.md#polish-with-nelder-mead), a held
+parameter refits with the swarm and then Nelder-Mead, and a held prediction
+runs a second augmented Lagrangian with Nelder-Mead as its inner solver, from
+the end, the multiplier and the penalty of the swarm; `Profile.multipliers`
+then comes from that second run.
 
 ## Prediction profiles
 
@@ -230,7 +235,9 @@ For a particle swarm with the improvement stop rule, `τ` is the improvement
 the rule allows at the fit, `tol_abs + tol_rel · |objective at the fit|`: the
 swarm stops when its best value improves by less. A swarm without that rule
 has no tolerance on the objective, and `τ` is
-`1e-6 · max(1, |objective at the fit|)`. `ν`, the noise floor, is the error of one
+`1e-6 · max(1, |objective at the fit|)`. A swarm with a
+[polish](../calibration-optimizers.md#polish-with-nelder-mead) ends with
+Nelder-Mead, so `τ` is the `sd_tolerance` of the polish. `ν`, the noise floor, is the error of one
 evaluation of the objective at the fit, from the accuracy of a run:
 `Σ |∂ℓᵢ/∂mᵢ| · eᵢ`, with `eᵢ = rtol · |mᵢ| + k · atol` the error of a run on
 an observation that sums `k` outputs, its prediction `mᵢ`, and the accuracy
