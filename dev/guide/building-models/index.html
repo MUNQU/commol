@@ -5035,7 +5035,12 @@ Under <code>Groups("group")</code>, a unit of <code>g2</code> sees only <code>g2
 </span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="c1"># [&#39;A_g1&#39;, &#39;A_g2_s1&#39;, &#39;A_g2_s2&#39;, &#39;B_g1&#39;, &#39;B_g2_s1&#39;, &#39;B_g2_s2&#39;]</span>
 </span></code></pre></div>
 <p><code>build</code> raises <code>ValueError</code> (or Pydantic's <code>ValidationError</code>, a subclass) when
-the definition is not valid:</p>
+the definition is not valid. The engine checks each rule (<code>check_model</code> in
+<code>crates/commol-model/src/builder.rs</code>), so a model in JSON
+(<code>Model.from_json</code>) meets the same rules and gets the same messages. The
+builder checks only the types of its arguments: a repeated id or a
+stratification without distinct categories is refused at <code>build</code>, not at the
+call that adds it.</p>
 <table>
 <thead>
 <tr>
@@ -5049,15 +5054,27 @@ the definition is not valid:</p>
 <td>An <code>Aggregate</code> with an engine of another kind; the message lists the engines of <code>Aggregate</code></td>
 </tr>
 <tr>
+<td>No two bins, accumulators, stratifications, transitions or parameters share an id</td>
+<td><code>add_bin(id="A", ...)</code> twice: <code>Two bins share the id 'A'; give each bin its own id</code></td>
+</tr>
+<tr>
+<td>A stratification has at least one category, and no category twice</td>
+<td><code>categories=["g1", "g1"]</code>: <code>Stratification 'g' names the category 'g1' twice; name each category once</code></td>
+</tr>
+<tr>
 <td>At least one bin and one transition</td>
-<td>A model with no transition</td>
+<td>A model with no transition: <code>The process has no transition; an aggregate model needs at least one transition</code></td>
+</tr>
+<tr>
+<td><code>bin_amounts</code> names each bin, and nothing else</td>
+<td>A bin with no amount in <code>bin_amounts</code>; the message lists the missing and the extra ids</td>
 </tr>
 <tr>
 <td>The structure follows the rules above</td>
-<td>A bin with no amount in <code>bin_amounts</code></td>
+<td>A fraction that names no category of its stratification</td>
 </tr>
 <tr>
-<td>Parameter ids are unique and are not <a href="#names-the-engine-sets">names the engine sets</a></td>
+<td>Parameter ids are not <a href="#names-the-engine-sets">names the engine sets</a></td>
 <td>A parameter named <code>A</code>, <code>total</code> or <code>A_g1</code></td>
 </tr>
 <tr>

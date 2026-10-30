@@ -4087,7 +4087,7 @@ plotting them.</p>
 <tr>
 <td><code>run(num_steps, *, seed=None)</code></td>
 <td><code>SimulationResults</code></td>
-<td>Runs from the initial state, with the model as it is now, and reports at the positions <code>0, 1, …, num_steps</code>. Raises <code>ValueError</code> if a parameter or a bin amount is still <code>None</code>, <code>InfeasibleStateError</code> if a difference step leaves an amount below zero (<a href="../transitions/#amounts-below-zero">Amounts below zero</a>), and <code>RuntimeError</code> that names the flow and the position if a rate is not a number.</td>
+<td>Runs from the initial state, with the model as it is now, and reports at the positions <code>0, 1, …, num_steps</code>. Raises <code>ValueError</code> if a parameter or a bin amount is still <code>None</code>, with the engine's message that names each of them (<code>CompiledModel::check_values</code> in <code>crates/commol-model/src/system.rs</code>), <code>InfeasibleStateError</code> if a difference step leaves an amount below zero (<a href="../transitions/#amounts-below-zero">Amounts below zero</a>), and <code>RuntimeError</code> that names the flow and the position if a rate is not a number.</td>
 </tr>
 <tr>
 <td><code>run_at(at, *, seed=None)</code></td>

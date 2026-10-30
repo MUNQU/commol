@@ -4104,7 +4104,8 @@ scale, or compare a gain over a window: <a href="../calibration-observations/">O
 values of the model kind, and the kind declares which it accepts
 (<code>model.structure.calibration_value_types()</code>): an aggregate model accepts
 <code>"initial_condition"</code>. A type the kind does not accept raises a <code>ValueError</code>
-that names the kind when you create the <code>Calibrator</code>. A <code>"parameter"</code> that
+with the engine's message, which names the kind, when you create the
+<code>Calibrator</code>. A <code>"parameter"</code> that
 the model does not have, or that a formula or a series sets, raises a
 <code>ValueError</code> with the engine's message at the same time.</p>
 <h2 id="losses">Losses<a class="headerlink" href="#losses" title="Permanent link">&para;</a></h2>

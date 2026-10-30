@@ -177,19 +177,6 @@ class Model(BaseModel, Generic[StructureT]):
         return self
 
     @model_validator(mode="after")
-    def _validate_unique_parameter_ids(self) -> Self:
-        """
-        Validates that parameter IDs are unique.
-        """
-        parameter_ids = [p.id for p in self.parameters]
-        if len(parameter_ids) != len(set(parameter_ids)):
-            duplicates = [
-                item for item in set(parameter_ids) if parameter_ids.count(item) > 1
-            ]
-            raise ValueError(f"Duplicate parameter IDs found: {duplicates}")
-        return self
-
-    @model_validator(mode="after")
     def _validate_structure(self) -> Self:
         """Check the structure against the parameters and the engine."""
         self.structure.check_model(self)
@@ -237,17 +224,6 @@ class Model(BaseModel, Generic[StructureT]):
         parameters = list(updated.values())
         self.structure.check_model(self.model_copy(update={"parameters": parameters}))
         self.parameters = parameters
-
-    def get_uncalibrated_parameters(self) -> list[str]:
-        """
-        Get a list of parameter IDs that have None values (need calibration).
-
-        Returns
-        -------
-        list[str]
-            List of parameter IDs that require calibration.
-        """
-        return [param.id for param in self.parameters if param.value is None]
 
     def apply_calibration_parameters(
         self,
@@ -654,35 +630,6 @@ def update_parameters(
     parameters = list(updated.values())
     self.structure.check_model(self.model_copy(update={"parameters": parameters}))
     self.parameters = parameters
-```
-
-#### get_uncalibrated_parameters
-
-```python
-get_uncalibrated_parameters() -> list[str]
-```
-
-Get a list of parameter IDs that have None values (need calibration).
-
-Returns:
-
-| Type        | Description                                     |
-| ----------- | ----------------------------------------------- |
-| `list[str]` | List of parameter IDs that require calibration. |
-
-Source code in `commol/_model/model.py`
-
-```python
-def get_uncalibrated_parameters(self) -> list[str]:
-    """
-    Get a list of parameter IDs that have None values (need calibration).
-
-    Returns
-    -------
-    list[str]
-        List of parameter IDs that require calibration.
-    """
-    return [param.id for param in self.parameters if param.value is None]
 ```
 
 #### apply_calibration_parameters
@@ -1139,70 +1086,6 @@ class Process(BaseModel):
     matrices: list[CategoryMatrix] = Field(default_factory=list)
     transitions: list[Transition] = Field(default_factory=list)
 
-    @model_validator(mode="after")
-    def _validate_unique_ids(self) -> Self:
-        """Validate that bin, stratification and transition ids are unique."""
-        for label, ids in (
-            ("bin", [item.id for item in self.bins]),
-            ("stratification", [item.id for item in self.stratifications]),
-            ("transition", [item.id for item in self.transitions]),
-        ):
-            if len(ids) != len(set(ids)):
-                duplicates = [item for item in set(ids) if ids.count(item) > 1]
-                raise ValueError(f"Duplicate {label} IDs found: {duplicates}")
-        return self
-
-    @model_validator(mode="after")
-    def _validate_transition_ids(self) -> Self:
-        """
-        Check that each transition moves between bins, or between the
-        categories of one stratification.
-        """
-        bin_ids = {bin_item.id for bin_item in self.bins}
-        category_to_stratification = {
-            cat: strat.id for strat in self.stratifications for cat in strat.categories
-        }
-        categories_ids = set(category_to_stratification)
-        bin_and_categories_ids = bin_ids | categories_ids
-
-        for transition in self.transitions:
-            transition_ids = set(transition.source) | set(transition.target)
-
-            if not transition_ids.issubset(bin_and_categories_ids):
-                invalid_ids = transition_ids - bin_and_categories_ids
-                raise ValueError(
-                    f"Transition '{transition.id}' contains invalid ids: "
-                    f"{invalid_ids}. Ids must be defined in Bin ids "
-                    f"or Stratification Categories."
-                )
-
-            is_bin_flow = transition_ids.issubset(bin_ids)
-            is_stratification_flow = transition_ids.issubset(categories_ids)
-
-            if not is_bin_flow and not is_stratification_flow:
-                raise ValueError(
-                    f"Transition '{transition.id}' mixes id types. "
-                    f"Found Bin ids ({transition_ids & bin_ids}) and "
-                    f"Stratification Categories ids "
-                    f"({transition_ids & categories_ids}). "
-                    "Transitions must be purely Bin flow or purely "
-                    f"Stratification flow."
-                )
-
-            if is_stratification_flow:
-                parent_stratification_ids = {
-                    category_to_stratification[cat_id] for cat_id in transition_ids
-                }
-                if len(parent_stratification_ids) > 1:
-                    raise ValueError(
-                        f"Transition '{transition.id}' is a Stratification flow "
-                        f"but involves categories from multiple stratifications: "
-                        f"{', '.join(sorted(parent_stratification_ids))}. A single "
-                        f"transition must only move between categories belonging "
-                        f"to the same parent stratification."
-                    )
-        return self
-
     def is_empty(self) -> bool:
         """
         Whether the process holds nothing.
@@ -1492,17 +1375,6 @@ class ModelStructure(BaseModel, ABC):
             name
             for name in commol_rs.engine.ModelKind(engine_json(self.kind)).value_types()
         )
-
-    def uncalibrated_values(self) -> list[str]:
-        """
-        Ids of the values of this kind that need calibration before a run.
-
-        Returns
-        -------
-        list[str]
-            Empty unless the kind has values left unset.
-        """
-        return []
 
     def check_calibration_values(
         self,
@@ -1829,35 +1701,6 @@ def calibration_value_types(self) -> frozenset[str]:
     )
 ```
 
-#### uncalibrated_values
-
-```python
-uncalibrated_values() -> list[str]
-```
-
-Ids of the values of this kind that need calibration before a run.
-
-Returns:
-
-| Type        | Description                                  |
-| ----------- | -------------------------------------------- |
-| `list[str]` | Empty unless the kind has values left unset. |
-
-Source code in `commol/_model/structure.py`
-
-```python
-def uncalibrated_values(self) -> list[str]:
-    """
-    Ids of the values of this kind that need calibration before a run.
-
-    Returns
-    -------
-    list[str]
-        Empty unless the kind has values left unset.
-    """
-    return []
-```
-
 #### check_calibration_values
 
 ```python
@@ -2172,14 +2015,17 @@ class Aggregate(ModelStructure, InitialConditions):
         """
         Check the structure against the process and the parameters.
 
-        The process needs a bin and a transition, the amounts must name every
-        bin, and the engine must check the fractions against the
+        The engine checks the model (``check_model`` of
+        `crates/commol-model/src/builder.rs`): unique ids, the categories of
+        each stratification, a bin and a transition, what each transition
+        moves, the conditions of the stratifications and of the stratified
+        rates, the amounts against the bins, the fractions against the
         stratifications (every stratification and category named, a split by
-        category by a stratification declared before it), plan every
-        transition, accept every id (no parameter id is an engine variable, a
-        bin, a compartment or a subgroup total), resolve the neighbors, find
-        every variable a rate or a formula parameter reads, and build the
-        initial state.
+        category by a stratification declared before it), every id (no
+        parameter id is an engine variable, a bin, a compartment or a
+        subgroup total), the neighbors, and every variable a rate or a
+        formula parameter reads. Then it plans every transition and builds
+        the initial state.
 
         Parameters
         ----------
@@ -2189,16 +2035,11 @@ class Aggregate(ModelStructure, InitialConditions):
         Raises
         ------
         ValueError
-            If one of these checks fails.
+            If one of these checks fails, with the message of the engine.
         """
         process = model.process
-        if not process.bins:
-            raise ValueError("At least one bin must be defined.")
-        if not process.transitions:
-            raise ValueError("At least one transition must be defined.")
-        self._check_bin_amounts(process)
-        engine_state.transition_flows(process, self)
         engine_state.check_model(model)
+        engine_state.transition_flows(process, self)
         if self.compartment_amounts:
             engine_state.initial_state(process, self)
 
@@ -2254,17 +2095,6 @@ class Aggregate(ModelStructure, InitialConditions):
         if bin_item is None:
             return SeriesLabel(series_id, None)
         return SeriesLabel(bin_item.name or series_id, bin_item.unit)
-
-    def uncalibrated_values(self) -> list[str]:
-        """
-        Ids of the bins whose initial amount needs calibration.
-
-        Returns
-        -------
-        list[str]
-            Bin ids with a None amount.
-        """
-        return self.get_uncalibrated_bins()
 
     def check_calibration_values(
         self,
@@ -2576,21 +2406,6 @@ class Aggregate(ModelStructure, InitialConditions):
                 for stratification, names in sets.items()
             )
         )
-
-    # ------------------------------------------------------------------
-    # Checks against the model
-    # ------------------------------------------------------------------
-
-    def _check_bin_amounts(self, process: Process) -> None:
-        """Check that the bin amounts name every bin of the process."""
-        actual_bins = set(self.bin_amounts)
-        expected_bins = {bin_item.id for bin_item in process.bins}
-        if actual_bins != expected_bins:
-            raise ValueError(
-                f"Initial bin amounts keys must exactly match bin ids. "
-                f"Missing ids: {sorted(expected_bins - actual_bins)}, "
-                f"Extra ids: {sorted(actual_bins - expected_bins)}."
-            )
 ```
 
 ### Methods:
@@ -2603,7 +2418,7 @@ check_model(model: Model[Self]) -> None
 
 Check the structure against the process and the parameters.
 
-The process needs a bin and a transition, the amounts must name every bin, and the engine must check the fractions against the stratifications (every stratification and category named, a split by category by a stratification declared before it), plan every transition, accept every id (no parameter id is an engine variable, a bin, a compartment or a subgroup total), resolve the neighbors, find every variable a rate or a formula parameter reads, and build the initial state.
+The engine checks the model (`check_model` of `crates/commol-model/src/builder.rs`): unique ids, the categories of each stratification, a bin and a transition, what each transition moves, the conditions of the stratifications and of the stratified rates, the amounts against the bins, the fractions against the stratifications (every stratification and category named, a split by category by a stratification declared before it), every id (no parameter id is an engine variable, a bin, a compartment or a subgroup total), the neighbors, and every variable a rate or a formula parameter reads. Then it plans every transition and builds the initial state.
 
 Parameters:
 
@@ -2613,9 +2428,9 @@ Parameters:
 
 Raises:
 
-| Type         | Description                   |
-| ------------ | ----------------------------- |
-| `ValueError` | If one of these checks fails. |
+| Type         | Description                                                   |
+| ------------ | ------------------------------------------------------------- |
+| `ValueError` | If one of these checks fails, with the message of the engine. |
 
 Source code in `commol/_model/aggregate.py`
 
@@ -2624,14 +2439,17 @@ def check_model(self, model: "Model[Self]") -> None:
     """
     Check the structure against the process and the parameters.
 
-    The process needs a bin and a transition, the amounts must name every
-    bin, and the engine must check the fractions against the
+    The engine checks the model (``check_model`` of
+    `crates/commol-model/src/builder.rs`): unique ids, the categories of
+    each stratification, a bin and a transition, what each transition
+    moves, the conditions of the stratifications and of the stratified
+    rates, the amounts against the bins, the fractions against the
     stratifications (every stratification and category named, a split by
-    category by a stratification declared before it), plan every
-    transition, accept every id (no parameter id is an engine variable, a
-    bin, a compartment or a subgroup total), resolve the neighbors, find
-    every variable a rate or a formula parameter reads, and build the
-    initial state.
+    category by a stratification declared before it), every id (no
+    parameter id is an engine variable, a bin, a compartment or a
+    subgroup total), the neighbors, and every variable a rate or a
+    formula parameter reads. Then it plans every transition and builds
+    the initial state.
 
     Parameters
     ----------
@@ -2641,16 +2459,11 @@ def check_model(self, model: "Model[Self]") -> None:
     Raises
     ------
     ValueError
-        If one of these checks fails.
+        If one of these checks fails, with the message of the engine.
     """
     process = model.process
-    if not process.bins:
-        raise ValueError("At least one bin must be defined.")
-    if not process.transitions:
-        raise ValueError("At least one transition must be defined.")
-    self._check_bin_amounts(process)
-    engine_state.transition_flows(process, self)
     engine_state.check_model(model)
+    engine_state.transition_flows(process, self)
     if self.compartment_amounts:
         engine_state.initial_state(process, self)
 ```
@@ -2757,35 +2570,6 @@ def series_label(self, model: "Model[Self]", series_id: str) -> SeriesLabel:
     if bin_item is None:
         return SeriesLabel(series_id, None)
     return SeriesLabel(bin_item.name or series_id, bin_item.unit)
-```
-
-#### uncalibrated_values
-
-```python
-uncalibrated_values() -> list[str]
-```
-
-Ids of the bins whose initial amount needs calibration.
-
-Returns:
-
-| Type        | Description                 |
-| ----------- | --------------------------- |
-| `list[str]` | Bin ids with a None amount. |
-
-Source code in `commol/_model/aggregate.py`
-
-```python
-def uncalibrated_values(self) -> list[str]:
-    """
-    Ids of the bins whose initial amount needs calibration.
-
-    Returns
-    -------
-    list[str]
-        Bin ids with a None amount.
-    """
-    return self.get_uncalibrated_bins()
 ```
 
 #### check_calibration_values
@@ -3650,7 +3434,7 @@ class SeriesValue(BaseModel):
     ) -> list[tuple[float, float]]:
         """
         Check the points with the rule of the engine (`check_series` of
-        `crates/commol-model/src/values.rs`): at least one point, each
+        `crates/commol-model/src/rules.rs`): at least one point, each
         position finite, not negative and once, each value finite.
         """
         commol_rs.model.check_series(value)
@@ -3774,12 +3558,12 @@ Defines a categorical subdivision of the compartments.
 
 Attributes:
 
-| Name          | Type                            | Description                                              |
-| ------------- | ------------------------------- | -------------------------------------------------------- |
-| `id`          | `str`                           | Identifier of the stratification.                        |
-| `categories`  | `list[str]`                     | List of the different stratification groups identifiers. |
-| `description` | \`str                           | None\`                                                   |
-| `conditions`  | \`list[StratificationCondition] | None\`                                                   |
+| Name          | Type                            | Description                                                                              |
+| ------------- | ------------------------------- | ---------------------------------------------------------------------------------------- |
+| `id`          | `str`                           | Identifier of the stratification.                                                        |
+| `categories`  | `list[str]`                     | The categories, at least one, each once; the engine checks them when the model is built. |
+| `description` | \`str                           | None\`                                                                                   |
+| `conditions`  | \`list[StratificationCondition] | None\`                                                                                   |
 
 Source code in `commol/_model/stratification.py`
 
@@ -3793,7 +3577,8 @@ class Stratification(BaseModel):
     id : str
         Identifier of the stratification.
     categories : list[str]
-        List of the different stratification groups identifiers.
+        The categories, at least one, each once; the engine checks them when
+        the model is built.
     description : str | None
         A human-readable description of the stratification.
     conditions : list[StratificationCondition] | None
@@ -3830,37 +3615,6 @@ class Stratification(BaseModel):
     @override
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Stratification) and self.id == other.id
-
-    @model_validator(mode="after")
-    def _validate_categories_length(self) -> Self:
-        """
-        Enforces that categories are not empty.
-        """
-        if not self.categories:
-            raise ValueError(
-                (f"Stratification '{self.id}' must have at least one category.")
-            )
-        return self
-
-    @model_validator(mode="after")
-    def _validate_categories_uniqueness(self) -> Self:
-        """
-        Enforces that categories are not repeated.
-        """
-        categories_set = set(self.categories)
-
-        if len(categories_set) != len(self.categories):
-            duplicates = [
-                item for item in categories_set if self.categories.count(item) > 1
-            ]
-            raise ValueError(
-                (
-                    f"Categories for stratification '{self.id}' must not be repeated. "
-                    f"Found duplicates: {list(set(duplicates))}."
-                )
-            )
-
-        return self
 ```
 
 ## CategoryMatrix
@@ -4347,7 +4101,7 @@ class Transition(BaseModel):
     def _validate_impulse(self) -> Self:
         """
         Check the impulse with the rule of the engine (`check_impulse` of
-        `crates/commol-model/src/values.rs`): one of `impulse_at` and
+        `crates/commol-model/src/rules.rs`): one of `impulse_at` and
         `impulse_every`, at least one position on the axis, a positive period
         and an offset that is not negative.
         """

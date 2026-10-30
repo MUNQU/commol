@@ -5239,6 +5239,64 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   it, or that gives no category, raises <code>ValueError</code> at <code>build</code>, with the
   message of the engine, and no longer at the call. Migration: catch the error
   of a condition at <code>build</code>.</li>
+<li><strong>Breaking:</strong> the engine holds every rule of a model that Python checked
+  alone, from <code>check_model</code>, so a model in JSON (<code>Model.from_json</code>,
+  <code>commol_rs.engine.Engine</code>) meets them too. It refuses two bins,
+  accumulators, stratifications, transitions or parameters with one id
+  (<code>Two bins share the id 'A'; give each bin its own id</code>); a stratification
+  with no category or a category twice (<code>Stratification 'g' names the
+  category 'g1' twice; name each category once</code>); a process without a bin or
+  a transition (<code>The process has no transition; an aggregate model needs at
+  least one transition</code>); <code>bin_amounts</code> that miss a bin or name one the
+  process does not have (<code>Missing ids: ["B"], Extra ids: ["Z"]</code>); and a
+  stratified rate with no condition or two conditions on one stratification
+  (<code>Transition 'ab', stratified rate 0: two conditions name 'g'; give one
+  condition per stratification</code>). A model in JSON with a repeated bin or
+  transition, a repeated category, no transition, a missing bin amount (read
+  as <code>0</code>), an unknown bin amount (ignored) or such a stratified rate built;
+  it is now refused. Accumulator ids were not checked anywhere. The message
+  of a transition that is not between bins or between the categories of one
+  stratification names the ids that break the rule: <code>Transition 't2' mixes
+  bins (["A"]) and categories (["g1"]); a transition moves between bins or
+  between the categories of one stratification</code>. <code>ModelBuilder</code> no longer
+  checks an id when it is added, and <code>Stratification</code> and <code>StratifiedRate</code>
+  no longer check their categories and conditions when they are made: each
+  of these errors is a <code>ValueError</code> at <code>build</code>, with the message of the
+  engine. Migration: catch these errors at <code>build</code>, and read the new
+  messages.</li>
+<li><strong>Breaking:</strong> a run refuses a parameter or a bin amount without a value
+  with the message of the engine, which names each of them: <code>The model
+  cannot run: the parameters ["k1"] and the amounts of the bins ["B"] have no
+  value. Give them a value, or calibrate them and write the calibrated values
+  back</code> (<code>ValueError</code> from <code>Simulation.run</code>, <code>run_at</code> and the replicates; the
+  old message was <code>Cannot run Simulation: ...</code>). Every engine checks it
+  before it runs, and a rate that reads a parameter without a value names it
+  (<code>the parameter 'k1' has no value</code>), not an index. A bin amount without a
+  value no longer runs as <code>0</code>. A bin left <code>None</code> needs a value in each of its
+  compartments: a calibration of <code>B_g1</code> alone leaves <code>B_g2</code> without one
+  (<code>the amounts of the compartments ["B_g2"]</code>), and the split of a category
+  (<code>g1</code>, <code>group:g1</code>) shares out what the bin holds, so it gives none. A
+  <code>Calibrator</code>, and every uncertainty method that builds the problem, raises
+  this <code>ValueError</code> when it is built if a value that the calibration does not
+  set has none, even when no rate reads it; it was a failed start of the
+  optimizer, or a run at <code>0</code>. Migration: give every parameter and bin amount
+  a value, or calibrate it.</li>
+<li>A qualified category id matches whole ids: <code>a:b:c</code> names the category
+  <code>b:c</code> of <code>a</code> or the category <code>c</code> of <code>a:b</code>, whichever the model declares, so
+  a stratification or a category whose id holds <code>:</code> resolves. The engine split
+  the id at the first <code>:</code> and <code>Aggregate</code> at the last.</li>
+<li>A split of no category in <code>stratification_fractions</code> (<code>{"g": {}}</code>) no
+  longer fails on its sum: <code>build</code> gives the message of the engine, such as
+  <code>Stratification 'g' has no category; give it at least one</code>.</li>
+<li>An ambiguous category of the initial conditions (<code>update_stratification_fractions</code>,
+  <code>subgroup_total</code>, <code>get_category_fraction</code>) gets the message of the engine,
+  the one a calibrated initial condition gets: <code>Category 'c1' is ambiguous:
+  it is declared by stratifications ["group", "level"]. Qualify it as
+  'group:c1' or 'level:c1'.</code> A qualified category that no compartment has
+  gets <code>Invalid bin, compartment or category 'group:g9' for initial
+  condition calibration</code>, with the compartments. A calibrated value of a type
+  the kind of the model does not take gets the message of the engine, <code>A test
+  model takes no values of type initial_condition; 'k' is one</code>.</li>
 <li>The engine checks that the fractions name every stratification and each of
   its categories, from <code>check_model</code>; the messages list the ids as the engine
   writes them, <code>Missing ids: ["g"], Extra ids: []</code>, and the message of the
@@ -5488,6 +5546,12 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Breaking:</strong> <code>Model.get_uncalibrated_parameters</code>,
+  <code>Aggregate.uncalibrated_values</code> (and <code>ModelStructure.uncalibrated_values</code>),
+  <code>Aggregate.get_uncalibrated_bins</code> and <code>Aggregate.get_categories_with_fractions</code>
+  are removed: no part of commol reads them, and the engine names every
+  value a run lacks. Migration: read <code>parameter.value is None</code> and
+  <code>structure.bin_amounts</code>, or run the model and read the message.</li>
 <li><strong>Breaking:</strong> <code>commol.utils.security</code> is removed, with <code>SecurityConfig</code>,
   <code>SecurityError</code>, <code>validate_expression_security</code> and the <code>config=</code> argument
   of <code>AxisPattern.combine</code> and <code>AxisPattern.from_formula</code>. The parser of the

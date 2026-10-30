@@ -78,11 +78,11 @@ A category that two stratifications share is written with its stratification, as
 
 The engine resolves every id when you create the `Calibrator` (`InitialConditionPlan` in `crates/commol-model/src/initial_conditions.rs`), so a wrong id fails before the optimization starts:
 
-| `id`                                                                                                   | Error                                                                 |
-| ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
-| Names nothing in the model                                                                             | `Invalid bin, compartment or category 'X'`, with the compartments     |
-| A category of a stratification with three or more categories, such as `"g1"` of `group = [g1, g2, g3]` | `Initial condition category 'group:g1' needs a binary stratification` |
-| A category name that two stratifications declare                                                       | `… is ambiguous`, with the qualified names                            |
+| `id`                                                                                                   | Error                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Names nothing in the model                                                                             | `Invalid bin, compartment or category 'X'`, with the compartments                                                                                 |
+| A category of a stratification with three or more categories, such as `"g1"` of `group = [g1, g2, g3]` | `Initial condition category 'group:g1' needs a binary stratification`                                                                             |
+| A category name that two stratifications declare                                                       | `Category 'c1' is ambiguous`, with the stratifications and the qualified names (`resolve_category`, which `Aggregate.resolve_category` also asks) |
 
 ## The remainder
 

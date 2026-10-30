@@ -1300,18 +1300,21 @@ print([c.name for c in stratified_model.structure.initial_state(stratified_model
 # ['A_g1', 'A_g2_s1', 'A_g2_s2', 'B_g1', 'B_g2_s1', 'B_g2_s2']
 ```
 
-`build` raises `ValueError` (or Pydantic's `ValidationError`, a subclass) when the definition is not valid:
+`build` raises `ValueError` (or Pydantic's `ValidationError`, a subclass) when the definition is not valid. The engine checks each rule (`check_model` in `crates/commol-model/src/builder.rs`), so a model in JSON (`Model.from_json`) meets the same rules and gets the same messages. The builder checks only the types of its arguments: a repeated id or a stratification without distinct categories is refused at `build`, not at the call that adds it.
 
-| Check                                                                                                                                                                     | Example of a rejected definition                                                                 |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| The engine runs the kind of the structure                                                                                                                                 | An `Aggregate` with an engine of another kind; the message lists the engines of `Aggregate`      |
-| At least one bin and one transition                                                                                                                                       | A model with no transition                                                                       |
-| The structure follows the rules above                                                                                                                                     | A bin with no amount in `bin_amounts`                                                            |
-| Parameter ids are unique and are not [names the engine sets](#names-the-engine-sets)                                                                                      | A parameter named `A`, `total` or `A_g1`                                                         |
-| Every `total_…` variable names a subgroup total                                                                                                                           | `total_t1_g1` when `group` is declared before `type`                                             |
-| A rate that reads the neighbors has them                                                                                                                                  | `k1 * neighbors_B` with no `neighbors=`                                                          |
-| Every rate expression is in the language of formulas ([Limits of the parser](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#limits-of-the-parser)) | A formula with `__import__('os')`                                                                |
-| Every transition can be planned by the engine                                                                                                                             | See [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#what-building-checks) |
+| Check                                                                                                                                                                     | Example of a rejected definition                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| The engine runs the kind of the structure                                                                                                                                 | An `Aggregate` with an engine of another kind; the message lists the engines of `Aggregate`                   |
+| No two bins, accumulators, stratifications, transitions or parameters share an id                                                                                         | `add_bin(id="A", ...)` twice: `Two bins share the id 'A'; give each bin its own id`                           |
+| A stratification has at least one category, and no category twice                                                                                                         | `categories=["g1", "g1"]`: `Stratification 'g' names the category 'g1' twice; name each category once`        |
+| At least one bin and one transition                                                                                                                                       | A model with no transition: `The process has no transition; an aggregate model needs at least one transition` |
+| `bin_amounts` names each bin, and nothing else                                                                                                                            | A bin with no amount in `bin_amounts`; the message lists the missing and the extra ids                        |
+| The structure follows the rules above                                                                                                                                     | A fraction that names no category of its stratification                                                       |
+| Parameter ids are not [names the engine sets](#names-the-engine-sets)                                                                                                     | A parameter named `A`, `total` or `A_g1`                                                                      |
+| Every `total_…` variable names a subgroup total                                                                                                                           | `total_t1_g1` when `group` is declared before `type`                                                          |
+| A rate that reads the neighbors has them                                                                                                                                  | `k1 * neighbors_B` with no `neighbors=`                                                                       |
+| Every rate expression is in the language of formulas ([Limits of the parser](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#limits-of-the-parser)) | A formula with `__import__('os')`                                                                             |
+| Every transition can be planned by the engine                                                                                                                             | See [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#what-building-checks)              |
 
 ## Save and load
 
@@ -1756,11 +1759,14 @@ A calibration gives a run that stops this way a penalty and goes on; see [Calibr
 
 | Rejected                                                                                                                                                                                                                                                                                                       | Message names                                                      |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| A source or target that is neither a bin nor a category of one stratification                                                                                                                                                                                                                                  | The transition                                                     |
+| A source or target that is neither a bin nor a category of a stratification                                                                                                                                                                                                                                    | The transition and the ids                                         |
+| Bins and categories in one transition                                                                                                                                                                                                                                                                          | The transition, its bins and its categories                        |
+| Categories of several stratifications in one transition                                                                                                                                                                                                                                                        | The transition and the stratifications                             |
 | A category transition without exactly one source and one target                                                                                                                                                                                                                                                | The transition                                                     |
 | A rate variable that is not a parameter, bin, compartment or special variable                                                                                                                                                                                                                                  | The variable and the available names                               |
 | Several sources with a proportional rate                                                                                                                                                                                                                                                                       | The transition; use an absolute rate or `$compartment`             |
 | A stratified rate whose `category` conditions match no source compartment                                                                                                                                                                                                                                      | The transition; use `to` to reach another stratification           |
+| A stratified rate with no condition, or with two conditions on one stratification (`Process::check_conditions` in `crates/commol-core/src/types/process.rs`)                                                                                                                                                   | The transition, the stratified rate and the stratification         |
 | A condition on a stratification the process does not have, with both `category` and `categories`, an empty set, a category twice, a category its stratification does not have, or `to` with `categories` (`Process::check_conditions` and `StratificationCondition::check` in `crates/commol-core/src/types/`) | The transition, the stratification and the category                |
 | A `to` condition on a transition without a source                                                                                                                                                                                                                                                              | The transition; use `category` to choose the compartment it enters |
 | A flow that ends in categories no compartment has                                                                                                                                                                                                                                                              | The transition; add a `to` condition                               |
@@ -2788,18 +2794,18 @@ print(f"C at step 100: {results['C'][-1]:.0f}")
 
 ## `Simulation`
 
-| Member                            | Returns                | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| --------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Simulation(model)`               | —                      | Builds the engine for the model. A model with uncalibrated parameters can be built, but not run.                                                                                                                                                                                                                                                                                                                                                 |
-| `run(num_steps, *, seed=None)`    | `SimulationResults`    | Runs from the initial state, with the model as it is now, and reports at the positions `0, 1, …, num_steps`. Raises `ValueError` if a parameter or a bin amount is still `None`, `InfeasibleStateError` if a difference step leaves an amount below zero ([Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero)), and `RuntimeError` that names the flow and the position if a rate is not a number. |
-| `run_at(at, *, seed=None)`        | `SimulationResults`    | Runs from the initial state and reports at the given sorted positions only. The engine decides which positions its model type accepts: a `DifferentialEquations` or `StochasticEvents` model any non-negative position, such as `0.5`; a `DifferenceEquations` or `StochasticSteps` model only integer steps. Otherwise `ValueError`, with the engine's message. See [Differential equations](#differential-equations).                          |
-| `replicates(count, *, seed=None)` | `ReplicateRuns`        | For a stochastic engine: an object whose `run` and `run_at` return `SimulationReplicates`, `count` runs with one seed each. See [Randomness, seeds and replicates](#randomness-seeds-and-replicates).                                                                                                                                                                                                                                            |
-| `is_stochastic`                   | `bool`                 | Whether the engine draws random numbers.                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `simulation_outputs`              | `list[str]`            | The output names, in engine order: compartments first, then accumulators.                                                                                                                                                                                                                                                                                                                                                                        |
-| `outputs_for(id)`                 | `list[str]`            | The outputs of one bin or accumulator.                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `group_outputs(ids)`              | `dict[str, list[str]]` | The outputs of several bins or accumulators, keyed by id.                                                                                                                                                                                                                                                                                                                                                                                        |
-| `total_series(results, ids)`      | `list[float]`          | The sum of the given outputs at each position of the results. A bin or accumulator id stands for all its outputs; an output name stands for itself.                                                                                                                                                                                                                                                                                              |
-| `engine`                          | engine                 | The underlying Rust engine, for the model as it is now: the engine `model.engine.type` names (`engine.engine_type`). `engine.step()` advances it one step; `engine.reset()` returns it to the initial state.                                                                                                                                                                                                                                     |
+| Member                            | Returns                | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| --------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Simulation(model)`               | —                      | Builds the engine for the model. A model with uncalibrated parameters can be built, but not run.                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `run(num_steps, *, seed=None)`    | `SimulationResults`    | Runs from the initial state, with the model as it is now, and reports at the positions `0, 1, …, num_steps`. Raises `ValueError` if a parameter or a bin amount is still `None`, with the engine's message that names each of them (`CompiledModel::check_values` in `crates/commol-model/src/system.rs`), `InfeasibleStateError` if a difference step leaves an amount below zero ([Amounts below zero](https://munqu.github.io/commol/latest/guide/transitions/#amounts-below-zero)), and `RuntimeError` that names the flow and the position if a rate is not a number. |
+| `run_at(at, *, seed=None)`        | `SimulationResults`    | Runs from the initial state and reports at the given sorted positions only. The engine decides which positions its model type accepts: a `DifferentialEquations` or `StochasticEvents` model any non-negative position, such as `0.5`; a `DifferenceEquations` or `StochasticSteps` model only integer steps. Otherwise `ValueError`, with the engine's message. See [Differential equations](#differential-equations).                                                                                                                                                    |
+| `replicates(count, *, seed=None)` | `ReplicateRuns`        | For a stochastic engine: an object whose `run` and `run_at` return `SimulationReplicates`, `count` runs with one seed each. See [Randomness, seeds and replicates](#randomness-seeds-and-replicates).                                                                                                                                                                                                                                                                                                                                                                      |
+| `is_stochastic`                   | `bool`                 | Whether the engine draws random numbers.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `simulation_outputs`              | `list[str]`            | The output names, in engine order: compartments first, then accumulators.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `outputs_for(id)`                 | `list[str]`            | The outputs of one bin or accumulator.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `group_outputs(ids)`              | `dict[str, list[str]]` | The outputs of several bins or accumulators, keyed by id.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `total_series(results, ids)`      | `list[float]`          | The sum of the given outputs at each position of the results. A bin or accumulator id stands for all its outputs; an output name stands for itself.                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `engine`                          | engine                 | The underlying Rust engine, for the model as it is now: the engine `model.engine.type` names (`engine.engine_type`). `engine.step()` advances it one step; `engine.reset()` returns it to the initial state.                                                                                                                                                                                                                                                                                                                                                               |
 
 Every `run` starts again from the initial state, so two calls with the same model give the same result (`Simulation.run` resets the engine first). To continue a run step by step, use the engine:
 
@@ -3646,7 +3652,7 @@ An `ObservedDataPoint(at=..., output=..., value=...)` is one observed value of a
 | `"factor"`            | Any new id, used by observations through `factor_id`                                                                                            | A factor on the predictions; not part of the model                                                                                                                                      |
 | `"noise"`             | Any new id, named by an [observation model](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#noise-parameters)       | An argument of the model, such as its standard deviation; not part of the model                                                                                                         |
 
-`"parameter"`, `"factor"` and `"noise"` work with every kind of model. The other types are values of the model kind, and the kind declares which it accepts (`model.structure.calibration_value_types()`): an aggregate model accepts `"initial_condition"`. A type the kind does not accept raises a `ValueError` that names the kind when you create the `Calibrator`. A `"parameter"` that the model does not have, or that a formula or a series sets, raises a `ValueError` with the engine's message at the same time.
+`"parameter"`, `"factor"` and `"noise"` work with every kind of model. The other types are values of the model kind, and the kind declares which it accepts (`model.structure.calibration_value_types()`): an aggregate model accepts `"initial_condition"`. A type the kind does not accept raises a `ValueError` with the engine's message, which names the kind, when you create the `Calibrator`. A `"parameter"` that the model does not have, or that a formula or a series sets, raises a `ValueError` with the engine's message at the same time.
 
 ## Losses
 
@@ -3884,11 +3890,11 @@ A category that two stratifications share is written with its stratification, as
 
 The engine resolves every id when you create the `Calibrator` (`InitialConditionPlan` in `crates/commol-model/src/initial_conditions.rs`), so a wrong id fails before the optimization starts:
 
-| `id`                                                                                                   | Error                                                                 |
-| ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
-| Names nothing in the model                                                                             | `Invalid bin, compartment or category 'X'`, with the compartments     |
-| A category of a stratification with three or more categories, such as `"g1"` of `group = [g1, g2, g3]` | `Initial condition category 'group:g1' needs a binary stratification` |
-| A category name that two stratifications declare                                                       | `… is ambiguous`, with the qualified names                            |
+| `id`                                                                                                   | Error                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Names nothing in the model                                                                             | `Invalid bin, compartment or category 'X'`, with the compartments                                                                                 |
+| A category of a stratification with three or more categories, such as `"g1"` of `group = [g1, g2, g3]` | `Initial condition category 'group:g1' needs a binary stratification`                                                                             |
+| A category name that two stratifications declare                                                       | `Category 'c1' is ambiguous`, with the stratifications and the qualified names (`resolve_category`, which `Aggregate.resolve_category` also asks) |
 
 ## The remainder
 
@@ -16594,10 +16600,11 @@ class ModelBuilder:
         ModelBuilder
             Self for method chaining.
 
-        Raises
-        ------
-        ValueError
-            If ``categories`` is empty or names a category twice.
+        Notes
+        -----
+        ``build`` refuses, with the message of the engine, a stratification
+        whose id another stratification has, with no category or a category
+        twice, or with a condition that does not fit.
         """
         self._stratifications.append(
             Stratification(
@@ -16752,16 +16759,11 @@ class ModelBuilder:
                     "series list."
                 )
             param_value = value
-        self._ensure_parameter_id_available(id)
         self._parameters.append(
             Parameter(id=id, value=param_value, description=description, unit=unit)
         )
         logger.info(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
         return self
-
-    def _ensure_parameter_id_available(self, id: str) -> None:
-        if any(parameter.id == id for parameter in self._parameters):
-            raise ValueError(f"Parameter id '{id}' already exists")
 
     def _register_series_pattern(
         self,
@@ -16792,7 +16794,6 @@ class ModelBuilder:
         else:
             param_name = f"_series_{self._series_counter}"
             self._series_counter += 1
-        self._ensure_parameter_id_available(param_name)
         self._parameters.append(
             Parameter(
                 id=param_name,
@@ -17533,11 +17534,9 @@ Returns:
 | -------------- | ------------------------- |
 | `ModelBuilder` | Self for method chaining. |
 
-Raises:
+Notes
 
-| Type         | Description                                       |
-| ------------ | ------------------------------------------------- |
-| `ValueError` | If categories is empty or names a category twice. |
+`build` refuses, with the message of the engine, a stratification whose id another stratification has, with no category or a category twice, or with a condition that does not fit.
 
 Source code in `commol/_model/builder.py`
 
@@ -17578,10 +17577,11 @@ def add_stratification(
     ModelBuilder
         Self for method chaining.
 
-    Raises
-    ------
-    ValueError
-        If ``categories`` is empty or names a category twice.
+    Notes
+    -----
+    ``build`` refuses, with the message of the engine, a stratification
+    whose id another stratification has, with no category or a category
+    twice, or with a condition that does not fit.
     """
     self._stratifications.append(
         Stratification(
@@ -17806,7 +17806,6 @@ def add_parameter(
                 "series list."
             )
         param_value = value
-    self._ensure_parameter_id_available(id)
     self._parameters.append(
         Parameter(id=id, value=param_value, description=description, unit=unit)
     )
@@ -18483,11 +18482,11 @@ The rate of the compartments of a transition that match some categories.
 
 Attributes:
 
-| Name         | Type                            | Description                                                                                   |
-| ------------ | ------------------------------- | --------------------------------------------------------------------------------------------- |
-| `conditions` | `list[StratificationCondition]` | The categories that a compartment must match, at least one, each stratification at most once. |
-| `rate`       | \`str                           | float\`                                                                                       |
-| `absolute`   | \`bool                          | None\`                                                                                        |
+| Name         | Type                            | Description                                                                                                                                   |
+| ------------ | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `conditions` | `list[StratificationCondition]` | The categories that a compartment must match, at least one, each stratification at most once; the engine checks them when the model is built. |
+| `rate`       | \`str                           | float\`                                                                                                                                       |
+| `absolute`   | \`bool                          | None\`                                                                                                                                        |
 
 Source code in `commol/_model/transition.py`
 
@@ -18504,7 +18503,8 @@ class StratifiedRate(BaseModel):
     ----------
     conditions : list[StratificationCondition]
         The categories that a compartment must match, at least one, each
-        stratification at most once.
+        stratification at most once; the engine checks them when the model
+        is built.
     rate : str | float
         The rate of the matching compartments: a formula, a parameter or a
         number, which is kept as its string. It can read ``$compartment``
@@ -18532,32 +18532,6 @@ class StratifiedRate(BaseModel):
             "any compartment variable."
         ),
     )
-
-    @field_validator("conditions")
-    @classmethod
-    def _validate_not_empty(
-        cls, v: list[StratificationCondition]
-    ) -> list[StratificationCondition]:
-        """Ensure at least one stratification condition is specified."""
-        if not v:
-            raise ValueError(
-                "conditions must contain at least one stratification condition"
-            )
-        return v
-
-    @model_validator(mode="after")
-    def _validate_unique_stratifications(self) -> Self:
-        """Ensure no duplicate stratification IDs."""
-        strat_ids = [sc.stratification for sc in self.conditions]
-        if len(strat_ids) != len(set(strat_ids)):
-            duplicates = [s for s in strat_ids if strat_ids.count(s) > 1]
-            raise ValueError(
-                (
-                    f"Duplicate stratifications found: {list(set(duplicates))}. "
-                    f"Each stratification can only be specified once per rate."
-                )
-            )
-        return self
 
     @field_validator("rate")
     @classmethod
@@ -18749,19 +18723,6 @@ class Model(BaseModel, Generic[StructureT]):
         return self
 
     @model_validator(mode="after")
-    def _validate_unique_parameter_ids(self) -> Self:
-        """
-        Validates that parameter IDs are unique.
-        """
-        parameter_ids = [p.id for p in self.parameters]
-        if len(parameter_ids) != len(set(parameter_ids)):
-            duplicates = [
-                item for item in set(parameter_ids) if parameter_ids.count(item) > 1
-            ]
-            raise ValueError(f"Duplicate parameter IDs found: {duplicates}")
-        return self
-
-    @model_validator(mode="after")
     def _validate_structure(self) -> Self:
         """Check the structure against the parameters and the engine."""
         self.structure.check_model(self)
@@ -18809,17 +18770,6 @@ class Model(BaseModel, Generic[StructureT]):
         parameters = list(updated.values())
         self.structure.check_model(self.model_copy(update={"parameters": parameters}))
         self.parameters = parameters
-
-    def get_uncalibrated_parameters(self) -> list[str]:
-        """
-        Get a list of parameter IDs that have None values (need calibration).
-
-        Returns
-        -------
-        list[str]
-            List of parameter IDs that require calibration.
-        """
-        return [param.id for param in self.parameters if param.value is None]
 
     def apply_calibration_parameters(
         self,
@@ -19226,35 +19176,6 @@ def update_parameters(
     parameters = list(updated.values())
     self.structure.check_model(self.model_copy(update={"parameters": parameters}))
     self.parameters = parameters
-```
-
-#### get_uncalibrated_parameters
-
-```python
-get_uncalibrated_parameters() -> list[str]
-```
-
-Get a list of parameter IDs that have None values (need calibration).
-
-Returns:
-
-| Type        | Description                                     |
-| ----------- | ----------------------------------------------- |
-| `list[str]` | List of parameter IDs that require calibration. |
-
-Source code in `commol/_model/model.py`
-
-```python
-def get_uncalibrated_parameters(self) -> list[str]:
-    """
-    Get a list of parameter IDs that have None values (need calibration).
-
-    Returns
-    -------
-    list[str]
-        List of parameter IDs that require calibration.
-    """
-    return [param.id for param in self.parameters if param.value is None]
 ```
 
 #### apply_calibration_parameters
@@ -19711,70 +19632,6 @@ class Process(BaseModel):
     matrices: list[CategoryMatrix] = Field(default_factory=list)
     transitions: list[Transition] = Field(default_factory=list)
 
-    @model_validator(mode="after")
-    def _validate_unique_ids(self) -> Self:
-        """Validate that bin, stratification and transition ids are unique."""
-        for label, ids in (
-            ("bin", [item.id for item in self.bins]),
-            ("stratification", [item.id for item in self.stratifications]),
-            ("transition", [item.id for item in self.transitions]),
-        ):
-            if len(ids) != len(set(ids)):
-                duplicates = [item for item in set(ids) if ids.count(item) > 1]
-                raise ValueError(f"Duplicate {label} IDs found: {duplicates}")
-        return self
-
-    @model_validator(mode="after")
-    def _validate_transition_ids(self) -> Self:
-        """
-        Check that each transition moves between bins, or between the
-        categories of one stratification.
-        """
-        bin_ids = {bin_item.id for bin_item in self.bins}
-        category_to_stratification = {
-            cat: strat.id for strat in self.stratifications for cat in strat.categories
-        }
-        categories_ids = set(category_to_stratification)
-        bin_and_categories_ids = bin_ids | categories_ids
-
-        for transition in self.transitions:
-            transition_ids = set(transition.source) | set(transition.target)
-
-            if not transition_ids.issubset(bin_and_categories_ids):
-                invalid_ids = transition_ids - bin_and_categories_ids
-                raise ValueError(
-                    f"Transition '{transition.id}' contains invalid ids: "
-                    f"{invalid_ids}. Ids must be defined in Bin ids "
-                    f"or Stratification Categories."
-                )
-
-            is_bin_flow = transition_ids.issubset(bin_ids)
-            is_stratification_flow = transition_ids.issubset(categories_ids)
-
-            if not is_bin_flow and not is_stratification_flow:
-                raise ValueError(
-                    f"Transition '{transition.id}' mixes id types. "
-                    f"Found Bin ids ({transition_ids & bin_ids}) and "
-                    f"Stratification Categories ids "
-                    f"({transition_ids & categories_ids}). "
-                    "Transitions must be purely Bin flow or purely "
-                    f"Stratification flow."
-                )
-
-            if is_stratification_flow:
-                parent_stratification_ids = {
-                    category_to_stratification[cat_id] for cat_id in transition_ids
-                }
-                if len(parent_stratification_ids) > 1:
-                    raise ValueError(
-                        f"Transition '{transition.id}' is a Stratification flow "
-                        f"but involves categories from multiple stratifications: "
-                        f"{', '.join(sorted(parent_stratification_ids))}. A single "
-                        f"transition must only move between categories belonging "
-                        f"to the same parent stratification."
-                    )
-        return self
-
     def is_empty(self) -> bool:
         """
         Whether the process holds nothing.
@@ -20064,17 +19921,6 @@ class ModelStructure(BaseModel, ABC):
             name
             for name in commol_rs.engine.ModelKind(engine_json(self.kind)).value_types()
         )
-
-    def uncalibrated_values(self) -> list[str]:
-        """
-        Ids of the values of this kind that need calibration before a run.
-
-        Returns
-        -------
-        list[str]
-            Empty unless the kind has values left unset.
-        """
-        return []
 
     def check_calibration_values(
         self,
@@ -20401,35 +20247,6 @@ def calibration_value_types(self) -> frozenset[str]:
     )
 ```
 
-#### uncalibrated_values
-
-```python
-uncalibrated_values() -> list[str]
-```
-
-Ids of the values of this kind that need calibration before a run.
-
-Returns:
-
-| Type        | Description                                  |
-| ----------- | -------------------------------------------- |
-| `list[str]` | Empty unless the kind has values left unset. |
-
-Source code in `commol/_model/structure.py`
-
-```python
-def uncalibrated_values(self) -> list[str]:
-    """
-    Ids of the values of this kind that need calibration before a run.
-
-    Returns
-    -------
-    list[str]
-        Empty unless the kind has values left unset.
-    """
-    return []
-```
-
 #### check_calibration_values
 
 ```python
@@ -20744,14 +20561,17 @@ class Aggregate(ModelStructure, InitialConditions):
         """
         Check the structure against the process and the parameters.
 
-        The process needs a bin and a transition, the amounts must name every
-        bin, and the engine must check the fractions against the
+        The engine checks the model (``check_model`` of
+        `crates/commol-model/src/builder.rs`): unique ids, the categories of
+        each stratification, a bin and a transition, what each transition
+        moves, the conditions of the stratifications and of the stratified
+        rates, the amounts against the bins, the fractions against the
         stratifications (every stratification and category named, a split by
-        category by a stratification declared before it), plan every
-        transition, accept every id (no parameter id is an engine variable, a
-        bin, a compartment or a subgroup total), resolve the neighbors, find
-        every variable a rate or a formula parameter reads, and build the
-        initial state.
+        category by a stratification declared before it), every id (no
+        parameter id is an engine variable, a bin, a compartment or a
+        subgroup total), the neighbors, and every variable a rate or a
+        formula parameter reads. Then it plans every transition and builds
+        the initial state.
 
         Parameters
         ----------
@@ -20761,16 +20581,11 @@ class Aggregate(ModelStructure, InitialConditions):
         Raises
         ------
         ValueError
-            If one of these checks fails.
+            If one of these checks fails, with the message of the engine.
         """
         process = model.process
-        if not process.bins:
-            raise ValueError("At least one bin must be defined.")
-        if not process.transitions:
-            raise ValueError("At least one transition must be defined.")
-        self._check_bin_amounts(process)
-        engine_state.transition_flows(process, self)
         engine_state.check_model(model)
+        engine_state.transition_flows(process, self)
         if self.compartment_amounts:
             engine_state.initial_state(process, self)
 
@@ -20826,17 +20641,6 @@ class Aggregate(ModelStructure, InitialConditions):
         if bin_item is None:
             return SeriesLabel(series_id, None)
         return SeriesLabel(bin_item.name or series_id, bin_item.unit)
-
-    def uncalibrated_values(self) -> list[str]:
-        """
-        Ids of the bins whose initial amount needs calibration.
-
-        Returns
-        -------
-        list[str]
-            Bin ids with a None amount.
-        """
-        return self.get_uncalibrated_bins()
 
     def check_calibration_values(
         self,
@@ -21148,21 +20952,6 @@ class Aggregate(ModelStructure, InitialConditions):
                 for stratification, names in sets.items()
             )
         )
-
-    # ------------------------------------------------------------------
-    # Checks against the model
-    # ------------------------------------------------------------------
-
-    def _check_bin_amounts(self, process: Process) -> None:
-        """Check that the bin amounts name every bin of the process."""
-        actual_bins = set(self.bin_amounts)
-        expected_bins = {bin_item.id for bin_item in process.bins}
-        if actual_bins != expected_bins:
-            raise ValueError(
-                f"Initial bin amounts keys must exactly match bin ids. "
-                f"Missing ids: {sorted(expected_bins - actual_bins)}, "
-                f"Extra ids: {sorted(actual_bins - expected_bins)}."
-            )
 ```
 
 ### Methods:
@@ -21175,7 +20964,7 @@ check_model(model: Model[Self]) -> None
 
 Check the structure against the process and the parameters.
 
-The process needs a bin and a transition, the amounts must name every bin, and the engine must check the fractions against the stratifications (every stratification and category named, a split by category by a stratification declared before it), plan every transition, accept every id (no parameter id is an engine variable, a bin, a compartment or a subgroup total), resolve the neighbors, find every variable a rate or a formula parameter reads, and build the initial state.
+The engine checks the model (`check_model` of `crates/commol-model/src/builder.rs`): unique ids, the categories of each stratification, a bin and a transition, what each transition moves, the conditions of the stratifications and of the stratified rates, the amounts against the bins, the fractions against the stratifications (every stratification and category named, a split by category by a stratification declared before it), every id (no parameter id is an engine variable, a bin, a compartment or a subgroup total), the neighbors, and every variable a rate or a formula parameter reads. Then it plans every transition and builds the initial state.
 
 Parameters:
 
@@ -21185,9 +20974,9 @@ Parameters:
 
 Raises:
 
-| Type         | Description                   |
-| ------------ | ----------------------------- |
-| `ValueError` | If one of these checks fails. |
+| Type         | Description                                                   |
+| ------------ | ------------------------------------------------------------- |
+| `ValueError` | If one of these checks fails, with the message of the engine. |
 
 Source code in `commol/_model/aggregate.py`
 
@@ -21196,14 +20985,17 @@ def check_model(self, model: "Model[Self]") -> None:
     """
     Check the structure against the process and the parameters.
 
-    The process needs a bin and a transition, the amounts must name every
-    bin, and the engine must check the fractions against the
+    The engine checks the model (``check_model`` of
+    `crates/commol-model/src/builder.rs`): unique ids, the categories of
+    each stratification, a bin and a transition, what each transition
+    moves, the conditions of the stratifications and of the stratified
+    rates, the amounts against the bins, the fractions against the
     stratifications (every stratification and category named, a split by
-    category by a stratification declared before it), plan every
-    transition, accept every id (no parameter id is an engine variable, a
-    bin, a compartment or a subgroup total), resolve the neighbors, find
-    every variable a rate or a formula parameter reads, and build the
-    initial state.
+    category by a stratification declared before it), every id (no
+    parameter id is an engine variable, a bin, a compartment or a
+    subgroup total), the neighbors, and every variable a rate or a
+    formula parameter reads. Then it plans every transition and builds
+    the initial state.
 
     Parameters
     ----------
@@ -21213,16 +21005,11 @@ def check_model(self, model: "Model[Self]") -> None:
     Raises
     ------
     ValueError
-        If one of these checks fails.
+        If one of these checks fails, with the message of the engine.
     """
     process = model.process
-    if not process.bins:
-        raise ValueError("At least one bin must be defined.")
-    if not process.transitions:
-        raise ValueError("At least one transition must be defined.")
-    self._check_bin_amounts(process)
-    engine_state.transition_flows(process, self)
     engine_state.check_model(model)
+    engine_state.transition_flows(process, self)
     if self.compartment_amounts:
         engine_state.initial_state(process, self)
 ```
@@ -21329,35 +21116,6 @@ def series_label(self, model: "Model[Self]", series_id: str) -> SeriesLabel:
     if bin_item is None:
         return SeriesLabel(series_id, None)
     return SeriesLabel(bin_item.name or series_id, bin_item.unit)
-```
-
-#### uncalibrated_values
-
-```python
-uncalibrated_values() -> list[str]
-```
-
-Ids of the bins whose initial amount needs calibration.
-
-Returns:
-
-| Type        | Description                 |
-| ----------- | --------------------------- |
-| `list[str]` | Bin ids with a None amount. |
-
-Source code in `commol/_model/aggregate.py`
-
-```python
-def uncalibrated_values(self) -> list[str]:
-    """
-    Ids of the bins whose initial amount needs calibration.
-
-    Returns
-    -------
-    list[str]
-        Bin ids with a None amount.
-    """
-    return self.get_uncalibrated_bins()
 ```
 
 #### check_calibration_values
@@ -22222,7 +21980,7 @@ class SeriesValue(BaseModel):
     ) -> list[tuple[float, float]]:
         """
         Check the points with the rule of the engine (`check_series` of
-        `crates/commol-model/src/values.rs`): at least one point, each
+        `crates/commol-model/src/rules.rs`): at least one point, each
         position finite, not negative and once, each value finite.
         """
         commol_rs.model.check_series(value)
@@ -22346,12 +22104,12 @@ Defines a categorical subdivision of the compartments.
 
 Attributes:
 
-| Name          | Type                            | Description                                              |
-| ------------- | ------------------------------- | -------------------------------------------------------- |
-| `id`          | `str`                           | Identifier of the stratification.                        |
-| `categories`  | `list[str]`                     | List of the different stratification groups identifiers. |
-| `description` | \`str                           | None\`                                                   |
-| `conditions`  | \`list[StratificationCondition] | None\`                                                   |
+| Name          | Type                            | Description                                                                              |
+| ------------- | ------------------------------- | ---------------------------------------------------------------------------------------- |
+| `id`          | `str`                           | Identifier of the stratification.                                                        |
+| `categories`  | `list[str]`                     | The categories, at least one, each once; the engine checks them when the model is built. |
+| `description` | \`str                           | None\`                                                                                   |
+| `conditions`  | \`list[StratificationCondition] | None\`                                                                                   |
 
 Source code in `commol/_model/stratification.py`
 
@@ -22365,7 +22123,8 @@ class Stratification(BaseModel):
     id : str
         Identifier of the stratification.
     categories : list[str]
-        List of the different stratification groups identifiers.
+        The categories, at least one, each once; the engine checks them when
+        the model is built.
     description : str | None
         A human-readable description of the stratification.
     conditions : list[StratificationCondition] | None
@@ -22402,37 +22161,6 @@ class Stratification(BaseModel):
     @override
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Stratification) and self.id == other.id
-
-    @model_validator(mode="after")
-    def _validate_categories_length(self) -> Self:
-        """
-        Enforces that categories are not empty.
-        """
-        if not self.categories:
-            raise ValueError(
-                (f"Stratification '{self.id}' must have at least one category.")
-            )
-        return self
-
-    @model_validator(mode="after")
-    def _validate_categories_uniqueness(self) -> Self:
-        """
-        Enforces that categories are not repeated.
-        """
-        categories_set = set(self.categories)
-
-        if len(categories_set) != len(self.categories):
-            duplicates = [
-                item for item in categories_set if self.categories.count(item) > 1
-            ]
-            raise ValueError(
-                (
-                    f"Categories for stratification '{self.id}' must not be repeated. "
-                    f"Found duplicates: {list(set(duplicates))}."
-                )
-            )
-
-        return self
 ```
 
 ## CategoryMatrix
@@ -22919,7 +22647,7 @@ class Transition(BaseModel):
     def _validate_impulse(self) -> Self:
         """
         Check the impulse with the rule of the engine (`check_impulse` of
-        `crates/commol-model/src/values.rs`): one of `impulse_at` and
+        `crates/commol-model/src/rules.rs`): one of `impulse_at` and
         `impulse_every`, at least one position on the axis, a positive period
         and an offset that is not negative.
         """
@@ -30413,8 +30141,9 @@ class Simulation:
         Parameters
         ----------
         model : Model
-            A fully constructed and validated model object, of any kind.
-            None values for parameters/initial conditions if used for calibration.
+            A fully constructed and validated model object, of any kind. A
+            parameter or an initial condition may have no value, for a
+            calibration; a run refuses it with the message of the engine.
 
         Raises
         ------
@@ -30447,42 +30176,6 @@ class Simulation:
         if model_json != self._model_json:
             logger.info("Model changed since the engine was built; rebuilding it.")
             self._build_engine(model_json)
-
-    def _validate_all_parameters_calibrated(self, model: Model) -> None:
-        """
-        Validates that every parameter, and every value of the model kind, has
-        a value (is calibrated).
-
-        Parameters
-        ----------
-        model : Model
-            The model to validate.
-
-        Raises
-        ------
-        ValueError
-            If any parameter, or any value of the model kind such as an
-            initial condition, has a None value.
-        """
-        uncalibrated_params = model.get_uncalibrated_parameters()
-        uncalibrated_ics = model.structure.uncalibrated_values()
-
-        errors = []
-        if uncalibrated_params:
-            errors.append(
-                f"Parameters requiring calibration: {', '.join(uncalibrated_params)}"
-            )
-        if uncalibrated_ics:
-            errors.append(
-                f"Initial conditions requiring calibration: "
-                f"{', '.join(uncalibrated_ics)}"
-            )
-
-        if errors:
-            raise ValueError(
-                f"Cannot run Simulation: {'; '.join(errors)}. "
-                f"Please calibrate these values before running a simulation."
-            )
 
     @property
     def is_stochastic(self) -> bool:
@@ -30537,7 +30230,6 @@ class Simulation:
             If a rate cannot be evaluated or is not a number; the message
             names the flow and the position.
         """
-        self._validate_all_parameters_calibrated(self.model_definition)
         self._sync_engine()
         used_seed = self._seed_run(seed)
         self._engine.reset()
@@ -30592,7 +30284,6 @@ class Simulation:
             names the flow and the position.
         """
         positions = [float(position) for position in at]
-        self._validate_all_parameters_calibrated(self.model_definition)
         self._sync_engine()
         used_seed = self._seed_run(seed)
         self._engine.reset()
@@ -30780,9 +30471,9 @@ Initializes the simulation engine from a Pydantic Model definition.
 
 Parameters:
 
-| Name    | Type    | Description                                                                                                                         | Default    |
-| ------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `model` | `Model` | A fully constructed and validated model object, of any kind. None values for parameters/initial conditions if used for calibration. | *required* |
+| Name    | Type    | Description                                                                                                                                                                             | Default    |
+| ------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `model` | `Model` | A fully constructed and validated model object, of any kind. A parameter or an initial condition may have no value, for a calibration; a run refuses it with the message of the engine. | *required* |
 
 Raises:
 
@@ -30800,8 +30491,9 @@ def __init__(self, model: Model) -> None:
     Parameters
     ----------
     model : Model
-        A fully constructed and validated model object, of any kind.
-        None values for parameters/initial conditions if used for calibration.
+        A fully constructed and validated model object, of any kind. A
+        parameter or an initial condition may have no value, for a
+        calibration; a run refuses it with the message of the engine.
 
     Raises
     ------
@@ -30891,7 +30583,6 @@ def run(self, num_steps: int, *, seed: int | None = None) -> SimulationResults:
         If a rate cannot be evaluated or is not a number; the message
         names the flow and the position.
     """
-    self._validate_all_parameters_calibrated(self.model_definition)
     self._sync_engine()
     used_seed = self._seed_run(seed)
     self._engine.reset()
@@ -30981,7 +30672,6 @@ def run_at(
         names the flow and the position.
     """
     positions = [float(position) for position in at]
-    self._validate_all_parameters_calibrated(self.model_definition)
     self._sync_engine()
     used_seed = self._seed_run(seed)
     self._engine.reset()
@@ -32890,7 +32580,6 @@ class ReplicateRuns:
     def _replicates(self, grid: int | list[float]) -> SimulationReplicates:
         """The replicates on ``grid``: a number of steps or the positions."""
         simulation = self.simulation
-        simulation._validate_all_parameters_calibrated(simulation.model_definition)
         engine = simulation.engine
         seed, positions, seeds, runs = engine.run_replicates(
             self.seed, self.count, grid
@@ -38909,41 +38598,14 @@ class InitialConditions(BaseModel):
         commol_rs.model.check_compartment_amounts(list(value.items()))
         return value
 
-    def get_uncalibrated_bins(self) -> list[str]:
-        """
-        Get list of bin IDs that have uncalibrated amounts (value = None).
-
-        Returns
-        -------
-        list[str]
-            List of bin IDs with uncalibrated initial conditions.
-        """
-        return [bin_id for bin_id, amount in self.bin_amounts.items() if amount is None]
-
-    def get_categories_with_fractions(self) -> set[str]:
-        """
-        Get the categories that have a declared initial fraction.
-
-        Returns
-        -------
-        set[str]
-            Category names collected from ``stratification_fractions``, the
-            categories of each split of a split by category included. A
-            category declared on a stratification but absent from the initial
-            conditions is not included.
-        """
-        return {
-            category
-            for fractions in self.stratification_fractions.values()
-            for category in split_categories(fractions)
-        }
-
     def resolve_category(self, category: str) -> tuple[str, str]:
         """
         Resolve a category id to its stratification and its bare name.
 
         A qualified id (``group:g1``) names the stratification. A bare name
-        must be declared by exactly one stratification.
+        must be declared by exactly one stratification. The engine resolves
+        it (``commol_rs.model.resolve_category``) among the categories of the
+        fractions, as a calibrated initial condition resolves.
 
         Parameters
         ----------
@@ -38960,27 +38622,13 @@ class InitialConditions(BaseModel):
         ValueError
             If the category is not found or a bare name is ambiguous.
         """
-        stratification_id, separator, name = category.rpartition(CATEGORY_SEPARATOR)
-        owners = [
-            stratification
-            for stratification, fractions in self.stratification_fractions.items()
-            if (not separator or stratification == stratification_id)
-            and name in split_categories(fractions)
-        ]
-        if len(owners) > 1:
-            qualified = " or ".join(
-                f"'{owner}{CATEGORY_SEPARATOR}{name}'" for owner in owners
-            )
-            raise ValueError(
-                f"Category '{category}' is ambiguous: it is declared by "
-                f"stratifications {owners}. Qualify it as {qualified}."
-            )
-        if not owners:
-            raise ValueError(
-                f"Category '{category}' not found in initial conditions. "
-                f"Available categories: {sorted(self.get_categories_with_fractions())}"
-            )
-        return owners[0], name
+        return commol_rs.model.resolve_category(
+            category,
+            [
+                (stratification, split_categories(fractions))
+                for stratification, fractions in self.stratification_fractions.items()
+            ],
+        )
 
     def category_id(self, stratification: str, category: str) -> str:
         """
@@ -39146,71 +38794,6 @@ class InitialConditions(BaseModel):
 
 ### Methods:
 
-#### get_uncalibrated_bins
-
-```python
-get_uncalibrated_bins() -> list[str]
-```
-
-Get list of bin IDs that have uncalibrated amounts (value = None).
-
-Returns:
-
-| Type        | Description                                           |
-| ----------- | ----------------------------------------------------- |
-| `list[str]` | List of bin IDs with uncalibrated initial conditions. |
-
-Source code in `commol/_model/initial_conditions.py`
-
-```python
-def get_uncalibrated_bins(self) -> list[str]:
-    """
-    Get list of bin IDs that have uncalibrated amounts (value = None).
-
-    Returns
-    -------
-    list[str]
-        List of bin IDs with uncalibrated initial conditions.
-    """
-    return [bin_id for bin_id, amount in self.bin_amounts.items() if amount is None]
-```
-
-#### get_categories_with_fractions
-
-```python
-get_categories_with_fractions() -> set[str]
-```
-
-Get the categories that have a declared initial fraction.
-
-Returns:
-
-| Type       | Description                                                                                                                                                                                                           |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `set[str]` | Category names collected from stratification_fractions, the categories of each split of a split by category included. A category declared on a stratification but absent from the initial conditions is not included. |
-
-Source code in `commol/_model/initial_conditions.py`
-
-```python
-def get_categories_with_fractions(self) -> set[str]:
-    """
-    Get the categories that have a declared initial fraction.
-
-    Returns
-    -------
-    set[str]
-        Category names collected from ``stratification_fractions``, the
-        categories of each split of a split by category included. A
-        category declared on a stratification but absent from the initial
-        conditions is not included.
-    """
-    return {
-        category
-        for fractions in self.stratification_fractions.values()
-        for category in split_categories(fractions)
-    }
-```
-
 #### resolve_category
 
 ```python
@@ -39219,7 +38802,7 @@ resolve_category(category: str) -> tuple[str, str]
 
 Resolve a category id to its stratification and its bare name.
 
-A qualified id (`group:g1`) names the stratification. A bare name must be declared by exactly one stratification.
+A qualified id (`group:g1`) names the stratification. A bare name must be declared by exactly one stratification. The engine resolves it (`commol_rs.model.resolve_category`) among the categories of the fractions, as a calibrated initial condition resolves.
 
 Parameters:
 
@@ -39247,7 +38830,9 @@ def resolve_category(self, category: str) -> tuple[str, str]:
     Resolve a category id to its stratification and its bare name.
 
     A qualified id (``group:g1``) names the stratification. A bare name
-    must be declared by exactly one stratification.
+    must be declared by exactly one stratification. The engine resolves
+    it (``commol_rs.model.resolve_category``) among the categories of the
+    fractions, as a calibrated initial condition resolves.
 
     Parameters
     ----------
@@ -39264,27 +38849,13 @@ def resolve_category(self, category: str) -> tuple[str, str]:
     ValueError
         If the category is not found or a bare name is ambiguous.
     """
-    stratification_id, separator, name = category.rpartition(CATEGORY_SEPARATOR)
-    owners = [
-        stratification
-        for stratification, fractions in self.stratification_fractions.items()
-        if (not separator or stratification == stratification_id)
-        and name in split_categories(fractions)
-    ]
-    if len(owners) > 1:
-        qualified = " or ".join(
-            f"'{owner}{CATEGORY_SEPARATOR}{name}'" for owner in owners
-        )
-        raise ValueError(
-            f"Category '{category}' is ambiguous: it is declared by "
-            f"stratifications {owners}. Qualify it as {qualified}."
-        )
-    if not owners:
-        raise ValueError(
-            f"Category '{category}' not found in initial conditions. "
-            f"Available categories: {sorted(self.get_categories_with_fractions())}"
-        )
-    return owners[0], name
+    return commol_rs.model.resolve_category(
+        category,
+        [
+            (stratification, split_categories(fractions))
+            for stratification, fractions in self.stratification_fractions.items()
+        ],
+    )
 ```
 
 #### category_id
@@ -39549,6 +39120,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Breaking:** a split by category names exactly the categories of `by` that the compartments of its stratification have. A `type` on `g2` only, split by `group`, gives the split of `g2` alone, and a split of `g1`, which no compartment reads, is refused with a message that names `type` and `g1`. Migration: remove the split of each category that the conditions of the stratification leave out.
 - **Breaking:** the engine checks the stratification each condition names, and its category, from `check_model`. The condition of a stratification names one declared before it, and the condition of a stratified rate one of the process. A model in JSON whose condition names another stratification built and expanded nothing for it; it is now refused, with a message that names the stratification. `ModelBuilder.add_stratification` refused it already. A condition of a stratification on a category its stratification does not have, such as `StratificationCondition(stratification="group", category="g9")`, built and expanded nothing; it is now refused, with a message that names the stratification and the category. The unknown stratification or category of a stratified rate gets the message of the engine, `Transition 'ab', stratified rate 0: the condition on 'group' names 'g9', which is not a category of 'group' (["g1", "g2"])`. Migration: name in each condition a stratification declared before it and one of its categories.
 - **Breaking:** the engine refuses a condition of a stratification that gives neither `category` nor `categories`, with the message `Stratification 'type': the condition on 'group' gives neither a category nor a set of categories; give one of them`. A model in JSON with such a condition built and split every compartment. The condition of a stratified rate that only sets `to` is unchanged. `ModelBuilder.add_stratification` no longer checks its conditions: a condition that names a stratification not declared before it, or that gives no category, raises `ValueError` at `build`, with the message of the engine, and no longer at the call. Migration: catch the error of a condition at `build`.
+- **Breaking:** the engine holds every rule of a model that Python checked alone, from `check_model`, so a model in JSON (`Model.from_json`, `commol_rs.engine.Engine`) meets them too. It refuses two bins, accumulators, stratifications, transitions or parameters with one id (`Two bins share the id 'A'; give each bin its own id`); a stratification with no category or a category twice (`Stratification 'g' names the category 'g1' twice; name each category once`); a process without a bin or a transition (`The process has no transition; an aggregate model needs at least one transition`); `bin_amounts` that miss a bin or name one the process does not have (`Missing ids: ["B"], Extra ids: ["Z"]`); and a stratified rate with no condition or two conditions on one stratification (`Transition 'ab', stratified rate 0: two conditions name 'g'; give one condition per stratification`). A model in JSON with a repeated bin or transition, a repeated category, no transition, a missing bin amount (read as `0`), an unknown bin amount (ignored) or such a stratified rate built; it is now refused. Accumulator ids were not checked anywhere. The message of a transition that is not between bins or between the categories of one stratification names the ids that break the rule: `Transition 't2' mixes bins (["A"]) and categories (["g1"]); a transition moves between bins or between the categories of one stratification`. `ModelBuilder` no longer checks an id when it is added, and `Stratification` and `StratifiedRate` no longer check their categories and conditions when they are made: each of these errors is a `ValueError` at `build`, with the message of the engine. Migration: catch these errors at `build`, and read the new messages.
+- **Breaking:** a run refuses a parameter or a bin amount without a value with the message of the engine, which names each of them: `The model cannot run: the parameters ["k1"] and the amounts of the bins ["B"] have no value. Give them a value, or calibrate them and write the calibrated values back` (`ValueError` from `Simulation.run`, `run_at` and the replicates; the old message was `Cannot run Simulation: ...`). Every engine checks it before it runs, and a rate that reads a parameter without a value names it (`the parameter 'k1' has no value`), not an index. A bin amount without a value no longer runs as `0`. A bin left `None` needs a value in each of its compartments: a calibration of `B_g1` alone leaves `B_g2` without one (`the amounts of the compartments ["B_g2"]`), and the split of a category (`g1`, `group:g1`) shares out what the bin holds, so it gives none. A `Calibrator`, and every uncertainty method that builds the problem, raises this `ValueError` when it is built if a value that the calibration does not set has none, even when no rate reads it; it was a failed start of the optimizer, or a run at `0`. Migration: give every parameter and bin amount a value, or calibrate it.
+- A qualified category id matches whole ids: `a:b:c` names the category `b:c` of `a` or the category `c` of `a:b`, whichever the model declares, so a stratification or a category whose id holds `:` resolves. The engine split the id at the first `:` and `Aggregate` at the last.
+- A split of no category in `stratification_fractions` (`{"g": {}}`) no longer fails on its sum: `build` gives the message of the engine, such as `Stratification 'g' has no category; give it at least one`.
+- An ambiguous category of the initial conditions (`update_stratification_fractions`, `subgroup_total`, `get_category_fraction`) gets the message of the engine, the one a calibrated initial condition gets: `Category 'c1' is ambiguous: it is declared by stratifications ["group", "level"]. Qualify it as 'group:c1' or 'level:c1'.` A qualified category that no compartment has gets `Invalid bin, compartment or category 'group:g9' for initial condition calibration`, with the compartments. A calibrated value of a type the kind of the model does not take gets the message of the engine, `A test model takes no values of type initial_condition; 'k' is one`.
 - The engine checks that the fractions name every stratification and each of its categories, from `check_model`; the messages list the ids as the engine writes them, `Missing ids: ["g"], Extra ids: []`, and the message of the categories reads `The fractions of stratification 'g' must name exactly its categories. Missing categories: ["g2"], Extra categories: ["g3"].`
 - **Breaking:** `Calibrator.delta_band(result, positions, confidence_level)` is `LocalResult.delta_band(calibrator, positions, confidence_level)`, a method of the result of `Laplace` and of `Sandwich`. `DeltaBand` is documented with `commol.local`. Migration: `calibrator.delta_band(laplace, [10, 20], 0.9)` is `laplace.delta_band(calibrator, [10, 20], 0.9)`. See [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/index.md).
 - **Breaking:** `ProfileResult.identifiability()` is removed. Migration: `profiles.identifiability()` is `calibrator.identifiability(ProfileIdentifiability(result=profiles))`.
@@ -39577,6 +39153,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Removed
 
+- **Breaking:** `Model.get_uncalibrated_parameters`, `Aggregate.uncalibrated_values` (and `ModelStructure.uncalibrated_values`), `Aggregate.get_uncalibrated_bins` and `Aggregate.get_categories_with_fractions` are removed: no part of commol reads them, and the engine names every value a run lacks. Migration: read `parameter.value is None` and `structure.bin_amounts`, or run the model and read the message.
 - **Breaking:** `commol.utils.security` is removed, with `SecurityConfig`, `SecurityError`, `validate_expression_security` and the `config=` argument of `AxisPattern.combine` and `AxisPattern.from_formula`. The parser of the engine is the only check of a formula: a rate, a formula parameter, a calibration constraint or an axis pattern that it rejects raises `ValueError` with its message, and no setting changes its limits. Remove the `config=` argument, and catch `ValueError` instead of `SecurityError`. A formula of the language that the old text guards rejected is now valid: a name with letters outside ASCII (`α * β`), a name such as `__import__`, `os` or `my_key`, a number such as `1e400`, `nan` as the name of a variable, and a formula of more than 1000 nodes, 10 000 characters or 10 levels of nesting, within the limits of the parser. The build still rejects a variable that the model does not define. See [Limits of the parser](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#limits-of-the-parser).
 
 ### Fixed

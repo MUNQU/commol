@@ -4170,16 +4170,16 @@ seed of the analysis (<code>Stream</code>, <code>crates/commol-random/src/stream
       <a href="#model-type-engine">Model type (engine)</a>, or add the new kind to the
       <code>kinds</code> of an engine that runs it.
       Each engine implements <code>SimulationEngine</code>: <code>plan_values</code> and
-      <code>apply_values</code> resolve and write the values of the kind, and
-      <code>state_outputs</code> and <code>output_sums</code> name what an expression reads.</li>
+      <code>apply_values</code> resolve and write the values of the kind, <code>check_values</code>
+      refuses a run that lacks one, and <code>state_outputs</code> and <code>output_sums</code>
+      name what an expression reads.</li>
 <li>[ ] Add a variant to <code>EngineValuePlan</code> in <code>py-commol/src/engine.rs</code>.</li>
 <li>[ ] Write a <code>ModelStructure</code> subclass in <code>py-commol/commol/_model/</code>, with
-      <code>kind</code> as a <code>Literal</code> default. Implement <code>check_model</code> and
-      <code>outputs_by_source</code>; override <code>series_label</code>, <code>uncalibrated_values</code>,
-      <code>check_calibration_values</code>, <code>with_calibrated_values</code>,
-      <code>report_sections</code>, <code>describe</code> and <code>check_unit_consistency</code> when the
-      kind has them. Reject in
-      <code>check_model</code> a feature of the process the kind cannot run, and name
+      <code>kind</code> as a <code>Literal</code> default. Implement <code>check_model</code> (it asks the
+      engine) and <code>outputs_by_source</code>; override <code>series_label</code>,
+      <code>check_calibration_values</code>, <code>with_calibrated_values</code>, <code>report_sections</code>,
+      <code>describe</code> and <code>check_unit_consistency</code> when the kind has them. Reject
+      in <code>check_model</code> a feature of the process the kind cannot run, and name
       the form that carries over. Export it from the root (<code>ROOT</code> of
       <code>tests/suite/public_surface.py</code>), so <code>Model.from_json</code> reads the kind.</li>
 <li>[ ] Do not write a builder: <code>ModelBuilder.build(structure, engine)</code> builds

@@ -173,10 +173,11 @@ class ModelBuilder:
         ModelBuilder
             Self for method chaining.
 
-        Raises
-        ------
-        ValueError
-            If ``categories`` is empty or names a category twice.
+        Notes
+        -----
+        ``build`` refuses, with the message of the engine, a stratification
+        whose id another stratification has, with no category or a category
+        twice, or with a condition that does not fit.
         """
         self._stratifications.append(
             Stratification(
@@ -331,16 +332,11 @@ class ModelBuilder:
                     "series list."
                 )
             param_value = value
-        self._ensure_parameter_id_available(id)
         self._parameters.append(
             Parameter(id=id, value=param_value, description=description, unit=unit)
         )
         logger.info(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
         return self
-
-    def _ensure_parameter_id_available(self, id: str) -> None:
-        if any(parameter.id == id for parameter in self._parameters):
-            raise ValueError(f"Parameter id '{id}' already exists")
 
     def _register_series_pattern(
         self,
@@ -371,7 +367,6 @@ class ModelBuilder:
         else:
             param_name = f"_series_{self._series_counter}"
             self._series_counter += 1
-        self._ensure_parameter_id_available(param_name)
         self._parameters.append(
             Parameter(
                 id=param_name,
@@ -1112,11 +1107,9 @@ Returns:
 | -------------- | ------------------------- |
 | `ModelBuilder` | Self for method chaining. |
 
-Raises:
+Notes
 
-| Type         | Description                                       |
-| ------------ | ------------------------------------------------- |
-| `ValueError` | If categories is empty or names a category twice. |
+`build` refuses, with the message of the engine, a stratification whose id another stratification has, with no category or a category twice, or with a condition that does not fit.
 
 Source code in `commol/_model/builder.py`
 
@@ -1157,10 +1150,11 @@ def add_stratification(
     ModelBuilder
         Self for method chaining.
 
-    Raises
-    ------
-    ValueError
-        If ``categories`` is empty or names a category twice.
+    Notes
+    -----
+    ``build`` refuses, with the message of the engine, a stratification
+    whose id another stratification has, with no category or a category
+    twice, or with a condition that does not fit.
     """
     self._stratifications.append(
         Stratification(
@@ -1385,7 +1379,6 @@ def add_parameter(
                 "series list."
             )
         param_value = value
-    self._ensure_parameter_id_available(id)
     self._parameters.append(
         Parameter(id=id, value=param_value, description=description, unit=unit)
     )
@@ -2062,11 +2055,11 @@ The rate of the compartments of a transition that match some categories.
 
 Attributes:
 
-| Name         | Type                            | Description                                                                                   |
-| ------------ | ------------------------------- | --------------------------------------------------------------------------------------------- |
-| `conditions` | `list[StratificationCondition]` | The categories that a compartment must match, at least one, each stratification at most once. |
-| `rate`       | \`str                           | float\`                                                                                       |
-| `absolute`   | \`bool                          | None\`                                                                                        |
+| Name         | Type                            | Description                                                                                                                                   |
+| ------------ | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `conditions` | `list[StratificationCondition]` | The categories that a compartment must match, at least one, each stratification at most once; the engine checks them when the model is built. |
+| `rate`       | \`str                           | float\`                                                                                                                                       |
+| `absolute`   | \`bool                          | None\`                                                                                                                                        |
 
 Source code in `commol/_model/transition.py`
 
@@ -2083,7 +2076,8 @@ class StratifiedRate(BaseModel):
     ----------
     conditions : list[StratificationCondition]
         The categories that a compartment must match, at least one, each
-        stratification at most once.
+        stratification at most once; the engine checks them when the model
+        is built.
     rate : str | float
         The rate of the matching compartments: a formula, a parameter or a
         number, which is kept as its string. It can read ``$compartment``
@@ -2111,32 +2105,6 @@ class StratifiedRate(BaseModel):
             "any compartment variable."
         ),
     )
-
-    @field_validator("conditions")
-    @classmethod
-    def _validate_not_empty(
-        cls, v: list[StratificationCondition]
-    ) -> list[StratificationCondition]:
-        """Ensure at least one stratification condition is specified."""
-        if not v:
-            raise ValueError(
-                "conditions must contain at least one stratification condition"
-            )
-        return v
-
-    @model_validator(mode="after")
-    def _validate_unique_stratifications(self) -> Self:
-        """Ensure no duplicate stratification IDs."""
-        strat_ids = [sc.stratification for sc in self.conditions]
-        if len(strat_ids) != len(set(strat_ids)):
-            duplicates = [s for s in strat_ids if strat_ids.count(s) > 1]
-            raise ValueError(
-                (
-                    f"Duplicate stratifications found: {list(set(duplicates))}. "
-                    f"Each stratification can only be specified once per rate."
-                )
-            )
-        return self
 
     @field_validator("rate")
     @classmethod

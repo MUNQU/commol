@@ -2770,6 +2770,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-engine-holds-every-rule-of-a-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The engine holds every rule of a model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-run-needs-every-value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A run needs every value
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#outputs-are-resolved-by-label" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3692,6 +3714,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-engine-holds-every-rule-of-a-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The engine holds every rule of a model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-run-needs-every-value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A run needs every value
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#outputs-are-resolved-by-label" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3918,6 +3962,102 @@ stores the conditions, and <code>build</code> gets the message of the engine.</p
 <code>crates/commol-model/tests/flows.rs::a_stratification_condition_filters_by_a_category</code>,
 <code>crates/commol-model/tests/stratified_rates.rs::a_condition_on_a_set_counts_as_one_condition</code>,
 <code>crates/commol-model/src/flows.rs::moving_into_a_category_of_a_set_needs_the_dependent_category</code>.</p>
+<h2 id="the-engine-holds-every-rule-of-a-model">The engine holds every rule of a model<a class="headerlink" href="#the-engine-holds-every-rule-of-a-model" title="Permanent link">&para;</a></h2>
+<p><code>check_model</code> in <code>crates/commol-model/src/builder.rs</code> refuses every model
+that breaks a rule of the model, whatever path brings it: the builder,
+<code>Model.from_json</code> or <code>commol_rs.engine.Engine</code> on a JSON model. No two
+parameters, bins, accumulators, stratifications or transitions share an id
+(<code>Model::check_ids</code>, <code>Process::check_ids</code>); a stratification has at least one
+category and none twice (<code>Process::check_categories</code>); the process has a bin
+and a transition; each transition moves between bins or between the
+categories of one stratification (<code>transition_kind</code> in
+<code>crates/commol-model/src/flows.rs</code>); a stratified rate has at least one
+condition and at most one on each stratification
+(<code>Process::check_conditions</code>); and <code>bin_amounts</code> names each bin, and nothing
+else (<code>check_bin_amounts</code>). Each message names the object and the id that
+break the rule. Python holds no copy of these rules: the Pydantic models
+check only the types and shapes of their fields, the builder stores what it
+gets, and <code>build</code> raises <code>ValueError</code> with the message of the engine
+(<code>Aggregate.check_model</code> calls <code>engine_state.check_model</code> first).</p>
+<p>A process without transitions is refused: a model without flows has nothing
+to run, and accepting it would widen the API without a request. The test
+kind (<code>py-commol/src/test_kind.rs</code>) runs no process; its engine checks the
+ids of the model (<code>Model::check_ids</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A refusal at the call that declares the object (<code>add_bin</code>, <code>add_stratification</code>)</td>
+<td>It needs a binding per object for a message that <code>build</code> already gives, or a Python copy of the rule, which breaks the golden rule.</td>
+</tr>
+<tr>
+<td>A copy of the rule in Python for a better message</td>
+<td>Two messages for one rule, and rules that only one side has: a JSON model skipped every Python check. Where the Python message said more, the engine message says it now.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong>
+<code>crates/commol-model/tests/model_rules.rs</code>,
+<code>crates/commol-model/tests/stratified_rates.rs::the_conditions_of_a_stratified_rate_are_checked</code>,
+<code>tests/building/test_builder.py::test_a_repeated_id_is_refused</code>,
+<code>tests/transitions/test_flows.py::test_the_kind_of_a_transition_is_checked</code>.</p>
+<h2 id="a-run-needs-every-value">A run needs every value<a class="headerlink" href="#a-run-needs-every-value" title="Permanent link">&para;</a></h2>
+<p>A parameter or a bin amount may be <code>None</code>, a value left for calibration, and
+the model builds. A run refuses it: <code>CompiledModel::check_values</code> in
+<code>crates/commol-model/src/system.rs</code> names every parameter that has no value
+(from the model or from <code>set_parameter</code>), every bin left <code>None</code> of which no
+compartment has a value, and every other compartment of such a bin that has
+none. The rule is per compartment: a bin of two compartments whose
+calibration writes one of them still has the other at <code>0</code>, which no one
+chose. A value reaches a compartment when <code>set_initial_condition</code> writes it,
+from a bin, a prefix, a compartment or the remainder. The split of a
+category does not: it shares out the amounts already in each pair
+(<code>write_target</code> in <code>crates/commol-model/src/initial_conditions.rs</code>), so of
+a bin left <code>None</code> it shares out nothing, and the compartments keep no value
+(<code>keep_unvalued</code>). Every engine checks it before it runs or steps
+(<code>record_steps</code>, <code>integrate_to</code>, <code>run_to</code> and <code>step</code>): it is a required
+method of the trait (<code>SimulationEngine::check_values</code>), with one message
+(<code>check_missing_values</code> in <code>commol-core</code>). The bindings <code>run</code>, <code>run_at</code>,
+<code>run_replicates</code> and <code>step</code> check it first to raise <code>ValueError</code>, so
+<code>Simulation.run</code> holds no check of its own. A calibration is refused when it
+is built: <code>check_model_values</code> in <code>crates/commol-calibration/src/values.rs</code>
+writes its values to a copy of the engine, each at the point of its bounds
+nearest 0, and checks the copy, so a value the calibration neither sets nor
+finds in the model raises the message of the engine from <code>Calibrator</code> and
+from every method that builds the problem, before an optimizer starts. A
+rate that reads a parameter without a value names the parameter, not an
+index (<code>resolve_slot</code> in <code>crates/commol-model/src/rates.rs</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A bin has a value once any of its compartments has one</td>
+<td>The other compartments run at <code>0</code>, a value no one gave.</td>
+</tr>
+<tr>
+<td>A check only when the calibration runs</td>
+<td>The error comes from the optimizer, as a failed start, after the setup.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong>
+<code>crates/commol-model/tests/model_rules.rs::a_run_needs_every_value</code>,
+<code>crates/commol-stochastic/tests/test_values.rs</code>,
+<code>crates/commol-calibration/tests/test_infeasible_runs.rs::a_value_that_the_calibration_leaves_missing_is_refused_before_it_runs</code>,
+<code>tests/calibration/test_initial_conditions.py::TestIds::test_a_bin_left_to_calibrate_needs_a_value_in_each_compartment</code>,
+<code>tests/calibration/test_problem.py::TestProblemAgainstTheModel::test_a_value_that_the_calibration_leaves_missing_is_refused_at_once</code>,
+<code>tests/simulation/test_runs.py::TestResults::test_a_run_with_an_uncalibrated_parameter_is_rejected</code>,
+<code>tests/building/test_parameters.py::TestValues::test_a_run_names_the_initial_conditions_left_to_calibrate</code>.</p>
 <h2 id="outputs-are-resolved-by-label">Outputs are resolved by label<a class="headerlink" href="#outputs-are-resolved-by-label" title="Permanent link">&para;</a></h2>
 <p><code>Aggregate.outputs_by_source(model)</code> maps each bin or accumulator id to its
 output names in engine order. It uses the engine expansion (<code>expanded_outputs</code>), so

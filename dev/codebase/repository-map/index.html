@@ -3802,7 +3802,7 @@
 <tbody>
 <tr>
 <td><code>crates/commol-core/src/types/</code></td>
-<td>The model data types shared by all crates and serialized from Python: <code>Model</code> (header, <code>engine</code>, <code>process</code>, <code>structure</code>), <code>Process</code> (<code>process.rs</code>: bins, accumulators, stratifications, matrices (<code>CategoryMatrix</code> and its check against the process), transitions; the names <code>NEIGHBORS</code> and <code>NEIGHBORS_PREFIX</code>), <code>ModelStructure</code> (one variant per kind, tagged by <code>kind</code>), <code>Aggregate</code> (<code>aggregate.rs</code>: <code>InitialConditions</code>, <code>StratificationFractions</code> and the name <code>FRACTIONS_BY</code>, <code>Neighbors</code> and their checks, <code>AggregateVariant</code>), <code>Transition</code> (<code>transitions.rs</code>), …; <code>types/test_kind.rs</code> only with the <code>test-kind</code> feature.</td>
+<td>The model data types shared by all crates and serialized from Python: <code>Model</code> (header, <code>engine</code>, <code>process</code>, <code>structure</code>; <code>check_ids</code>: unique ids), <code>Process</code> (<code>process.rs</code>: bins, accumulators, stratifications, matrices (<code>CategoryMatrix</code> and its check against the process), transitions; the rules of a process: unique ids (<code>check_ids</code>), the categories of each stratification (<code>check_categories</code>), the conditions of the stratifications and of the stratified rates (<code>check_conditions</code>); the names <code>NEIGHBORS</code> and <code>NEIGHBORS_PREFIX</code>), <code>ModelStructure</code> (one variant per kind, tagged by <code>kind</code>), <code>Aggregate</code> (<code>aggregate.rs</code>: <code>InitialConditions</code>, <code>StratificationFractions</code> and the name <code>FRACTIONS_BY</code>, <code>Neighbors</code> and their checks, <code>AggregateVariant</code>), <code>Transition</code> (<code>transitions.rs</code>), …; <code>types/test_kind.rs</code> only with the <code>test-kind</code> feature.</td>
 <td>Engine behavior.</td>
 </tr>
 <tr>
@@ -3832,7 +3832,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-core/src/simulation_engine.rs</code></td>
-<td>The <code>SimulationEngine</code> trait, for an engine of any kind: runs at positions (<code>check_position</code>), outputs (<code>output_names</code>, <code>state_outputs</code>, <code>output_sums</code>), the matrices between categories with the values of their scales (<code>matrices</code>), parameters, reset, the seed of a stochastic engine (<code>set_seed</code>), the entry of the list of engines it runs and whether it draws random numbers (<code>engine_type</code>, <code>is_stochastic</code>), and the values of its kind (<code>plan_values</code>, <code>apply_values</code>, <code>ValuePlan</code>); <code>Trajectory</code>, <code>check_positions</code>, <code>run_replicates</code> (one run per seed, in parallel); the rules <code>NUM_STEPS</code>, <code>REPLICATE_COUNT</code> and <code>SEED</code> (a whole number from 0 to 2^64 - 1, the one rule of every seed). What calibration needs from any engine.</td>
+<td>The <code>SimulationEngine</code> trait, for an engine of any kind: runs at positions (<code>check_position</code>), outputs (<code>output_names</code>, <code>state_outputs</code>, <code>output_sums</code>), the matrices between categories with the values of their scales (<code>matrices</code>), parameters, reset, the seed of a stochastic engine (<code>set_seed</code>), the entry of the list of engines it runs and whether it draws random numbers (<code>engine_type</code>, <code>is_stochastic</code>), the values of its kind (<code>plan_values</code>, <code>apply_values</code>, <code>ValuePlan</code>) and the values a run lacks (<code>check_values</code>, with the one message <code>check_missing_values</code>); <code>Trajectory</code>, <code>check_positions</code>, <code>run_replicates</code> (one run per seed, in parallel); the rules <code>NUM_STEPS</code>, <code>REPLICATE_COUNT</code> and <code>SEED</code> (a whole number from 0 to 2^64 - 1, the one rule of every seed). What calibration needs from any engine.</td>
 <td>Code for one engine or one kind.</td>
 </tr>
 <tr>
@@ -3862,7 +3862,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-model/src/builder.rs</code></td>
-<td>Expansion of the bins and accumulators of a process over its stratifications (<code>expand</code>, <code>expand_compartments</code>, <code>expand_accumulators</code>), the initial state (<code>initial_state</code>), the checks of an aggregate model (<code>check_model</code>: variant, neighbors, stratification fractions (<code>check_stratification_fractions</code>), names, whole units for a stochastic engine; <code>as_whole</code>), the subgroup total names (<code>subgroup_total_names</code>), impulse schedules and the compilation into <code>CompiledModel</code> (<code>try_from_model</code>).</td>
+<td>Expansion of the bins and accumulators of a process over its stratifications (<code>expand</code>, <code>expand_compartments</code>, <code>expand_accumulators</code>), the initial state (<code>initial_state</code>), the checks of an aggregate model (<code>check_model</code>: unique ids, the categories of each stratification, a bin and a transition, what each transition moves, the bin amounts against the bins (<code>check_bin_amounts</code>), variant, neighbors, stratification fractions (<code>check_stratification_fractions</code>), names, whole units for a stochastic engine; <code>as_whole</code>), the subgroup total names (<code>subgroup_total_names</code>), impulse schedules and the compilation into <code>CompiledModel</code> (<code>try_from_model</code>).</td>
 <td>Flow planning; stepping.</td>
 </tr>
 <tr>
@@ -3882,7 +3882,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-model/src/initial_conditions.rs</code></td>
-<td>How initial-condition values reach a compartmental engine (<code>InitialConditionPlan</code>: resolution, layers, remainder); the <code>plan_values</code> and <code>apply_values</code> of every engine of the aggregate kind use it.</td>
+<td>How initial-condition values reach a compartmental engine (<code>InitialConditionPlan</code>: resolution, layers, remainder); the <code>plan_values</code> and <code>apply_values</code> of every engine of the aggregate kind use it. The one resolver of a category id, bare or qualified (<code>resolve_category</code>, <code>resolve_declared_category</code>, <code>CATEGORY_SEPARATOR</code>).</td>
 <td>Parameter values.</td>
 </tr>
 <tr>
@@ -3912,7 +3912,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-model/src/system.rs</code></td>
-<td>The flows every engine reads: <code>flow_rates</code> (the value of each flow), <code>transition_rates</code> (its rate), <code>flow_changes</code> (the change of one event of each flow), the right-hand side <code>derivatives</code> built on them; impulses (<code>apply_impulses</code>, <code>impulse_rates</code>, <code>impulse_changes</code>, <code>impulse_positions</code>); the positions where a rate can jump (<code>breakpoints</code>, <code>reads_time</code>); the parameters a caller sets (<code>set_parameter</code>, <code>check_parameter</code>: a constant or a parameter to calibrate); the accessors the engines use.</td>
+<td>The flows every engine reads: <code>flow_rates</code> (the value of each flow), <code>transition_rates</code> (its rate), <code>flow_changes</code> (the change of one event of each flow), the right-hand side <code>derivatives</code> built on them; impulses (<code>apply_impulses</code>, <code>impulse_rates</code>, <code>impulse_changes</code>, <code>impulse_positions</code>); the positions where a rate can jump (<code>breakpoints</code>, <code>reads_time</code>); the parameters a caller sets (<code>set_parameter</code>, <code>check_parameter</code>: a constant or a parameter to calibrate); the values a run needs (<code>check_values</code>); the accessors the engines use.</td>
 <td>Stepping along the axis.</td>
 </tr>
 <tr>
@@ -4007,7 +4007,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/values.rs</code></td>
-<td>How calibrated values reach any engine: parameters by id, which the engine checks when a problem is built (<code>set_parameter</code> on a copy), values of the model kind through the engine (<code>ValueWriter</code>, <code>check_model_values</code>, <code>configured_engine</code>); a factor has positive bounds (<code>ValueWriter::new</code>).</td>
+<td>How calibrated values reach any engine: parameters by id, which the engine checks when a problem is built (<code>set_parameter</code> on a copy), values of the model kind through the engine (<code>ValueWriter</code>, <code>check_model_values</code>, <code>configured_engine</code>); a factor has positive bounds (<code>ValueWriter::new</code>); a problem leaves no value missing (<code>check_model_values</code> checks a copy of the engine with its values written).</td>
 <td>How a kind resolves its values; a check of parameter ids in Python.</td>
 </tr>
 <tr>
@@ -4154,7 +4154,7 @@
 </tr>
 <tr>
 <td><code>py-commol/src/model.rs</code></td>
-<td>The queries of <code>commol_rs.model</code> on a process and its aggregate structure: <code>initial_state</code>, <code>expanded_outputs</code>, <code>transition_flows</code>, <code>subgroup_total_names</code>; <code>check_model</code> on a model; the rules of the values of a model (<code>check_bin_amounts</code>, <code>check_compartment_amounts</code>, <code>check_fractions</code>, <code>check_impulse</code>, <code>check_series</code>); the names <code>FRACTIONS_BY</code>, <code>NEIGHBORS</code> and <code>NEIGHBORS_PREFIX</code>.</td>
+<td>The queries of <code>commol_rs.model</code> on a process and its aggregate structure: <code>initial_state</code>, <code>expanded_outputs</code>, <code>transition_flows</code>, <code>subgroup_total_names</code>; <code>check_model</code> on a model; the rules of the values of a model (<code>check_bin_amounts</code>, <code>check_compartment_amounts</code>, <code>check_fractions</code>, <code>check_impulse</code>, <code>check_series</code>); the resolution of a category id (<code>resolve_category</code>); the names <code>CATEGORY_SEPARATOR</code>, <code>FRACTIONS_BY</code>, <code>NEIGHBORS</code> and <code>NEIGHBORS_PREFIX</code>.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
@@ -4283,8 +4283,8 @@ table, and <code>tests/suite/test_architecture.py</code> checks it.</p>
 </tr>
 <tr>
 <td><code>_model/process.py</code></td>
-<td><code>Process</code>: bins, accumulators, stratifications, matrices and transitions, and the checks of the process by itself.</td>
-<td>Checks that depend on a structure.</td>
+<td><code>Process</code>: bins, accumulators, stratifications, matrices and transitions.</td>
+<td>A rule of the process (unique ids, what a transition moves): the engine's.</td>
 </tr>
 <tr>
 <td><code>_model/matrix.py</code></td>
@@ -4298,18 +4298,18 @@ table, and <code>tests/suite/test_architecture.py</code> checks it.</p>
 </tr>
 <tr>
 <td><code>_model/aggregate.py</code></td>
-<td><code>Aggregate</code>: the initial amounts and the neighbors, their checks against the process, and the aggregate side of the interface.</td>
-<td>Generic code.</td>
+<td><code>Aggregate</code>: the initial amounts and the neighbors, the aggregate side of the interface; <code>check_model</code> asks the engine for every check against the process.</td>
+<td>Generic code; a rule of the model.</td>
 </tr>
 <tr>
 <td><code>_model/initial_conditions.py</code></td>
-<td><code>InitialConditions</code>, the fields <code>Aggregate</code> holds (bin amounts, category fractions, compartment amounts), the check of each amount and fraction with the rule of the engine, and their updates.</td>
-<td>Checks against the process; the rule of an amount or a fraction (<code>rules.rs</code>).</td>
+<td><code>InitialConditions</code>, the fields <code>Aggregate</code> holds (bin amounts, category fractions, compartment amounts), the check of each amount and fraction with the rule of the engine, the resolution of a category id through the engine (<code>resolve_category</code>), and their updates.</td>
+<td>Checks against the process; the rule of an amount or a fraction (<code>rules.rs</code>); a resolver of a category of its own.</td>
 </tr>
 <tr>
 <td><code>_model/bin.py</code>, <code>_model/stratification.py</code>, <code>_model/stratification_condition.py</code></td>
-<td><code>Bin</code> and <code>Accumulator</code>; <code>Stratification</code> and the checks of its categories; <code>StratificationCondition</code>.</td>
-<td>Expansion (the engine's).</td>
+<td><code>Bin</code> and <code>Accumulator</code>; <code>Stratification</code>; <code>StratificationCondition</code>.</td>
+<td>Expansion and the rules of the categories (the engine's).</td>
 </tr>
 <tr>
 <td><code>_model/parameter.py</code></td>

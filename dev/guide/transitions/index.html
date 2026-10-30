@@ -4628,8 +4628,16 @@ simulate as written:</p>
 </thead>
 <tbody>
 <tr>
-<td>A source or target that is neither a bin nor a category of one stratification</td>
-<td>The transition</td>
+<td>A source or target that is neither a bin nor a category of a stratification</td>
+<td>The transition and the ids</td>
+</tr>
+<tr>
+<td>Bins and categories in one transition</td>
+<td>The transition, its bins and its categories</td>
+</tr>
+<tr>
+<td>Categories of several stratifications in one transition</td>
+<td>The transition and the stratifications</td>
 </tr>
 <tr>
 <td>A category transition without exactly one source and one target</td>
@@ -4646,6 +4654,10 @@ simulate as written:</p>
 <tr>
 <td>A stratified rate whose <code>category</code> conditions match no source compartment</td>
 <td>The transition; use <code>to</code> to reach another stratification</td>
+</tr>
+<tr>
+<td>A stratified rate with no condition, or with two conditions on one stratification (<code>Process::check_conditions</code> in <code>crates/commol-core/src/types/process.rs</code>)</td>
+<td>The transition, the stratified rate and the stratification</td>
 </tr>
 <tr>
 <td>A condition on a stratification the process does not have, with both <code>category</code> and <code>categories</code>, an empty set, a category twice, a category its stratification does not have, or <code>to</code> with <code>categories</code> (<code>Process::check_conditions</code> and <code>StratificationCondition::check</code> in <code>crates/commol-core/src/types/</code>)</td>
