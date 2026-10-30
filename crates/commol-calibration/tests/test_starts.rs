@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use commol_calibration::{
     CalibrationParameter, CalibrationProblem, LossConfig, NelderMeadConfig, ObservedDataPoint,
-    OptimizationConfig, ParticleSwarmConfig, Starts, optimize, optimize_starts,
+    OptimizationConfig, ParticleSwarmConfig, Starts, optimize, optimize_from, optimize_starts,
     optimize_with_history, start_points,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
@@ -244,4 +244,92 @@ fn the_calibration_from_the_guess_is_the_first_start() {
     assert_eq!(format!("{:?}", result(0)), format!("{alone:?}"));
     assert_ne!(result(1).best_parameters, result(2).best_parameters);
     assert_ne!(result(1).best_parameters, alone.best_parameters);
+}
+
+/// The swarm of [`swarm`], polished by the Nelder-Mead of [`config`].
+fn polished_swarm() -> OptimizationConfig {
+    let OptimizationConfig::ParticleSwarm(swarm) = swarm() else {
+        unreachable!("`swarm` is a particle swarm")
+    };
+    let OptimizationConfig::NelderMead(polish) = config() else {
+        unreachable!("`config` is Nelder-Mead")
+    };
+    OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
+        polish: Some(Box::new(polish)),
+        ..swarm
+    })
+}
+
+#[test]
+fn a_polished_start_counts_both_stages() {
+    // Below 2/3, where every run succeeds.
+    let problem = problem_within(0.6);
+    let swarm_alone = run(&problem, &swarm(), 3, 11).unwrap();
+    let polished = run(&problem, &polished_swarm(), 3, 11).unwrap();
+
+    for (alone, outcome) in swarm_alone.outcomes().iter().zip(polished.outcomes()) {
+        let alone = alone.result.as_ref().unwrap();
+        let by_hand = optimize_from(&problem, &config(), &alone.best_parameters, 0).unwrap();
+        let result = outcome.result.as_ref().unwrap();
+        assert_eq!(result.iterations, alone.iterations + by_hand.iterations);
+        assert_eq!(result.termination_reason, by_hand.termination_reason);
+        assert_eq!(result.termination_reason, "Terminated(SolverConverged)");
+        assert!(result.converged);
+        assert_eq!(result.best_parameters, by_hand.best_parameters);
+        assert_eq!(result.final_loss.to_bits(), by_hand.final_loss.to_bits());
+        assert!((result.best_parameters[0] - 0.2).abs() < 1e-5, "{result:?}");
+    }
+    let best = polished.best();
+    let alone = swarm_alone.outcomes()[polished.best_index()]
+        .result
+        .as_ref()
+        .unwrap();
+    assert_eq!(alone.iterations, 3);
+    assert!(best.iterations > 3, "{best:?}");
+}
+
+#[test]
+fn a_swarm_with_no_polish_is_unchanged() {
+    // Below 2/3, where every run succeeds. The values are those of the swarm
+    // before a swarm had a polish, with the same seed.
+    let problem = problem_within(0.6);
+    let starts = run(&problem, &swarm(), 3, 11).unwrap();
+    let expected: [(f64, f64, f64); 3] = [
+        (0.1, 0.19840354483680456, 2.548669088093423e-6),
+        (
+            0.052852272125482304,
+            0.19216470775023914,
+            6.139180463916279e-5,
+        ),
+        (
+            0.5242938534109123,
+            0.20840671260648147,
+            7.067281684797429e-5,
+        ),
+    ];
+
+    for (outcome, (start, end, loss)) in starts.outcomes().iter().zip(expected) {
+        let result = outcome.result.as_ref().unwrap();
+        assert_eq!(outcome.start, vec![start]);
+        assert_eq!(result.best_parameters, vec![end]);
+        assert_eq!(result.final_loss.to_bits(), loss.to_bits());
+        assert_eq!(result.iterations, 3);
+        assert_eq!(result.termination_reason, "Terminated(MaxItersReached)");
+    }
+}
+
+#[test]
+fn a_polish_outside_its_ranges_names_its_setting() {
+    let OptimizationConfig::ParticleSwarm(swarm) = polished_swarm() else {
+        unreachable!("`polished_swarm` is a particle swarm")
+    };
+    let mut polish = swarm.polish.clone().unwrap();
+    polish.sd_tolerance = -1.0;
+    let config = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig {
+        polish: Some(polish),
+        ..swarm
+    });
+
+    let error = run(&problem_within(0.6), &config, 1, 11).unwrap_err();
+    assert!(error.contains("sd_tolerance"), "{error}");
 }

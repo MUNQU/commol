@@ -11,8 +11,8 @@
 
 use crate::parallelism::parallel;
 use commol_calibration::{
-    CalibrationProblem, EvaluationError, OptimizationConfig, ProblemSettings, Starts, Violation,
-    Workspace, observed_data, optimize_starts, optimize_with_history, start_points,
+    CalibrationProblem, EvaluationError, OptimizationConfig, ProblemSettings, Progress, Starts,
+    Violation, Workspace, observed_data, optimize_starts, optimize_with_history, start_points,
 };
 use commol_inference::resampling::{
     BayesianBootstrap, BlockDrawing, BlockScheme, FitUnit, Multipliers, ParametricResampler,
@@ -37,10 +37,8 @@ pub struct PyCalibrationProblem {
     pub(crate) inner: CalibrationProblem<Engine>,
     /// The optimizer of every fit.
     optimizer: OptimizationConfig,
-    /// Whether the optimizer writes its progress.
-    verbose: bool,
-    /// Iterations between two headers of the progress table.
-    header_interval: u64,
+    /// The progress table of each stage of the optimizer.
+    progress: Progress,
     /// The seed of every random number of the calibration.
     pub(crate) seed: u64,
 }
@@ -161,20 +159,20 @@ impl PyCalibrationProblem {
     /// A `ValueError` when a verbose optimizer has more than one start, and
     /// a `RuntimeError` when every start fails.
     pub(crate) fn fit(&self, py: Python<'_>, starts: usize) -> PyResult<Starts> {
-        if self.verbose && starts > 1 {
+        if self.progress.any() && starts > 1 {
             return Err(value_error(
                 "A verbose optimizer shows one start; set starts=1 or verbose=False".to_string(),
             ));
         }
         let points = start_points(self.inner.parameters(), starts, self.seed);
         parallel(py, || {
-            if self.verbose {
+            if self.progress.any() {
                 crate::python_observer::optimize_with_python_observer(
                     &self.inner,
                     &self.optimizer,
                     points,
                     self.seed,
-                    self.header_interval,
+                    self.progress,
                 )
             } else {
                 optimize_starts(&self.inner, &self.optimizer, points, self.seed)
@@ -315,8 +313,7 @@ impl PyCalibrationProblem {
         Ok(Self {
             inner,
             optimizer,
-            verbose: settings.optimization_config.verbose(),
-            header_interval: settings.optimization_config.header_interval(),
+            progress: settings.optimization_config.progress(),
             seed: commol_random::seed_or_drawn(settings.seed),
         })
     }

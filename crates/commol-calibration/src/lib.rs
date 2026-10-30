@@ -102,7 +102,7 @@ pub use optimization::{
 pub use series::SeriesIndex;
 pub use settings::{
     FitRecord, NelderMeadSettings, Observation, OptimizerSettings, ParticleSwarmSettings,
-    ProblemSettings, StartRecord, observed_data,
+    PolishSettings, ProblemSettings, Progress, StartRecord, observed_data,
 };
 pub use starts::{
     StartOutcome, Starts, optimize_starts, optimize_starts_with_observer, start_points,

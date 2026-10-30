@@ -5,7 +5,7 @@
 use commol_calibration::{
     FitRecord, InertiaWeightStrategy, LossConfig, MutationApplication, MutationStrategy,
     Observation, ObservationModel, OptimizationConfig, OptimizerSettings, ProblemSettings,
-    ReplicateSummary,
+    Progress, ReplicateSummary,
 };
 use commol_core::json;
 
@@ -32,7 +32,7 @@ fn problem_json(swarm: &str, problem: &str) -> String {
             "mutation_application": null, "velocity_clamp_factor": null,
             "velocity_mutation_threshold": null, "improvement_window": null,
             "improvement_tol_abs": null, "improvement_tol_rel": null,
-            "radius_tol": null {swarm}}},
+            "radius_tol": null, "polish": null {swarm}}},
         "initial_condition_remainder": null,
         "replicates": null,
         "replicate_summary": null,
@@ -253,15 +253,63 @@ fn a_quantile_summary_reads_its_level() {
 
 #[test]
 fn a_nelder_mead_optimizer_reads_its_verbosity() {
-    let settings: OptimizerSettings = json::read(
-        r#"{"kind": "nelder_mead", "max_iterations": 5, "sd_tolerance": 1e-6,
-        "initial_simplex_size": 0.1, "alpha": null, "gamma": null, "rho": null,
-        "sigma": null, "verbose": true, "header_interval": 7}"#,
-    )
-    .unwrap();
+    let settings: OptimizerSettings =
+        json::read(&format!(r#"{{"kind": "nelder_mead", {}}}"#, NELDER_MEAD)).unwrap();
 
-    assert!(settings.verbose());
-    assert_eq!(settings.header_interval(), 7);
+    assert_eq!(
+        settings.progress(),
+        Progress {
+            nelder_mead: Some(7),
+            particle_swarm: None,
+        }
+    );
+    assert!(settings.progress().any());
+}
+
+/// The fields of a verbose Nelder-Mead of 5 iterations, with a header every
+/// 7 iterations.
+const NELDER_MEAD: &str = r#""max_iterations": 5, "sd_tolerance": 1e-6,
+    "initial_simplex_size": 0.1, "alpha": null, "gamma": null, "rho": null,
+    "sigma": null, "verbose": true, "header_interval": 7"#;
+
+#[test]
+fn a_swarm_reads_its_polish_and_the_progress_of_each_stage() {
+    let polish = format!(r#"{{"kind": "nelder_mead", {NELDER_MEAD}}}"#);
+    let settings = read_with(&[("polish", &polish)])
+        .unwrap()
+        .optimization_config;
+
+    let OptimizationConfig::ParticleSwarm(config) = settings.config().unwrap() else {
+        panic!("the optimizer is a particle swarm");
+    };
+    assert_eq!(config.polish.unwrap().max_iterations, 5);
+    assert_eq!(
+        settings.progress(),
+        Progress {
+            nelder_mead: Some(7),
+            particle_swarm: None,
+        }
+    );
+    let quiet = read_with(&[]).unwrap().optimization_config.progress();
+    assert!(!quiet.any());
+}
+
+#[test]
+fn a_polish_is_a_nelder_mead_with_its_rules() {
+    let swarm = r#"{"kind": "particle_swarm", "particles": 4}"#;
+    let message = read_with(&[("polish", swarm)]).unwrap_err();
+    assert!(
+        message.starts_with("optimization_config.polish"),
+        "{message}"
+    );
+
+    let polish = format!(r#"{{"kind": "nelder_mead", {NELDER_MEAD}}}"#)
+        .replace(r#""sd_tolerance": 1e-6"#, r#""sd_tolerance": -1.0"#);
+    let message = read_with(&[("polish", &polish)]).unwrap_err();
+    assert!(
+        message.starts_with("optimization_config.polish.sd_tolerance"),
+        "{message}"
+    );
 }
 
 #[test]

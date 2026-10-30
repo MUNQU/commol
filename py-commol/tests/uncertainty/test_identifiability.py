@@ -9,6 +9,7 @@ from commol import (
     Calibrator,
     NelderMeadConfig,
     ObservedDataPoint,
+    ParticleSwarmConfig,
     Simulation,
 )
 from commol._fit.result import CalibrationResult, StartSummary
@@ -38,8 +39,9 @@ def _calibrator(
     ab: str = "k1 * A * B / total",
     factors: tuple[str, ...] = (),
     seed: int = 3,
+    config: NelderMeadConfig | ParticleSwarmConfig | None = None,
 ) -> Calibrator:
-    """``abc_builder`` with `parameters` left for calibration in their bounds."""
+    """``abc_builder`` with `parameters` to calibrate in their bounds by `config`."""
     model_parameters: dict[str, float | None] = {**TRUTH, "s": 1.0}
     for parameter_id in parameters:
         if parameter_id not in factors:
@@ -57,7 +59,7 @@ def _calibrator(
             for parameter_id, (low, high) in parameters.items()
         ],
         loss_function="sse",
-        optimization_config=NelderMeadConfig(max_iterations=200),
+        optimization_config=config or NelderMeadConfig(max_iterations=200),
         seed=seed,
     )
     return Calibrator(Simulation(model), problem)
@@ -562,3 +564,37 @@ class TestPractical:
 
         with pytest.raises(ValueError, match=r"Calibrator\.run\(starts=n\)"):
             product.identifiability(method)
+
+
+def test_the_starts_of_a_polished_fit_are_its_polished_ends(
+    truth: dict[str, list[float]],
+) -> None:
+    # Values 2% off the run: the best loss is not 0, so equal losses agree.
+    data = [
+        point.model_copy(update={"value": point.value * (1.02 if i % 2 else 0.98)})
+        for i, point in enumerate(observed(truth, "B", range(5, 51, 5)))
+    ]
+    bounds = {"k1": (0.1, 0.6), "s": (0.5, 2.0), "k2": (0.02, 0.3)}
+    polish = NelderMeadConfig(max_iterations=2000, sd_tolerance=1e-12)
+    calibrators = [
+        _calibrator(data, bounds, ab="k1 * s * A * B / total", config=swarm)
+        for swarm in (
+            ParticleSwarmConfig(particles=8, max_iterations=3, polish=polish),
+            ParticleSwarmConfig(particles=8, max_iterations=3),
+        )
+    ]
+    polished, alone = (calibrator.run(starts=4) for calibrator in calibrators)
+    method = {"parameter_tolerance": 0.05, "loss_tolerance": 1e-6}
+    report = calibrators[0].identifiability(
+        StartsIdentifiability(result=polished, **method)
+    )
+
+    # The polished ends converged at one loss, spread along k1 · s.
+    assert all(start.converged for start in polished.starts)
+    assert report.starts[0].flagged == ["k1", "s"]
+    assert report.verdicts["k2"].practical.reasons == [
+        "Starts: the 4 converged starts of equal loss agree on it."
+    ]
+    # The swarm alone converges at no start, so the method has none to read.
+    with pytest.raises(ValueError, match="at least two that converged, got 0"):
+        calibrators[1].identifiability(StartsIdentifiability(result=alone, **method))
