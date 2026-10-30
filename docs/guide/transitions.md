@@ -483,7 +483,7 @@ simulate as written:
 | A rate variable that is not a parameter, bin, compartment or special variable | The variable and the available names |
 | Several sources with a proportional rate | The transition; use an absolute rate or `$compartment` |
 | A stratified rate whose `category` conditions match no source compartment | The transition; use `to` to reach another stratification |
-| A condition with both `category` and `categories`, an empty set, a category twice, a category its stratification does not have, or `to` with `categories` (`StratificationCondition::check` in `crates/commol-core/src/types/transitions.rs`) | The transition, the stratification and the category |
+| A condition on a stratification the process does not have, with both `category` and `categories`, an empty set, a category twice, a category its stratification does not have, or `to` with `categories` (`Process::check_conditions` and `StratificationCondition::check` in `crates/commol-core/src/types/`) | The transition, the stratification and the category |
 | A `to` condition on a transition without a source | The transition; use `category` to choose the compartment it enters |
 | A flow that ends in categories no compartment has | The transition; add a `to` condition |
 | `impulse_at` and `impulse_every` together, an `impulse_at` with no step, a step that is negative or not finite, a period that is not positive, or a negative offset; the `Transition` fails when it is made, with the rule of the engine (`check_impulse` in `crates/commol-model/src/rules.rs`) | The transition |

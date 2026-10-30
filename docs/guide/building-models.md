@@ -463,7 +463,7 @@ structure = Aggregate(
 |---|---|
 | Every amount is finite and not negative; `0` is an amount. The engine holds the rule (`check_bin_amount` and `check_compartment_amount` in `crates/commol-model/src/rules.rs`) | `Aggregate(...)` and each update of an amount |
 | Every bin has an amount, and no other id | `build` |
-| Every stratification has a fraction for each of its categories, and no other category; a split by category has one split for each category of the stratification it differs by. The engine holds the rule (`check_stratification_fractions` in `crates/commol-model/src/builder.rs`) | `build` |
+| Every stratification has a fraction for each of its categories, and no other category; a split by category has one split for each category of the stratification it differs by that its compartments have. The engine holds the rule (`check_stratification_fractions` in `crates/commol-model/src/builder.rs`) | `build` |
 | Every fraction is from 0 to 1, and each split sums to 1 within 1e-6. The engine holds the rule (`check_fractions` in `crates/commol-model/src/rules.rs`) | `Aggregate(...)` and each `update_stratification_fractions` |
 | Override names are expanded compartments | `build` |
 | With a stochastic engine, the amount of each bin is a whole number | `build` |

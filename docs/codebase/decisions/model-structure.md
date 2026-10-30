@@ -99,11 +99,13 @@ holds `category` or `categories`, a set of which the compartment has one.
 `holds` is the one rule of a match, for the expansion
 (`stratification_conditions_met`), the stratified rates
 (`get_rate_string_for_compartment`) and their check
-(`commol-model/src/flows.rs`). A set counts as one condition when the most
-specific stratified rate wins. `Process::check_conditions`, from
+(`crates/commol-model/src/flows.rs`). A set counts as one condition when the
+most specific stratified rate wins. `Process::check_conditions`, from
 `check_model` and the planning of the flows, refuses each condition that does
 not fit its stratification
-([What building checks](../../guide/transitions.md#what-building-checks)).
+([What building checks](../../guide/transitions.md#what-building-checks)):
+the condition of a stratification names one declared before it, and the
+condition of a stratified rate one of the process.
 
 | Alternative | Why not |
 |---|---|

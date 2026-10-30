@@ -25,7 +25,8 @@ result with the state the engine starts from.
 
 The fractions of a stratification are one split
 (`StratificationFractions::Split`) or one split per category of a
-stratification declared before it (`StratificationFractions::ByCategory`, in
+stratification declared before it that its compartments have
+(`StratificationFractions::ByCategory`, in
 `crates/commol-core/src/types/aggregate.rs`). Its JSON names that
 stratification under `"by"`, next to the splits:
 `{"by": "group", "g1": {"t1": 0.25, "t2": 0.75}, "g2": {...}}`. The fraction

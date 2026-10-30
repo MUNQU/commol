@@ -546,10 +546,11 @@ def split_groups(
     if by is None:
         return [(conditions, split) for _, split in category_splits(fractions)]
     others = tuple(c for c in conditions if structure.resolve_category(c)[0] != by)
-    return [
-        (others if of is None else (*others, structure.category_id(by, of)), split)
-        for of, split in category_splits(fractions)
-    ]
+    groups = []
+    for of, split in category_splits(fractions):
+        assert of is not None, "each split of a split by category has its category"
+        groups.append(((*others, structure.category_id(by, of)), split))
+    return groups
 
 
 def _unit_name(unit: str | None) -> str:

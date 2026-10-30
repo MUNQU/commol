@@ -52,23 +52,17 @@ impl StratificationCondition {
         }
     }
 
-    /// Check the condition against the stratifications of its process.
+    /// Check the condition against `stratification`, the one it names.
     /// `owner` names what holds the condition, as a message starts.
     ///
     /// # Errors
     ///
     /// Returns a message that names `owner` and the stratification when the
-    /// stratification is not one of `stratifications`, the condition gives
-    /// both `category` and `categories`, an empty set, or `to` with a set,
-    /// and that also names the category when the set names it twice or the
-    /// stratification does not have it.
-    pub fn check(&self, owner: &str, stratifications: &[Stratification]) -> Result<(), String> {
+    /// condition gives both `category` and `categories`, an empty set, or
+    /// `to` with a set, and that also names the category when the set names
+    /// it twice or the stratification does not have it.
+    pub fn check(&self, owner: &str, stratification: &Stratification) -> Result<(), String> {
         let id = &self.stratification;
-        let Some(stratification) = stratifications.iter().find(|s| &s.id == id) else {
-            return Err(format!(
-                "{owner}: a condition names '{id}', which is not a stratification of the process"
-            ));
-        };
         let set = self.categories.as_deref().unwrap_or_default();
         if let (Some(category), Some(_)) = (&self.category, &self.categories) {
             return Err(format!(

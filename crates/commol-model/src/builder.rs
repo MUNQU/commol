@@ -824,14 +824,14 @@ pub(crate) fn check_stratification_fractions(
                     .map(String::as_str)
                     .filter(|of| {
                         compartments.iter().any(|compartment| {
-                            let category = |of: &str| {
+                            let category_in = |stratification: &str| {
                                 compartment
                                     .categories
                                     .iter()
-                                    .find(|(s, _)| s == of)
+                                    .find(|(s, _)| s == stratification)
                                     .map(|(_, category)| category.as_str())
                             };
-                            category(id).is_some() && category(by) == Some(*of)
+                            category_in(id).is_some() && category_in(by) == Some(*of)
                         })
                     })
                     .collect();
@@ -953,6 +953,7 @@ fn subgroup_total_entries(
             .map(|(_, category)| category.as_str())
             .collect();
         if categories.is_empty() {
+            // coverage: invariant, the first stratification has no condition (Process::check_conditions)
             continue;
         }
 

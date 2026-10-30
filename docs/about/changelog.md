@@ -68,8 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   some groups have a later stratification. A set counts as one condition when
   the most specific stratified rate wins. The engine refuses a condition with
   both `category` and `categories`, an empty set, a category twice, a category
-  its stratification does not have, or `to` with a set, and a condition on a
-  stratification the process does not have.
+  its stratification does not have, or `to` with a set.
   `Aggregate.subgroup_total` reads the categories of one stratification as a
   set, and the description writes `where group in {g3, g4}`. See
   [Building Models](../guide/building-models.md#a-condition-on-a-set-of-categories).
@@ -82,7 +81,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   compartment reads, is refused with a message that names `type` and `g1`.
   Migration: remove the split of each category that the conditions of the
   stratification leave out.
-
+- **Breaking:** the engine checks the stratification each condition names,
+  from `check_model`. The condition of a stratification names one declared
+  before it, and the condition of a stratified rate one of the process. A
+  model in JSON whose condition names another stratification built and
+  expanded nothing for it; it is now refused, with a message that names the
+  stratification. `ModelBuilder.add_stratification` refused it already. The
+  unknown stratification or category of a stratified rate gets the message of
+  the engine, `Transition 'ab', stratified rate 0: the condition on 'group'
+  names 'g9', which is not a category of 'group' (["g1", "g2"])`. Migration:
+  name in each condition a stratification declared before it.
 - The engine checks that the fractions name every stratification and each of
   its categories, from `check_model`; the messages list the ids as the engine
   writes them, `Missing ids: ["g"], Extra ids: []`, and the message of the

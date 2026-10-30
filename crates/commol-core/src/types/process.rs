@@ -270,7 +270,9 @@ impl Process {
     }
 
     /// Check the conditions of each stratification and of each stratified
-    /// rate ([`StratificationCondition::check`]).
+    /// rate ([`StratificationCondition::check`]). A condition of a
+    /// stratification names a stratification declared before it, and a
+    /// condition of a stratified rate one of the process.
     ///
     /// # Errors
     ///
@@ -279,10 +281,18 @@ impl Process {
     /// it.
     pub fn check_conditions(&self) -> Result<(), String> {
         let stratifications = &self.stratifications;
-        for stratification in stratifications {
+        for (position, stratification) in stratifications.iter().enumerate() {
             let owner = format!("Stratification '{}'", stratification.id);
             for condition in stratification.conditions.iter().flatten() {
-                condition.check(&owner, stratifications)?;
+                let earlier = &stratifications[..position];
+                let Some(named) = earlier.iter().find(|s| s.id == condition.stratification) else {
+                    return Err(format!(
+                        "{owner}: a condition names '{}', which is not a stratification \
+                         declared before it",
+                        condition.stratification
+                    ));
+                };
+                condition.check(&owner, named)?;
             }
         }
         for transition in &self.transitions {
@@ -290,7 +300,19 @@ impl Process {
             {
                 let owner = format!("Transition '{}', stratified rate {index}", transition.id);
                 for condition in &stratified_rate.conditions {
-                    condition.check(&owner, stratifications)?;
+                    let Some(named) = stratifications
+                        .iter()
+                        .find(|s| s.id == condition.stratification)
+                    else {
+                        let ids: Vec<&str> =
+                            stratifications.iter().map(|s| s.id.as_str()).collect();
+                        return Err(format!(
+                            "{owner}: a condition names '{}', which is not a stratification \
+                             of the process; its stratifications are {ids:?}",
+                            condition.stratification
+                        ));
+                    };
+                    condition.check(&owner, named)?;
                 }
             }
         }

@@ -210,11 +210,13 @@ class TestConditions:
             ),
             (
                 [StratificationCondition(stratification="z", category="g1")],
-                r"rate 0: Stratification 'z' not found. Available: \['g'\]",
+                r"""Transition 't2', stratified rate 0: a condition names 'z', """
+                r"""which is not a stratification of the process; its """
+                r"""stratifications are \["g"\]""",
             ),
             (
                 [StratificationCondition(stratification="g", category="g9")],
-                r"Category 'g9' not found in stratification 'g'",
+                r"the condition on 'g' names 'g9', which is not a category of 'g'",
             ),
         ],
         ids=["none", "repeated", "unknown stratification", "unknown category"],
