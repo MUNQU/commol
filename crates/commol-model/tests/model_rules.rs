@@ -179,11 +179,23 @@ fn a_run_needs_every_value() {
         )
     );
 
-    let compartment = compiled
-        .compartments()
-        .iter()
-        .position(|name| name == "B_g2")
-        .unwrap();
-    compiled.set_initial_condition(compartment, 5.0).unwrap();
+    let index = |name: &str| {
+        compiled
+            .compartments()
+            .iter()
+            .position(|compartment| compartment == name)
+            .unwrap()
+    };
+    let (b_g1, b_g2) = (index("B_g1"), index("B_g2"));
+    compiled.set_initial_condition(b_g2, 5.0).unwrap();
+    assert_eq!(
+        compiled.check_values().err().as_deref(),
+        Some(
+            "The model cannot run: the amounts of the compartments [\"B_g1\"] have no value. \
+             Give them a value, or calibrate them and write the calibrated values back"
+        )
+    );
+
+    compiled.set_initial_condition(b_g1, 5.0).unwrap();
     assert_eq!(compiled.check_values(), Ok(()));
 }

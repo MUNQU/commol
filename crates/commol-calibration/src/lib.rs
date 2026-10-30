@@ -113,4 +113,4 @@ pub use types::{
     CalibrationResult, CalibrationResultWithHistory, LossConfig, ObservedDataPoint,
     ReplicateSummary, Replicates, crps, weighted_crps,
 };
-pub use values::{check_model_values, configured_engine};
+pub use values::{check_model_values, configured_engine, plan_model_values};

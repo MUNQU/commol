@@ -64,6 +64,10 @@ impl ValuePlan for NoPlan {
 }
 
 impl SimulationEngine for Curve {
+    fn check_values(&self) -> Result<(), String> {
+        Ok(())
+    }
+
     type ValuePlan = NoPlan;
 
     fn check_position(&self, _position: f64) -> Result<(), String> {

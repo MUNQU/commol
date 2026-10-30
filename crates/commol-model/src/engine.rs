@@ -21,7 +21,8 @@ pub trait CompartmentalEngine: SimulationEngine {
     fn model(&self) -> &CompiledModel;
 
     /// The compiled model the engine runs, for a change of a parameter
-    /// ([`CompiledModel::set_parameter`]). The engine keeps its state apart
+    /// ([`CompiledModel::set_parameter`]) or of the compartments that have no
+    /// value ([`CompiledModel::check_values`]). The engine keeps its state apart
     /// from the model, so a change of the initial state goes through
     /// [`Self::set_initial_condition`].
     fn model_mut(&mut self) -> &mut CompiledModel;

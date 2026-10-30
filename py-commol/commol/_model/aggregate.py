@@ -172,17 +172,6 @@ class Aggregate(ModelStructure, InitialConditions):
             return SeriesLabel(series_id, None)
         return SeriesLabel(bin_item.name or series_id, bin_item.unit)
 
-    def uncalibrated_values(self) -> list[str]:
-        """
-        Ids of the bins whose initial amount needs calibration.
-
-        Returns
-        -------
-        list[str]
-            Bin ids with a None amount.
-        """
-        return self.get_uncalibrated_bins()
-
     def check_calibration_values(
         self,
         model: "Model[Self]",

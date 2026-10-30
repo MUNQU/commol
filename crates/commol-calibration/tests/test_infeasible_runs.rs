@@ -5,7 +5,7 @@ use argmin::core::CostFunction;
 use commol_calibration::{
     CalibrationParameter, CalibrationParameterType, CalibrationProblem, LossConfig,
     NelderMeadConfig, ObservedDataPoint, OptimizationConfig, OptimizationObjective, Violation,
-    optimize,
+    check_model_values, optimize,
 };
 use commol_core::Model;
 use commol_difference::DifferenceEquations;
@@ -102,4 +102,26 @@ fn a_run_that_fails_stops_the_calibration_with_its_message() {
         error.contains("The model cannot run: the parameters [\"m\"] have no value"),
         "{error}"
     );
+}
+
+#[test]
+fn a_value_that_the_calibration_leaves_missing_is_refused_before_it_runs() {
+    let k = CalibrationParameter::with_type_and_guess(
+        "k".to_string(),
+        CalibrationParameterType::Parameter,
+        0.0,
+        3.0,
+        0.5,
+    );
+
+    assert_eq!(
+        check_model_values(&decay_engine("k * m"), std::slice::from_ref(&k), None)
+            .err()
+            .as_deref(),
+        Some(
+            "The model cannot run: the parameters [\"m\"] have no value. Give them a value, \
+             or calibrate them and write the calibrated values back"
+        )
+    );
+    assert!(check_model_values(&decay_engine("k"), &[k], None).is_ok());
 }

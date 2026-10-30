@@ -131,12 +131,17 @@ class TestCategories:
             ),
         ],
     )
+    @pytest.mark.parametrize("fractions", [{}, {"g": {}}])
     def test_build_refuses_a_stratification_without_distinct_categories(
-        self, categories: list[str], message: str
+        self, categories: list[str], message: str, fractions: dict
     ) -> None:
         builder = a_to_b_builder()
         builder.add_stratification(id="g", categories=categories)
-        builder.set_structure(Aggregate(bin_amounts={"A": 1000, "B": 0}))
+        builder.set_structure(
+            Aggregate(
+                bin_amounts={"A": 1000, "B": 0}, stratification_fractions=fractions
+            )
+        )
 
         with pytest.raises(ValidationError) as error:
             build(builder)

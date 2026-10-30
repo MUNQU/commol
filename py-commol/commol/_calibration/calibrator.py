@@ -497,7 +497,8 @@ def check_values(
     as its ``set_parameter`` does: one the model does not have, or one that
     a formula or a series sets, is not a value to set. The structure and the
     engine check the values of the model kind, such as initial conditions,
-    and the remainder.
+    and the remainder, and the engine checks that no value is missing once
+    they are written.
 
     Parameters
     ----------

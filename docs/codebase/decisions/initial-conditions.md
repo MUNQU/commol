@@ -134,9 +134,15 @@ One function resolves a category id, `resolve_category` in
 `crates/commol-model/src/initial_conditions.rs`, with the one separator
 `CATEGORY_SEPARATOR`: the plan asks it among the categories the compartments
 have, and `Aggregate.resolve_category` asks it through the binding
-`commol_rs.model.resolve_category` among the categories of the fractions,
-with the separator the binding exports. A bare category that two
-stratifications declare is an error that names them and the qualified ids.
+`commol_rs.model.resolve_category` (`resolve_declared_category`, which adds
+the message of an unknown category) among the categories of the fractions.
+A qualified id matches a whole stratification id, the separator and a whole
+category id, never a split at one `:`, because ids have no rule on their
+characters. A bare category that two stratifications declare is an error
+that names them and the qualified ids. The write-back of a calibration
+(`_model/calibration_write_back.py`) takes as categories the values the
+engine resolves as category splits (`CalibratedInitialState.categories`,
+from `initial_condition_coverage`).
 
 **Rule:** the plan reads the initial state of the engine
 (`CompartmentalEngine::initial_state`), never its current state: the split of

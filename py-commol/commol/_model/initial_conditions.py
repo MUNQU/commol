@@ -144,35 +144,6 @@ class InitialConditions(BaseModel):
         commol_rs.model.check_compartment_amounts(list(value.items()))
         return value
 
-    def get_uncalibrated_bins(self) -> list[str]:
-        """
-        Get list of bin IDs that have uncalibrated amounts (value = None).
-
-        Returns
-        -------
-        list[str]
-            List of bin IDs with uncalibrated initial conditions.
-        """
-        return [bin_id for bin_id, amount in self.bin_amounts.items() if amount is None]
-
-    def get_categories_with_fractions(self) -> set[str]:
-        """
-        Get the categories that have a declared initial fraction.
-
-        Returns
-        -------
-        set[str]
-            Category names collected from ``stratification_fractions``, the
-            categories of each split of a split by category included. A
-            category declared on a stratification but absent from the initial
-            conditions is not included.
-        """
-        return {
-            category
-            for fractions in self.stratification_fractions.values()
-            for category in split_categories(fractions)
-        }
-
     def resolve_category(self, category: str) -> tuple[str, str]:
         """
         Resolve a category id to its stratification and its bare name.

@@ -302,6 +302,10 @@ impl CompiledModel {
             .collect();
 
         let num_compartments = compartments.len();
+        let bin_amounts = &aggregate.initial_conditions.bin_amounts;
+        let unvalued_compartments = (0..num_compartments)
+            .filter(|&idx| matches!(bin_amounts.get(&output_labels[idx].source), Some(None)))
+            .collect();
         let flow_changes = transition_flows
             .iter()
             .map(|flow| FlowChange::of(flow, num_compartments))
@@ -343,13 +347,7 @@ impl CompiledModel {
                 .filter(|parameter| parameter.value.is_none())
                 .map(|parameter| parameter.id.clone())
                 .collect(),
-            unvalued_bins: aggregate
-                .initial_conditions
-                .bin_amounts
-                .iter()
-                .filter(|(_, amount)| amount.is_none())
-                .map(|(bin, _)| bin.clone())
-                .collect(),
+            unvalued_compartments,
         })
     }
 }

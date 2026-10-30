@@ -428,9 +428,14 @@ fn write_target<E: CompartmentalEngine>(
                     );
                 }
             }
+            // A split of a pair is a share of the amounts already there,
+            // so a compartment that had no value still has none.
+            let indices: Vec<usize> = writes.iter().map(|&(idx, _)| idx).collect();
+            let unvalued = engine.model().unvalued_of(&indices);
             for (idx, amount) in writes {
                 engine.set_initial_condition(idx, amount)?;
             }
+            engine.model_mut().keep_unvalued(&unvalued);
         }
     }
     Ok(())
@@ -461,44 +466,80 @@ fn prefix_indices(id: &str, labels: &[OutputLabels]) -> Option<Vec<usize>> {
 /// The stratification and the bare name of a category id, among
 /// `stratifications`, each with its categories.
 ///
-/// A qualified id (`group:g1`) names its stratification, split at the first
-/// [`CATEGORY_SEPARATOR`]; a bare id (`g1`) names the one stratification
-/// that has the category. `Ok(None)` when no stratification has it.
+/// A bare id (`g1`) is a category; a qualified id (`group:g1`) is a
+/// stratification, [`CATEGORY_SEPARATOR`] and one of its categories. Ids
+/// have no rule on their characters, so an id matches whole ids, never a
+/// split at one separator: `a:b:c` is the category `b:c` of `a` or the
+/// category `c` of `a:b`, whichever the stratifications declare. `Ok(None)`
+/// when no stratification has the category.
 ///
 /// # Errors
 ///
-/// Returns a message when several stratifications have a bare category; it
-/// names each of them and the qualified ids to write.
+/// Returns a message when several stratifications match the id; it names
+/// each of them and the qualified ids to write.
 pub fn resolve_category<'a, S: AsRef<str>>(
-    id: &'a str,
+    id: &str,
     stratifications: &'a [(S, Vec<S>)],
 ) -> Result<Option<(&'a str, &'a str)>, String> {
-    let (qualifier, name) = match id.split_once(CATEGORY_SEPARATOR) {
-        Some((stratification, name)) => (Some(stratification), name),
-        None => (None, id),
-    };
-    let owners: Vec<&str> = stratifications
+    let matches: Vec<(&str, &str)> = stratifications
         .iter()
-        .map(|(stratification, categories)| (stratification.as_ref(), categories))
-        .filter(|(stratification, categories)| {
-            qualifier.is_none_or(|qualifier| qualifier == *stratification)
-                && categories.iter().any(|category| category.as_ref() == name)
-        })
-        .map(|(stratification, _)| stratification)
-        .collect();
-    match owners.as_slice() {
-        [] => Ok(None),
-        [owner] => Ok(Some((owner, name))),
-        _ => Err(format!(
-            "Category '{id}' is ambiguous: it is declared by stratifications {owners:?}. \
-             Qualify it as {}.",
-            owners
+        .flat_map(|(stratification, categories)| {
+            let stratification = stratification.as_ref();
+            categories
                 .iter()
-                .map(|owner| format!("'{owner}{CATEGORY_SEPARATOR}{name}'"))
-                .collect::<Vec<_>>()
-                .join(" or ")
-        )),
+                .map(AsRef::as_ref)
+                .filter(move |&category| {
+                    category == id
+                        || id
+                            .strip_prefix(stratification)
+                            .and_then(|rest| rest.strip_prefix(CATEGORY_SEPARATOR))
+                            == Some(category)
+                })
+                .map(move |category| (stratification, category))
+        })
+        .collect();
+    match matches.as_slice() {
+        [] => Ok(None),
+        [found] => Ok(Some(*found)),
+        _ => {
+            let owners: Vec<&str> = matches.iter().map(|(owner, _)| *owner).collect();
+            Err(format!(
+                "Category '{id}' is ambiguous: it is declared by stratifications {owners:?}. \
+                 Qualify it as {}.",
+                matches
+                    .iter()
+                    .map(|(owner, name)| format!("'{owner}{CATEGORY_SEPARATOR}{name}'"))
+                    .collect::<Vec<_>>()
+                    .join(" or ")
+            ))
+        }
     }
+}
+
+/// The stratification and the bare name of a category id of the initial
+/// conditions ([`resolve_category`]), among `stratifications`, each with its
+/// categories.
+///
+/// # Errors
+///
+/// Returns the message of [`resolve_category`], or a message with every
+/// category there is when no stratification has the category.
+pub fn resolve_declared_category<'a, S: AsRef<str>>(
+    id: &str,
+    stratifications: &'a [(S, Vec<S>)],
+) -> Result<(&'a str, &'a str), String> {
+    resolve_category(id, stratifications)?.ok_or_else(|| {
+        let mut available: Vec<&str> = stratifications
+            .iter()
+            .flat_map(|(_, categories)| categories.iter().map(AsRef::as_ref))
+            .collect();
+        available.sort_unstable();
+        available.dedup();
+        format!(
+            "Category '{id}' not found in initial conditions. Available categories: \
+             {available:?}"
+        )
+    })
 }
 
 fn resolve_target(
@@ -715,6 +756,29 @@ mod tests {
 
         assert!(error.contains("ambiguous"), "{error}");
         assert!(error.contains("'group:c1' or 'type:c1'"), "{error}");
+    }
+
+    #[test]
+    fn a_qualified_category_matches_whole_ids_that_hold_the_separator() {
+        let category_with_separator = [("a", vec!["b:c", "d"])];
+        let stratification_with_separator = [("a:b", vec!["c", "d"])];
+
+        assert_eq!(
+            resolve_category("a:b:c", &category_with_separator),
+            Ok(Some(("a", "b:c")))
+        );
+        assert_eq!(
+            resolve_category("a:b:c", &stratification_with_separator),
+            Ok(Some(("a:b", "c")))
+        );
+        assert_eq!(
+            resolve_declared_category("a:x", &category_with_separator),
+            Err(
+                "Category 'a:x' not found in initial conditions. Available categories: \
+                 [\"b:c\", \"d\"]"
+                    .to_string()
+            )
+        );
     }
 
     #[test]

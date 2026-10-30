@@ -402,7 +402,7 @@ impl PyEngine {
     ///     one unit apart, and one output row per position
     ///
     /// Raises:
-    ///     ValueError: If a parameter or a value of the model has no value
+    ///     ValueError: If a parameter or an initial amount has no value
     ///     InfeasibleStateError: If the state leaves the values the model
     ///         allows, such as an amount below zero
     ///     RuntimeError: If the simulation fails for another reason
@@ -433,7 +433,7 @@ impl PyEngine {
     ///     replicate, and one list of output rows per replicate
     ///
     /// Raises:
-    ///     ValueError: If a parameter or a value of the model has no value,
+    ///     ValueError: If a parameter or an initial amount has no value,
     ///         or a position is not valid for the engine
     ///     InfeasibleStateError: If a replicate leaves the values the model
     ///         allows
@@ -480,7 +480,7 @@ impl PyEngine {
     ///     One output row per position
     ///
     /// Raises:
-    ///     ValueError: If a parameter or a value of the model has no value, a
+    ///     ValueError: If a parameter or an initial amount has no value, a
     ///         position is not valid for the engine (a difference engine
     ///         reports only at integer steps), or the positions are not
     ///         sorted and unique
@@ -500,7 +500,7 @@ impl PyEngine {
     /// Advance one step
     ///
     /// Raises:
-    ///     ValueError: If a parameter or a value of the model has no value
+    ///     ValueError: If a parameter or an initial amount has no value
     ///     InfeasibleStateError: If the state leaves the values the model
     ///         allows, such as an amount below zero
     ///     RuntimeError: If the step fails for another reason

@@ -219,8 +219,8 @@ To add a kind of model, such as an agent network (see
       name what an expression reads.
 - [ ] Add a variant to `EngineValuePlan` in `py-commol/src/engine.rs`.
 - [ ] Write a `ModelStructure` subclass in `py-commol/commol/_model/`, with
-      `kind` as a `Literal` default. Implement `check_model` and
-      `outputs_by_source`; override `series_label`, `uncalibrated_values`,
+      `kind` as a `Literal` default. Implement `check_model` (it asks the
+      engine) and `outputs_by_source`; override `series_label`,
       `check_calibration_values`, `with_calibrated_values`, `report_sections`,
       `describe` and `check_unit_consistency` when the kind has them. Reject
       in `check_model` a feature of the process the kind cannot run, and name

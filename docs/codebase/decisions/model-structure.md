@@ -163,20 +163,40 @@ ids of the model (`Model::check_ids`).
 A parameter or a bin amount may be `None`, a value left for calibration, and
 the model builds. A run refuses it: `CompiledModel::check_values` in
 `crates/commol-model/src/system.rs` names every parameter that has no value
-(from the model or from `set_parameter`) and every bin left `None` that no
-value has reached (`set_initial_condition` writes a compartment of the bin,
-as a calibration does). Every engine of the aggregate kind checks it before
-it runs or steps (`record_steps`, `integrate_to`, `run_to` and `step`), and
-the bindings `run`, `run_at`, `run_replicates` and `step` check it first
-(`SimulationEngine::check_values`) to raise `ValueError`, so
-`Simulation.run` holds no check of its own. A calibration writes every value
-it calibrates before each run; a value it neither calibrates nor finds in
-the model stops it with the same message. A rate that reads a parameter
-without a value names the parameter, not an index (`resolve_slot` in
-`crates/commol-model/src/rates.rs`).
+(from the model or from `set_parameter`), every bin left `None` of which no
+compartment has a value, and every other compartment of such a bin that has
+none. The rule is per compartment: a bin of two compartments whose
+calibration writes one of them still has the other at `0`, which no one
+chose. A value reaches a compartment when `set_initial_condition` writes it,
+from a bin, a prefix, a compartment or the remainder. The split of a
+category does not: it shares out the amounts already in each pair
+(`write_target` in `crates/commol-model/src/initial_conditions.rs`), so of
+a bin left `None` it shares out nothing, and the compartments keep no value
+(`keep_unvalued`). Every engine checks it before it runs or steps
+(`record_steps`, `integrate_to`, `run_to` and `step`): it is a required
+method of the trait (`SimulationEngine::check_values`), with one message
+(`check_missing_values` in `commol-core`). The bindings `run`, `run_at`,
+`run_replicates` and `step` check it first to raise `ValueError`, so
+`Simulation.run` holds no check of its own. A calibration is refused when it
+is built: `check_model_values` in `crates/commol-calibration/src/values.rs`
+writes its values to a copy of the engine, each at the point of its bounds
+nearest 0, and checks the copy, so a value the calibration neither sets nor
+finds in the model raises the message of the engine from `Calibrator` and
+from every method that builds the problem, before an optimizer starts. A
+rate that reads a parameter without a value names the parameter, not an
+index (`resolve_slot` in `crates/commol-model/src/rates.rs`).
+
+| Alternative | Why not |
+|---|---|
+| A bin has a value once any of its compartments has one | The other compartments run at `0`, a value no one gave. |
+| A check only when the calibration runs | The error comes from the optimizer, as a failed start, after the setup. |
 
 **Guards:**
 `crates/commol-model/tests/model_rules.rs::a_run_needs_every_value`,
+`crates/commol-stochastic/tests/test_values.rs`,
+`crates/commol-calibration/tests/test_infeasible_runs.rs::a_value_that_the_calibration_leaves_missing_is_refused_before_it_runs`,
+`tests/calibration/test_initial_conditions.py::TestIds::test_a_bin_left_to_calibrate_needs_a_value_in_each_compartment`,
+`tests/calibration/test_problem.py::TestProblemAgainstTheModel::test_a_value_that_the_calibration_leaves_missing_is_refused_at_once`,
 `tests/simulation/test_runs.py::TestResults::test_a_run_with_an_uncalibrated_parameter_is_rejected`,
 `tests/building/test_parameters.py::TestValues::test_a_run_names_the_initial_conditions_left_to_calibrate`.
 

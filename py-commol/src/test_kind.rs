@@ -140,10 +140,7 @@ fn check_rates(outputs: &[DecayOutput], parameters: &HashMap<String, f64>) -> Re
     if missing.is_empty() {
         return Ok(());
     }
-    Err(format!(
-        "The model cannot run: the parameters {missing:?} have no value. Give them a value, \
-         or calibrate them and write the calibrated values back"
-    ))
+    commol_core::check_missing_values(&[format!("the parameters {missing:?}")])
 }
 
 /// The structure and the constant parameters of a test model, once its ids

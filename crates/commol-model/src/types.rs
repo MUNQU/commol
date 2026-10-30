@@ -430,10 +430,11 @@ pub struct CompiledModel {
     /// run needs a value for each one ([`CompiledModel::check_values`]):
     /// [`CompiledModel::set_parameter`] gives it.
     pub(crate) unvalued_parameters: Vec<String>,
-    /// The bins whose amount the model leaves to calibrate and that no
-    /// value has reached since: [`CompiledModel::set_initial_condition`]
-    /// removes the bin of the compartment it writes.
-    pub(crate) unvalued_bins: Vec<String>,
+    /// The compartments of the bins whose amount the model leaves to
+    /// calibrate that no value has reached since, in engine order:
+    /// [`CompiledModel::set_initial_condition`] removes the compartment it
+    /// writes, and [`CompiledModel::rescale_initial_condition`] keeps it.
+    pub(crate) unvalued_compartments: Vec<usize>,
 }
 
 #[cfg(test)]

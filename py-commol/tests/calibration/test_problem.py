@@ -252,6 +252,27 @@ class TestProblemAgainstTheModel:
         ):
             self._calibrator(model, [bounded("k2")])
 
+    @pytest.mark.parametrize(
+        "engine",
+        [
+            "DifferenceEquations",
+            "DifferentialEquations",
+            "StochasticSteps",
+            "StochasticEvents",
+        ],
+    )
+    def test_a_value_that_the_calibration_leaves_missing_is_refused_at_once(
+        self, engine: str
+    ) -> None:
+        builder = abc_builder(parameters={"k1": 0.3, "k2": 0.1, "unused": None})
+        model = builder.build(builder.structure, engine=engine)
+
+        with pytest.raises(
+            ValueError,
+            match=r'^The model cannot run: the parameters \["unused"\] have no value',
+        ):
+            self._calibrator(model, [bounded("k1")])
+
     def test_a_factor_has_positive_bounds(self, truth: Model) -> None:
         with pytest.raises(ValueError, match="'f' must have positive bounds"):
             self._calibrator(truth, [bounded("f", 0.0, 1.0, kind="factor")])

@@ -159,13 +159,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with the message of the engine, which names each of them: `The model
   cannot run: the parameters ["k1"] and the amounts of the bins ["B"] have no
   value. Give them a value, or calibrate them and write the calibrated values
-  back` (`ValueError` from `Simulation.run`, `run_at` and the replicates, which
-  read `Cannot run Simulation: ...`). Every engine checks it before it runs,
-  so a calibration that leaves a parameter without a value stops with this
-  message, even when no rate reads the parameter, and a rate that reads a
-  parameter without a value names it (`the parameter 'k1' has no value`), not
-  an index. A bin amount without a value no longer runs as `0`. Migration:
-  give every parameter and bin amount a value, or calibrate it.
+  back` (`ValueError` from `Simulation.run`, `run_at` and the replicates; the
+  old message was `Cannot run Simulation: ...`). Every engine checks it
+  before it runs, and a rate that reads a parameter without a value names it
+  (`the parameter 'k1' has no value`), not an index. A bin amount without a
+  value no longer runs as `0`. A bin left `None` needs a value in each of its
+  compartments: a calibration of `B_g1` alone leaves `B_g2` without one
+  (`the amounts of the compartments ["B_g2"]`), and the split of a category
+  (`g1`, `group:g1`) shares out what the bin holds, so it gives none. A
+  `Calibrator`, and every uncertainty method that builds the problem, raises
+  this `ValueError` when it is built if a value that the calibration does not
+  set has none, even when no rate reads it; it was a failed start of the
+  optimizer, or a run at `0`. Migration: give every parameter and bin amount
+  a value, or calibrate it.
+- **Breaking:** `Model.get_uncalibrated_parameters`,
+  `Aggregate.uncalibrated_values` (and `ModelStructure.uncalibrated_values`),
+  `Aggregate.get_uncalibrated_bins` and `Aggregate.get_categories_with_fractions`
+  are removed: no part of commol reads them, and the engine names every
+  value a run lacks. Migration: read `parameter.value is None` and
+  `structure.bin_amounts`, or run the model and read the message.
+- A qualified category id matches whole ids: `a:b:c` names the category
+  `b:c` of `a` or the category `c` of `a:b`, whichever the model declares, so
+  a stratification or a category whose id holds `:` resolves. The engine split
+  the id at the first `:` and `Aggregate` at the last.
+- A split of no category in `stratification_fractions` (`{"g": {}}`) no
+  longer fails on its sum: `build` gives the message of the engine, such as
+  `Stratification 'g' has no category; give it at least one`.
 - An ambiguous category of the initial conditions (`update_stratification_fractions`,
   `subgroup_total`, `get_category_fraction`) gets the message of the engine,
   the one a calibrated initial condition gets: `Category 'c1' is ambiguous:

@@ -303,21 +303,9 @@ fn resolve_category(
     category: &str,
     stratifications: Vec<(String, Vec<String>)>,
 ) -> PyResult<(String, String)> {
-    match commol_model::resolve_category(category, &stratifications).map_err(value_error)? {
-        Some((stratification, name)) => Ok((stratification.to_string(), name.to_string())),
-        None => {
-            let mut available: Vec<&str> = stratifications
-                .iter()
-                .flat_map(|(_, categories)| categories.iter().map(String::as_str))
-                .collect();
-            available.sort_unstable();
-            available.dedup();
-            Err(value_error(format!(
-                "Category '{category}' not found in initial conditions. Available \
-                 categories: {available:?}"
-            )))
-        }
-    }
+    commol_model::resolve_declared_category(category, &stratifications)
+        .map(|(stratification, name)| (stratification.to_string(), name.to_string()))
+        .map_err(value_error)
 }
 
 /// Register the model helpers with the Python module

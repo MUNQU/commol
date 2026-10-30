@@ -158,11 +158,6 @@ class TestStructureInterface:
         assert aggregate.calibration_value_types() == {"initial_condition"}
         assert decay_model().structure.calibration_value_types() == frozenset()
 
-    def test_a_kind_without_values_of_its_own_leaves_none_to_calibrate(
-        self,
-    ) -> None:
-        assert decay_model(rate=None).structure.uncalibrated_values() == []
-
     def test_the_compartment_queries_of_an_engine_name_it(self) -> None:
         engine = Simulation(decay_model()).engine
 

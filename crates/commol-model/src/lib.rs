@@ -72,7 +72,9 @@ pub use builder::{
 };
 pub use engine::{CompartmentalEngine, IntegerStepper, record_steps, rounded};
 pub use flows::{FlowDescription, describe_flows};
-pub use initial_conditions::{CATEGORY_SEPARATOR, InitialConditionPlan, resolve_category};
+pub use initial_conditions::{
+    CATEGORY_SEPARATOR, InitialConditionPlan, resolve_category, resolve_declared_category,
+};
 pub use labels::{OutputLabels, output_sums};
 pub use matrices::{MatrixVariable, matrix_variables};
 pub use types::{CompiledModel, FlowChange};

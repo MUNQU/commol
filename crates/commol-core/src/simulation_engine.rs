@@ -58,6 +58,28 @@ impl From<String> for SimulationError {
     }
 }
 
+/// The one message of a model that cannot run because values are missing:
+/// `missing` names each group of them, such as `the parameters ["k"]`.
+/// Every engine writes [`SimulationEngine::check_values`] with it.
+///
+/// # Errors
+///
+/// Returns the message that names every group, unless `missing` is empty.
+pub fn check_missing_values(missing: &[String]) -> Result<(), String> {
+    let Some((last, others)) = missing.split_last() else {
+        return Ok(());
+    };
+    let named = if others.is_empty() {
+        last.clone()
+    } else {
+        format!("{} and {last}", others.join(", "))
+    };
+    Err(format!(
+        "The model cannot run: {named} have no value. Give them a value, or calibrate them \
+         and write the calibrated values back"
+    ))
+}
+
 /// Check that positions are sorted, unique, not before `from`, and each one
 /// accepted by `accept`.
 ///
@@ -173,6 +195,10 @@ pub trait ValuePlan: Clone + Debug + Send + Sync {
 /// }
 ///
 /// impl SimulationEngine for Constant {
+///     fn check_values(&self) -> Result<(), String> {
+///         Ok(())
+///     }
+///
 ///     type ValuePlan = NoValues;
 ///
 ///     fn check_position(&self, position: f64) -> Result<(), String> {
@@ -441,14 +467,13 @@ pub trait SimulationEngine: Clone {
     /// value of the kind left for calibration has one, from
     /// [`Self::set_parameter`] or [`Self::apply_values`]. An engine checks it
     /// before it runs; a caller checks it to refuse a run before it starts.
-    /// Every value is given by default.
+    /// An engine whose model leaves no value to calibrate returns `Ok(())`.
     ///
     /// # Errors
     ///
-    /// Returns a message that names every value the model lacks.
-    fn check_values(&self) -> Result<(), String> {
-        Ok(())
-    }
+    /// Returns the message of [`check_missing_values`], which names every
+    /// value the model lacks.
+    fn check_values(&self) -> Result<(), String>;
 
     /// The current position on the axis.
     ///

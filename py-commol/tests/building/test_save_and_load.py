@@ -135,7 +135,7 @@ class TestToJson:
         restored = Model.from_json(path)
 
         assert restored == model
-        assert restored.get_uncalibrated_parameters() == ["k"]
+        assert restored.parameters[0].value is None
 
     def test_an_uncalibrated_bin_amount_round_trips(self, tmp_path: Path) -> None:
         model = _model(amount=None)
@@ -145,7 +145,7 @@ class TestToJson:
         restored = Model.from_json(path)
 
         assert restored == model
-        assert restored.structure.uncalibrated_values() == ["A"]
+        assert restored.structure.bin_amounts["A"] is None
 
     @pytest.mark.parametrize(
         "array",
