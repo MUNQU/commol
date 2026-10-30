@@ -23,7 +23,7 @@ class ParameterEntry(TypedDict):
 
     value: float
     calibrated: bool
-    interval: NotRequired[EntrySpread]
+    spread: NotRequired[EntrySpread]
 
 
 class AppliedParametersReport(ReportSections):
@@ -42,14 +42,14 @@ def _parameter_entry(
     calibrated_ids: set[str],
     statistics: Mapping[str, EntrySummary] | None,
 ) -> ParameterEntry:
-    """One reported parameter, with its interval when there is one."""
+    """One reported parameter, with its spread when there is one."""
     entry: ParameterEntry = {
         "value": value,
         "calibrated": entry_id in calibrated_ids,
     }
-    interval = entry_spread(entry_id, statistics)
-    if interval is not None:
-        entry["interval"] = interval
+    spread = entry_spread(entry_id, statistics)
+    if spread is not None:
+        entry["spread"] = spread
     return entry
 
 

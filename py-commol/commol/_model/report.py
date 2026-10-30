@@ -20,7 +20,7 @@ class InitialAmountEntry(TypedDict):
     amount: float | None
     unit: str | None
     calibrated: bool
-    interval: NotRequired[EntrySpread]
+    spread: NotRequired[EntrySpread]
 
 
 class CategorySplitEntry(TypedDict):
@@ -29,18 +29,18 @@ class CategorySplitEntry(TypedDict):
     group: list[str]
     fraction: float
     calibrated: bool
-    interval: NotRequired[EntrySpread]
+    spread: NotRequired[EntrySpread]
 
 
-def _interval(
+def _spread(
     entry: InitialAmountEntry | CategorySplitEntry,
     entry_id: str,
     statistics: "Mapping[str, EntrySummary] | None",
 ) -> None:
-    """Add the interval of an entry, when the sample has one."""
-    interval = entry_spread(entry_id, statistics)
-    if interval is not None:
-        entry["interval"] = interval
+    """Add the spread of an entry, when the sample has one."""
+    spread = entry_spread(entry_id, statistics)
+    if spread is not None:
+        entry["spread"] = spread
 
 
 def _amount_entry(
@@ -50,13 +50,13 @@ def _amount_entry(
     calibrated: bool,
     statistics: "Mapping[str, EntrySummary] | None",
 ) -> InitialAmountEntry:
-    """One reported amount, with its interval when there is one."""
+    """One reported amount, with its spread when there is one."""
     entry: InitialAmountEntry = {
         "amount": amount,
         "unit": unit,
         "calibrated": calibrated,
     }
-    _interval(entry, entry_id, statistics)
+    _spread(entry, entry_id, statistics)
     return entry
 
 
@@ -194,7 +194,7 @@ def category_splits_report(
                     "fraction": fraction,
                     "calibrated": entry_id in calibrated_ids,
                 }
-                _interval(entry, entry_id, parameter_statistics)
+                _spread(entry, entry_id, parameter_statistics)
                 key = ids[0] if by is None else f"{ids[0]} of {group[-1]}"
                 report[key] = entry
     return report

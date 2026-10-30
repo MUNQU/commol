@@ -84,6 +84,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** with a `sample`, each entry of a report
+  (`Model.applied_parameters`, `ModelStructure.report_sections`) holds its
+  `EntrySpread` under the key `spread`, not `interval`. A report saved as JSON
+  before this change has the key `interval`: read `spread`.
 - **Breaking:** a split by category names exactly the categories of `by` that
   the compartments of its stratification have. A `type` on `g2` only, split by
   `group`, gives the split of `g2` alone, and a split of `g1`, which no

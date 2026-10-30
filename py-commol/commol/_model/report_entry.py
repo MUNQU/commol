@@ -55,7 +55,7 @@ class SummarizedSample(Protocol):
 
 class EntrySpread(TypedDict):
     """Weighted spread of one reported entry across the draws of a sample: the
-    block under the key `interval` of the entry."""
+    block under the key `spread` of the entry."""
 
     mean: float
     median: float
