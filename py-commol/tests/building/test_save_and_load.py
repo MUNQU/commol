@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from commol._model.model import Model
 from commol._model.parameter import SeriesValue
-from commol._model.serialization import INLINE_ARRAY_MIN_LENGTH, render_json
+from commol._data.serialization import INLINE_ARRAY_MIN_LENGTH, render_json
 from tests.support import a_to_b_builder, build, initial_state
 
 

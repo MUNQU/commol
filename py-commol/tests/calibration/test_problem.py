@@ -2,6 +2,7 @@
 
 import json
 import math
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -179,7 +180,7 @@ class TestResult:
         )
 
     def test_a_result_records_the_seed_of_its_calibration(
-        self, truth: Model, caplog: pytest.LogCaptureFixture
+        self, truth: Model, caplog: pytest.LogCaptureFixture, tmp_path: Path
     ) -> None:
         def calibrator(seed: int | None) -> Calibrator:
             problem = CalibrationProblem(
@@ -199,7 +200,9 @@ class TestResult:
         assert f"drew the seed {drawn.seed}" in caplog.text
         assert calibrator(result.seed).run() == result
         assert calibrator(SEED).run().seed == SEED
-        assert CalibrationResult.model_validate_json(result.model_dump_json()) == result
+        result.to_json(tmp_path / "fit.json")
+        read = CalibrationResult.from_json(tmp_path / "fit.json")
+        assert calibrator(read.seed).run() == read
 
 
 class TestProblemAgainstTheModel:

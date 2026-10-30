@@ -1,6 +1,7 @@
 """The parameter sample: its invariants and its weighted statistics."""
 
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -70,10 +71,11 @@ class TestInvariants:
         assert sample != sample.values
         assert sample == _sample([0.0, 0.0, 1.0])
 
-    def test_a_sample_saved_to_json_loads_back_equal(self) -> None:
+    def test_a_sample_saved_to_json_loads_back_equal(self, tmp_path: Path) -> None:
         sample = _sample([0.0, float("-inf"), 1.0])
+        sample.to_json(tmp_path / "sample.json")
 
-        loaded = ParameterSample.model_validate_json(sample.model_dump_json())
+        loaded = ParameterSample.from_json(tmp_path / "sample.json")
 
         assert loaded == sample
         assert loaded.weights == sample.weights

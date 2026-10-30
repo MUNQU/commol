@@ -2,8 +2,9 @@
 
 [Back to Design decisions](../design-decisions.md)
 
-How intervals, descriptions, reports and model files are made from a model and
-its runs. Figures have [a page of their own](figures.md).
+How intervals, descriptions and reports are made from a model and its runs.
+Figures have [a page of their own](figures.md), and the files of models and
+results [one too](files.md).
 
 ## One confidence-interval convention
 
@@ -235,15 +236,3 @@ function reports anything.
 
 **Guard:** `tests/reporting/` (`test_reports.py` checks that each method
 gives the block of its definition, with its key order).
-
-## Model files are written in full
-
-`Model.to_json` writes every field, nulls included. Dropping nulls is not
-round-trip safe: an uncalibrated `Parameter.value` or a `None` in `bin_amounts`
-would lose a required key and fail to reload. `render_json`
-(`_model/serialization.py`) keeps files readable by writing long numeric
-arrays on one line. It is internal on purpose: an output format in the public
-API becomes a compatibility promise.
-
-**Guards:** `tests/building/test_save_and_load.py::test_an_uncalibrated_parameter_round_trips`,
-`tests/building/test_save_and_load.py::test_an_uncalibrated_bin_amount_round_trips`.

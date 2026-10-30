@@ -1,4 +1,4 @@
-"""JSON rendering for model files."""
+"""JSON rendering for the files of models and results."""
 
 import json
 import re
