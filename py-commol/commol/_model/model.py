@@ -348,7 +348,7 @@ class Model(BaseModel, Generic[StructureT]):
         category of an earlier one gives a row per split, under the key
         ``t1 of g1``, with that category in its ``group``.
 
-        With a `sample` each entry gains an ``interval`` holding the weighted
+        With a `sample` each entry gains a ``spread`` holding the weighted
         statistics of its draws (`ParameterSample.summary`). Every entry is in
         the unit it was calibrated in: a parameter in its own, an amount in
         the unit of its bin, and a category split as a fraction of its group.

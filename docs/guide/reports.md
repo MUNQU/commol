@@ -128,12 +128,12 @@ kind of model; the structure of the model adds the sections of its kind
 | An uncalibrated bin (`None` amount) | `amount` is `null`. |
 | A bin with no unit | `unit` is `null`. |
 | A category name that two stratifications declare | Its row is under the qualified id, such as `group:g1`. |
-| A `sample` | Each entry gains an `interval` block, an `EntrySpread` (`mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max`, `std`, all weighted), and the report starts with `confidence_level`. |
+| A `sample` | Each entry gains a `spread` block, an `EntrySpread` (`mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max`, `std`, all weighted), and the report starts with `confidence_level`. |
 
-The key order of each entry is fixed (`value`, `calibrated`, then `interval`;
-`amount`, `unit`, `calibrated`, then `interval`; `group`, `fraction`,
-`calibrated`, then `interval`), so saved JSON files stay comparable. An
-interval is in the unit of its entry: an amount in the unit of its bin, a split
+The key order of each entry is fixed (`value`, `calibrated`, then `spread`;
+`amount`, `unit`, `calibrated`, then `spread`; `group`, `fraction`,
+`calibrated`, then `spread`), so saved JSON files stay comparable. The
+spread is in the unit of its entry: an amount in the unit of its bin, a split
 as a fraction of its group.
 
 ## The report of a run

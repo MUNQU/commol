@@ -102,8 +102,8 @@ class TestParameters:
             confidence_level=0.95,
         )
 
-        interval = report["parameters"]["reporting_rate"]["interval"]
-        assert interval["mean"] == pytest.approx(0.5)
+        spread = report["parameters"]["reporting_rate"]["spread"]
+        assert spread["mean"] == pytest.approx(0.5)
 
     def test_scale_parameters_are_absent_without_the_problem(self) -> None:
         report = _model().applied_parameters({"k1": 0.3, "reporting_rate": 0.5})
@@ -287,7 +287,7 @@ class TestCompartmentOverrides:
 
 
 class TestIntervals:
-    def test_entries_gain_the_statistics_of_a_sample(self) -> None:
+    def test_an_entry_of_a_sample_has_a_spread(self) -> None:
         report = _model().applied_parameters(
             {"k1": 0.3},
             sample=_sample("k1", [0.8, 1.0, 1.2]),
@@ -297,7 +297,7 @@ class TestIntervals:
         # Three equal draws: the 2.5 % and 97.5 % quantiles lie outside the
         # first and last midpoints (1/6, 5/6), so they are the extremes; the
         # sample variance is 0.08 / 2.
-        assert report["parameters"]["k1"]["interval"] == pytest.approx(
+        assert report["parameters"]["k1"]["spread"] == pytest.approx(
             {
                 "mean": 1.0,
                 "median": 1.0,
@@ -325,11 +325,11 @@ class TestIntervals:
         )
 
         entry = report["category_splits"]["s1"]
-        interval = entry["interval"]
-        assert interval["mean"] == pytest.approx(0.25)
-        assert interval["ci_lower"] == pytest.approx(0.2)
-        assert interval["ci_upper"] == pytest.approx(0.3)
-        assert interval["ci_lower"] < entry["fraction"] < interval["ci_upper"]
+        spread = entry["spread"]
+        assert spread["mean"] == pytest.approx(0.25)
+        assert spread["ci_lower"] == pytest.approx(0.2)
+        assert spread["ci_upper"] == pytest.approx(0.3)
+        assert spread["ci_lower"] < entry["fraction"] < spread["ci_upper"]
 
     def test_bin_category_and_override_rows_gain_their_statistics(self) -> None:
         sample = ParameterSample.equally_weighted(
@@ -343,21 +343,19 @@ class TestIntervals:
             {}, sample=sample, confidence_level=0.95
         )
 
-        assert report["initial_amounts"]["A"]["interval"]["mean"] == pytest.approx(300)
-        assert report["category_splits"]["g1"]["interval"]["mean"] == pytest.approx(0.5)
-        assert report["initial_amounts"]["A_g1"]["interval"]["mean"] == pytest.approx(
-            200
-        )
+        assert report["initial_amounts"]["A"]["spread"]["mean"] == pytest.approx(300)
+        assert report["category_splits"]["g1"]["spread"]["mean"] == pytest.approx(0.5)
+        assert report["initial_amounts"]["A_g1"]["spread"]["mean"] == pytest.approx(200)
 
-    def test_entries_without_statistics_have_no_interval(self) -> None:
+    def test_entries_without_statistics_have_no_spread(self) -> None:
         report = _model().applied_parameters(
             {"k1": 0.3},
             sample=_sample("k1", [0.8, 1.2]),
             confidence_level=0.95,
         )
 
-        assert "interval" not in report["initial_amounts"]["A"]
-        assert "interval" not in report["category_splits"]["group1"]
+        assert "spread" not in report["initial_amounts"]["A"]
+        assert "spread" not in report["category_splits"]["group1"]
 
     def test_confidence_level_leads_the_report(self) -> None:
         report = _model().applied_parameters({}, confidence_level=0.95)
