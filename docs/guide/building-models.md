@@ -270,8 +270,9 @@ builder = builder.add_stratification(
 
 Each condition is `StratificationCondition(stratification=<id>,
 category=<category>)`, or `categories=[...]` for a set of categories of which
-the compartment has one. It may only name a stratification declared before
-this one; otherwise the call raises `ValueError`.
+the compartment has one. It names a stratification declared before this one
+and gives `category` or `categories`; otherwise `build` raises `ValueError`
+with the message of the engine, which names the stratification.
 
 | Rule | Effect |
 |---|---|

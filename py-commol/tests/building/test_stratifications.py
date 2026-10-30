@@ -2,7 +2,7 @@
 
 import pytest
 
-from commol import ModelBuilder, Simulation, StratificationCondition
+from commol import ModelBuilder, Simulation
 from commol._model.stratification import Stratification
 from tests.support import abc_builder, assert_total_conserved, build
 
@@ -103,31 +103,18 @@ class TestConditionalStratification:
 
         assert_total_conserved(Simulation(model).run(20), 1000.0)
 
-    def test_a_condition_on_an_undeclared_stratification_is_rejected(self) -> None:
-        builder = ModelBuilder(name="invalid").add_bin(id="A", name="A")
-
-        with pytest.raises(ValueError, match="not been declared"):
-            builder.add_stratification(
-                id="status",
-                categories=["s1", "s2"],
-                conditions=[
-                    StratificationCondition(stratification="group", category="g2")
-                ],
-            )
-
-    def test_a_condition_without_a_category_is_rejected(self) -> None:
-        builder = (
-            ModelBuilder(name="invalid")
-            .add_bin(id="A", name="A")
-            .add_stratification(id="group", categories=["cat0", "cat1"])
+    def test_a_condition_names_a_stratification_declared_before_it(self) -> None:
+        builder = abc_builder(
+            stratifications={"status": STATUS, "group": GROUP},
+            conditions={"status": {"group": "g2"}},
         )
 
-        with pytest.raises(ValueError, match="'group' must include a category"):
-            builder.add_stratification(
-                id="subgroup",
-                categories=["sub0", "sub1"],
-                conditions=[StratificationCondition(stratification="group")],
-            )
+        with pytest.raises(
+            ValueError,
+            match="Stratification 'status': a condition names 'group', which is not "
+            "a stratification declared before it",
+        ):
+            build(builder)
 
 
 class TestCategories:

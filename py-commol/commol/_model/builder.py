@@ -176,7 +176,7 @@ class ModelBuilder:
             already-applied categories satisfy ALL conditions. Each condition
             names a stratification declared before this one and its category,
             or a set of its categories (``categories``) of which the
-            compartment has one.
+            compartment has one; ``build`` refuses a condition that does not.
 
             Example: only apply the `sub` stratification to `group1`::
 
@@ -192,19 +192,8 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If any condition references a stratification not yet declared.
+            If ``categories`` is empty or names a category twice.
         """
-        if conditions:
-            declared_ids = {s.id for s in self._stratifications}
-            for cond in conditions:
-                if cond.stratification not in declared_ids:
-                    raise ValueError(
-                        f"Stratification '{id}': condition references "
-                        f"'{cond.stratification}' which has not been declared yet. "
-                        "Conditions may only reference stratifications declared before "
-                        "this one."
-                    )
-
         self._stratifications.append(
             Stratification(
                 id=id,

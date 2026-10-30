@@ -9,7 +9,8 @@ class StratificationCondition(BaseModel):
 
     The condition holds for a compartment whose category in the
     stratification is ``category``, or one of ``categories``. A condition
-    gives one of them, or neither when it only sets ``to``.
+    gives one of them; the condition of a stratified rate gives neither when
+    it only sets ``to``.
 
     When ``to`` is set, the matched category in the source compartment is
     replaced with the ``to`` category in the target compartment name. This
@@ -38,9 +39,10 @@ class StratificationCondition(BaseModel):
     category: str | None = Field(
         default=None,
         description=(
-            "Category within the stratification. When None, the condition acts as a "
-            "target-only override: it does not filter source compartments but still "
-            "contributes a 'to' category to the computed target compartment name."
+            "Category within the stratification. When None, with 'categories' also "
+            "None, the condition of a stratified rate acts as a target-only override: "
+            "it does not filter source compartments but still contributes a 'to' "
+            "category to the computed target compartment name."
         ),
     )
     categories: list[str] | None = Field(

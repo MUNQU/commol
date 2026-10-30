@@ -13,12 +13,14 @@ use super::process::Stratification;
 /// with the `to` category in the target compartment name. This enables
 /// cross-category transitions within the same bin (for example `g1` → `g2`).
 ///
-/// When `category` and `categories` are `None`, the condition acts as a
-/// target-only override: it does not filter source compartments but still
-/// contributes a `to` category to the computed target compartment name. This is
-/// required when the source compartment lacks a stratification that the target
-/// compartment must have (e.g., an `A_cat0` compartment routing into an
-/// `A_cat1_sub0` compartment).
+/// When `category` and `categories` are `None`, the condition of a stratified
+/// rate acts as a target-only override: it does not filter source
+/// compartments but still contributes a `to` category to the computed target
+/// compartment name. This is required when the source compartment lacks a
+/// stratification that the target compartment must have (e.g., an `A_cat0`
+/// compartment routing into an `A_cat1_sub0` compartment). A condition of a
+/// stratification gives one of them
+/// ([`Process::check_conditions`](super::process::Process::check_conditions)).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StratificationCondition {
     /// Id of the stratification.
