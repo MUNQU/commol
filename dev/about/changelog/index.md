@@ -61,6 +61,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Documentation
 
+- [Development workflow](https://munqu.github.io/commol/latest/development/workflow/#7-merging): the merge step gives `gh pr merge <number>`, which adds a pull request to the merge queue once its required checks pass, with the setting "Allow auto-merge" of the repository on.
 - [Design principles](https://munqu.github.io/commol/latest/codebase/design-principles/index.md): the structure, the rules of each unit and of the interface, and the proof that every part of the code follows. «Before you change code» of `AGENTS.md` links them. `tests/suite/test_architecture.py` fails when a crate of `crates/` depends on PyO3 or on the bridge.
 - A numbered list of the documentation keeps its first number, and a line inside a paragraph that starts with a number and a period, such as `512.`, stays in its paragraph: the site reads lists with `sane_lists`.
 

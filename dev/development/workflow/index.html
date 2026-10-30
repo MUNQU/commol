@@ -4551,10 +4551,14 @@ from the latest <code>main</code>, linked to the issue, in a sibling worktree:</
   reason: <code># pragma: no cover: &lt;reason&gt;</code> or <code>// coverage: &lt;reason&gt;</code></li>
 </ul>
 <h3 id="7-merging">7. Merging<a class="headerlink" href="#7-merging" title="Permanent link">&para;</a></h3>
-<p>Once its checks pass, add the pull request to the merge queue ("Merge when ready", or
-<code>gh pr merge &lt;number&gt; --squash</code>): the queue squash-merges it, the only method
-<code>main</code> allows, once the required checks pass on top of the pull requests before
-it. GitHub deletes the branch after the merge (<code>delete_branch_on_merge</code>);
+<p>Add the pull request to the merge queue with <code>gh pr merge &lt;number&gt;</code> or "Merge
+when ready", also before its checks end: auto-merge holds it until its required
+checks pass, and then it enters the queue. <code>gh</code> asks for auto-merge on a branch
+with a merge queue, so the repository keeps "Allow auto-merge"
+(<code>allow_auto_merge</code>) on. A merge method flag such as <code>--squash</code> only gives a
+warning. The queue squash-merges the pull request, the only method <code>main</code>
+allows, once the required checks pass on top of the pull requests before it.
+GitHub deletes the branch after the merge (<code>delete_branch_on_merge</code>);
 delete your local copy with <code>git branch -D &lt;branch&gt;</code> after <code>git fetch --prune</code>.</p>
 <p>A release needs no merge between branches: it is a tag on <code>main</code> (<a href="../release/">Release
 Process</a>).</p>
