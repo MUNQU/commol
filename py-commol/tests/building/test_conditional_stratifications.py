@@ -15,6 +15,7 @@ from commol import (
 )
 from commol._model.description import Table
 from commol._model.model import Model
+from tests.support import assert_accepted
 
 GROUPS = {"g1": 0.2, "g2": 0.3, "g3": 0.5}
 
@@ -188,7 +189,7 @@ def test_a_condition_on_a_set_is_checked(
         ):
             _build(of_a_rate)
     else:
-        assert _compartments(_build(of_a_rate)) == _compartments(_build(_builder()))
+        assert_accepted(_build, of_a_rate)
 
 
 def test_a_condition_on_one_category_is_unchanged() -> None:
