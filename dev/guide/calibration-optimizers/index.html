@@ -3010,6 +3010,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/optimizers/" class="md-nav__link">
         
   
@@ -4005,8 +4033,10 @@ of 0 works. Nelder-Mead moves in an unbounded coordinate <code>u</code>, and the
 scores is <code>lo + (hi − lo)·(sin u + 1)/2</code> (the transform of MINUIT and lmfit), so every
 value it tries is inside the bounds (<code>SineTransform</code> of the argmin fork). An
 optimum exactly at a bound is reached only asymptotically, so it can take more
-iterations. Nelder-Mead needs finite bounds: a run with an infinite bound fails
-with the message <code>Nelder-Mead needs finite bounds</code>.</p>
+iterations. Every optimizer needs finite bounds: Nelder-Mead searches through
+their transform, and a particle swarm draws its particles inside them. A run
+with an infinite bound fails with a message that names the parameter,
+<code>An optimizer searches inside the bounds, so they must be finite</code>.</p>
 <h2 id="converged-and-termination_reason"><code>converged</code> and <code>termination_reason</code><a class="headerlink" href="#converged-and-termination_reason" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

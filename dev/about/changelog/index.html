@@ -2807,6 +2807,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/optimizers/" class="md-nav__link">
         
   
@@ -5208,12 +5236,48 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   (<code>Model.applied_parameters</code>, <code>ModelStructure.report_sections</code>) holds its
   <code>EntrySpread</code> under the key <code>spread</code>, not <code>interval</code>. A report saved as JSON
   before this change has the key <code>interval</code>: read <code>spread</code>.</li>
-<li><strong>Breaking:</strong> a split by category names exactly the categories of <code>by</code> that
+<li><strong>Breaking:</strong> the engine holds every rule of a calibration problem and of
+  an uncertainty method, and Python holds no copy: each class sends its JSON
+  to the engine when it is built and raises the message of the engine. A
+  problem or a method written as JSON meets the same rules. Several messages
+  change: two parameters with one id say <code>Two parameters have the id 'k'</code>,
+  a loss with observation models says <code>not both</code>, a problem with neither
+  says <code>There is no default</code>, and a list of names in a message is written
+  as Rust writes it, <code>["k1"]</code>. See
+  <a href="../../guide/calibration/#unknowns">Calibration</a>.</li>
+<li><strong>Breaking:</strong> a <code>CalibrationParameter</code> with a NaN bound, <code>max_bound</code> not
+  above <code>min_bound</code>, or an <code>initial_guess</code> that is not finite or outside its
+  bounds is refused by the engine too, so a problem in JSON can no longer
+  calibrate a parameter of zero width. An infinite bound stays valid for a
+  prior; every run of an optimizer refuses it with a message that names the
+  parameter (before, a swarm panicked and Nelder-Mead named no parameter),
+  and so do <code>StructuralRank</code> and <code>SampleIdentifiability(reference="bounds")</code>,
+  which gave a contraction of 1 and the verdict <code>determined</code>. See
+  <a href="../../guide/calibration/#infinite-bounds">Infinite bounds</a>.</li>
+<li><strong>Breaking:</strong> an <code>InputSpace</code> with neither distributions nor a sample is
+  refused when <code>SensitivityAnalysis</code> reads it; before, the engine drew each
+  input uniform on its bounds. One with both is refused; before, the engine
+  ignored the distributions. The check of the names and the bounds of a
+  sample moves from <code>InputSpace.from_sample</code> to <code>SensitivityAnalysis</code>, and a
+  <code>Uniform()</code> on an infinite bound is refused by <code>InputSpace.uniform_on_bounds</code>.
+  See <a href="../../guide/uncertainty/sensitivity/">Input spaces</a>.</li>
+<li><strong>Breaking:</strong> the engine writes the default label of a quantity of
+  interest: a very small or very large position has an exponent with no
+  sign or zero, <code>1e-7</code> and <code>2.5e16</code>, not <code>1e-07</code> and <code>2.5e+16</code>. Two
+  quantities with one label are refused with a message that names the
+  label.</li>
+<li>
+<p><code>score="spread"</code> without a sample is refused when a <code>SplitConformal</code> or an
+  <code>AdaptiveConformal</code> runs, before it fits, not when it is built.</p>
+</li>
+<li>
+<p><strong>Breaking:</strong> a split by category names exactly the categories of <code>by</code> that
   the compartments of its stratification have. A <code>type</code> on <code>g2</code> only, split by
   <code>group</code>, gives the split of <code>g2</code> alone, and a split of <code>g1</code>, which no
   compartment reads, is refused with a message that names <code>type</code> and <code>g1</code>.
   Migration: remove the split of each category that the conditions of the
-  stratification leave out.</li>
+  stratification leave out.</p>
+</li>
 <li><strong>Breaking:</strong> the engine checks the stratification each condition names,
   and its category, from <code>check_model</code>. The condition of a stratification
   names one declared before it, and the condition of a stratified rate one of
@@ -5552,6 +5616,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   are removed: no part of commol reads them, and the engine names every
   value a run lacks. Migration: read <code>parameter.value is None</code> and
   <code>structure.bin_amounts</code>, or run the model and read the message.</li>
+<li><strong>Breaking:</strong> the quantities of interest lose the methods that copied
+  rules of the engine: <code>ValueAt.default_label()</code> and that of the other
+  quantities, <code>Level.text</code>, <code>Increments.text</code>, <code>Increments.check_ends()</code> and
+  <code>output_name</code>. <code>labels()</code> and <code>axes()</code> give what the engine names.</li>
 <li><strong>Breaking:</strong> <code>commol.utils.security</code> is removed, with <code>SecurityConfig</code>,
   <code>SecurityError</code>, <code>validate_expression_security</code> and the <code>config=</code> argument
   of <code>AxisPattern.combine</code> and <code>AxisPattern.from_formula</code>. The parser of the
@@ -5569,12 +5637,34 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
-<li>A figure of a run, or of its replicates, logs one warning for each factor of
+<li><code>Collinearity</code> at a point where a parameter with an infinite bound is 0
+  scaled its column by an infinite width: an infinite sensitivity and an
+  index below 1, with no error. The magnitude of the parameter there is now
+  1, as the step of finite differences takes it.</li>
+<li>A <code>SampleIdentifiability(reference="prior")</code> without priors, or
+  <code>reference="bounds"</code> with priors, written as JSON measured the sample
+  against the bounds with no error; the engine now refuses it.</li>
+<li>An empty list of settings is refused with a message that names the
+  field: the <code>at</code> of a constraint (before, the constraint was never
+  evaluated), the <code>origins</code> of a <code>RollingConformal</code> (before, <code>Every origin
+  failed: 0 of 0</code>), the <code>positions</code> of a conformal method, the <code>stream</code> of an
+  <code>AdaptiveConformal</code>, the <code>parameters</code> of a <code>ProfileLikelihood</code> and the
+  <code>specs</code> of a <code>PredictionProfile</code> (before, an empty result). A parameter
+  profiled twice, or two predictions with one label, are refused; before,
+  one profile overwrote the other.</li>
+<li>
+<p>The positions of a quantity of interest in JSON must ascend, each once;
+  before, the engine read unsorted positions in their given order, and the
+  first position of a peak depended on it.</p>
+</li>
+<li>
+<p>A figure of a run, or of its replicates, logs one warning for each factor of
   its observations that <code>calibration_result</code> does not have, and counts the
   factor as 1. Before, it logged the warning once for each observation and
   each replicate. The cumulative figure of a <code>Predictive</code> raises the
   <code>ValueError</code> of its other figures for a factor that the problem does not
-  have; before, it drew the observation as if the factor were 1.</li>
+  have; before, it drew the observation as if the factor were 1.</p>
+</li>
 <li>A calibrated amount of a bin whose amount is <code>None</code>, or of a remainder whose
   compartments start at <code>0</code>, split evenly among its compartments. It now
   splits by the stratification fractions, as the amount of the model does,

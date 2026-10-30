@@ -6,7 +6,7 @@ The module `commol.profiles`: the profile likelihood of parameters and predictio
 
 ## ProfileLikelihood
 
-Bases: `UncertaintyMethod[ProfileResult]`, `RangeChecked`
+Bases: `UncertaintyMethod[ProfileResult]`, `EngineChecked`, `RangeChecked`
 
 The profile likelihood of parameters (Raue et al. 2009).
 
@@ -24,7 +24,7 @@ Attributes:
 Source code in `commol/profiles/methods.py`
 
 ```python
-class ProfileLikelihood(UncertaintyMethod[ProfileResult], RangeChecked):
+class ProfileLikelihood(UncertaintyMethod[ProfileResult], EngineChecked, RangeChecked):
     """
     The profile likelihood of parameters (Raue et al. 2009).
 
@@ -50,7 +50,7 @@ class ProfileLikelihood(UncertaintyMethod[ProfileResult], RangeChecked):
 
     _runner = staticmethod(run_profile_likelihood)
 
-    parameters: list[str] = Field(min_length=1)
+    parameters: list[str] = Field()
     threshold: Threshold
     max_steps: int = Field(
         default=100,
@@ -58,18 +58,11 @@ class ProfileLikelihood(UncertaintyMethod[ProfileResult], RangeChecked):
     starts: int = Field(
         default=1,
     )
-
-    @model_validator(mode="after")
-    def _check_unique(self) -> Self:
-        """Each parameter is profiled once."""
-        if len(set(self.parameters)) != len(self.parameters):
-            raise ValueError(f"A parameter is listed twice: {self.parameters}.")
-        return self
 ```
 
 ## PredictionProfile
 
-Bases: `UncertaintyMethod[ProfileResult]`, `RangeChecked`
+Bases: `UncertaintyMethod[ProfileResult]`, `EngineChecked`, `RangeChecked`
 
 The profile likelihood of predictions (Kreutz et al. 2012).
 
@@ -87,7 +80,7 @@ Attributes:
 Source code in `commol/profiles/methods.py`
 
 ```python
-class PredictionProfile(UncertaintyMethod[ProfileResult], RangeChecked):
+class PredictionProfile(UncertaintyMethod[ProfileResult], EngineChecked, RangeChecked):
     """
     The profile likelihood of predictions (Kreutz et al. 2012).
 
@@ -111,7 +104,7 @@ class PredictionProfile(UncertaintyMethod[ProfileResult], RangeChecked):
 
     _runner = staticmethod(run_prediction_profile)
 
-    specs: list[PredictionSpec] = Field(min_length=1)
+    specs: list[PredictionSpec] = Field()
     threshold: Threshold
     max_steps: int = Field(
         default=100,
@@ -119,16 +112,6 @@ class PredictionProfile(UncertaintyMethod[ProfileResult], RangeChecked):
     starts: int = Field(
         default=1,
     )
-
-    @model_validator(mode="after")
-    def _check_labels(self) -> Self:
-        """Each prediction has a label of its own."""
-        labels = [spec.as_observation().label for spec in self.specs]
-        if len(set(labels)) != len(labels):
-            raise ValueError(
-                f"Each prediction needs a label of its own, got {labels}; set label."
-            )
-        return self
 ```
 
 ## PredictionSpec
@@ -268,7 +251,7 @@ def as_observation(self) -> ObservedDataPoint:
 
 ## Threshold
 
-Bases: `RangeChecked`
+Bases: `EngineChecked`, `RangeChecked`
 
 How far the statistic of a profile may rise above the fit inside an interval of `confidence_level`.
 
@@ -285,7 +268,7 @@ Attributes:
 Source code in `commol/profiles/results.py`
 
 ```python
-class Threshold(RangeChecked):
+class Threshold(EngineChecked, RangeChecked):
     """
     How far the statistic of a profile may rise above the fit inside an
     interval of `confidence_level`.
@@ -307,17 +290,6 @@ class Threshold(RangeChecked):
     kind: Literal["chi_square", "beale", "bootstrap_calibrated"]
     confidence_level: float
     bootstrap: _ProfileBootstrap | None = None
-
-    @model_validator(mode="after")
-    def _check_bootstrap(self) -> Self:
-        """A bootstrap goes with ``"bootstrap_calibrated"``, and only with it."""
-        if (self.kind == "bootstrap_calibrated") != (self.bootstrap is not None):
-            raise ValueError(
-                "A bootstrap calibrates the threshold 'bootstrap_calibrated' and no "
-                "other; build thresholds with Threshold.chi_square, Threshold.beale "
-                "or Threshold.bootstrap_calibrated."
-            )
-        return self
 
     @classmethod
     def chi_square(cls, confidence_level: float) -> Self:

@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://munqu.github.io/commol/dev/codebase/decisions/optimizers/">
       
       
-        <link rel="prev" href="../calibration/">
+        <link rel="prev" href="../settings/">
       
       
         <link rel="next" href="../uncertainty/">
@@ -2820,6 +2820,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -2887,6 +2915,17 @@
     <span class="md-ellipsis">
       
         Nelder-Mead searches inside the bounds
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#an-optimizer-needs-finite-bounds-a-prior-does-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An optimizer needs finite bounds, a prior does not
       
     </span>
   </a>
@@ -3637,6 +3676,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#an-optimizer-needs-finite-bounds-a-prior-does-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An optimizer needs finite bounds, a prior does not
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-swarm-scores-in-parallel-and-keeps-the-order-of-its-particles" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3729,6 +3779,44 @@ message (<code>NelderMead::init</code> of the argmin fork returns it).</p>
 <p><strong>Rule:</strong> report and record values in <code>x</code>, never in <code>u</code>. Every optimizer run,
 the verbose one included, goes through <code>optimization::run</code>.</p>
 <p><strong>Guards:</strong> <code>optimization::tests</code>; <code>tests/calibration/test_optimizers.py</code>.</p>
+<h2 id="an-optimizer-needs-finite-bounds-a-prior-does-not">An optimizer needs finite bounds, a prior does not<a class="headerlink" href="#an-optimizer-needs-finite-bounds-a-prior-does-not" title="Permanent link">&para;</a></h2>
+<p>A bound may be infinite, for a prior on a half-line; a NaN bound is refused
+(<code>CalibrationParameter::check</code>). The settings of a problem keep an infinite
+bound with either optimizer, since the same problem serves a sampler that
+never fits. Every run of an optimizer refuses it first, with a message that
+names the parameter (<code>SearchSpace::check_finite</code>): <code>optimize_particle_swarm</code>
+and the constrained swarm, because the swarm draws its particles between the
+bounds, and <code>SearchSpace::transform</code> for Nelder-Mead, before the
+<code>SineTransform</code> of the argmin fork. A method that reads the bounds as a box
+refuses it too: <code>structural_rank</code> draws its points in them and
+<code>sample_identifiability</code> with <code>Reference::Bounds</code> takes the variance of the
+uniform distribution on them.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Refuse every infinite bound</td>
+<td>A prior on <code>[0, inf]</code> is a documented use of a sampler.</td>
+</tr>
+<tr>
+<td>Refuse it for a swarm problem when it is built</td>
+<td>The problem of a sampler would depend on an optimizer it never runs.</td>
+</tr>
+<tr>
+<td>Let the swarm draw</td>
+<td>The draw of the argmin fork panics on a bound that is not finite (#445).</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>optimization::tests::a_particle_swarm_refuses_an_infinite_bound</code>,
+<code>a_constrained_run_refuses_an_infinite_bound_with_either_optimizer</code>;
+<code>crates/commol-inference/tests/test_identifiability.rs::a_measure_over_the_bounds_refuses_an_infinite_bound</code>;
+<code>tests/calibration/test_optimizers.py::test_an_optimizer_refuses_an_infinite_bound</code>.</p>
 <h2 id="a-swarm-scores-in-parallel-and-keeps-the-order-of-its-particles">A swarm scores in parallel and keeps the order of its particles<a class="headerlink" href="#a-swarm-scores-in-parallel-and-keeps-the-order-of-its-particles" title="Permanent link">&para;</a></h2>
 <p>The argmin fork runs with its feature <code>rayon</code>, so a particle swarm asks for
 the costs of an iteration at once (<code>bulk_cost</code>). <code>OptimizationObjective</code>,

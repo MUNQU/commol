@@ -176,7 +176,9 @@ Every side of every quantity runs in parallel. A held parameter leaves the value
 
 ## Prediction profiles
 
-`PredictionProfile(specs, threshold)` profiles the value of each prediction: a `PredictionSpec` reads an output, or a sum of outputs, at a position, with a `window`, a `factor_id` and a known `scale`, as an observation does. Its interval is the set of values the data do not reject (Kreutz et al. 2012); specs at several positions give a band. A prediction past the data has a wider interval, as `B at 50` shows in the [quick path](#quick-path). The intervals are pointwise: a band of them is not a joint region.
+`ProfileLikelihood(parameters, threshold)` profiles each parameter once: an empty list, or a parameter listed twice, raises a `ValueError`.
+
+`PredictionProfile(specs, threshold)` profiles the value of each prediction: a `PredictionSpec` reads an output, or a sum of outputs, at a position, with a `window`, a `factor_id` and a known `scale`, as an observation does. Its interval is the set of values the data do not reject (Kreutz et al. 2012); specs at several positions give a band. A prediction past the data has a wider interval, as `B at 50` shows in the [quick path](#quick-path). The intervals are pointwise: a band of them is not a joint region. `specs` holds at least one prediction, each with a label of its own (an empty label is the name of its output).
 
 ## Verdicts and the identifiability report
 

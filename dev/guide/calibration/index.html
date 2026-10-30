@@ -1094,6 +1094,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Unknowns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#infinite-bounds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Infinite bounds
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -2999,6 +3016,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/optimizers/" class="md-nav__link">
         
   
@@ -3731,6 +3776,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Unknowns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#infinite-bounds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Infinite bounds
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -3963,13 +4025,13 @@ also when it was created while a parameter was <code>None</code>. See
 <td><code>observed_data</code></td>
 <td><code>list[ObservedDataPoint]</code></td>
 <td>required</td>
-<td>What the model must reproduce. See <a href="../calibration-observations/">Observations</a>.</td>
+<td>What the model must reproduce, at least one observation. See <a href="../calibration-observations/">Observations</a>.</td>
 </tr>
 <tr>
 <td><code>parameters</code></td>
 <td><code>list[CalibrationParameter]</code></td>
 <td>required</td>
-<td>The unknowns and their bounds.</td>
+<td>The unknowns and their bounds, at least one, each with an id of its own.</td>
 </tr>
 <tr>
 <td><code>loss_function</code></td>
@@ -4059,13 +4121,13 @@ scale, or compare a gain over a window: <a href="../calibration-observations/">O
 <td><code>min_bound</code>, <code>max_bound</code></td>
 <td><code>float</code></td>
 <td>required</td>
-<td>The search interval.</td>
+<td>The search interval: numbers, with <code>max_bound</code> above <code>min_bound</code>. A bound may be infinite, for a prior on a half-line; an optimizer refuses it (see <a href="#infinite-bounds">Infinite bounds</a>).</td>
 </tr>
 <tr>
 <td><code>initial_guess</code></td>
 <td><code>float \| None</code></td>
 <td><code>None</code></td>
-<td>Where the optimizer starts; the midpoint of the bounds if <code>None</code>.</td>
+<td>Where the optimizer starts, a finite number between the bounds; the midpoint of the bounds if <code>None</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -4108,6 +4170,20 @@ with the engine's message, which names the kind, when you create the
 <code>Calibrator</code>. A <code>"parameter"</code> that
 the model does not have, or that a formula or a series sets, raises a
 <code>ValueError</code> with the engine's message at the same time.</p>
+<p>The engine holds every rule of a problem and of its parameters, and checks
+them when you build the object: the Python classes send their JSON to it and
+raise its message. The same rules refuse a problem written as JSON, which
+no Python class checked.</p>
+<h4 id="infinite-bounds">Infinite bounds<a class="headerlink" href="#infinite-bounds" title="Permanent link">&para;</a></h4>
+<p>An infinite bound gives a prior on a half-line, such as <code>[0, inf]</code> for
+<a href="../uncertainty/smc/">sequential Monte Carlo</a>, so a problem keeps it with
+either optimizer. An optimizer needs finite bounds: each start of a fit
+refuses an infinite bound, with a message that names the parameter (see
+<a href="../calibration-optimizers/#nelder-mead">Optimizers</a>). So do the methods that
+read the bounds as a box: <code>StructuralRank</code>, which draws its points inside
+them, and <code>SampleIdentifiability(reference="bounds")</code>, which measures the
+contraction against the uniform distribution on them; give it
+<code>reference="prior"</code>. A NaN bound is always refused.</p>
 <h2 id="losses">Losses<a class="headerlink" href="#losses" title="Permanent link">&para;</a></h2>
 <p>A problem has a loss or observation models, exactly one, and neither has a
 default: what to fit is a modelling choice. A loss measures the residuals;

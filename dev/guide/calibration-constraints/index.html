@@ -2949,6 +2949,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/optimizers/" class="md-nav__link">
         
   
@@ -3836,7 +3864,7 @@ outputs is checked at the steps you list.</p>
 <td><code>at</code></td>
 <td><code>list[float] \| None</code></td>
 <td><code>None</code></td>
-<td>The positions on the axis at which to evaluate it. Required when the expression names an output. The engine accepts the positions it accepts for <a href="../calibration-observations/#positions-between-integers">observations</a>.</td>
+<td>The positions on the axis at which to evaluate it, at least one. Required when the expression names an output; an empty list is refused, because the constraint would never be evaluated. The engine accepts the positions it accepts for <a href="../calibration-observations/#positions-between-integers">observations</a>.</td>
 </tr>
 </tbody>
 </table>

@@ -3620,8 +3620,8 @@ A `Simulation` follows its model: after `apply_calibration_parameters` or `updat
 
 | `CalibrationProblem` field    | Type                                                                 | Default  | Meaning                                                                                                                                                                                                                                                                                                                         |
 | ----------------------------- | -------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `observed_data`               | `list[ObservedDataPoint]`                                            | required | What the model must reproduce. See [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md).                                                                                                                                                                                               |
-| `parameters`                  | `list[CalibrationParameter]`                                         | required | The unknowns and their bounds.                                                                                                                                                                                                                                                                                                  |
+| `observed_data`               | `list[ObservedDataPoint]`                                            | required | What the model must reproduce, at least one observation. See [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md).                                                                                                                                                                     |
+| `parameters`                  | `list[CalibrationParameter]`                                         | required | The unknowns and their bounds, at least one, each with an id of its own.                                                                                                                                                                                                                                                        |
 | `loss_function`               | `str \| None`                                                        | `None`   | How the misfit is measured; see [Losses](#losses). A problem has `loss_function` or `observation_models`, exactly one.                                                                                                                                                                                                          |
 | `observation_models`          | `dict[str, NormalObservations \| … \| BinomialObservations] \| None` | `None`   | One observation model per series label: the fit maximizes their likelihood. See [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md).                                                                                                                                      |
 | `optimization_config`         | `NelderMeadConfig` or `ParticleSwarmConfig`                          | required | The optimizer and its settings. See [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md).                                                                                                                                                                                                  |
@@ -3638,12 +3638,12 @@ An `ObservedDataPoint(at=..., output=..., value=...)` is one observed value of a
 
 ### Unknowns
 
-| `CalibrationParameter` field | Type            | Default  | Meaning                                                           |
-| ---------------------------- | --------------- | -------- | ----------------------------------------------------------------- |
-| `id`                         | `str`           | required | What to calibrate; depends on `parameter_type`.                   |
-| `parameter_type`             | `str`           | required | `"parameter"`, `"initial_condition"`, `"factor"` or `"noise"`.    |
-| `min_bound`, `max_bound`     | `float`         | required | The search interval.                                              |
-| `initial_guess`              | `float \| None` | `None`   | Where the optimizer starts; the midpoint of the bounds if `None`. |
+| `CalibrationParameter` field | Type            | Default  | Meaning                                                                                                                                                                                   |
+| ---------------------------- | --------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                         | `str`           | required | What to calibrate; depends on `parameter_type`.                                                                                                                                           |
+| `parameter_type`             | `str`           | required | `"parameter"`, `"initial_condition"`, `"factor"` or `"noise"`.                                                                                                                            |
+| `min_bound`, `max_bound`     | `float`         | required | The search interval: numbers, with `max_bound` above `min_bound`. A bound may be infinite, for a prior on a half-line; an optimizer refuses it (see [Infinite bounds](#infinite-bounds)). |
+| `initial_guess`              | `float \| None` | `None`   | Where the optimizer starts, a finite number between the bounds; the midpoint of the bounds if `None`.                                                                                     |
 
 | `parameter_type`      | `id` names                                                                                                                                      | The value is                                                                                                                                                                            |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -3653,6 +3653,12 @@ An `ObservedDataPoint(at=..., output=..., value=...)` is one observed value of a
 | `"noise"`             | Any new id, named by an [observation model](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#noise-parameters)       | An argument of the model, such as its standard deviation; not part of the model                                                                                                         |
 
 `"parameter"`, `"factor"` and `"noise"` work with every kind of model. The other types are values of the model kind, and the kind declares which it accepts (`model.structure.calibration_value_types()`): an aggregate model accepts `"initial_condition"`. A type the kind does not accept raises a `ValueError` with the engine's message, which names the kind, when you create the `Calibrator`. A `"parameter"` that the model does not have, or that a formula or a series sets, raises a `ValueError` with the engine's message at the same time.
+
+The engine holds every rule of a problem and of its parameters, and checks them when you build the object: the Python classes send their JSON to it and raise its message. The same rules refuse a problem written as JSON, which no Python class checked.
+
+#### Infinite bounds
+
+An infinite bound gives a prior on a half-line, such as `[0, inf]` for [sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md), so a problem keeps it with either optimizer. An optimizer needs finite bounds: each start of a fit refuses an infinite bound, with a message that names the parameter (see [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#nelder-mead)). So do the methods that read the bounds as a box: `StructuralRank`, which draws its points inside them, and `SampleIdentifiability(reference="bounds")`, which measures the contraction against the uniform distribution on them; give it `reference="prior"`. A NaN bound is always refused.
 
 ## Losses
 
@@ -4187,12 +4193,12 @@ windowed = [
 print(calibrate_k1(windowed))  # 0.4
 ```
 
-| Rule                            | Detail                                                                                                                                                                                                                    |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The window starts at 0 or later | `at − window`, read as 0 within the rounding of the window; otherwise the observation is rejected when it is created, with the rule of the engine (`check_window_end` in `crates/commol-calibration/src/observation.rs`). |
-| Any output                      | Usually an accumulator, but any compartment works.                                                                                                                                                                        |
-| Mixed windows                   | Observations may use different windows, and positions need not be multiples of the window.                                                                                                                                |
-| Combinations                    | Works with `factor_id` and `outputs`.                                                                                                                                                                                     |
+| Rule                            | Detail                                                                                                                                                                                                                                                      |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The window starts at 0 or later | `at − window`, read as 0 within the rounding of the window; otherwise the observation is rejected when it is created, with the rule of the engine (`check_window_end` in `crates/commol-calibration/src/observation.rs`, which `Observation::check` calls). |
+| Any output                      | Usually an accumulator, but any compartment works.                                                                                                                                                                                                          |
+| Mixed windows                   | Observations may use different windows, and positions need not be multiples of the window.                                                                                                                                                                  |
+| Combinations                    | Works with `factor_id` and `outputs`.                                                                                                                                                                                                                       |
 
 `SimulationResults.windowed_totals` applies the same reduction outside calibration, so a report shows exactly what the loss compared. See [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals). An observation without `window` reads its output at `at`; `SimulationResults.sample` reads a run there in the same way ([Values at positions](https://munqu.github.io/commol/latest/guide/simulations/#values-at-positions)).
 
@@ -4347,7 +4353,7 @@ print(calibrate(nelder_mead))  # {'k1': 0.4, 'k2': 0.1}
 | `verbose`                        | `False`                  | Writes a progress table to `sys.stdout` (a notebook shows it). It shows one start, so it needs `run(starts=1)`.                          |
 | `header_interval`                | `100`                    | With `verbose`, repeats the table header every this many iterations.                                                                     |
 
-The search starts at `initial_guess`, or at the midpoint of the bounds; a start of 0 works. Nelder-Mead moves in an unbounded coordinate `u`, and the value it scores is `lo + (hi − lo)·(sin u + 1)/2` (the transform of MINUIT and lmfit), so every value it tries is inside the bounds (`SineTransform` of the argmin fork). An optimum exactly at a bound is reached only asymptotically, so it can take more iterations. Nelder-Mead needs finite bounds: a run with an infinite bound fails with the message `Nelder-Mead needs finite bounds`.
+The search starts at `initial_guess`, or at the midpoint of the bounds; a start of 0 works. Nelder-Mead moves in an unbounded coordinate `u`, and the value it scores is `lo + (hi − lo)·(sin u + 1)/2` (the transform of MINUIT and lmfit), so every value it tries is inside the bounds (`SineTransform` of the argmin fork). An optimum exactly at a bound is reached only asymptotically, so it can take more iterations. Every optimizer needs finite bounds: Nelder-Mead searches through their transform, and a particle swarm draws its particles inside them. A run with an infinite bound fails with a message that names the parameter, `An optimizer searches inside the bounds, so they must be finite`.
 
 ## `converged` and `termination_reason`
 
@@ -4604,13 +4610,13 @@ print(round(best["k1"] / best["k2"], 2))  # 3.0: the best fit that respects k1 /
 
 ## `CalibrationConstraint`
 
-| Field         | Type                  | Default  | Meaning                                                                                                                                                                                                                                                            |
-| ------------- | --------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `id`          | `str`                 | required | A unique identifier, used in error messages.                                                                                                                                                                                                                       |
-| `expression`  | `str`                 | required | Must evaluate to `>= 0` when the constraint holds.                                                                                                                                                                                                                 |
-| `description` | `str \| None`         | `None`   | A free-text description.                                                                                                                                                                                                                                           |
-| `weight`      | `float`               | `1.0`    | Above zero. Multiplies the amount of a violation in the penalty.                                                                                                                                                                                                   |
-| `at`          | `list[float] \| None` | `None`   | The positions on the axis at which to evaluate it. Required when the expression names an output. The engine accepts the positions it accepts for [observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#positions-between-integers). |
+| Field         | Type                  | Default  | Meaning                                                                                                                                                                                                                                                                                                                                                     |
+| ------------- | --------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`          | `str`                 | required | A unique identifier, used in error messages.                                                                                                                                                                                                                                                                                                                |
+| `expression`  | `str`                 | required | Must evaluate to `>= 0` when the constraint holds.                                                                                                                                                                                                                                                                                                          |
+| `description` | `str \| None`         | `None`   | A free-text description.                                                                                                                                                                                                                                                                                                                                    |
+| `weight`      | `float`               | `1.0`    | Above zero. Multiplies the amount of a violation in the penalty.                                                                                                                                                                                                                                                                                            |
+| `at`          | `list[float] \| None` | `None`   | The positions on the axis at which to evaluate it, at least one. Required when the expression names an output; an empty list is refused, because the constraint would never be evaluated. The engine accepts the positions it accepts for [observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#positions-between-integers). |
 
 ## Writing the expression
 
@@ -5462,7 +5468,7 @@ print(pair.first, pair.second, round(pair.correlation, 1))  # k1 alpha -1.0
 | `correlated_pairs` | The pairs whose absolute correlation is above `correlation_threshold`                                                |
 | `modes`            | The modes of each marginal: the maxima of a kernel density above a tenth of the highest                              |
 
-The `reference` of the contraction is `"bounds"`, the uniform distribution on the bounds, or `"prior"` with `priors`, the prior of each parameter: the sample of a [Gibbs posterior or ABC](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md) contracts its priors by how much the data inform each parameter, and a sample drawn from the priors themselves has a contraction near 0.
+The `reference` of the contraction is `"bounds"`, the uniform distribution on the bounds, or `"prior"` with `priors`, the prior of each parameter: the sample of a [Gibbs posterior or ABC](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md) contracts its priors by how much the data inform each parameter, and a sample drawn from the priors themselves has a contraction near 0. `"prior"` without `priors`, or `"bounds"` with them, raises a `ValueError`: the engine never measures against a reference you did not choose.
 
 ```python
 from commol.distributions import Priors, Uniform
@@ -6355,7 +6361,9 @@ Every side of every quantity runs in parallel. A held parameter leaves the value
 
 ## Prediction profiles
 
-`PredictionProfile(specs, threshold)` profiles the value of each prediction: a `PredictionSpec` reads an output, or a sum of outputs, at a position, with a `window`, a `factor_id` and a known `scale`, as an observation does. Its interval is the set of values the data do not reject (Kreutz et al. 2012); specs at several positions give a band. A prediction past the data has a wider interval, as `B at 50` shows in the [quick path](#quick-path). The intervals are pointwise: a band of them is not a joint region.
+`ProfileLikelihood(parameters, threshold)` profiles each parameter once: an empty list, or a parameter listed twice, raises a `ValueError`.
+
+`PredictionProfile(specs, threshold)` profiles the value of each prediction: a `PredictionSpec` reads an output, or a sum of outputs, at a position, with a `window`, a `factor_id` and a known `scale`, as an observation does. Its interval is the set of values the data do not reject (Kreutz et al. 2012); specs at several positions give a band. A prediction past the data has a wider interval, as `B at 50` shows in the [quick path](#quick-path). The intervals are pointwise: a band of them is not a joint region. `specs` holds at least one prediction, each with a label of its own (an empty label is the name of its output).
 
 ## Verdicts and the identifiability report
 
@@ -6568,7 +6576,8 @@ Every variant takes a `score`, a `by` and a `confidence_level`, none with a defa
 `by="series"` gives each series (observation label) its own quantile; `by="all"` gives every series one quantile. Per series is the safer first choice: a small series does not borrow the errors of a large one, but it needs `1/α − 1` scores of its own.
 
 - `score="normalized"` with `by="series"` raises a `ValueError`: with one constant factor per series, its intervals are those of `"absolute"`.
-- `score="spread"` needs predictions with a spread. `SplitConformal` and `AdaptiveConformal` take it from a `sample`, whose predictive gives the prediction (its weighted median) and the spread (its weighted standard deviation); without one they raise a `ValueError`. `JackknifePlus` and `EnbPI` take it from their own refits. `RollingConformal` fits once per origin, so it rejects `"spread"`.
+- `score="spread"` needs predictions with a spread. `SplitConformal` and `AdaptiveConformal` take it from a `sample`, whose predictive gives the prediction (its weighted median) and the spread (its weighted standard deviation); without one, the run raises a `ValueError` before it fits. `JackknifePlus` and `EnbPI` take it from their own refits. `RollingConformal` fits once per origin, so it rejects `"spread"`.
+- `calibration_data`, `origins`, `positions` and `stream` hold at least one item each: an empty list raises a `ValueError` that names the field.
 
 ```python
 from commol.uncertainty import ParameterSample, SampleMethod
@@ -6795,6 +6804,8 @@ Each input is a `CalibrationParameter`: a model parameter or an initial conditio
 | `InputSpace.uniform_on_bounds(parameters)`          | `Uniform()` on the bounds of every input; they must be finite                                                                                                                                | Every method             |
 | `InputSpace.from_sample(sample, parameters)`        | The draws of a `ParameterSample`, with their weights; the inputs may depend on each other. The parameters give the type of each value, which a sample does not hold                          | `Propagation` and `PRCC` |
 
+An input space has distributions or a sample, exactly one, with no default: how the inputs vary is a modelling choice. `InputSpace(parameters=...)` with neither, or with both, is refused when `SensitivityAnalysis` reads it, which also checks that the names and the bounds of a sample are those of the parameters. The distributions name each input once, and fit its bounds, when you build the input space.
+
 An initial condition is an amount in the unit of its bin, or a category split in `[0, 1]`, with `initial_condition_remainder` as in a calibration problem. A factor or a noise parameter is not an input: both belong to observations, and an analysis has none.
 
 `SensitivityAnalysis(simulation, inputs, *, replicates=None, seed=None)` holds the inputs for every method you run on it. With a stochastic engine `replicates` (at least 1) and `seed` are required. A point of the design of PRCC, Morris, Sobol or a polynomial chaos runs `replicates` replicates, on the same seeds at every point, and holds their mean: the indices are those of the mean of `replicates` replicates, and they come close to those of the expected value as `replicates` grows. A propagation, and the `Predictive` of its draws, keep every replicate, each with a seed of its own. A deterministic engine does not use `replicates`, so the same analysis runs on either engine; with no seed, the engine draws one, which `analysis.seed` gives and the analysis logs. A negative `replicates` raises `ValueError` that names the setting.
@@ -6848,7 +6859,7 @@ Every quantity follows the same rules:
 | A NaN in a value a quantity reads makes it NaN                             | Its peak and the position of its peak are NaN too                                                                          |
 | With a stochastic engine, a quantity is computed for each replicate        | A design point holds the mean of its replicates, or for a `Ratio` what its `replicate_rule` says; a propagation keeps each |
 
-Each quantity has a `label`, by default what it reads, such as `"B at 10"`. The default label writes each position in full, as Python reads it back, so two positions give two labels: `"B at 1000000"` and `"B at 1000001"`.
+Each quantity has a `label`, by default what it reads, such as `"B at 10"`. The engine writes the default label and checks it: each position in the shortest form that reads back as the same number, so two positions give two labels: `"B at 1000000"` and `"B at 1000001"`. A very small or very large position is written with an exponent, such as `1e-7` and `2.5e16`. Two quantities with one label are refused, with a message that names the label. The positions of a quantity ascend, each once.
 
 ### A quantity that is NaN
 
@@ -11070,7 +11081,7 @@ def identifiability(self, method: IdentifiabilityMethod[ResultT]) -> ResultT:
 
 ## CalibrationProblem
 
-Bases: `RangeChecked`
+Bases: `EngineChecked`, `RangeChecked`
 
 Defines a complete calibration problem.
 
@@ -11095,7 +11106,7 @@ Attributes:
 Source code in `commol/_problem/problem.py`
 
 ```python
-class CalibrationProblem(RangeChecked):
+class CalibrationProblem(EngineChecked, RangeChecked):
     """
     Defines a complete calibration problem.
 
@@ -11162,10 +11173,10 @@ class CalibrationProblem(RangeChecked):
     model_config = ConfigDict(extra="forbid")
 
     observed_data: list[ObservedDataPoint] = Field(
-        default=..., min_length=1, description="Observed data points"
+        default=..., description="Observed data points"
     )
     parameters: list[CalibrationParameter] = Field(
-        default=..., min_length=1, description="Parameters to calibrate"
+        default=..., description="Parameters to calibrate"
     )
     constraints: list[CalibrationConstraint] = Field(
         default_factory=list,
@@ -11212,36 +11223,6 @@ class CalibrationProblem(RangeChecked):
             "stochastic engine, the starts, a particle swarm and the methods"
         ),
     )
-
-    @model_validator(mode="after")
-    def _validate_loss_or_models(self) -> Self:
-        """Require a loss or observation models, exactly one."""
-        if self.loss_function is not None and self.observation_models is not None:
-            raise ValueError(
-                "A problem has a loss_function or observation_models, not both: "
-                "the fit and the posterior would answer different questions."
-            )
-        if self.loss_function is None and self.observation_models is None:
-            raise ValueError(
-                "A problem needs a loss_function (sse, rmse or mae) or "
-                "observation_models. There is no default: what to fit is a "
-                "modelling choice."
-            )
-        if self.observation_models is not None and self.normalize_observations:
-            raise ValueError(
-                "normalize_observations needs a loss_function: the observation "
-                "models set the scale of each series with their noise."
-            )
-        return self
-
-    @model_validator(mode="after")
-    def _validate_unique_parameter_ids(self) -> Self:
-        """Ensure parameter IDs are unique."""
-        param_ids = [p.id for p in self.parameters]
-        if len(param_ids) != len(set(param_ids)):
-            duplicates = [id for id in set(param_ids) if param_ids.count(id) > 1]
-            raise ValueError(f"Duplicate parameter IDs found: {duplicates}")
-        return self
 ```
 
 ## Quantile
@@ -11328,7 +11309,7 @@ def __init__(self, level: float) -> None:
 
 ## ObservedDataPoint
 
-Bases: `RangeChecked`
+Bases: `EngineChecked`, `RangeChecked`
 
 Represents a single observed data point for calibration.
 
@@ -11352,7 +11333,7 @@ Attributes:
 Source code in `commol/_problem/problem.py`
 
 ```python
-class ObservedDataPoint(RangeChecked):
+class ObservedDataPoint(EngineChecked, RangeChecked):
     """
     Represents a single observed data point for calibration.
 
@@ -11439,33 +11420,19 @@ class ObservedDataPoint(RangeChecked):
         description="Trials of a binomial observation model that reads them here",
     )
 
-    @model_validator(mode="after")
-    def _validate_observed_outputs(self) -> Self:
-        """Require one of `output` and `outputs`; name the series."""
-        if (self.output is None) == (self.outputs is None):
-            raise ValueError("Give exactly one of 'output' and 'outputs'.")
-        if self.outputs is not None:
-            if not self.outputs:
-                raise ValueError("outputs must be non-empty when provided")
-            if not self.label:
-                raise ValueError(
-                    "An observation of several outputs needs a 'label' that names "
-                    "their sum."
-                )
-        elif not self.label:
-            self.label = self.output or ""
-        return self
-
-    @model_validator(mode="after")
-    def _validate_window(self) -> Self:
+    @model_validator(mode="before")
+    @classmethod
+    def _label_of_one_output(cls, data: JsonValue) -> JsonValue:
         """
-        A window must not start before position 0, with the rule of the
-        engine (`check_window_end` of
-        `crates/commol-calibration/src/observation.rs`).
+        Name the series of one output after it when no label is given; the
+        engine checks every other rule of the observation
+        (`Observation::check` of `crates/commol-calibration/src/settings.rs`).
         """
-        if self.window is not None:
-            commol_rs.calibration.check_window_end(self.at, self.window)
-        return self
+        if isinstance(data, Mapping) and not data.get("label"):
+            output = data.get("output")
+            if isinstance(output, str):
+                return {**data, "label": output}
+        return data
 
     @property
     def observed_outputs(self) -> list[str]:
@@ -11487,7 +11454,7 @@ The outputs whose sum is compared: `outputs`, or `output` alone.
 
 ## CalibrationParameter
 
-Bases: `BaseModel`
+Bases: `EngineChecked`
 
 Defines a parameter or initial condition to be calibrated with its bounds.
 
@@ -11498,13 +11465,13 @@ Attributes:
 | `id`             | `str`                                           | Identifier (parameter ID for parameters, bin ID for initial conditions)                                                                                                                                                                                                    |
 | `parameter_type` | `{parameter, initial_condition, factor, noise}` | What the value is: a parameter of the model; the initial amount of a compartment, a bin or a category; a factor that multiplies the model output of an observation; or an argument of an observation model, such as its standard deviation, which never reaches the engine |
 | `min_bound`      | `float`                                         | Minimum allowed value for this parameter                                                                                                                                                                                                                                   |
-| `max_bound`      | `float`                                         | Maximum allowed value for this parameter                                                                                                                                                                                                                                   |
+| `max_bound`      | `float`                                         | Maximum allowed value for this parameter, above min_bound. A bound may be infinite, for a prior on a half-line; an optimizer refuses it (a particle swarm when the problem is built, Nelder-Mead when it runs).                                                            |
 | `initial_guess`  | \`float                                         | None\`                                                                                                                                                                                                                                                                     |
 
 Source code in `commol/_problem/problem.py`
 
 ```python
-class CalibrationParameter(BaseModel):
+class CalibrationParameter(EngineChecked):
     """
     Defines a parameter or initial condition to be calibrated with its bounds.
 
@@ -11520,9 +11487,13 @@ class CalibrationParameter(BaseModel):
     min_bound : float
         Minimum allowed value for this parameter
     max_bound : float
-        Maximum allowed value for this parameter
+        Maximum allowed value for this parameter, above `min_bound`. A bound
+        may be infinite, for a prior on a half-line; an optimizer refuses it
+        (a particle swarm when the problem is built, Nelder-Mead when it
+        runs).
     initial_guess : float | None
-        Optional starting value for optimization (if None, midpoint is used)
+        Optional starting value for optimization (if None, midpoint is
+        used): a finite number between the bounds
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -11541,33 +11512,11 @@ class CalibrationParameter(BaseModel):
     initial_guess: float | None = Field(
         default=None, description="Optional starting value for optimization"
     )
-
-    @model_validator(mode="after")
-    def _validate_bounds(self) -> Self:
-        """Validate that max_bound > min_bound and initial_guess is within bounds."""
-        if self.max_bound <= self.min_bound:
-            raise ValueError(
-                (
-                    f"max_bound ({self.max_bound}) must be greater than "
-                    f"min_bound ({self.min_bound}) for parameter '{self.id}'"
-                )
-            )
-        if self.initial_guess is not None:
-            if not (self.min_bound <= self.initial_guess <= self.max_bound):
-                raise ValueError(
-                    (
-                        f"initial_guess ({self.initial_guess}) must be between "
-                        f"min_bound ({self.min_bound}) and max_bound "
-                        f"({self.max_bound}) for parameter '{self.id}'"
-                    )
-                )
-
-        return self
 ```
 
 ## CalibrationConstraint
 
-Bases: `RangeChecked`
+Bases: `EngineChecked`, `RangeChecked`
 
 A constraint on calibration parameters defined as a mathematical expression.
 
@@ -11625,7 +11574,7 @@ Examples:
 Source code in `commol/_problem/problem.py`
 
 ```python
-class CalibrationConstraint(RangeChecked):
+class CalibrationConstraint(EngineChecked, RangeChecked):
     """
     A constraint on calibration parameters defined as a mathematical expression.
 
@@ -11722,15 +11671,6 @@ class CalibrationConstraint(RangeChecked):
         """Check the expression with the parser of the engine."""
         commol_rs.core.MathExpression(value).check()
         return value
-
-    @model_validator(mode="after")
-    def _validate_positions(self) -> Self:
-        """Validate that the positions, when given, are not empty."""
-        if self.at is not None and len(self.at) == 0:
-            raise ValueError(
-                f"at for constraint '{self.id}' must not be empty if specified"
-            )
-        return self
 ```
 
 ## NelderMeadConfig
@@ -11844,7 +11784,7 @@ class NelderMeadConfig(RangeChecked):
 
 ## ParticleSwarmConfig
 
-Bases: `RangeChecked`
+Bases: `EngineChecked`, `RangeChecked`
 
 Configuration for the Particle Swarm Optimization algorithm.
 
@@ -11894,7 +11834,7 @@ Zielinski, K., & Laur, R. (2007). Stopping criteria for a constrained single-obj
 Source code in `commol/_problem/problem.py`
 
 ```python
-class ParticleSwarmConfig(RangeChecked):
+class ParticleSwarmConfig(EngineChecked, RangeChecked):
     """
     Configuration for the Particle Swarm Optimization algorithm.
 
@@ -12097,26 +12037,6 @@ class ParticleSwarmConfig(RangeChecked):
     polish: NelderMeadConfig | None = Field(
         default=None, description="Nelder-Mead from the best point of the swarm"
     )
-
-    @model_validator(mode="after")
-    def _check_strategies(self) -> Self:
-        """
-        Check each number against its strategy, as the engine reads them.
-
-        Returns
-        -------
-        Self
-            The configuration.
-
-        Raises
-        ------
-        ValueError
-            If a strategy lacks a number it needs, a number is set without
-            its strategy or with another one, or the chaotic weights are not
-            in order; the message is that of the engine.
-        """
-        commol_rs.json.as_read("ParticleSwarmConfig", engine_json(self))
-        return self
 ```
 
 ## CalibrationResult
@@ -12417,7 +12337,7 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
 
 ## SplitConformal
 
-Bases: `ConformalMethod`, `RangeChecked`
+Bases: `ConformalMethod`, `EngineChecked`, `RangeChecked`
 
 Split conformal prediction.
 
@@ -12437,7 +12357,7 @@ Attributes:
 Source code in `commol/conformal/methods.py`
 
 ```python
-class SplitConformal(ConformalMethod, RangeChecked):
+class SplitConformal(ConformalMethod, EngineChecked, RangeChecked):
     """
     Split conformal prediction.
 
@@ -12467,24 +12387,18 @@ class SplitConformal(ConformalMethod, RangeChecked):
     _engine_handles: ClassVar[tuple[str, ...]] = ("sample",)
 
     calibration_data: list[ObservedDataPoint] = Field(
-        min_length=1, description="Held-out observations."
+        description="Held-out observations."
     )
-    positions: list[float] = Field(min_length=1, description="Where the intervals are.")
+    positions: list[float] = Field(description="Where the intervals are.")
     sample: ParameterSample | None = Field(
         default=None, description="The sample whose predictive predicts."
     )
     starts: int = Field(default=1, description="Starts of the fit.")
-
-    @model_validator(mode="after")
-    def _check_spread(self) -> Self:
-        """Reject ``score="spread"`` without a sample."""
-        _no_spread_without_sample(self)
-        return self
 ```
 
 ## RollingConformal
 
-Bases: `ConformalMethod`, `RangeChecked`
+Bases: `ConformalMethod`, `EngineChecked`, `RangeChecked`
 
 Rolling-origin conformal prediction: intervals ahead of the data, one quantile per horizon.
 
@@ -12503,7 +12417,7 @@ Attributes:
 Source code in `commol/conformal/methods.py`
 
 ```python
-class RollingConformal(ConformalMethod, RangeChecked):
+class RollingConformal(ConformalMethod, EngineChecked, RangeChecked):
     """
     Rolling-origin conformal prediction: intervals ahead of the data, one
     quantile per horizon.
@@ -12527,24 +12441,14 @@ class RollingConformal(ConformalMethod, RangeChecked):
 
     _runner = staticmethod(run_rolling_conformal)
 
-    origins: list[float] = Field(min_length=1, description="The origins.")
-    positions: list[float] = Field(min_length=1, description="Where the intervals are.")
+    origins: list[float] = Field(description="The origins.")
+    positions: list[float] = Field(description="Where the intervals are.")
     starts: int = Field(default=1, description="Starts of each fit.")
-
-    @model_validator(mode="after")
-    def _check_spread(self) -> Self:
-        """Reject ``score="spread"``: one fit per origin has no spread."""
-        if self.score == "spread":
-            raise ValueError(
-                "RollingConformal fits once per origin, so its predictions have no "
-                'spread for score="spread"; use "absolute" or "normalized"'
-            )
-        return self
 ```
 
 ## JackknifePlus
 
-Bases: `ConformalMethod`, `RangeChecked`
+Bases: `ConformalMethod`, `EngineChecked`, `RangeChecked`
 
 Jackknife+ (Barber et al. 2021) with blocks: one refit per block left out, and intervals from the left-out residuals and predictions.
 
@@ -12563,7 +12467,7 @@ Attributes:
 Source code in `commol/conformal/methods.py`
 
 ```python
-class JackknifePlus(ConformalMethod, RangeChecked):
+class JackknifePlus(ConformalMethod, EngineChecked, RangeChecked):
     """
     Jackknife+ (Barber et al. 2021) with blocks: one refit per block left
     out, and intervals from the left-out residuals and predictions.
@@ -12586,13 +12490,13 @@ class JackknifePlus(ConformalMethod, RangeChecked):
     _runner = staticmethod(run_jackknife_plus)
 
     block_length: int | Literal["auto"] = Field(description="Positions per block.")
-    positions: list[float] = Field(min_length=1, description="Where the intervals are.")
+    positions: list[float] = Field(description="Where the intervals are.")
     starts: int = Field(default=1, description="Starts per fit.")
 ```
 
 ## EnbPI
 
-Bases: `ConformalMethod`, `RangeChecked`
+Bases: `ConformalMethod`, `EngineChecked`, `RangeChecked`
 
 Ensemble batch prediction intervals (Xu and Xie 2021).
 
@@ -12612,7 +12516,7 @@ Attributes:
 Source code in `commol/conformal/methods.py`
 
 ```python
-class EnbPI(ConformalMethod, RangeChecked):
+class EnbPI(ConformalMethod, EngineChecked, RangeChecked):
     """
     Ensemble batch prediction intervals (Xu and Xie 2021).
 
@@ -12639,13 +12543,13 @@ class EnbPI(ConformalMethod, RangeChecked):
 
     replicates: int = Field(description="Number of replicates.")
     block_length: int | Literal["auto"] = Field(description="Positions per block.")
-    positions: list[float] = Field(min_length=1, description="Where the intervals are.")
+    positions: list[float] = Field(description="Where the intervals are.")
     starts: int = Field(default=1, description="Starts per fit.")
 ```
 
 ## AdaptiveConformal
 
-Bases: `ConformalMethod`, `RangeChecked`
+Bases: `ConformalMethod`, `EngineChecked`, `RangeChecked`
 
 Adaptive conformal inference (Gibbs and Candès 2021).
 
@@ -12665,7 +12569,7 @@ Attributes:
 Source code in `commol/conformal/methods.py`
 
 ```python
-class AdaptiveConformal(ConformalMethod, RangeChecked):
+class AdaptiveConformal(ConformalMethod, EngineChecked, RangeChecked):
     """
     Adaptive conformal inference (Gibbs and Candès 2021).
 
@@ -12692,21 +12596,13 @@ class AdaptiveConformal(ConformalMethod, RangeChecked):
     _runner = staticmethod(run_adaptive_conformal)
 
     step: float = Field(description="The step of the working level.")
-    stream: list[ObservedDataPoint] = Field(
-        min_length=1, description="The observations that arrive."
-    )
+    stream: list[ObservedDataPoint] = Field(description="The observations that arrive.")
     _engine_handles: ClassVar[tuple[str, ...]] = ("sample",)
 
     sample: ParameterSample | None = Field(
         default=None, description="The sample whose predictive predicts."
     )
     starts: int = Field(default=1, description="Starts of the fit.")
-
-    @model_validator(mode="after")
-    def _check_spread(self) -> Self:
-        """Reject ``score="spread"`` without a sample."""
-        _no_spread_without_sample(self)
-        return self
 ```
 
 ## ConformalResult
@@ -14273,7 +14169,7 @@ class Collinearity(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
 
 ## SampleIdentifiability
 
-Bases: `IdentifiabilityMethod[IdentifiabilityReport]`, `RangeChecked`
+Bases: `IdentifiabilityMethod[IdentifiabilityReport]`, `EngineChecked`, `RangeChecked`
 
 Practical identifiability from any parameter sample: how much it contracts each parameter, which parameters move together, and which marginals have several modes.
 
@@ -14289,7 +14185,9 @@ Attributes:
 Source code in `commol/identifiability/methods.py`
 
 ```python
-class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
+class SampleIdentifiability(
+    IdentifiabilityMethod[IdentifiabilityReport], EngineChecked, RangeChecked
+):
     """
     Practical identifiability from any parameter sample: how much it contracts
     each parameter, which parameters move together, and which marginals have
@@ -14327,20 +14225,6 @@ class SampleIdentifiability(IdentifiabilityMethod[IdentifiabilityReport], RangeC
         if isinstance(data, Mapping) and data.get("priors") is not None:
             return {**data, "priors": coerce_priors(data["priors"])}
         return data
-
-    @model_validator(mode="after")
-    def _check_priors(self) -> Self:
-        """The priors go with ``reference="prior"``, and only with it."""
-        if self.reference == "prior" and self.priors is None:
-            raise ValueError(
-                "reference='prior' needs priors: the prior of each parameter."
-            )
-        if self.reference == "bounds" and self.priors is not None:
-            raise ValueError(
-                "priors are read only with reference='prior'; with "
-                "reference='bounds' leave them out."
-            )
-        return self
 ```
 
 ## StartsIdentifiability
@@ -15990,16 +15874,11 @@ class LocalResult(ResultModel):
         RuntimeError
             If the derivatives fail at the fit.
         """
-        names = calibrator.parameter_names
-        if self.sample.names != names:
-            raise ValueError(
-                f"The result has the parameters {self.sample.names}; the problem "
-                f"has {names}."
-            )
         points = [float(position) for position in positions]
         outputs, center, lower, upper = commol_rs.inference.delta_band(
             calibrator._engine_problem,
-            [self.fit.best_parameters[name] for name in names],
+            self.sample.names,
+            list(self.fit.best_parameters.items()),
             self.covariance,
             self.degrees_of_freedom(),
             points,
@@ -16120,16 +15999,11 @@ def delta_band(
     RuntimeError
         If the derivatives fail at the fit.
     """
-    names = calibrator.parameter_names
-    if self.sample.names != names:
-        raise ValueError(
-            f"The result has the parameters {self.sample.names}; the problem "
-            f"has {names}."
-        )
     points = [float(position) for position in positions]
     outputs, center, lower, upper = commol_rs.inference.delta_band(
         calibrator._engine_problem,
-        [self.fit.best_parameters[name] for name in names],
+        self.sample.names,
+        list(self.fit.best_parameters.items()),
         self.covariance,
         self.degrees_of_freedom(),
         points,
@@ -24241,7 +24115,7 @@ The module `commol.profiles`: the profile likelihood of parameters and predictio
 
 ## ProfileLikelihood
 
-Bases: `UncertaintyMethod[ProfileResult]`, `RangeChecked`
+Bases: `UncertaintyMethod[ProfileResult]`, `EngineChecked`, `RangeChecked`
 
 The profile likelihood of parameters (Raue et al. 2009).
 
@@ -24259,7 +24133,7 @@ Attributes:
 Source code in `commol/profiles/methods.py`
 
 ```python
-class ProfileLikelihood(UncertaintyMethod[ProfileResult], RangeChecked):
+class ProfileLikelihood(UncertaintyMethod[ProfileResult], EngineChecked, RangeChecked):
     """
     The profile likelihood of parameters (Raue et al. 2009).
 
@@ -24285,7 +24159,7 @@ class ProfileLikelihood(UncertaintyMethod[ProfileResult], RangeChecked):
 
     _runner = staticmethod(run_profile_likelihood)
 
-    parameters: list[str] = Field(min_length=1)
+    parameters: list[str] = Field()
     threshold: Threshold
     max_steps: int = Field(
         default=100,
@@ -24293,18 +24167,11 @@ class ProfileLikelihood(UncertaintyMethod[ProfileResult], RangeChecked):
     starts: int = Field(
         default=1,
     )
-
-    @model_validator(mode="after")
-    def _check_unique(self) -> Self:
-        """Each parameter is profiled once."""
-        if len(set(self.parameters)) != len(self.parameters):
-            raise ValueError(f"A parameter is listed twice: {self.parameters}.")
-        return self
 ```
 
 ## PredictionProfile
 
-Bases: `UncertaintyMethod[ProfileResult]`, `RangeChecked`
+Bases: `UncertaintyMethod[ProfileResult]`, `EngineChecked`, `RangeChecked`
 
 The profile likelihood of predictions (Kreutz et al. 2012).
 
@@ -24322,7 +24189,7 @@ Attributes:
 Source code in `commol/profiles/methods.py`
 
 ```python
-class PredictionProfile(UncertaintyMethod[ProfileResult], RangeChecked):
+class PredictionProfile(UncertaintyMethod[ProfileResult], EngineChecked, RangeChecked):
     """
     The profile likelihood of predictions (Kreutz et al. 2012).
 
@@ -24346,7 +24213,7 @@ class PredictionProfile(UncertaintyMethod[ProfileResult], RangeChecked):
 
     _runner = staticmethod(run_prediction_profile)
 
-    specs: list[PredictionSpec] = Field(min_length=1)
+    specs: list[PredictionSpec] = Field()
     threshold: Threshold
     max_steps: int = Field(
         default=100,
@@ -24354,16 +24221,6 @@ class PredictionProfile(UncertaintyMethod[ProfileResult], RangeChecked):
     starts: int = Field(
         default=1,
     )
-
-    @model_validator(mode="after")
-    def _check_labels(self) -> Self:
-        """Each prediction has a label of its own."""
-        labels = [spec.as_observation().label for spec in self.specs]
-        if len(set(labels)) != len(labels):
-            raise ValueError(
-                f"Each prediction needs a label of its own, got {labels}; set label."
-            )
-        return self
 ```
 
 ## PredictionSpec
@@ -24503,7 +24360,7 @@ def as_observation(self) -> ObservedDataPoint:
 
 ## Threshold
 
-Bases: `RangeChecked`
+Bases: `EngineChecked`, `RangeChecked`
 
 How far the statistic of a profile may rise above the fit inside an interval of `confidence_level`.
 
@@ -24520,7 +24377,7 @@ Attributes:
 Source code in `commol/profiles/results.py`
 
 ```python
-class Threshold(RangeChecked):
+class Threshold(EngineChecked, RangeChecked):
     """
     How far the statistic of a profile may rise above the fit inside an
     interval of `confidence_level`.
@@ -24542,17 +24399,6 @@ class Threshold(RangeChecked):
     kind: Literal["chi_square", "beale", "bootstrap_calibrated"]
     confidence_level: float
     bootstrap: _ProfileBootstrap | None = None
-
-    @model_validator(mode="after")
-    def _check_bootstrap(self) -> Self:
-        """A bootstrap goes with ``"bootstrap_calibrated"``, and only with it."""
-        if (self.kind == "bootstrap_calibrated") != (self.bootstrap is not None):
-            raise ValueError(
-                "A bootstrap calibrates the threshold 'bootstrap_calibrated' and no "
-                "other; build thresholds with Threshold.chi_square, Threshold.beale "
-                "or Threshold.bootstrap_calibrated."
-            )
-        return self
 
     @classmethod
     def chi_square(cls, confidence_level: float) -> Self:
@@ -25390,41 +25236,6 @@ class Level(_Outputs):
         self, outputs: str | list[str], *, kind: Literal["level"] = "level"
     ) -> None:
         BaseModel.__init__(self, outputs=outputs, kind=kind)
-
-    @property
-    def text(self) -> str:
-        """The series as a label reads it: the outputs."""
-        return self.output_name
-
-    def check_ends(self, positions: Sequence[float]) -> None:
-        """A level reads any position."""
-```
-
-### Attributes
-
-#### text
-
-```python
-text: str
-```
-
-The series as a label reads it: the outputs.
-
-### Methods:
-
-#### check_ends
-
-```python
-check_ends(positions: Sequence[float]) -> None
-```
-
-A level reads any position.
-
-Source code in `commol/quantities/quantities.py`
-
-```python
-def check_ends(self, positions: Sequence[float]) -> None:
-    """A level reads any position."""
 ```
 
 ## Increments
@@ -25475,72 +25286,11 @@ class Increments(_Outputs, RangeChecked):
         kind: Literal["increments"] = "increments",
     ) -> None:
         BaseModel.__init__(self, outputs=outputs, window=window, kind=kind)
-
-    @property
-    def text(self) -> str:
-        """The series as a label reads it: the gain over windows of a width."""
-        return f"{self.output_name} gain over windows of {_position_text(self.window)}"
-
-    def check_ends(self, positions: Sequence[float]) -> None:
-        """
-        No window starts before 0, with the rule of the engine
-        (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
-
-        Raises
-        ------
-        ValueError
-            With the message of the engine, if a window starts before 0.
-        """
-        for at in positions:
-            commol_rs.calibration.check_window_end(at, self.window)
-```
-
-### Attributes
-
-#### text
-
-```python
-text: str
-```
-
-The series as a label reads it: the gain over windows of a width.
-
-### Methods:
-
-#### check_ends
-
-```python
-check_ends(positions: Sequence[float]) -> None
-```
-
-No window starts before 0, with the rule of the engine (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
-
-Raises:
-
-| Type         | Description                                                  |
-| ------------ | ------------------------------------------------------------ |
-| `ValueError` | With the message of the engine, if a window starts before 0. |
-
-Source code in `commol/quantities/quantities.py`
-
-```python
-def check_ends(self, positions: Sequence[float]) -> None:
-    """
-    No window starts before 0, with the rule of the engine
-    (`check_window_end` of `crates/commol-calibration/src/observation.rs`).
-
-    Raises
-    ------
-    ValueError
-        With the message of the engine, if a window starts before 0.
-    """
-    for at in positions:
-        commol_rs.calibration.check_window_end(at, self.window)
 ```
 
 ## ValueAt
 
-Bases: `_OfSeries`, `_OneScalar`, `RangeChecked`
+Bases: `_OfSeries`, `RangeChecked`
 
 The value of a series at a position: the level of the outputs, or their gain over the window that ends there.
 
@@ -25555,7 +25305,7 @@ Attributes:
 Source code in `commol/quantities/quantities.py`
 
 ```python
-class ValueAt(_OfSeries, _OneScalar, RangeChecked):
+class ValueAt(_OfSeries, RangeChecked):
     """
     The value of a series at a position: the level of the outputs, or their
     gain over the window that ends there.
@@ -25573,39 +25323,11 @@ class ValueAt(_OfSeries, _OneScalar, RangeChecked):
 
     kind: Literal["value_at"] = "value_at"
     at: float = Field(description="The position.")
-
-    @model_validator(mode="after")
-    def _window_after_zero(self) -> Self:
-        """The window of increments ends at least its width after 0."""
-        self.series.check_ends([self.at])
-        return self
-
-    def default_label(self) -> str:
-        """The series at `at`."""
-        return f"{self.series.text} at {_position_text(self.at)}"
-```
-
-### Methods:
-
-#### default_label
-
-```python
-default_label() -> str
-```
-
-The series at `at`.
-
-Source code in `commol/quantities/quantities.py`
-
-```python
-def default_label(self) -> str:
-    """The series at `at`."""
-    return f"{self.series.text} at {_position_text(self.at)}"
 ```
 
 ## Gain
 
-Bases: `_Outputs`, `_OneScalar`, `RangeChecked`
+Bases: `_Outputs`, `QuantityBase`, `RangeChecked`
 
 The value at `end` minus the value at `start`: what entered a cumulative output over `(start, end]`, as an observation with the window `end - start` that starts at exactly `start` reads it.
 
@@ -25621,7 +25343,7 @@ Attributes:
 Source code in `commol/quantities/quantities.py`
 
 ```python
-class Gain(_Outputs, _OneScalar, RangeChecked):
+class Gain(_Outputs, QuantityBase, RangeChecked):
     """
     The value at `end` minus the value at `start`: what entered a cumulative
     output over ``(start, end]``, as an observation with the window
@@ -25643,45 +25365,11 @@ class Gain(_Outputs, _OneScalar, RangeChecked):
     kind: Literal["gain"] = "gain"
     start: float = Field(description="The start of the window.")
     end: float = Field(description="The end of the window.")
-
-    @model_validator(mode="after")
-    def _end_after_start(self) -> Self:
-        """A window ends after it starts."""
-        if self.end <= self.start:
-            raise ValueError(
-                f"A gain ends after it starts, got start {self.start} and end "
-                f"{self.end}"
-            )
-        return self
-
-    def default_label(self) -> str:
-        """The gain of `outputs` over the window."""
-        start, end = _position_text(self.start), _position_text(self.end)
-        return f"{self.output_name} gain over ({start}, {end}]"
-```
-
-### Methods:
-
-#### default_label
-
-```python
-default_label() -> str
-```
-
-The gain of `outputs` over the window.
-
-Source code in `commol/quantities/quantities.py`
-
-```python
-def default_label(self) -> str:
-    """The gain of `outputs` over the window."""
-    start, end = _position_text(self.start), _position_text(self.end)
-    return f"{self.output_name} gain over ({start}, {end}]"
 ```
 
 ## Peak
 
-Bases: `_AtPositions`, `_OneScalar`, `RangeChecked`
+Bases: `_AtPositions`, `RangeChecked`
 
 The largest value of a series at the positions.
 
@@ -25698,7 +25386,7 @@ Attributes:
 Source code in `commol/quantities/quantities.py`
 
 ```python
-class Peak(_AtPositions, _OneScalar, RangeChecked):
+class Peak(_AtPositions, RangeChecked):
     """
     The largest value of a series at the positions.
 
@@ -25719,33 +25407,11 @@ class Peak(_AtPositions, _OneScalar, RangeChecked):
     """
 
     kind: Literal["peak"] = "peak"
-
-    def default_label(self) -> str:
-        """The peak of the series."""
-        return f"peak of {self.series.text}"
-```
-
-### Methods:
-
-#### default_label
-
-```python
-default_label() -> str
-```
-
-The peak of the series.
-
-Source code in `commol/quantities/quantities.py`
-
-```python
-def default_label(self) -> str:
-    """The peak of the series."""
-    return f"peak of {self.series.text}"
 ```
 
 ## PeakPosition
 
-Bases: `_AtPositions`, `_OneScalar`, `RangeChecked`
+Bases: `_AtPositions`, `RangeChecked`
 
 The first of the positions where the value of a series is largest; NaN when the value at a position is NaN.
 
@@ -25760,7 +25426,7 @@ Attributes:
 Source code in `commol/quantities/quantities.py`
 
 ```python
-class PeakPosition(_AtPositions, _OneScalar, RangeChecked):
+class PeakPosition(_AtPositions, RangeChecked):
     """
     The first of the positions where the value of a series is largest; NaN
     when the value at a position is NaN.
@@ -25777,28 +25443,6 @@ class PeakPosition(_AtPositions, _OneScalar, RangeChecked):
     """
 
     kind: Literal["peak_position"] = "peak_position"
-
-    def default_label(self) -> str:
-        """The position of the peak of the series."""
-        return f"position of the peak of {self.series.text}"
-```
-
-### Methods:
-
-#### default_label
-
-```python
-default_label() -> str
-```
-
-The position of the peak of the series.
-
-Source code in `commol/quantities/quantities.py`
-
-```python
-def default_label(self) -> str:
-    """The position of the peak of the series."""
-    return f"position of the peak of {self.series.text}"
 ```
 
 ## Trajectory
@@ -25835,57 +25479,11 @@ class Trajectory(_AtPositions, RangeChecked):
     """
 
     kind: Literal["trajectory"] = "trajectory"
-
-    def _name(self) -> str:
-        """The name of the series."""
-        return self.label or self.series.text
-
-    def labels(self) -> list[str]:
-        """The name and each position."""
-        return [f"{self._name()} at {_position_text(at)}" for at in self.positions]
-
-    def axes(self) -> list[tuple[str, float | None]]:
-        """Its name and each position."""
-        return [(self._name(), at) for at in self.positions]
-```
-
-### Methods:
-
-#### labels
-
-```python
-labels() -> list[str]
-```
-
-The name and each position.
-
-Source code in `commol/quantities/quantities.py`
-
-```python
-def labels(self) -> list[str]:
-    """The name and each position."""
-    return [f"{self._name()} at {_position_text(at)}" for at in self.positions]
-```
-
-#### axes
-
-```python
-axes() -> list[tuple[str, float | None]]
-```
-
-Its name and each position.
-
-Source code in `commol/quantities/quantities.py`
-
-```python
-def axes(self) -> list[tuple[str, float | None]]:
-    """Its name and each position."""
-    return [(self._name(), at) for at in self.positions]
 ```
 
 ## Ratio
 
-Bases: `_OneScalar`
+Bases: `QuantityBase`
 
 The ratio of two quantities of one value each, numerator N over denominator D.
 
@@ -25903,7 +25501,7 @@ Attributes:
 Source code in `commol/quantities/quantities.py`
 
 ```python
-class Ratio(_OneScalar):
+class Ratio(QuantityBase):
     """
     The ratio of two quantities of one value each, numerator N over
     denominator D.
@@ -25940,43 +25538,6 @@ class Ratio(_OneScalar):
     replicate_rule: Literal["within", "within_positive", "pooled"] = Field(
         description="How the replicates of a stochastic run combine."
     )
-
-    @field_validator("numerator", "denominator")
-    @classmethod
-    def _one_value(cls, value: QuantityBase) -> QuantityBase:
-        """An operand gives one value per run."""
-        if isinstance(value, PeakPosition | Trajectory):
-            raise ValueError(
-                f"A Ratio divides quantities of one value each (ValueAt, Gain, "
-                f"Peak), got the {type(value).__name__} '{value.labels()[0]}'"
-            )
-        return value
-
-    def default_label(self) -> str:
-        """The numerator over the denominator."""
-        numerator = self.numerator.labels()[0]
-        denominator = self.denominator.labels()[0]
-        return f"({numerator}) / ({denominator})"
-```
-
-### Methods:
-
-#### default_label
-
-```python
-default_label() -> str
-```
-
-The numerator over the denominator.
-
-Source code in `commol/quantities/quantities.py`
-
-```python
-def default_label(self) -> str:
-    """The numerator over the denominator."""
-    numerator = self.numerator.labels()[0]
-    denominator = self.denominator.labels()[0]
-    return f"({numerator}) / ({denominator})"
 ```
 
 ## quantity_schedule
@@ -26035,8 +25596,6 @@ def quantity_schedule(quantities: Sequence[QuantityBase]) -> list[float]:
     ValueError
         If there is no quantity.
     """
-    if not quantities:
-        raise ValueError("Give at least one quantity of interest.")
     return commol_rs.inference.quantity_schedule(engine_json(list(quantities)))
 ```
 
@@ -28199,11 +27758,11 @@ def run(self, method: SensitivityMethod[ResultT]) -> ResultT:
 
 ## InputSpace
 
-Bases: `BaseModel`
+Bases: `EngineChecked`
 
 What a sensitivity analysis varies.
 
-Each input is a `CalibrationParameter`, a model parameter or an initial condition with its bounds, as a calibration sets it. The inputs follow independent distributions, one per input, truncated to its bounds, or are the draws of a sample, with their weights; the inputs of a sample may depend on each other, so only the methods that allow it take one. Build it with `independent`, `uniform_on_bounds` or `from_sample`.
+Each input is a `CalibrationParameter`, a model parameter or an initial condition with its bounds, as a calibration sets it. The inputs follow independent distributions, one per input, truncated to its bounds, or are the draws of a sample, with their weights; the inputs of a sample may depend on each other, so only the methods that allow it take one. Build it with `independent`, `uniform_on_bounds` or `from_sample`: it has distributions or a sample, exactly one, with no default, which `SensitivityAnalysis` checks with the inputs of the sample.
 
 Attributes:
 
@@ -28217,7 +27776,7 @@ Attributes:
 Source code in `commol/sensitivity/results.py`
 
 ```python
-class InputSpace(BaseModel):
+class InputSpace(EngineChecked):
     """
     What a sensitivity analysis varies.
 
@@ -28226,7 +27785,9 @@ class InputSpace(BaseModel):
     independent distributions, one per input, truncated to its bounds, or
     are the draws of a sample, with their weights; the inputs of a sample may
     depend on each other, so only the methods that allow it take one. Build
-    it with `independent`, `uniform_on_bounds` or `from_sample`.
+    it with `independent`, `uniform_on_bounds` or `from_sample`: it has
+    distributions or a sample, exactly one, with no default, which
+    `SensitivityAnalysis` checks with the inputs of the sample.
 
     Attributes
     ----------
@@ -28246,9 +27807,7 @@ class InputSpace(BaseModel):
 
     _engine_handles: ClassVar[tuple[str, ...]] = ("sample",)
 
-    parameters: list[CalibrationParameter] = Field(
-        min_length=1, description="The inputs, in order."
-    )
+    parameters: list[CalibrationParameter] = Field(description="The inputs, in order.")
     distributions: dict[str, _Distribution] | None = Field(
         default=None, description="The distribution of each independent input."
     )
@@ -28259,46 +27818,6 @@ class InputSpace(BaseModel):
         default=None,
         description="Bin or compartment that takes what the initial conditions leave.",
     )
-
-    @model_validator(mode="after")
-    def _check_inputs(self) -> Self:
-        """Check the inputs against the distributions or the sample."""
-        ids = [parameter.id for parameter in self.parameters]
-        repeated = sorted({i for i in ids if ids.count(i) > 1})
-        if repeated:
-            raise ValueError(f"Inputs repeat the ids {repeated}.")
-        observed = {
-            "factor": ("a factor, which multiplies an observation"),
-            "noise": ("a noise parameter, which belongs to an observation model"),
-        }
-        for parameter in self.parameters:
-            what = observed.get(parameter.parameter_type)
-            if what is not None:
-                raise ValueError(
-                    f"'{parameter.id}' is {what}; a sensitivity analysis has no "
-                    "observations."
-                )
-        if (self.distributions is None) == (self.sample is None):
-            raise ValueError("Give distributions or a sample, not both.")
-        if self.distributions is not None:
-            missing = [i for i in ids if i not in self.distributions]
-            extra = sorted(set(self.distributions) - set(ids))
-            if missing:
-                raise ValueError(
-                    f"The inputs {missing} have no distribution: give one per "
-                    "input, or InputSpace.uniform_on_bounds(parameters)."
-                )
-            if extra:
-                raise ValueError(f"The distributions of {extra} name no input.")
-        if self.sample is not None:
-            bounds = [(p.min_bound, p.max_bound) for p in self.parameters]
-            if self.sample.names != ids or list(self.sample.bounds) != bounds:
-                raise ValueError(
-                    f"The sample has the inputs {self.sample.names} with the bounds "
-                    f"{list(self.sample.bounds)}; the parameters are {ids} with the "
-                    f"bounds {bounds}, in this order."
-                )
-        return self
 
     @classmethod
     def independent(
@@ -28397,10 +27916,10 @@ class InputSpace(BaseModel):
         InputSpace
             The input space.
 
-        Raises
-        ------
-        ValueError
-            If the sample's names or bounds are not the parameters'.
+        Notes
+        -----
+        `SensitivityAnalysis` checks that the sample's names and bounds are
+        the parameters'.
         """
         return cls(
             parameters=list(parameters),
@@ -28574,11 +28093,9 @@ Returns:
 | ------------ | ---------------- |
 | `InputSpace` | The input space. |
 
-Raises:
+Notes
 
-| Type         | Description                                              |
-| ------------ | -------------------------------------------------------- |
-| `ValueError` | If the sample's names or bounds are not the parameters'. |
+`SensitivityAnalysis` checks that the sample's names and bounds are the parameters'.
 
 Source code in `commol/sensitivity/results.py`
 
@@ -28613,10 +28130,10 @@ def from_sample(
     InputSpace
         The input space.
 
-    Raises
-    ------
-    ValueError
-        If the sample's names or bounds are not the parameters'.
+    Notes
+    -----
+    `SensitivityAnalysis` checks that the sample's names and bounds are
+    the parameters'.
     """
     return cls(
         parameters=list(parameters),
@@ -28778,15 +28295,11 @@ class PropagationResult(ResultModel):
                 f"The mask has one boolean per run: {len(self.values)} runs, got "
                 f"an array of {keep.dtype} with the shape {keep.shape}"
             )
-        weights = np.asarray(self.weights, dtype=float)[keep]
-        if weights.sum() <= 0.0:
-            raise ValueError(
-                "The mask keeps no run of positive weight: a summary needs at least one"
-            )
+        kept = [weight for weight, kept in zip(self.weights, keep) if kept]
         return self.model_copy(
             update={
                 "values": [row for row, kept in zip(self.values, keep) if kept],
-                "weights": (weights / weights.sum()).tolist(),
+                "weights": commol_rs.inference.normalized_weights(kept),
             }
         )
 
@@ -28915,15 +28428,11 @@ def where(self, mask: ArrayLike) -> "PropagationResult":
             f"The mask has one boolean per run: {len(self.values)} runs, got "
             f"an array of {keep.dtype} with the shape {keep.shape}"
         )
-    weights = np.asarray(self.weights, dtype=float)[keep]
-    if weights.sum() <= 0.0:
-        raise ValueError(
-            "The mask keeps no run of positive weight: a summary needs at least one"
-        )
+    kept = [weight for weight, kept in zip(self.weights, keep) if kept]
     return self.model_copy(
         update={
             "values": [row for row, kept in zip(self.values, keep) if kept],
-            "weights": (weights / weights.sum()).tolist(),
+            "weights": commol_rs.inference.normalized_weights(kept),
         }
     )
 ```
@@ -34384,8 +33893,8 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult], RangeChecked):
     @model_validator(mode="before")
     @classmethod
     def _require_eta(cls, data: JsonValue) -> JsonValue:
-        """Name the choices of `eta` when it is missing."""
-        _require(data, "eta", f"give {ETA_CHOICES}")
+        """The engine refuses a missing `eta` with the choices it takes."""
+        check_required(cls, data, "eta")
         return data
 ```
 
@@ -35200,12 +34709,12 @@ class ParameterSample(ResultModel):
         lower, upper = self._rust.interval(confidence_level)
         quantiles = self.quantiles([0.0, 0.5, 1.0])
         mean = self.mean()
-        covariance = self.covariance()
+        deviations = self._rust.standard_deviations()
         return {
             name: ParameterSummary(
                 mean=mean[name],
                 median=quantiles[name][1],
-                std=covariance[index][index] ** 0.5,
+                std=deviations[index],
                 lower=lower[index],
                 upper=upper[index],
                 min=quantiles[name][0],
@@ -35661,12 +35170,12 @@ def summary(self, confidence_level: float) -> dict[str, ParameterSummary]:
     lower, upper = self._rust.interval(confidence_level)
     quantiles = self.quantiles([0.0, 0.5, 1.0])
     mean = self.mean()
-    covariance = self.covariance()
+    deviations = self._rust.standard_deviations()
     return {
         name: ParameterSummary(
             mean=mean[name],
             median=quantiles[name][1],
-            std=covariance[index][index] ** 0.5,
+            std=deviations[index],
             lower=lower[index],
             upper=upper[index],
             min=quantiles[name][0],
@@ -37694,13 +37203,7 @@ class Scenarios(Mapping[str, Predictive]):
         model = source.simulation.model_definition
         models = {}
         for name, overrides in scenarios.items():
-            held = [parameter for parameter in overrides if parameter in sample.names]
-            if held:
-                raise ValueError(
-                    f"Scenario '{name}' sets {held}, which the sample holds: each "
-                    "draw sets them. A scenario overrides only parameters the "
-                    "sample does not hold."
-                )
+            sample._rust.check_scenario(name, list(overrides))
             scenario_model = model.model_copy(deep=True)
             try:
                 scenario_model.update_parameters(overrides)
@@ -37926,13 +37429,7 @@ def __init__(
     model = source.simulation.model_definition
     models = {}
     for name, overrides in scenarios.items():
-        held = [parameter for parameter in overrides if parameter in sample.names]
-        if held:
-            raise ValueError(
-                f"Scenario '{name}' sets {held}, which the sample holds: each "
-                "draw sets them. A scenario overrides only parameters the "
-                "sample does not hold."
-            )
+        sample._rust.check_scenario(name, list(overrides))
         scenario_model = model.model_copy(deep=True)
         try:
             scenario_model.update_parameters(overrides)
@@ -39117,6 +38614,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 - **Breaking:** with a `sample`, each entry of a report (`Model.applied_parameters`, `ModelStructure.report_sections`) holds its `EntrySpread` under the key `spread`, not `interval`. A report saved as JSON before this change has the key `interval`: read `spread`.
+- **Breaking:** the engine holds every rule of a calibration problem and of an uncertainty method, and Python holds no copy: each class sends its JSON to the engine when it is built and raises the message of the engine. A problem or a method written as JSON meets the same rules. Several messages change: two parameters with one id say `Two parameters have the id 'k'`, a loss with observation models says `not both`, a problem with neither says `There is no default`, and a list of names in a message is written as Rust writes it, `["k1"]`. See [Calibration](https://munqu.github.io/commol/latest/guide/calibration/#unknowns).
+- **Breaking:** a `CalibrationParameter` with a NaN bound, `max_bound` not above `min_bound`, or an `initial_guess` that is not finite or outside its bounds is refused by the engine too, so a problem in JSON can no longer calibrate a parameter of zero width. An infinite bound stays valid for a prior; every run of an optimizer refuses it with a message that names the parameter (before, a swarm panicked and Nelder-Mead named no parameter), and so do `StructuralRank` and `SampleIdentifiability(reference="bounds")`, which gave a contraction of 1 and the verdict `determined`. See [Infinite bounds](https://munqu.github.io/commol/latest/guide/calibration/#infinite-bounds).
+- **Breaking:** an `InputSpace` with neither distributions nor a sample is refused when `SensitivityAnalysis` reads it; before, the engine drew each input uniform on its bounds. One with both is refused; before, the engine ignored the distributions. The check of the names and the bounds of a sample moves from `InputSpace.from_sample` to `SensitivityAnalysis`, and a `Uniform()` on an infinite bound is refused by `InputSpace.uniform_on_bounds`. See [Input spaces](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md).
+- **Breaking:** the engine writes the default label of a quantity of interest: a very small or very large position has an exponent with no sign or zero, `1e-7` and `2.5e16`, not `1e-07` and `2.5e+16`. Two quantities with one label are refused with a message that names the label.
+- `score="spread"` without a sample is refused when a `SplitConformal` or an `AdaptiveConformal` runs, before it fits, not when it is built.
 - **Breaking:** a split by category names exactly the categories of `by` that the compartments of its stratification have. A `type` on `g2` only, split by `group`, gives the split of `g2` alone, and a split of `g1`, which no compartment reads, is refused with a message that names `type` and `g1`. Migration: remove the split of each category that the conditions of the stratification leave out.
 - **Breaking:** the engine checks the stratification each condition names, and its category, from `check_model`. The condition of a stratification names one declared before it, and the condition of a stratified rate one of the process. A model in JSON whose condition names another stratification built and expanded nothing for it; it is now refused, with a message that names the stratification. `ModelBuilder.add_stratification` refused it already. A condition of a stratification on a category its stratification does not have, such as `StratificationCondition(stratification="group", category="g9")`, built and expanded nothing; it is now refused, with a message that names the stratification and the category. The unknown stratification or category of a stratified rate gets the message of the engine, `Transition 'ab', stratified rate 0: the condition on 'group' names 'g9', which is not a category of 'group' (["g1", "g2"])`. Migration: name in each condition a stratification declared before it and one of its categories.
 - **Breaking:** the engine refuses a condition of a stratification that gives neither `category` nor `categories`, with the message `Stratification 'type': the condition on 'group' gives neither a category nor a set of categories; give one of them`. A model in JSON with such a condition built and split every compartment. The condition of a stratified rate that only sets `to` is unchanged. `ModelBuilder.add_stratification` no longer checks its conditions: a condition that names a stratification not declared before it, or that gives no category, raises `ValueError` at `build`, with the message of the engine, and no longer at the call. Migration: catch the error of a condition at `build`.
@@ -39154,10 +38656,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Removed
 
 - **Breaking:** `Model.get_uncalibrated_parameters`, `Aggregate.uncalibrated_values` (and `ModelStructure.uncalibrated_values`), `Aggregate.get_uncalibrated_bins` and `Aggregate.get_categories_with_fractions` are removed: no part of commol reads them, and the engine names every value a run lacks. Migration: read `parameter.value is None` and `structure.bin_amounts`, or run the model and read the message.
+- **Breaking:** the quantities of interest lose the methods that copied rules of the engine: `ValueAt.default_label()` and that of the other quantities, `Level.text`, `Increments.text`, `Increments.check_ends()` and `output_name`. `labels()` and `axes()` give what the engine names.
 - **Breaking:** `commol.utils.security` is removed, with `SecurityConfig`, `SecurityError`, `validate_expression_security` and the `config=` argument of `AxisPattern.combine` and `AxisPattern.from_formula`. The parser of the engine is the only check of a formula: a rate, a formula parameter, a calibration constraint or an axis pattern that it rejects raises `ValueError` with its message, and no setting changes its limits. Remove the `config=` argument, and catch `ValueError` instead of `SecurityError`. A formula of the language that the old text guards rejected is now valid: a name with letters outside ASCII (`α * β`), a name such as `__import__`, `os` or `my_key`, a number such as `1e400`, `nan` as the name of a variable, and a formula of more than 1000 nodes, 10 000 characters or 10 levels of nesting, within the limits of the parser. The build still rejects a variable that the model does not define. See [Limits of the parser](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#limits-of-the-parser).
 
 ### Fixed
 
+- `Collinearity` at a point where a parameter with an infinite bound is 0 scaled its column by an infinite width: an infinite sensitivity and an index below 1, with no error. The magnitude of the parameter there is now 1, as the step of finite differences takes it.
+- A `SampleIdentifiability(reference="prior")` without priors, or `reference="bounds"` with priors, written as JSON measured the sample against the bounds with no error; the engine now refuses it.
+- An empty list of settings is refused with a message that names the field: the `at` of a constraint (before, the constraint was never evaluated), the `origins` of a `RollingConformal` (before, `Every origin failed: 0 of 0`), the `positions` of a conformal method, the `stream` of an `AdaptiveConformal`, the `parameters` of a `ProfileLikelihood` and the `specs` of a `PredictionProfile` (before, an empty result). A parameter profiled twice, or two predictions with one label, are refused; before, one profile overwrote the other.
+- The positions of a quantity of interest in JSON must ascend, each once; before, the engine read unsorted positions in their given order, and the first position of a peak depended on it.
 - A figure of a run, or of its replicates, logs one warning for each factor of its observations that `calibration_result` does not have, and counts the factor as 1. Before, it logged the warning once for each observation and each replicate. The cumulative figure of a `Predictive` raises the `ValueError` of its other figures for a factor that the problem does not have; before, it drew the observation as if the factor were 1.
 - A calibrated amount of a bin whose amount is `None`, or of a remainder whose compartments start at `0`, split evenly among its compartments. It now splits by the stratification fractions, as the amount of the model does, also within a prefix whose own fraction is 0.
 - A number that is not finite in a model or in the settings of an engine reached the engine as `null`. An infinite tolerance of `ODESolver` raised a message about the type of the setting, and an infinite parameter value failed when the model ran, with a message about a parameter index. Such a number now reaches the engine as its text, as every setting does: `ODESolver(atol=float("inf"))` raises `atol is a finite number greater than 0, got inf`, and the infinite parameter value is rejected when the engine is built, with the name of the parameter.

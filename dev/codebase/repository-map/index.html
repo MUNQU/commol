@@ -2973,6 +2973,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/optimizers/" class="md-nav__link">
         
   
@@ -4169,7 +4197,7 @@
 </tr>
 <tr>
 <td><code>py-commol/src/calibration.rs</code></td>
-<td>The results of a fit (<code>CalibrationResult</code>, <code>Starts</code>, the history), the checks that take an <code>Engine</code> and the parameters as JSON, and the windows of the engine (<code>check_window</code>, <code>check_window_end</code>, <code>window_bounds</code>, <code>window_index</code>, <code>window_ends</code>, <code>windows_in</code>, <code>window_increments</code>).</td>
+<td>The results of a fit (<code>CalibrationResult</code>, <code>Starts</code>, the history), the checks that take an <code>Engine</code> and the parameters as JSON, and the windows of the engine (<code>check_window</code>, <code>window_bounds</code>, <code>window_index</code>, <code>window_ends</code>, <code>windows_in</code>, <code>window_increments</code>).</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
@@ -4253,8 +4281,8 @@ table, and <code>tests/suite/test_architecture.py</code> checks it.</p>
 </tr>
 <tr>
 <td><code>_data/</code></td>
-<td>The base of every data object: <code>RangeChecked</code> (<code>ranges.py</code>, the check of the engine for an object with range rules, <code>commol_rs.core.check_ranges</code>, when the model is built); <code>ComparedByValue</code> and <code>ResultModel</code> (<code>result_model.py</code>, the one equality of every result: <code>==</code> over the values a result compares, a NaN equal to a NaN, a hash that agrees; and the JSON file of a result model, <code>to_json</code> and <code>from_json</code>); the one writer of the JSON file of a model or a result, with the texts of the numbers that are not finite in every nested model and long numeric arrays on one line (<code>serialization.py</code>: <code>write_json_file</code>, <code>render_json</code>); and the port of the bridge on the Python side (<code>engine_json.py</code>: <code>engine_json</code>, the JSON of the <code>model_dump()</code> of a data object, with the texts <code>"Infinity"</code>, <code>"-Infinity"</code> and <code>"NaN"</code>, and <code>engine_handles</code>, the handle of each field a class names in <code>_engine_handles</code>); and the protocols of the prediction intervals that a report and a figure read (<code>_data/intervals.py</code>: <code>PredictionIntervalsData</code>, <code>SeriesIntervalsData</code>), so they import no method.</td>
-<td>A range constraint of pydantic; an <code>__eq__</code> of one result; a conversion of a field to the engine.</td>
+<td>The base of every data object: <code>RangeChecked</code> (<code>ranges.py</code>, the check of the engine for an object with range rules, <code>commol_rs.core.check_ranges</code>, when the model is built); <code>ComparedByValue</code> and <code>ResultModel</code> (<code>result_model.py</code>, the one equality of every result: <code>==</code> over the values a result compares, a NaN equal to a NaN, a hash that agrees; and the JSON file of a result model, <code>to_json</code> and <code>from_json</code>); the one writer of the JSON file of a model or a result, with the texts of the numbers that are not finite in every nested model and long numeric arrays on one line (<code>serialization.py</code>: <code>write_json_file</code>, <code>render_json</code>); and the port of the bridge on the Python side (<code>engine_json.py</code>: <code>engine_json</code>, the JSON of the <code>model_dump()</code> of a data object, with the texts <code>"Infinity"</code>, <code>"-Infinity"</code> and <code>"NaN"</code>, <code>engine_handles</code>, the handle of each field a class names in <code>_engine_handles</code>, and <code>EngineChecked</code>, the base of a data object whose fields join in a rule: when it is built, the engine checks its JSON with the reader of its class, and the object raises the message of the engine); and the protocols of the prediction intervals that a report and a figure read (<code>_data/intervals.py</code>: <code>PredictionIntervalsData</code>, <code>SeriesIntervalsData</code>), so they import no method.</td>
+<td>A range constraint of pydantic; an <code>__eq__</code> of one result; a conversion of a field to the engine; a copy of a rule of the engine.</td>
 </tr>
 <tr>
 <td><code>_statistics/</code></td>

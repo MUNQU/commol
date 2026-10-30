@@ -101,7 +101,8 @@ Every variant takes a `score`, a `by` and a `confidence_level`, none with a defa
 `by="series"` gives each series (observation label) its own quantile; `by="all"` gives every series one quantile. Per series is the safer first choice: a small series does not borrow the errors of a large one, but it needs `1/α − 1` scores of its own.
 
 - `score="normalized"` with `by="series"` raises a `ValueError`: with one constant factor per series, its intervals are those of `"absolute"`.
-- `score="spread"` needs predictions with a spread. `SplitConformal` and `AdaptiveConformal` take it from a `sample`, whose predictive gives the prediction (its weighted median) and the spread (its weighted standard deviation); without one they raise a `ValueError`. `JackknifePlus` and `EnbPI` take it from their own refits. `RollingConformal` fits once per origin, so it rejects `"spread"`.
+- `score="spread"` needs predictions with a spread. `SplitConformal` and `AdaptiveConformal` take it from a `sample`, whose predictive gives the prediction (its weighted median) and the spread (its weighted standard deviation); without one, the run raises a `ValueError` before it fits. `JackknifePlus` and `EnbPI` take it from their own refits. `RollingConformal` fits once per origin, so it rejects `"spread"`.
+- `calibration_data`, `origins`, `positions` and `stream` hold at least one item each: an empty list raises a `ValueError` that names the field.
 
 ```python
 from commol.uncertainty import ParameterSample, SampleMethod

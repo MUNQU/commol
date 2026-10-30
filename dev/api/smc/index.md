@@ -70,8 +70,8 @@ class GibbsPosterior(WithPriors, UncertaintyMethod[GibbsResult], RangeChecked):
     @model_validator(mode="before")
     @classmethod
     def _require_eta(cls, data: JsonValue) -> JsonValue:
-        """Name the choices of `eta` when it is missing."""
-        _require(data, "eta", f"give {ETA_CHOICES}")
+        """The engine refuses a missing `eta` with the choices it takes."""
+        check_required(cls, data, "eta")
         return data
 ```
 

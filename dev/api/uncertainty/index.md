@@ -317,12 +317,12 @@ class ParameterSample(ResultModel):
         lower, upper = self._rust.interval(confidence_level)
         quantiles = self.quantiles([0.0, 0.5, 1.0])
         mean = self.mean()
-        covariance = self.covariance()
+        deviations = self._rust.standard_deviations()
         return {
             name: ParameterSummary(
                 mean=mean[name],
                 median=quantiles[name][1],
-                std=covariance[index][index] ** 0.5,
+                std=deviations[index],
                 lower=lower[index],
                 upper=upper[index],
                 min=quantiles[name][0],
@@ -778,12 +778,12 @@ def summary(self, confidence_level: float) -> dict[str, ParameterSummary]:
     lower, upper = self._rust.interval(confidence_level)
     quantiles = self.quantiles([0.0, 0.5, 1.0])
     mean = self.mean()
-    covariance = self.covariance()
+    deviations = self._rust.standard_deviations()
     return {
         name: ParameterSummary(
             mean=mean[name],
             median=quantiles[name][1],
-            std=covariance[index][index] ** 0.5,
+            std=deviations[index],
             lower=lower[index],
             upper=upper[index],
             min=quantiles[name][0],
@@ -2811,13 +2811,7 @@ class Scenarios(Mapping[str, Predictive]):
         model = source.simulation.model_definition
         models = {}
         for name, overrides in scenarios.items():
-            held = [parameter for parameter in overrides if parameter in sample.names]
-            if held:
-                raise ValueError(
-                    f"Scenario '{name}' sets {held}, which the sample holds: each "
-                    "draw sets them. A scenario overrides only parameters the "
-                    "sample does not hold."
-                )
+            sample._rust.check_scenario(name, list(overrides))
             scenario_model = model.model_copy(deep=True)
             try:
                 scenario_model.update_parameters(overrides)
@@ -3043,13 +3037,7 @@ def __init__(
     model = source.simulation.model_definition
     models = {}
     for name, overrides in scenarios.items():
-        held = [parameter for parameter in overrides if parameter in sample.names]
-        if held:
-            raise ValueError(
-                f"Scenario '{name}' sets {held}, which the sample holds: each "
-                "draw sets them. A scenario overrides only parameters the "
-                "sample does not hold."
-            )
+        sample._rust.check_scenario(name, list(overrides))
         scenario_model = model.model_copy(deep=True)
         try:
             scenario_model.update_parameters(overrides)

@@ -3071,6 +3071,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/optimizers/" class="md-nav__link">
         
   
@@ -4093,6 +4121,12 @@ engine as a calibration writes them (<code>ForwardModel::unobserved</code>,
 </tr>
 </tbody>
 </table>
+<p>An input space has distributions or a sample, exactly one, with no default:
+how the inputs vary is a modelling choice. <code>InputSpace(parameters=...)</code> with
+neither, or with both, is refused when <code>SensitivityAnalysis</code> reads it, which
+also checks that the names and the bounds of a sample are those of the
+parameters. The distributions name each input once, and fit its bounds, when
+you build the input space.</p>
 <p>An initial condition is an amount in the unit of its bin, or a category split
 in <code>[0, 1]</code>, with <code>initial_condition_remainder</code> as in a calibration problem.
 A factor or a noise parameter is not an input: both belong to observations,
@@ -4219,8 +4253,12 @@ one window, and <code>PeakPosition</code> gives the end of that window:</p>
 </tbody>
 </table>
 <p>Each quantity has a <code>label</code>, by default what it reads, such as <code>"B at 10"</code>.
-The default label writes each position in full, as Python reads it back, so
-two positions give two labels: <code>"B at 1000000"</code> and <code>"B at 1000001"</code>.</p>
+The engine writes the default label and checks it: each position in the
+shortest form that reads back as the same number, so two positions give two
+labels: <code>"B at 1000000"</code> and <code>"B at 1000001"</code>. A very small or very large
+position is written with an exponent, such as <code>1e-7</code> and <code>2.5e16</code>. Two
+quantities with one label are refused, with a message that names the label.
+The positions of a quantity ascend, each once.</p>
 <h3 id="a-quantity-that-is-nan">A quantity that is NaN<a class="headerlink" href="#a-quantity-that-is-nan" title="Permanent link">&para;</a></h3>
 <p>A propagation keeps the NaN of each run in <code>values</code>. Every reduction across
 runs raises a <code>ValueError</code> on a NaN: <code>summary()</code>, <code>member_statistics</code>, and

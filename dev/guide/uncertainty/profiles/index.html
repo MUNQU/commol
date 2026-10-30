@@ -2971,6 +2971,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/optimizers/" class="md-nav__link">
         
   
@@ -4063,13 +4091,17 @@ runs a second augmented Lagrangian with Nelder-Mead as its inner solver, from
 the end, the multiplier and the penalty of the swarm; <code>Profile.multipliers</code>
 then comes from that second run.</p>
 <h2 id="prediction-profiles">Prediction profiles<a class="headerlink" href="#prediction-profiles" title="Permanent link">&para;</a></h2>
+<p><code>ProfileLikelihood(parameters, threshold)</code> profiles each parameter once: an
+empty list, or a parameter listed twice, raises a <code>ValueError</code>.</p>
 <p><code>PredictionProfile(specs, threshold)</code> profiles the value of each prediction: a
 <code>PredictionSpec</code> reads an output, or a sum of outputs, at a position, with a
 <code>window</code>, a <code>factor_id</code> and a known <code>scale</code>, as an observation does. Its
 interval is the set of values the data do not reject (Kreutz et al. 2012);
 specs at several positions give a band. A prediction past the data has a wider
 interval, as <code>B at 50</code> shows in the <a href="#quick-path">quick path</a>. The intervals
-are pointwise: a band of them is not a joint region.</p>
+are pointwise: a band of them is not a joint region. <code>specs</code> holds at least
+one prediction, each with a label of its own (an empty label is the name of
+its output).</p>
 <h2 id="verdicts-and-the-identifiability-report">Verdicts and the identifiability report<a class="headerlink" href="#verdicts-and-the-identifiability-report" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

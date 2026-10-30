@@ -67,6 +67,8 @@ Each input is a `CalibrationParameter`: a model parameter or an initial conditio
 | `InputSpace.uniform_on_bounds(parameters)`          | `Uniform()` on the bounds of every input; they must be finite                                                                                                                                | Every method             |
 | `InputSpace.from_sample(sample, parameters)`        | The draws of a `ParameterSample`, with their weights; the inputs may depend on each other. The parameters give the type of each value, which a sample does not hold                          | `Propagation` and `PRCC` |
 
+An input space has distributions or a sample, exactly one, with no default: how the inputs vary is a modelling choice. `InputSpace(parameters=...)` with neither, or with both, is refused when `SensitivityAnalysis` reads it, which also checks that the names and the bounds of a sample are those of the parameters. The distributions name each input once, and fit its bounds, when you build the input space.
+
 An initial condition is an amount in the unit of its bin, or a category split in `[0, 1]`, with `initial_condition_remainder` as in a calibration problem. A factor or a noise parameter is not an input: both belong to observations, and an analysis has none.
 
 `SensitivityAnalysis(simulation, inputs, *, replicates=None, seed=None)` holds the inputs for every method you run on it. With a stochastic engine `replicates` (at least 1) and `seed` are required. A point of the design of PRCC, Morris, Sobol or a polynomial chaos runs `replicates` replicates, on the same seeds at every point, and holds their mean: the indices are those of the mean of `replicates` replicates, and they come close to those of the expected value as `replicates` grows. A propagation, and the `Predictive` of its draws, keep every replicate, each with a seed of its own. A deterministic engine does not use `replicates`, so the same analysis runs on either engine; with no seed, the engine draws one, which `analysis.seed` gives and the analysis logs. A negative `replicates` raises `ValueError` that names the setting.
@@ -120,7 +122,7 @@ Every quantity follows the same rules:
 | A NaN in a value a quantity reads makes it NaN                             | Its peak and the position of its peak are NaN too                                                                          |
 | With a stochastic engine, a quantity is computed for each replicate        | A design point holds the mean of its replicates, or for a `Ratio` what its `replicate_rule` says; a propagation keeps each |
 
-Each quantity has a `label`, by default what it reads, such as `"B at 10"`. The default label writes each position in full, as Python reads it back, so two positions give two labels: `"B at 1000000"` and `"B at 1000001"`.
+Each quantity has a `label`, by default what it reads, such as `"B at 10"`. The engine writes the default label and checks it: each position in the shortest form that reads back as the same number, so two positions give two labels: `"B at 1000000"` and `"B at 1000001"`. A very small or very large position is written with an exponent, such as `1e-7` and `2.5e16`. Two quantities with one label are refused, with a message that names the label. The positions of a quantity ascend, each once.
 
 ### A quantity that is NaN
 

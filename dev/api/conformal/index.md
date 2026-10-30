@@ -60,7 +60,7 @@ class ConformalMethod(UncertaintyMethod[ConformalResult]):
 
 ## SplitConformal
 
-Bases: `ConformalMethod`, `RangeChecked`
+Bases: `ConformalMethod`, `EngineChecked`, `RangeChecked`
 
 Split conformal prediction.
 
@@ -80,7 +80,7 @@ Attributes:
 Source code in `commol/conformal/methods.py`
 
 ```python
-class SplitConformal(ConformalMethod, RangeChecked):
+class SplitConformal(ConformalMethod, EngineChecked, RangeChecked):
     """
     Split conformal prediction.
 
@@ -110,24 +110,18 @@ class SplitConformal(ConformalMethod, RangeChecked):
     _engine_handles: ClassVar[tuple[str, ...]] = ("sample",)
 
     calibration_data: list[ObservedDataPoint] = Field(
-        min_length=1, description="Held-out observations."
+        description="Held-out observations."
     )
-    positions: list[float] = Field(min_length=1, description="Where the intervals are.")
+    positions: list[float] = Field(description="Where the intervals are.")
     sample: ParameterSample | None = Field(
         default=None, description="The sample whose predictive predicts."
     )
     starts: int = Field(default=1, description="Starts of the fit.")
-
-    @model_validator(mode="after")
-    def _check_spread(self) -> Self:
-        """Reject ``score="spread"`` without a sample."""
-        _no_spread_without_sample(self)
-        return self
 ```
 
 ## RollingConformal
 
-Bases: `ConformalMethod`, `RangeChecked`
+Bases: `ConformalMethod`, `EngineChecked`, `RangeChecked`
 
 Rolling-origin conformal prediction: intervals ahead of the data, one quantile per horizon.
 
@@ -146,7 +140,7 @@ Attributes:
 Source code in `commol/conformal/methods.py`
 
 ```python
-class RollingConformal(ConformalMethod, RangeChecked):
+class RollingConformal(ConformalMethod, EngineChecked, RangeChecked):
     """
     Rolling-origin conformal prediction: intervals ahead of the data, one
     quantile per horizon.
@@ -170,24 +164,14 @@ class RollingConformal(ConformalMethod, RangeChecked):
 
     _runner = staticmethod(run_rolling_conformal)
 
-    origins: list[float] = Field(min_length=1, description="The origins.")
-    positions: list[float] = Field(min_length=1, description="Where the intervals are.")
+    origins: list[float] = Field(description="The origins.")
+    positions: list[float] = Field(description="Where the intervals are.")
     starts: int = Field(default=1, description="Starts of each fit.")
-
-    @model_validator(mode="after")
-    def _check_spread(self) -> Self:
-        """Reject ``score="spread"``: one fit per origin has no spread."""
-        if self.score == "spread":
-            raise ValueError(
-                "RollingConformal fits once per origin, so its predictions have no "
-                'spread for score="spread"; use "absolute" or "normalized"'
-            )
-        return self
 ```
 
 ## JackknifePlus
 
-Bases: `ConformalMethod`, `RangeChecked`
+Bases: `ConformalMethod`, `EngineChecked`, `RangeChecked`
 
 Jackknife+ (Barber et al. 2021) with blocks: one refit per block left out, and intervals from the left-out residuals and predictions.
 
@@ -206,7 +190,7 @@ Attributes:
 Source code in `commol/conformal/methods.py`
 
 ```python
-class JackknifePlus(ConformalMethod, RangeChecked):
+class JackknifePlus(ConformalMethod, EngineChecked, RangeChecked):
     """
     Jackknife+ (Barber et al. 2021) with blocks: one refit per block left
     out, and intervals from the left-out residuals and predictions.
@@ -229,13 +213,13 @@ class JackknifePlus(ConformalMethod, RangeChecked):
     _runner = staticmethod(run_jackknife_plus)
 
     block_length: int | Literal["auto"] = Field(description="Positions per block.")
-    positions: list[float] = Field(min_length=1, description="Where the intervals are.")
+    positions: list[float] = Field(description="Where the intervals are.")
     starts: int = Field(default=1, description="Starts per fit.")
 ```
 
 ## EnbPI
 
-Bases: `ConformalMethod`, `RangeChecked`
+Bases: `ConformalMethod`, `EngineChecked`, `RangeChecked`
 
 Ensemble batch prediction intervals (Xu and Xie 2021).
 
@@ -255,7 +239,7 @@ Attributes:
 Source code in `commol/conformal/methods.py`
 
 ```python
-class EnbPI(ConformalMethod, RangeChecked):
+class EnbPI(ConformalMethod, EngineChecked, RangeChecked):
     """
     Ensemble batch prediction intervals (Xu and Xie 2021).
 
@@ -282,13 +266,13 @@ class EnbPI(ConformalMethod, RangeChecked):
 
     replicates: int = Field(description="Number of replicates.")
     block_length: int | Literal["auto"] = Field(description="Positions per block.")
-    positions: list[float] = Field(min_length=1, description="Where the intervals are.")
+    positions: list[float] = Field(description="Where the intervals are.")
     starts: int = Field(default=1, description="Starts per fit.")
 ```
 
 ## AdaptiveConformal
 
-Bases: `ConformalMethod`, `RangeChecked`
+Bases: `ConformalMethod`, `EngineChecked`, `RangeChecked`
 
 Adaptive conformal inference (Gibbs and Candès 2021).
 
@@ -308,7 +292,7 @@ Attributes:
 Source code in `commol/conformal/methods.py`
 
 ```python
-class AdaptiveConformal(ConformalMethod, RangeChecked):
+class AdaptiveConformal(ConformalMethod, EngineChecked, RangeChecked):
     """
     Adaptive conformal inference (Gibbs and Candès 2021).
 
@@ -335,21 +319,13 @@ class AdaptiveConformal(ConformalMethod, RangeChecked):
     _runner = staticmethod(run_adaptive_conformal)
 
     step: float = Field(description="The step of the working level.")
-    stream: list[ObservedDataPoint] = Field(
-        min_length=1, description="The observations that arrive."
-    )
+    stream: list[ObservedDataPoint] = Field(description="The observations that arrive.")
     _engine_handles: ClassVar[tuple[str, ...]] = ("sample",)
 
     sample: ParameterSample | None = Field(
         default=None, description="The sample whose predictive predicts."
     )
     starts: int = Field(default=1, description="Starts of the fit.")
-
-    @model_validator(mode="after")
-    def _check_spread(self) -> Self:
-        """Reject ``score="spread"`` without a sample."""
-        _no_spread_without_sample(self)
-        return self
 ```
 
 ## ConformalResult

@@ -3038,6 +3038,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/optimizers/" class="md-nav__link">
         
   
@@ -4301,7 +4329,9 @@ method. Here the sample is the ends of the starts.</p>
 the bounds, or <code>"prior"</code> with <code>priors</code>, the prior of each parameter: the
 sample of a <a href="../smc/">Gibbs posterior or ABC</a> contracts its priors by how much
 the data inform each parameter, and a sample drawn from the priors themselves
-has a contraction near 0.</p>
+has a contraction near 0. <code>"prior"</code> without <code>priors</code>, or <code>"bounds"</code> with
+them, raises a <code>ValueError</code>: the engine never measures against a reference you
+did not choose.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol.distributions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Priors</span><span class="p">,</span> <span class="n">Uniform</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">against_priors</span> <span class="o">=</span> <span class="n">calibrator</span><span class="o">.</span><span class="n">identifiability</span><span class="p">(</span>

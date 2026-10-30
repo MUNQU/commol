@@ -228,7 +228,7 @@ print(pair.first, pair.second, round(pair.correlation, 1))  # k1 alpha -1.0
 | `correlated_pairs` | The pairs whose absolute correlation is above `correlation_threshold`                                                |
 | `modes`            | The modes of each marginal: the maxima of a kernel density above a tenth of the highest                              |
 
-The `reference` of the contraction is `"bounds"`, the uniform distribution on the bounds, or `"prior"` with `priors`, the prior of each parameter: the sample of a [Gibbs posterior or ABC](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md) contracts its priors by how much the data inform each parameter, and a sample drawn from the priors themselves has a contraction near 0.
+The `reference` of the contraction is `"bounds"`, the uniform distribution on the bounds, or `"prior"` with `priors`, the prior of each parameter: the sample of a [Gibbs posterior or ABC](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md) contracts its priors by how much the data inform each parameter, and a sample drawn from the priors themselves has a contraction near 0. `"prior"` without `priors`, or `"bounds"` with them, raises a `ValueError`: the engine never measures against a reference you did not choose.
 
 ```python
 from commol.distributions import Priors, Uniform

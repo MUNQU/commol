@@ -334,16 +334,11 @@ class LocalResult(ResultModel):
         RuntimeError
             If the derivatives fail at the fit.
         """
-        names = calibrator.parameter_names
-        if self.sample.names != names:
-            raise ValueError(
-                f"The result has the parameters {self.sample.names}; the problem "
-                f"has {names}."
-            )
         points = [float(position) for position in positions]
         outputs, center, lower, upper = commol_rs.inference.delta_band(
             calibrator._engine_problem,
-            [self.fit.best_parameters[name] for name in names],
+            self.sample.names,
+            list(self.fit.best_parameters.items()),
             self.covariance,
             self.degrees_of_freedom(),
             points,
@@ -464,16 +459,11 @@ def delta_band(
     RuntimeError
         If the derivatives fail at the fit.
     """
-    names = calibrator.parameter_names
-    if self.sample.names != names:
-        raise ValueError(
-            f"The result has the parameters {self.sample.names}; the problem "
-            f"has {names}."
-        )
     points = [float(position) for position in positions]
     outputs, center, lower, upper = commol_rs.inference.delta_band(
         calibrator._engine_problem,
-        [self.fit.best_parameters[name] for name in names],
+        self.sample.names,
+        list(self.fit.best_parameters.items()),
         self.covariance,
         self.degrees_of_freedom(),
         points,
