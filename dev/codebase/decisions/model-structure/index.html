@@ -3810,11 +3810,12 @@ rejected with the fields to use (<code>InitialConditions._reject_fractions_of_a_
 stratifications in declaration order. A stratification with <code>conditions</code> only
 expands the compartments whose earlier categories satisfy all of them, so the
 result can be a non-uniform product. A condition may only reference a
-stratification declared before it (<code>ModelBuilder.add_stratification</code> checks
-this).</p>
+stratification declared before it (<code>Process::check_conditions</code> checks this
+at build).</p>
 <p><strong>Rule:</strong> changing the order of <code>add_stratification</code> calls changes which
 compartments exist and what they are named.</p>
-<p><strong>Guard:</strong> <code>tests/building/test_stratifications.py::test_the_order_of_the_stratifications_sets_the_compartments</code>.</p>
+<p><strong>Guards:</strong> <code>tests/building/test_stratifications.py::test_the_order_of_the_stratifications_sets_the_compartments</code>,
+<code>tests/building/test_stratifications.py::TestConditionalStratification::test_a_condition_names_a_stratification_declared_before_it</code>.</p>
 <h2 id="a-condition-names-one-category-or-a-set">A condition names one category or a set<a class="headerlink" href="#a-condition-names-one-category-or-a-set" title="Permanent link">&para;</a></h2>
 <p><code>StratificationCondition</code> (<code>crates/commol-core/src/types/transitions.rs</code>)
 holds <code>category</code> or <code>categories</code>, a set of which the compartment has one.
@@ -3826,8 +3827,10 @@ most specific stratified rate wins. <code>Process::check_conditions</code>, from
 <code>check_model</code> and the planning of the flows, refuses each condition that does
 not fit its stratification
 (<a href="../../../guide/transitions/#what-building-checks">What building checks</a>):
-the condition of a stratification names one declared before it, and the
-condition of a stratified rate one of the process.</p>
+the condition of a stratification names one declared before it and gives
+<code>category</code> or <code>categories</code>, and the condition of a stratified rate names one
+of the process. Python holds no copy of these rules: <code>add_stratification</code>
+stores the conditions, and <code>build</code> gets the message of the engine.</p>
 <table>
 <thead>
 <tr>
@@ -3848,10 +3851,15 @@ condition of a stratified rate one of the process.</p>
 <td>A set weighs by its size for the rate that wins</td>
 <td>It changes which rate wins in models without sets.</td>
 </tr>
+<tr>
+<td><code>add_stratification</code> asks the engine to check the conditions of the stratifications declared so far</td>
+<td>It needs a binding for a part of a process, to give at the call the message that <code>build</code> gives (KISS).</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Guards:</strong>
 <code>tests/building/test_conditional_stratifications.py</code>,
+<code>crates/commol-model/tests/flows.rs::a_stratification_condition_filters_by_a_category</code>,
 <code>crates/commol-model/tests/stratified_rates.rs::a_condition_on_a_set_counts_as_one_condition</code>,
 <code>crates/commol-model/src/flows.rs::moving_into_a_category_of_a_set_needs_the_dependent_category</code>.</p>
 <h2 id="outputs-are-resolved-by-label">Outputs are resolved by label<a class="headerlink" href="#outputs-are-resolved-by-label" title="Permanent link">&para;</a></h2>

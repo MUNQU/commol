@@ -5149,6 +5149,16 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   names 'g9', which is not a category of 'group' (["g1", "g2"])</code>. Migration:
   name in each condition a stratification declared before it and one of its
   categories.</li>
+<li><strong>Breaking:</strong> the engine refuses a condition of a stratification that gives
+  neither <code>category</code> nor <code>categories</code>, with the message <code>Stratification
+  'type': the condition on 'group' gives neither a category nor a set of
+  categories; give one of them</code>. A model in JSON with such a condition built
+  and split every compartment. The condition of a stratified rate that only
+  sets <code>to</code> is unchanged. <code>ModelBuilder.add_stratification</code> no longer checks
+  its conditions: a condition that names a stratification not declared before
+  it, or that gives no category, raises <code>ValueError</code> at <code>build</code>, with the
+  message of the engine, and no longer at the call. Migration: catch the error
+  of a condition at <code>build</code>.</li>
 <li>The engine checks that the fractions name every stratification and each of
   its categories, from <code>check_model</code>; the messages list the ids as the engine
   writes them, <code>Missing ids: ["g"], Extra ids: []</code>, and the message of the

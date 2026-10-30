@@ -232,7 +232,7 @@ builder = builder.add_stratification(
 | `description` | `str \| None`                           | `None`   | A free-text description.                                                        |
 | `conditions`  | `list[StratificationCondition] \| None` | `None`   | Splits only the compartments whose earlier categories match **all** conditions. |
 
-Each condition is `StratificationCondition(stratification=<id>, category=<category>)`, or `categories=[...]` for a set of categories of which the compartment has one. It may only name a stratification declared before this one; otherwise the call raises `ValueError`.
+Each condition is `StratificationCondition(stratification=<id>, category=<category>)`, or `categories=[...]` for a set of categories of which the compartment has one. It names a stratification declared before this one and gives `category` or `categories`; otherwise `build` raises `ValueError` with the message of the engine, which names the stratification.
 
 | Rule                       | Effect                                                                                                                            |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |

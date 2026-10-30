@@ -4440,8 +4440,9 @@ the parameter, and the model stays as it was
 </table>
 <p>Each condition is <code>StratificationCondition(stratification=&lt;id&gt;,
 category=&lt;category&gt;)</code>, or <code>categories=[...]</code> for a set of categories of which
-the compartment has one. It may only name a stratification declared before
-this one; otherwise the call raises <code>ValueError</code>.</p>
+the compartment has one. It names a stratification declared before this one
+and gives <code>category</code> or <code>categories</code>; otherwise <code>build</code> raises <code>ValueError</code>
+with the message of the engine, which names the stratification.</p>
 <table>
 <thead>
 <tr>

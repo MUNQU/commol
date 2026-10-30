@@ -160,7 +160,7 @@ class ModelBuilder:
             already-applied categories satisfy ALL conditions. Each condition
             names a stratification declared before this one and its category,
             or a set of its categories (``categories``) of which the
-            compartment has one.
+            compartment has one; ``build`` refuses a condition that does not.
 
             Example: only apply the `sub` stratification to `group1`::
 
@@ -176,19 +176,8 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If any condition references a stratification not yet declared.
+            If ``categories`` is empty or names a category twice.
         """
-        if conditions:
-            declared_ids = {s.id for s in self._stratifications}
-            for cond in conditions:
-                if cond.stratification not in declared_ids:
-                    raise ValueError(
-                        f"Stratification '{id}': condition references "
-                        f"'{cond.stratification}' which has not been declared yet. "
-                        "Conditions may only reference stratifications declared before "
-                        "this one."
-                    )
-
         self._stratifications.append(
             Stratification(
                 id=id,
@@ -1110,12 +1099,12 @@ Add a stratification to the model.
 
 Parameters:
 
-| Name          | Type                            | Description                                              | Default                                                                                                                                                                                                                                                                                                                                                                                                                |
-| ------------- | ------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`          | `str`                           | Unique identifier for the stratification.                | *required*                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `categories`  | `list[str]`                     | list of category identifiers within this stratification. | *required*                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `description` | \`str                           | None\`                                                   | Human-readable description of the stratification.                                                                                                                                                                                                                                                                                                                                                                      |
-| `conditions`  | \`list[StratificationCondition] | None\`                                                   | When set, this stratification only expands compartments whose already-applied categories satisfy ALL conditions. Each condition names a stratification declared before this one and its category, or a set of its categories (categories) of which the compartment has one. Example: only apply the sub stratification to group1:: conditions = [ StratificationCondition(stratification="group", category="group1") ] |
+| Name          | Type                            | Description                                              | Default                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------- | ------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`          | `str`                           | Unique identifier for the stratification.                | *required*                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `categories`  | `list[str]`                     | list of category identifiers within this stratification. | *required*                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `description` | \`str                           | None\`                                                   | Human-readable description of the stratification.                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `conditions`  | \`list[StratificationCondition] | None\`                                                   | When set, this stratification only expands compartments whose already-applied categories satisfy ALL conditions. Each condition names a stratification declared before this one and its category, or a set of its categories (categories) of which the compartment has one; build refuses a condition that does not. Example: only apply the sub stratification to group1:: conditions = [ StratificationCondition(stratification="group", category="group1") ] |
 
 Returns:
 
@@ -1125,9 +1114,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                    |
-| ------------ | -------------------------------------------------------------- |
-| `ValueError` | If any condition references a stratification not yet declared. |
+| Type         | Description                                       |
+| ------------ | ------------------------------------------------- |
+| `ValueError` | If categories is empty or names a category twice. |
 
 Source code in `commol/_model/builder.py`
 
@@ -1155,7 +1144,7 @@ def add_stratification(
         already-applied categories satisfy ALL conditions. Each condition
         names a stratification declared before this one and its category,
         or a set of its categories (``categories``) of which the
-        compartment has one.
+        compartment has one; ``build`` refuses a condition that does not.
 
         Example: only apply the `sub` stratification to `group1`::
 
@@ -1171,19 +1160,8 @@ def add_stratification(
     Raises
     ------
     ValueError
-        If any condition references a stratification not yet declared.
+        If ``categories`` is empty or names a category twice.
     """
-    if conditions:
-        declared_ids = {s.id for s in self._stratifications}
-        for cond in conditions:
-            if cond.stratification not in declared_ids:
-                raise ValueError(
-                    f"Stratification '{id}': condition references "
-                    f"'{cond.stratification}' which has not been declared yet. "
-                    "Conditions may only reference stratifications declared before "
-                    "this one."
-                )
-
     self._stratifications.append(
         Stratification(
             id=id,
@@ -1952,7 +1930,7 @@ Bases: `BaseModel`
 
 Specifies a category within a stratification for rate matching.
 
-The condition holds for a compartment whose category in the stratification is `category`, or one of `categories`. A condition gives one of them, or neither when it only sets `to`.
+The condition holds for a compartment whose category in the stratification is `category`, or one of `categories`. A condition gives one of them; the condition of a stratified rate gives neither when it only sets `to`.
 
 When `to` is set, the matched category in the source compartment is replaced with the `to` category in the target compartment name. This enables cross-category transitions within the same bin (e.g., from `g1` to `g2`).
 
@@ -1974,7 +1952,8 @@ class StratificationCondition(BaseModel):
 
     The condition holds for a compartment whose category in the
     stratification is ``category``, or one of ``categories``. A condition
-    gives one of them, or neither when it only sets ``to``.
+    gives one of them; the condition of a stratified rate gives neither when
+    it only sets ``to``.
 
     When ``to`` is set, the matched category in the source compartment is
     replaced with the ``to`` category in the target compartment name. This
@@ -2003,9 +1982,10 @@ class StratificationCondition(BaseModel):
     category: str | None = Field(
         default=None,
         description=(
-            "Category within the stratification. When None, the condition acts as a "
-            "target-only override: it does not filter source compartments but still "
-            "contributes a 'to' category to the computed target compartment name."
+            "Category within the stratification. When None, with 'categories' also "
+            "None, the condition of a stratified rate acts as a target-only override: "
+            "it does not filter source compartments but still contributes a 'to' "
+            "category to the computed target compartment name."
         ),
     )
     categories: list[str] | None = Field(
