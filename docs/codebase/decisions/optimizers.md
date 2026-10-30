@@ -83,6 +83,38 @@ profile under a swarm ([Profiles](profiles.md)).
 `crates/commol-inference/tests/test_profiles.rs::a_swarm_fits_a_subproblem_and_repeats_from_its_seed`;
 `tests/calibration/test_optimizers.py::TestConverged::test_a_swarm_that_stagnates_stops_and_converges`.
 
+## A swarm polishes each start with Nelder-Mead
+
+`ParticleSwarmConfig::polish` holds a `NelderMeadConfig`. With it,
+`optimization::run` runs the swarm, then Nelder-Mead on the same cost from
+the best point of the swarm, in the same call, so each start polishes its own
+end on the threads of the start. The result is that of Nelder-Mead, with the
+iterations of both stages (`polished`). Every fit goes through `run`, so a
+calibration, the refit of a replicate and a subproblem with a held parameter
+polish alike; a held prediction runs the augmented Lagrangian again with
+Nelder-Mead from the end, the multiplier and the penalty of the swarm
+(`optimize_subproblem`). The tolerance `τ` of a profile under a polished
+swarm is the `sd_tolerance` of the polish. Each stage has its own copy of
+the observer (`O: Clone`), and `OptimizerSettings::progress` gives the table
+of each stage from its own `verbose`.
+
+| Alternative | Why not |
+|---|---|
+| An argument of `Calibrator.run` | The methods that refit read the problem, not the call, so their replicates would not polish. |
+| Nelder-Mead from the best point of all starts | The starts would end at one point, and `StartsIdentifiability` would read no spread. |
+| The polishes in one pool after every swarm | A start that ends early would wait for the slowest swarm. |
+| A chain of any optimizers | Only a swarm followed by Nelder-Mead has a use. |
+| `iterations` of the polish only | The cost of the start would hide the swarm. |
+| A composite solver in the argmin fork | The fork has one solver per run; two runs on one cost need no change there. |
+
+**Guards:** `crates/commol-calibration/tests/test_starts.rs`
+(`a_polished_start_counts_both_stages`,
+`a_swarm_with_no_polish_is_unchanged`);
+`crates/commol-inference/tests/test_profiles.rs::a_polished_swarm_ends_a_subproblem_with_nelder_mead`;
+`tests/calibration/test_polish.py::test_a_polish_is_nelder_mead_from_the_end_of_the_swarm`;
+`tests/uncertainty/test_identifiability.py::test_the_starts_of_a_polished_fit_are_its_polished_ends`;
+`tests/uncertainty/test_resampling.py::test_a_replicate_polishes_as_the_fit`.
+
 ## One function runs the starts and chooses the best
 
 `optimize_starts` (`crates/commol-calibration/src/starts.rs`) takes the start

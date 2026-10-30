@@ -230,7 +230,9 @@ For a particle swarm with the improvement stop rule, `τ` is the improvement
 the rule allows at the fit, `tol_abs + tol_rel · |objective at the fit|`: the
 swarm stops when its best value improves by less. A swarm without that rule
 has no tolerance on the objective, and `τ` is
-`1e-6 · max(1, |objective at the fit|)`. `ν`, the noise floor, is the error of one
+`1e-6 · max(1, |objective at the fit|)`. A swarm with a
+[polish](../calibration-optimizers.md#polish-with-nelder-mead) ends with
+Nelder-Mead, so `τ` is the `sd_tolerance` of the polish. `ν`, the noise floor, is the error of one
 evaluation of the objective at the fit, from the accuracy of a run:
 `Σ |∂ℓᵢ/∂mᵢ| · eᵢ`, with `eᵢ = rtol · |mᵢ| + k · atol` the error of a run on
 an observation that sums `k` outputs, its prediction `mᵢ`, and the accuracy
