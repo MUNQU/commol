@@ -214,16 +214,16 @@ To add a kind of model, such as an agent network (see
       [Model type (engine)](#model-type-engine), or add the new kind to the
       `kinds` of an engine that runs it.
       Each engine implements `SimulationEngine`: `plan_values` and
-      `apply_values` resolve and write the values of the kind, and
-      `state_outputs` and `output_sums` name what an expression reads.
+      `apply_values` resolve and write the values of the kind, `check_values`
+      refuses a run that lacks one, and `state_outputs` and `output_sums`
+      name what an expression reads.
 - [ ] Add a variant to `EngineValuePlan` in `py-commol/src/engine.rs`.
 - [ ] Write a `ModelStructure` subclass in `py-commol/commol/_model/`, with
       `kind` as a `Literal` default. Implement `check_model` and
       `outputs_by_source`; override `series_label`, `uncalibrated_values`,
-      `check_calibration_values`, `with_calibrated_values`,
-      `report_sections`, `describe` and `check_unit_consistency` when the
-      kind has them. Reject in
-      `check_model` a feature of the process the kind cannot run, and name
+      `check_calibration_values`, `with_calibrated_values`, `report_sections`,
+      `describe` and `check_unit_consistency` when the kind has them. Reject
+      in `check_model` a feature of the process the kind cannot run, and name
       the form that carries over. Export it from the root (`ROOT` of
       `tests/suite/public_surface.py`), so `Model.from_json` reads the kind.
 - [ ] Do not write a builder: `ModelBuilder.build(structure, engine)` builds

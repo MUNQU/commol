@@ -56,35 +56,87 @@ enum TransitionKind<'a> {
     Categories(&'a Stratification),
 }
 
+/// What a transition moves. A transition moves between bins, or between the
+/// categories of one stratification, with one source and one target
+/// category.
+///
+/// # Errors
+///
+/// Returns a message that names the transition and the ids that break the
+/// rule: the ids that are neither bins nor categories, the bins and the
+/// categories of a transition that mixes them, or the stratifications of the
+/// categories of a transition that moves between several.
 fn transition_kind<'a>(
     process: &'a Process,
     transition: &Transition,
 ) -> Result<TransitionKind<'a>, String> {
-    let ids: Vec<&String> = transition.source.iter().chain(&transition.target).collect();
-    if ids
+    let id = &transition.id;
+    let ids: Vec<&str> = transition
+        .source
         .iter()
-        .all(|id| process.bins.iter().any(|bin| &bin.id == *id))
-    {
+        .chain(&transition.target)
+        .map(String::as_str)
+        .collect();
+    let is_bin = |of: &str| process.bins.iter().any(|bin| bin.id == of);
+    let stratifications_of = |of: &str| -> Vec<&'a str> {
+        process
+            .stratifications
+            .iter()
+            .filter(|strat| strat.categories.iter().any(|category| category == of))
+            .map(|strat| strat.id.as_str())
+            .collect()
+    };
+    let unknown: Vec<&str> = ids
+        .iter()
+        .copied()
+        .filter(|&of| !is_bin(of) && stratifications_of(of).is_empty())
+        .collect();
+    if !unknown.is_empty() {
+        return Err(format!(
+            "Transition '{id}' names ids that are neither bins nor categories of a \
+             stratification: {unknown:?}"
+        ));
+    }
+    let (bins, categories): (Vec<&str>, Vec<&str>) = ids.iter().partition(|&&of| is_bin(of));
+    if categories.is_empty() {
         return Ok(TransitionKind::Bins);
     }
-    let stratification = process
-        .stratifications
-        .iter()
-        .find(|strat| ids.iter().all(|id| strat.categories.contains(id)))
-        .ok_or_else(|| {
-            format!(
-                "Transition '{}' must move between bins or between the categories \
-                 of one stratification",
-                transition.id
-            )
-        })?;
+    if !bins.is_empty() {
+        return Err(format!(
+            "Transition '{id}' mixes bins ({bins:?}) and categories ({categories:?}); a \
+             transition moves between bins or between the categories of one stratification"
+        ));
+    }
+    let Some(stratification) = process.stratifications.iter().find(|strat| {
+        ids.iter()
+            .all(|of| strat.categories.iter().any(|c| c == of))
+    }) else {
+        let mut named: Vec<&str> = ids.iter().flat_map(|&of| stratifications_of(of)).collect();
+        named.sort_unstable();
+        named.dedup();
+        return Err(format!(
+            "Transition '{id}' moves between the categories of several stratifications \
+             ({named:?}); a transition moves between the categories of one stratification"
+        ));
+    };
     if transition.source.len() != 1 || transition.target.len() != 1 {
         return Err(format!(
-            "Category transition '{}' needs exactly one source and one target category",
-            transition.id
+            "Category transition '{id}' needs exactly one source and one target category"
         ));
     }
     Ok(TransitionKind::Categories(stratification))
+}
+
+/// Check what each transition of `process` moves ([`transition_kind`]).
+///
+/// # Errors
+///
+/// Returns the message of the first transition that breaks the rule.
+pub(crate) fn check_transition_kinds(process: &Process) -> Result<(), String> {
+    for transition in &process.transitions {
+        transition_kind(process, transition)?;
+    }
+    Ok(())
 }
 
 /// Compartments a transition starts from: those of its first source bin, of its

@@ -189,10 +189,11 @@ class ModelBuilder:
         ModelBuilder
             Self for method chaining.
 
-        Raises
-        ------
-        ValueError
-            If ``categories`` is empty or names a category twice.
+        Notes
+        -----
+        ``build`` refuses, with the message of the engine, a stratification
+        whose id another stratification has, with no category or a category
+        twice, or with a condition that does not fit.
         """
         self._stratifications.append(
             Stratification(
@@ -347,16 +348,11 @@ class ModelBuilder:
                     "series list."
                 )
             param_value = value
-        self._ensure_parameter_id_available(id)
         self._parameters.append(
             Parameter(id=id, value=param_value, description=description, unit=unit)
         )
         logger.info(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
         return self
-
-    def _ensure_parameter_id_available(self, id: str) -> None:
-        if any(parameter.id == id for parameter in self._parameters):
-            raise ValueError(f"Parameter id '{id}' already exists")
 
     def _register_series_pattern(
         self,
@@ -387,7 +383,6 @@ class ModelBuilder:
         else:
             param_name = f"_series_{self._series_counter}"
             self._series_counter += 1
-        self._ensure_parameter_id_available(param_name)
         self._parameters.append(
             Parameter(
                 id=param_name,

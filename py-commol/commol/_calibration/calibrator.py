@@ -517,5 +517,5 @@ def check_values(
         parameter or the structure or the engine rejects a value; the message
         is theirs.
     """
-    engine_state.check_model_values(model, engine, parameters, remainder)
+    engine_state.check_model_values(engine, parameters, remainder)
     model.structure.check_calibration_values(model, engine, parameters, remainder)

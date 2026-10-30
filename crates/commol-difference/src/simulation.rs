@@ -160,8 +160,10 @@ impl DifferenceEquations {
     /// Returns [`SimulationError::Infeasible`] when the impulses or the flows
     /// leave a compartment below zero (by more than the rounding of a flow
     /// that empties it), and the state stays as it was before them. Returns
-    /// [`SimulationError::Failed`] when a rate cannot be evaluated.
+    /// [`SimulationError::Failed`] when a value of the model is missing
+    /// ([`CompiledModel::check_values`]) or a rate cannot be evaluated.
     pub fn step(&mut self) -> Result<(), SimulationError> {
+        self.model.check_values()?;
         self.settle()?;
         let step = self.current_step;
         self.model
@@ -464,7 +466,7 @@ mod tests {
     }
 
     #[test]
-    fn jit_fast_path_reports_missing_parameters() {
+    fn a_step_without_a_value_names_the_parameter() {
         let model = make_missing_parameter_model();
         let mut engine = DifferenceEquations::from_model(&model);
         let error = engine
@@ -473,7 +475,7 @@ mod tests {
             .to_string();
 
         assert!(
-            error.contains("The rate of transition 'flow' cannot be evaluated: Parameter index"),
+            error.starts_with("The model cannot run: the parameters [\"missing\"] have no value"),
             "{error}"
         );
     }

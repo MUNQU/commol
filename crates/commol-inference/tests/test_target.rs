@@ -68,5 +68,8 @@ fn a_run_that_fails_is_an_error_not_a_point_outside_the_support() {
 
     let error = discrepancy_in_support(&problem, &[0.2], &mut Workspace::default()).unwrap_err();
 
-    assert!(error.contains("not found"), "{error}");
+    assert!(
+        error.contains("the parameters [\"z\"] have no value"),
+        "{error}"
+    );
 }

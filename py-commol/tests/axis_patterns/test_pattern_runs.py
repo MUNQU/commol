@@ -5,6 +5,7 @@ import math
 import pytest
 
 from commol import (
+    Aggregate,
     AxisPattern,
     ModelBuilder,
     Simulation,
@@ -401,17 +402,27 @@ class TestAddTransitionAcceptsAxisPattern:
         assert numbered == ["_series_0", "_series_1", "_series_2"]
         assert [p.id for p in builder._parameters] == ["_series_0"]
 
-    def test_generated_series_parameter_collision_raises(self):
-        with pytest.raises(ValueError, match="already exists"):
-            (
-                ModelBuilder("AB")
-                .add_bin("A", "Source")
-                .add_bin("B", "Sink")
-                .add_parameter("_series_0", 1.0)
-                .add_transition(
-                    "flow",
-                    ["A"],
-                    ["B"],
-                    rate=AxisPattern.pulse(at=5, value=0.1),
-                )
+    def test_a_generated_series_parameter_that_takes_an_id_is_refused_at_build(
+        self,
+    ):
+        builder = (
+            ModelBuilder("AB")
+            .add_bin("A", "Source")
+            .add_bin("B", "Sink")
+            .add_parameter("_series_0", 1.0)
+            .add_transition(
+                "flow",
+                ["A"],
+                ["B"],
+                rate=AxisPattern.pulse(at=5, value=0.1),
+            )
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="Two parameters share the id '_series_0'; give each parameter "
+            "its own id",
+        ):
+            builder.build(
+                Aggregate(bin_amounts={"A": 1, "B": 0}), "DifferenceEquations"
             )

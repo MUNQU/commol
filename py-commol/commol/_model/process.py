@@ -4,13 +4,12 @@ A process holds the bins, the accumulators, the stratifications, the
 matrices between the categories of a stratification and the transitions.
 It is the same for every structure: the structure of a model
 (`ModelStructure`) says how the process is laid out, such as amounts per
-compartment (`Aggregate`). This module checks what the process holds by
-itself; the structure checks it against the rest of the model.
+compartment (`Aggregate`). The engine checks the rules of the process when
+the model is built (`Aggregate.check_model`): unique ids, the categories of
+each stratification, and what each transition moves.
 """
 
-from typing import Self
-
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from commol._model.bin import Accumulator, Bin
 from commol._model.matrix import CategoryMatrix
@@ -45,70 +44,6 @@ class Process(BaseModel):
     stratifications: list[Stratification] = Field(default_factory=list)
     matrices: list[CategoryMatrix] = Field(default_factory=list)
     transitions: list[Transition] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def _validate_unique_ids(self) -> Self:
-        """Validate that bin, stratification and transition ids are unique."""
-        for label, ids in (
-            ("bin", [item.id for item in self.bins]),
-            ("stratification", [item.id for item in self.stratifications]),
-            ("transition", [item.id for item in self.transitions]),
-        ):
-            if len(ids) != len(set(ids)):
-                duplicates = [item for item in set(ids) if ids.count(item) > 1]
-                raise ValueError(f"Duplicate {label} IDs found: {duplicates}")
-        return self
-
-    @model_validator(mode="after")
-    def _validate_transition_ids(self) -> Self:
-        """
-        Check that each transition moves between bins, or between the
-        categories of one stratification.
-        """
-        bin_ids = {bin_item.id for bin_item in self.bins}
-        category_to_stratification = {
-            cat: strat.id for strat in self.stratifications for cat in strat.categories
-        }
-        categories_ids = set(category_to_stratification)
-        bin_and_categories_ids = bin_ids | categories_ids
-
-        for transition in self.transitions:
-            transition_ids = set(transition.source) | set(transition.target)
-
-            if not transition_ids.issubset(bin_and_categories_ids):
-                invalid_ids = transition_ids - bin_and_categories_ids
-                raise ValueError(
-                    f"Transition '{transition.id}' contains invalid ids: "
-                    f"{invalid_ids}. Ids must be defined in Bin ids "
-                    f"or Stratification Categories."
-                )
-
-            is_bin_flow = transition_ids.issubset(bin_ids)
-            is_stratification_flow = transition_ids.issubset(categories_ids)
-
-            if not is_bin_flow and not is_stratification_flow:
-                raise ValueError(
-                    f"Transition '{transition.id}' mixes id types. "
-                    f"Found Bin ids ({transition_ids & bin_ids}) and "
-                    f"Stratification Categories ids "
-                    f"({transition_ids & categories_ids}). "
-                    "Transitions must be purely Bin flow or purely "
-                    f"Stratification flow."
-                )
-
-            if is_stratification_flow:
-                parent_stratification_ids = {
-                    category_to_stratification[cat_id] for cat_id in transition_ids
-                }
-                if len(parent_stratification_ids) > 1:
-                    raise ValueError(
-                        f"Transition '{transition.id}' is a Stratification flow "
-                        f"but involves categories from multiple stratifications: "
-                        f"{', '.join(sorted(parent_stratification_ids))}. A single "
-                        f"transition must only move between categories belonging "
-                        f"to the same parent stratification."
-                    )
-        return self
 
     def is_empty(self) -> bool:
         """

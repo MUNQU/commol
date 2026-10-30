@@ -437,6 +437,19 @@ pub trait SimulationEngine: Clone {
     /// at each step. The engine is unchanged after an error.
     fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String>;
 
+    /// Check that the model has every value a run needs: a parameter or a
+    /// value of the kind left for calibration has one, from
+    /// [`Self::set_parameter`] or [`Self::apply_values`]. An engine checks it
+    /// before it runs; a caller checks it to refuse a run before it starts.
+    /// Every value is given by default.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names every value the model lacks.
+    fn check_values(&self) -> Result<(), String> {
+        Ok(())
+    }
+
     /// The current position on the axis.
     ///
     /// Should return 0.0 immediately after construction or `reset()`.

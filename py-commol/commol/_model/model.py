@@ -184,19 +184,6 @@ class Model(BaseModel, Generic[StructureT]):
         return self
 
     @model_validator(mode="after")
-    def _validate_unique_parameter_ids(self) -> Self:
-        """
-        Validates that parameter IDs are unique.
-        """
-        parameter_ids = [p.id for p in self.parameters]
-        if len(parameter_ids) != len(set(parameter_ids)):
-            duplicates = [
-                item for item in set(parameter_ids) if parameter_ids.count(item) > 1
-            ]
-            raise ValueError(f"Duplicate parameter IDs found: {duplicates}")
-        return self
-
-    @model_validator(mode="after")
     def _validate_structure(self) -> Self:
         """Check the structure against the parameters and the engine."""
         self.structure.check_model(self)

@@ -89,7 +89,7 @@ class TestWorkflow:
             100
         )
         model = build(abc_builder(parameters={"k1": None, "k2": None}))
-        with pytest.raises(ValueError, match="Cannot run Simulation"):
+        with pytest.raises(ValueError, match="The model cannot run"):
             Simulation(model).run(100)
         problem = CalibrationProblem(
             observed_data=observed(truth, "B", range(100)),

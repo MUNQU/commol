@@ -123,6 +123,63 @@ stores the conditions, and `build` gets the message of the engine.
 `crates/commol-model/tests/stratified_rates.rs::a_condition_on_a_set_counts_as_one_condition`,
 `crates/commol-model/src/flows.rs::moving_into_a_category_of_a_set_needs_the_dependent_category`.
 
+## The engine holds every rule of a model
+
+`check_model` in `crates/commol-model/src/builder.rs` refuses every model
+that breaks a rule of the model, whatever path brings it: the builder,
+`Model.from_json` or `commol_rs.engine.Engine` on a JSON model. No two
+parameters, bins, accumulators, stratifications or transitions share an id
+(`Model::check_ids`, `Process::check_ids`); a stratification has at least one
+category and none twice (`Process::check_categories`); the process has a bin
+and a transition; each transition moves between bins or between the
+categories of one stratification (`transition_kind` in
+`crates/commol-model/src/flows.rs`); a stratified rate has at least one
+condition and at most one on each stratification
+(`Process::check_conditions`); and `bin_amounts` names each bin, and nothing
+else (`check_bin_amounts`). Each message names the object and the id that
+break the rule. Python holds no copy of these rules: the Pydantic models
+check only the types and shapes of their fields, the builder stores what it
+gets, and `build` raises `ValueError` with the message of the engine
+(`Aggregate.check_model` calls `engine_state.check_model` first).
+
+A process without transitions is refused: a model without flows has nothing
+to run, and accepting it would widen the API without a request. The test
+kind (`py-commol/src/test_kind.rs`) runs no process; its engine checks the
+ids of the model (`Model::check_ids`).
+
+| Alternative | Why not |
+|---|---|
+| A refusal at the call that declares the object (`add_bin`, `add_stratification`) | It needs a binding per object for a message that `build` already gives, or a Python copy of the rule, which breaks the golden rule. |
+| A copy of the rule in Python for a better message | Two messages for one rule, and rules that only one side has: a JSON model skipped every Python check. Where the Python message said more, the engine message says it now. |
+
+**Guards:**
+`crates/commol-model/tests/model_rules.rs`,
+`crates/commol-model/tests/stratified_rates.rs::the_conditions_of_a_stratified_rate_are_checked`,
+`tests/building/test_builder.py::test_a_repeated_id_is_refused`,
+`tests/transitions/test_flows.py::test_the_kind_of_a_transition_is_checked`.
+
+## A run needs every value
+
+A parameter or a bin amount may be `None`, a value left for calibration, and
+the model builds. A run refuses it: `CompiledModel::check_values` in
+`crates/commol-model/src/system.rs` names every parameter that has no value
+(from the model or from `set_parameter`) and every bin left `None` that no
+value has reached (`set_initial_condition` writes a compartment of the bin,
+as a calibration does). Every engine of the aggregate kind checks it before
+it runs or steps (`record_steps`, `integrate_to`, `run_to` and `step`), and
+the bindings `run`, `run_at`, `run_replicates` and `step` check it first
+(`SimulationEngine::check_values`) to raise `ValueError`, so
+`Simulation.run` holds no check of its own. A calibration writes every value
+it calibrates before each run; a value it neither calibrates nor finds in
+the model stops it with the same message. A rate that reads a parameter
+without a value names the parameter, not an index (`resolve_slot` in
+`crates/commol-model/src/rates.rs`).
+
+**Guards:**
+`crates/commol-model/tests/model_rules.rs::a_run_needs_every_value`,
+`tests/simulation/test_runs.py::TestResults::test_a_run_with_an_uncalibrated_parameter_is_rejected`,
+`tests/building/test_parameters.py::TestValues::test_a_run_names_the_initial_conditions_left_to_calibrate`.
+
 ## Outputs are resolved by label
 
 `Aggregate.outputs_by_source(model)` maps each bin or accumulator id to its

@@ -46,7 +46,7 @@ class SeriesValue(BaseModel):
     ) -> list[tuple[float, float]]:
         """
         Check the points with the rule of the engine (`check_series` of
-        `crates/commol-model/src/values.rs`): at least one point, each
+        `crates/commol-model/src/rules.rs`): at least one point, each
         position finite, not negative and once, each value finite.
         """
         commol_rs.model.check_series(value)

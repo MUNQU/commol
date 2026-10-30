@@ -102,7 +102,44 @@ impl CompiledModel {
         }
         crate::rules::check_compartment_amount(&self.compartments[compartment_index], value)?;
         self.initial_state[compartment_index] = value;
+        let bin = &self.output_labels[compartment_index].source;
+        self.unvalued_bins.retain(|unvalued| unvalued != bin);
         Ok(())
+    }
+
+    /// Check that a run has every value: each parameter has one, from the
+    /// model or from [`Self::set_parameter`], and each bin whose amount the
+    /// model leaves to calibrate has had a value written to one of its
+    /// compartments ([`Self::set_initial_condition`]), as a calibration
+    /// does. Every engine of the aggregate kind checks it before it runs.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names every parameter and every bin without a
+    /// value.
+    pub fn check_values(&self) -> Result<(), String> {
+        let parameters: Vec<&str> = self
+            .unvalued_parameters
+            .iter()
+            .map(String::as_str)
+            .filter(|&id| self.expression_context.get_parameter(id).is_none())
+            .collect();
+        let bins = &self.unvalued_bins;
+        if parameters.is_empty() && bins.is_empty() {
+            return Ok(());
+        }
+        let mut missing = Vec::new();
+        if !parameters.is_empty() {
+            missing.push(format!("the parameters {parameters:?}"));
+        }
+        if !bins.is_empty() {
+            missing.push(format!("the amounts of the bins {bins:?}"));
+        }
+        Err(format!(
+            "The model cannot run: {} have no value. Give them a value, or calibrate them \
+             and write the calibrated values back",
+            missing.join(" and ")
+        ))
     }
 
     /// Set the value of a parameter: a constant, or a parameter to

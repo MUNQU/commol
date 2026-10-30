@@ -130,7 +130,8 @@ scale, or compare a gain over a window: [Observations](calibration-observations.
 values of the model kind, and the kind declares which it accepts
 (`model.structure.calibration_value_types()`): an aggregate model accepts
 `"initial_condition"`. A type the kind does not accept raises a `ValueError`
-that names the kind when you create the `Calibrator`. A `"parameter"` that
+with the engine's message, which names the kind, when you create the
+`Calibrator`. A `"parameter"` that
 the model does not have, or that a formula or a series sets, raises a
 `ValueError` with the engine's message at the same time.
 

@@ -113,10 +113,6 @@ class TestSeriesParameterValue:
         assert [p.id for p in builder._parameters] == ["k"]
         assert builder._transitions[0].rate == pattern.formula
 
-    def test_duplicate_user_parameter_id_raises_immediately(self):
-        with pytest.raises(ValueError, match="already exists"):
-            ModelBuilder("M").add_parameter("x", 1.0).add_parameter("x", 2.0)
-
 
 class TestPeriodic:
     def test_period_zero_raises(self):

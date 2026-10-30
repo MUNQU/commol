@@ -90,9 +90,10 @@ fn resolve_slot(
         VarSlot::Step => Ok(clock.step),
         VarSlot::Time => Ok(clock.time),
         VarSlot::Constant(value) => Ok(*value),
-        VarSlot::ParameterIndex(idx) => ctx
-            .get_parameter_by_index(*idx)
-            .ok_or_else(|| format!("Parameter index '{}' not found", idx)),
+        VarSlot::ParameterIndex(idx) => ctx.get_parameter_by_index(*idx).ok_or_else(|| {
+            let name = ctx.parameter_name(*idx).unwrap_or_default();
+            format!("the parameter '{name}' has no value")
+        }),
     }
 }
 

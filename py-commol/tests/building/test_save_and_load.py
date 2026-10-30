@@ -227,7 +227,7 @@ class TestFromJson:
             ),
             (
                 lambda p: p["parameters"].append(dict(p["parameters"][0])),
-                r"Duplicate parameter IDs found: \['k'\]",
+                "Two parameters share the id 'k'; give each parameter its own id",
             ),
         ],
         ids=["no kind", "variant", "parameter"],

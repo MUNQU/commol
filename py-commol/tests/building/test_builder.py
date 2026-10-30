@@ -79,51 +79,45 @@ class TestCloneAndReset:
         assert model.process.accumulators == []
 
 
+@pytest.mark.parametrize(
+    ("add", "message"),
+    [
+        (
+            lambda b: b.add_bin(id="A", name="A2"),
+            "Two bins share the id 'A'; give each bin its own id",
+        ),
+        (
+            lambda b: b.add_accumulator(id="n", name="n2"),
+            "Two accumulators share the id 'n'; give each accumulator its own id",
+        ),
+        (
+            lambda b: b.add_stratification(id="g", categories=["x"]),
+            "Two stratifications share the id 'g'; give each stratification its own id",
+        ),
+        (
+            lambda b: b.add_transition(id="t_ab", source=["A"], target=["B"], rate="k"),
+            "Two transitions share the id 't_ab'; give each transition its own id",
+        ),
+        (
+            lambda b: b.add_parameter(id="k", value=0.2),
+            "Two parameters share the id 'k'; give each parameter its own id",
+        ),
+    ],
+    ids=["bin", "accumulator", "stratification", "transition", "parameter"],
+)
+def test_a_repeated_id_is_refused(add, message: str) -> None:
+    builder = a_to_b_builder(
+        accumulator="n", stratifications={"g": {"g1": 0.5, "g2": 0.5}}
+    )
+    add(builder)
+
+    with pytest.raises(ValidationError) as error:
+        build(builder)
+
+    assert error.value.errors()[0]["msg"] == f"Value error, {message}"
+
+
 class TestProcessChecks:
-    @pytest.mark.parametrize(
-        ("add", "message"),
-        [
-            (lambda b: b.add_bin(id="A", name="A2"), r"Duplicate bin IDs.*'A'"),
-            (
-                lambda b: b.add_stratification(id="g", categories=["x"]),
-                r"Duplicate stratification IDs.*'g'",
-            ),
-            (
-                lambda b: b.add_transition(
-                    id="t_ab", source=["A"], target=["B"], rate="k"
-                ),
-                r"Duplicate transition IDs.*'t_ab'",
-            ),
-        ],
-        ids=["bin", "stratification", "transition"],
-    )
-    def test_an_id_names_one_item_of_its_kind(self, add, message: str) -> None:
-        builder = a_to_b_builder(stratifications={"g": {"g1": 0.5, "g2": 0.5}})
-        add(builder)
-
-        with pytest.raises(ValidationError, match=message):
-            build(builder)
-
-    @pytest.mark.parametrize(
-        ("source", "target", "message"),
-        [
-            (["A"], ["Z"], r"'t2' contains invalid ids: \{'Z'\}"),
-            (["A"], ["g1"], "'t2' mixes id types"),
-            (["g1"], ["h1"], "categories from multiple stratifications: g, h"),
-        ],
-        ids=["unknown", "bin and category", "two stratifications"],
-    )
-    def test_a_transition_moves_between_bins_or_categories_of_one_stratification(
-        self, source: list[str], target: list[str], message: str
-    ) -> None:
-        builder = a_to_b_builder(
-            stratifications={"g": {"g1": 0.5, "g2": 0.5}, "h": {"h1": 0.5, "h2": 0.5}}
-        )
-        builder.add_transition(id="t2", source=source, target=target, rate="k")
-
-        with pytest.raises(ValidationError, match=message):
-            build(builder)
-
     def test_bins_of_one_id_are_one_member_of_a_set(self) -> None:
         bins = {Bin(id="A", name="first"), Bin(id="A", name="second")}
 
@@ -131,7 +125,17 @@ class TestProcessChecks:
 
     @pytest.mark.parametrize(
         ("bins", "message"),
-        [([], "At least one bin"), (["A"], "At least one transition")],
+        [
+            (
+                [],
+                "The process has no bin; an aggregate model needs at least one bin",
+            ),
+            (
+                ["A"],
+                "The process has no transition; an aggregate model needs at least "
+                "one transition",
+            ),
+        ],
     )
     def test_a_process_has_a_bin_and_a_transition(
         self, bins: list[str], message: str
@@ -141,5 +145,7 @@ class TestProcessChecks:
             builder.add_bin(bin_id, bin_id)
         builder.set_structure(Aggregate(bin_amounts=dict.fromkeys(bins, 10)))
 
-        with pytest.raises(ValidationError, match=message):
+        with pytest.raises(ValidationError) as error:
             build(builder)
+
+        assert error.value.errors()[0]["msg"] == f"Value error, {message}"

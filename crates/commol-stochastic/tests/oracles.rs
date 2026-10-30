@@ -557,7 +557,8 @@ fn a_rounding_error_names_five_amounts_and_counts_the_rest() {
             .map(String::as_str)
             .zip(amounts.iter().copied())
             .collect();
-        let model = model("StochasticSteps", "null", &bins, &[], &[]);
+        let out = transition("out", &["B0"], &[], "0");
+        let model = model("StochasticSteps", "null", &bins, &[], &[out]);
         StochasticSteps::try_from_model(&model).err().unwrap()
     };
     let five = error(&[10.2; 5]);

@@ -70,8 +70,9 @@ pub trait CompartmentalEngine: SimulationEngine {
 /// in its `impl SimulationEngine` block: the type `ValuePlan`
 /// ([`crate::InitialConditionPlan`]), `output_names`, `state_outputs` (the
 /// compartments), `output_sums` ([`crate::output_sums`]), `matrices`
-/// ([`CompiledModel::matrices`]), `plan_values`,
-/// `apply_values` and `set_parameter` ([`CompiledModel::set_parameter`]).
+/// ([`CompiledModel::matrices`]), `check_values`
+/// ([`CompiledModel::check_values`]), `plan_values`, `apply_values` and
+/// `set_parameter` ([`CompiledModel::set_parameter`]).
 ///
 /// A trait cannot give a default to a method of its supertrait, so the
 /// engines take these methods from this macro. `delegate_to_compiled_model!(
@@ -106,6 +107,10 @@ macro_rules! delegate_to_compiled_model {
 
         fn matrices(&self) -> Vec<::commol_core::ScaledMatrix> {
             $crate::CompartmentalEngine::model(self).matrices().to_vec()
+        }
+
+        fn check_values(&self) -> Result<(), String> {
+            $crate::CompartmentalEngine::model(self).check_values()
         }
 
         fn plan_values(
@@ -162,15 +167,17 @@ pub trait IntegerStepper {
 ///
 /// # Errors
 ///
-/// Returns [`SimulationError::Failed`] when a position is not an integer step
+/// Returns [`SimulationError::Failed`] when a value of the model is missing
+/// ([`CompiledModel::check_values`]), a position is not an integer step
 /// ([`EngineType::check_position`]), or the positions are not sorted, unique
 /// and not before the current step ([`check_positions`]); and the error of a
 /// step or an impulse.
-pub fn record_steps<E: IntegerStepper>(
+pub fn record_steps<E: IntegerStepper + CompartmentalEngine>(
     engine: &mut E,
     positions: &[f64],
     buffer: &mut Vec<Vec<f64>>,
 ) -> Result<(), SimulationError> {
+    engine.model().check_values()?;
     check_positions(positions, engine.current_step(), |position| {
         E::ENGINE.check_position(position)
     })?;

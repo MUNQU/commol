@@ -269,11 +269,75 @@ impl Process {
         self.matrices.iter().find(|matrix| matrix.id == id)
     }
 
+    /// Check that no two bins, accumulators, stratifications or transitions
+    /// share an id.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the kind of object and the first id it
+    /// finds twice.
+    pub fn check_ids(&self) -> Result<(), String> {
+        let kinds: [(&str, Vec<&str>); 4] = [
+            ("bin", self.bins.iter().map(|b| b.id.as_str()).collect()),
+            (
+                "accumulator",
+                self.accumulators.iter().map(|a| a.id.as_str()).collect(),
+            ),
+            (
+                "stratification",
+                self.stratifications.iter().map(|s| s.id.as_str()).collect(),
+            ),
+            (
+                "transition",
+                self.transitions.iter().map(|t| t.id.as_str()).collect(),
+            ),
+        ];
+        for (kind, ids) in kinds {
+            if let Some(id) = repeated(&ids) {
+                return Err(format!(
+                    "Two {kind}s share the id '{id}'; give each {kind} its own id"
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Check that each stratification has at least one category, and no
+    /// category twice.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the stratification, and the category it
+    /// names twice.
+    pub fn check_categories(&self) -> Result<(), String> {
+        for stratification in &self.stratifications {
+            let id = &stratification.id;
+            let categories: Vec<&str> = stratification
+                .categories
+                .iter()
+                .map(String::as_str)
+                .collect();
+            if categories.is_empty() {
+                return Err(format!(
+                    "Stratification '{id}' has no category; give it at least one"
+                ));
+            }
+            if let Some(category) = repeated(&categories) {
+                return Err(format!(
+                    "Stratification '{id}' names the category '{category}' twice; name each \
+                     category once"
+                ));
+            }
+        }
+        Ok(())
+    }
+
     /// Check the conditions of each stratification and of each stratified
     /// rate ([`StratificationCondition::check`]). A condition of a
     /// stratification names a stratification declared before it and gives
-    /// `category` or `categories`, and a condition of a stratified rate names
-    /// one of the process.
+    /// `category` or `categories`. A stratified rate has at least one
+    /// condition and at most one on each stratification, and each of its
+    /// conditions names a stratification of the process.
     ///
     /// # Errors
     ///
@@ -307,6 +371,20 @@ impl Process {
             for (index, stratified_rate) in transition.stratified_rates.iter().flatten().enumerate()
             {
                 let owner = format!("Transition '{}', stratified rate {index}", transition.id);
+                let named: Vec<&str> = stratified_rate
+                    .conditions
+                    .iter()
+                    .map(|condition| condition.stratification.as_str())
+                    .collect();
+                if named.is_empty() {
+                    return Err(format!("{owner} has no condition; give it at least one"));
+                }
+                if let Some(id) = repeated(&named) {
+                    return Err(format!(
+                        "{owner}: two conditions name '{id}'; give one condition per \
+                         stratification"
+                    ));
+                }
                 for condition in &stratified_rate.conditions {
                     let Some(named) = stratifications
                         .iter()
@@ -326,6 +404,15 @@ impl Process {
         }
         Ok(())
     }
+}
+
+/// The first item of `items` that an earlier item repeats.
+fn repeated<'a>(items: &[&'a str]) -> Option<&'a str> {
+    items
+        .iter()
+        .enumerate()
+        .find(|(position, item)| items[..*position].contains(item))
+        .map(|(_, item)| *item)
 }
 
 #[cfg(test)]

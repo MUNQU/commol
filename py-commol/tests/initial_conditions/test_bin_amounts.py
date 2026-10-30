@@ -79,6 +79,6 @@ class TestAmounts:
         builder.set_structure(Aggregate(bin_amounts={"A": 10, "C": 0}))
 
         with pytest.raises(
-            ValidationError, match=r"Missing ids: \['B'\], Extra ids: \['C'\]"
+            ValidationError, match=r'Missing ids: \["B"\], Extra ids: \["C"\]'
         ):
             build(builder)

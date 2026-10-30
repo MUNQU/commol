@@ -233,6 +233,7 @@ class TestValues:
         model = build(a_to_b_builder(amounts={"A": 500, "B": None}))
 
         with pytest.raises(
-            ValueError, match="Initial conditions requiring calibration: B"
+            ValueError,
+            match=r'the amounts of the bins \["B"\] have no value',
         ):
             Simulation(model).run(2)

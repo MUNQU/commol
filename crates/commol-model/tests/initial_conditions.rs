@@ -32,9 +32,11 @@ impl FrozenEngine {
             .collect();
         let json = format!(
             r#"{{"name":"frozen","parameters":[],"engine":{{"type":"DifferenceEquations"}},
-            "process":{{"bins":[{}],"accumulators":[],"stratifications":[],"transitions":[]}},
+            "process":{{"bins":[{}],"accumulators":[],"stratifications":[],
+            "transitions":[{{"id":"out","source":["{}"],"target":[],"rate":"0"}}]}},
             "structure":{{"kind":"aggregate","bin_amounts":{{{}}}}}}}"#,
             bins.join(","),
+            compartments[0],
             amounts.join(",")
         );
         let model: Model = serde_json::from_str(&json).expect("valid model JSON");
@@ -385,12 +387,13 @@ fn a_plan_takes_one_value_per_initial_condition() {
 }
 
 #[test]
-fn a_qualified_category_that_no_compartment_has_is_rejected() {
+fn a_qualified_category_that_no_compartment_has_is_an_unknown_id() {
     let error = written_state(FrozenEngine::two_bins(), &["group:cat9"], None, &[0.5]).unwrap_err();
 
     assert_eq!(
         error,
-        "Initial condition category 'group:cat9' matches no compartment"
+        "Invalid bin, compartment or category 'group:cat9' for initial condition \
+         calibration (available compartments: A_cat0, A_cat1, B_cat0, B_cat1)"
     );
 }
 

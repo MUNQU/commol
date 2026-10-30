@@ -91,14 +91,17 @@ class Aggregate(ModelStructure, InitialConditions):
         """
         Check the structure against the process and the parameters.
 
-        The process needs a bin and a transition, the amounts must name every
-        bin, and the engine must check the fractions against the
+        The engine checks the model (``check_model`` of
+        `crates/commol-model/src/builder.rs`): unique ids, the categories of
+        each stratification, a bin and a transition, what each transition
+        moves, the conditions of the stratifications and of the stratified
+        rates, the amounts against the bins, the fractions against the
         stratifications (every stratification and category named, a split by
-        category by a stratification declared before it), plan every
-        transition, accept every id (no parameter id is an engine variable, a
-        bin, a compartment or a subgroup total), resolve the neighbors, find
-        every variable a rate or a formula parameter reads, and build the
-        initial state.
+        category by a stratification declared before it), every id (no
+        parameter id is an engine variable, a bin, a compartment or a
+        subgroup total), the neighbors, and every variable a rate or a
+        formula parameter reads. Then it plans every transition and builds
+        the initial state.
 
         Parameters
         ----------
@@ -108,16 +111,11 @@ class Aggregate(ModelStructure, InitialConditions):
         Raises
         ------
         ValueError
-            If one of these checks fails.
+            If one of these checks fails, with the message of the engine.
         """
         process = model.process
-        if not process.bins:
-            raise ValueError("At least one bin must be defined.")
-        if not process.transitions:
-            raise ValueError("At least one transition must be defined.")
-        self._check_bin_amounts(process)
-        engine_state.transition_flows(process, self)
         engine_state.check_model(model)
+        engine_state.transition_flows(process, self)
         if self.compartment_amounts:
             engine_state.initial_state(process, self)
 
@@ -495,21 +493,6 @@ class Aggregate(ModelStructure, InitialConditions):
                 for stratification, names in sets.items()
             )
         )
-
-    # ------------------------------------------------------------------
-    # Checks against the model
-    # ------------------------------------------------------------------
-
-    def _check_bin_amounts(self, process: Process) -> None:
-        """Check that the bin amounts name every bin of the process."""
-        actual_bins = set(self.bin_amounts)
-        expected_bins = {bin_item.id for bin_item in process.bins}
-        if actual_bins != expected_bins:
-            raise ValueError(
-                f"Initial bin amounts keys must exactly match bin ids. "
-                f"Missing ids: {sorted(expected_bins - actual_bins)}, "
-                f"Extra ids: {sorted(actual_bins - expected_bins)}."
-            )
 
 
 def split_groups(

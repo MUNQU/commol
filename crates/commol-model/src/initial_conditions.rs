@@ -29,7 +29,7 @@ use crate::engine::CompartmentalEngine;
 use crate::labels::OutputLabels;
 
 /// Separator of a qualified category id, as in `group:g1`.
-const CATEGORY_SEPARATOR: char = ':';
+pub const CATEGORY_SEPARATOR: char = ':';
 
 /// Relative tolerance under which an excess over the sum the remainder keeps
 /// is taken to be zero.
@@ -171,9 +171,11 @@ impl InitialConditionPlan {
     ///
     /// An initial-condition id names, in order of precedence:
     /// - an expanded compartment (`A_g1`);
-    /// - a qualified stratification category (`group:g1`);
-    /// - a bin or a bin prefix (`A`, or `A_g1` over a deeper stratification);
-    /// - a category of exactly one binary stratification (`g1`).
+    /// - a bin or a bin prefix (`A`, or `A_g1` over a deeper stratification),
+    ///   when it holds no [`CATEGORY_SEPARATOR`];
+    /// - a category of a binary stratification, qualified (`group:g1`) or
+    ///   bare (`g1`) when one stratification has it ([`resolve_category`],
+    ///   among the categories the compartments have).
     ///
     /// The remainder, when given, names the compartments that take what the
     /// other compartments leave of the sum of the amounts the model states.
@@ -456,6 +458,49 @@ fn prefix_indices(id: &str, labels: &[OutputLabels]) -> Option<Vec<usize>> {
     (!indices.is_empty()).then_some(indices)
 }
 
+/// The stratification and the bare name of a category id, among
+/// `stratifications`, each with its categories.
+///
+/// A qualified id (`group:g1`) names its stratification, split at the first
+/// [`CATEGORY_SEPARATOR`]; a bare id (`g1`) names the one stratification
+/// that has the category. `Ok(None)` when no stratification has it.
+///
+/// # Errors
+///
+/// Returns a message when several stratifications have a bare category; it
+/// names each of them and the qualified ids to write.
+pub fn resolve_category<'a, S: AsRef<str>>(
+    id: &'a str,
+    stratifications: &'a [(S, Vec<S>)],
+) -> Result<Option<(&'a str, &'a str)>, String> {
+    let (qualifier, name) = match id.split_once(CATEGORY_SEPARATOR) {
+        Some((stratification, name)) => (Some(stratification), name),
+        None => (None, id),
+    };
+    let owners: Vec<&str> = stratifications
+        .iter()
+        .map(|(stratification, categories)| (stratification.as_ref(), categories))
+        .filter(|(stratification, categories)| {
+            qualifier.is_none_or(|qualifier| qualifier == *stratification)
+                && categories.iter().any(|category| category.as_ref() == name)
+        })
+        .map(|(stratification, _)| stratification)
+        .collect();
+    match owners.as_slice() {
+        [] => Ok(None),
+        [owner] => Ok(Some((owner, name))),
+        _ => Err(format!(
+            "Category '{id}' is ambiguous: it is declared by stratifications {owners:?}. \
+             Qualify it as {}.",
+            owners
+                .iter()
+                .map(|owner| format!("'{owner}{CATEGORY_SEPARATOR}{name}'"))
+                .collect::<Vec<_>>()
+                .join(" or ")
+        )),
+    }
+}
+
 fn resolve_target(
     id: &str,
     compartments: &[String],
@@ -467,41 +512,38 @@ fn resolve_target(
     if let Some(index) = compartments.iter().position(|name| name == id) {
         return Ok(InitialConditionTarget::Exact { index });
     }
-    if let Some((stratification, category)) = id.split_once(CATEGORY_SEPARATOR) {
-        return paired_category(stratification, category, labels, splits_by);
-    }
-    if let Some(indices) = prefix_indices(id, labels) {
+    if !id.contains(CATEGORY_SEPARATOR)
+        && let Some(indices) = prefix_indices(id, labels)
+    {
         return Ok(InitialConditionTarget::aggregate(
             indices, state, labels, fractions,
         ));
     }
-
-    let mut stratifications: Vec<&str> = Vec::new();
+    // Each stratification with the categories its compartments have.
+    let mut stratifications: Vec<(&str, Vec<&str>)> = Vec::new();
     for label in labels {
         for (stratification, category) in &label.categories {
-            if category == id && !stratifications.contains(&stratification.as_str()) {
-                stratifications.push(stratification);
+            match stratifications
+                .iter_mut()
+                .find(|(id, _)| id == stratification)
+            {
+                Some((_, categories)) if !categories.contains(&category.as_str()) => {
+                    categories.push(category);
+                }
+                Some(_) => {}
+                None => stratifications.push((stratification, vec![category])),
             }
         }
     }
-    match stratifications.as_slice() {
-        [stratification] => paired_category(stratification, id, labels, splits_by),
-        [] => Err(format!(
+    match resolve_category(id, &stratifications)? {
+        Some((stratification, category)) => {
+            paired_category(stratification, category, labels, splits_by)
+        }
+        None => Err(format!(
             "Invalid bin, compartment or category '{}' for initial condition \
              calibration (available compartments: {})",
             id,
             compartments.join(", ")
-        )),
-        _ => Err(format!(
-            "Initial condition category '{}' is ambiguous: it is declared by \
-             stratifications {:?}. Qualify it as {}",
-            id,
-            stratifications,
-            stratifications
-                .iter()
-                .map(|stratification| format!("'{stratification}{CATEGORY_SEPARATOR}{id}'"))
-                .collect::<Vec<_>>()
-                .join(" or ")
         )),
     }
 }
@@ -570,13 +612,6 @@ fn paired_category(
         }
         paired.extend(&side);
         pairs.push((side, complement));
-    }
-
-    if pairs.is_empty() {
-        return Err(format!(
-            "Initial condition category '{}' matches no compartment",
-            qualified
-        ));
     }
     Ok(InitialConditionTarget::PairedCategory { pairs })
 }

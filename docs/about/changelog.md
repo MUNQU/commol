@@ -130,6 +130,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it, or that gives no category, raises `ValueError` at `build`, with the
   message of the engine, and no longer at the call. Migration: catch the error
   of a condition at `build`.
+- **Breaking:** the engine holds every rule of a model that Python checked
+  alone, from `check_model`, so a model in JSON (`Model.from_json`,
+  `commol_rs.engine.Engine`) meets them too. It refuses two bins,
+  accumulators, stratifications, transitions or parameters with one id
+  (`Two bins share the id 'A'; give each bin its own id`); a stratification
+  with no category or a category twice (`Stratification 'g' names the
+  category 'g1' twice; name each category once`); a process without a bin or
+  a transition (`The process has no transition; an aggregate model needs at
+  least one transition`); `bin_amounts` that miss a bin or name one the
+  process does not have (`Missing ids: ["B"], Extra ids: ["Z"]`); and a
+  stratified rate with no condition or two conditions on one stratification
+  (`Transition 'ab', stratified rate 0: two conditions name 'g'; give one
+  condition per stratification`). A model in JSON with a repeated bin or
+  transition, a repeated category, no transition, a missing bin amount (read
+  as `0`), an unknown bin amount (ignored) or such a stratified rate built;
+  it is now refused. Accumulator ids were not checked anywhere. The message
+  of a transition that is not between bins or between the categories of one
+  stratification names the ids that break the rule: `Transition 't2' mixes
+  bins (["A"]) and categories (["g1"]); a transition moves between bins or
+  between the categories of one stratification`. `ModelBuilder` no longer
+  checks an id when it is added, and `Stratification` and `StratifiedRate`
+  no longer check their categories and conditions when they are made: each
+  of these errors is a `ValueError` at `build`, with the message of the
+  engine. Migration: catch these errors at `build`, and read the new
+  messages.
+- **Breaking:** a run refuses a parameter or a bin amount without a value
+  with the message of the engine, which names each of them: `The model
+  cannot run: the parameters ["k1"] and the amounts of the bins ["B"] have no
+  value. Give them a value, or calibrate them and write the calibrated values
+  back` (`ValueError` from `Simulation.run`, `run_at` and the replicates, which
+  read `Cannot run Simulation: ...`). Every engine checks it before it runs,
+  so a calibration that leaves a parameter without a value stops with this
+  message, even when no rate reads the parameter, and a rate that reads a
+  parameter without a value names it (`the parameter 'k1' has no value`), not
+  an index. A bin amount without a value no longer runs as `0`. Migration:
+  give every parameter and bin amount a value, or calibrate it.
+- An ambiguous category of the initial conditions (`update_stratification_fractions`,
+  `subgroup_total`, `get_category_fraction`) gets the message of the engine,
+  the one a calibrated initial condition gets: `Category 'c1' is ambiguous:
+  it is declared by stratifications ["group", "level"]. Qualify it as
+  'group:c1' or 'level:c1'.` A qualified category that no compartment has
+  gets `Invalid bin, compartment or category 'group:g9' for initial
+  condition calibration`, with the compartments. A calibrated value of a type
+  the kind of the model does not take gets the message of the engine, `A test
+  model takes no values of type initial_condition; 'k' is one`.
 - The engine checks that the fractions name every stratification and each of
   its categories, from `check_model`; the messages list the ids as the engine
   writes them, `Missing ids: ["g"], Extra ids: []`, and the message of the

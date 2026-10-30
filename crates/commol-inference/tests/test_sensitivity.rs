@@ -507,7 +507,7 @@ fn a_center_that_cannot_be_run_says_why() {
     );
     assert!(
         matches!(jacobian(without_z, k(), 0.5), SensitivityError::Failed(message)
-            if message.contains("not found")),
+            if message.contains("the parameters [\"z\"] have no value")),
     );
     assert_eq!(
         FiniteDifferences::new(&beyond_the_remainder, Design::Observations)

@@ -104,11 +104,13 @@ class TestResults:
     def test_a_run_with_an_uncalibrated_parameter_is_rejected(self) -> None:
         simulation = Simulation(build(abc_builder(parameters={"k1": None, "k2": 0.05})))
 
-        with pytest.raises(ValueError, match="Cannot run Simulation") as error:
+        with pytest.raises(ValueError) as error:
             simulation.run(100)
 
-        assert "k1" in str(error.value)
-        assert "calibration" in str(error.value).lower()
+        assert str(error.value) == (
+            'The model cannot run: the parameters ["k1"] have no value. Give them a '
+            "value, or calibrate them and write the calibrated values back"
+        )
 
 
 class TestRepeatableRuns:

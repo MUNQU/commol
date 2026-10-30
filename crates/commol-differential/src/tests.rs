@@ -573,7 +573,7 @@ fn a_missing_parameter_is_an_error_not_a_nan() {
     );
     let error = engine(&model).run(2).unwrap_err().to_string();
     assert!(
-        error.contains("The rate of transition 'ab' cannot be evaluated: "),
+        error.starts_with("The model cannot run: the parameters [\"missing\"] have no value"),
         "{error}"
     );
 }
@@ -876,12 +876,34 @@ fn an_engine_solves_only_a_model_of_its_own_type() {
 
 #[test]
 fn a_rate_that_cannot_be_evaluated_stops_the_solver() {
-    let mut without_k = decay_model(TIGHT);
-    without_k.parameters[0].value = None;
+    let model = model(
+        "DifferentialEquations",
+        &[("A", 1000.0), ("B", 0.0)],
+        &[("k", "0.3")],
+        &[],
+        &[transition("ab", &["A"], &["B"], "k * sqrt(0.5 - t)", "")],
+        TIGHT,
+    );
 
-    let error = engine(&without_k).run_at(&[1.0]).unwrap_err().to_string();
+    let error = engine(&model).run_at(&[1.0]).unwrap_err().to_string();
 
-    assert!(error.contains("not found"), "{error}");
+    assert!(error.contains("is not a number"), "{error}");
+}
+
+#[test]
+fn a_rate_that_is_not_a_number_at_the_start_stops_the_run() {
+    let model = model(
+        "DifferentialEquations",
+        &[("A", 1000.0), ("B", 0.0)],
+        &[("k", "0.3")],
+        &[],
+        &[transition("ab", &["A"], &["B"], "k * sqrt(-1 - t)", "")],
+        TIGHT,
+    );
+
+    let error = engine(&model).run(2).unwrap_err().to_string();
+
+    assert!(error.contains("is not a number"), "{error}");
 }
 
 #[test]

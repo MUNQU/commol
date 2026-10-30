@@ -219,7 +219,7 @@ fn an_error_of_a_rate_names_its_transition() {
 
     assert_eq!(
         error,
-        "The rate of transition 'ab' cannot be evaluated: Parameter index '4' not found"
+        "The rate of transition 'ab' cannot be evaluated: the parameter 'k1' has no value"
     );
 }
 

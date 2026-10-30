@@ -27,7 +27,8 @@ class StratifiedRate(BaseModel):
     ----------
     conditions : list[StratificationCondition]
         The categories that a compartment must match, at least one, each
-        stratification at most once.
+        stratification at most once; the engine checks them when the model
+        is built.
     rate : str | float
         The rate of the matching compartments: a formula, a parameter or a
         number, which is kept as its string. It can read ``$compartment``
@@ -55,32 +56,6 @@ class StratifiedRate(BaseModel):
             "any compartment variable."
         ),
     )
-
-    @field_validator("conditions")
-    @classmethod
-    def _validate_not_empty(
-        cls, v: list[StratificationCondition]
-    ) -> list[StratificationCondition]:
-        """Ensure at least one stratification condition is specified."""
-        if not v:
-            raise ValueError(
-                "conditions must contain at least one stratification condition"
-            )
-        return v
-
-    @model_validator(mode="after")
-    def _validate_unique_stratifications(self) -> Self:
-        """Ensure no duplicate stratification IDs."""
-        strat_ids = [sc.stratification for sc in self.conditions]
-        if len(strat_ids) != len(set(strat_ids)):
-            duplicates = [s for s in strat_ids if strat_ids.count(s) > 1]
-            raise ValueError(
-                (
-                    f"Duplicate stratifications found: {list(set(duplicates))}. "
-                    f"Each stratification can only be specified once per rate."
-                )
-            )
-        return self
 
     @field_validator("rate")
     @classmethod
@@ -199,7 +174,7 @@ class Transition(BaseModel):
     def _validate_impulse(self) -> Self:
         """
         Check the impulse with the rule of the engine (`check_impulse` of
-        `crates/commol-model/src/values.rs`): one of `impulse_at` and
+        `crates/commol-model/src/rules.rs`): one of `impulse_at` and
         `impulse_every`, at least one position on the axis, a positive period
         and an offset that is not negative.
         """

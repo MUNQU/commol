@@ -200,13 +200,18 @@ class TestConditions:
     @pytest.mark.parametrize(
         ("conditions", "message"),
         [
-            ([], "at least one stratification condition"),
+            (
+                [],
+                "Transition 't2', stratified rate 0 has no condition; give it at "
+                "least one",
+            ),
             (
                 [
                     StratificationCondition(stratification="g", category="g1"),
                     StratificationCondition(stratification="g", category="g2"),
                 ],
-                r"Duplicate stratifications found: \['g'\]",
+                "Transition 't2', stratified rate 0: two conditions name 'g'; give "
+                "one condition per stratification",
             ),
             (
                 [StratificationCondition(stratification="z", category="g1")],
