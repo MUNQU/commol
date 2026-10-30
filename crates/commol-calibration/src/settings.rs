@@ -310,7 +310,7 @@ pub struct ParticleSwarmSettings {
 #[serde(remote = "Self", rename_all = "snake_case")]
 pub enum PolishSettings {
     /// Nelder-Mead.
-    NelderMead(Box<NelderMeadSettings>),
+    NelderMead(NelderMeadSettings),
 }
 
 tagged!(PolishSettings);
