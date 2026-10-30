@@ -184,6 +184,14 @@ def named_types(annotation: object) -> Iterator[object]:
     yield from named_types(typing.get_args(annotation))
 
 
+def home_of(module: str) -> str:
+    """The public module that exports the classes of a module of commol: the
+    root for a private package, and ``commol.<page>`` for the package of a
+    page."""
+    package = module.split(".")[1]
+    return "commol" if package.startswith("_") else f"commol.{package}"
+
+
 def is_commol(item: object) -> bool:
     """Whether ``item`` is a class that a module of commol defines."""
     return isinstance(item, type) and item.__module__.startswith("commol.")
@@ -230,16 +238,17 @@ def walk() -> tuple[dict[type, set[object]], set[type]]:
 
 
 def results() -> dict[type, set[object]]:
-    """Each class of commol that the surface returns and does not export,
-    with the objects that return it."""
-    public = set(exported().values())
+    """Each class of commol that the surface returns, with the objects that
+    return it."""
     returned_by, _ = walk()
-    return {cls: owners for cls, owners in returned_by.items() if cls not in public}
+    return returned_by
 
 
 def surface() -> list[object]:
-    """Each exported object and each result it reaches."""
-    return [*exported().values(), *results()]
+    """Each exported object and each result it reaches that no module
+    exports."""
+    public = exported().values()
+    return [*public, *(cls for cls in results() if cls not in public)]
 
 
 def inputs() -> Iterator[tuple[str, object]]:
@@ -252,14 +261,36 @@ def inputs() -> Iterator[tuple[str, object]]:
                 yield f"{signature.owner}({name})", annotation
 
 
-def annotations() -> Iterator[tuple[str, object]]:
-    """Each annotation of the surface, of an argument or of a return."""
+class Output(NamedTuple):
+    """A class or a type that the surface gives a user back."""
+
+    item: object
+    """The object of the surface that gives it: a class or a function."""
+    owner: str
+    """``Class.member``, a class, or a function."""
+    annotation: object
+    """The annotation of what it gives."""
+
+
+def outputs() -> Iterator[Output]:
+    """Each annotation that the surface returns: the return of each member,
+    the type of each field of a class a user gets back, and the result that
+    a generic base of a method names."""
     _, given = walk()
-    yield from inputs()
     for item in surface():
         for signature in signatures(item, item in given):
             if signature.returned is not None:
-                yield signature.owner, signature.returned
+                yield Output(item, signature.owner, signature.returned)
+        if isinstance(item, type):
+            for result in generic_results(item):
+                yield Output(item, item.__name__, result)
+
+
+def annotations() -> Iterator[tuple[str, object]]:
+    """Each annotation of the surface, of an argument or of a return."""
+    yield from inputs()
+    for output in outputs():
+        yield output.owner, output.annotation
 
 
 def choice_faults(annotation: object, package: str = "commol.") -> list[str]:

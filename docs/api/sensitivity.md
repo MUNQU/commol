@@ -13,22 +13,22 @@ run are in [Quantities](quantities.md). Guide:
 
 ::: commol.sensitivity.Propagation
 
-::: commol.sensitivity.results.PropagationResult
+::: commol.sensitivity.PropagationResult
 
-::: commol.sensitivity.results.QuantitySummary
+::: commol.sensitivity.QuantitySummary
 
 ::: commol.sensitivity.PRCC
 
-::: commol.sensitivity.results.PRCCResult
+::: commol.sensitivity.PRCCResult
 
 ::: commol.sensitivity.Morris
 
-::: commol.sensitivity.results.MorrisResult
+::: commol.sensitivity.MorrisResult
 
 ::: commol.sensitivity.Sobol
 
-::: commol.sensitivity.results.SobolResult
+::: commol.sensitivity.SobolResult
 
 ::: commol.sensitivity.PolynomialChaos
 
-::: commol.sensitivity.results.ChaosResult
+::: commol.sensitivity.ChaosResult

@@ -22,10 +22,10 @@ Fits a model to observations. Guide: [Model Calibration](../guide/calibration.md
 
 ::: commol.ParticleSwarmConfig
 
-::: commol._fit.result.CalibrationResult
+::: commol.CalibrationResult
 
-::: commol._fit.result.StartSummary
+::: commol.StartSummary
 
-::: commol._fit.result.CalibrationHistory
+::: commol.CalibrationHistory
 
-::: commol._fit.result.CalibrationEvaluation
+::: commol.CalibrationEvaluation

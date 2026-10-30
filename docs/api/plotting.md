@@ -16,14 +16,14 @@ predictives on the same panels. The figures need the optional extra
 
 ::: commol.plotting.plot_compared
 
-::: commol.sensitivity.results.PRCCResult.plot
+::: commol.sensitivity.PRCCResult.plot
 
-::: commol.sensitivity.results.MorrisResult.plot
+::: commol.sensitivity.MorrisResult.plot
 
-::: commol.sensitivity.results.SobolResult.plot
+::: commol.sensitivity.SobolResult.plot
 
-::: commol.sensitivity.results.ChaosResult.plot
+::: commol.sensitivity.ChaosResult.plot
 
-::: commol.profiles.results.ProfileResult.plot
+::: commol.profiles.ProfileResult.plot
 
 ::: commol.plotting.PlotConfig

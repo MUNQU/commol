@@ -8,19 +8,23 @@ import importlib
 import re
 import tomllib
 import typing
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from types import ModuleType
 
-
+from commol import Simulation
 from tests.suite import public_surface
+from tests.support import a_to_b_builder, build
+from tests.support.problems import line_calibrator
 from tests.support.surface import (
     annotations,
     choice_faults,
     exported,
+    home_of,
     inputs,
     is_commol,
     named_types,
+    outputs,
     own_classes,
     results,
     surface,
@@ -249,14 +253,9 @@ def test_the_check_names_each_enum_read_by_name(tmp_path: Path) -> None:
 
 def private_inputs() -> list[str]:
     """Each argument of the surface that names a class of commol a user
-    cannot pass: one that is not exported, not a result of the table, not a
-    base of either and not a protocol that they implement."""
-    reachable = {
-        item
-        for item in [*exported().values(), *results()]
-        if isinstance(item, type)
-        and (item.__name__ in public_surface.RESULTS or item in exported().values())
-    }
+    cannot pass: one that is not exported, not a base of an exported class
+    and not a protocol that they implement."""
+    reachable = {item for item in exported().values() if isinstance(item, type)}
     allowed = {base for cls in reachable for base in own_classes(cls)}
     return sorted(
         f"{owner}: {item.__name__}"
@@ -269,18 +268,83 @@ def private_inputs() -> list[str]:
     )
 
 
+def private_outputs(
+    found: Iterable[tuple[str, object]], public: set[object]
+) -> list[str]:
+    """Each class of commol that a member of ``found`` returns and that
+    ``public`` does not hold, as ``owner: Class``; ``found`` holds ``(owner,
+    annotation)``."""
+    return sorted(
+        {
+            f"{owner}: {item.__name__}"
+            for owner, annotation in found
+            for item in named_types(annotation)
+            if is_commol(item) and item not in public
+        }
+    )
+
+
 def test_the_public_surface_is_the_table() -> None:
-    """The exports are the table of ``tests/suite/public_surface.py``, and a
-    user can reach every class that a public signature takes."""
+    """The exports are the table of ``tests/suite/public_surface.py``, a user
+    can reach every class that a public signature takes, and a user can name
+    every class that a public member returns."""
     found = {
         module: set(importlib.import_module(module).__all__)
         for module in public_surface.EXPORTS
     }
+    returned = [(output.owner, output.annotation) for output in outputs()]
 
     assert found == {
         module: set(names) for module, names in public_surface.EXPORTS.items()
     }
     assert private_inputs() == []
+    assert private_outputs(returned, set(exported().values())) == [], (
+        "Export each class that a public member returns, in the root for the "
+        "main flow and in the module of its page for the others"
+    )
+
+
+def test_the_check_of_outputs_names_each_private_class() -> None:
+    hidden = type("Hidden", (), {"__module__": "commol._fit.result"})
+    shown = type("Shown", (), {"__module__": "commol._fit.result"})
+    found = [("Runner.run", hidden), ("Runner.runs", list[shown | hidden] | None)]
+    found += [("Runner.shown", shown), ("Runner.count", int)]
+
+    assert private_outputs(found, {shown}) == [
+        "Runner.run: Hidden",
+        "Runner.runs: Hidden",
+    ]
+
+
+def test_the_results_of_the_main_flow_are_in_the_root() -> None:
+    from commol import CalibrationResult, SimulationResults, StartSummary
+
+    result = line_calibrator([1.0, 2.0, 3.0]).run()
+    simulated = Simulation(build(a_to_b_builder())).run(3)
+
+    assert type(result) is CalibrationResult
+    assert all(type(start) is StartSummary for start in result.starts)
+    assert type(simulated) is SimulationResults
+
+
+def test_a_result_is_in_the_module_of_its_page() -> None:
+    """Each exported class that a public package defines is in the module of
+    that package, and each one of a private package is in the root."""
+    from commol.resampling import BayesianBootstrap, BootstrapResult
+
+    result = line_calibrator([1.0, 2.0, 3.0]).uncertainty(
+        BayesianBootstrap(replicates=2, block_length=1)
+    )
+    wrong = sorted(
+        f"{path}: defined in {item.__module__}"
+        for path, item in exported().items()
+        if isinstance(item, type)
+        and is_commol(item)
+        and path.rsplit(".", 1)[0] != home_of(item.__module__)
+    )
+
+    assert type(result) is BootstrapResult
+    assert not wrong, "Export a class from its package:\n" + "\n".join(wrong)
 
 
 def homes(exports: dict[str, list[str]]) -> dict[str, list[str]]:
@@ -511,8 +575,10 @@ def test_the_check_of_choices_names_each_enum_and_alias() -> None:
 
 def test_no_public_member_is_internal() -> None:
     """No class of the surface has a public validator, and no exported class
-    has an exported base."""
+    has an exported base that only serves as a base: a base that a member
+    returns, such as ``SMCResult`` of ``GibbsResult``, is a result."""
     public = {item for item in exported().values() if isinstance(item, type)}
+    bases = public - set(results())
     wrong = sorted(
         f"{cls.__name__}.{name}"
         for cls in (item for item in surface() if isinstance(item, type))
@@ -523,7 +589,7 @@ def test_no_public_member_is_internal() -> None:
         f"{cls.__name__} has the exported base {base.__name__}"
         for cls in public
         for base in own_classes(cls)[1:]
-        if base in public
+        if base in bases
     )
 
     assert not wrong, (

@@ -1,4 +1,4 @@
-"""The conformal prediction methods (guide: Conformal)."""
+"""The conformal prediction methods and their results (guide: Conformal)."""
 
 from commol.conformal.methods import (
     AdaptiveConformal,
@@ -7,6 +7,12 @@ from commol.conformal.methods import (
     RollingConformal,
     SplitConformal,
 )
+from commol.conformal.results import (
+    ConformalResult,
+    PredictionIntervals,
+    SeriesIntervals,
+)
+
 
 __all__ = [
     "AdaptiveConformal",
@@ -14,4 +20,8 @@ __all__ = [
     "JackknifePlus",
     "RollingConformal",
     "SplitConformal",
+    # Results
+    "ConformalResult",
+    "PredictionIntervals",
+    "SeriesIntervals",
 ]

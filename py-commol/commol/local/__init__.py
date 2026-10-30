@@ -1,5 +1,5 @@
 """The local approximations around a fit: Laplace, the sandwich and the
-Laplace mixture (guide: Local Approximations)."""
+Laplace mixture, and their results (guide: Local Approximations)."""
 
 from commol.local.methods import (
     GibbsTarget,
@@ -8,6 +8,14 @@ from commol.local.methods import (
     LikelihoodTarget,
     Sandwich,
 )
+from commol.local.results import (
+    DeltaBand,
+    ImportanceResult,
+    LaplaceResult,
+    MixtureComponent,
+    SandwichResult,
+)
+
 
 __all__ = [
     "GibbsTarget",
@@ -15,4 +23,10 @@ __all__ = [
     "LaplaceMixture",
     "LikelihoodTarget",
     "Sandwich",
+    # Results
+    "DeltaBand",
+    "ImportanceResult",
+    "LaplaceResult",
+    "MixtureComponent",
+    "SandwichResult",
 ]

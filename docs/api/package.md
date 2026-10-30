@@ -17,4 +17,4 @@ Commol logs to the logger `commol` and to one child per module, such as
 
 ::: commol.build_info
 
-::: commol._build.info.BuildInfo
+::: commol.BuildInfo

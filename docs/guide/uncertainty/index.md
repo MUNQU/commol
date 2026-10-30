@@ -355,8 +355,10 @@ held-out positions above, and say whether you score a band of the model
 Every method runs through `Calibrator.uncertainty(method)`. A method is a
 configuration, a subclass of `UncertaintyMethod[R]` whose type parameter `R` is
 its result; the call returns an `R`, which a static type checker infers from
-the configuration's type. Each configuration names the function that runs
-it; one that names none raises a `ValueError`.
+the configuration's type. The module of the method exports `R`, so a typed
+function names it, as `BootstrapResult` of `from commol.resampling import
+BootstrapResult`. Each configuration names the function that runs it; one
+that names none raises a `ValueError`.
 
 The identifiability methods run through their own entry point,
 `Calibrator.identifiability(method)`, with a subclass of

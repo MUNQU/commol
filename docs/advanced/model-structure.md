@@ -69,48 +69,27 @@ the model. A variant keeps the kind, the fields and the engines of its
 structure, and loads back as its own class
 ([Design decisions](../codebase/decisions/model-kinds.md#a-model-is-a-header-a-process-a-structure-and-an-engine)).
 
-## Bins and accumulators
+## The parts of a model
 
-::: commol._model.bin.Bin
+`Model.process` holds the parts that the builder makes, and `Model.parameters`
+holds the parameters. The root `commol` exports the class of each part, so a
+typed function that reads a part names its class. The
+[Model API](../api/model.md#the-parts-of-a-model) documents them.
 
-::: commol._model.bin.Accumulator
-
-## Stratifications
-
-::: commol._model.stratification.Stratification
-
-A condition of a stratification or of a stratified rate,
-`StratificationCondition`, is documented in
-[ModelBuilder API](../api/model-builder.md).
-
-## Matrices between categories
-
-::: commol._model.matrix.CategoryMatrix
-
-`ModelBuilder.add_matrix` adds one; a rate reads it through `matrix_sum`
-([Matrix sums](../guide/mathematical-expressions.md#matrix-sums)).
-
-## Parameters
-
-::: commol._model.parameter.Parameter
-
-The value of a series parameter, `SeriesValue`, is documented in
-[Model API](../api/model.md).
-
-## Transitions
-
-::: commol._model.transition.Transition
-
-The rate of a transition in the compartments that match its conditions,
-`StratifiedRate`, is documented in [ModelBuilder API](../api/model-builder.md).
+| Part | Added by | Read with |
+|---|---|---|
+| `Bin`, `Accumulator` | `ModelBuilder.add_bin`, `ModelBuilder.add_accumulator` | `Process.bins`, `Process.accumulators` |
+| `Stratification` | `ModelBuilder.add_stratification`, with a `StratificationCondition` ([ModelBuilder API](../api/model-builder.md)) | `Process.stratifications` |
+| `CategoryMatrix` | `ModelBuilder.add_matrix`; a rate reads it through `matrix_sum` ([Matrix sums](../guide/mathematical-expressions.md#matrix-sums)) | `Process.matrices` |
+| `Parameter` | `ModelBuilder.add_parameter`; a series parameter holds a `SeriesValue` ([Model API](../api/model.md)) | `Model.parameters` |
+| `Transition` | `ModelBuilder.add_transition`, with a `StratifiedRate` ([ModelBuilder API](../api/model-builder.md)) | `Process.transitions` |
 
 ## Engine
 
 The engine's list of engines (`crates/commol-core/src/types/engine.rs`)
 validates the settings: settings of another engine raise an error that names
-both. `ODESolver` is documented in [Simulation API](../api/simulation.md).
-
-::: commol.engines.engine.ModelEngine
+both. `Model.engine` is a `ModelEngine`, which the
+[Engines API](../api/engines.md) documents with `ODESolver`.
 
 ## Initial conditions
 

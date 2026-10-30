@@ -7,10 +7,35 @@ describes. Guide: [Reports](../guide/reports.md).
 
 ::: commol.Model.applied_parameters
 
-::: commol._simulation.results.SimulationResults.report
+::: commol.SimulationResults.report
 
-::: commol._simulation.results.SimulationReplicates.report
+::: commol.SimulationReplicates.report
 
 ::: commol.uncertainty.Predictive.report
 
-::: commol.identifiability.results.IdentifiabilityReport.report
+::: commol.identifiability.IdentifiabilityReport.report
+
+## The types of the reports
+
+Each report is a `TypedDict`: a plain dictionary whose keys a type checker
+knows. The root `commol` exports the types of `Model.applied_parameters` and
+of a simulation report; the [Identifiability API](identifiability.md) holds
+the types of the identifiability report.
+
+::: commol.AppliedParametersReport
+
+::: commol.ParameterEntry
+
+::: commol.Interval
+
+::: commol.SimulationReport
+
+::: commol.ObservedSeries
+
+::: commol.AccumulatorReport
+
+::: commol.WindowedAccumulator
+
+::: commol.PredictionIntervalsReport
+
+::: commol.SeriesIntervalsReport

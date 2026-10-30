@@ -3,7 +3,8 @@
 [Back to API Reference](index.md)
 
 The module `commol.engines`: the settings of the engines that take them, the
-solver of the ODE engine and the stochastic engines. Guide:
+solver of the ODE engine and the stochastic engines, and `ModelEngine`, the
+engine of a model (`Model.engine`). Guide:
 [Running Simulations](../guide/simulations.md) and
 [Stochastic Simulation](../guide/stochastic.md).
 
@@ -12,3 +13,5 @@ solver of the ODE engine and the stochastic engines. Guide:
 ::: commol.engines.StochasticEventsSettings
 
 ::: commol.engines.StochasticStepsSettings
+
+::: commol.engines.ModelEngine

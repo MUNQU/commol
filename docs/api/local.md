@@ -18,12 +18,12 @@ Laplace mixture, and their results. Guide:
 
 ::: commol.local.results.LocalResult
 
-::: commol.local.results.LaplaceResult
+::: commol.local.LaplaceResult
 
-::: commol.local.results.SandwichResult
+::: commol.local.SandwichResult
 
-::: commol.local.results.ImportanceResult
+::: commol.local.ImportanceResult
 
-::: commol.local.results.MixtureComponent
+::: commol.local.MixtureComponent
 
-::: commol.local.results.DeltaBand
+::: commol.local.DeltaBand

@@ -15,30 +15,31 @@ An unknown field, such as a misspelt or an old name (`window_steps`), raises a
 
 ## The public surface holds only what a user writes
 
-The public modules hold the names a user writes: the builder and its
-conditions (`StratificationCondition`, `StratifiedRate`), the structures, the
-entry points, the settings and the methods. The data of the surface is
-`py-commol/tests/suite/public_surface.py`: `EXPORTS`, the names of each public
-module, and `RESULTS`, the results that public objects return.
+The public modules hold the names a user writes, in a call or in an
+annotation, so every class that a public member returns is public, as in
+`def fit(...) -> CalibrationResult`. `py-commol/tests/suite/public_surface.py`
+holds `ROOT` and `PAGES`, the names of a call, and `RESULTS`, the returned
+classes by module; `EXPORTS` joins them into the `__all__` of each module.
 
 | Kind of name | Rule |
 |---|---|
-| A result | Not exported. The member that gives it has it as its return type, and its `::: path` entry is on the page of `docs/api/` of that object. |
+| A result: a class that a public member returns, and the class of each field of such a class, recursively | Exported: by the root for the main flow (`SimulationResults`, `CalibrationResult`, `StartSummary`, `Process` and its parts, `ModelDescription` and its blocks, the types of the reports), by the module of its page for the others (`commol.resampling.BootstrapResult`). It is the return of its member, not a class to build. Its `::: path` entry is under its public path on the page of `docs/api/` of an object that returns it, or of its module. |
 | A choice among names | A `Literal` in the signature, such as `loss_function: Literal["sse", "rmse", "mae"]`; no enum and no public alias of strings. |
-| A union of classes, a base, a part that the builder makes | Private: a union is a `type _Name = …` alias, and a base is not exported. |
+| A union of classes, or a base that no member returns | Private: a union is a `type _Name = …` alias, and a base such as `ModelStructure` is not exported. A base that a member returns is a result, such as `SMCResult`, the base of `GibbsResult`. |
 | A pydantic validator or serializer | A name that starts with `_`. |
 | An idea | One public path: `SimulationResults.sample` and `SimulationResults.windowed_totals` read a run by id; the functions on one series are private. |
 
 | Alternative | Why not |
 |---|---|
-| Export each class a signature names | About half the names are results, enums and unions a user never writes. |
+| A result reached only from its object | A typed caller cannot name it: a function with no annotation fails `ANN` of ruff and a strict type checker, and an import from a private package breaks when the code moves. |
+| One module of every result, or every result in the root | A second path for each idea, or about a hundred and fifty names in the root. |
+| `Protocol` classes, or private imports under `TYPE_CHECKING` | Each field written twice and drifting from the class; a private use that a strict checker reports. |
 | An enum for each choice | A name to import and learn for each choice; a string is checked by pydantic with the same list of values. |
 | A dict for a condition | No type check of its keys, and a second shape of one idea next to the class. |
 
-**Guards:** `tests/suite/test_architecture.py::test_the_public_surface_is_the_table`,
-`tests/suite/test_architecture.py::test_a_choice_is_a_literal`,
-`tests/suite/test_architecture.py::test_no_public_member_is_internal`,
-`tests/docs/test_reference.py::test_each_result_is_on_the_page_of_its_object`
+**Guards:** `tests/suite/test_architecture.py::test_the_public_surface_is_the_table` (`private_inputs`, `private_outputs`),
+`tests/suite/test_architecture.py::test_a_result_is_in_the_module_of_its_page`, `tests/suite/test_architecture.py::test_a_choice_is_a_literal`,
+`tests/suite/test_architecture.py::test_no_public_member_is_internal`, `tests/docs/test_reference.py::test_each_result_is_on_the_page_of_its_object`
 and `tests/building/test_conditions.py::test_a_condition_is_one_class`.
 
 ## One module per page of the guide

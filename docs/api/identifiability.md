@@ -3,7 +3,8 @@
 [Back to API Reference](index.md)
 
 The module `commol.identifiability`: the identifiability methods, the report
-they return, and its parts. Guide:
+they return, its parts, and the types of its plain-dictionary report
+(`IdentifiabilityReport.report`). Guide:
 [Identifiability](../guide/uncertainty/identifiability.md).
 
 ::: commol.identifiability.StructuralRank
@@ -16,32 +17,69 @@ they return, and its parts. Guide:
 
 ::: commol.identifiability.ProfileIdentifiability
 
-::: commol.identifiability.results.IdentifiabilityReport
+::: commol.identifiability.IdentifiabilityReport
 
-::: commol.identifiability.results.ParameterVerdicts
+::: commol.identifiability.ParameterVerdicts
 
-::: commol.identifiability.results.StructuralVerdict
+::: commol.identifiability.StructuralVerdict
 
-::: commol.identifiability.results.PracticalVerdict
+::: commol.identifiability.PracticalVerdict
 
-::: commol.identifiability.results.StructuralSection
+::: commol.identifiability.StructuralSection
 
-::: commol.identifiability.results.PointRank
+::: commol.identifiability.PointRank
 
-::: commol.identifiability.results.TighterRank
+::: commol.identifiability.TighterRank
 
-::: commol.identifiability.results.Accuracy
+::: commol.identifiability.Accuracy
 
-::: commol.identifiability.results.Combination
+::: commol.identifiability.Combination
 
-::: commol.identifiability.results.CollinearitySection
+::: commol.identifiability.CollinearitySection
 
-::: commol.identifiability.results.SubsetIndex
+::: commol.identifiability.SubsetIndex
 
-::: commol.identifiability.results.SampleSection
+::: commol.identifiability.SampleSection
 
-::: commol.identifiability.results.CorrelatedPair
+::: commol.identifiability.CorrelatedPair
 
-::: commol.identifiability.results.StartsSection
+::: commol.identifiability.StartsSection
 
-::: commol.identifiability.results.ProfileSection
+::: commol.identifiability.ProfileSection
+
+## The types of the report
+
+`IdentifiabilityReport.report` returns an `IdentifiabilityReportData`, a
+`TypedDict` that holds the others.
+
+::: commol.identifiability.IdentifiabilityReportData
+
+::: commol.identifiability.VerdictsEntry
+
+::: commol.identifiability.StructuralVerdictEntry
+
+::: commol.identifiability.PracticalVerdictEntry
+
+::: commol.identifiability.IdentifiabilitySections
+
+::: commol.identifiability.StructuralSectionData
+
+::: commol.identifiability.PointRankData
+
+::: commol.identifiability.TighterRankData
+
+::: commol.identifiability.AccuracyData
+
+::: commol.identifiability.CombinationData
+
+::: commol.identifiability.CollinearitySectionData
+
+::: commol.identifiability.SubsetIndexData
+
+::: commol.identifiability.SampleSectionData
+
+::: commol.identifiability.CorrelatedPairData
+
+::: commol.identifiability.StartsSectionData
+
+::: commol.identifiability.ProfileSectionData

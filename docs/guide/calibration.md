@@ -242,6 +242,27 @@ print(result.converged, result.termination_reason)
 print(f"loss = {result.final_loss:.3g} after {result.iterations} iterations")
 ```
 
+The root `commol` exports `CalibrationResult` and the class of each of its
+fields, such as `StartSummary`, so a typed function names them with no
+import from a private module:
+
+```python
+from commol import CalibrationResult, StartSummary
+
+
+def converged_starts(result: CalibrationResult) -> list[StartSummary]:
+    """The starts whose optimizer met its convergence test."""
+    return [start for start in result.starts if start.converged]
+
+
+print(len(converged_starts(result)), "of", len(result.starts), "starts converged")
+```
+
+Every class that a public member returns has one public path: a result of
+the main flow, such as `SimulationResults`, is in the root, and the result of
+a method is in the module of the method, such as `BootstrapResult` in
+`commol.resampling` ([API Reference](../api/index.md)).
+
 | `Calibrator` member | What it does |
 |---|---|
 | `run(starts=1)` | Runs the optimizer from `starts` start points and returns the best `CalibrationResult`. See [Several starts](calibration-optimizers.md#several-starts). |

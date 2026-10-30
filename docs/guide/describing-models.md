@@ -66,7 +66,8 @@ print([type(block).__name__ for block in dynamics.blocks])
 # ['StateGraph', 'StateGraph', 'Equations', 'Text', 'Equations']
 ```
 
-The blocks are a closed set (`commol._model.description`):
+The blocks are a closed set, and the root `commol` exports each class, so
+`isinstance(block, Equations)` reads the kind of a block:
 
 | Block | Holds |
 |---|---|
