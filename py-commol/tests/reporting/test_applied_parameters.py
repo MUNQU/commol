@@ -286,7 +286,7 @@ class TestCompartmentOverrides:
         assert names == sorted(names)
 
 
-class TestIntervals:
+class TestSpreads:
     def test_an_entry_of_a_sample_has_a_spread(self) -> None:
         report = _model().applied_parameters(
             {"k1": 0.3},
@@ -308,6 +308,15 @@ class TestIntervals:
                 "std": 0.2,
             }
         )
+
+    def test_the_spread_is_the_last_key_of_an_entry(self) -> None:
+        report = _model().applied_parameters(
+            {"k1": 0.3},
+            sample=_sample("k1", [0.8, 1.0, 1.2]),
+            confidence_level=0.95,
+        )
+
+        assert list(report["parameters"]["k1"]) == ["value", "calibrated", "spread"]
 
     def test_a_sample_needs_a_confidence_level(self) -> None:
         with pytest.raises(ValueError) as error:
