@@ -3894,14 +3894,14 @@ kind of model; the structure of the model adds the sections of its kind
 </tr>
 <tr>
 <td>A <code>sample</code></td>
-<td>Each entry gains an <code>interval</code> block, an <code>EntrySpread</code> (<code>mean</code>, <code>median</code>, <code>ci_lower</code>, <code>ci_upper</code>, <code>min</code>, <code>max</code>, <code>std</code>, all weighted), and the report starts with <code>confidence_level</code>.</td>
+<td>Each entry gains a <code>spread</code> block, an <code>EntrySpread</code> (<code>mean</code>, <code>median</code>, <code>ci_lower</code>, <code>ci_upper</code>, <code>min</code>, <code>max</code>, <code>std</code>, all weighted), and the report starts with <code>confidence_level</code>.</td>
 </tr>
 </tbody>
 </table>
-<p>The key order of each entry is fixed (<code>value</code>, <code>calibrated</code>, then <code>interval</code>;
-<code>amount</code>, <code>unit</code>, <code>calibrated</code>, then <code>interval</code>; <code>group</code>, <code>fraction</code>,
-<code>calibrated</code>, then <code>interval</code>), so saved JSON files stay comparable. An
-interval is in the unit of its entry: an amount in the unit of its bin, a split
+<p>The key order of each entry is fixed (<code>value</code>, <code>calibrated</code>, then <code>spread</code>;
+<code>amount</code>, <code>unit</code>, <code>calibrated</code>, then <code>spread</code>; <code>group</code>, <code>fraction</code>,
+<code>calibrated</code>, then <code>spread</code>), so saved JSON files stay comparable. The
+spread is in the unit of its entry: an amount in the unit of its bin, a split
 as a fraction of its group.</p>
 <h2 id="the-report-of-a-run">The report of a run<a class="headerlink" href="#the-report-of-a-run" title="Permanent link">&para;</a></h2>
 <p><code>SimulationResults.report(positions, window, windows, observed_data=(),

@@ -3957,7 +3957,7 @@ categories a conditional stratification is conditioned on, empty when
 it splits every bin. A stratification whose fractions differ by the
 category of an earlier one gives a row per split, under the key
 <code>t1 of g1</code>, with that category in its <code>group</code>.</p>
-<p>With a <code>sample</code> each entry gains an <code>interval</code> holding the weighted
+<p>With a <code>sample</code> each entry gains a <code>spread</code> holding the weighted
 statistics of its draws (<code>ParameterSample.summary</code>). Every entry is in
 the unit it was calibrated in: a parameter in its own, an amount in
 the unit of its bin, and a category split as a fraction of its group.</p>
@@ -4196,7 +4196,7 @@ model), preceded by <code>confidence_level</code> when there is one.</p>
 </span><span id="__span-0-348"><a id="__codelineno-0-348" name="__codelineno-0-348"></a><span class="sd">    category of an earlier one gives a row per split, under the key</span>
 </span><span id="__span-0-349"><a id="__codelineno-0-349" name="__codelineno-0-349"></a><span class="sd">    ``t1 of g1``, with that category in its ``group``.</span>
 </span><span id="__span-0-350"><a id="__codelineno-0-350" name="__codelineno-0-350"></a>
-</span><span id="__span-0-351"><a id="__codelineno-0-351" name="__codelineno-0-351"></a><span class="sd">    With a `sample` each entry gains an ``interval`` holding the weighted</span>
+</span><span id="__span-0-351"><a id="__codelineno-0-351" name="__codelineno-0-351"></a><span class="sd">    With a `sample` each entry gains a ``spread`` holding the weighted</span>
 </span><span id="__span-0-352"><a id="__codelineno-0-352" name="__codelineno-0-352"></a><span class="sd">    statistics of its draws (`ParameterSample.summary`). Every entry is in</span>
 </span><span id="__span-0-353"><a id="__codelineno-0-353" name="__codelineno-0-353"></a><span class="sd">    the unit it was calibrated in: a parameter in its own, an amount in</span>
 </span><span id="__span-0-354"><a id="__codelineno-0-354" name="__codelineno-0-354"></a><span class="sd">    the unit of its bin, and a category split as a fraction of its group.</span>
@@ -5442,7 +5442,7 @@ the types of the identifiability report.</p>
 </span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23"></a>
 </span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24"></a>    <span class="n">value</span><span class="p">:</span> <span class="nb">float</span>
 </span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25"></a>    <span class="n">calibrated</span><span class="p">:</span> <span class="nb">bool</span>
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26"></a>    <span class="n">interval</span><span class="p">:</span> <span class="n">NotRequired</span><span class="p">[</span><span class="n">EntrySpread</span><span class="p">]</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26"></a>    <span class="n">spread</span><span class="p">:</span> <span class="n">NotRequired</span><span class="p">[</span><span class="n">EntrySpread</span><span class="p">]</span>
 </span></code></pre></div></td></tr></table></div>
               </details>
 
@@ -5485,7 +5485,7 @@ the types of the identifiability report.</p>
 
 
         <p>Weighted spread of one reported entry across the draws of a sample: the
-block under the key <code>interval</code> of the entry.</p>
+block under the key <code>spread</code> of the entry.</p>
 
 
 
@@ -5508,7 +5508,7 @@ block under the key <code>interval</code> of the entry.</p>
 <span class="normal"><a href="#__codelineno-0-65">65</a></span>
 <span class="normal"><a href="#__codelineno-0-66">66</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56"></a><span class="k">class</span><span class="w"> </span><span class="nc">EntrySpread</span><span class="p">(</span><span class="n">TypedDict</span><span class="p">):</span>
 </span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Weighted spread of one reported entry across the draws of a sample: the</span>
-</span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58"></a><span class="sd">    block under the key `interval` of the entry.&quot;&quot;&quot;</span>
+</span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58"></a><span class="sd">    block under the key `spread` of the entry.&quot;&quot;&quot;</span>
 </span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59"></a>
 </span><span id="__span-0-60"><a id="__codelineno-0-60" name="__codelineno-0-60"></a>    <span class="n">mean</span><span class="p">:</span> <span class="nb">float</span>
 </span><span id="__span-0-61"><a id="__codelineno-0-61" name="__codelineno-0-61"></a>    <span class="n">median</span><span class="p">:</span> <span class="nb">float</span>
@@ -5581,7 +5581,7 @@ block under the key <code>interval</code> of the entry.</p>
 </span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20"></a>    <span class="n">amount</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span>
 </span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21"></a>    <span class="n">unit</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>
 </span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22"></a>    <span class="n">calibrated</span><span class="p">:</span> <span class="nb">bool</span>
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23"></a>    <span class="n">interval</span><span class="p">:</span> <span class="n">NotRequired</span><span class="p">[</span><span class="n">EntrySpread</span><span class="p">]</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23"></a>    <span class="n">spread</span><span class="p">:</span> <span class="n">NotRequired</span><span class="p">[</span><span class="n">EntrySpread</span><span class="p">]</span>
 </span></code></pre></div></td></tr></table></div>
               </details>
 
@@ -5646,7 +5646,7 @@ block under the key <code>interval</code> of the entry.</p>
 </span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29"></a>    <span class="n">group</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
 </span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30"></a>    <span class="n">fraction</span><span class="p">:</span> <span class="nb">float</span>
 </span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31"></a>    <span class="n">calibrated</span><span class="p">:</span> <span class="nb">bool</span>
-</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32"></a>    <span class="n">interval</span><span class="p">:</span> <span class="n">NotRequired</span><span class="p">[</span><span class="n">EntrySpread</span><span class="p">]</span>
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32"></a>    <span class="n">spread</span><span class="p">:</span> <span class="n">NotRequired</span><span class="p">[</span><span class="n">EntrySpread</span><span class="p">]</span>
 </span></code></pre></div></td></tr></table></div>
               </details>
 

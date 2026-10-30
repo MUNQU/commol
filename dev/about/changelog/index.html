@@ -5165,6 +5165,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Breaking:</strong> with a <code>sample</code>, each entry of a report
+  (<code>Model.applied_parameters</code>, <code>ModelStructure.report_sections</code>) holds its
+  <code>EntrySpread</code> under the key <code>spread</code>, not <code>interval</code>. A report saved as JSON
+  before this change has the key <code>interval</code>: read <code>spread</code>.</li>
 <li><strong>Breaking:</strong> a split by category names exactly the categories of <code>by</code> that
   the compartments of its stratification have. A <code>type</code> on <code>g2</code> only, split by
   <code>group</code>, gives the split of <code>g2</code> alone, and a split of <code>g1</code>, which no

@@ -18,7 +18,7 @@ Parameters that are not a single number, such as a formula or a series, are omit
 
 `initial_amounts` gives each bin and each overridden compartment of an aggregate model its `amount` the engine builds and the `unit` of its bin, so bins of different units are reported side by side; no row is a share of a total. A bin left uncalibrated keeps a `None` amount as its "needs calibration" marker even when overrides touch some of its compartments. `category_splits` gives each category its `fraction` of the group it splits, and that `group`: the categories a conditional stratification is conditioned on, empty when it splits every bin. A stratification whose fractions differ by the category of an earlier one gives a row per split, under the key `t1 of g1`, with that category in its `group`.
 
-With a `sample` each entry gains an `interval` holding the weighted statistics of its draws (`ParameterSample.summary`). Every entry is in the unit it was calibrated in: a parameter in its own, an amount in the unit of its bin, and a category split as a fraction of its group.
+With a `sample` each entry gains a `spread` holding the weighted statistics of its draws (`ParameterSample.summary`). Every entry is in the unit it was calibrated in: a parameter in its own, an amount in the unit of its bin, and a category split as a fraction of its group.
 
 Parameters:
 
@@ -78,7 +78,7 @@ def applied_parameters(
     category of an earlier one gives a row per split, under the key
     ``t1 of g1``, with that category in its ``group``.
 
-    With a `sample` each entry gains an ``interval`` holding the weighted
+    With a `sample` each entry gains a ``spread`` holding the weighted
     statistics of its draws (`ParameterSample.summary`). Every entry is in
     the unit it was calibrated in: a parameter in its own, an amount in
     the unit of its bin, and a category split as a fraction of its group.
@@ -498,21 +498,21 @@ class ParameterEntry(TypedDict):
 
     value: float
     calibrated: bool
-    interval: NotRequired[EntrySpread]
+    spread: NotRequired[EntrySpread]
 ```
 
 ## EntrySpread
 
 Bases: `TypedDict`
 
-Weighted spread of one reported entry across the draws of a sample: the block under the key `interval` of the entry.
+Weighted spread of one reported entry across the draws of a sample: the block under the key `spread` of the entry.
 
 Source code in `commol/_model/report_entry.py`
 
 ```python
 class EntrySpread(TypedDict):
     """Weighted spread of one reported entry across the draws of a sample: the
-    block under the key `interval` of the entry."""
+    block under the key `spread` of the entry."""
 
     mean: float
     median: float
@@ -538,7 +538,7 @@ class InitialAmountEntry(TypedDict):
     amount: float | None
     unit: str | None
     calibrated: bool
-    interval: NotRequired[EntrySpread]
+    spread: NotRequired[EntrySpread]
 ```
 
 ## CategorySplitEntry
@@ -556,7 +556,7 @@ class CategorySplitEntry(TypedDict):
     group: list[str]
     fraction: float
     calibrated: bool
-    interval: NotRequired[EntrySpread]
+    spread: NotRequired[EntrySpread]
 ```
 
 ## SimulationReport
