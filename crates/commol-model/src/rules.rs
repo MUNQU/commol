@@ -79,11 +79,17 @@ pub fn check_fractions(
 }
 
 /// Check one split of `owner`, the stratification it belongs to as a message
-/// names it.
+/// names it. A split of no category passes: it has no sum to check, and the
+/// check of the categories against the process
+/// ([`crate::builder::check_model`]) names what it lacks.
 fn check_split<'a>(
     owner: &str,
     split: impl IntoIterator<Item = (&'a String, &'a f64)>,
 ) -> Result<(), String> {
+    let mut split = split.into_iter().peekable();
+    if split.peek().is_none() {
+        return Ok(());
+    }
     let mut sum = 0.0;
     for (category, &fraction) in split {
         FRACTION

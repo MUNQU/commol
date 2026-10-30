@@ -217,17 +217,6 @@ class ModelStructure(BaseModel, ABC):
             for name in commol_rs.engine.ModelKind(engine_json(self.kind)).value_types()
         )
 
-    def uncalibrated_values(self) -> list[str]:
-        """
-        Ids of the values of this kind that need calibration before a run.
-
-        Returns
-        -------
-        list[str]
-            Empty unless the kind has values left unset.
-        """
-        return []
-
     def check_calibration_values(
         self,
         model: "Model[Self]",  # noqa: ARG002

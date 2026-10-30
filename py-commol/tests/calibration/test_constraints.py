@@ -293,5 +293,5 @@ class TestMatrixConstraints:
             seed=SEED,
         )
 
-        with pytest.raises(ValueError, match="the scale 'a1' of matrix 'M' has no"):
+        with pytest.raises(ValueError, match=r'the parameters \["a1"\] have no value'):
             Calibrator(Simulation(self._model(None, None)), problem)

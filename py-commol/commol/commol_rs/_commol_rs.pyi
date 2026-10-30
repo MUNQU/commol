@@ -68,6 +68,7 @@ class EngineModule(Protocol):
     ModelKind: type[ModelKindProtocol]
 
 class ModelModule(Protocol):
+    CATEGORY_SEPARATOR: str
     FRACTIONS_BY: str
     NEIGHBORS: str
     NEIGHBORS_PREFIX: str
@@ -95,6 +96,9 @@ class ModelModule(Protocol):
         every: tuple[float, float] | None,
     ) -> None: ...
     def check_series(self, data: list[tuple[float, float]]) -> None: ...
+    def resolve_category(
+        self, category: str, stratifications: list[tuple[str, list[str]]]
+    ) -> tuple[str, str]: ...
     def expanded_outputs(
         self, process: str
     ) -> tuple[

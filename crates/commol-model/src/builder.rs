@@ -1,6 +1,6 @@
 //! Expansion of a model and its compilation into a [`CompiledModel`].
 
-use crate::flows::{PlannedFlow, plan_transition_flows};
+use crate::flows::{PlannedFlow, check_transition_kinds, plan_transition_flows};
 use crate::helpers::stratification_conditions_met;
 use crate::labels::OutputLabels;
 use crate::layout::CompartmentLayout;
@@ -302,6 +302,10 @@ impl CompiledModel {
             .collect();
 
         let num_compartments = compartments.len();
+        let bin_amounts = &aggregate.initial_conditions.bin_amounts;
+        let unvalued_compartments = (0..num_compartments)
+            .filter(|&idx| matches!(bin_amounts.get(&output_labels[idx].source), Some(None)))
+            .collect();
         let flow_changes = transition_flows
             .iter()
             .map(|flow| FlowChange::of(flow, num_compartments))
@@ -337,6 +341,13 @@ impl CompiledModel {
             total_parameter_index,
             t_parameter_index,
             requires_compartment_context,
+            unvalued_parameters: model
+                .parameters
+                .iter()
+                .filter(|parameter| parameter.value.is_none())
+                .map(|parameter| parameter.id.clone())
+                .collect(),
+            unvalued_compartments,
         })
     }
 }
@@ -679,6 +690,7 @@ pub fn initial_state(
 ) -> Result<Vec<InitialCompartment>, String> {
     let initial_conditions = &aggregate.initial_conditions;
     let bin_amounts = &initial_conditions.bin_amounts;
+    check_bin_amounts(process, initial_conditions)?;
     for (bin, amount) in bin_amounts {
         if let Some(amount) = amount {
             crate::rules::check_bin_amount(bin, *amount)?;
@@ -743,6 +755,49 @@ pub fn initial_state(
     }
 
     Ok(state)
+}
+
+/// Check that the process of an aggregate model has a bin and a transition:
+/// a model without flows has nothing to run.
+///
+/// # Errors
+///
+/// Returns a message that says which of the two the process lacks.
+fn check_bins_and_transitions(process: &Process) -> Result<(), String> {
+    if process.bins.is_empty() {
+        return Err(
+            "The process has no bin; an aggregate model needs at least one bin".to_string(),
+        );
+    }
+    if process.transitions.is_empty() {
+        return Err(
+            "The process has no transition; an aggregate model needs at least one transition"
+                .to_string(),
+        );
+    }
+    Ok(())
+}
+
+/// Check that the bin amounts name each bin of `process` once, and nothing
+/// else. An amount may be `None`, a value left for calibration.
+///
+/// # Errors
+///
+/// Returns a message with the missing and the extra ids.
+pub(crate) fn check_bin_amounts(
+    process: &Process,
+    initial_conditions: &InitialConditions,
+) -> Result<(), String> {
+    let ids: Vec<&str> = process.bins.iter().map(|bin| bin.id.as_str()).collect();
+    let given = initial_conditions.bin_amounts.keys().map(String::as_str);
+    let (missing, extra) = differences(&ids, given);
+    if missing.is_empty() && extra.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "Initial bin amounts keys must exactly match bin ids. Missing ids: {missing:?}, \
+         Extra ids: {extra:?}."
+    ))
 }
 
 /// Check the fractions of an aggregate structure against the stratifications
@@ -1111,8 +1166,13 @@ pub fn subgroup_total_names(process: &Process) -> Vec<String> {
 pub fn check_model(model: &Model) -> Result<(), String> {
     let aggregate = model.aggregate()?;
     let process = &model.process;
+    model.check_ids()?;
+    process.check_categories()?;
+    check_bins_and_transitions(process)?;
     process.check_conditions()?;
+    check_transition_kinds(process)?;
     aggregate.check(process)?;
+    check_bin_amounts(process, &aggregate.initial_conditions)?;
     check_stratification_fractions(process, &aggregate.initial_conditions)?;
     check_formulas(model)?;
     check_engine_variable_ids(model, process)?;
@@ -1992,6 +2052,41 @@ mod tests {
         ("sub", [("s1", s1), ("s2", s2)])
     }
 
+    /// A transition `ab` from A to B at `rate`.
+    fn transition_ab(rate: &str) -> commol_core::Transition {
+        commol_core::Transition {
+            id: "ab".to_string(),
+            source: vec!["A".to_string()],
+            target: vec!["B".to_string()],
+            accumulators: vec![],
+            rate: Some(rate.to_string()),
+            stratified_rates: None,
+            per_compartment: None,
+            impulse_at: None,
+            impulse_every: None,
+        }
+    }
+
+    /// Give the bin `from` the id `to`, in the process and in the amounts.
+    fn rename_bin(model: &mut Model, from: &str, to: &str) {
+        let process = &mut model.process;
+        let ids = process.bins.iter_mut().map(|bin| &mut bin.id).chain(
+            process
+                .transitions
+                .iter_mut()
+                .flat_map(|transition| transition.source.iter_mut().chain(&mut transition.target)),
+        );
+        for id in ids.filter(|id| *id == from) {
+            *id = to.to_string();
+        }
+        let amounts = &mut aggregate_mut(model).initial_conditions.bin_amounts;
+        let amount = amounts.shift_remove(from).unwrap();
+        amounts.insert(to.to_string(), amount);
+    }
+
+    /// Bins A and B of 1000 and 0, the transition `ab` from A to B at `0`,
+    /// and the stratifications, their fractions and the compartment amounts
+    /// given.
     fn make_model(
         stratifications: Vec<Stratification>,
         stratification_fractions: Vec<Fractions>,
@@ -2017,7 +2112,7 @@ mod tests {
                 accumulators: vec![],
                 stratifications,
                 matrices: vec![],
-                transitions: vec![],
+                transitions: vec![transition_ab("0")],
             },
             structure: ModelStructure::Aggregate(Aggregate {
                 variant: None,
@@ -2195,7 +2290,7 @@ mod tests {
     }
 
     fn model_with_rate(rate: &str) -> Model {
-        use commol_core::{Parameter, ParameterValue, Transition};
+        use commol_core::{Parameter, ParameterValue};
         let sub = Stratification {
             id: "sub".to_string(),
             categories: vec!["s1".to_string(), "s2".to_string()],
@@ -2211,17 +2306,7 @@ mod tests {
             value: Some(ParameterValue::Constant(0.1)),
             description: None,
         }];
-        model.process.transitions = vec![Transition {
-            id: "ab".to_string(),
-            source: vec!["A".to_string()],
-            target: vec!["B".to_string()],
-            accumulators: vec![],
-            rate: Some(rate.to_string()),
-            stratified_rates: None,
-            per_compartment: None,
-            impulse_at: None,
-            impulse_every: None,
-        }];
+        model.process.transitions = vec![transition_ab(rate)];
         model
     }
 
@@ -2384,7 +2469,7 @@ mod tests {
     fn an_engine_variable_is_not_a_parameter_bin_or_accumulator_id() {
         let parameter = model_with_parameter("step");
         let mut bin = model_with_rate("k");
-        bin.process.bins[1].id = "t".to_string();
+        rename_bin(&mut bin, "B", "t");
         let mut accumulator = model_with_rate("k");
         accumulator.process.accumulators = vec![commol_core::Accumulator {
             id: "total".to_string(),
@@ -2405,7 +2490,7 @@ mod tests {
     fn a_name_of_the_neighbors_is_not_a_parameter_bin_or_accumulator_id() {
         let parameter = model_with_parameter("neighbors_A");
         let mut bin = model_with_rate("k");
-        bin.process.bins[1].id = "neighbors".to_string();
+        rename_bin(&mut bin, "B", "neighbors");
 
         for (model, conflict) in [
             (parameter, "parameter 'neighbors_A'"),
@@ -2469,7 +2554,7 @@ mod tests {
             vec![("group", halves), ("type", halves)],
             vec![],
         );
-        model.process.bins[0].id = "total_y".to_string();
+        rename_bin(&mut model, "A", "total_y");
 
         let error = check_model(&model).expect_err("total_y_y names two sums");
         assert!(error.contains("'total_y_y'"), "{error}");
@@ -2482,7 +2567,7 @@ mod tests {
             vec![group_fractions(0.5, 0.5)],
             vec![],
         );
-        model.process.bins[0].id = "total_x".to_string();
+        rename_bin(&mut model, "A", "total_x");
 
         assert!(check_model(&model).is_ok());
     }

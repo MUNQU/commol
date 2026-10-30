@@ -87,6 +87,34 @@ class TestIds:
         with pytest.raises(ValueError, match="Invalid bin, compartment or category .X"):
             Calibrator(Simulation(build(abc_builder())), problem)
 
+    @pytest.mark.parametrize(
+        ("parameter_id", "missing"),
+        [
+            ("B_g1", r'the amounts of the compartments \["B_g2"\]'),
+            ("g1", r'the amounts of the bins \["B"\]'),
+            ("group:g1", r'the amounts of the bins \["B"\]'),
+        ],
+    )
+    def test_a_bin_left_to_calibrate_needs_a_value_in_each_compartment(
+        self, parameter_id: str, missing: str
+    ) -> None:
+        """A split of a category shares out what a bin holds, so it gives no value."""
+        model = build(
+            a_to_b_builder(
+                amounts={"A": 1000, "B": None},
+                stratifications={"group": {"g1": 0.5, "g2": 0.5}},
+            )
+        )
+        problem = CalibrationProblem(
+            observed_data=[ObservedDataPoint(at=1, output="B_g1", value=10.0)],
+            parameters=[bounded(parameter_id, 0.0, 1.0, kind="initial_condition")],
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=5),
+        )
+
+        with pytest.raises(ValueError, match=f"^The model cannot run: {missing}"):
+            Calibrator(Simulation(model), problem)
+
 
 def _abc(b_amount: float | None, k1: float | None = 0.3) -> Model:
     return build(

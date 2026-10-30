@@ -136,12 +136,14 @@ impl StochasticEvents {
     }
 
     /// Run through the last of `positions`, writing the state at each of them
-    /// into `buffer`.
+    /// into `buffer`, once the model has every value
+    /// ([`CompiledModel::check_values`]).
     fn run_to(
         &mut self,
         positions: &[f64],
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), SimulationError> {
+        self.units.model.check_values()?;
         commol_core::check_positions(positions, self.position, |position| {
             EngineType::StochasticEvents.check_position(position)
         })?;

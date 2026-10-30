@@ -426,6 +426,15 @@ pub struct CompiledModel {
     /// expression context. JIT-resolved transition formulas read compartments
     /// directly from the state and do not need this HashMap update.
     pub(crate) requires_compartment_context: bool,
+    /// The ids of the parameters the model gives no value, to calibrate. A
+    /// run needs a value for each one ([`CompiledModel::check_values`]):
+    /// [`CompiledModel::set_parameter`] gives it.
+    pub(crate) unvalued_parameters: Vec<String>,
+    /// The compartments of the bins whose amount the model leaves to
+    /// calibrate that no value has reached since, in engine order:
+    /// [`CompiledModel::set_initial_condition`] removes the compartment it
+    /// writes, and [`CompiledModel::keep_unvalued`] keeps it.
+    pub(crate) unvalued_compartments: Vec<usize>,
 }
 
 #[cfg(test)]

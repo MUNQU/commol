@@ -2,9 +2,11 @@
 
 import pytest
 
-from commol import ModelBuilder, Simulation
+from pydantic import ValidationError
+
+from commol import Aggregate, ModelBuilder, Simulation
 from commol._model.stratification import Stratification
-from tests.support import abc_builder, assert_total_conserved, build
+from tests.support import a_to_b_builder, abc_builder, assert_total_conserved, build
 
 GROUP = {"g1": 0.8, "g2": 0.2}
 STATUS = {"s1": 0.7, "s2": 0.3}
@@ -121,15 +123,30 @@ class TestCategories:
     @pytest.mark.parametrize(
         ("categories", "message"),
         [
-            ([], "'g' must have at least one category"),
-            (["g1", "g2", "g1"], r"must not be repeated. Found duplicates: \['g1'\]"),
+            ([], "Stratification 'g' has no category; give it at least one"),
+            (
+                ["g1", "g2", "g1"],
+                "Stratification 'g' names the category 'g1' twice; name each "
+                "category once",
+            ),
         ],
     )
-    def test_a_stratification_has_distinct_categories(
-        self, categories: list[str], message: str
+    @pytest.mark.parametrize("fractions", [{}, {"g": {}}])
+    def test_build_refuses_a_stratification_without_distinct_categories(
+        self, categories: list[str], message: str, fractions: dict
     ) -> None:
-        with pytest.raises(ValueError, match=message):
-            ModelBuilder(name="m").add_stratification(id="g", categories=categories)
+        builder = a_to_b_builder()
+        builder.add_stratification(id="g", categories=categories)
+        builder.set_structure(
+            Aggregate(
+                bin_amounts={"A": 1000, "B": 0}, stratification_fractions=fractions
+            )
+        )
+
+        with pytest.raises(ValidationError) as error:
+            build(builder)
+
+        assert error.value.errors()[0]["msg"] == f"Value error, {message}"
 
     def test_stratifications_of_one_id_are_one_member_of_a_set(self) -> None:
         first = Stratification(id="g", categories=["g1"])

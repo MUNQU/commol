@@ -281,6 +281,10 @@ impl SimulationEngine for Engine {
         dispatch!(self, engine => engine.set_parameter(parameter_id, value))
     }
 
+    fn check_values(&self) -> Result<(), String> {
+        dispatch!(self, engine => engine.check_values())
+    }
+
     fn current_position(&self) -> f64 {
         dispatch!(self, engine => engine.current_position())
     }
@@ -398,11 +402,13 @@ impl PyEngine {
     ///     one unit apart, and one output row per position
     ///
     /// Raises:
+    ///     ValueError: If a parameter or an initial amount has no value
     ///     InfeasibleStateError: If the state leaves the values the model
     ///         allows, such as an amount below zero
     ///     RuntimeError: If the simulation fails for another reason
     fn run(&mut self, num_steps: i64) -> PyResult<(Vec<f64>, Vec<Vec<f64>>)> {
         let num_steps: u32 = crate::counts::count(&commol_core::NUM_STEPS, num_steps)?;
+        self.inner.check_values().map_err(PyValueError::new_err)?;
         let trajectory =
             SimulationEngine::run(&mut self.inner, num_steps).map_err(simulation_error)?;
         Ok((trajectory.positions, trajectory.rows))
@@ -427,7 +433,8 @@ impl PyEngine {
     ///     replicate, and one list of output rows per replicate
     ///
     /// Raises:
-    ///     ValueError: If a position is not valid for the engine
+    ///     ValueError: If a parameter or an initial amount has no value,
+    ///         or a position is not valid for the engine
     ///     InfeasibleStateError: If a replicate leaves the values the model
     ///         allows
     ///     RuntimeError: If a replicate fails for another reason
@@ -441,6 +448,7 @@ impl PyEngine {
     ) -> PyResult<(u64, Vec<f64>, Vec<u64>, Vec<Vec<Vec<f64>>>)> {
         let seed: Option<u64> = crate::counts::optional_count(&commol_core::SEED, seed)?;
         let count: u64 = crate::counts::count(&commol_core::REPLICATE_COUNT, count)?;
+        self.inner.check_values().map_err(PyValueError::new_err)?;
         let seed = commol_random::seed_or_drawn(seed);
         let mut start = self.inner.clone();
         start.reset();
@@ -472,14 +480,16 @@ impl PyEngine {
     ///     One output row per position
     ///
     /// Raises:
-    ///     ValueError: If a position is not valid for the engine (a
-    ///         difference engine reports only at integer steps), or the
-    ///         positions are not sorted and unique
+    ///     ValueError: If a parameter or an initial amount has no value, a
+    ///         position is not valid for the engine (a difference engine
+    ///         reports only at integer steps), or the positions are not
+    ///         sorted and unique
     ///     InfeasibleStateError: If the state leaves the values the model
     ///         allows, such as an amount below zero
     ///     RuntimeError: If the simulation fails for another reason
     fn run_at(&mut self, positions: Vec<f64>) -> PyResult<Vec<Vec<f64>>> {
         let engine = &mut self.inner;
+        engine.check_values().map_err(PyValueError::new_err)?;
         commol_core::check_positions(&positions, engine.current_position(), |position| {
             engine.check_position(position)
         })
@@ -490,10 +500,12 @@ impl PyEngine {
     /// Advance one step
     ///
     /// Raises:
+    ///     ValueError: If a parameter or an initial amount has no value
     ///     InfeasibleStateError: If the state leaves the values the model
     ///         allows, such as an amount below zero
     ///     RuntimeError: If the step fails for another reason
     fn step(&mut self) -> PyResult<()> {
+        self.inner.check_values().map_err(PyValueError::new_err)?;
         SimulationEngine::step(&mut self.inner).map_err(simulation_error)
     }
 

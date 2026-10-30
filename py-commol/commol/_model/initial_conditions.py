@@ -1,8 +1,10 @@
 """Initial amounts: the amount of each bin, category splits and overrides.
 
 The engine holds the rule of an initial amount (`check_bin_amount` and
-`check_compartment_amount` of `crates/commol-model/src/values.rs`): each
-amount is checked with it when the object is built or an amount changes.
+`check_compartment_amount` of `crates/commol-model/src/rules.rs`): each
+amount is checked with it when the object is built or an amount changes. It
+also resolves a category id, bare or qualified (`resolve_category` of
+`crates/commol-model/src/initial_conditions.rs`).
 """
 
 from collections.abc import Mapping
@@ -20,7 +22,7 @@ from commol._data.engine_json import engine_json
 from commol.commol_rs import _commol_rs as commol_rs
 
 # Separator of a qualified category id, as in ``group:g1``.
-CATEGORY_SEPARATOR = ":"
+CATEGORY_SEPARATOR = commol_rs.model.CATEGORY_SEPARATOR
 
 # The key of a split by category that names the earlier stratification it
 # differs by, as in ``{"by": "group", "g1": {...}, "g2": {...}}``.
@@ -142,41 +144,14 @@ class InitialConditions(BaseModel):
         commol_rs.model.check_compartment_amounts(list(value.items()))
         return value
 
-    def get_uncalibrated_bins(self) -> list[str]:
-        """
-        Get list of bin IDs that have uncalibrated amounts (value = None).
-
-        Returns
-        -------
-        list[str]
-            List of bin IDs with uncalibrated initial conditions.
-        """
-        return [bin_id for bin_id, amount in self.bin_amounts.items() if amount is None]
-
-    def get_categories_with_fractions(self) -> set[str]:
-        """
-        Get the categories that have a declared initial fraction.
-
-        Returns
-        -------
-        set[str]
-            Category names collected from ``stratification_fractions``, the
-            categories of each split of a split by category included. A
-            category declared on a stratification but absent from the initial
-            conditions is not included.
-        """
-        return {
-            category
-            for fractions in self.stratification_fractions.values()
-            for category in split_categories(fractions)
-        }
-
     def resolve_category(self, category: str) -> tuple[str, str]:
         """
         Resolve a category id to its stratification and its bare name.
 
         A qualified id (``group:g1``) names the stratification. A bare name
-        must be declared by exactly one stratification.
+        must be declared by exactly one stratification. The engine resolves
+        it (``commol_rs.model.resolve_category``) among the categories of the
+        fractions, as a calibrated initial condition resolves.
 
         Parameters
         ----------
@@ -193,27 +168,13 @@ class InitialConditions(BaseModel):
         ValueError
             If the category is not found or a bare name is ambiguous.
         """
-        stratification_id, separator, name = category.rpartition(CATEGORY_SEPARATOR)
-        owners = [
-            stratification
-            for stratification, fractions in self.stratification_fractions.items()
-            if (not separator or stratification == stratification_id)
-            and name in split_categories(fractions)
-        ]
-        if len(owners) > 1:
-            qualified = " or ".join(
-                f"'{owner}{CATEGORY_SEPARATOR}{name}'" for owner in owners
-            )
-            raise ValueError(
-                f"Category '{category}' is ambiguous: it is declared by "
-                f"stratifications {owners}. Qualify it as {qualified}."
-            )
-        if not owners:
-            raise ValueError(
-                f"Category '{category}' not found in initial conditions. "
-                f"Available categories: {sorted(self.get_categories_with_fractions())}"
-            )
-        return owners[0], name
+        return commol_rs.model.resolve_category(
+            category,
+            [
+                (stratification, split_categories(fractions))
+                for stratification, fractions in self.stratification_fractions.items()
+            ],
+        )
 
     def category_id(self, stratification: str, category: str) -> str:
         """

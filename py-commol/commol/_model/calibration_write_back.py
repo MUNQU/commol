@@ -9,7 +9,6 @@ from commol._model.engine_state import (
     calibrated_initial_state,
     initial_state,
 )
-from commol._model.initial_conditions import CATEGORY_SEPARATOR
 
 if TYPE_CHECKING:
     from commol._model.aggregate import Aggregate
@@ -76,7 +75,12 @@ def calibrated_structure[S: "Aggregate"](
         problem.initial_condition_remainder,
     )
 
-    candidate = _declared_update(model, scored.values, scored.state, scored.covered)
+    candidate = _declared_update(
+        model,
+        {param_id: scored.values[param_id] for param_id in scored.categories},
+        scored.state,
+        scored.covered,
+    )
     rebuilt = initial_state(process, candidate)
     bin_amounts = _bin_amounts(rebuilt, scored.state)
     target = scored.state
@@ -97,12 +101,15 @@ def calibrated_structure[S: "Aggregate"](
 
 def _declared_update[S: "Aggregate"](
     model: "Model[S]",
-    applied: Mapping[str, float],
+    category_fractions: Mapping[str, float],
     scored: Mapping[str, float],
     covered: Sequence[str],
 ) -> S:
     """
     Copy of the structure with bin and category values written back.
+
+    ``category_fractions`` holds the applied value of each id that the engine
+    resolves as the split of a category.
 
     Every bin whose every compartment a calibrated value or the remainder
     sets takes the amount the engine gave it; a bin of which a value sets only
@@ -112,8 +119,6 @@ def _declared_update[S: "Aggregate"](
     skipped; the pins that follow cover the compartments it would have set.
     """
     candidate = model.structure.model_copy(deep=True)
-    bin_ids = {bin_item.id for bin_item in model.process.bins}
-    categories = candidate.get_categories_with_fractions()
     state = initial_state(model.process, model.structure)
 
     covered_names = set(covered)
@@ -123,12 +128,6 @@ def _declared_update[S: "Aggregate"](
         bin_id: amount
         for bin_id, amount in _bin_amounts(state, scored).items()
         if bin_id in touched_bins
-    }
-    category_fractions = {
-        param_id: value
-        for param_id, value in applied.items()
-        if param_id not in bin_ids
-        and (CATEGORY_SEPARATOR in param_id or param_id in categories)
     }
 
     candidate.update_bin_amounts(bin_amounts)

@@ -124,14 +124,16 @@ impl DifferentialEquations {
     ///
     /// # Errors
     ///
-    /// Returns a message when the positions are not sorted, unique, finite,
-    /// non-negative and not before the current time, when a rate cannot be
-    /// evaluated, or when the solver fails.
+    /// Returns a message when a value of the model is missing
+    /// ([`CompiledModel::check_values`]), when the positions are not sorted,
+    /// unique, finite, non-negative and not before the current time, when a
+    /// rate cannot be evaluated, or when the solver fails.
     fn integrate_to(
         &mut self,
         positions: &[f64],
         buffer: &mut Vec<Vec<f64>>,
     ) -> Result<(), String> {
+        self.model.check_values()?;
         commol_core::check_positions(positions, self.current_time, |position| {
             EngineType::DifferentialEquations.check_position(position)
         })?;

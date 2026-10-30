@@ -102,7 +102,75 @@ impl CompiledModel {
         }
         crate::rules::check_compartment_amount(&self.compartments[compartment_index], value)?;
         self.initial_state[compartment_index] = value;
+        self.unvalued_compartments
+            .retain(|&unvalued| unvalued != compartment_index);
         Ok(())
+    }
+
+    /// Of `indices`, the compartments that no value has reached of a bin
+    /// whose amount the model leaves to calibrate.
+    pub(crate) fn unvalued_of(&self, indices: &[usize]) -> Vec<usize> {
+        indices
+            .iter()
+            .copied()
+            .filter(|idx| self.unvalued_compartments.contains(idx))
+            .collect()
+    }
+
+    /// Mark `indices` again as compartments that no value has reached, after
+    /// a write that only splits the amounts already there, as the split of a
+    /// category does: a share of nothing is not a value.
+    pub(crate) fn keep_unvalued(&mut self, indices: &[usize]) {
+        for &idx in indices {
+            if !self.unvalued_compartments.contains(&idx) {
+                self.unvalued_compartments.push(idx);
+            }
+        }
+        self.unvalued_compartments.sort_unstable();
+    }
+
+    /// Check that a run has every value: each parameter has one, from the
+    /// model or from [`Self::set_parameter`], and each compartment of a bin
+    /// whose amount the model leaves to calibrate has had a value written to
+    /// it ([`Self::set_initial_condition`]), as a calibration does. Every
+    /// engine of the aggregate kind checks it before it runs.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names every parameter without a value, every
+    /// bin of which no compartment has a value, and every other compartment
+    /// without a value.
+    pub fn check_values(&self) -> Result<(), String> {
+        let parameters: Vec<&str> = self
+            .unvalued_parameters
+            .iter()
+            .map(String::as_str)
+            .filter(|&id| self.expression_context.get_parameter(id).is_none())
+            .collect();
+        let mut bins: Vec<&str> = Vec::new();
+        let mut compartments: Vec<&str> = Vec::new();
+        for &idx in &self.unvalued_compartments {
+            let bin = self.output_labels[idx].source.as_str();
+            let whole = (0..self.compartments.len())
+                .filter(|&other| self.output_labels[other].source == bin)
+                .all(|other| self.unvalued_compartments.contains(&other));
+            if !whole {
+                compartments.push(&self.compartments[idx]);
+            } else if !bins.contains(&bin) {
+                bins.push(bin);
+            }
+        }
+        let mut missing = Vec::new();
+        if !parameters.is_empty() {
+            missing.push(format!("the parameters {parameters:?}"));
+        }
+        if !bins.is_empty() {
+            missing.push(format!("the amounts of the bins {bins:?}"));
+        }
+        if !compartments.is_empty() {
+            missing.push(format!("the amounts of the compartments {compartments:?}"));
+        }
+        commol_core::check_missing_values(&missing)
     }
 
     /// Set the value of a parameter: a constant, or a parameter to

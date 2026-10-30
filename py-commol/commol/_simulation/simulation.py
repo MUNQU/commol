@@ -62,8 +62,9 @@ class Simulation:
         Parameters
         ----------
         model : Model
-            A fully constructed and validated model object, of any kind.
-            None values for parameters/initial conditions if used for calibration.
+            A fully constructed and validated model object, of any kind. A
+            parameter or an initial condition may have no value, for a
+            calibration; a run refuses it with the message of the engine.
 
         Raises
         ------
@@ -96,42 +97,6 @@ class Simulation:
         if model_json != self._model_json:
             logger.info("Model changed since the engine was built; rebuilding it.")
             self._build_engine(model_json)
-
-    def _validate_all_parameters_calibrated(self, model: Model) -> None:
-        """
-        Validates that every parameter, and every value of the model kind, has
-        a value (is calibrated).
-
-        Parameters
-        ----------
-        model : Model
-            The model to validate.
-
-        Raises
-        ------
-        ValueError
-            If any parameter, or any value of the model kind such as an
-            initial condition, has a None value.
-        """
-        uncalibrated_params = model.get_uncalibrated_parameters()
-        uncalibrated_ics = model.structure.uncalibrated_values()
-
-        errors = []
-        if uncalibrated_params:
-            errors.append(
-                f"Parameters requiring calibration: {', '.join(uncalibrated_params)}"
-            )
-        if uncalibrated_ics:
-            errors.append(
-                f"Initial conditions requiring calibration: "
-                f"{', '.join(uncalibrated_ics)}"
-            )
-
-        if errors:
-            raise ValueError(
-                f"Cannot run Simulation: {'; '.join(errors)}. "
-                f"Please calibrate these values before running a simulation."
-            )
 
     @property
     def is_stochastic(self) -> bool:
@@ -186,7 +151,6 @@ class Simulation:
             If a rate cannot be evaluated or is not a number; the message
             names the flow and the position.
         """
-        self._validate_all_parameters_calibrated(self.model_definition)
         self._sync_engine()
         used_seed = self._seed_run(seed)
         self._engine.reset()
@@ -241,7 +205,6 @@ class Simulation:
             names the flow and the position.
         """
         positions = [float(position) for position in at]
-        self._validate_all_parameters_calibrated(self.model_definition)
         self._sync_engine()
         used_seed = self._seed_run(seed)
         self._engine.reset()
@@ -432,7 +395,6 @@ class ReplicateRuns:
     def _replicates(self, grid: int | list[float]) -> SimulationReplicates:
         """The replicates on ``grid``: a number of steps or the positions."""
         simulation = self.simulation
-        simulation._validate_all_parameters_calibrated(simulation.model_definition)
         engine = simulation.engine
         seed, positions, seeds, runs = engine.run_replicates(
             self.seed, self.count, grid

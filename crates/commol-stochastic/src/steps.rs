@@ -109,8 +109,10 @@ impl StochasticSteps {
     /// rate is above 1, or when the proportional rates out of one compartment
     /// sum to more than 1; and when an impulse is not valid. The state stays
     /// as it was before the flows. Returns [`SimulationError::Failed`] when a
+    /// value of the model is missing ([`CompiledModel::check_values`]) or a
     /// rate cannot be evaluated.
     pub fn step(&mut self) -> Result<(), SimulationError> {
+        self.units.model.check_values()?;
         self.settle()?;
         let step = self.current_step;
         let units = &mut self.units;

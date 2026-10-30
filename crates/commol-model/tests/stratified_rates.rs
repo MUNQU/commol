@@ -63,3 +63,24 @@ fn a_set_and_one_category_of_the_same_specificity_keep_the_rate_declared_first()
         .collect();
     assert_eq!(rate_of_g3, ["k1", "k1"]);
 }
+
+#[test]
+fn the_conditions_of_a_stratified_rate_are_checked() {
+    let twice = process(
+        r#"{"conditions":[{"stratification":"group","category":"g2"},
+                          {"stratification":"group","category":"g3"}],"rate":"k1"}"#,
+    );
+    let none = process(r#"{"conditions":[],"rate":"k1"}"#);
+
+    assert_eq!(
+        describe_flows(&twice, None).err().as_deref(),
+        Some(
+            "Transition 'ab', stratified rate 0: two conditions name 'group'; give one \
+             condition per stratification"
+        )
+    );
+    assert_eq!(
+        describe_flows(&none, None).err().as_deref(),
+        Some("Transition 'ab', stratified rate 0 has no condition; give it at least one")
+    );
+}

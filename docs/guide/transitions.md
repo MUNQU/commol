@@ -478,11 +478,14 @@ simulate as written:
 
 | Rejected | Message names |
 |---|---|
-| A source or target that is neither a bin nor a category of one stratification | The transition |
+| A source or target that is neither a bin nor a category of a stratification | The transition and the ids |
+| Bins and categories in one transition | The transition, its bins and its categories |
+| Categories of several stratifications in one transition | The transition and the stratifications |
 | A category transition without exactly one source and one target | The transition |
 | A rate variable that is not a parameter, bin, compartment or special variable | The variable and the available names |
 | Several sources with a proportional rate | The transition; use an absolute rate or `$compartment` |
 | A stratified rate whose `category` conditions match no source compartment | The transition; use `to` to reach another stratification |
+| A stratified rate with no condition, or with two conditions on one stratification (`Process::check_conditions` in `crates/commol-core/src/types/process.rs`) | The transition, the stratified rate and the stratification |
 | A condition on a stratification the process does not have, with both `category` and `categories`, an empty set, a category twice, a category its stratification does not have, or `to` with `categories` (`Process::check_conditions` and `StratificationCondition::check` in `crates/commol-core/src/types/`) | The transition, the stratification and the category |
 | A `to` condition on a transition without a source | The transition; use `category` to choose the compartment it enters |
 | A flow that ends in categories no compartment has | The transition; add a `to` condition |

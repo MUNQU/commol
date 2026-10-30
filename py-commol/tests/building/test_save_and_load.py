@@ -135,7 +135,7 @@ class TestToJson:
         restored = Model.from_json(path)
 
         assert restored == model
-        assert restored.get_uncalibrated_parameters() == ["k"]
+        assert restored.parameters[0].value is None
 
     def test_an_uncalibrated_bin_amount_round_trips(self, tmp_path: Path) -> None:
         model = _model(amount=None)
@@ -145,7 +145,7 @@ class TestToJson:
         restored = Model.from_json(path)
 
         assert restored == model
-        assert restored.structure.uncalibrated_values() == ["A"]
+        assert restored.structure.bin_amounts["A"] is None
 
     @pytest.mark.parametrize(
         "array",
@@ -227,7 +227,7 @@ class TestFromJson:
             ),
             (
                 lambda p: p["parameters"].append(dict(p["parameters"][0])),
-                r"Duplicate parameter IDs found: \['k'\]",
+                "Two parameters share the id 'k'; give each parameter its own id",
             ),
         ],
         ids=["no kind", "variant", "parameter"],

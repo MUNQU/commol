@@ -47,7 +47,7 @@ class TestSimulation:
         assert simulation.outputs_for("x") == ["x"]
 
     def test_an_uncalibrated_parameter_stops_a_run(self) -> None:
-        with pytest.raises(ValueError, match="Parameters requiring calibration: k"):
+        with pytest.raises(ValueError, match=r'the parameters \["k"\] have no value'):
             Simulation(decay_model(rate=None)).run(1)
 
 
@@ -63,7 +63,10 @@ class TestCalibration:
         assert model.parameters[0].value == pytest.approx(0.3, rel=1e-4)
 
     def test_a_value_type_the_kind_does_not_accept_names_the_kind(self) -> None:
-        with pytest.raises(ValueError, match="test model does not accept"):
+        with pytest.raises(
+            ValueError,
+            match="A test model takes no values of type initial_condition; 'k' is one",
+        ):
             Calibrator(Simulation(decay_model()), _problem(kind="initial_condition"))
 
 

@@ -195,13 +195,13 @@ fn rate_of_a_g0(stratified_rates: &str) -> f64 {
 
 #[test]
 fn the_most_specific_stratified_rate_wins_and_the_first_on_a_tie() {
-    let any = r#"{"conditions":[],"rate":"r"}"#;
     let g0 = |rate: &str| {
         format!(
             r#"{{"conditions":[{{"stratification":"group","category":"g0"}}],"rate":"{rate}"}}"#
         )
     };
-    assert_eq!(rate_of_a_g0(&format!("{any},{}", g0("k1"))), 0.3);
+    // The rate of the transition, `k2`, has no condition.
+    assert_eq!(rate_of_a_g0(&g0("k1")), 0.3);
     assert_eq!(rate_of_a_g0(&format!("{},{}", g0("k1"), g0("k2"))), 0.3);
 }
 

@@ -225,7 +225,6 @@ def transition_flows(
 
 
 def check_model_values(
-    model: "Model",
     engine: "EngineProtocol",
     parameters: Sequence["CalibrationParameter"],
     remainder: str | None = None,
@@ -236,18 +235,20 @@ def check_model_values(
     The engine sets each ``parameter`` value as the calibration objective
     does, so its message names a parameter the model does not have or one
     that a formula or a series sets. ``factor`` and ``noise`` values belong
-    to no model kind. Every other type must be one the kind of the model
-    accepts (`ModelStructure.calibration_value_types`), and the engine must
-    resolve each value and the remainder as the calibration objective does,
-    so its message names the problem: an unknown id, an ambiguous category,
-    or a category of a stratification that is not binary.
+    to no model kind. The engine resolves every other value and the
+    remainder as the calibration objective does (``plan_values`` of the
+    engine of the kind), so its message names the problem: a type of value
+    the kind does not take (the test kind takes none), an unknown id, an
+    ambiguous category, or a category of a stratification that is not
+    binary. The engine then writes the values to a copy of itself and checks
+    that the model has every value a run needs: a parameter or an initial
+    amount that the model leaves without a value and the calibration does
+    not set is refused here, before the calibration starts.
 
     Parameters
     ----------
-    model : Model
-        The model the calibration runs on.
     engine : EngineProtocol
-        The engine built from it.
+        The engine built from the model the calibration runs on.
     parameters : Sequence[CalibrationParameter]
         Calibration parameters, in problem order.
     remainder : str | None
@@ -258,23 +259,10 @@ def check_model_values(
     ------
     ValueError
         If the engine does not set a parameter, the kind does not accept a
-        type of value, or a value or the remainder cannot be resolved; the
-        message of the engine names the parameter or the initial condition.
+        type of value, a value or the remainder cannot be resolved, or a
+        value the calibration does not set is missing; the message of the
+        engine names the parameter or the initial condition.
     """
-    accepted = model.structure.calibration_value_types()
-    generic = {
-        "parameter",
-        "factor",
-        "noise",
-    }
-    for param in parameters:
-        if param.parameter_type not in generic and param.parameter_type not in accepted:
-            raise ValueError(
-                f"Calibration parameter '{param.id}' is a "
-                f"{param.parameter_type} value, which a {model.structure.kind} "
-                f"model does not accept. It accepts: "
-                f"{sorted(generic | accepted)}"
-            )
     commol_rs.calibration.check_model_values(
         engine,
         engine_json(list(parameters)),
@@ -330,11 +318,14 @@ class CalibratedInitialState(NamedTuple):
     covered : list[str]
         Compartments whose amount a calibrated bin or compartment value, or
         the remainder, sets.
+    categories : list[str]
+        The parameter ids the engine resolves as the split of a category.
     """
 
     values: dict[str, float]
     state: dict[str, float]
     covered: list[str]
+    categories: list[str]
 
 
 def calibrated_initial_state[S: "Aggregate"](
@@ -365,7 +356,8 @@ def calibrated_initial_state[S: "Aggregate"](
     Returns
     -------
     CalibratedInitialState
-        The values the engine applied and the state it built.
+        The values the engine applied, the state it built and the values it
+        resolves as category splits.
 
     Raises
     ------
@@ -380,10 +372,16 @@ def calibrated_initial_state[S: "Aggregate"](
         list(values),
         initial_condition_remainder=remainder,
     )
+    coverage, _ = initial_condition_coverage(engine, parameters, remainder)
     return CalibratedInitialState(
         values=dict(zip((param.id for param in parameters), applied, strict=True)),
         state=dict(zip(engine.compartments, state, strict=True)),
         covered=[engine.compartments[index] for index in covered],
+        categories=[
+            param.id
+            for param, compartments in zip(parameters, coverage, strict=True)
+            if not compartments
+        ],
     )
 
 

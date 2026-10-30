@@ -125,12 +125,24 @@ whose every compartment a value or the remainder sets and the split of every
 calibrated category, and pins as per-compartment overrides every compartment
 that these cannot reproduce.
 
-An id names, in this order: an expanded compartment (`A_g1`), a qualified
-category (`group:g1`), a bin or a bin prefix (`A`, or `A_g1` over a deeper
-stratification), or a category of exactly one binary stratification (`g1`)
-(`InitialConditionPlan::new`). The plan matches categories on the labels of
-the compartments, never on their names. A bare category that two
-stratifications declare is an error that names the qualified ids.
+An id names, in this order: an expanded compartment (`A_g1`), a bin or a bin
+prefix (`A`, or `A_g1` over a deeper stratification) when it holds no `:`,
+or a category of a binary stratification, qualified (`group:g1`) or bare
+(`g1`) when one stratification has it (`InitialConditionPlan::new`). The plan
+matches categories on the labels of the compartments, never on their names.
+One function resolves a category id, `resolve_category` in
+`crates/commol-model/src/initial_conditions.rs`, with the one separator
+`CATEGORY_SEPARATOR`: the plan asks it among the categories the compartments
+have, and `Aggregate.resolve_category` asks it through the binding
+`commol_rs.model.resolve_category` (`resolve_declared_category`, which adds
+the message of an unknown category) among the categories of the fractions.
+A qualified id matches a whole stratification id, the separator and a whole
+category id, never a split at one `:`, because ids have no rule on their
+characters. A bare category that two stratifications declare is an error
+that names them and the qualified ids. The write-back of a calibration
+(`_model/calibration_write_back.py`) takes as categories the values the
+engine resolves as category splits (`CalibratedInitialState.categories`,
+from `initial_condition_coverage`).
 
 **Rule:** the plan reads the initial state of the engine
 (`CompartmentalEngine::initial_state`), never its current state: the split of
@@ -151,6 +163,7 @@ nothing.
 `crates/commol-model/tests/initial_conditions.rs::a_prefix_that_starts_empty_keeps_its_declared_split`,
 `tests/calibration/test_initial_conditions.py::test_a_calibrated_amount_keeps_the_split_by_category`,
 `crates/commol-model/src/initial_conditions.rs::category_shared_by_two_stratifications_is_ambiguous`,
+`tests/initial_conditions/test_stratification_fractions.py::test_an_ambiguous_category_is_refused`,
 `tests/calibration/test_initial_conditions.py::test_a_calibrator_on_a_simulation_that_has_run_splits_a_bin_by_the_initial_state`.
 
 ## The remainder keeps the sum the model declares

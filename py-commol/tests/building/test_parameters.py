@@ -78,22 +78,12 @@ class TestUncalibratedParameters:
     def test_a_parameter_with_a_value_is_calibrated(self) -> None:
         assert Parameter(id="k2", value=0.05).is_calibrated()
 
-    def test_the_model_lists_the_parameters_without_a_value(self) -> None:
-        model = build(
-            abc_builder(
-                parameters={"k1": None, "k2": 0.05, "delta": None},
-            )
-        )
-
-        assert model.get_uncalibrated_parameters() == ["k1", "delta"]
-
     def test_update_parameters_sets_the_values(self) -> None:
         model = build(abc_builder(parameters={"k1": None, "k2": None}))
 
         model.update_parameters({"k1": 0.1, "k2": 0.05})
 
         assert [p.value for p in model.parameters] == [0.1, 0.05]
-        assert model.get_uncalibrated_parameters() == []
 
     def test_update_parameters_rejects_an_unknown_id(self) -> None:
         model = build(abc_builder(parameters={"k1": None, "k2": None}))
@@ -233,6 +223,7 @@ class TestValues:
         model = build(a_to_b_builder(amounts={"A": 500, "B": None}))
 
         with pytest.raises(
-            ValueError, match="Initial conditions requiring calibration: B"
+            ValueError,
+            match=r'the amounts of the bins \["B"\] have no value',
         ):
             Simulation(model).run(2)

@@ -290,6 +290,24 @@ fn check_series(data: Vec<(f64, f64)>) -> PyResult<()> {
     commol_model::rules::check_series(&data).map_err(value_error)
 }
 
+/// The stratification and the bare name of a category id of the initial
+/// conditions, bare (`g1`) or qualified (`group:g1`), among the
+/// stratifications given with their categories
+///
+/// Raises:
+///     ValueError: If no stratification has the category, with the
+///         categories there are, or a bare category is in several
+///         stratifications, with each of them and the qualified ids
+#[pyfunction]
+fn resolve_category(
+    category: &str,
+    stratifications: Vec<(String, Vec<String>)>,
+) -> PyResult<(String, String)> {
+    commol_model::resolve_declared_category(category, &stratifications)
+        .map(|(stratification, name)| (stratification.to_string(), name.to_string()))
+        .map_err(value_error)
+}
+
 /// Register the model helpers with the Python module
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(initial_state, m)?)?;
@@ -303,6 +321,9 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(check_fractions, m)?)?;
     m.add_function(wrap_pyfunction!(check_impulse, m)?)?;
     m.add_function(wrap_pyfunction!(check_series, m)?)?;
+    m.add_function(wrap_pyfunction!(resolve_category, m)?)?;
+    let separator = commol_model::CATEGORY_SEPARATOR.to_string();
+    m.add("CATEGORY_SEPARATOR", separator)?;
     m.add("FRACTIONS_BY", commol_core::FRACTIONS_BY)?;
     m.add("NEIGHBORS", commol_core::NEIGHBORS)?;
     m.add("NEIGHBORS_PREFIX", commol_core::NEIGHBORS_PREFIX)?;

@@ -251,10 +251,7 @@ fn a_value_that_reads_a_parameter_without_a_value_fails_where_it_is_read() {
     let applied = impulse.apply_impulses(1.0, &mut state.clone()).unwrap_err();
 
     for error in [&program, &rate] {
-        assert!(
-            error.contains("Parameter index '") && error.ends_with("' not found"),
-            "{error}"
-        );
+        assert!(error.ends_with("the parameter 'k' has no value"), "{error}");
     }
     assert!(
         threshold.starts_with("Failed to evaluate the time threshold 'k'"),

@@ -385,16 +385,17 @@ class TestUpdateStratificationFractions:
 
         assert _fractions_of(model, "tier") == {"low": 0.5, "mid": 0.3, "high": 0.2}
 
-    def test_a_bare_shared_category_is_rejected_as_ambiguous(self) -> None:
-        model = build(shared_category_builder())
 
-        with pytest.raises(ValueError) as error:
-            model.structure.update_stratification_fractions({"c1": 0.6})
+def test_an_ambiguous_category_is_refused() -> None:
+    model = build(shared_category_builder())
 
-        assert str(error.value) == (
-            "Category 'c1' is ambiguous: it is declared by stratifications "
-            "['group', 'level']. Qualify it as 'group:c1' or 'level:c1'."
-        )
+    with pytest.raises(ValueError) as error:
+        model.structure.update_stratification_fractions({"c1": 0.6})
+
+    assert str(error.value) == (
+        "Category 'c1' is ambiguous: it is declared by stratifications "
+        "[\"group\", \"level\"]. Qualify it as 'group:c1' or 'level:c1'."
+    )
 
 
 class TestQualifiedCategoryReads:

@@ -42,6 +42,28 @@ impl Model {
         self.engine.engine_type().check_kind(self.structure.kind())
     }
 
+    /// Check that no two parameters share an id, and the ids of the process
+    /// ([`Process::check_ids`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the kind of object and the first id it
+    /// finds twice.
+    pub fn check_ids(&self) -> Result<(), String> {
+        for (position, parameter) in self.parameters.iter().enumerate() {
+            if self.parameters[..position]
+                .iter()
+                .any(|earlier| earlier.id == parameter.id)
+            {
+                return Err(format!(
+                    "Two parameters share the id '{}'; give each parameter its own id",
+                    parameter.id
+                ));
+            }
+        }
+        self.process.check_ids()
+    }
+
     /// The aggregate structure of the model.
     ///
     /// # Errors

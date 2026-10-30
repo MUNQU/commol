@@ -154,7 +154,7 @@ class TestReplicates:
             _stochastic().replicates(count)  # ty: ignore[invalid-argument-type]
 
     def test_an_uncalibrated_parameter_stops_the_replicates(self) -> None:
-        with pytest.raises(ValueError, match="Parameters requiring calibration: k"):
+        with pytest.raises(ValueError, match=r'the parameters \["k"\] have no value'):
             _stochastic(rate=None).replicates(2, seed=1).run(1)
 
 

@@ -219,7 +219,8 @@ fn calibrated_initial_state(
 }
 
 /// Check that the engine sets every parameter and resolves every value of
-/// its model kind, such as an initial condition, and the remainder
+/// its model kind, such as an initial condition, and the remainder, and that
+/// the model has every value a run needs once they are written
 ///
 /// Args:
 ///     engine: The simulation engine
@@ -233,7 +234,8 @@ fn calibrated_initial_state(
 ///         does not have, or one a formula or a series sets), the kind does
 ///         not accept a type of value, or a value or the remainder cannot be
 ///         resolved; for example a category of a stratification that is not
-///         binary
+///         binary; or if the model still lacks a value that the
+///         calibration does not set
 #[pyfunction]
 #[pyo3(signature = (engine, parameters, initial_condition_remainder=None))]
 fn check_model_values(
@@ -277,7 +279,7 @@ fn initial_condition_coverage(
     initial_condition_remainder: Option<String>,
 ) -> PyResult<(Vec<Vec<usize>>, Vec<usize>)> {
     let parameters: Vec<CalibrationParameter> = crate::json::read(parameters)?;
-    commol_calibration::check_model_values(
+    commol_calibration::plan_model_values(
         &engine.engine(),
         &parameters,
         initial_condition_remainder.as_deref(),

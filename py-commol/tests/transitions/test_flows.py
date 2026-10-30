@@ -1,6 +1,7 @@
 """Transition flows: what the engine simulates is what is printed."""
 
 import pytest
+from pydantic import ValidationError
 
 from commol import Aggregate
 from commol._model.engine_state import transition_flows
@@ -26,6 +27,46 @@ def _group_model() -> Model:
             stratifications={"group": {"g1": 0.5, "g2": 0.5}},
         ).add_transition(id="move", source=["g1"], target=["g2"], rate="a")
     )
+
+
+@pytest.mark.parametrize(
+    ("source", "target", "message"),
+    [
+        (
+            ["A"],
+            ["Z"],
+            "Transition 't2' names ids that are neither bins nor categories of a "
+            'stratification: ["Z"]',
+        ),
+        (
+            ["A"],
+            ["g1"],
+            'Transition \'t2\' mixes bins (["A"]) and categories (["g1"]); a '
+            "transition moves between bins or between the categories of one "
+            "stratification",
+        ),
+        (
+            ["g1"],
+            ["h1"],
+            "Transition 't2' moves between the categories of several "
+            'stratifications (["g", "h"]); a transition moves between the '
+            "categories of one stratification",
+        ),
+    ],
+    ids=["unknown", "bin and category", "two stratifications"],
+)
+def test_the_kind_of_a_transition_is_checked(
+    source: list[str], target: list[str], message: str
+) -> None:
+    builder = a_to_b_builder(
+        stratifications={"g": {"g1": 0.5, "g2": 0.5}, "h": {"h1": 0.5, "h2": 0.5}}
+    )
+    builder.add_transition(id="t2", source=source, target=target, rate="k")
+
+    with pytest.raises(ValidationError) as error:
+        build(builder)
+
+    assert error.value.errors()[0]["msg"] == f"Value error, {message}"
 
 
 class TestCategoryTransitions:

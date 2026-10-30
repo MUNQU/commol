@@ -52,7 +52,7 @@ pub use range::{Bound, CONFIDENCE_LEVEL, Count, Ranges, Real, Rule, Setting, che
 // Re-export simulation engine trait
 pub use simulation_engine::{
     Accuracy, AccuracySettings, ModelValue, NUM_STEPS, REPLICATE_COUNT, SEED, SimulationEngine,
-    SimulationError, Trajectory, ValuePlan, check_positions, run_replicates,
+    SimulationError, Trajectory, ValuePlan, check_missing_values, check_positions, run_replicates,
 };
 
 // The matrix an engine reads, and the public types of the types module.

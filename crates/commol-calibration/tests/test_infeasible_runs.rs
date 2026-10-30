@@ -5,16 +5,21 @@ use argmin::core::CostFunction;
 use commol_calibration::{
     CalibrationParameter, CalibrationParameterType, CalibrationProblem, LossConfig,
     NelderMeadConfig, ObservedDataPoint, OptimizationConfig, OptimizationObjective, Violation,
-    optimize,
+    check_model_values, optimize,
 };
 use commol_core::Model;
 use commol_difference::DifferenceEquations;
 
 /// A → B at the proportional rate `rate`, in discrete steps from A = 1000,
-/// with `k = 0.1` and `m`, which has no value.
+/// with `k = 0.1`, and `m`, which has no value, when the rate reads it.
 fn decay_engine(rate: &str) -> DifferenceEquations {
+    let m = if rate.contains('m') {
+        r#",{"id":"m","value":null}"#
+    } else {
+        ""
+    };
     let json = format!(
-        r#"{{"name":"m","parameters":[{{"id":"k","value":0.1}},{{"id":"m","value":null}}],
+        r#"{{"name":"m","parameters":[{{"id":"k","value":0.1}}{m}],
         "engine":{{"type":"DifferenceEquations"}},
         "process":{{"bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}}],
         "accumulators":[],"stratifications":[],
@@ -85,7 +90,7 @@ fn a_calibration_whose_bounds_include_infeasible_rates_finds_the_rate_of_the_dat
 }
 
 #[test]
-fn a_rate_that_cannot_be_evaluated_stops_the_calibration_with_its_message() {
+fn a_run_that_fails_stops_the_calibration_with_its_message() {
     let problem = problem("k * m", 0.5);
 
     let error = OptimizationObjective::new(&problem)
@@ -94,7 +99,29 @@ fn a_rate_that_cannot_be_evaluated_stops_the_calibration_with_its_message() {
         .to_string();
 
     assert!(
-        error.contains("The rate of transition 'ab' cannot be evaluated: "),
+        error.contains("The model cannot run: the parameters [\"m\"] have no value"),
         "{error}"
     );
+}
+
+#[test]
+fn a_value_that_the_calibration_leaves_missing_is_refused_before_it_runs() {
+    let k = CalibrationParameter::with_type_and_guess(
+        "k".to_string(),
+        CalibrationParameterType::Parameter,
+        0.0,
+        3.0,
+        0.5,
+    );
+
+    assert_eq!(
+        check_model_values(&decay_engine("k * m"), std::slice::from_ref(&k), None)
+            .err()
+            .as_deref(),
+        Some(
+            "The model cannot run: the parameters [\"m\"] have no value. Give them a value, \
+             or calibrate them and write the calibrated values back"
+        )
+    );
+    assert!(check_model_values(&decay_engine("k"), &[k], None).is_ok());
 }

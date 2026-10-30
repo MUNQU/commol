@@ -89,7 +89,7 @@ class TestWorkflow:
             100
         )
         model = build(abc_builder(parameters={"k1": None, "k2": None}))
-        with pytest.raises(ValueError, match="Cannot run Simulation"):
+        with pytest.raises(ValueError, match="The model cannot run"):
             Simulation(model).run(100)
         problem = CalibrationProblem(
             observed_data=observed(truth, "B", range(100)),
@@ -251,6 +251,27 @@ class TestProblemAgainstTheModel:
             ValueError, match="^Parameter 'k2' cannot be set: its formula sets it"
         ):
             self._calibrator(model, [bounded("k2")])
+
+    @pytest.mark.parametrize(
+        "engine",
+        [
+            "DifferenceEquations",
+            "DifferentialEquations",
+            "StochasticSteps",
+            "StochasticEvents",
+        ],
+    )
+    def test_a_value_that_the_calibration_leaves_missing_is_refused_at_once(
+        self, engine: str
+    ) -> None:
+        builder = abc_builder(parameters={"k1": 0.3, "k2": 0.1, "unused": None})
+        model = builder.build(builder.structure, engine=engine)
+
+        with pytest.raises(
+            ValueError,
+            match=r'^The model cannot run: the parameters \["unused"\] have no value',
+        ):
+            self._calibrator(model, [bounded("k1")])
 
     def test_a_factor_has_positive_bounds(self, truth: Model) -> None:
         with pytest.raises(ValueError, match="'f' must have positive bounds"):

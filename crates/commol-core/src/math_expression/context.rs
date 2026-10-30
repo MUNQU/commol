@@ -116,6 +116,11 @@ impl MathExpressionContext {
         self.parameter_indices.get(name).copied()
     }
 
+    /// The name of the parameter of a previously resolved index.
+    pub fn parameter_name(&self, index: usize) -> Option<&str> {
+        self.parameter_names.get(index).map(String::as_str)
+    }
+
     /// Get a parameter value by a previously resolved index.
     pub fn get_parameter_by_index(&self, index: usize) -> Option<f64> {
         self.parameter_values.get(index).and_then(|value| *value)

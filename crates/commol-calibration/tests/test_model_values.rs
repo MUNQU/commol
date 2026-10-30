@@ -48,6 +48,10 @@ impl ValuePlan for StartPlan {
 }
 
 impl SimulationEngine for StartEngine {
+    fn check_values(&self) -> Result<(), String> {
+        Ok(())
+    }
+
     type ValuePlan = StartPlan;
 
     fn check_position(&self, _position: f64) -> Result<(), String> {

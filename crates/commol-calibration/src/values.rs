@@ -161,24 +161,58 @@ pub(crate) fn configure_engine<E: SimulationEngine>(
 
 /// Check that every factor has positive bounds and the engine sets every
 /// parameter and resolves every value of its model kind and the remainder,
-/// and return the plan it resolves them to.
-///
-/// The engine sets and resolves them as the calibration objective does, so
-/// the first check that sees an id gives the engine's message, for example
-/// that the model has no such parameter or that a category needs a binary
-/// stratification.
+/// and return the plan it resolves them to: [`check_model_values`] without
+/// its check that no value is missing, for a query of some of the values,
+/// such as the compartments each initial condition sets.
 ///
 /// # Errors
 ///
 /// Returns a message that names a factor with a bound at or below 0, or the
 /// engine's message when it does not set a parameter, a value or the
 /// remainder does not resolve, or the kind does not accept a type of value.
-pub fn check_model_values<E: SimulationEngine>(
+pub fn plan_model_values<E: SimulationEngine>(
     engine: &E,
     parameters: &[CalibrationParameter],
     remainder: Option<&str>,
 ) -> Result<E::ValuePlan, String> {
     ValueWriter::new(engine, parameters, remainder).map(|writer| writer.plan)
+}
+
+/// Check that every factor has positive bounds, the engine sets every
+/// parameter and resolves every value of its model kind and the remainder,
+/// and the model has every value a run needs once they are written, and
+/// return the plan it resolves them to.
+///
+/// The engine sets and resolves them as the calibration objective does, so
+/// the first check that sees an id gives the engine's message, for example
+/// that the model has no such parameter or that a category needs a binary
+/// stratification. The values are written to a copy of the engine, each at
+/// the point of its bounds nearest 0, and the copy checks that nothing is
+/// left without a value ([`SimulationEngine::check_values`]), so a
+/// calibration that leaves a parameter or an initial amount without a value
+/// is refused before it starts.
+///
+/// # Errors
+///
+/// Returns a message that names a factor with a bound at or below 0, or the
+/// engine's message when it does not set a parameter, a value or the
+/// remainder does not resolve, the kind does not accept a type of value, or
+/// a value the calibration does not write is missing.
+pub fn check_model_values<E: SimulationEngine>(
+    engine: &E,
+    parameters: &[CalibrationParameter],
+    remainder: Option<&str>,
+) -> Result<E::ValuePlan, String> {
+    let writer = ValueWriter::new(engine, parameters, remainder)?;
+    let values: Vec<f64> = parameters
+        .iter()
+        .map(|parameter| 0.0_f64.max(parameter.min_bound).min(parameter.max_bound))
+        .collect();
+    let mut written = engine.clone();
+    written.reset();
+    writer.apply(&mut written, parameters, &values)?;
+    written.check_values()?;
+    Ok(writer.plan)
 }
 
 /// An engine with calibration values applied exactly as the calibration

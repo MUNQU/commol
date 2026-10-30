@@ -124,7 +124,27 @@ impl TestEngine {
     }
 }
 
-/// The structure and the constant parameters of a test model.
+/// Check that the parameter of the rate of each output has a value.
+///
+/// # Errors
+///
+/// Returns a message that names every parameter without a value.
+fn check_rates(outputs: &[DecayOutput], parameters: &HashMap<String, f64>) -> Result<(), String> {
+    let mut missing: Vec<&str> = outputs
+        .iter()
+        .map(|output| output.rate.as_str())
+        .filter(|rate| !parameters.contains_key(*rate))
+        .collect();
+    missing.sort_unstable();
+    missing.dedup();
+    if missing.is_empty() {
+        return Ok(());
+    }
+    commol_core::check_missing_values(&[format!("the parameters {missing:?}")])
+}
+
+/// The structure and the constant parameters of a test model, once its ids
+/// are checked ([`Model::check_ids`]).
 fn test_model(model: &Model) -> Result<(&TestStructure, HashMap<String, f64>), String> {
     let ModelStructure::Test(structure) = &model.structure else {
         return Err(format!(
@@ -133,6 +153,7 @@ fn test_model(model: &Model) -> Result<(&TestStructure, HashMap<String, f64>), S
             model.structure.kind().name()
         ));
     };
+    model.check_ids()?;
     if !model.process.is_empty() {
         return Err(format!(
             "Model '{}' is a test model, which runs no process; its process must be empty",
@@ -199,6 +220,10 @@ impl SimulationEngine for TestEngine {
 
     fn reset(&mut self) {
         self.position = 0.0;
+    }
+
+    fn check_values(&self) -> Result<(), String> {
+        check_rates(&self.outputs, &self.parameters)
     }
 
     fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
@@ -389,6 +414,10 @@ impl SimulationEngine for TestStochasticEngine {
         self.seed = seed;
         self.generator = Generator::from_seed(seed);
         self.next_event = None;
+    }
+
+    fn check_values(&self) -> Result<(), String> {
+        check_rates(&self.outputs, &self.parameters)
     }
 
     fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
