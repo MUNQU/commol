@@ -247,6 +247,21 @@ fn a_partial_bin_total_leaves_out_the_compartments() {
 }
 
 #[test]
+fn a_subgroup_total_of_a_stratification_that_expands_nothing_names_none() {
+    // `subgroup_total_names` reads a process before its conditions are checked:
+    // a condition no compartment meets leaves every compartment without a
+    // category.
+    let process: commol_core::Process = serde_json::from_str(
+        r#"{"bins":[{"id":"A","name":"A"}],"stratifications":[{"id":"g",
+        "categories":["g1","g2"],"conditions":[{"stratification":"h","category":"h1"}]}],
+        "transitions":[]}"#,
+    )
+    .expect("valid process JSON");
+
+    assert!(subgroup_total_names(&process).is_empty());
+}
+
+#[test]
 fn an_inflow_chooses_its_compartment_with_a_category_and_has_no_to() {
     let inflow = |condition: &str| {
         model(&[&transition(

@@ -57,12 +57,13 @@ pub enum StratificationFractions {
     /// each category, by category.
     Split(IndexMap<String, f64>),
     /// One split per category of the stratification `by`, declared before
-    /// the one it splits: the fraction of each category, by category of
-    /// `by` and category.
+    /// the one it splits, that the compartments of that one have: the
+    /// fraction of each category, by category of `by` and category.
     ByCategory {
         /// The id of the earlier stratification the split differs by.
         by: String,
-        /// The split of each category of `by`, by category of `by`.
+        /// The split of each category of `by` that the compartments have, by
+        /// category of `by`.
         #[serde(flatten)]
         splits: IndexMap<String, IndexMap<String, f64>>,
     },

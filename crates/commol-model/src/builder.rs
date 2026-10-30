@@ -751,8 +751,9 @@ pub fn initial_state(
 /// The fractions name every stratification once. One split names exactly the
 /// categories of its stratification. A split by category names a
 /// stratification declared before the one it splits that every compartment
-/// of that one has, one split per category of it, and in each split exactly
-/// the categories of the stratification it splits. Every split follows the
+/// of that one has, one split per category of it that those compartments
+/// have, and in each split exactly the categories of the stratification it
+/// splits. Every split follows the
 /// rule of [`crate::rules::check_fractions`].
 ///
 /// # Errors
@@ -953,7 +954,6 @@ fn subgroup_total_entries(
             .map(|(_, category)| category.as_str())
             .collect();
         if categories.is_empty() {
-            // coverage: invariant, the first stratification has no condition (Process::check_conditions)
             continue;
         }
 
@@ -1066,6 +1066,8 @@ pub fn subgroup_total_names(process: &Process) -> Vec<String> {
 /// and `neighbors`, which the structure resolves ([`commol_core::Neighbors`]).
 /// This function returns an error when:
 ///
+/// - a condition of a stratification or of a stratified rate does not fit the
+///   process ([`Process::check_conditions`]);
 /// - the variant or the neighbors of the structure do not fit the process;
 /// - the stratification fractions do not fit the stratifications
 ///   (`check_stratification_fractions`);
