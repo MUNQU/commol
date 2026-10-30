@@ -625,7 +625,7 @@ print(aggregate.subgroup_total(process, ["g2", "s1"]))   # 4000 x 0.5 = 2000
 print(aggregate.get_conditioning_categories(process, "subtype"))  # ('g2',)
 ```
 
-See [Conditional Stratifications](https://munqu.github.io/commol/latest/guide/building-models/#stratifications) for the full API.
+Two categories of one stratification are a set: `["g1", "g2"]` sums the compartments of `g1` or `g2`, as a condition on a [set of categories](https://munqu.github.io/commol/latest/guide/building-models/#a-condition-on-a-set-of-categories) selects them. See [Conditional Stratifications](https://munqu.github.io/commol/latest/guide/building-models/#stratifications) for the full API.
 
 ### Per-compartment overrides
 
@@ -990,17 +990,61 @@ builder = builder.add_stratification(
 | `description` | `str \| None`                           | `None`   | A free-text description.                                                        |
 | `conditions`  | `list[StratificationCondition] \| None` | `None`   | Splits only the compartments whose earlier categories match **all** conditions. |
 
-Each condition is `StratificationCondition(stratification=<id>, category=<category>)`, and may only name a stratification declared before this one; otherwise the call raises `ValueError`.
+Each condition is `StratificationCondition(stratification=<id>, category=<category>)`, or `categories=[...]` for a set of categories of which the compartment has one. It may only name a stratification declared before this one; otherwise the call raises `ValueError`.
 
-| Rule                       | Effect                                                                                     |
-| -------------------------- | ------------------------------------------------------------------------------------------ |
-| Expansion                  | Every bin and accumulator gets one compartment per category: `A_g1`, `A_g2`.               |
-| Several stratifications    | The expansion is the product of their categories, in declaration order: `A_g1_s1`.         |
-| Conditional stratification | Only matching compartments are split: with the code above, `A_g1`, `A_g2_s1`, `A_g2_s2`.   |
-| Order                      | Changing the order of `add_stratification` calls changes the compartments and their names. |
-| Case                       | Names are case-sensitive: `A_g1` is not `A_G1`.                                            |
+| Rule                       | Effect                                                                                                                            |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Expansion                  | Every bin and accumulator gets one compartment per category: `A_g1`, `A_g2`.                                                      |
+| Several stratifications    | The expansion is the product of their categories, in declaration order: `A_g1_s1`.                                                |
+| Conditional stratification | Only matching compartments are split: with the code above, `A_g1`, `A_g2_s1`, `A_g2_s2`.                                          |
+| Condition on a set         | A compartment matches when its category is one of the set: `categories=["g2", "g3"]` splits `A_g2` and `A_g3`, and leaves `A_g1`. |
+| Order                      | Changing the order of `add_stratification` calls changes the compartments and their names.                                        |
+| Case                       | Names are case-sensitive: `A_g1` is not `A_G1`.                                                                                   |
 
 See [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/#stratifications) for worked examples, and [Transitions](https://munqu.github.io/commol/latest/guide/transitions/#stratified-rates) for rates that depend on the category.
+
+### A condition on a set of categories
+
+A set lets a later stratification split only some categories of an earlier one, and the model keeps one stratification for the categories that a [matrix](#matrices-between-categories) couples:
+
+```python
+on_a_set = (
+    ModelBuilder(name="Type of g2 and g3")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_stratification(id="group", categories=["g1", "g2", "g3"])
+    .add_stratification(
+        id="type",
+        categories=["t1", "t2"],
+        conditions=[
+            StratificationCondition(stratification="group", categories=["g2", "g3"])
+        ],
+    )
+    .add_parameter(id="k1", value=0.1)
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")
+    .build(
+        Aggregate(
+            bin_amounts={"A": 1000, "B": 0},
+            stratification_fractions={
+                "group": {"g1": 0.2, "g2": 0.3, "g3": 0.5},
+                "type": {"t1": 0.5, "t2": 0.5},
+            },
+        ),
+        engine="DifferenceEquations",
+    )
+)
+
+state = on_a_set.structure.initial_state(on_a_set.process)
+print([c.name for c in state if c.bin == "A"])
+# ['A_g1', 'A_g2_t1', 'A_g2_t2', 'A_g3_t1', 'A_g3_t2']
+```
+
+| Rule                                         | Effect                                                                                                                                                     |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A condition gives `category` or `categories` | Both, an empty set, a category twice or a category its stratification does not have: `build` raises `ValueError` with the stratification and the category. |
+| A set takes no `to`                          | `to` moves one category; a condition with `to` and a set is refused.                                                                                       |
+| Fractions                                    | The split of `type` is of the subgroup of `g2` and `g3`; `subgroup_total(process, ["g2", "g3"])` sums it.                                                  |
+| Description                                  | The table of stratifications says `where group in {g2, g3}`.                                                                                               |
 
 ## Matrices between categories
 
@@ -1108,14 +1152,14 @@ structure = Aggregate(
 | `compartment_amounts`      | `dict[str, float]`                                                  | `{}`     | Overrides single expanded compartments with an amount in the unit of their bin.                                                                                                                                                                                                                                   |
 | `neighbors`                | `Complete \| Groups \| None`                                        | `None`   | Who the [neighbors](#neighbors) of a unit are. Required when a rate reads them.                                                                                                                                                                                                                                   |
 
-| Rule                                                                                                                                                                                                                                                                                 | Checked when                                                |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
-| Every amount is finite and not negative; `0` is an amount. The engine holds the rule (`check_bin_amount` and `check_compartment_amount` in `crates/commol-model/src/rules.rs`)                                                                                                       | `Aggregate(...)` and each update of an amount               |
-| Every bin has an amount, and no other id                                                                                                                                                                                                                                             | `build`                                                     |
-| Every stratification has a fraction for each of its categories, and no other category; a split by category has one split for each category of the stratification it differs by. The engine holds the rule (`check_stratification_fractions` in `crates/commol-model/src/builder.rs`) | `build`                                                     |
-| Every fraction is from 0 to 1, and each split sums to 1 within 1e-6. The engine holds the rule (`check_fractions` in `crates/commol-model/src/rules.rs`)                                                                                                                             | `Aggregate(...)` and each `update_stratification_fractions` |
-| Override names are expanded compartments                                                                                                                                                                                                                                             | `build`                                                     |
-| With a stochastic engine, the amount of each bin is a whole number                                                                                                                                                                                                                   | `build`                                                     |
+| Rule                                                                                                                                                                                                                                                                                                            | Checked when                                                |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Every amount is finite and not negative; `0` is an amount. The engine holds the rule (`check_bin_amount` and `check_compartment_amount` in `crates/commol-model/src/rules.rs`)                                                                                                                                  | `Aggregate(...)` and each update of an amount               |
+| Every bin has an amount, and no other id                                                                                                                                                                                                                                                                        | `build`                                                     |
+| Every stratification has a fraction for each of its categories, and no other category; a split by category has one split for each category of the stratification it differs by that its compartments have. The engine holds the rule (`check_stratification_fractions` in `crates/commol-model/src/builder.rs`) | `build`                                                     |
+| Every fraction is from 0 to 1, and each split sums to 1 within 1e-6. The engine holds the rule (`check_fractions` in `crates/commol-model/src/rules.rs`)                                                                                                                                                        | `Aggregate(...)` and each `update_stratification_fractions` |
+| Override names are expanded compartments                                                                                                                                                                                                                                                                        | `build`                                                     |
+| With a stochastic engine, the amount of each bin is a whole number                                                                                                                                                                                                                                              | `build`                                                     |
 
 The initial amount of a compartment is `bin amount × the fraction of each of its categories`, unless an override names it. `model.structure.initial_state(model.process)` shows the result. To change amounts or fractions on a built model, see [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/#updating-the-initial-state-after-building).
 
@@ -1157,16 +1201,16 @@ print({c.name: c.amount for c in state if c.bin == "A"})
 
 The amount of `A_g1_t1` is `1000 × 0.4 × 0.25`. The two stratifications stay apart: a rate reads `A_g1` and `total_g1`, and a condition names `g1`, with no category that joins `g1` and `t1`.
 
-| Rule                             | Effect                                                                                                                                                                                              |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"by"`                           | Names a stratification declared before this one. Every compartment of this stratification must have a category of it, so a conditional stratification that leaves some of them out cannot be named. |
-| Splits                           | One split for each category of the `"by"` stratification, each with every category of this one. The message of a wrong split names the stratification and the category.                             |
-| A calibrated bin amount          | Its compartments keep the split, also when the amount is `None` before calibration.                                                                                                                 |
-| Reading one fraction             | `get_category_fraction` raises `ValueError` for such a stratification: it has one fraction per split.                                                                                               |
-| Setting a fraction               | `update_stratification_fractions({"t1": 0.3})` sets `t1` to 0.3 in every split.                                                                                                                     |
-| Calibrating a category of it     | A category value of `type`, such as `t1`, takes its value in every split, so the write-back sets every split.                                                                                       |
-| Calibrating a category of `"by"` | A category value of `group`, such as `g1`, splits each bin between `g1` and `g2`, and each side keeps the split of `type` and of any stratification split by `type`, also a side that starts at 0.  |
-| A category named `by`            | Takes a fraction in one split, where `"by"` holds a number. The stratification a split by category names cannot have a category named `by`, because that key names it.                              |
+| Rule                             | Effect                                                                                                                                                                                                                                                                                                      |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"by"`                           | Names a stratification declared before this one. Every compartment of this stratification must have a category of it, so a conditional stratification that leaves some of them out cannot be named.                                                                                                         |
+| Splits                           | One split for each category of the `"by"` stratification that the compartments of this one have, each with every category of this one. A `type` on `g2` and `g3` gives the splits of `g2` and `g3`, and a split of `g1` is refused. The message of a wrong split names the stratification and the category. |
+| A calibrated bin amount          | Its compartments keep the split, also when the amount is `None` before calibration.                                                                                                                                                                                                                         |
+| Reading one fraction             | `get_category_fraction` raises `ValueError` for such a stratification: it has one fraction per split.                                                                                                                                                                                                       |
+| Setting a fraction               | `update_stratification_fractions({"t1": 0.3})` sets `t1` to 0.3 in every split.                                                                                                                                                                                                                             |
+| Calibrating a category of it     | A category value of `type`, such as `t1`, takes its value in every split, so the write-back sets every split.                                                                                                                                                                                               |
+| Calibrating a category of `"by"` | A category value of `group`, such as `g1`, splits each bin between `g1` and `g2`, and each side keeps the split of `type` and of any stratification split by `type`, also a side that starts at 0.                                                                                                          |
+| A category named `by`            | Takes a fraction in one split, where `"by"` holds a number. The stratification a split by category names cannot have a category named `by`, because that key names it.                                                                                                                                      |
 
 ### Bins of different units
 
@@ -1567,19 +1611,22 @@ print(group_rates.describe().render("text"))
 | `rate`                    | `str` or `float`                | The rate for matching compartments.             |
 | `absolute`                | `bool`, optional                | Forces the rate to be absolute or proportional. |
 
-| Field of `StratificationCondition` | Meaning                                                        |
-| ---------------------------------- | -------------------------------------------------------------- |
-| `stratification`                   | The stratification id.                                         |
-| `category`                         | Optional. The category the **source** must have.               |
-| `to`                               | Optional. The category the **target** gets instead; see below. |
+| Field of `StratificationCondition` | Meaning                                                                                                               |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `stratification`                   | The stratification id.                                                                                                |
+| `category`                         | Optional. The category the **source** must have.                                                                      |
+| `categories`                       | Optional. A set of categories: the **source** must have one of them. Give it instead of `category`; it takes no `to`. |
+| `to`                               | Optional. The category the **target** gets instead; see below.                                                        |
 
-**Which rate applies:** for each source compartment, the entry that matches with the **most** conditions wins; on a tie, the first one in the list. With no match, the fallback `rate` applies. With three stratifications and one entry for `g2`, `t1`, `v2`:
+**Which rate applies:** for each source compartment, the entry that matches with the **most** conditions wins; on a tie, the first one in the list. A condition on a set counts as one condition, as a condition on one category does. With no match, the fallback `rate` applies. With three stratifications and one entry for `g2`, `t1`, `v2`:
 
 | Source compartment | Conditions matched | Rate      |
 | ------------------ | ------------------ | --------- |
 | `A_g2_t1_v2`       | 3 of 3             | The entry |
 | `A_g2_t1_v1`       | not all            | Fallback  |
 | `A_g1_t1_v1`       | not all            | Fallback  |
+
+An entry on `group` in `{g2, g3}` and another on `group` `g3` and `type` `t2` give `A_g2_t1` the first rate and `A_g3_t2` the second, which matches two conditions (`crates/commol-model/tests/stratified_rates.rs`).
 
 ### Redirecting the target with `to`
 
@@ -1707,17 +1754,18 @@ A calibration gives a run that stops this way a penalty and goes on; see [Calibr
 
 `build` plans every flow in the engine and rejects a transition it cannot simulate as written:
 
-| Rejected                                                                                                                                                                                                                                                                                         | Message names                                                      |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| A source or target that is neither a bin nor a category of one stratification                                                                                                                                                                                                                    | The transition                                                     |
-| A category transition without exactly one source and one target                                                                                                                                                                                                                                  | The transition                                                     |
-| A rate variable that is not a parameter, bin, compartment or special variable                                                                                                                                                                                                                    | The variable and the available names                               |
-| Several sources with a proportional rate                                                                                                                                                                                                                                                         | The transition; use an absolute rate or `$compartment`             |
-| A stratified rate whose `category` conditions match no source compartment                                                                                                                                                                                                                        | The transition; use `to` to reach another stratification           |
-| A `to` condition on a transition without a source                                                                                                                                                                                                                                                | The transition; use `category` to choose the compartment it enters |
-| A flow that ends in categories no compartment has                                                                                                                                                                                                                                                | The transition; add a `to` condition                               |
-| `impulse_at` and `impulse_every` together, an `impulse_at` with no step, a step that is negative or not finite, a period that is not positive, or a negative offset; the `Transition` fails when it is made, with the rule of the engine (`check_impulse` in `crates/commol-model/src/rules.rs`) | The transition                                                     |
-| A non-integer impulse step in a `DifferenceEquations` or `StochasticSteps` model                                                                                                                                                                                                                 | The transition and the step                                        |
+| Rejected                                                                                                                                                                                                                                                                                                       | Message names                                                      |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| A source or target that is neither a bin nor a category of one stratification                                                                                                                                                                                                                                  | The transition                                                     |
+| A category transition without exactly one source and one target                                                                                                                                                                                                                                                | The transition                                                     |
+| A rate variable that is not a parameter, bin, compartment or special variable                                                                                                                                                                                                                                  | The variable and the available names                               |
+| Several sources with a proportional rate                                                                                                                                                                                                                                                                       | The transition; use an absolute rate or `$compartment`             |
+| A stratified rate whose `category` conditions match no source compartment                                                                                                                                                                                                                                      | The transition; use `to` to reach another stratification           |
+| A condition on a stratification the process does not have, with both `category` and `categories`, an empty set, a category twice, a category its stratification does not have, or `to` with `categories` (`Process::check_conditions` and `StratificationCondition::check` in `crates/commol-core/src/types/`) | The transition, the stratification and the category                |
+| A `to` condition on a transition without a source                                                                                                                                                                                                                                                              | The transition; use `category` to choose the compartment it enters |
+| A flow that ends in categories no compartment has                                                                                                                                                                                                                                                              | The transition; add a `to` condition                               |
+| `impulse_at` and `impulse_every` together, an `impulse_at` with no step, a step that is negative or not finite, a period that is not positive, or a negative offset; the `Transition` fails when it is made, with the rule of the engine (`check_impulse` in `crates/commol-model/src/rules.rs`)               | The transition                                                     |
+| A non-integer impulse step in a `DifferenceEquations` or `StochasticSteps` model                                                                                                                                                                                                                               | The transition and the step                                        |
 
 ## Next steps
 
@@ -15102,7 +15150,7 @@ class DeltaBand(ResultModel):
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-Builds a `Model`. A `StratificationCondition` selects the compartments of a category, and a `StratifiedRate` gives a transition its rate in the compartments that match its conditions. Guide: [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md), [Transitions](https://munqu.github.io/commol/latest/guide/transitions/index.md).
+Builds a `Model`. A `StratificationCondition` selects the compartments of a category or of a set of categories, and a `StratifiedRate` gives a transition its rate in the compartments that match its conditions. Guide: [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md), [Transitions](https://munqu.github.io/commol/latest/guide/transitions/index.md).
 
 ## ModelBuilder
 
@@ -15258,7 +15306,9 @@ class ModelBuilder:
         conditions : list[StratificationCondition] | None, default=None
             When set, this stratification only expands compartments whose
             already-applied categories satisfy ALL conditions. Each condition
-            names a stratification declared before this one and its category.
+            names a stratification declared before this one and its category,
+            or a set of its categories (``categories``) of which the
+            compartment has one.
 
             Example: only apply the `sub` stratification to `group1`::
 
@@ -15470,9 +15520,9 @@ class ModelBuilder:
             return pattern
         conditions = pattern.conditions
         if transition_id and conditions:
-            src_cats = "_".join(c.category for c in conditions if c.category)
+            src_cats = "_".join(name for c in conditions for name in c.names())
             tgt_cats = "_".join(
-                target for c in conditions if (target := c.to or c.category)
+                name for c in conditions for name in ([c.to] if c.to else c.names())
             )
             src = f"{source_bin}_{src_cats}" if source_bin else src_cats
             tgt = f"{target_bin}_{tgt_cats}" if target_bin else tgt_cats
@@ -16208,12 +16258,12 @@ Add a stratification to the model.
 
 Parameters:
 
-| Name          | Type                            | Description                                              | Default                                                                                                                                                                                                                                                                                                                                      |
-| ------------- | ------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`          | `str`                           | Unique identifier for the stratification.                | *required*                                                                                                                                                                                                                                                                                                                                   |
-| `categories`  | `list[str]`                     | list of category identifiers within this stratification. | *required*                                                                                                                                                                                                                                                                                                                                   |
-| `description` | \`str                           | None\`                                                   | Human-readable description of the stratification.                                                                                                                                                                                                                                                                                            |
-| `conditions`  | \`list[StratificationCondition] | None\`                                                   | When set, this stratification only expands compartments whose already-applied categories satisfy ALL conditions. Each condition names a stratification declared before this one and its category. Example: only apply the sub stratification to group1:: conditions = [ StratificationCondition(stratification="group", category="group1") ] |
+| Name          | Type                            | Description                                              | Default                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------- | ------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`          | `str`                           | Unique identifier for the stratification.                | *required*                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `categories`  | `list[str]`                     | list of category identifiers within this stratification. | *required*                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `description` | \`str                           | None\`                                                   | Human-readable description of the stratification.                                                                                                                                                                                                                                                                                                                                                                      |
+| `conditions`  | \`list[StratificationCondition] | None\`                                                   | When set, this stratification only expands compartments whose already-applied categories satisfy ALL conditions. Each condition names a stratification declared before this one and its category, or a set of its categories (categories) of which the compartment has one. Example: only apply the sub stratification to group1:: conditions = [ StratificationCondition(stratification="group", category="group1") ] |
 
 Returns:
 
@@ -16251,7 +16301,9 @@ def add_stratification(
     conditions : list[StratificationCondition] | None, default=None
         When set, this stratification only expands compartments whose
         already-applied categories satisfy ALL conditions. Each condition
-        names a stratification declared before this one and its category.
+        names a stratification declared before this one and its category,
+        or a set of its categories (``categories``) of which the
+        compartment has one.
 
         Example: only apply the `sub` stratification to `group1`::
 
@@ -17048,15 +17100,18 @@ Bases: `BaseModel`
 
 Specifies a category within a stratification for rate matching.
 
+The condition holds for a compartment whose category in the stratification is `category`, or one of `categories`. A condition gives one of them, or neither when it only sets `to`.
+
 When `to` is set, the matched category in the source compartment is replaced with the `to` category in the target compartment name. This enables cross-category transitions within the same bin (e.g., from `g1` to `g2`).
 
 Attributes:
 
-| Name             | Type  | Description                                                |
-| ---------------- | ----- | ---------------------------------------------------------- |
-| `stratification` | `str` | The ID of the stratification (e.g., "group", "type")       |
-| `category`       | `str` | The category within that stratification (e.g., "g1", "t1") |
-| `to`             | \`str | None\`                                                     |
+| Name             | Type        | Description                                          |
+| ---------------- | ----------- | ---------------------------------------------------- |
+| `stratification` | `str`       | The ID of the stratification (e.g., "group", "type") |
+| `category`       | \`str       | None\`                                               |
+| `categories`     | \`list[str] | None\`                                               |
+| `to`             | \`str       | None\`                                               |
 
 Source code in `commol/_model/stratification_condition.py`
 
@@ -17064,6 +17119,10 @@ Source code in `commol/_model/stratification_condition.py`
 class StratificationCondition(BaseModel):
     """
     Specifies a category within a stratification for rate matching.
+
+    The condition holds for a compartment whose category in the
+    stratification is ``category``, or one of ``categories``. A condition
+    gives one of them, or neither when it only sets ``to``.
 
     When ``to`` is set, the matched category in the source compartment is
     replaced with the ``to`` category in the target compartment name. This
@@ -17074,8 +17133,12 @@ class StratificationCondition(BaseModel):
     ----------
     stratification : str
         The ID of the stratification (e.g., "group", "type")
-    category : str
+    category : str | None
         The category within that stratification (e.g., "g1", "t1")
+    categories : list[str] | None
+        A set of categories within that stratification: the compartment has
+        one of them (e.g., ``["g2", "g3"]``). It counts as one condition when
+        the most specific stratified rate wins, and it takes no ``to``.
     to : str | None
         Target category override. When set, the target compartment will use
         this category instead of the source compartment's category for this
@@ -17093,6 +17156,13 @@ class StratificationCondition(BaseModel):
             "contributes a 'to' category to the computed target compartment name."
         ),
     )
+    categories: list[str] | None = Field(
+        default=None,
+        description=(
+            "Categories within the stratification, one of which the compartment "
+            "has. Give it instead of 'category'."
+        ),
+    )
     to: str | None = Field(
         default=None,
         description=(
@@ -17100,6 +17170,54 @@ class StratificationCondition(BaseModel):
             "this category instead of the source's for this stratification."
         ),
     )
+
+    def names(self) -> list[str]:
+        """
+        The categories the condition filters by.
+
+        Returns
+        -------
+        list[str]
+            ``[category]``, the set ``categories``, or empty when the
+            condition filters nothing.
+        """
+        if self.category is not None:
+            return [self.category]
+        return list(self.categories or [])
+```
+
+### Methods:
+
+#### names
+
+```python
+names() -> list[str]
+```
+
+The categories the condition filters by.
+
+Returns:
+
+| Type        | Description                                                                  |
+| ----------- | ---------------------------------------------------------------------------- |
+| `list[str]` | [category], the set categories, or empty when the condition filters nothing. |
+
+Source code in `commol/_model/stratification_condition.py`
+
+```python
+def names(self) -> list[str]:
+    """
+    The categories the condition filters by.
+
+    Returns
+    -------
+    list[str]
+        ``[category]``, the set ``categories``, or empty when the
+        condition filters nothing.
+    """
+    if self.category is not None:
+        return [self.category]
+    return list(self.categories or [])
 ```
 
 ## StratifiedRate
@@ -18357,36 +18475,6 @@ class Process(BaseModel):
             if len(ids) != len(set(ids)):
                 duplicates = [item for item in set(ids) if ids.count(item) > 1]
                 raise ValueError(f"Duplicate {label} IDs found: {duplicates}")
-        return self
-
-    @model_validator(mode="after")
-    def _validate_stratified_rates(self) -> Self:
-        """Validate that stratified rates name stratifications and categories."""
-        strat_map = {strat.id: strat for strat in self.stratifications}
-
-        for transition in self.transitions:
-            for idx, stratified_rate in enumerate(transition.stratified_rates or []):
-                for condition in stratified_rate.conditions:
-                    if condition.stratification not in strat_map:
-                        raise ValueError(
-                            f"In transition '{transition.id}', stratified rate "
-                            f"{idx}: Stratification "
-                            f"'{condition.stratification}' not found. "
-                            f"Available: {list(strat_map.keys())}"
-                        )
-
-                    # A condition without a category only redirects the target.
-                    strat = strat_map[condition.stratification]
-                    if (
-                        condition.category is not None
-                        and condition.category not in strat.categories
-                    ):
-                        raise ValueError(
-                            f"In transition '{transition.id}', stratified rate "
-                            f"{idx}: Category '{condition.category}' not found "
-                            f"in stratification '{condition.stratification}'. "
-                            f"Available: {strat.categories}"
-                        )
         return self
 
     @model_validator(mode="after")
@@ -19818,9 +19906,10 @@ class Aggregate(ModelStructure, InitialConditions):
         -------
         tuple[str, ...]
             Ids of the categories selecting the subgroup this stratification
-            subdivides, empty for an unconditional stratification. A category
-            name another stratification also declares is qualified, as in
-            ``group:g1``.
+            subdivides, empty for an unconditional stratification. The
+            categories of one stratification are a set: the subgroup has one
+            of them (`subgroup_total`). A category name another
+            stratification also declares is qualified, as in ``group:g1``.
 
         Raises
         ------
@@ -19830,9 +19919,9 @@ class Aggregate(ModelStructure, InitialConditions):
         for stratification in process.stratifications:
             if stratification.id == stratification_id:
                 return tuple(
-                    self.category_id(condition.stratification, condition.category)
+                    self.category_id(condition.stratification, category)
                     for condition in (stratification.conditions or [])
-                    if condition.category is not None
+                    for category in condition.names()
                 )
         raise ValueError(
             f"Stratification '{stratification_id}' not found. Available: "
@@ -19844,8 +19933,10 @@ class Aggregate(ModelStructure, InitialConditions):
         Get the initial sum of the compartments of a subgroup.
 
         The sum is taken of the state the engine builds, overrides included,
-        over every compartment that has each of the categories. Passing no
-        categories gives the sum of every compartment. It adds every bin it
+        over every compartment that has, in each stratification the categories
+        name, one of the categories of that stratification: ``["g2", "g3",
+        "s1"]`` sums the compartments of ``g2`` or ``g3`` that have ``s1``.
+        Passing no categories gives the sum of every compartment. It adds every bin it
         covers, so over bins of different units it has no unit.
 
         Parameters
@@ -19865,13 +19956,16 @@ class Aggregate(ModelStructure, InitialConditions):
         ValueError
             If a category is not found or a bare name is ambiguous.
         """
-        resolved = [self.resolve_category(c) for c in categories]
+        sets: dict[str, set[str]] = {}
+        for category in categories:
+            stratification, name = self.resolve_category(category)
+            sets.setdefault(stratification, set()).add(name)
         return sum(
             compartment.amount
             for compartment in self.initial_state(process)
             if all(
-                compartment.categories.get(stratification) == name
-                for stratification, name in resolved
+                compartment.categories.get(stratification) in names
+                for stratification, names in sets.items()
             )
         )
 
@@ -20515,9 +20609,9 @@ Parameters:
 
 Returns:
 
-| Type              | Description                                                                                                                                                                                                |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tuple[str, ...]` | Ids of the categories selecting the subgroup this stratification subdivides, empty for an unconditional stratification. A category name another stratification also declares is qualified, as in group:g1. |
+| Type              | Description                                                                                                                                                                                                                                                                                               |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tuple[str, ...]` | Ids of the categories selecting the subgroup this stratification subdivides, empty for an unconditional stratification. The categories of one stratification are a set: the subgroup has one of them (subgroup_total). A category name another stratification also declares is qualified, as in group:g1. |
 
 Raises:
 
@@ -20550,9 +20644,10 @@ def get_conditioning_categories(
     -------
     tuple[str, ...]
         Ids of the categories selecting the subgroup this stratification
-        subdivides, empty for an unconditional stratification. A category
-        name another stratification also declares is qualified, as in
-        ``group:g1``.
+        subdivides, empty for an unconditional stratification. The
+        categories of one stratification are a set: the subgroup has one
+        of them (`subgroup_total`). A category name another
+        stratification also declares is qualified, as in ``group:g1``.
 
     Raises
     ------
@@ -20562,9 +20657,9 @@ def get_conditioning_categories(
     for stratification in process.stratifications:
         if stratification.id == stratification_id:
             return tuple(
-                self.category_id(condition.stratification, condition.category)
+                self.category_id(condition.stratification, category)
                 for condition in (stratification.conditions or [])
-                if condition.category is not None
+                for category in condition.names()
             )
     raise ValueError(
         f"Stratification '{stratification_id}' not found. Available: "
@@ -20580,7 +20675,7 @@ subgroup_total(process: Process, categories: Iterable[str] = ()) -> float
 
 Get the initial sum of the compartments of a subgroup.
 
-The sum is taken of the state the engine builds, overrides included, over every compartment that has each of the categories. Passing no categories gives the sum of every compartment. It adds every bin it covers, so over bins of different units it has no unit.
+The sum is taken of the state the engine builds, overrides included, over every compartment that has, in each stratification the categories name, one of the categories of that stratification: `["g2", "g3", "s1"]` sums the compartments of `g2` or `g3` that have `s1`. Passing no categories gives the sum of every compartment. It adds every bin it covers, so over bins of different units it has no unit.
 
 Parameters:
 
@@ -20609,8 +20704,10 @@ def subgroup_total(self, process: Process, categories: Iterable[str] = ()) -> fl
     Get the initial sum of the compartments of a subgroup.
 
     The sum is taken of the state the engine builds, overrides included,
-    over every compartment that has each of the categories. Passing no
-    categories gives the sum of every compartment. It adds every bin it
+    over every compartment that has, in each stratification the categories
+    name, one of the categories of that stratification: ``["g2", "g3",
+    "s1"]`` sums the compartments of ``g2`` or ``g3`` that have ``s1``.
+    Passing no categories gives the sum of every compartment. It adds every bin it
     covers, so over bins of different units it has no unit.
 
     Parameters
@@ -20630,13 +20727,16 @@ def subgroup_total(self, process: Process, categories: Iterable[str] = ()) -> fl
     ValueError
         If a category is not found or a bare name is ambiguous.
     """
-    resolved = [self.resolve_category(c) for c in categories]
+    sets: dict[str, set[str]] = {}
+    for category in categories:
+        stratification, name = self.resolve_category(category)
+        sets.setdefault(stratification, set()).add(name)
     return sum(
         compartment.amount
         for compartment in self.initial_state(process)
         if all(
-            compartment.categories.get(stratification) == name
-            for stratification, name in resolved
+            compartment.categories.get(stratification) in names
+            for stratification, names in sets.items()
         )
     )
 ```
@@ -37515,11 +37615,12 @@ class Stratification(BaseModel):
             return self
 
         for condition in self.conditions:
-            if condition.category is None:
+            if condition.category is None and condition.categories is None:
                 raise ValueError(
                     (
                         f"Condition for stratification '{self.id}' referencing "
-                        f"'{condition.stratification}' must include a category. "
+                        f"'{condition.stratification}' must include a category "
+                        "or a set of categories. "
                         "Category-less conditions are only valid for transition "
                         "target overrides."
                     )
@@ -38875,9 +38976,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `GibbsResult` and `ConformalResult` give `block_length` and `block_length_estimates`, as the bootstraps, the jackknife and the sandwich do: the length a method ran with, and with `block_length="auto"` the estimate of each series, by label. `GibbsResult` gives them for `InformationMatchingEta` and `BootstrapCoverageEta`, and `None` for a number `η`; `ConformalResult` for `JackknifePlus` and `EnbPI`, and `None` for the variants without blocks. See [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means) and [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#results-plots-and-reports).
 - `ProfileIdentifiability(result=profiles)` in `commol.identifiability`: the identifiability report of the verdicts of a `ProfileResult`, run through `Calibrator.identifiability` as every identifiability method. It runs no model, and it refuses the profiles of another problem with a `ValueError` that names the parameters of both. See [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#verdicts-and-the-identifiability-report).
 - The fractions of a stratification can differ by the category of a stratification declared before it: `stratification_fractions={"type": {"by": "group", "g1": {"t1": 0.25, "t2": 0.75}, "g2": {"t1": 0.5, "t2": 0.5}}}`. The stratifications stay apart, so a rate reads `A_g1` and a condition names `g1`. The engine checks that `by` is declared before, that every compartment of the stratification has a category of it, and each split, with a message that names the stratification and the category. See [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#fractions-that-differ-by-category).
+- `StratificationCondition(categories=[...])`: a condition of a stratification or of a stratified rate matches any category of a set, such as `StratificationCondition(stratification="group", categories=["g3", "g4"])`. A stratification then splits only some categories of an earlier one, and one stratification keeps the categories that a matrix couples, so `matrix_sum`, `M_radius` and a split by category work in a model where only some groups have a later stratification. A set counts as one condition when the most specific stratified rate wins. The engine refuses a condition with both `category` and `categories`, an empty set, a category twice, a category its stratification does not have, or `to` with a set. `Aggregate.subgroup_total` reads the categories of one stratification as a set, and the description writes `where group in {g3, g4}`. See [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#a-condition-on-a-set-of-categories).
 
 ### Changed
 
+- **Breaking:** a split by category names exactly the categories of `by` that the compartments of its stratification have. A `type` on `g2` only, split by `group`, gives the split of `g2` alone, and a split of `g1`, which no compartment reads, is refused with a message that names `type` and `g1`. Migration: remove the split of each category that the conditions of the stratification leave out.
+- **Breaking:** the engine checks the stratification each condition names, and its category, from `check_model`. The condition of a stratification names one declared before it, and the condition of a stratified rate one of the process. A model in JSON whose condition names another stratification built and expanded nothing for it; it is now refused, with a message that names the stratification. `ModelBuilder.add_stratification` refused it already. A condition of a stratification on a category its stratification does not have, such as `StratificationCondition(stratification="group", category="g9")`, built and expanded nothing; it is now refused, with a message that names the stratification and the category. The unknown stratification or category of a stratified rate gets the message of the engine, `Transition 'ab', stratified rate 0: the condition on 'group' names 'g9', which is not a category of 'group' (["g1", "g2"])`. Migration: name in each condition a stratification declared before it and one of its categories.
 - The engine checks that the fractions name every stratification and each of its categories, from `check_model`; the messages list the ids as the engine writes them, `Missing ids: ["g"], Extra ids: []`, and the message of the categories reads `The fractions of stratification 'g' must name exactly its categories. Missing categories: ["g2"], Extra categories: ["g3"].`
 - **Breaking:** `Calibrator.delta_band(result, positions, confidence_level)` is `LocalResult.delta_band(calibrator, positions, confidence_level)`, a method of the result of `Laplace` and of `Sandwich`. `DeltaBand` is documented with `commol.local`. Migration: `calibrator.delta_band(laplace, [10, 20], 0.9)` is `laplace.delta_band(calibrator, [10, 20], 0.9)`. See [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/index.md).
 - **Breaking:** `ProfileResult.identifiability()` is removed. Migration: `profiles.identifiability()` is `calibrator.identifiability(ProfileIdentifiability(result=profiles))`.

@@ -253,11 +253,12 @@ class Stratification(BaseModel):
             return self
 
         for condition in self.conditions:
-            if condition.category is None:
+            if condition.category is None and condition.categories is None:
                 raise ValueError(
                     (
                         f"Condition for stratification '{self.id}' referencing "
-                        f"'{condition.stratification}' must include a category. "
+                        f"'{condition.stratification}' must include a category "
+                        "or a set of categories. "
                         "Category-less conditions are only valid for transition "
                         "target overrides."
                     )

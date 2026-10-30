@@ -2,7 +2,7 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-Builds a `Model`. A `StratificationCondition` selects the compartments of a category, and a `StratifiedRate` gives a transition its rate in the compartments that match its conditions. Guide: [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md), [Transitions](https://munqu.github.io/commol/latest/guide/transitions/index.md).
+Builds a `Model`. A `StratificationCondition` selects the compartments of a category or of a set of categories, and a `StratifiedRate` gives a transition its rate in the compartments that match its conditions. Guide: [Building Models](https://munqu.github.io/commol/latest/guide/building-models/index.md), [Transitions](https://munqu.github.io/commol/latest/guide/transitions/index.md).
 
 ## ModelBuilder
 
@@ -158,7 +158,9 @@ class ModelBuilder:
         conditions : list[StratificationCondition] | None, default=None
             When set, this stratification only expands compartments whose
             already-applied categories satisfy ALL conditions. Each condition
-            names a stratification declared before this one and its category.
+            names a stratification declared before this one and its category,
+            or a set of its categories (``categories``) of which the
+            compartment has one.
 
             Example: only apply the `sub` stratification to `group1`::
 
@@ -370,9 +372,9 @@ class ModelBuilder:
             return pattern
         conditions = pattern.conditions
         if transition_id and conditions:
-            src_cats = "_".join(c.category for c in conditions if c.category)
+            src_cats = "_".join(name for c in conditions for name in c.names())
             tgt_cats = "_".join(
-                target for c in conditions if (target := c.to or c.category)
+                name for c in conditions for name in ([c.to] if c.to else c.names())
             )
             src = f"{source_bin}_{src_cats}" if source_bin else src_cats
             tgt = f"{target_bin}_{tgt_cats}" if target_bin else tgt_cats
@@ -1108,12 +1110,12 @@ Add a stratification to the model.
 
 Parameters:
 
-| Name          | Type                            | Description                                              | Default                                                                                                                                                                                                                                                                                                                                      |
-| ------------- | ------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`          | `str`                           | Unique identifier for the stratification.                | *required*                                                                                                                                                                                                                                                                                                                                   |
-| `categories`  | `list[str]`                     | list of category identifiers within this stratification. | *required*                                                                                                                                                                                                                                                                                                                                   |
-| `description` | \`str                           | None\`                                                   | Human-readable description of the stratification.                                                                                                                                                                                                                                                                                            |
-| `conditions`  | \`list[StratificationCondition] | None\`                                                   | When set, this stratification only expands compartments whose already-applied categories satisfy ALL conditions. Each condition names a stratification declared before this one and its category. Example: only apply the sub stratification to group1:: conditions = [ StratificationCondition(stratification="group", category="group1") ] |
+| Name          | Type                            | Description                                              | Default                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------- | ------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`          | `str`                           | Unique identifier for the stratification.                | *required*                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `categories`  | `list[str]`                     | list of category identifiers within this stratification. | *required*                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `description` | \`str                           | None\`                                                   | Human-readable description of the stratification.                                                                                                                                                                                                                                                                                                                                                                      |
+| `conditions`  | \`list[StratificationCondition] | None\`                                                   | When set, this stratification only expands compartments whose already-applied categories satisfy ALL conditions. Each condition names a stratification declared before this one and its category, or a set of its categories (categories) of which the compartment has one. Example: only apply the sub stratification to group1:: conditions = [ StratificationCondition(stratification="group", category="group1") ] |
 
 Returns:
 
@@ -1151,7 +1153,9 @@ def add_stratification(
     conditions : list[StratificationCondition] | None, default=None
         When set, this stratification only expands compartments whose
         already-applied categories satisfy ALL conditions. Each condition
-        names a stratification declared before this one and its category.
+        names a stratification declared before this one and its category,
+        or a set of its categories (``categories``) of which the
+        compartment has one.
 
         Example: only apply the `sub` stratification to `group1`::
 
@@ -1948,15 +1952,18 @@ Bases: `BaseModel`
 
 Specifies a category within a stratification for rate matching.
 
+The condition holds for a compartment whose category in the stratification is `category`, or one of `categories`. A condition gives one of them, or neither when it only sets `to`.
+
 When `to` is set, the matched category in the source compartment is replaced with the `to` category in the target compartment name. This enables cross-category transitions within the same bin (e.g., from `g1` to `g2`).
 
 Attributes:
 
-| Name             | Type  | Description                                                |
-| ---------------- | ----- | ---------------------------------------------------------- |
-| `stratification` | `str` | The ID of the stratification (e.g., "group", "type")       |
-| `category`       | `str` | The category within that stratification (e.g., "g1", "t1") |
-| `to`             | \`str | None\`                                                     |
+| Name             | Type        | Description                                          |
+| ---------------- | ----------- | ---------------------------------------------------- |
+| `stratification` | `str`       | The ID of the stratification (e.g., "group", "type") |
+| `category`       | \`str       | None\`                                               |
+| `categories`     | \`list[str] | None\`                                               |
+| `to`             | \`str       | None\`                                               |
 
 Source code in `commol/_model/stratification_condition.py`
 
@@ -1964,6 +1971,10 @@ Source code in `commol/_model/stratification_condition.py`
 class StratificationCondition(BaseModel):
     """
     Specifies a category within a stratification for rate matching.
+
+    The condition holds for a compartment whose category in the
+    stratification is ``category``, or one of ``categories``. A condition
+    gives one of them, or neither when it only sets ``to``.
 
     When ``to`` is set, the matched category in the source compartment is
     replaced with the ``to`` category in the target compartment name. This
@@ -1974,8 +1985,12 @@ class StratificationCondition(BaseModel):
     ----------
     stratification : str
         The ID of the stratification (e.g., "group", "type")
-    category : str
+    category : str | None
         The category within that stratification (e.g., "g1", "t1")
+    categories : list[str] | None
+        A set of categories within that stratification: the compartment has
+        one of them (e.g., ``["g2", "g3"]``). It counts as one condition when
+        the most specific stratified rate wins, and it takes no ``to``.
     to : str | None
         Target category override. When set, the target compartment will use
         this category instead of the source compartment's category for this
@@ -1993,6 +2008,13 @@ class StratificationCondition(BaseModel):
             "contributes a 'to' category to the computed target compartment name."
         ),
     )
+    categories: list[str] | None = Field(
+        default=None,
+        description=(
+            "Categories within the stratification, one of which the compartment "
+            "has. Give it instead of 'category'."
+        ),
+    )
     to: str | None = Field(
         default=None,
         description=(
@@ -2000,6 +2022,54 @@ class StratificationCondition(BaseModel):
             "this category instead of the source's for this stratification."
         ),
     )
+
+    def names(self) -> list[str]:
+        """
+        The categories the condition filters by.
+
+        Returns
+        -------
+        list[str]
+            ``[category]``, the set ``categories``, or empty when the
+            condition filters nothing.
+        """
+        if self.category is not None:
+            return [self.category]
+        return list(self.categories or [])
+```
+
+### Methods:
+
+#### names
+
+```python
+names() -> list[str]
+```
+
+The categories the condition filters by.
+
+Returns:
+
+| Type        | Description                                                                  |
+| ----------- | ---------------------------------------------------------------------------- |
+| `list[str]` | [category], the set categories, or empty when the condition filters nothing. |
+
+Source code in `commol/_model/stratification_condition.py`
+
+```python
+def names(self) -> list[str]:
+    """
+    The categories the condition filters by.
+
+    Returns
+    -------
+    list[str]
+        ``[category]``, the set ``categories``, or empty when the
+        condition filters nothing.
+    """
+    if self.category is not None:
+        return [self.category]
+    return list(self.categories or [])
 ```
 
 ## StratifiedRate

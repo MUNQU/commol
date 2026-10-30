@@ -4244,7 +4244,10 @@ and <code>get_conditioning_categories</code> names the subgroup:</p>
 </span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">aggregate</span><span class="o">.</span><span class="n">subgroup_total</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;g2&quot;</span><span class="p">,</span> <span class="s2">&quot;s1&quot;</span><span class="p">]))</span>   <span class="c1"># 4000 x 0.5 = 2000</span>
 </span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">aggregate</span><span class="o">.</span><span class="n">get_conditioning_categories</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="s2">&quot;subtype&quot;</span><span class="p">))</span>  <span class="c1"># (&#39;g2&#39;,)</span>
 </span></code></pre></div>
-<p>See <a href="../building-models/#stratifications">Conditional Stratifications</a>
+<p>Two categories of one stratification are a set: <code>["g1", "g2"]</code> sums the
+compartments of <code>g1</code> or <code>g2</code>, as a condition on a
+<a href="../building-models/#a-condition-on-a-set-of-categories">set of categories</a>
+selects them. See <a href="../building-models/#stratifications">Conditional Stratifications</a>
 for the full API.</p>
 <h3 id="per-compartment-overrides">Per-compartment overrides<a class="headerlink" href="#per-compartment-overrides" title="Permanent link">&para;</a></h3>
 <p>When the product of fractions cannot express the starting state, for example a

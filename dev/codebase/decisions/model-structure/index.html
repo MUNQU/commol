@@ -2731,6 +2731,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-condition-names-one-category-or-a-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A condition names one category or a set
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#outputs-are-resolved-by-label" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3614,6 +3625,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-condition-names-one-category-or-a-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A condition names one category or a set
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#outputs-are-resolved-by-label" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3793,6 +3815,45 @@ this).</p>
 <p><strong>Rule:</strong> changing the order of <code>add_stratification</code> calls changes which
 compartments exist and what they are named.</p>
 <p><strong>Guard:</strong> <code>tests/building/test_stratifications.py::test_the_order_of_the_stratifications_sets_the_compartments</code>.</p>
+<h2 id="a-condition-names-one-category-or-a-set">A condition names one category or a set<a class="headerlink" href="#a-condition-names-one-category-or-a-set" title="Permanent link">&para;</a></h2>
+<p><code>StratificationCondition</code> (<code>crates/commol-core/src/types/transitions.rs</code>)
+holds <code>category</code> or <code>categories</code>, a set of which the compartment has one.
+<code>holds</code> is the one rule of a match, for the expansion
+(<code>stratification_conditions_met</code>), the stratified rates
+(<code>get_rate_string_for_compartment</code>) and their check
+(<code>crates/commol-model/src/flows.rs</code>). A set counts as one condition when the
+most specific stratified rate wins. <code>Process::check_conditions</code>, from
+<code>check_model</code> and the planning of the flows, refuses each condition that does
+not fit its stratification
+(<a href="../../../guide/transitions/#what-building-checks">What building checks</a>):
+the condition of a stratification names one declared before it, and the
+condition of a stratified rate one of the process.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>category: str \| list[str]</code></td>
+<td>Each reader would check the type of the field, in Python and in the engine (S, KISS).</td>
+</tr>
+<tr>
+<td>Several conditions on one stratification read as OR</td>
+<td>The conditions are an AND, and one list would mean two things (one idea, one name).</td>
+</tr>
+<tr>
+<td>A set weighs by its size for the rate that wins</td>
+<td>It changes which rate wins in models without sets.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong>
+<code>tests/building/test_conditional_stratifications.py</code>,
+<code>crates/commol-model/tests/stratified_rates.rs::a_condition_on_a_set_counts_as_one_condition</code>,
+<code>crates/commol-model/src/flows.rs::moving_into_a_category_of_a_set_needs_the_dependent_category</code>.</p>
 <h2 id="outputs-are-resolved-by-label">Outputs are resolved by label<a class="headerlink" href="#outputs-are-resolved-by-label" title="Permanent link">&para;</a></h2>
 <p><code>Aggregate.outputs_by_source(model)</code> maps each bin or accumulator id to its
 output names in engine order. It uses the engine expansion (<code>expanded_outputs</code>), so

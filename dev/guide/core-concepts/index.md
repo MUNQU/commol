@@ -239,7 +239,7 @@ print(aggregate.subgroup_total(process, ["g2", "s1"]))   # 4000 x 0.5 = 2000
 print(aggregate.get_conditioning_categories(process, "subtype"))  # ('g2',)
 ```
 
-See [Conditional Stratifications](https://munqu.github.io/commol/latest/guide/building-models/#stratifications) for the full API.
+Two categories of one stratification are a set: `["g1", "g2"]` sums the compartments of `g1` or `g2`, as a condition on a [set of categories](https://munqu.github.io/commol/latest/guide/building-models/#a-condition-on-a-set-of-categories) selects them. See [Conditional Stratifications](https://munqu.github.io/commol/latest/guide/building-models/#stratifications) for the full API.
 
 ### Per-compartment overrides
 

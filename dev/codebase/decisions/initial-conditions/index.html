@@ -3653,7 +3653,8 @@ result with the state the engine starts from.</p>
 <h2 id="a-split-can-differ-by-the-category-of-an-earlier-stratification">A split can differ by the category of an earlier stratification<a class="headerlink" href="#a-split-can-differ-by-the-category-of-an-earlier-stratification" title="Permanent link">&para;</a></h2>
 <p>The fractions of a stratification are one split
 (<code>StratificationFractions::Split</code>) or one split per category of a
-stratification declared before it (<code>StratificationFractions::ByCategory</code>, in
+stratification declared before it that its compartments have
+(<code>StratificationFractions::ByCategory</code>, in
 <code>crates/commol-core/src/types/aggregate.rs</code>). Its JSON names that
 stratification under <code>"by"</code>, next to the splits:
 <code>{"by": "group", "g1": {"t1": 0.25, "t2": 0.75}, "g2": {...}}</code>. The fraction
@@ -3665,7 +3666,9 @@ stay apart in names, rates and conditions.</p>
 (<code>check_stratification_fractions</code> in <code>builder.rs</code>, from <code>check_model</code> and
 <code>initial_state</code>): each stratification and each category named once, <code>by</code>
 declared before the stratification it splits, every compartment of that
-stratification with a category of <code>by</code>, one split per category of <code>by</code>. A
+stratification with a category of <code>by</code>, one split per category of <code>by</code> that
+those compartments have, so a split of a category that a condition leaves out
+is refused, as an extra category is. A
 field <code>"by"</code> that holds a text is the stratification, so a category may be
 named <code>by</code> in one split, and the stratification <code>by</code> names cannot have a
 category named <code>by</code>, whose split would take the key. Python sends the data and
@@ -3707,6 +3710,7 @@ stratifications. Pairing one compartment with one would mix the splits of
 <code>crates/commol-model/tests/initial_conditions.rs::the_fractions_of_each_category_sum_to_one</code>,
 <code>crates/commol-model/tests/initial_conditions.rs::a_category_of_the_stratification_a_split_differs_by_keeps_the_split</code>,
 <code>crates/commol-model/tests/initial_conditions.rs::a_category_keeps_a_chain_of_splits_that_differ_by_it</code>,
+<code>crates/commol-model/tests/initial_conditions.rs::a_split_by_category_names_no_category_it_does_not_reach</code>,
 <code>crates/commol-model/tests/initial_conditions.rs::a_side_that_starts_empty_keeps_its_declared_split</code>,
 <code>tests/calibration/test_initial_conditions.py::test_the_write_back_of_a_split_by_category_rebuilds_the_scored_state</code>,
 <code>tests/initial_conditions/test_stratification_fractions.py::test_a_stratification_splits_each_category_of_an_earlier_one</code>.</p>

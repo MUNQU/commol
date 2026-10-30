@@ -4346,14 +4346,19 @@ flow <code>A_g1 -&gt; B_g1</code>, <code>"k * A * C / total"</code> reads <code>
 <td>Optional. The category the <strong>source</strong> must have.</td>
 </tr>
 <tr>
+<td><code>categories</code></td>
+<td>Optional. A set of categories: the <strong>source</strong> must have one of them. Give it instead of <code>category</code>; it takes no <code>to</code>.</td>
+</tr>
+<tr>
 <td><code>to</code></td>
 <td>Optional. The category the <strong>target</strong> gets instead; see below.</td>
 </tr>
 </tbody>
 </table>
 <p><strong>Which rate applies:</strong> for each source compartment, the entry that matches
-with the <strong>most</strong> conditions wins; on a tie, the first one in the list. With no
-match, the fallback <code>rate</code> applies. With three stratifications and one entry for
+with the <strong>most</strong> conditions wins; on a tie, the first one in the list. A
+condition on a set counts as one condition, as a condition on one category
+does. With no match, the fallback <code>rate</code> applies. With three stratifications and one entry for
 <code>g2</code>, <code>t1</code>, <code>v2</code>:</p>
 <table>
 <thead>
@@ -4381,6 +4386,9 @@ match, the fallback <code>rate</code> applies. With three stratifications and on
 </tr>
 </tbody>
 </table>
+<p>An entry on <code>group</code> in <code>{g2, g3}</code> and another on <code>group</code> <code>g3</code> and <code>type</code> <code>t2</code>
+give <code>A_g2_t1</code> the first rate and <code>A_g3_t2</code> the second, which matches two
+conditions (<code>crates/commol-model/tests/stratified_rates.rs</code>).</p>
 <h3 id="redirecting-the-target-with-to">Redirecting the target with <code>to</code><a class="headerlink" href="#redirecting-the-target-with-to" title="Permanent link">&para;</a></h3>
 <p>A condition with <code>category</code> filters the <strong>source</strong>. A condition with <code>to</code>
 changes the <strong>target</strong> category. A condition with only <code>to</code> filters nothing, so
@@ -4582,6 +4590,10 @@ simulate as written:</p>
 <tr>
 <td>A stratified rate whose <code>category</code> conditions match no source compartment</td>
 <td>The transition; use <code>to</code> to reach another stratification</td>
+</tr>
+<tr>
+<td>A condition on a stratification the process does not have, with both <code>category</code> and <code>categories</code>, an empty set, a category twice, a category its stratification does not have, or <code>to</code> with <code>categories</code> (<code>Process::check_conditions</code> and <code>StratificationCondition::check</code> in <code>crates/commol-core/src/types/</code>)</td>
+<td>The transition, the stratification and the category</td>
 </tr>
 <tr>
 <td>A <code>to</code> condition on a transition without a source</td>

@@ -1159,36 +1159,6 @@ class Process(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def _validate_stratified_rates(self) -> Self:
-        """Validate that stratified rates name stratifications and categories."""
-        strat_map = {strat.id: strat for strat in self.stratifications}
-
-        for transition in self.transitions:
-            for idx, stratified_rate in enumerate(transition.stratified_rates or []):
-                for condition in stratified_rate.conditions:
-                    if condition.stratification not in strat_map:
-                        raise ValueError(
-                            f"In transition '{transition.id}', stratified rate "
-                            f"{idx}: Stratification "
-                            f"'{condition.stratification}' not found. "
-                            f"Available: {list(strat_map.keys())}"
-                        )
-
-                    # A condition without a category only redirects the target.
-                    strat = strat_map[condition.stratification]
-                    if (
-                        condition.category is not None
-                        and condition.category not in strat.categories
-                    ):
-                        raise ValueError(
-                            f"In transition '{transition.id}', stratified rate "
-                            f"{idx}: Category '{condition.category}' not found "
-                            f"in stratification '{condition.stratification}'. "
-                            f"Available: {strat.categories}"
-                        )
-        return self
-
-    @model_validator(mode="after")
     def _validate_transition_ids(self) -> Self:
         """
         Check that each transition moves between bins, or between the
@@ -2617,9 +2587,10 @@ class Aggregate(ModelStructure, InitialConditions):
         -------
         tuple[str, ...]
             Ids of the categories selecting the subgroup this stratification
-            subdivides, empty for an unconditional stratification. A category
-            name another stratification also declares is qualified, as in
-            ``group:g1``.
+            subdivides, empty for an unconditional stratification. The
+            categories of one stratification are a set: the subgroup has one
+            of them (`subgroup_total`). A category name another
+            stratification also declares is qualified, as in ``group:g1``.
 
         Raises
         ------
@@ -2629,9 +2600,9 @@ class Aggregate(ModelStructure, InitialConditions):
         for stratification in process.stratifications:
             if stratification.id == stratification_id:
                 return tuple(
-                    self.category_id(condition.stratification, condition.category)
+                    self.category_id(condition.stratification, category)
                     for condition in (stratification.conditions or [])
-                    if condition.category is not None
+                    for category in condition.names()
                 )
         raise ValueError(
             f"Stratification '{stratification_id}' not found. Available: "
@@ -2643,8 +2614,10 @@ class Aggregate(ModelStructure, InitialConditions):
         Get the initial sum of the compartments of a subgroup.
 
         The sum is taken of the state the engine builds, overrides included,
-        over every compartment that has each of the categories. Passing no
-        categories gives the sum of every compartment. It adds every bin it
+        over every compartment that has, in each stratification the categories
+        name, one of the categories of that stratification: ``["g2", "g3",
+        "s1"]`` sums the compartments of ``g2`` or ``g3`` that have ``s1``.
+        Passing no categories gives the sum of every compartment. It adds every bin it
         covers, so over bins of different units it has no unit.
 
         Parameters
@@ -2664,13 +2637,16 @@ class Aggregate(ModelStructure, InitialConditions):
         ValueError
             If a category is not found or a bare name is ambiguous.
         """
-        resolved = [self.resolve_category(c) for c in categories]
+        sets: dict[str, set[str]] = {}
+        for category in categories:
+            stratification, name = self.resolve_category(category)
+            sets.setdefault(stratification, set()).add(name)
         return sum(
             compartment.amount
             for compartment in self.initial_state(process)
             if all(
-                compartment.categories.get(stratification) == name
-                for stratification, name in resolved
+                compartment.categories.get(stratification) in names
+                for stratification, names in sets.items()
             )
         )
 
@@ -3314,9 +3290,9 @@ Parameters:
 
 Returns:
 
-| Type              | Description                                                                                                                                                                                                |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tuple[str, ...]` | Ids of the categories selecting the subgroup this stratification subdivides, empty for an unconditional stratification. A category name another stratification also declares is qualified, as in group:g1. |
+| Type              | Description                                                                                                                                                                                                                                                                                               |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tuple[str, ...]` | Ids of the categories selecting the subgroup this stratification subdivides, empty for an unconditional stratification. The categories of one stratification are a set: the subgroup has one of them (subgroup_total). A category name another stratification also declares is qualified, as in group:g1. |
 
 Raises:
 
@@ -3349,9 +3325,10 @@ def get_conditioning_categories(
     -------
     tuple[str, ...]
         Ids of the categories selecting the subgroup this stratification
-        subdivides, empty for an unconditional stratification. A category
-        name another stratification also declares is qualified, as in
-        ``group:g1``.
+        subdivides, empty for an unconditional stratification. The
+        categories of one stratification are a set: the subgroup has one
+        of them (`subgroup_total`). A category name another
+        stratification also declares is qualified, as in ``group:g1``.
 
     Raises
     ------
@@ -3361,9 +3338,9 @@ def get_conditioning_categories(
     for stratification in process.stratifications:
         if stratification.id == stratification_id:
             return tuple(
-                self.category_id(condition.stratification, condition.category)
+                self.category_id(condition.stratification, category)
                 for condition in (stratification.conditions or [])
-                if condition.category is not None
+                for category in condition.names()
             )
     raise ValueError(
         f"Stratification '{stratification_id}' not found. Available: "
@@ -3379,7 +3356,7 @@ subgroup_total(process: Process, categories: Iterable[str] = ()) -> float
 
 Get the initial sum of the compartments of a subgroup.
 
-The sum is taken of the state the engine builds, overrides included, over every compartment that has each of the categories. Passing no categories gives the sum of every compartment. It adds every bin it covers, so over bins of different units it has no unit.
+The sum is taken of the state the engine builds, overrides included, over every compartment that has, in each stratification the categories name, one of the categories of that stratification: `["g2", "g3", "s1"]` sums the compartments of `g2` or `g3` that have `s1`. Passing no categories gives the sum of every compartment. It adds every bin it covers, so over bins of different units it has no unit.
 
 Parameters:
 
@@ -3408,8 +3385,10 @@ def subgroup_total(self, process: Process, categories: Iterable[str] = ()) -> fl
     Get the initial sum of the compartments of a subgroup.
 
     The sum is taken of the state the engine builds, overrides included,
-    over every compartment that has each of the categories. Passing no
-    categories gives the sum of every compartment. It adds every bin it
+    over every compartment that has, in each stratification the categories
+    name, one of the categories of that stratification: ``["g2", "g3",
+    "s1"]`` sums the compartments of ``g2`` or ``g3`` that have ``s1``.
+    Passing no categories gives the sum of every compartment. It adds every bin it
     covers, so over bins of different units it has no unit.
 
     Parameters
@@ -3429,13 +3408,16 @@ def subgroup_total(self, process: Process, categories: Iterable[str] = ()) -> fl
     ValueError
         If a category is not found or a bare name is ambiguous.
     """
-    resolved = [self.resolve_category(c) for c in categories]
+    sets: dict[str, set[str]] = {}
+    for category in categories:
+        stratification, name = self.resolve_category(category)
+        sets.setdefault(stratification, set()).add(name)
     return sum(
         compartment.amount
         for compartment in self.initial_state(process)
         if all(
-            compartment.categories.get(stratification) == name
-            for stratification, name in resolved
+            compartment.categories.get(stratification) in names
+            for stratification, names in sets.items()
         )
     )
 ```
