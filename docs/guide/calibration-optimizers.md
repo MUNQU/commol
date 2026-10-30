@@ -119,8 +119,9 @@ with the message `Nelder-Mead needs finite bounds`.
 
 `converged` comes from `converged` in
 `crates/commol-calibration/src/optimization.rs`. A particle swarm
-without a [stop rule](#stop-rules) always stops at `max_iterations`, so it
-reports `converged=False`; judge it by `final_loss`.
+without a [stop rule](#stop-rules) or a [polish](#polish-with-nelder-mead)
+always stops at `max_iterations`, so it reports `converged=False`; judge it
+by `final_loss`. A polished swarm reports the convergence of Nelder-Mead.
 
 ## Particle swarm
 
@@ -329,7 +330,7 @@ order. A point the objective penalizes is not kept.
 | Symptom | Try |
 |---|---|
 | A result sits at a bound | Check the bounds, give a better `initial_guess`, or use particle swarm |
-| `converged=False` | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations`; a particle swarm needs a [stop rule](#stop-rules) to converge |
+| `converged=False` | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations`; a particle swarm needs a [stop rule](#stop-rules) or a [polish](#polish-with-nelder-mead) to converge |
 | Different results on each run | Set `seed`; use more particles or iterations |
 | A local minimum | `run(starts=n)` from several points |
 | A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations |
