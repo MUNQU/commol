@@ -102,10 +102,11 @@ impl Sensitivities {
     }
 }
 
-/// `|θ_j|`, or the width of the bounds of the parameter when `θ_j = 0`.
+/// `|θ_j|`, or when `θ_j = 0` the width of the bounds of the parameter, 1
+/// for an infinite bound ([`CalibrationParameter::width_scale`]).
 fn parameter_magnitude(value: f64, parameter: &CalibrationParameter) -> f64 {
     if value == 0.0 {
-        parameter.max_bound - parameter.min_bound
+        parameter.width_scale()
     } else {
         value.abs()
     }

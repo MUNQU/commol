@@ -88,9 +88,19 @@ impl Serialize for Eta {
     }
 }
 
+/// What a method takes when its eta is missing.
+const ETA_FIX: &str = "give a number above 0, InformationMatchingEta(block_length=...) or \
+                       BootstrapCoverageEta(replicates=..., block_length=..., \
+                       confidence_level=...); the loss has no scale of its own, so eta has no \
+                       default";
+
 impl<'de> Deserialize<'de> for Eta {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        match Value::deserialize(deserializer)? {
+        // A missing field fails to read as a value; a null reads as one.
+        let value = Value::deserialize(deserializer)
+            .map_err(|_: D::Error| de::Error::custom(format!("eta is required: {ETA_FIX}")))?;
+        match value {
+            Value::Null => Err(de::Error::custom(format!("null is not an eta: {ETA_FIX}"))),
             value @ (Value::Int(_) | Value::Float(_)) => json::from_value(value).map(Self::Value),
             // A number that is not finite crosses as its text.
             Value::String(text) if json::non_finite(&text).is_some() => {

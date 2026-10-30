@@ -71,6 +71,25 @@ impl Series {
             Self::Level { outputs } | Self::Increments { outputs, .. } => outputs,
         }
     }
+
+    /// The series as a label reads it: its outputs, and the width of the
+    /// windows of increments.
+    fn text(&self) -> String {
+        match self {
+            Self::Level { outputs } => outputs.join(" + "),
+            Self::Increments { outputs, window } => format!(
+                "{} gain over windows of {}",
+                outputs.join(" + "),
+                position_text(*window)
+            ),
+        }
+    }
+}
+
+/// `at` as the shortest text that reads back as it, with no `.0`.
+fn position_text(at: f64) -> String {
+    let text = format!("{at:?}");
+    text.strip_suffix(".0").map_or(text.clone(), str::to_string)
 }
 
 /// A series of a run and how it is reduced to scalars.
@@ -235,6 +254,79 @@ impl Quantity {
         self.len() == 0
     }
 
+    /// The series and the position of each scalar: its label and no
+    /// position, or for a trajectory its name and each position. A quantity
+    /// with no `label` is named after what it reads.
+    pub fn axes(&self) -> Vec<(String, Option<f64>)> {
+        let given = |text: String| match self.label() {
+            Some(label) => label.to_string(),
+            None => text,
+        };
+        let one = |text: String| vec![(given(text), None)];
+        match self {
+            Self::ValueAt { series, at, .. } => {
+                one(format!("{} at {}", series.text(), position_text(*at)))
+            }
+            Self::Gain {
+                outputs,
+                start,
+                end,
+                ..
+            } => one(format!(
+                "{} gain over ({}, {}]",
+                outputs.join(" + "),
+                position_text(*start),
+                position_text(*end)
+            )),
+            Self::Peak { series, .. } => one(format!("peak of {}", series.text())),
+            Self::PeakPosition { series, .. } => {
+                one(format!("position of the peak of {}", series.text()))
+            }
+            Self::Trajectory {
+                series, positions, ..
+            } => {
+                let name = given(series.text());
+                positions
+                    .iter()
+                    .map(|&at| (name.clone(), Some(at)))
+                    .collect()
+            }
+            Self::Ratio {
+                numerator,
+                denominator,
+                ..
+            } => one(format!(
+                "({}) / ({})",
+                numerator.labels()[0],
+                denominator.labels()[0]
+            )),
+        }
+    }
+
+    /// The label of each scalar: its name, and for a trajectory the
+    /// position of the scalar.
+    pub fn labels(&self) -> Vec<String> {
+        self.axes()
+            .into_iter()
+            .map(|(name, at)| match at {
+                Some(at) => format!("{name} at {}", position_text(at)),
+                None => name,
+            })
+            .collect()
+    }
+
+    /// The label given to the quantity, if any.
+    fn label(&self) -> Option<&str> {
+        match self {
+            Self::ValueAt { label, .. }
+            | Self::Gain { label, .. }
+            | Self::Peak { label, .. }
+            | Self::PeakPosition { label, .. }
+            | Self::Trajectory { label, .. }
+            | Self::Ratio { label, .. } => label.as_deref(),
+        }
+    }
+
     /// The outputs the quantity sums; for a ratio, those of its numerator,
     /// then those of its denominator.
     pub fn outputs(&self) -> Vec<&str> {
@@ -256,6 +348,33 @@ impl Quantity {
                 outputs
             }
         }
+    }
+}
+
+/// The label of every scalar of `quantities`, in order: the quantities
+/// compiled ([`Quantities::schedule_of`]), each scalar with a label of its
+/// own.
+///
+/// # Errors
+///
+/// The message of [`Quantities::new`] for the outputs the quantities name.
+pub fn labels(quantities: &[Quantity]) -> Result<Vec<String>, String> {
+    Quantities::schedule_of(quantities)?;
+    Ok(quantities.iter().flat_map(Quantity::labels).collect())
+}
+
+/// Check that no two scalars of `quantities` have one label.
+fn distinct_labels(quantities: &[Quantity]) -> Result<(), String> {
+    let labels: Vec<String> = quantities.iter().flat_map(Quantity::labels).collect();
+    match labels
+        .iter()
+        .enumerate()
+        .find(|(index, label)| labels[..*index].contains(label))
+    {
+        Some((_, label)) => Err(format!(
+            "Two quantities have the label '{label}': give each a label of its own"
+        )),
+        None => Ok(()),
     }
 }
 
@@ -413,6 +532,11 @@ impl Points<'_> {
                         "Quantity {index}: a peak or a trajectory needs positions"
                     ));
                 }
+                if positions.windows(2).any(|pair| pair[1] <= pair[0]) {
+                    return Err(format!(
+                        "Quantity {index}: positions must ascend, each once, got {positions:?}"
+                    ));
+                }
                 let range = self.read(series, positions, POSITIONS)?;
                 match quantity {
                     Quantity::Peak { .. } => Reduction::Scalar(Scalar::Max(range)),
@@ -439,14 +563,15 @@ impl Points<'_> {
             ) => Ok(scalar),
             _ => {
                 let kind = match quantity {
-                    Quantity::PeakPosition { .. } => "peak_position",
-                    Quantity::Trajectory { .. } => "trajectory",
-                    _ => "ratio",
+                    Quantity::PeakPosition { .. } => "PeakPosition",
+                    Quantity::Trajectory { .. } => "Trajectory",
+                    _ => "Ratio",
                 };
                 Err(format!(
-                    "Quantity {}: a ratio divides quantities of one value each (value_at, gain, \
-                     peak), got {kind}",
-                    self.index
+                    "Quantity {}: a Ratio divides quantities of one value each (ValueAt, Gain, \
+                     Peak), got the {kind} '{}'",
+                    self.index,
+                    quantity.labels()[0]
                 ))
             }
         }
@@ -461,11 +586,12 @@ impl Quantities {
     /// Returns a message when there is no quantity, a quantity has no
     /// outputs or names an unknown one, a position or the window of
     /// increments is outside its range ([`crate::ranges`]), a gain does not
-    /// end after it starts, the window of increments is longer than an end, or a peak or a trajectory has no
-    /// positions.
+    /// end after it starts, the window of increments is longer than an end,
+    /// a peak or a trajectory has no positions or positions that do not
+    /// ascend, or two scalars have one label ([`labels`]).
     pub fn new(quantities: &[Quantity], output_names: &[String]) -> Result<Self, String> {
         if quantities.is_empty() {
-            return Err("No quantities of interest given".to_string());
+            return Err("Give at least one quantity of interest".to_string());
         }
         let mut points = Vec::new();
         let mut starts = Vec::new();
@@ -503,6 +629,7 @@ impl Quantities {
         schedule.dedup();
         let operator =
             ObservationOperator::with_starts(&points, &starts, &[], output_names, &schedule)?;
+        distinct_labels(quantities)?;
         Ok(Self {
             schedule,
             operator,

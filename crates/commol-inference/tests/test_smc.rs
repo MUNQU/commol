@@ -773,3 +773,53 @@ fn eta_is_a_number_or_a_calibration_of_it() {
         "{message}"
     );
 }
+
+#[test]
+fn the_priors_and_eta_of_a_method_are_required() {
+    use commol_inference::settings::smc::{AbcRejectionSettings, GibbsPosteriorSettings};
+
+    let without_priors = commol_core::json::read::<AbcRejectionSettings>(
+        r#"{"distance": {"kind": "loss"}, "draws": 10, "quantile": 0.1}"#,
+    )
+    .unwrap_err();
+    let without_eta = commol_core::json::read::<GibbsPosteriorSettings>(
+        r#"{"priors": {"distributions": null}, "particles": 10, "target_cess": 0.5,
+        "resample_threshold": 0.5, "stay_probability": 0.05}"#,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        without_priors,
+        "priors is required: give a prior per calibrated parameter, or \
+         Priors.uniform_on_bounds()"
+    );
+    assert!(
+        without_eta.starts_with("eta is required: give a number above 0"),
+        "{without_eta}"
+    );
+}
+
+#[test]
+fn a_null_prior_or_eta_names_its_field_once() {
+    use commol_inference::settings::smc::{AbcRejectionSettings, GibbsPosteriorSettings};
+
+    let priors = commol_core::json::read::<AbcRejectionSettings>(
+        r#"{"distance": {"kind": "loss"}, "draws": 10, "quantile": 0.1, "priors": null}"#,
+    )
+    .unwrap_err();
+    let eta = commol_core::json::read::<GibbsPosteriorSettings>(
+        r#"{"priors": {"distributions": null}, "eta": null, "particles": 10,
+        "target_cess": 0.5, "resample_threshold": 0.5, "stay_probability": 0.05}"#,
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        priors,
+        "priors: null is not a prior: give a prior per calibrated parameter, or \
+         Priors.uniform_on_bounds()"
+    );
+    assert!(
+        eta.starts_with("eta: null is not an eta: give a number above 0"),
+        "{eta}"
+    );
+}

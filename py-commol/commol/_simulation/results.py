@@ -392,10 +392,8 @@ def quantities_of_runs(
     from commol.quantities.quantities import quantity_labels
 
     labels = quantity_labels(quantities)
-    names = [quantity.axes()[0][0] for quantity in quantities]
     values = commol_rs.inference.quantities_of_runs(
         engine_json(list(quantities)),
-        names,
         list(runs[0]),
         [float(position) for position in positions],
         [run.rows() for run in runs],

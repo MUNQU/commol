@@ -15,13 +15,19 @@ A field that holds a result with behavior in the engine, such as the sample
 of a method, is not part of the JSON: the class names it in its class
 variable ``_engine_handles``, and it crosses as its handle
 (`engine_handles`).
+
+A data object whose fields join in a rule lists `EngineChecked` among its
+bases: when it is built, the engine checks its JSON with the reader of the
+class that lists it, and the object raises the message of the engine.
 """
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar, Self
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from pydantic_core import to_json
+
+from commol.commol_rs import _commol_rs as commol_rs
 
 if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import EngineHandle
@@ -96,3 +102,43 @@ def engine_handles(value: BaseModel) -> dict[str, "EngineHandle"]:
     """
     handles: tuple[str, ...] = getattr(value, "_engine_handles", ())
     return {name: _handle(getattr(value, name)) for name in handles}
+
+
+class EngineChecked(BaseModel):
+    """
+    A data object whose rules the engine checks when it is built.
+
+    The engine checks the JSON of the object with the reader of the class
+    that lists `EngineChecked` among its bases (``commol_rs.json.check``),
+    which holds every rule that joins its fields, such as two parameters
+    with one id or a bound above the other; a subclass keeps the reader of
+    that class. A field that crosses as a handle is not in the JSON, so a
+    rule that reads it is checked when the engine runs the object.
+    """
+
+    _engine_object: ClassVar[str]
+
+    @classmethod
+    def __pydantic_init_subclass__(cls, **kwargs: object) -> None:
+        """Name the object of the engine of a model that lists `EngineChecked`."""
+        super().__pydantic_init_subclass__(**kwargs)
+        if EngineChecked in cls.__bases__:
+            cls._engine_object = cls.__name__
+
+    @model_validator(mode="after")
+    def _check_with_engine(self) -> Self:
+        """
+        Check the rules of the object with the reader of the engine.
+
+        Returns
+        -------
+        Self
+            The object.
+
+        Raises
+        ------
+        ValueError
+            With the message of the engine, if the object breaks a rule.
+        """
+        commol_rs.json.check(self._engine_object, engine_json(self))
+        return self

@@ -5,7 +5,7 @@
 //! ([`crate::json`]). A list of quantities crosses inside the JSON of a
 //! method, or once per call that reduces runs that are done.
 
-use commol_inference::quantity::{MissingPositions, Quantities, Quantity};
+use commol_inference::quantity::{self, MissingPositions, Quantities, Quantity};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
@@ -36,6 +36,43 @@ fn quantity_schedule(json: &str) -> PyResult<Vec<f64>> {
     Quantities::schedule_of(&read_quantities(json)?).map_err(PyValueError::new_err)
 }
 
+/// The label of every scalar of the quantities of `json`, in order
+///
+/// A quantity with no label is named after what it reads; each scalar of a
+/// trajectory is its name and its position.
+///
+/// Args:
+///     json: A JSON list of quantities, as the quantity classes write them
+///
+/// Returns:
+///     The labels
+///
+/// Raises:
+///     ValueError: If `json` is not a list of quantities, there is none, a
+///         quantity does not fit its rules, or two scalars have one label
+#[pyfunction]
+fn quantity_labels(json: &str) -> PyResult<Vec<String>> {
+    quantity::labels(&read_quantities(json)?).map_err(PyValueError::new_err)
+}
+
+/// The series and the position of each scalar of the quantities of `json`
+///
+/// Args:
+///     json: A JSON list of quantities, as the quantity classes write them
+///
+/// Returns:
+///     For each scalar, its label and no position, or for a trajectory its
+///     name and its position
+///
+/// Raises:
+///     ValueError: As `quantity_labels`
+#[pyfunction]
+fn quantity_axes(json: &str) -> PyResult<Vec<(String, Option<f64>)>> {
+    let quantities = read_quantities(json)?;
+    quantity::labels(&quantities).map_err(PyValueError::new_err)?;
+    Ok(quantities.iter().flat_map(Quantity::axes).collect())
+}
+
 /// The quantities of runs that are done, each run reduced as a propagation
 /// reduces its runs
 ///
@@ -44,8 +81,6 @@ fn quantity_schedule(json: &str) -> PyResult<Vec<f64>> {
 ///
 /// Args:
 ///     json: A JSON list of quantities, as the quantity classes write them
-///     names: The name of each quantity, for the message of a missing
-///         position
 ///     output_names: The outputs of a row, in order
 ///     positions: The positions of the runs, ascending
 ///     runs: The rows of each run, one row per position
@@ -61,13 +96,16 @@ fn quantity_schedule(json: &str) -> PyResult<Vec<f64>> {
 #[pyfunction]
 fn quantities_of_runs(
     json: &str,
-    names: Vec<String>,
     output_names: Vec<String>,
     positions: Vec<f64>,
     runs: Vec<Vec<Vec<f64>>>,
 ) -> PyResult<Vec<Vec<f64>>> {
-    let compiled =
-        Quantities::new(&read_quantities(json)?, &output_names).map_err(PyValueError::new_err)?;
+    let quantities = read_quantities(json)?;
+    let compiled = Quantities::new(&quantities, &output_names).map_err(PyValueError::new_err)?;
+    let names: Vec<String> = quantities
+        .iter()
+        .map(|quantity| quantity.axes().swap_remove(0).0)
+        .collect();
     runs.iter()
         .map(|rows| {
             compiled
@@ -98,6 +136,8 @@ fn missing_message(missing: &[MissingPositions], names: &[String]) -> String {
 /// Register the quantity bindings in the inference module.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(quantity_schedule, m)?)?;
+    m.add_function(wrap_pyfunction!(quantity_labels, m)?)?;
+    m.add_function(wrap_pyfunction!(quantity_axes, m)?)?;
     m.add_function(wrap_pyfunction!(quantities_of_runs, m)?)?;
     Ok(())
 }

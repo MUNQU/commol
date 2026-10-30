@@ -15,7 +15,7 @@ use commol_core::SimulationEngine;
 use crate::conformal::intervals::{ConformalRun, PredictionIntervals};
 use crate::conformal::predict::{set_predictions, targets};
 use crate::conformal::quantile::conformal_quantile;
-use crate::conformal::score::{ConformalSettings, NonconformityScore, scales};
+use crate::conformal::score::{ConformalSettings, scales};
 use crate::error::MethodError;
 use crate::resampling::{FitUnit, Perturbation, ReplicateRunner};
 
@@ -26,13 +26,10 @@ fn check<E: SimulationEngine + Send + Sync>(
     settings: ConformalSettings,
 ) -> Result<(), MethodError> {
     let invalid = |message: String| Err(MethodError::Invalid(message));
-    if settings.score == NonconformityScore::Spread {
-        return invalid(
-            "RollingConformal fits once per origin, so its predictions have no spread for \
-             score=\"spread\"; use \"absolute\" or \"normalized\""
-                .to_string(),
-        );
-    }
+    settings
+        .score
+        .check_rolling()
+        .map_err(MethodError::Invalid)?;
     let observed = runner.problem().observed_data();
     let last = observed
         .iter()

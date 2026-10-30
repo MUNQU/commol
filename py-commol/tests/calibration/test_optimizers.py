@@ -1,5 +1,6 @@
 """Nelder-Mead and particle swarm recover known parameters and report convergence."""
 
+import math
 import re
 
 import pytest
@@ -494,3 +495,19 @@ def test_a_particle_swarm_takes_particles(capfd) -> None:
     _calibrate(_k_problem(config))
 
     assert "Particles: 4\n" in capfd.readouterr().out
+
+
+def test_an_optimizer_refuses_an_infinite_bound() -> None:
+    # A problem keeps an infinite bound, for a prior on a half-line: it
+    # serves a sampler that never fits. Each start of a fit refuses it.
+    message = r"An optimizer searches inside the bounds.*'k' has the bounds \[0, inf\]"
+    for config in [NelderMeadConfig(max_iterations=2), ParticleSwarmConfig()]:
+        problem = _k_problem(config, bounds=(0.0, math.inf), initial_guess=0.3)
+        with pytest.raises(RuntimeError, match=message):
+            _calibrate(problem)
+    with pytest.raises(ValueError, match=r"bounds of parameter 'k' must be numbers"):
+        bounded("k", math.nan, 1.0)
+    with pytest.raises(ValueError, match=r"max_bound \(0\) must be greater"):
+        bounded("k", 0.0, 0.0)
+    with pytest.raises(ValueError, match=r"initial_guess \(2\) must be a finite"):
+        bounded("k", 0.0, 1.0, initial_guess=2.0)

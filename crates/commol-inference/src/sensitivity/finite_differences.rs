@@ -130,8 +130,7 @@ impl<E: SimulationEngine + Send + Sync> FiniteDifferences<E> {
             .zip(self.forward.parameters())
             .map(|(&value, parameter)| {
                 let width = parameter.max_bound - parameter.min_bound;
-                let scale = if width.is_finite() { width } else { 1.0 };
-                (factor * value.abs().max(scale)).min(width / 8.0)
+                (factor * value.abs().max(parameter.width_scale())).min(width / 8.0)
             })
             .collect()
     }
@@ -153,9 +152,6 @@ impl<E: SimulationEngine + Send + Sync> FiniteDifferences<E> {
     ) -> Result<(Vec<f64>, Vec<f64>), SensitivityError> {
         let parameter = &self.forward.parameters()[j];
         let rows = center.len();
-        if step <= 0.0 {
-            return Ok((vec![0.0; rows], vec![0.0; rows]));
-        }
         let value = values[j];
         let (stencil, direction) = if value - 2.0 * step >= parameter.min_bound
             && value + 2.0 * step <= parameter.max_bound

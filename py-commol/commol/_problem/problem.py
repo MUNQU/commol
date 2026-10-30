@@ -1,10 +1,11 @@
 """Calibration problems: observations, unknowns, constraints and optimizers."""
 
 from collections.abc import Mapping
-from typing import Annotated, Literal, Self
+from typing import Annotated, Literal
 
 from pydantic import (
     AfterValidator,
+    JsonValue,
     BaseModel,
     ConfigDict,
     Field,
@@ -12,7 +13,7 @@ from pydantic import (
     model_validator,
 )
 
-from commol._data.engine_json import engine_json
+from commol._data.engine_json import EngineChecked
 from commol._data.ranges import RangeChecked
 from commol._fit.result import CalibrationResult
 from commol.commol_rs import _commol_rs as commol_rs
@@ -21,7 +22,7 @@ from commol.observations.models import _ObservationModel
 __all__ = ["calibrated_values"]
 
 
-class ObservedDataPoint(RangeChecked):
+class ObservedDataPoint(EngineChecked, RangeChecked):
     """
     Represents a single observed data point for calibration.
 
@@ -108,33 +109,19 @@ class ObservedDataPoint(RangeChecked):
         description="Trials of a binomial observation model that reads them here",
     )
 
-    @model_validator(mode="after")
-    def _validate_observed_outputs(self) -> Self:
-        """Require one of `output` and `outputs`; name the series."""
-        if (self.output is None) == (self.outputs is None):
-            raise ValueError("Give exactly one of 'output' and 'outputs'.")
-        if self.outputs is not None:
-            if not self.outputs:
-                raise ValueError("outputs must be non-empty when provided")
-            if not self.label:
-                raise ValueError(
-                    "An observation of several outputs needs a 'label' that names "
-                    "their sum."
-                )
-        elif not self.label:
-            self.label = self.output or ""
-        return self
-
-    @model_validator(mode="after")
-    def _validate_window(self) -> Self:
+    @model_validator(mode="before")
+    @classmethod
+    def _label_of_one_output(cls, data: JsonValue) -> JsonValue:
         """
-        A window must not start before position 0, with the rule of the
-        engine (`check_window_end` of
-        `crates/commol-calibration/src/observation.rs`).
+        Name the series of one output after it when no label is given; the
+        engine checks every other rule of the observation
+        (`Observation::check` of `crates/commol-calibration/src/settings.rs`).
         """
-        if self.window is not None:
-            commol_rs.calibration.check_window_end(self.at, self.window)
-        return self
+        if isinstance(data, Mapping) and not data.get("label"):
+            output = data.get("output")
+            if isinstance(output, str):
+                return {**data, "label": output}
+        return data
 
     @property
     def observed_outputs(self) -> list[str]:
@@ -142,7 +129,7 @@ class ObservedDataPoint(RangeChecked):
         return list(self.outputs) if self.outputs is not None else [self.output or ""]
 
 
-class CalibrationParameter(BaseModel):
+class CalibrationParameter(EngineChecked):
     """
     Defines a parameter or initial condition to be calibrated with its bounds.
 
@@ -158,9 +145,13 @@ class CalibrationParameter(BaseModel):
     min_bound : float
         Minimum allowed value for this parameter
     max_bound : float
-        Maximum allowed value for this parameter
+        Maximum allowed value for this parameter, above `min_bound`. A bound
+        may be infinite, for a prior on a half-line; an optimizer refuses it
+        (a particle swarm when the problem is built, Nelder-Mead when it
+        runs).
     initial_guess : float | None
-        Optional starting value for optimization (if None, midpoint is used)
+        Optional starting value for optimization (if None, midpoint is
+        used): a finite number between the bounds
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -180,30 +171,8 @@ class CalibrationParameter(BaseModel):
         default=None, description="Optional starting value for optimization"
     )
 
-    @model_validator(mode="after")
-    def _validate_bounds(self) -> Self:
-        """Validate that max_bound > min_bound and initial_guess is within bounds."""
-        if self.max_bound <= self.min_bound:
-            raise ValueError(
-                (
-                    f"max_bound ({self.max_bound}) must be greater than "
-                    f"min_bound ({self.min_bound}) for parameter '{self.id}'"
-                )
-            )
-        if self.initial_guess is not None:
-            if not (self.min_bound <= self.initial_guess <= self.max_bound):
-                raise ValueError(
-                    (
-                        f"initial_guess ({self.initial_guess}) must be between "
-                        f"min_bound ({self.min_bound}) and max_bound "
-                        f"({self.max_bound}) for parameter '{self.id}'"
-                    )
-                )
 
-        return self
-
-
-class CalibrationConstraint(RangeChecked):
+class CalibrationConstraint(EngineChecked, RangeChecked):
     """
     A constraint on calibration parameters defined as a mathematical expression.
 
@@ -301,15 +270,6 @@ class CalibrationConstraint(RangeChecked):
         commol_rs.core.MathExpression(value).check()
         return value
 
-    @model_validator(mode="after")
-    def _validate_positions(self) -> Self:
-        """Validate that the positions, when given, are not empty."""
-        if self.at is not None and len(self.at) == 0:
-            raise ValueError(
-                f"at for constraint '{self.id}' must not be empty if specified"
-            )
-        return self
-
 
 class NelderMeadConfig(RangeChecked):
     """
@@ -394,7 +354,7 @@ class NelderMeadConfig(RangeChecked):
     )
 
 
-class ParticleSwarmConfig(RangeChecked):
+class ParticleSwarmConfig(EngineChecked, RangeChecked):
     """
     Configuration for the Particle Swarm Optimization algorithm.
 
@@ -598,26 +558,6 @@ class ParticleSwarmConfig(RangeChecked):
         default=None, description="Nelder-Mead from the best point of the swarm"
     )
 
-    @model_validator(mode="after")
-    def _check_strategies(self) -> Self:
-        """
-        Check each number against its strategy, as the engine reads them.
-
-        Returns
-        -------
-        Self
-            The configuration.
-
-        Raises
-        ------
-        ValueError
-            If a strategy lacks a number it needs, a number is set without
-            its strategy or with another one, or the chaotic weights are not
-            in order; the message is that of the engine.
-        """
-        commol_rs.json.as_read("ParticleSwarmConfig", engine_json(self))
-        return self
-
 
 def check_quantile_level(level: float) -> float:
     """
@@ -676,7 +616,7 @@ class Quantile(BaseModel):
         super().__init__(level=level)
 
 
-class CalibrationProblem(RangeChecked):
+class CalibrationProblem(EngineChecked, RangeChecked):
     """
     Defines a complete calibration problem.
 
@@ -743,10 +683,10 @@ class CalibrationProblem(RangeChecked):
     model_config = ConfigDict(extra="forbid")
 
     observed_data: list[ObservedDataPoint] = Field(
-        default=..., min_length=1, description="Observed data points"
+        default=..., description="Observed data points"
     )
     parameters: list[CalibrationParameter] = Field(
-        default=..., min_length=1, description="Parameters to calibrate"
+        default=..., description="Parameters to calibrate"
     )
     constraints: list[CalibrationConstraint] = Field(
         default_factory=list,
@@ -793,36 +733,6 @@ class CalibrationProblem(RangeChecked):
             "stochastic engine, the starts, a particle swarm and the methods"
         ),
     )
-
-    @model_validator(mode="after")
-    def _validate_loss_or_models(self) -> Self:
-        """Require a loss or observation models, exactly one."""
-        if self.loss_function is not None and self.observation_models is not None:
-            raise ValueError(
-                "A problem has a loss_function or observation_models, not both: "
-                "the fit and the posterior would answer different questions."
-            )
-        if self.loss_function is None and self.observation_models is None:
-            raise ValueError(
-                "A problem needs a loss_function (sse, rmse or mae) or "
-                "observation_models. There is no default: what to fit is a "
-                "modelling choice."
-            )
-        if self.observation_models is not None and self.normalize_observations:
-            raise ValueError(
-                "normalize_observations needs a loss_function: the observation "
-                "models set the scale of each series with their noise."
-            )
-        return self
-
-    @model_validator(mode="after")
-    def _validate_unique_parameter_ids(self) -> Self:
-        """Ensure parameter IDs are unique."""
-        param_ids = [p.id for p in self.parameters]
-        if len(param_ids) != len(set(param_ids)):
-            duplicates = [id for id in set(param_ids) if param_ids.count(id) > 1]
-            raise ValueError(f"Duplicate parameter IDs found: {duplicates}")
-        return self
 
 
 def calibrated_values(

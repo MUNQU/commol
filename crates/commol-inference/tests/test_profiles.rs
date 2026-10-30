@@ -947,3 +947,48 @@ fn a_value_on_a_bound_follows_one_rule_with_an_infinite_bound() {
     assert_eq!(transform.on_bound(&[0.5, 1e-10]), Some((1, 0.0)));
     assert_eq!(transform.on_bound(&[0.5, 1.0]), None);
 }
+
+#[test]
+fn each_parameter_and_each_prediction_is_profiled_once() {
+    use commol_inference::settings::profiles::{
+        PredictionProfileSettings, ProfileLikelihoodSettings,
+    };
+
+    let threshold = r#"{"kind": "chi_square", "confidence_level": 0.95, "bootstrap": null}"#;
+    let parameters = |names: &str| {
+        commol_core::json::read::<ProfileLikelihoodSettings>(&format!(
+            r#"{{"parameters": {names}, "threshold": {threshold}, "max_steps": 10,
+            "starts": 1}}"#
+        ))
+    };
+    let spec = |label: &str| {
+        format!(
+            r#"{{"at": 1.0, "output": "B", "outputs": null, "label": "{label}",
+            "window": null, "factor_id": null, "scale": 1.0}}"#
+        )
+    };
+    let predictions = |specs: &str| {
+        commol_core::json::read::<PredictionProfileSettings>(&format!(
+            r#"{{"specs": {specs}, "threshold": {threshold}, "max_steps": 10, "starts": 1}}"#
+        ))
+    };
+
+    assert_eq!(
+        parameters("[]").unwrap_err(),
+        "Give at least one parameter to profile"
+    );
+    assert_eq!(
+        parameters(r#"["a", "b", "a"]"#).unwrap_err(),
+        "The parameter 'a' is listed twice: each parameter is profiled once"
+    );
+    assert_eq!(
+        predictions("[]").unwrap_err(),
+        "Give at least one prediction to profile in specs"
+    );
+    // An empty label is the name of the output.
+    assert_eq!(
+        predictions(&format!("[{}, {}]", spec(""), spec("B"))).unwrap_err(),
+        "Two predictions have the label 'B': give each a label of its own"
+    );
+    assert!(predictions(&format!("[{}, {}]", spec(""), spec("late"))).is_ok());
+}

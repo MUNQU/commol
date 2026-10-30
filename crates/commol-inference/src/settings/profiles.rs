@@ -133,8 +133,29 @@ pub struct ProfileLikelihoodSettings {
 checked!(
     ProfileLikelihoodSettings,
     "ProfileLikelihood",
-    [Rule::Count(MAX_STEPS), Rule::Count(STARTS)]
+    [Rule::Count(MAX_STEPS), Rule::Count(STARTS)],
+    check = ProfileLikelihoodSettings::check
 );
+
+impl ProfileLikelihoodSettings {
+    /// Check that there is a parameter to profile, and that each is
+    /// profiled once.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the parameter listed twice.
+    pub fn check(&self) -> Result<(), String> {
+        if self.parameters.is_empty() {
+            return Err("Give at least one parameter to profile".to_string());
+        }
+        match repeated(&self.parameters) {
+            Some(name) => Err(format!(
+                "The parameter '{name}' is listed twice: each parameter is profiled once"
+            )),
+            None => Ok(()),
+        }
+    }
+}
 
 /// The profile likelihood of predictions, as the Python class
 /// `PredictionProfile` writes it.
@@ -154,5 +175,40 @@ pub struct PredictionProfileSettings {
 checked!(
     PredictionProfileSettings,
     "PredictionProfile",
-    [Rule::Count(MAX_STEPS), Rule::Count(STARTS)]
+    [Rule::Count(MAX_STEPS), Rule::Count(STARTS)],
+    check = PredictionProfileSettings::check
 );
+
+impl PredictionProfileSettings {
+    /// Check that there is a prediction to profile, and that each has a
+    /// label of its own: the label of an observation that reads it.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the label two predictions share.
+    pub fn check(&self) -> Result<(), String> {
+        if self.specs.is_empty() {
+            return Err("Give at least one prediction to profile in specs".to_string());
+        }
+        let labels: Vec<String> = self
+            .specs
+            .iter()
+            .map(|spec| spec.observation().label)
+            .collect();
+        match repeated(&labels) {
+            Some(label) => Err(format!(
+                "Two predictions have the label '{label}': give each a label of its own"
+            )),
+            None => Ok(()),
+        }
+    }
+}
+
+/// The first name of `names` that an earlier one repeats.
+fn repeated(names: &[String]) -> Option<&String> {
+    names
+        .iter()
+        .enumerate()
+        .find(|(index, name)| names[..*index].contains(name))
+        .map(|(_, name)| name)
+}

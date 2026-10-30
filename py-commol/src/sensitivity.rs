@@ -8,7 +8,6 @@
 //! builds the result classes.
 
 use crate::parallelism::parallel;
-use commol_inference::design::InputSpace;
 use commol_inference::global_sensitivity::{ChaosExpansion, ForwardAnalysis, Truncation};
 use commol_inference::settings::sensitivity::{
     InputSpaceSettings, MorrisSettings, PolynomialChaosSettings, PrccSettings, PropagationSettings,
@@ -35,24 +34,6 @@ type MorrisValues = (Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<Vec<f64>>, usize);
 /// The draws, the coefficients, the p-values and the effective size of a
 /// PRCC.
 type PrccValues = (Draws, Vec<Vec<f64>>, Vec<Vec<f64>>, f64);
-
-/// The inputs of `settings`: the draws of `sample` when there is one,
-/// otherwise the distributions of the settings, uniform on the bounds when
-/// it has none.
-fn input_space(
-    settings: &InputSpaceSettings,
-    sample: Option<&PyParameterSample>,
-) -> PyResult<InputSpace> {
-    match sample {
-        Some(sample) => Ok(InputSpace::Sample(sample.inner.clone())),
-        None => commol_inference::settings::PriorsSettings {
-            distributions: settings.distributions.clone(),
-        }
-        .priors(&settings.names(), &settings.bounds())
-        .map(InputSpace::Independent)
-        .map_err(value_error),
-    }
-}
 
 /// A forward model with no observations, the inputs it varies and its
 /// seed, built once
@@ -95,7 +76,9 @@ impl PyForwardAnalysis {
         let replicates: Option<usize> =
             crate::counts::optional_count(&commol_calibration::ranges::REPLICATES, replicates)?;
         let settings: InputSpaceSettings = crate::json::read(inputs)?;
-        let inputs = input_space(&settings, sample.as_deref())?;
+        let inputs = settings
+            .inputs(sample.map(|sample| sample.inner.clone()))
+            .map_err(value_error)?;
         let inner = ForwardAnalysis::new(
             engine.engine(),
             settings.parameters,
@@ -428,7 +411,7 @@ fn chaos_evaluate(
     let max_interaction: Option<usize> =
         crate::counts::optional_count(&commol_inference::ranges::MAX_INTERACTION, max_interaction)?;
     let settings: InputSpaceSettings = crate::json::read(inputs)?;
-    let inputs = input_space(&settings, None)?;
+    let inputs = settings.inputs(None).map_err(value_error)?;
     let truncation = Truncation::new(q_norm, max_interaction).map_err(method_error)?;
     let expansion =
         ChaosExpansion::new(settings.parameters.len(), degree, truncation, coefficients)

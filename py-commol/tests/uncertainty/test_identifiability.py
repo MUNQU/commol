@@ -466,22 +466,6 @@ class TestPractical:
             # The priors are narrower than their bounds.
             assert against_bounds.contraction[name] > 0.3
 
-    def test_a_reference_of_priors_needs_the_priors(self) -> None:
-        sample = ParameterSample.equally_weighted(
-            ["k1"], [(0.0, 1.0)], [[0.5]], SampleMethod(name="g")
-        )
-        with pytest.raises(ValidationError, match="reference='prior' needs priors"):
-            SampleIdentifiability(
-                sample=sample, reference="prior", correlation_threshold=0.9
-            )
-        with pytest.raises(ValidationError, match="priors are read only with"):
-            SampleIdentifiability(
-                sample=sample,
-                reference="bounds",
-                priors=Priors.uniform_on_bounds(),
-                correlation_threshold=0.9,
-            )
-
     def test_a_sample_of_other_parameters_is_rejected(
         self, product: Calibrator
     ) -> None:
@@ -598,3 +582,17 @@ def test_the_starts_of_a_polished_fit_are_its_polished_ends(
     # The swarm alone converges at no start, so the method has none to read.
     with pytest.raises(ValueError, match="at least two that converged, got 0"):
         calibrators[1].identifiability(StartsIdentifiability(result=alone, **method))
+
+
+def test_the_reference_matches_the_priors() -> None:
+    # The engine reads the JSON of the method: no priors with "prior", and
+    # priors only with "prior".
+    given = SampleMethod(name="g")
+    sample = ParameterSample.equally_weighted(["k1"], [(0, 1)], [[0.5]], given)
+    method = {"sample": sample, "correlation_threshold": 0.9}
+    with pytest.raises(ValidationError, match="reference='prior' needs priors"):
+        SampleIdentifiability(**method, reference="prior")
+    with pytest.raises(ValidationError, match="priors are read only with"):
+        SampleIdentifiability(
+            **method, reference="bounds", priors=Priors.uniform_on_bounds()
+        )

@@ -11,7 +11,7 @@ use commol_inference::global_sensitivity::{
     ChaosExpansion, ForwardAnalysis, Truncation, morris, prcc, sobol,
 };
 use commol_inference::quantity::{
-    MissingPositions, Quantities, Quantity, ReplicateRule, Series, Undefined,
+    self, MissingPositions, Quantities, Quantity, ReplicateRule, Series, Undefined,
 };
 use commol_inference::{MethodError, NanRun, PredictiveError, Priors};
 use commol_statistics::statistics::{self, NotANumber};
@@ -212,7 +212,7 @@ fn the_schedule_alone_reads_the_outputs_the_quantities_name() {
         Quantity::Trajectory {
             label: None,
             series: level(&["B", "A"]),
-            positions: vec![5.0, 1.0],
+            positions: vec![1.0, 5.0],
         },
         Quantity::Gain {
             label: None,
@@ -492,7 +492,21 @@ const RULES: [ReplicateRule; 3] = [
 /// The value of a ratio of `N` to `D` under each rule, for replicates of the
 /// values `(N, D)` given.
 fn combined(replicates: &[(f64, f64)]) -> Vec<Result<f64, Undefined>> {
-    let quantities = Quantities::new(&RULES.map(n_over_d), &names(&["N", "D"])).unwrap();
+    let ratios = RULES.map(|rule| match n_over_d(rule) {
+        Quantity::Ratio {
+            numerator,
+            denominator,
+            replicate_rule,
+            ..
+        } => Quantity::Ratio {
+            label: Some(format!("{rule:?}")),
+            numerator,
+            denominator,
+            replicate_rule,
+        },
+        _ => unreachable!("n_over_d is a ratio"),
+    });
+    let quantities = Quantities::new(&ratios, &names(&["N", "D"])).unwrap();
     let terms: Vec<_> = replicates
         .iter()
         .map(|&(n, d)| quantities.terms(&[vec![n, d]]))
@@ -580,9 +594,19 @@ fn a_ratio_takes_values_only() {
     });
     let nested = of(n_over_d(ReplicateRule::Within));
 
-    assert!(position.contains("got peak_position"), "{position}");
-    assert!(trajectory.contains("got trajectory"), "{trajectory}");
-    assert!(nested.contains("got ratio"), "{nested}");
+    assert_eq!(
+        position,
+        "Quantity 0: a Ratio divides quantities of one value each (ValueAt, Gain, Peak), got \
+         the PeakPosition 'position of the peak of acc'"
+    );
+    assert!(
+        trajectory.contains("got the Trajectory 'acc at 1'"),
+        "{trajectory}"
+    );
+    assert!(
+        nested.contains("got the Ratio '(N at 0) / (D at 0)'"),
+        "{nested}"
+    );
 }
 
 /// A → B at the proportional rate `k`, from one unit of A, and two units
@@ -770,4 +794,95 @@ fn a_zero_denominator_follows_the_nan_rule_in_every_method() {
     assert!(!undefined.is_empty());
     let error = statistics::quantiles(&ratios, &propagation.weights, &[0.5]).unwrap_err();
     assert_eq!(error, NotANumber { points: undefined });
+}
+
+#[test]
+fn a_repeated_label_is_refused() {
+    let outputs = names(&["A", "B"]);
+    let unnamed = [value_at(&["A"], 2.0), value_at(&["A"], 2.0)];
+    let named = [
+        value_at(&["A"], 2.0),
+        Quantity::Peak {
+            label: Some("A at 2".to_string()),
+            series: level(&["B"]),
+            positions: vec![1.0, 2.0],
+        },
+    ];
+    let expected = "Two quantities have the label 'A at 2': give each a label of its own";
+
+    assert_eq!(Quantities::new(&unnamed, &outputs).unwrap_err(), expected);
+    assert_eq!(quantity::labels(&named).unwrap_err(), expected);
+}
+
+#[test]
+fn a_quantity_is_named_after_what_it_reads() {
+    let quantities = [
+        value_at(&["A", "B"], 2.0),
+        Quantity::Gain {
+            label: None,
+            outputs: names(&["acc"]),
+            start: 0.5,
+            end: 3.0,
+        },
+        Quantity::Peak {
+            label: None,
+            series: increments(&["acc"], 7.0),
+            positions: vec![7.0, 14.0],
+        },
+        Quantity::PeakPosition {
+            label: None,
+            series: level(&["A"]),
+            positions: vec![1.0, 2.0],
+        },
+        Quantity::Trajectory {
+            label: Some("path".to_string()),
+            series: level(&["A"]),
+            positions: vec![1.0, 2.5],
+        },
+        ratio_of(
+            value_at(&["N"], 0.0),
+            value_at(&["D"], 0.0),
+            ReplicateRule::Pooled,
+        ),
+    ];
+
+    assert_eq!(
+        quantity::labels(&quantities).unwrap(),
+        [
+            "A + B at 2",
+            "acc gain over (0.5, 3]",
+            "peak of acc gain over windows of 7",
+            "position of the peak of A",
+            "path at 1",
+            "path at 2.5",
+            "(N at 0) / (D at 0)",
+        ]
+    );
+    assert_eq!(
+        quantities[4].axes(),
+        [
+            ("path".to_string(), Some(1.0)),
+            ("path".to_string(), Some(2.5))
+        ]
+    );
+    assert_eq!(
+        quantity::labels(&[]).unwrap_err(),
+        "Give at least one quantity of interest"
+    );
+}
+
+#[test]
+fn positions_ascend_each_once() {
+    for positions in [vec![2.0, 1.0], vec![1.0, 1.0]] {
+        let trajectory = Quantity::Trajectory {
+            label: None,
+            series: level(&["A"]),
+            positions: positions.clone(),
+        };
+
+        assert_eq!(
+            Quantities::schedule_of(&[trajectory]).unwrap_err(),
+            format!("Quantity 0: positions must ascend, each once, got {positions:?}")
+        );
+    }
 }

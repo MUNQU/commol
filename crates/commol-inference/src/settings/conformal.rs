@@ -30,6 +30,21 @@ fn pair(score: NonconformityScore, by: Pooling) -> Result<(), String> {
     ConformalSettings::check_pair(score, by).map_err(|error| error.to_string())
 }
 
+/// Check that the list `field` holds at least one `what`: a method with an
+/// empty one would return no interval.
+fn given<T>(list: &[T], field: &str, what: &str) -> Result<(), String> {
+    if list.is_empty() {
+        return Err(format!("{field} is empty: give at least one {what}"));
+    }
+    Ok(())
+}
+
+/// The check of the score of a method whose predictor is a sample or the
+/// fit, before the fit runs.
+fn predictor(score: NonconformityScore, sample: bool) -> Result<(), MethodError> {
+    score.check_spread(sample).map_err(MethodError::Invalid)
+}
+
 /// The score and the pooling of a conformal method, which the Python class
 /// checks before its other fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -75,8 +90,28 @@ checked!(
     SplitConformalSettings,
     "SplitConformal",
     [Rule::Real(CONFIDENCE_LEVEL), Rule::Count(STARTS)],
-    check = |settings: &SplitConformalSettings| pair(settings.score, settings.by)
+    check = |settings: &SplitConformalSettings| {
+        pair(settings.score, settings.by)?;
+        given(
+            &settings.calibration_data,
+            "calibration_data",
+            "held-out observation",
+        )?;
+        given(&settings.positions, "positions", "position")
+    }
 );
+
+impl SplitConformalSettings {
+    /// Check that the score fits the predictor: a sample when `sample`,
+    /// otherwise the fit.
+    ///
+    /// # Errors
+    ///
+    /// As [`NonconformityScore::check_spread`].
+    pub fn check_predictor(&self, sample: bool) -> Result<(), MethodError> {
+        predictor(self.score, sample)
+    }
+}
 
 /// Rolling-origin conformal prediction, as the Python class
 /// `RollingConformal` writes it.
@@ -101,7 +136,12 @@ checked!(
     RollingConformalSettings,
     "RollingConformal",
     [Rule::Real(CONFIDENCE_LEVEL), Rule::Count(STARTS)],
-    check = |settings: &RollingConformalSettings| pair(settings.score, settings.by)
+    check = |settings: &RollingConformalSettings| {
+        pair(settings.score, settings.by)?;
+        settings.score.check_rolling()?;
+        given(&settings.origins, "origins", "origin")?;
+        given(&settings.positions, "positions", "position")
+    }
 );
 
 /// Jackknife+ with blocks, as the Python class `JackknifePlus` writes it.
@@ -130,7 +170,10 @@ checked!(
         Rule::Count(BLOCK_LENGTH),
         Rule::Count(STARTS),
     ],
-    check = |settings: &JackknifePlusSettings| pair(settings.score, settings.by)
+    check = |settings: &JackknifePlusSettings| {
+        pair(settings.score, settings.by)?;
+        given(&settings.positions, "positions", "position")
+    }
 );
 
 /// Ensemble batch prediction intervals, as the Python class `EnbPI` writes
@@ -163,7 +206,10 @@ checked!(
         Rule::Count(BLOCK_LENGTH),
         Rule::Count(STARTS),
     ],
-    check = |settings: &EnbPiSettings| pair(settings.score, settings.by)
+    check = |settings: &EnbPiSettings| {
+        pair(settings.score, settings.by)?;
+        given(&settings.positions, "positions", "position")
+    }
 );
 
 /// Adaptive conformal inference, as the Python class `AdaptiveConformal`
@@ -193,8 +239,23 @@ checked!(
         Rule::Real(STEP),
         Rule::Count(STARTS),
     ],
-    check = |settings: &AdaptiveConformalSettings| pair(settings.score, settings.by)
+    check = |settings: &AdaptiveConformalSettings| {
+        pair(settings.score, settings.by)?;
+        given(&settings.stream, "stream", "observation that arrives")
+    }
 );
+
+impl AdaptiveConformalSettings {
+    /// Check that the score fits the predictor: a sample when `sample`,
+    /// otherwise the fit.
+    ///
+    /// # Errors
+    ///
+    /// As [`NonconformityScore::check_spread`].
+    pub fn check_predictor(&self, sample: bool) -> Result<(), MethodError> {
+        predictor(self.score, sample)
+    }
+}
 
 macro_rules! conformal_settings {
     ($($type:ty),*) => {

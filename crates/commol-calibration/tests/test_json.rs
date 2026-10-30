@@ -3,9 +3,9 @@
 //! its name, and an invalid value with its path.
 
 use commol_calibration::{
-    FitRecord, InertiaWeightStrategy, LossConfig, MutationApplication, MutationStrategy,
-    Observation, ObservationModel, OptimizationConfig, OptimizerSettings, ProblemSettings,
-    Progress, ReplicateSummary,
+    CalibrationParameter, FitRecord, InertiaWeightStrategy, LossConfig, MutationApplication,
+    MutationStrategy, Observation, ObservationModel, OptimizationConfig, OptimizerSettings,
+    ProblemSettings, Progress, ReplicateSummary, check_unobserved,
 };
 use commol_core::json;
 
@@ -371,6 +371,10 @@ fn an_observation_has_one_output_and_a_label() {
             (r#""B""#, "null", ""),
             "An observation needs a 'label' that names its series.",
         ),
+        (
+            ("null", r#"["B", "C"]"#, ""),
+            "An observation of several outputs needs a 'label' that names their sum.",
+        ),
     ] {
         assert_eq!(
             observation(output, outputs, label),
@@ -394,5 +398,140 @@ fn a_fit_gives_the_values_of_the_parameters_it_has() {
     assert_eq!(
         fit.values(&["k".to_string(), "m".to_string()]),
         Err(r#"The fit is not a fit of this problem: it lacks ["m"]"#.to_string())
+    );
+}
+
+/// The JSON of the parameter `id` with the bounds and the initial guess
+/// given, as JSON texts.
+fn parameter(id: &str, min: &str, max: &str, guess: &str) -> String {
+    format!(
+        r#"{{"id": "{id}", "parameter_type": "parameter", "min_bound": {min},
+        "max_bound": {max}, "initial_guess": {guess}}}"#
+    )
+}
+
+/// The problem with `parameters`, a JSON list, in place of its parameter.
+fn with_parameters(parameters: &str, swarm: bool) -> Result<ProblemSettings, String> {
+    let mut text = with(
+        &problem_json("", ""),
+        r#"[{"id": "k", "parameter_type": "parameter", "min_bound": 0.0,
+            "max_bound": 1.0, "initial_guess": null}]"#,
+        parameters,
+    );
+    if !swarm {
+        let start = text.find(r#"{"kind": "particle_swarm""#).unwrap();
+        let end = start + text[start..].find(r#""polish": null }"#).unwrap() + 16;
+        text.replace_range(
+            start..end,
+            r#"{"kind": "nelder_mead", "max_iterations": 10, "sd_tolerance": 1e-6,
+            "initial_simplex_size": 0.1, "alpha": null, "gamma": null, "rho": null,
+            "sigma": null, "verbose": false, "header_interval": 100}"#,
+        );
+    }
+    json::read(&text)
+}
+
+#[test]
+fn the_bounds_of_a_parameter_are_checked() {
+    let refused = |min: &str, max: &str, guess: &str| {
+        with_parameters(&format!("[{}]", parameter("k", min, max, guess)), false).unwrap_err()
+    };
+
+    assert_eq!(
+        refused("2.0", "1.0", "null"),
+        "parameters[0]: max_bound (1) must be greater than min_bound (2) for parameter 'k'"
+    );
+    assert_eq!(
+        refused("1.0", "1.0", "null"),
+        "parameters[0]: max_bound (1) must be greater than min_bound (1) for parameter 'k'"
+    );
+    assert_eq!(
+        refused(r#""NaN""#, "1.0", "null"),
+        "parameters[0]: The bounds of parameter 'k' must be numbers, got min_bound NaN and \
+         max_bound 1"
+    );
+    assert_eq!(
+        refused("0.0", "1.0", "1.5"),
+        "parameters[0]: initial_guess (1.5) must be a finite number between min_bound (0) \
+         and max_bound (1) for parameter 'k'"
+    );
+    assert_eq!(
+        refused("0.0", r#""Infinity""#, r#""Infinity""#),
+        "parameters[0]: initial_guess (inf) must be a finite number between min_bound (0) \
+         and max_bound (inf) for parameter 'k'"
+    );
+    // A bound may be infinite, for a prior on a half-line, with either
+    // optimizer: the problem serves a sampler, and an optimizer refuses it
+    // when it runs.
+    let half_line = format!("[{}]", parameter("k", "0.0", r#""Infinity""#, "1.0"));
+    assert!(with_parameters(&half_line, false).is_ok());
+    assert!(with_parameters(&half_line, true).is_ok());
+    let built = ProblemSettings {
+        parameters: vec![CalibrationParameter::new("k".to_string(), 2.0, 1.0)],
+        ..read("", "").unwrap()
+    }
+    .check()
+    .unwrap_err();
+    assert_eq!(
+        built,
+        "max_bound (1) must be greater than min_bound (2) for parameter 'k'"
+    );
+}
+
+#[test]
+fn a_repeated_parameter_is_refused() {
+    let twice = format!(
+        "[{}, {}]",
+        parameter("k", "0.0", "1.0", "null"),
+        parameter("k", "0.0", "2.0", "null")
+    );
+    let inputs = [
+        CalibrationParameter::new("k".to_string(), 0.0, 1.0),
+        CalibrationParameter::new("k".to_string(), 0.0, 2.0),
+    ];
+    let expected = "Two parameters have the id 'k': give each parameter an id of its own";
+
+    assert_eq!(with_parameters(&twice, false).unwrap_err(), expected);
+    assert_eq!(check_unobserved(&inputs).unwrap_err(), expected);
+}
+
+#[test]
+fn a_problem_measures_its_fit_one_way() {
+    let models = r#""observation_models": {"B": {"kind": "poisson"}}"#;
+    let likelihood = with(
+        &with(
+            &problem_json("", ""),
+            r#""loss_function": "sse""#,
+            r#""loss_function": null"#,
+        ),
+        r#""observation_models": null"#,
+        models,
+    );
+    let neither = with(
+        &problem_json("", ""),
+        r#""loss_function": "sse""#,
+        r#""loss_function": null"#,
+    );
+    let normalized = with(
+        &likelihood,
+        r#""normalize_observations": false"#,
+        r#""normalize_observations": true"#,
+    );
+
+    assert!(json::read::<ProblemSettings>(&likelihood).is_ok());
+    assert_eq!(
+        read_with(&[("observation_models", r#"{"B": {"kind": "poisson"}}"#)]).unwrap_err(),
+        "A problem has a loss_function or observation_models, not both: the fit and the \
+         posterior would answer different questions"
+    );
+    assert_eq!(
+        json::read::<ProblemSettings>(&neither).unwrap_err(),
+        "A problem needs a loss_function (sse, rmse or mae) or observation_models. There is \
+         no default: what to fit is a modelling choice"
+    );
+    assert_eq!(
+        json::read::<ProblemSettings>(&normalized).unwrap_err(),
+        "normalize_observations needs a loss_function: the observation models set the scale \
+         of each series with their noise"
     );
 }

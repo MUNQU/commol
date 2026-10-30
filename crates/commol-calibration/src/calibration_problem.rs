@@ -18,8 +18,40 @@ use crate::likelihood::TermDerivatives;
 use crate::observation::ObservationOperator;
 use crate::types::{
     CalibrationConstraint, CalibrationParameter, ObservedDataPoint, ReplicateSummary, Replicates,
+    check_parameters,
 };
 use crate::values::{ValueWriter, clamp_to_bounds};
+
+/// Check what a problem holds before an engine reads it: at least one
+/// observation and one parameter, each parameter and each constraint by its
+/// rules ([`CalibrationParameter::check`], [`CalibrationConstraint::check`]),
+/// and no two parameters with one id.
+///
+/// # Errors
+///
+/// Returns a message that names the rule, and the parameter, the id or the
+/// constraint that breaks it.
+pub fn check_contents(
+    observations: usize,
+    parameters: &[CalibrationParameter],
+    constraints: &[CalibrationConstraint],
+) -> Result<(), String> {
+    if observations == 0 {
+        return Err(
+            "A calibration problem needs observed_data: at least one observation to fit"
+                .to_string(),
+        );
+    }
+    if parameters.is_empty() {
+        return Err(
+            "A calibration problem needs parameters: at least one value to calibrate".to_string(),
+        );
+    }
+    check_parameters(parameters)?;
+    constraints
+        .iter()
+        .try_for_each(CalibrationConstraint::check)
+}
 
 /// A calibration problem for any [`SimulationEngine`].
 ///
@@ -89,7 +121,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     ///
     /// Returns a message when a stochastic engine
     /// ([`SimulationEngine::is_stochastic`]) comes with observation models,
-    /// there is no observation or parameter, a window is outside its rule
+    /// what the problem holds breaks a rule of [`check_contents`], a window is outside its rule
     /// ([`crate::check_window_end`]), a position is one the engine
     /// rejects, an observation names an unknown output or factor, a factor
     /// has a bound at or below 0, the engine does not resolve a value of its
@@ -111,13 +143,8 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
                     .to_string(),
             );
         }
-        if observed_data.is_empty() {
-            return Err("No observed data provided".to_string());
-        }
+        check_contents(observed_data.len(), &parameters, &constraints)?;
         check_positions(&base_engine, &observed_data, &constraints)?;
-        if parameters.is_empty() {
-            return Err("No calibration parameters provided".to_string());
-        }
 
         let schedule = schedule_of(&observed_data, constraint_positions(&constraints));
 

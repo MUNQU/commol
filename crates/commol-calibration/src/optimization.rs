@@ -468,6 +468,31 @@ impl SearchSpace {
         }
     }
 
+    /// Check that every bound is finite, as every optimizer needs: a swarm
+    /// draws its particles inside the bounds, and Nelder-Mead searches
+    /// through their sine transform. A bound may be infinite for a prior of
+    /// a sampler, which never fits.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the first parameter with an infinite
+    /// bound.
+    pub(crate) fn check_finite(&self) -> Result<(), String> {
+        match crate::types::first_infinite_bound(
+            self.names
+                .iter()
+                .map(String::as_str)
+                .zip(self.bounds.iter().copied()),
+        ) {
+            Some((name, (lo, hi))) => Err(format!(
+                "An optimizer searches inside the bounds, so they must be finite: parameter \
+                 '{name}' has the bounds [{lo}, {hi}]. Give it finite bounds to fit it; an \
+                 infinite bound serves only the prior of a sampler"
+            )),
+            None => Ok(()),
+        }
+    }
+
     /// Each value of `values` clamped to its bounds.
     pub(crate) fn clamp(&self, values: &[f64]) -> Vec<f64> {
         values
@@ -477,8 +502,10 @@ impl SearchSpace {
             .collect()
     }
 
-    /// The sine transform of the bounds, which Nelder-Mead searches through.
+    /// The sine transform of the bounds, which Nelder-Mead searches through;
+    /// the bounds must be finite ([`Self::check_finite`]).
     fn transform(&self) -> Result<SineTransform<f64>, String> {
+        self.check_finite()?;
         SineTransform::new(self.bounds.clone())
             .map_err(|e| format!("Nelder-Mead needs finite bounds: {e}"))
     }
@@ -668,6 +695,7 @@ where
             (best, result.state, cost)
         }
         OptimizationConfig::ParticleSwarm(ps_config) => {
+            space.check_finite()?;
             let outer_iteration = std::cell::Cell::new(0u64);
             let factory = |_: &Vec<f64>| {
                 let k = outer_iteration.get();
@@ -901,6 +929,7 @@ where
     C: CostFunction<Param = Vec<f64>, Output = f64> + Sync,
     O: Observe<ParticleSwarmState> + 'static,
 {
+    space.check_finite()?;
     let solver = build_particle_swarm_solver(&space.bounds, config, seed)?;
     let mut executor = Executor::new(cost, solver)
         .configure(|state| swarm_state(state, config))
@@ -1377,6 +1406,39 @@ mod tests {
     }
 
     #[test]
+    fn a_constrained_run_refuses_an_infinite_bound_with_either_optimizer() {
+        let problem = two_rates();
+        let spec = crate::ObservedDataPoint::new(8.0, "C".to_string(), 0.0);
+        let (observing, operator) = problem.observing(&[spec]).unwrap();
+        let held = &crate::subproblem::HeldPrediction {
+            observing,
+            operator,
+            value: 200.0,
+            settings: ConstraintSettings::for_value(200.0),
+        };
+        let mut space = SearchSpace::of(&problem);
+        space.bounds[1].1 = f64::INFINITY;
+        let swarm = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig::default());
+        let simplex = OptimizationConfig::NelderMead(NelderMeadConfig::default());
+        for config in [swarm, simplex] {
+            let error = run_constrained(
+                &space,
+                PredictionCost::new(held),
+                &config,
+                &[0.5, 0.5],
+                5,
+                &held.settings,
+            )
+            .err()
+            .expect("an infinite bound");
+            assert!(
+                error.starts_with("An optimizer searches inside the bounds"),
+                "{error}"
+            );
+        }
+    }
+
+    #[test]
     fn a_swarm_with_nan_costs_finds_the_minimum_where_the_cost_is_a_number() {
         let space = SearchSpace {
             bounds: vec![(0.0, 1.0)],
@@ -1493,6 +1555,24 @@ mod tests {
     }
 
     #[test]
+    fn a_particle_swarm_refuses_an_infinite_bound() {
+        let space = SearchSpace {
+            bounds: vec![(0.0, 1.0), (f64::NEG_INFINITY, 1.0)],
+            names: vec!["x".to_string(), "y".to_string()],
+        };
+        let config = ParticleSwarmConfig::default();
+        let error = optimize_particle_swarm(&space, Bowl, &config, 1, None::<NoObserver>)
+            .err()
+            .expect("an infinite bound");
+        assert_eq!(
+            error,
+            "An optimizer searches inside the bounds, so they must be finite: parameter 'y' \
+             has the bounds [-inf, 1]. Give it finite bounds to fit it; an infinite bound \
+             serves only the prior of a sampler"
+        );
+    }
+
+    #[test]
     fn nelder_mead_refuses_an_infinite_bound() {
         let space = SearchSpace {
             bounds: vec![(0.0, f64::INFINITY)],
@@ -1503,7 +1583,8 @@ mod tests {
             .err()
             .expect("an infinite bound");
         assert!(
-            error.starts_with("Nelder-Mead needs finite bounds"),
+            error.starts_with("An optimizer searches inside the bounds")
+                && error.contains("parameter 'x' has the bounds [0, inf]"),
             "{error}"
         );
     }

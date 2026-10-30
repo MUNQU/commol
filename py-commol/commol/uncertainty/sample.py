@@ -379,12 +379,12 @@ class ParameterSample(ResultModel):
         lower, upper = self._rust.interval(confidence_level)
         quantiles = self.quantiles([0.0, 0.5, 1.0])
         mean = self.mean()
-        covariance = self.covariance()
+        deviations = self._rust.standard_deviations()
         return {
             name: ParameterSummary(
                 mean=mean[name],
                 median=quantiles[name][1],
-                std=covariance[index][index] ** 0.5,
+                std=deviations[index],
                 lower=lower[index],
                 upper=upper[index],
                 min=quantiles[name][0],

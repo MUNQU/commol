@@ -340,17 +340,6 @@ fn check_window(window: f64) -> PyResult<()> {
         .map_err(window_error)
 }
 
-/// Check the window of length `window` that ends at `at`, and give its
-/// start: it starts at 0 or after it
-///
-/// Raises:
-///     ValueError: If `window` is not a finite, positive length, or the
-///         window starts before 0
-#[pyfunction]
-fn check_window_end(at: f64, window: f64) -> PyResult<f64> {
-    commol_calibration::check_window_end(at, window).map_err(window_error)
-}
-
 /// The number of windows of length `window` in `span`, a whole number when
 /// it is one within the tolerance of the axis
 ///
@@ -437,7 +426,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(window_start, m)?)?;
     m.add_function(wrap_pyfunction!(window_increments, m)?)?;
     m.add_function(wrap_pyfunction!(check_window, m)?)?;
-    m.add_function(wrap_pyfunction!(check_window_end, m)?)?;
     m.add_function(wrap_pyfunction!(windows_in, m)?)?;
     m.add_function(wrap_pyfunction!(window_bounds, m)?)?;
     m.add_function(wrap_pyfunction!(window_index, m)?)?;

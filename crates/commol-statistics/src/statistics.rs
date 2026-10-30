@@ -27,6 +27,25 @@ pub fn normalized_weights(log_weights: &[f64]) -> Vec<f64> {
     weights.into_iter().map(|w| w / total).collect()
 }
 
+/// Weights that sum to 1: each of `weights` divided by their sum.
+///
+/// # Errors
+///
+/// Returns a message when a weight is negative or not finite, or none is
+/// positive.
+pub fn normalize(weights: &[f64]) -> Result<Vec<f64>, String> {
+    if let Some(weight) = weights.iter().find(|w| !(w.is_finite() && **w >= 0.0)) {
+        return Err(format!(
+            "A weight is a finite number of at least 0, got {weight}"
+        ));
+    }
+    let total: f64 = weights.iter().sum();
+    if total <= 0.0 {
+        return Err("No weight is positive: a summary needs a run of positive weight".to_string());
+    }
+    Ok(weights.iter().map(|w| w / total).collect())
+}
+
 /// Check that every quantile level is in `[0, 1]`.
 ///
 /// # Errors
@@ -249,6 +268,19 @@ pub fn quantile_error(values: &[f64], level: f64) -> (f64, f64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn weights_normalize_to_one_when_one_is_positive() {
+        assert_eq!(normalize(&[1.0, 3.0, 0.0]), Ok(vec![0.25, 0.75, 0.0]));
+        assert_eq!(
+            normalize(&[0.0, 0.0]),
+            Err("No weight is positive: a summary needs a run of positive weight".to_string())
+        );
+        assert_eq!(
+            normalize(&[1.0, -1.0]),
+            Err("A weight is a finite number of at least 0, got -1".to_string())
+        );
+    }
 
     #[test]
     fn the_covariance_of_one_effective_member_is_not_a_number() {

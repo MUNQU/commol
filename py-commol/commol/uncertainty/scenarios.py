@@ -107,13 +107,7 @@ class Scenarios(Mapping[str, Predictive]):
         model = source.simulation.model_definition
         models = {}
         for name, overrides in scenarios.items():
-            held = [parameter for parameter in overrides if parameter in sample.names]
-            if held:
-                raise ValueError(
-                    f"Scenario '{name}' sets {held}, which the sample holds: each "
-                    "draw sets them. A scenario overrides only parameters the "
-                    "sample does not hold."
-                )
+            sample._rust.check_scenario(name, list(overrides))
             scenario_model = model.model_copy(deep=True)
             try:
                 scenario_model.update_parameters(overrides)

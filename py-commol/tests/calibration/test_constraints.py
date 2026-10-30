@@ -214,7 +214,7 @@ class TestPositions:
     @pytest.mark.parametrize(
         ("at", "message"),
         [
-            ([], "'cap' must not be empty if specified"),
+            ([], "Constraint 'cap' has an empty 'at': give the positions"),
             ([10, -1], "at is a finite number of at least 0, got -1"),
             ([float("inf")], "at is a finite number of at least 0, got inf"),
         ],

@@ -6,6 +6,7 @@
 //! the threshold, or when its marginal has several modes; otherwise it is
 //! determined.
 
+use commol_calibration::first_infinite_bound;
 use commol_statistics::statistics::{effective_size, quantiles};
 
 use super::PracticalVerdict;
@@ -69,8 +70,9 @@ pub enum Reference<'a> {
 /// # Errors
 ///
 /// [`MethodError::Invalid`] when `correlation_threshold` is not
-/// strictly between 0 and 1, or the priors are not those of the sample's
-/// parameters and bounds.
+/// strictly between 0 and 1, the reference is the bounds and a bound is not
+/// finite, or the priors are not those of the sample's parameters and
+/// bounds.
 pub fn sample_identifiability(
     sample: &ParameterSample,
     reference: Reference<'_>,
@@ -80,11 +82,27 @@ pub fn sample_identifiability(
         .check(correlation_threshold)
         .map_err(MethodError::Invalid)?;
     let variances: Vec<f64> = match reference {
-        Reference::Bounds => sample
-            .bounds()
-            .iter()
-            .map(|(min, max)| (max - min).powi(2) / 12.0)
-            .collect(),
+        Reference::Bounds => {
+            if let Some((name, (min, max))) = first_infinite_bound(
+                sample
+                    .names()
+                    .iter()
+                    .map(String::as_str)
+                    .zip(sample.bounds().iter().copied()),
+            ) {
+                return Err(MethodError::Invalid(format!(
+                    "reference='bounds' measures the contraction against the uniform \
+                     distribution on the bounds, so they must be finite: parameter '{name}' \
+                     has the bounds [{min}, {max}]. Give reference='prior' with the priors of \
+                     the sample"
+                )));
+            }
+            sample
+                .bounds()
+                .iter()
+                .map(|(min, max)| (max - min).powi(2) / 12.0)
+                .collect()
+        }
         Reference::Prior(priors) => {
             if priors.names() != sample.names() || priors.bounds() != sample.bounds() {
                 return Err(MethodError::Invalid(format!(

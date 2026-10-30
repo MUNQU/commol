@@ -135,13 +135,7 @@ impl Discrepancy {
     /// Returns a message when it is enabled with observation models, which
     /// set the scale of each series themselves.
     pub(crate) fn set_normalization(&mut self, enabled: bool) -> Result<(), String> {
-        if enabled && self.likelihood().is_some() {
-            return Err(
-                "normalize_observations needs a loss: the observation models set the \
-                 scale of each series with their noise"
-                    .to_string(),
-            );
-        }
+        check_normalization(enabled, self.likelihood().is_some())?;
         self.normalized = enabled;
         self.normalization = if enabled {
             observation_normalization(&self.labels, &self.observed)
@@ -388,6 +382,24 @@ pub fn series_rms(labels: &[String], values: &[f64]) -> Vec<f64> {
         .iter()
         .map(|&series| scales[series])
         .collect()
+}
+
+/// Check that a problem normalizes its observations only with a loss: with
+/// observation models, their noise sets the scale of each series.
+///
+/// # Errors
+///
+/// Returns a message that names the fix when `enabled` comes with
+/// observation models.
+pub(crate) fn check_normalization(enabled: bool, observation_models: bool) -> Result<(), String> {
+    if enabled && observation_models {
+        return Err(
+            "normalize_observations needs a loss_function: the observation models set the \
+             scale of each series with their noise"
+                .to_string(),
+        );
+    }
+    Ok(())
 }
 
 #[cfg(test)]

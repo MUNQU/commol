@@ -22,7 +22,7 @@ use commol_inference::resampling::{
     BayesianBootstrap, BlockScheme, Perturbation, ReplicateRunner, Resampler, ResidualScale,
     Residuals, block_jackknife, bootstrap,
 };
-use commol_inference::sensitivity::{Design, FiniteDifferences, Matrix};
+use commol_inference::sensitivity::{Design, FiniteDifferences};
 use commol_inference::smc::{RandomWalk, SmcSampler, bootstrap_coverage_eta, gibbs_posterior};
 use commol_inference::{ErrorKind, MethodError, Priors};
 use commol_random::Generator;
@@ -238,8 +238,9 @@ fn a_setting_out_of_range_is_invalid_in_every_method() {
         kind_of(ReplicateRunner::new(&problem, &config, &FIT, 0, 4)),
         kind_of(delta_band(
             &problem,
-            &FIT,
-            &Matrix::identity(2, 2),
+            &problem.parameter_names(),
+            &[("a".to_string(), FIT[0]), ("b".to_string(), FIT[1])],
+            &[vec![1.0, 0.0], vec![0.0, 1.0]],
             None,
             &[1.0],
             1.5,

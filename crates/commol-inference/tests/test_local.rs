@@ -797,9 +797,11 @@ fn a_band_of_replicates_is_refused() {
     .unwrap()
     .with_replicates(Some(Replicates::new(2, 1, ReplicateSummary::Mean).unwrap()))
     .unwrap();
-    let covariance = nalgebra::DMatrix::identity(2, 2);
+    let names = ["a".to_string(), "b".to_string()];
+    let fit = [("a".to_string(), 1.0), ("b".to_string(), 0.5)];
+    let covariance = [vec![1.0, 0.0], vec![0.0, 1.0]];
 
-    let error = delta_band(&problem, &[1.0, 0.5], &covariance, None, &[1.0], 0.9).unwrap_err();
+    let error = delta_band(&problem, &names, &fit, &covariance, None, &[1.0], 0.9).unwrap_err();
 
     assert_eq!(
         error,

@@ -70,33 +70,30 @@ class TestInputs:
             InputSpace.uniform_on_bounds([bounded("s", 0.1, 2.0, kind="noise")])
 
     def test_every_input_has_one_distribution(self) -> None:
-        with pytest.raises(ValueError, match=r"\['k2'\] have no distribution.*"):
+        with pytest.raises(ValueError, match=r"The input 'k2' has no distribution"):
             InputSpace.independent([bounded("k1"), bounded("k2")], {"k1": Uniform()})
-        with pytest.raises(ValueError, match=r"distributions of \['k3'\] name no"):
+        with pytest.raises(ValueError, match=r"distribution of 'k3' names no input"):
             InputSpace.independent([bounded("k1")], {"k1": Uniform(), "k3": Uniform()})
-        with pytest.raises(ValueError, match=r"repeat the ids \['k1'\]"):
+        with pytest.raises(ValueError, match=r"Two parameters have the id 'k1'"):
             InputSpace.uniform_on_bounds([bounded("k1"), bounded("k1")])
 
-    def test_distributions_or_a_sample_not_both(self) -> None:
-        with pytest.raises(ValueError, match=r"distributions or a sample"):
-            InputSpace(parameters=[bounded("k1")])
-
-    def test_a_sample_has_the_inputs_of_its_parameters(self) -> None:
+    def test_a_sample_has_the_inputs_of_its_parameters(
+        self, simulation: Simulation
+    ) -> None:
         sample = ParameterSample.equally_weighted(
             ["k1"], [(0.0, 1.0)], [[0.2], [0.4]], SampleMethod(name="test")
         )
         inputs = InputSpace.from_sample(sample, [bounded("k1")])
         assert inputs.sample == sample
         assert inputs.distributions is None
-        with pytest.raises(ValueError, match=r"the parameters are \['k2'\]"):
-            InputSpace.from_sample(sample, [bounded("k2")])
-        with pytest.raises(ValueError, match=r"bounds \[\(0\.0, 2\.0\)\]"):
-            InputSpace.from_sample(sample, [bounded("k1", 0.0, 2.0)])
+        for parameter in [bounded("k2"), bounded("k1", 0.0, 2.0)]:
+            other = InputSpace.from_sample(sample, [parameter])
+            with pytest.raises(ValueError, match=r"the parameters are"):
+                SensitivityAnalysis(simulation, other)
 
-    def test_a_uniform_needs_finite_bounds(self, simulation: Simulation) -> None:
-        inputs = InputSpace.uniform_on_bounds([bounded("k1", 0.0, math.inf)])
+    def test_a_uniform_needs_finite_bounds(self) -> None:
         with pytest.raises(ValueError, match=r"Uniform\(\) of 'k1' needs finite"):
-            SensitivityAnalysis(simulation, inputs)
+            InputSpace.uniform_on_bounds([bounded("k1", 0.0, math.inf)])
 
 
 class TestAnalysis:
@@ -475,3 +472,18 @@ def test_sobol_takes_draws_and_replicates(simulation: Simulation) -> None:
 
     assert result.runs == 8 * (2 + 2)
     assert result.confidence_level == 0.9
+
+
+def test_the_input_space_is_given_once(simulation: Simulation) -> None:
+    sample = ParameterSample.equally_weighted(
+        ["k1"], [(0.0, 1.0)], [[0.2], [0.4]], SampleMethod(name="test")
+    )
+    neither = InputSpace(parameters=[bounded("k1")])
+    both = InputSpace(
+        parameters=[bounded("k1")], distributions={"k1": Uniform()}, sample=sample
+    )
+
+    with pytest.raises(ValueError, match=r"There is no default"):
+        SensitivityAnalysis(simulation, neither)
+    with pytest.raises(ValueError, match=r"distributions or a sample, not both"):
+        SensitivityAnalysis(simulation, both)

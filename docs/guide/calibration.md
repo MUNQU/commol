@@ -91,8 +91,8 @@ also when it was created while a parameter was `None`. See
 
 | `CalibrationProblem` field | Type | Default | Meaning |
 |---|---|---|---|
-| `observed_data` | `list[ObservedDataPoint]` | required | What the model must reproduce. See [Observations](calibration-observations.md). |
-| `parameters` | `list[CalibrationParameter]` | required | The unknowns and their bounds. |
+| `observed_data` | `list[ObservedDataPoint]` | required | What the model must reproduce, at least one observation. See [Observations](calibration-observations.md). |
+| `parameters` | `list[CalibrationParameter]` | required | The unknowns and their bounds, at least one, each with an id of its own. |
 | `loss_function` | `str \| None` | `None` | How the misfit is measured; see [Losses](#losses). A problem has `loss_function` or `observation_models`, exactly one. |
 | `observation_models` | `dict[str, NormalObservations \| … \| BinomialObservations] \| None` | `None` | One observation model per series label: the fit maximizes their likelihood. See [Observation Models](uncertainty/observation-models.md). |
 | `optimization_config` | `NelderMeadConfig` or `ParticleSwarmConfig` | required | The optimizer and its settings. See [Optimizers](calibration-optimizers.md). |
@@ -116,8 +116,8 @@ scale, or compare a gain over a window: [Observations](calibration-observations.
 |---|---|---|---|
 | `id` | `str` | required | What to calibrate; depends on `parameter_type`. |
 | `parameter_type` | `str` | required | `"parameter"`, `"initial_condition"`, `"factor"` or `"noise"`. |
-| `min_bound`, `max_bound` | `float` | required | The search interval. |
-| `initial_guess` | `float \| None` | `None` | Where the optimizer starts; the midpoint of the bounds if `None`. |
+| `min_bound`, `max_bound` | `float` | required | The search interval: numbers, with `max_bound` above `min_bound`. A bound may be infinite, for a prior on a half-line; an optimizer refuses it (see [Infinite bounds](#infinite-bounds)). |
+| `initial_guess` | `float \| None` | `None` | Where the optimizer starts, a finite number between the bounds; the midpoint of the bounds if `None`. |
 
 | `parameter_type` | `id` names | The value is |
 |---|---|---|
@@ -134,6 +134,23 @@ with the engine's message, which names the kind, when you create the
 `Calibrator`. A `"parameter"` that
 the model does not have, or that a formula or a series sets, raises a
 `ValueError` with the engine's message at the same time.
+
+The engine holds every rule of a problem and of its parameters, and checks
+them when you build the object: the Python classes send their JSON to it and
+raise its message. The same rules refuse a problem written as JSON, which
+no Python class checked.
+
+#### Infinite bounds
+
+An infinite bound gives a prior on a half-line, such as `[0, inf]` for
+[sequential Monte Carlo](uncertainty/smc.md), so a problem keeps it with
+either optimizer. An optimizer needs finite bounds: each start of a fit
+refuses an infinite bound, with a message that names the parameter (see
+[Optimizers](calibration-optimizers.md#nelder-mead)). So do the methods that
+read the bounds as a box: `StructuralRank`, which draws its points inside
+them, and `SampleIdentifiability(reference="bounds")`, which measures the
+contraction against the uniform distribution on them; give it
+`reference="prior"`. A NaN bound is always refused.
 
 ## Losses
 

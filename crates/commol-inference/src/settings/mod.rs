@@ -38,12 +38,39 @@ use crate::distribution::Family;
 use crate::priors::Priors;
 
 /// The priors of the parameters, as the Python class `Priors` writes them.
+///
+/// The priors of a method are required: a reader of a method with no
+/// `priors` says how to give them.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(remote = "Self", deny_unknown_fields)]
 pub struct PriorsSettings {
     /// The prior of each parameter by name, or None for uniform on the
     /// bounds of every parameter.
     pub distributions: Option<Pairs<Family>>,
+}
+
+impl Serialize for PriorsSettings {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        PriorsSettings::serialize(self, serializer)
+    }
+}
+
+/// What a method takes when its priors are missing.
+const PRIORS_FIX: &str = "give a prior per calibrated parameter, or Priors.uniform_on_bounds()";
+
+impl<'de> Deserialize<'de> for PriorsSettings {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        // A missing field fails to read as a value; a null reads as one.
+        let value = Value::deserialize(deserializer).map_err(|_: D::Error| {
+            de::Error::custom(format!("priors is required: {PRIORS_FIX}"))
+        })?;
+        match value {
+            Value::Null => Err(de::Error::custom(format!(
+                "null is not a prior: {PRIORS_FIX}"
+            ))),
+            value => json::tracked(value, |tracked| PriorsSettings::deserialize(tracked)),
+        }
+    }
 }
 
 impl PriorsSettings {

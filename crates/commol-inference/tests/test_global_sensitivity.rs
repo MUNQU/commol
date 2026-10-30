@@ -237,7 +237,7 @@ fn a_quantity_reads_only_what_the_model_has() {
     assert!(no_positions.contains("needs positions"), "{no_positions}");
     assert!(no_outputs.contains("no outputs"), "{no_outputs}");
     assert!(not_finite.contains("finite"), "{not_finite}");
-    assert!(none.contains("No quantities"), "{none}");
+    assert_eq!(none, "Give at least one quantity of interest");
     assert!(rejected.contains("1.5"), "{rejected}");
 }
 
@@ -775,4 +775,54 @@ fn an_analysis_runs_each_method_in_one_call() {
         .unwrap_err()
         .to_string();
     assert!(unknown.contains("'C'"), "{unknown}");
+}
+
+#[test]
+fn the_inputs_are_distributions_or_a_sample() {
+    use commol_inference::settings::sensitivity::InputSpaceSettings;
+
+    let read = |parameters: &str, distributions: &str| {
+        commol_core::json::read::<InputSpaceSettings>(&format!(
+            r#"{{"parameters": {parameters}, "distributions": {distributions},
+            "initial_condition_remainder": null}}"#
+        ))
+    };
+    let k = r#"[{"id": "k", "parameter_type": "parameter", "min_bound": 0.0,
+        "max_bound": 1.0, "initial_guess": null}]"#;
+    let uniform = r#"{"k": {"kind": "uniform"}}"#;
+    let sample = || {
+        commol_inference::ParameterSample::new(
+            vec!["k".to_string()],
+            vec![(0.0, 1.0)],
+            vec![vec![0.5]],
+            &[0.0],
+            None,
+        )
+        .unwrap()
+    };
+
+    assert_eq!(
+        read("[]", "null").unwrap_err(),
+        "Give at least one parameter to vary"
+    );
+    assert_eq!(
+        read(k, r#"{"j": {"kind": "uniform"}}"#).unwrap_err(),
+        "The distribution of 'j' names no input; the inputs are [\"k\"]"
+    );
+    let independent = read(k, uniform).unwrap();
+    let from_sample = read(k, "null").unwrap();
+    assert!(independent.inputs(None).is_ok());
+    assert!(from_sample.inputs(Some(sample())).is_ok());
+    assert!(
+        independent
+            .inputs(Some(sample()))
+            .unwrap_err()
+            .starts_with("Give the inputs distributions or a sample, not both")
+    );
+    assert!(
+        from_sample
+            .inputs(None)
+            .unwrap_err()
+            .contains("There is no default")
+    );
 }

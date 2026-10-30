@@ -15,7 +15,6 @@ use commol_inference::settings::local::{
     LaplaceMixtureSettings, LaplaceSettings, MixtureTarget, SandwichSettings,
 };
 use commol_inference::smc::{GibbsTarget, LikelihoodTarget};
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 use crate::calibration::PyStarts;
@@ -162,7 +161,8 @@ type BandTables = (Vec<String>, Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<Vec<f64>>);
 ///
 /// Args:
 ///     problem: The calibration problem
-///     fit: The fitted values, in problem order
+///     names: The parameters of the rows and columns of the covariance
+///     fit: The fitted value of each parameter, by name
 ///     covariance: The covariance on the unbounded scale
 ///     degrees_of_freedom: The degrees of freedom of a Student t, or None
 ///         for a normal
@@ -174,32 +174,29 @@ type BandTables = (Vec<String>, Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<Vec<f64>>);
 ///     upper end at each position and output, `[position][output]`
 ///
 /// Raises:
-///     ValueError: If the covariance is not one row and column per
+///     ValueError: If the names are not the parameters of the problem, the
+///         fit lacks one, the covariance is not one row and column per
 ///         parameter, the level is not strictly between 0 and 1, the engine is
 ///         stochastic, or a position is one the engine rejects
 ///     RuntimeError: If the derivatives fail at the fit
 #[pyfunction]
+#[allow(clippy::too_many_arguments)]
 fn delta_band(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
-    fit: Vec<f64>,
+    names: Vec<String>,
+    fit: Vec<(String, f64)>,
     covariance: Vec<Vec<f64>>,
     degrees_of_freedom: Option<f64>,
     positions: Vec<f64>,
     confidence_level: f64,
 ) -> PyResult<BandTables> {
-    let p = fit.len();
-    if covariance.len() != p || covariance.iter().any(|row| row.len() != p) {
-        return Err(PyValueError::new_err(format!(
-            "The covariance needs {p} rows of {p} values, one per parameter"
-        )));
-    }
-    let matrix = Matrix::from_fn(p, p, |j, k| covariance[j][k]);
     let band = parallel(py, || {
         local::delta_band(
             &problem.inner,
+            &names,
             &fit,
-            &matrix,
+            &covariance,
             degrees_of_freedom,
             &positions,
             confidence_level,
