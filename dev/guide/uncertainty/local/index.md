@@ -101,7 +101,7 @@ Every local approximation sits at the best of its `starts`, as [several starts](
 
 With a noise parameter the fit estimates the noise by maximum likelihood: for `NormalObservations(sd="sd")`, `σ̂² = SSE/n`, not `SSE/(n − p)`. The Laplace intervals are then narrower than the classical ones by `√(n/(n − p))`, which is negligible when `n ≫ p`.
 
-`result.delta_band(calibrator, positions, confidence_level)` gives the band of every output by the delta method: the prediction at the fit plus and minus the quantile of the normal times `√(J Σ Jᵀ)`, with `J` the derivatives of the output on the unbounded scale. It runs the model a few times per parameter, not once per draw, and for a model linear in its parameters it equals the band of the draws (`Predictive(calibrator, result.sample, positions).band(confidence_level)`). It reads only the fields of the result, so a result read back from JSON works.
+`result.delta_band(calibrator, positions, confidence_level)` gives the band of every output by the delta method: the prediction at the fit plus and minus the quantile of the normal times `√(J Σ Jᵀ)`, with `J` the derivatives of the output on the unbounded scale. It runs the model a few times per parameter, not once per draw, and for a model linear in its parameters it equals the band of the draws (`Predictive(calibrator, result.sample, positions).band(confidence_level)`). It reads only the fields of the result, so a result that `LaplaceResult.from_json` read back works.
 
 ```python
 widths = [round(high - low, 2) for low, high in zip(band.lower["B"], band.upper["B"])]

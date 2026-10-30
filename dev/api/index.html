@@ -3079,6 +3079,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../codebase/decisions/files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../codebase/decisions/python-models/" class="md-nav__link">
         
   
@@ -3601,6 +3629,10 @@ root, and the others are in the module of their page, such as
 <code>commol.resampling.BootstrapResult</code> and <code>commol.description.ModelDescription</code>.
 A result is on the page of the object that returns it or of its module, as
 <code>SimulationResults</code> is on the Simulation page. A result is the return of its member, not a class to build.
+A result of a calibration or of a method, its sample and its parts write
+themselves to a JSON file with <code>to_json</code>, and their class reads the file back
+with <code>from_json</code>, as <code>CalibrationResult.from_json(path)</code>
+(<a href="../guide/calibration/#saving-a-result">Saving a result</a>).
 A choice among names is a string, such as <code>loss_function="sse"</code>.</p>
 <h2 id="the-root-commol">The root <code>commol</code><a class="headerlink" href="#the-root-commol" title="Permanent link">&para;</a></h2>
 <table>

@@ -3169,6 +3169,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/python-models/" class="md-nav__link">
         
   
@@ -4225,7 +4253,7 @@ table, and <code>tests/suite/test_architecture.py</code> checks it.</p>
 </tr>
 <tr>
 <td><code>_data/</code></td>
-<td>The base of every data object: <code>RangeChecked</code> (<code>ranges.py</code>, the check of the engine for an object with range rules, <code>commol_rs.core.check_ranges</code>, when the model is built); <code>ComparedByValue</code> and <code>ResultModel</code> (<code>result_model.py</code>, the one equality of every result: <code>==</code> over the values a result compares, a NaN equal to a NaN, a hash that agrees); and the port of the bridge on the Python side (<code>engine_json.py</code>: <code>engine_json</code>, the JSON of the <code>model_dump()</code> of a data object, with the texts <code>"Infinity"</code>, <code>"-Infinity"</code> and <code>"NaN"</code>, and <code>engine_handles</code>, the handle of each field a class names in <code>_engine_handles</code>); and the protocols of the prediction intervals that a report and a figure read (<code>_data/intervals.py</code>: <code>PredictionIntervalsData</code>, <code>SeriesIntervalsData</code>), so they import no method.</td>
+<td>The base of every data object: <code>RangeChecked</code> (<code>ranges.py</code>, the check of the engine for an object with range rules, <code>commol_rs.core.check_ranges</code>, when the model is built); <code>ComparedByValue</code> and <code>ResultModel</code> (<code>result_model.py</code>, the one equality of every result: <code>==</code> over the values a result compares, a NaN equal to a NaN, a hash that agrees; and the JSON file of a result model, <code>to_json</code> and <code>from_json</code>); the one writer of the JSON file of a model or a result, with the texts of the numbers that are not finite in every nested model and long numeric arrays on one line (<code>serialization.py</code>: <code>write_json_file</code>, <code>render_json</code>); and the port of the bridge on the Python side (<code>engine_json.py</code>: <code>engine_json</code>, the JSON of the <code>model_dump()</code> of a data object, with the texts <code>"Infinity"</code>, <code>"-Infinity"</code> and <code>"NaN"</code>, and <code>engine_handles</code>, the handle of each field a class names in <code>_engine_handles</code>); and the protocols of the prediction intervals that a report and a figure read (<code>_data/intervals.py</code>: <code>PredictionIntervalsData</code>, <code>SeriesIntervalsData</code>), so they import no method.</td>
 <td>A range constraint of pydantic; an <code>__eq__</code> of one result; a conversion of a field to the engine.</td>
 </tr>
 <tr>
@@ -4335,7 +4363,7 @@ table, and <code>tests/suite/test_architecture.py</code> checks it.</p>
 </tr>
 <tr>
 <td><code>_model/</code> (other files)</td>
-<td>Internals of an aggregate model: the sections of its description (<code>aggregate_description.py</code>, and the equations, event table and state graphs of <code>_model/equations.py</code>), calibration write-back, the <code>initial_amounts</code> and <code>category_splits</code> report sections (<code>_model/report.py</code>), the spread of a report entry from the summary of a sample (<code>report_entry.py</code>, with the protocols <code>EntrySummary</code> and <code>SummarizedSample</code> that a <code>ParameterSample</code> meets), the block of <code>Model.applied_parameters</code> (<code>applied_parameters.py</code>), and the outputs a source id stands for (<code>outputs.py</code>: <code>outputs_for</code>, <code>series_names</code>), which a simulation, a report and a figure share; the JSON rendering of any model (<code>serialization.py</code>).</td>
+<td>Internals of an aggregate model: the sections of its description (<code>aggregate_description.py</code>, and the equations, event table and state graphs of <code>_model/equations.py</code>), calibration write-back, the <code>initial_amounts</code> and <code>category_splits</code> report sections (<code>_model/report.py</code>), the spread of a report entry from the summary of a sample (<code>report_entry.py</code>, with the protocols <code>EntrySummary</code> and <code>SummarizedSample</code> that a <code>ParameterSample</code> meets), the block of <code>Model.applied_parameters</code> (<code>applied_parameters.py</code>), and the outputs a source id stands for (<code>outputs.py</code>: <code>outputs_for</code>, <code>series_names</code>), which a simulation, a report and a figure share.</td>
 <td>Public API.</td>
 </tr>
 <tr>

@@ -827,6 +827,28 @@ class SampleMethod(ResultModel):
     settings: dict[str, JsonValue] = Field(
         default_factory=dict, description="The settings the method ran with."
     )
+
+    @field_validator("settings")
+    @classmethod
+    def _settings_are_finite(
+        cls, settings: dict[str, JsonValue]
+    ) -> dict[str, JsonValue]:
+        """
+        Refuse a number that is not finite: JSON has none, so a file would
+        read it back as a text, and no setting of a method takes one.
+        """
+        pending: list[tuple[str, JsonValue]] = list(settings.items())
+        while pending:
+            path, value = pending.pop()
+            if isinstance(value, float) and not math.isfinite(value):
+                raise ValueError(f"settings.{path} is not finite, got {value}")
+            if isinstance(value, dict):
+                pending.extend((f"{path}.{key}", item) for key, item in value.items())
+            elif isinstance(value, list):
+                pending.extend(
+                    (f"{path}.{index}", item) for index, item in enumerate(value)
+                )
+        return settings
 ```
 
 ## ParameterSummary

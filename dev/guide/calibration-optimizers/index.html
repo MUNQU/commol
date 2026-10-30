@@ -3206,6 +3206,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/python-models/" class="md-nav__link">
         
   
@@ -4309,7 +4337,9 @@ replicates of a stochastic engine then make the same random choices on every
 run. Without a seed, the engine draws one when the calibrator is built;
 <code>Calibrator.seed</code> gives it and the calibrator logs it. The result keeps it in <code>CalibrationResult.seed</code>, and the sample of
 each uncertainty method in <code>sample.method.settings["seed"]</code>: set it as
-<code>problem.seed</code> to repeat the run, also from a result read back from JSON.</p>
+<code>problem.seed</code> to repeat the run, also from a result that
+<code>CalibrationResult.from_json</code> read back (see
+<a href="../calibration/#saving-a-result">Saving a result</a>).</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">again</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">model_copy</span><span class="p">(</span><span class="n">update</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;seed&quot;</span><span class="p">:</span> <span class="n">result</span><span class="o">.</span><span class="n">seed</span><span class="p">})</span>
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)),</span> <span class="n">again</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">starts</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span> <span class="o">==</span> <span class="n">result</span><span class="p">)</span>  <span class="c1"># True</span>
 </span></code></pre></div>

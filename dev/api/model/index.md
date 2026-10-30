@@ -166,10 +166,7 @@ class Model(BaseModel, Generic[StructureT]):
         indent : int, optional
             Indentation width for nested structures.
         """
-        payload = self.model_dump(mode="json")
-        Path(file_path).write_text(
-            render_json(payload, indent=indent), encoding="utf-8"
-        )
+        write_json_file(self, file_path, indent=indent)
 
     @model_validator(mode="after")
     def _validate_engine_runs_structure(self) -> Self:
@@ -587,10 +584,7 @@ def to_json(self, file_path: str | Path, indent: int = 2) -> None:
     indent : int, optional
         Indentation width for nested structures.
     """
-    payload = self.model_dump(mode="json")
-    Path(file_path).write_text(
-        render_json(payload, indent=indent), encoding="utf-8"
-    )
+    write_json_file(self, file_path, indent=indent)
 ```
 
 #### update_parameters

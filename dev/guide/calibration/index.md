@@ -236,6 +236,28 @@ Every class that a public member returns has one public path ([API Reference](ht
 
 It accepts a `CalibrationResult` or a plain `{id: value}` mapping, such as one of `sample.draws()`; a `ParameterSample` has no single set of values and raises `TypeError`. It computes the new definition first, so a rejected value leaves the model unchanged. To set values by hand, use `Model.update_parameters({...})`.
 
+## Saving a result
+
+A long calibration and its analysis can run in two processes. Every result writes itself to a JSON file with `to_json(file_path, indent=2)`, and its class reads the file back with `from_json(file_path)`, as `Model` does. The result read back equals the result written, and the methods that take a result accept it, such as `StartsIdentifiability(result=...)` and `Collinearity(at=...)`.
+
+```python
+from commol import CalibrationResult
+
+result.to_json("fit.json")
+
+# Later, in another process:
+fit = CalibrationResult.from_json("fit.json")
+print(fit == result)  # True
+```
+
+| Rule                     | What it means                                                                                                                                                                                                                                                                                                     |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One class reads the file | `from_json` returns its own class: `BootstrapResult.from_json` (from `commol.resampling`) reads a bootstrap. A file whose fields do not fit the class raises `pydantic.ValidationError`, which names each field that does not fit. The file holds no name of its class, so a class with the same fields reads it. |
+| Every field is written   | Nulls too, as UTF-8; a number that is not finite is the text `"Infinity"`, `"-Infinity"` or `"NaN"`, and long numeric arrays are on one line.                                                                                                                                                                     |
+| One release              | A file is read by the release of commol that wrote it, as a model file is.                                                                                                                                                                                                                                        |
+
+The result of a run and of replicates (`SimulationResults`, `SimulationReplicates`) has no file of its own: save the model and its seed, and run it again.
+
 ## Checklist
 
 - [ ] Every unknown is `None` in the model and has a `CalibrationParameter`.

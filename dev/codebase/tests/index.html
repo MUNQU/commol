@@ -3017,6 +3017,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/python-models/" class="md-nav__link">
         
   
@@ -3831,8 +3859,8 @@ kind that is not aggregate through every generic layer.</p>
 </tr>
 <tr>
 <td><code>reporting/</code></td>
-<td>Reports</td>
-<td><a href="../../guide/reports/">Reports</a></td>
+<td>Reports, and the JSON file of a result: every result reads back equal and feeds the methods (<code>test_result_json.py</code>)</td>
+<td><a href="../../guide/reports/">Reports</a>, <a href="../../guide/calibration/#saving-a-result">Saving a result</a></td>
 </tr>
 <tr>
 <td><code>plotting/</code></td>
@@ -3861,7 +3889,7 @@ kind that is not aggregate through every generic layer.</p>
 </tr>
 <tr>
 <td><code>support/</code></td>
-<td>No tests: the code the tests share, with a valid object of each data class whose JSON the engine reads (<code>support/data_objects.py</code>) and the walk of the public surface: the members of each exported name, the types their signatures name, quoted or not, the results they return, and the checks of the inputs and the outputs, <code>private_inputs</code> and <code>private_outputs</code> (<code>support/surface.py</code>). <code>support/plotted.py</code> reads figures and imports matplotlib, so <code>tests/support</code> does not import it: a module of <code>plotting/</code> imports it by name</td>
+<td>No tests: the code the tests share, with a valid object of each data class whose JSON the engine reads (<code>support/data_objects.py</code>), a result of each subclass of <code>ResultModel</code> on the public surface, from a small run (<code>support/results.py</code>: <code>EXAMPLES_OF_RESULTS</code>), and the walk of the public surface: the members of each exported name, the types their signatures name, quoted or not, the results they return, and the checks of the inputs and the outputs, <code>private_inputs</code> and <code>private_outputs</code> (<code>support/surface.py</code>). <code>support/plotted.py</code> reads figures and imports matplotlib, so <code>tests/support</code> does not import it: a module of <code>plotting/</code> imports it by name</td>
 <td>—</td>
 </tr>
 </tbody>

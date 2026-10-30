@@ -3003,6 +3003,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/python-models/" class="md-nav__link">
         
   
@@ -5092,6 +5120,17 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li>Every result writes itself to a JSON file with <code>to_json(file_path,
+  indent=2)</code>, and its class reads it back with <code>from_json(file_path)</code>, as
+  <code>Model</code> does: <code>CalibrationResult.from_json("fit.json")</code> returns a
+  <code>CalibrationResult</code> equal to the result written. A result read back feeds
+  the methods that take a result, such as <code>StartsIdentifiability(result=...)</code>
+  and <code>Collinearity(at=...)</code>, and its sample draws the same members. A file
+  whose fields do not fit the class raises <code>pydantic.ValidationError</code>; the
+  file holds no name of its class, so a class with the same fields reads it.
+  <code>SampleMethod</code> refuses a setting that is not finite, which JSON cannot
+  hold. See
+  <a href="../../guide/calibration/#saving-a-result">Saving a result</a>.</li>
 <li><code>ParticleSwarmConfig(polish=NelderMeadConfig(...))</code>: each start runs the
   swarm, then Nelder-Mead from the best point of the swarm of that start.
   The start ends at the point, the loss and the convergence of Nelder-Mead,
@@ -5247,7 +5286,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>logging.getLogger("commol.resampling")</code>.</li>
 <li><strong>Breaking:</strong> a pickle of an object of commol 0.10 does not load: the path
   of each class changed. Migration: save a model with <code>Model.to_json</code> and a
-  result with <code>model_dump_json</code>, which do not depend on the path.</li>
+  result with its <code>to_json</code>, which do not depend on the path.</li>
 <li><strong>Breaking:</strong> <code>ParticleSwarmConfig</code> is one class with plain fields, and
   its chained methods <code>.inertia</code>, <code>.acceleration</code>, <code>.velocity</code>, <code>.mutation</code>,
   <code>.improvement_stop</code> and <code>.radius_stop</code> and their <code>*_config</code> properties are
@@ -5310,7 +5349,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   …</code> or <code>score: unknown variant `other`, expected one of `absolute`,
   `normalized`, `spread`</code>. A conformal method without <code>score</code> or <code>by</code>
   gives <code>missing field `score`</code>.</li>
-<li>The JSON of every result (<code>model_dump_json</code>) is standard JSON: a number
+<li>The JSON of every result (<code>to_json</code>) is standard JSON: a number
   that is not finite is the text <code>"Infinity"</code>, <code>"-Infinity"</code> or <code>"NaN"</code>, as
   at the port of the engine. Before, <code>ParameterSample</code>, <code>SMCResult</code>,
   <code>JackknifeResult</code>, <code>ConformalResult</code>, <code>PredictionIntervals</code> and

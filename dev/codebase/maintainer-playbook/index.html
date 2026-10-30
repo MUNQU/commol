@@ -3017,6 +3017,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/python-models/" class="md-nav__link">
         
   
@@ -4058,7 +4086,7 @@ changing it (<a href="../decisions/uncertainty/#methods-plug-into-one-entry-poin
 <li>[ ] The configuration, a subclass of <code>UncertaintyMethod[YourResult]</code>, and
       the result, a subclass of <code>ResultModel</code>, in the module of its family
       (<code>resampling/methods.py</code>, …), which exports the configuration (<code>PAGES</code> of <code>tests/suite/public_surface.py</code>)
-      and the result with the class of each of its fields (<code>RESULTS</code>); a result with draws holds a <code>ParameterSample</code>.</li>
+      and the result with the class of each of its fields (<code>RESULTS</code>); a result with draws holds a <code>ParameterSample</code>; each class has an example from a small run in <code>EXAMPLES_OF_RESULTS</code> of <code>tests/support/results.py</code>, which a file reads back (<a href="../decisions/files/#a-result-file-is-read-by-its-class">Design decisions</a>).</li>
 <li>[ ] A method that fits several times fits its perturbations with
       <code>ReplicateRunner::fit_all</code> and checks them with <code>ReplicateFits::require</code>;
       its result has <code>failed</code> (the entries of <code>FitUnit::failed</code>, logged as

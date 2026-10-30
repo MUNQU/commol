@@ -18,7 +18,7 @@
         <link rel="prev" href="../profiles/">
       
       
-        <link rel="next" href="../python-models/">
+        <link rel="next" href="../files/">
       
       
         
@@ -3116,21 +3116,38 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#model-files-are-written-in-full" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Model files are written in full
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3674,17 +3691,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#model-files-are-written-in-full" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Model files are written in full
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -3707,8 +3713,9 @@
 
 <h1 id="results">Results<a class="headerlink" href="#results" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
-<p>How intervals, descriptions, reports and model files are made from a model and
-its runs. Figures have <a href="../figures/">a page of their own</a>.</p>
+<p>How intervals, descriptions and reports are made from a model and its runs.
+Figures have <a href="../figures/">a page of their own</a>, and the files of models and
+results <a href="../files/">one too</a>.</p>
 <h2 id="one-confidence-interval-convention">One confidence-interval convention<a class="headerlink" href="#one-confidence-interval-convention" title="Permanent link">&para;</a></h2>
 <p>Every interval is a weighted quantile: the inverse of the weighted empirical
 distribution, interpolated between the midpoints of the cumulative weights
@@ -4058,15 +4065,6 @@ function reports anything.</p>
 </ul>
 <p><strong>Guard:</strong> <code>tests/reporting/</code> (<code>test_reports.py</code> checks that each method
 gives the block of its definition, with its key order).</p>
-<h2 id="model-files-are-written-in-full">Model files are written in full<a class="headerlink" href="#model-files-are-written-in-full" title="Permanent link">&para;</a></h2>
-<p><code>Model.to_json</code> writes every field, nulls included. Dropping nulls is not
-round-trip safe: an uncalibrated <code>Parameter.value</code> or a <code>None</code> in <code>bin_amounts</code>
-would lose a required key and fail to reload. <code>render_json</code>
-(<code>_model/serialization.py</code>) keeps files readable by writing long numeric
-arrays on one line. It is internal on purpose: an output format in the public
-API becomes a compatibility promise.</p>
-<p><strong>Guards:</strong> <code>tests/building/test_save_and_load.py::test_an_uncalibrated_parameter_round_trips</code>,
-<code>tests/building/test_save_and_load.py::test_an_uncalibrated_bin_amount_round_trips</code>.</p>
 
 
 

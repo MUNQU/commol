@@ -3217,6 +3217,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/python-models/" class="md-nav__link">
         
   
@@ -4256,9 +4284,10 @@ unweighted statistic.</p>
 </span></code></pre></div>
 <p>A sample has no single set of parameters, so
 <code>Model.apply_calibration_parameters</code> rejects it with a <code>TypeError</code>; apply one of
-<code>sample.draws()</code>. A sample saves to JSON and loads back equal
-(<code>model_dump_json</code>, <code>model_validate_json</code>), as every result does; a weight or
-a value that is not finite is the text <code>"Infinity"</code>, <code>"-Infinity"</code> or <code>"NaN"</code>
+<code>sample.draws()</code>. A sample writes itself to a JSON file and reads back equal
+(<code>sample.to_json(path)</code>, <code>ParameterSample.from_json(path)</code>), as every result
+does (<a href="../calibration/#saving-a-result">Saving a result</a>); a weight or a
+value that is not finite is the text <code>"Infinity"</code>, <code>"-Infinity"</code> or <code>"NaN"</code>
 in the JSON.</p>
 <h3 id="the-one-quantile">The one quantile<a class="headerlink" href="#the-one-quantile" title="Permanent link">&para;</a></h3>
 <p>Every interval of commol reads one weighted quantile. It inverts the

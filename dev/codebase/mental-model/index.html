@@ -3152,6 +3152,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/python-models/" class="md-nav__link">
         
   
@@ -3937,7 +3965,8 @@ discussion first.</p>
   <a href="../decisions/engines/#stochastic-engines-and-seeds">Stochastic engines and seeds</a>.</li>
 <li><strong>What the user saves, the engine reloads.</strong> <code>Model.to_json</code> writes every
   field, and calibrated values written back to a model reproduce the
-  state the optimizer scored.</li>
+  state the optimizer scored. A result written with <code>to_json</code> reads back
+  equal with <code>from_json</code> of its class, and feeds the methods that take it.</li>
 </ul>
 <h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
 <ul>
