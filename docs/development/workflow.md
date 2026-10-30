@@ -370,12 +370,13 @@ When you create a PR, automated checks run:
 ### 7. Merging
 
 Add the pull request to the merge queue with `gh pr merge <number>` or "Merge
-when ready", also before its checks end: it waits with auto-merge on, and enters
-the queue once its required checks pass. On a branch with a merge queue, `gh`
-asks for auto-merge, so the repository keeps the setting "Allow auto-merge"
-(`allow_auto_merge`) on; a merge method flag such as `--squash` only gives a
+when ready", also before its checks end: auto-merge holds it until its required
+checks pass, and then it enters the queue. `gh` asks for auto-merge on a branch
+with a merge queue, so the repository keeps "Allow auto-merge"
+(`allow_auto_merge`) on. A merge method flag such as `--squash` only gives a
 warning. The queue squash-merges the pull request, the only method `main`
-allows, once the required checks pass on top of the pull requests before it. GitHub deletes the branch after the merge (`delete_branch_on_merge`);
+allows, once the required checks pass on top of the pull requests before it.
+GitHub deletes the branch after the merge (`delete_branch_on_merge`);
 delete your local copy with `git branch -D <branch>` after `git fetch --prune`.
 
 A release needs no merge between branches: it is a tag on `main` ([Release
