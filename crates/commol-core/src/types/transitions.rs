@@ -23,11 +23,12 @@ use super::process::Stratification;
 pub struct StratificationCondition {
     /// Id of the stratification.
     pub stratification: String,
-    /// Category the source compartment must have; `None` filters nothing.
+    /// Category the source compartment must have; with `categories` also
+    /// `None`, the condition filters nothing.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub category: Option<String>,
-    /// Categories the source compartment must have one of; `None` filters
-    /// nothing.
+    /// Categories the source compartment must have one of; with `category`
+    /// also `None`, the condition filters nothing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub categories: Option<Vec<String>>,
     /// Category the target compartment gets instead.
