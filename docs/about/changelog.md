@@ -377,6 +377,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- [Development workflow](../development/workflow.md#7-merging): the merge
+  step gives `gh pr merge <number>`, which adds a pull request to the merge
+  queue once its required checks pass, with the setting "Allow auto-merge" of
+  the repository on.
 - [Design principles](../codebase/design-principles.md): the structure,
   the rules of each unit and of the interface, and the proof that every part
   of the code follows. «Before you change code» of `AGENTS.md` links them.
