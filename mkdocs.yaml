@@ -180,6 +180,7 @@ nav:
       - Reports: api/reports.md
       - Package: api/package.md
       - commol.engines: api/engines.md
+      - commol.description: api/description.md
       - commol.plotting: api/plotting.md
       - commol.parallelism: api/parallelism.md
       - commol.distributions: api/distributions.md

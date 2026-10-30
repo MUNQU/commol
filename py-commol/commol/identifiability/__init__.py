@@ -1,4 +1,5 @@
-"""The identifiability methods (guide: Identifiability)."""
+"""The identifiability methods, their report and its parts (guide:
+Identifiability)."""
 
 from commol.identifiability.methods import (
     Collinearity,
@@ -7,6 +8,42 @@ from commol.identifiability.methods import (
     StartsIdentifiability,
     StructuralRank,
 )
+from commol.identifiability.report import (
+    AccuracyData,
+    CollinearitySectionData,
+    CombinationData,
+    CorrelatedPairData,
+    IdentifiabilityReportData,
+    IdentifiabilitySections,
+    PointRankData,
+    PracticalVerdictEntry,
+    ProfileSectionData,
+    SampleSectionData,
+    StartsSectionData,
+    StructuralSectionData,
+    StructuralVerdictEntry,
+    SubsetIndexData,
+    TighterRankData,
+    VerdictsEntry,
+)
+from commol.identifiability.results import (
+    Accuracy,
+    CollinearitySection,
+    Combination,
+    CorrelatedPair,
+    IdentifiabilityReport,
+    ParameterVerdicts,
+    PointRank,
+    PracticalVerdict,
+    ProfileSection,
+    SampleSection,
+    StartsSection,
+    StructuralSection,
+    StructuralVerdict,
+    SubsetIndex,
+    TighterRank,
+)
+
 
 __all__ = [
     "Collinearity",
@@ -14,4 +51,36 @@ __all__ = [
     "SampleIdentifiability",
     "StartsIdentifiability",
     "StructuralRank",
+    # Results
+    "AccuracyData",
+    "CollinearitySectionData",
+    "CombinationData",
+    "CorrelatedPairData",
+    "IdentifiabilityReportData",
+    "IdentifiabilitySections",
+    "PointRankData",
+    "PracticalVerdictEntry",
+    "ProfileSectionData",
+    "SampleSectionData",
+    "StartsSectionData",
+    "StructuralSectionData",
+    "StructuralVerdictEntry",
+    "SubsetIndexData",
+    "TighterRankData",
+    "VerdictsEntry",
+    "Accuracy",
+    "CollinearitySection",
+    "Combination",
+    "CorrelatedPair",
+    "IdentifiabilityReport",
+    "ParameterVerdicts",
+    "PointRank",
+    "PracticalVerdict",
+    "ProfileSection",
+    "SampleSection",
+    "StartsSection",
+    "StructuralSection",
+    "StructuralVerdict",
+    "SubsetIndex",
+    "TighterRank",
 ]

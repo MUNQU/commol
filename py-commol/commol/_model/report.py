@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, NotRequired, TypedDict
 from commol._model.aggregate import split_groups
 from commol._model.engine_state import InitialCompartment
 from commol._model.initial_conditions import CATEGORY_SEPARATOR, split_by
-from commol._model.report_entry import Interval, entry_interval
+from commol._model.report_entry import EntrySpread, entry_spread
 
 if TYPE_CHECKING:
     from commol._model.aggregate import Aggregate
@@ -20,7 +20,7 @@ class InitialAmountEntry(TypedDict):
     amount: float | None
     unit: str | None
     calibrated: bool
-    interval: NotRequired[Interval]
+    interval: NotRequired[EntrySpread]
 
 
 class CategorySplitEntry(TypedDict):
@@ -29,7 +29,7 @@ class CategorySplitEntry(TypedDict):
     group: list[str]
     fraction: float
     calibrated: bool
-    interval: NotRequired[Interval]
+    interval: NotRequired[EntrySpread]
 
 
 def _interval(
@@ -38,7 +38,7 @@ def _interval(
     statistics: "Mapping[str, EntrySummary] | None",
 ) -> None:
     """Add the interval of an entry, when the sample has one."""
-    interval = entry_interval(entry_id, statistics)
+    interval = entry_spread(entry_id, statistics)
     if interval is not None:
         entry["interval"] = interval
 

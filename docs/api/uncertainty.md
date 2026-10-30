@@ -10,21 +10,21 @@ and the one quantile. Guide: [Uncertainty](../guide/uncertainty/index.md).
 
 ::: commol.uncertainty.SampleMethod
 
-::: commol.uncertainty.sample.ParameterSummary
+::: commol.uncertainty.ParameterSummary
 
 ::: commol.uncertainty.Predictive
 
-::: commol.uncertainty.predictive.PredictiveBand
+::: commol.uncertainty.PredictiveBand
 
-::: commol.uncertainty.predictive.SeriesBand
+::: commol.uncertainty.SeriesBand
 
-::: commol.uncertainty.predictive.ObservationDraws
+::: commol.uncertainty.ObservationDraws
 
-::: commol.uncertainty.plots.PredictivePlot
+::: commol.uncertainty.PredictivePlot
 
 ::: commol.uncertainty.Scenarios
 
-::: commol.uncertainty.scenarios.ScenarioSummary
+::: commol.uncertainty.ScenarioSummary
 
 ::: commol.uncertainty.weighted_quantiles
 

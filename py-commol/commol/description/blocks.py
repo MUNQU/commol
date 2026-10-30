@@ -4,8 +4,8 @@
 `Section`, each with a key, a title and blocks from a closed set: `Text`,
 `Table`, `Equations`, `StateGraph` and `Matrix`. Each kind of model builds its
 sections from these blocks (`ModelStructure.describe`), and the renderers of
-`commol._model.render` turn any description into text, Markdown, LaTeX, JSON
-or Graphviz DOT without knowing the kind.
+`commol.description.render` turn any description into text, Markdown, LaTeX,
+JSON or Graphviz DOT without knowing the kind.
 """
 
 from pathlib import Path
@@ -377,7 +377,7 @@ class ModelDescription(BaseModel):
         ValueError
             If the format is not one of these.
         """
-        from commol._model.render import render
+        from commol.description.render import render
 
         return render(self, format)
 
@@ -408,7 +408,7 @@ class ModelDescription(BaseModel):
             If the format is None and the suffix is not one of these, or the
             format is not valid.
         """
-        from commol._model.render import save
+        from commol.description.render import save
 
         return save(self, Path(path), format)
 

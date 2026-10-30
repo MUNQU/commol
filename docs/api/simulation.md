@@ -6,14 +6,14 @@ Runs a model and reads its outputs. Guide: [Running Simulations](../guide/simula
 
 ::: commol.Simulation
 
-::: commol._simulation.results.SimulationResults
+::: commol.SimulationResults
 
-::: commol._simulation.plots.ResultsPlot
+::: commol.ResultsPlot
 
-::: commol._simulation.simulation.ReplicateRuns
+::: commol.ReplicateRuns
 
-::: commol._simulation.results.SimulationReplicates
+::: commol.SimulationReplicates
 
-::: commol._simulation.plots.ReplicatesPlot
+::: commol.ReplicatesPlot
 
 ::: commol.InfeasibleStateError

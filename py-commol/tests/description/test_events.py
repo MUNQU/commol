@@ -2,7 +2,7 @@
 
 import pytest
 
-from commol._model.description import Table, Text
+from commol.description.blocks import Table, Text
 from commol._model.model import Model
 from commol.engines import StochasticEventsSettings
 from commol.engines.engine import EngineName

@@ -53,8 +53,9 @@ class SummarizedSample(Protocol):
         ...
 
 
-class Interval(TypedDict):
-    """Weighted spread of one reported entry across the draws of a sample."""
+class EntrySpread(TypedDict):
+    """Weighted spread of one reported entry across the draws of a sample: the
+    block under the key `interval` of the entry."""
 
     mean: float
     median: float
@@ -65,10 +66,10 @@ class Interval(TypedDict):
     std: float
 
 
-def entry_interval(
+def entry_spread(
     entry_id: str,
     statistics: Mapping[str, EntrySummary] | None,
-) -> Interval | None:
+) -> EntrySpread | None:
     """
     Weighted spread of one reported entry across the draws of a sample.
 
@@ -81,7 +82,7 @@ def entry_interval(
 
     Returns
     -------
-    Interval | None
+    EntrySpread | None
         The spread, or None when there is no sample or no spread for the id.
     """
     stats = (statistics or {}).get(entry_id)

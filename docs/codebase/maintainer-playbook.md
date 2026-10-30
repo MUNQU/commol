@@ -125,8 +125,8 @@ changing it ([Design decisions](decisions/uncertainty.md#methods-plug-into-one-e
       in `tests/parallelism/test_threads.py`.
 - [ ] The configuration, a subclass of `UncertaintyMethod[YourResult]`, and
       the result, a subclass of `ResultModel`, in the module of its family
-      (`resampling/methods.py`, …), which exports the configuration (`PAGES`
-      of `tests/suite/public_surface.py`); a result with draws holds a `ParameterSample`.
+      (`resampling/methods.py`, …), which exports the configuration (`PAGES` of `tests/suite/public_surface.py`)
+      and the result with the class of each of its fields (`RESULTS`); a result with draws holds a `ParameterSample`.
 - [ ] A method that fits several times fits its perturbations with
       `ReplicateRunner::fit_all` and checks them with `ReplicateFits::require`;
       its result has `failed` (the entries of `FitUnit::failed`, logged as
@@ -236,7 +236,7 @@ To add a kind of model, such as an agent network (see
 - [ ] Give the description of the kind: override `ModelStructure.describe`
       with the sections it fills (`entities`, `dynamics`, `initialization`,
       `design_concepts`), built from the blocks of
-      `_model/description.py`; the renderers need no change.
+      `description/blocks.py`; the renderers need no change.
 - [ ] Copy the tests of `tests/model_kinds/` for the new kind, and run the
       Rust and Python suites.
 - [ ] Add the kind to [Model structure](../advanced/model-structure.md), the

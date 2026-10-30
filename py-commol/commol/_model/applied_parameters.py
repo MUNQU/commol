@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING, NotRequired, TypedDict
 from commol._fit.result import CalibrationResult
 from commol._model.report_entry import (
     EntrySummary,
-    Interval,
+    EntrySpread,
     SummarizedSample,
-    entry_interval,
+    entry_spread,
 )
 from commol._model.structure import ReportSections
 from commol._problem.problem import CalibrationProblem, calibrated_values
@@ -23,7 +23,7 @@ class ParameterEntry(TypedDict):
 
     value: float
     calibrated: bool
-    interval: NotRequired[Interval]
+    interval: NotRequired[EntrySpread]
 
 
 class AppliedParametersReport(ReportSections):
@@ -47,7 +47,7 @@ def _parameter_entry(
         "value": value,
         "calibrated": entry_id in calibrated_ids,
     }
-    interval = entry_interval(entry_id, statistics)
+    interval = entry_spread(entry_id, statistics)
     if interval is not None:
         entry["interval"] = interval
     return entry

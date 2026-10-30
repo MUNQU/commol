@@ -22,8 +22,8 @@ results. The priors are in [Distributions](distributions.md). Guide:
 
 ::: commol.smc.SeriesDistance
 
-::: commol.smc.results.SMCResult
+::: commol.smc.SMCResult
 
-::: commol.smc.results.GibbsResult
+::: commol.smc.GibbsResult
 
-::: commol.smc.results.SMCDiagnostics
+::: commol.smc.SMCDiagnostics

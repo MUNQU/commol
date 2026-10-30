@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from tests.suite.public_surface import EXPORTS, RESULTS
-from tests.support.surface import results
+from tests.support.surface import is_commol, named_types, outputs
 
 API_DIR = Path(__file__).resolve().parents[3] / "docs" / "api"
 DIRECTIVE = re.compile(r"^:::\s*(?P<target>\S+)", re.MULTILINE)
@@ -87,24 +87,81 @@ def pages_of(item: object, pages: dict[str, set[str]]) -> set[str]:
     return pages.get(public, set()) | pages.get(path, set()) | pages.get(module, set())
 
 
+def owner_pages(item: object, owner: str, pages: dict[str, set[str]]) -> set[str]:
+    """The pages that document ``item`` or its member of ``owner``
+    (``Class.member``)."""
+    found = pages_of(item, pages)
+    if isinstance(item, type) and owner.startswith(f"{item.__name__}."):
+        member = owner.removeprefix(f"{item.__name__}.")
+        public = public_paths().get(id(item), f"{item.__module__}.{item.__name__}")
+        found |= pages.get(f"{public}.{member}", set())
+    return found
+
+
+def result_faults(results: set[str], pages: dict[str, set[str]]) -> list[str]:
+    """Each fault of the documentation of the classes that the surface
+    returns: a class documented under the path of its private module, and a
+    name of ``results`` that no member returns or that is not documented under
+    its public path on the page of an object that returns it or of its
+    module."""
+    paths = public_paths()
+    owners: dict[type, set[str]] = {}
+    for output in outputs():
+        for cls in named_types(output.annotation):
+            if is_commol(cls):
+                owners.setdefault(cls, set()).update(
+                    owner_pages(output.item, output.owner, pages)
+                )
+    wrong = []
+    for cls in sorted(owners, key=lambda cls: cls.__name__):
+        private = f"{cls.__module__}.{cls.__qualname__}"
+        public = paths.get(id(cls), private)
+        if public != private and any(
+            target == private or target.startswith(f"{private}.") for target in pages
+        ):
+            wrong.append(f"{cls.__name__}: documented under {private}, not {public}")
+        if cls.__name__ not in results:
+            continue
+        module = public.rsplit(".", 1)[0]
+        expected = owners[cls] | {f"{module.removeprefix('commol.')}.md"}
+        found = pages.get(public, set())
+        if not found & expected:
+            objects = sorted(owners[cls])
+            wrong.append(
+                f"{cls.__name__}: on {sorted(found)}, its objects on {objects}"
+            )
+    returned = {cls.__name__ for cls in owners}
+    wrong += [
+        f"{name}: no member of the surface returns it"
+        for name in sorted(results - returned)
+    ]
+    return wrong
+
+
 @pytest.mark.docs
 def test_each_result_is_on_the_page_of_its_object() -> None:
-    """Each result of ``RESULTS`` is returned by an object of the surface, and
-    has its ``:::`` entry on the page of an object that returns it."""
-    pages = pages_of_targets()
-    returned_by = {cls.__name__: owners for cls, owners in results().items()}
-    classes = {cls.__name__: cls for cls in results()}
-    wrong = []
-    for name in sorted(RESULTS):
-        if name not in returned_by:
-            wrong.append(f"{name}: no member of the surface returns it")
-            continue
-        owners = set().union(*(pages_of(owner, pages) for owner in returned_by[name]))
-        found = pages_of(classes[name], pages)
-        if not found & owners:
-            wrong.append(f"{name}: on {sorted(found)}, its objects on {sorted(owners)}")
+    """Each result of ``RESULTS`` is returned by an object of the surface,
+    and its ``:::`` entry under its public path is on the page of an object
+    that returns it or of its module; no class that the surface returns is
+    documented under the path of its private module."""
+    results = {name for names in RESULTS.values() for name in names}
+    wrong = result_faults(results, pages_of_targets())
 
     assert not wrong, "Document each result with its object:\n" + "\n".join(wrong)
+
+
+@pytest.mark.docs
+def test_the_check_of_results_names_each_fault() -> None:
+    pages = pages_of_targets()
+    pages["commol._fit.result.CalibrationResult"] = {"calibrator.md"}
+    pages["commol.resampling.BootstrapResult"] = {"simulation.md"}
+
+    assert result_faults({"BootstrapResult", "Unknown"}, pages) == [
+        "BootstrapResult: on ['simulation.md'], its objects on ['resampling.md']",
+        "CalibrationResult: documented under commol._fit.result.CalibrationResult, "
+        "not commol.CalibrationResult",
+        "Unknown: no member of the surface returns it",
+    ]
 
 
 @pytest.mark.docs

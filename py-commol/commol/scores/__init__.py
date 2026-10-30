@@ -1,4 +1,5 @@
-"""Scores of a predictive against observations (guide: Uncertainty, Scores)."""
+"""Scores of a predictive against observations, and the score they return
+(guide: Uncertainty, Scores)."""
 
 from commol.scores.rules import (
     coverage,
@@ -8,6 +9,8 @@ from commol.scores.rules import (
     pit,
     weighted_interval_score,
 )
+from commol.scores.rules import Score
+
 
 __all__ = [
     "coverage",
@@ -16,4 +19,6 @@ __all__ = [
     "log_score",
     "pit",
     "weighted_interval_score",
+    # Results
+    "Score",
 ]

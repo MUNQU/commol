@@ -1,5 +1,5 @@
 """The sequential Monte Carlo methods: the Gibbs and Bayesian posteriors and
-ABC (guide: Sequential Monte Carlo)."""
+ABC, and their results (guide: Sequential Monte Carlo)."""
 
 from commol.smc.methods import (
     ABCSMC,
@@ -11,6 +11,12 @@ from commol.smc.methods import (
     LossDistance,
     SeriesDistance,
 )
+from commol.smc.results import (
+    GibbsResult,
+    SMCDiagnostics,
+    SMCResult,
+)
+
 
 __all__ = [
     "ABCRejection",
@@ -21,4 +27,8 @@ __all__ = [
     "InformationMatchingEta",
     "LossDistance",
     "SeriesDistance",
+    # Results
+    "GibbsResult",
+    "SMCDiagnostics",
+    "SMCResult",
 ]

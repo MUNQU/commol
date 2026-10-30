@@ -15,10 +15,10 @@ their results. Guide: [Resampling](../guide/uncertainty/resampling.md).
 
 ::: commol.resampling.ParametricBootstrap
 
-::: commol.resampling.results.BootstrapResult
+::: commol.resampling.BootstrapResult
 
-::: commol.resampling.results.JackknifeResult
+::: commol.resampling.JackknifeResult
 
-::: commol.resampling.results.ResamplingDiagnostics
+::: commol.resampling.ResamplingDiagnostics
 
-::: commol.resampling.results.BoundError
+::: commol.resampling.BoundError

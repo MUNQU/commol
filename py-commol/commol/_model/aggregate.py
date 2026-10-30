@@ -26,7 +26,7 @@ from commol._model.process import Process
 from commol._model.structure import ModelStructure, ReportSections, SeriesLabel
 
 if TYPE_CHECKING:
-    from commol._model.description import Section
+    from commol.description.blocks import Section
     from commol._model.model import Model
     from commol._problem.problem import CalibrationParameter, CalibrationProblem
     from commol.commol_rs._commol_rs import EngineProtocol

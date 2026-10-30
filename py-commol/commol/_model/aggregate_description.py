@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from commol._model import engine_state
 from commol._model.aggregate import split_groups
-from commol._model.description import Matrix, Section, Table, Text, _Block
+from commol.description.blocks import Matrix, Section, Table, Text, _Block
 from commol._model.equations import DynamicsDescription
 from commol._model.neighbors import Complete, Groups
 

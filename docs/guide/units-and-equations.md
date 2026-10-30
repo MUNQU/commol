@@ -52,8 +52,8 @@ and `kg/day` in the other. In such a model `total`, a subgroup total
 units, so they have none, and a rate that reads one fails the check; read the
 bins or the compartments instead. A rate that reads the
 [neighbors of a unit](building-models.md#neighbors) is checked as the sums
-they are. It raises `UnitConsistencyError` (from `commol._model.unit_checks`) and
-lists every transition that fails.
+they are. It raises `UnitConsistencyError`, which the root `commol` exports, and lists
+every transition that fails.
 
 ### What needs a unit
 
@@ -147,7 +147,7 @@ with `k` in `"1/day"` is a flow and fails with `expected '<bin unit>'`.
 ### What the check catches
 
 ```python
-from commol._model.unit_checks import UnitConsistencyError
+from commol import UnitConsistencyError
 
 wrong_units = (
     ModelBuilder(name="Wrong units", bin_unit="item", step_unit="day")

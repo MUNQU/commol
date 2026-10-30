@@ -1,5 +1,5 @@
-"""The resampling methods: bootstraps and the block jackknife (guide:
-Resampling)."""
+"""The resampling methods: bootstraps and the block jackknife, and their
+results (guide: Resampling)."""
 
 from commol.resampling.methods import (
     BayesianBootstrap,
@@ -8,6 +8,13 @@ from commol.resampling.methods import (
     ResidualBootstrap,
     WildBootstrap,
 )
+from commol.resampling.results import (
+    BootstrapResult,
+    BoundError,
+    JackknifeResult,
+    ResamplingDiagnostics,
+)
+
 
 __all__ = [
     "BayesianBootstrap",
@@ -15,4 +22,9 @@ __all__ = [
     "ParametricBootstrap",
     "ResidualBootstrap",
     "WildBootstrap",
+    # Results
+    "BootstrapResult",
+    "BoundError",
+    "JackknifeResult",
+    "ResamplingDiagnostics",
 ]

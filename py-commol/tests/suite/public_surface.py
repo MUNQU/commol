@@ -1,12 +1,14 @@
-"""The public surface of commol: the names a user writes, and the results that
-public objects return.
+"""The public surface of commol: the names a user writes in a call (`ROOT` and
+`PAGES`), and the results that public members return (`RESULTS`), which a
+typed caller writes in an annotation.
 
-`tests/suite/test_architecture.py` checks the exports against `EXPORTS`, and
-`tests/docs/test_reference.py` checks that each name of `RESULTS` is
-documented on the page of an object that returns it. A name a user only
-reads, passes as a string or never builds is not exported: a result is
-reached from its object, a choice among names is a `Literal`, and a union, a
-base or a part that the builder makes stays private.
+`tests/suite/test_architecture.py` checks the exports against `EXPORTS` and
+that every class a public member returns is exported, and
+`tests/docs/test_reference.py` checks that each result is documented under its
+public path on the page of an object that returns it. A result is exported so
+that a typed caller can name it, not so that a user builds it. A choice among
+names is a `Literal`, and a union or a base that no member returns stays
+private.
 """
 
 ROOT = frozenset(
@@ -19,6 +21,7 @@ ROOT = frozenset(
         "SeriesValue",
         "AxisUnits",
         "AxisPattern",
+        "UnitConsistencyError",
         # Structures and neighborhoods
         "Aggregate",
         "Complete",
@@ -39,10 +42,15 @@ ROOT = frozenset(
         "build_info",
     }
 )
-"""The main flow: build, the structures, simulate and calibrate."""
+"""The main flow that a user writes: build, the structures, simulate and
+calibrate."""
 
 PAGES = {
-    "engines": {"ODESolver", "StochasticEventsSettings", "StochasticStepsSettings"},
+    "engines": {
+        "ODESolver",
+        "StochasticEventsSettings",
+        "StochasticStepsSettings",
+    },
     "plotting": {"plot_compared", "PlotConfig"},
     "parallelism": {"set_threads", "threads", "get_threads", "get_levels"},
     "distributions": {
@@ -149,69 +157,182 @@ PAGES = {
 """The other public names, by the page of the guide that documents them: each
 page is the module ``commol.<page>``."""
 
-EXPORTS = {
+RESULTS = {
+    "commol": frozenset(
+        {
+            # The model and its parts
+            "Process",
+            "Bin",
+            "Accumulator",
+            "Stratification",
+            "CategoryMatrix",
+            "Parameter",
+            "Transition",
+            "InitialCompartment",
+            "SeriesLabel",
+            "ReportSections",
+            "AppliedParametersReport",
+            "ParameterEntry",
+            "EntrySpread",
+            "InitialAmountEntry",
+            "CategorySplitEntry",
+            # Simulate
+            "SimulationResults",
+            "SimulationReplicates",
+            "ReplicateRuns",
+            "ResultsPlot",
+            "ReplicatesPlot",
+            "SimulationReport",
+            "ObservedSeries",
+            "AccumulatorReport",
+            "WindowedAccumulator",
+            "PredictionIntervalsReport",
+            "SeriesIntervalsReport",
+            # Calibrate
+            "CalibrationResult",
+            "StartSummary",
+            "CalibrationHistory",
+            "CalibrationEvaluation",
+            # The package
+            "BuildInfo",
+        }
+    ),
+    "commol.engines": frozenset(
+        {
+            "ModelEngine",
+        }
+    ),
+    "commol.uncertainty": frozenset(
+        {
+            "PredictivePlot",
+            "ObservationDraws",
+            "PredictiveBand",
+            "SeriesBand",
+            "ParameterSummary",
+            "ScenarioSummary",
+        }
+    ),
+    "commol.resampling": frozenset(
+        {
+            "BootstrapResult",
+            "BoundError",
+            "JackknifeResult",
+            "ResamplingDiagnostics",
+        }
+    ),
+    "commol.profiles": frozenset(
+        {
+            "Profile",
+            "ProfileInterval",
+            "ProfileResult",
+            "ProfileStructure",
+        }
+    ),
+    "commol.local": frozenset(
+        {
+            "DeltaBand",
+            "ImportanceResult",
+            "LaplaceResult",
+            "MixtureComponent",
+            "SandwichResult",
+        }
+    ),
+    "commol.smc": frozenset(
+        {
+            "GibbsResult",
+            "SMCDiagnostics",
+            "SMCResult",
+        }
+    ),
+    "commol.description": frozenset(
+        {
+            "ModelDescription",
+            "Section",
+            "Text",
+            "Table",
+            "Equations",
+            "EquationGroup",
+            "Equation",
+            "StateGraph",
+            "GraphNode",
+            "GraphEdge",
+            "Matrix",
+        }
+    ),
+    "commol.conformal": frozenset(
+        {
+            "ConformalResult",
+            "PredictionIntervals",
+            "SeriesIntervals",
+        }
+    ),
+    "commol.identifiability": frozenset(
+        {
+            "AccuracyData",
+            "CollinearitySectionData",
+            "CombinationData",
+            "CorrelatedPairData",
+            "IdentifiabilityReportData",
+            "IdentifiabilitySections",
+            "PointRankData",
+            "PracticalVerdictEntry",
+            "ProfileSectionData",
+            "SampleSectionData",
+            "StartsSectionData",
+            "StructuralSectionData",
+            "StructuralVerdictEntry",
+            "SubsetIndexData",
+            "TighterRankData",
+            "VerdictsEntry",
+            "Accuracy",
+            "CollinearitySection",
+            "Combination",
+            "CorrelatedPair",
+            "IdentifiabilityReport",
+            "ParameterVerdicts",
+            "PointRank",
+            "PracticalVerdict",
+            "ProfileSection",
+            "SampleSection",
+            "StartsSection",
+            "StructuralSection",
+            "StructuralVerdict",
+            "SubsetIndex",
+            "TighterRank",
+        }
+    ),
+    "commol.sensitivity": frozenset(
+        {
+            "ChaosResult",
+            "MorrisResult",
+            "PRCCResult",
+            "PropagationResult",
+            "QuantitySummary",
+            "SobolResult",
+        }
+    ),
+    "commol.scores": frozenset(
+        {
+            "Score",
+        }
+    ),
+}
+"""The classes that public members return and that a user does not write in a
+call, by the module that exports them: a typed caller names each one in an
+annotation. A result of the main flow is in the root, and the result of a
+method in the module of the method. Each is documented on the page of an
+object that returns it."""
+
+WRITTEN = {
     "commol": ROOT,
     **{f"commol.{page}": frozenset(names) for page, names in PAGES.items()},
 }
-"""The ``__all__`` of each public module of commol: the root, and one module
-per page of the guide."""
+"""The names a user writes in a call, by public module."""
 
-RESULTS = frozenset(
-    {
-        "SimulationResults",
-        "SimulationReplicates",
-        "ReplicateRuns",
-        "Process",
-        "CalibrationResult",
-        "CalibrationEvaluation",
-        "CalibrationHistory",
-        "StartSummary",
-        "ModelDescription",
-        "Section",
-        "StateGraph",
-        "BuildInfo",
-        "ResultsPlot",
-        "ReplicatesPlot",
-        "PredictivePlot",
-        "ParameterSummary",
-        "PredictiveBand",
-        "SeriesBand",
-        "ObservationDraws",
-        "ScenarioSummary",
-        "Score",
-        "BootstrapResult",
-        "JackknifeResult",
-        "ResamplingDiagnostics",
-        "BoundError",
-        "ProfileResult",
-        "Profile",
-        "ProfileInterval",
-        "ProfileStructure",
-        "SMCResult",
-        "GibbsResult",
-        "SMCDiagnostics",
-        "LaplaceResult",
-        "SandwichResult",
-        "DeltaBand",
-        "ImportanceResult",
-        "MixtureComponent",
-        "ConformalResult",
-        "PredictionIntervals",
-        "SeriesIntervals",
-        "IdentifiabilityReport",
-        "ParameterVerdicts",
-        "StructuralSection",
-        "CollinearitySection",
-        "SampleSection",
-        "StartsSection",
-        "ProfileSection",
-        "PropagationResult",
-        "QuantitySummary",
-        "PRCCResult",
-        "MorrisResult",
-        "SobolResult",
-        "ChaosResult",
-    }
-)
-"""The results that public objects return: each is typed as the return of the
-member that gives it, and documented on the page of that object."""
+EXPORTS = {
+    module: WRITTEN.get(module, frozenset()) | RESULTS.get(module, frozenset())
+    for module in {**WRITTEN, **RESULTS}
+}
+"""The ``__all__`` of each public module of commol: the root, and one module
+per page of the guide, each with its results. A page whose names a user only
+reads, such as ``commol.description``, has only results."""

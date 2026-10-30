@@ -17,4 +17,4 @@ Guide: [Uncertainty](../guide/uncertainty/index.md).
 
 ::: commol.scores.log_score
 
-::: commol.scores.rules.Score
+::: commol.scores.Score

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from commol import Aggregate, ModelBuilder
-from commol._model.description import Matrix, Text
+from commol.description.blocks import Matrix, Text
 from commol._model.model import Model
 
 VALUES = {"g1": {"g1": 2.0, "g2": 1.0}, "g2": {"g1": 1.0, "g2": 3.0}}

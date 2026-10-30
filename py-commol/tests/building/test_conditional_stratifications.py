@@ -13,7 +13,7 @@ from commol import (
     StratificationCondition,
     StratifiedRate,
 )
-from commol._model.description import Table
+from commol.description.blocks import Table
 from commol._model.model import Model
 from tests.support import assert_accepted
 

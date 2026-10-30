@@ -129,8 +129,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Complete`, `Groups`), simulate (`Simulation`, `InfeasibleStateError`),
   calibrate (`Calibrator`, `CalibrationProblem`, `CalibrationParameter`,
   `CalibrationConstraint`, `ObservedDataPoint`, `NelderMeadConfig`,
-  `ParticleSwarmConfig`, `Quantile`) and `build_info`. The modules are
-  `commol.engines`, `commol.plotting`, `commol.parallelism`,
+  `ParticleSwarmConfig`, `Quantile`), `build_info` and the results of these
+  steps. The modules are `commol.engines`, `commol.description`,
+  `commol.plotting`, `commol.parallelism`,
   `commol.distributions`, `commol.quantities`, `commol.observations`,
   `commol.uncertainty`, `commol.scores`, `commol.resampling`,
   `commol.profiles`, `commol.local`, `commol.smc`, `commol.conformal`,
@@ -252,20 +253,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Another value of `keep` raises `ValueError` with the message of the
   engine, ``unknown variant `median`, expected `survival` or `mean` ``.
   See [Units of the axis](../guide/core-concepts.md#units-of-the-axis).
-- **Breaking:** the package root exports only the names a user writes: 99
-  names, down from 147. A result is reached from the object that returns it,
-  typed as the return of that member and documented on its page; it is not
-  an import. The names that leave `commol` are the results
-  (`SimulationResults`, `SimulationReplicates`, `ReplicateRuns`,
-  `CalibrationResult`, `CalibrationEvaluation`, `CalibrationHistory`,
-  `StartSummary`, `ModelDescription`, `Process`, `BuildInfo`, and the result
-  of every uncertainty, identifiability and sensitivity method with its
-  parts), the bases `ModelStructure`, `InferenceMethod`,
+- **Breaking:** the public modules export only the names a user writes, in
+  a call or in an annotation. Every class that a public member returns, and
+  the class of each field of one, has one public path, so a typed function
+  names it, as in `def fit(...) -> CalibrationResult`: a result of the main
+  flow is in the root (`SimulationResults`, `SimulationReplicates`,
+  `ReplicateRuns`, `CalibrationResult`, `StartSummary`, `CalibrationHistory`,
+  `CalibrationEvaluation`, `Process` and its parts, `BuildInfo` and the types
+  of the reports, such as `EntrySpread`, the spread of an entry over a
+  sample), and the others are in the module of their page, such as
+  `commol.resampling.BootstrapResult` and
+  `commol.description.ModelDescription` with the blocks of a description. A
+  result is the return of its member, not a class to build. The root also
+  exports `UnitConsistencyError`, which `Model.check_unit_consistency`
+  raises, and holds 53 names, down from 147. The names that no module
+  exports are the bases `ModelStructure`, `InferenceMethod`,
   `UncertaintyMethod`, `IdentifiabilityMethod` and `SensitivityMethod`, the
-  union `ObservationModel`, and the functions `sample`, `windowed_totals`
-  and `ci_percentiles`. Migration: remove the import and annotate with the
-  class of its module, such as `commol.api.results.SimulationResults`, or
-  with no annotation. See [API Reference](../api/index.md).
+  union `ObservationModel`, and the functions `sample`, `windowed_totals` and
+  `ci_percentiles`; `ModelStructure.of_kind` is private. Migration: `from
+  commol import BootstrapResult` is `from commol.resampling import
+  BootstrapResult`, and `from commol import ModelDescription` is `from
+  commol.description import ModelDescription`; remove the import of a base,
+  the union or a function. See [API Reference](../api/index.md).
 - **Breaking:** a condition is a `StratificationCondition` and a stratified
   rate is a `StratifiedRate`, which the package root exports;
   `ModelBuilder.add_stratification`, `ModelBuilder.add_transition` and
