@@ -585,9 +585,14 @@ pub fn optimize_subproblem<E: SimulationEngine + Sync>(
                     ..held.settings.clone()
                 };
                 let swarm = run.fit;
-                let polish = OptimizationConfig::NelderMead((**polish).clone());
-                let at = &swarm.best_parameters;
-                let end = run_constrained(&space, run.cost, &polish, at, seed, &settings)?;
+                let end = run_constrained(
+                    &space,
+                    run.cost,
+                    &OptimizationConfig::NelderMead((**polish).clone()),
+                    &swarm.best_parameters,
+                    seed,
+                    &settings,
+                )?;
                 run = ConstrainedRun {
                     fit: polished(&swarm, end.fit),
                     ..end
