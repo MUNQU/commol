@@ -1,14 +1,17 @@
 """Walk the public surface of commol: the exported names, the members of each,
-the types that their signatures name, and the results that they return."""
+the types that their signatures name, quoted or not, and the results that they
+return; and check that a user can pass every class a signature takes and name
+every class a member returns."""
 
 import builtins
+import collections.abc
 import enum
 import importlib
 import inspect
 import pkgutil
 import sys
 import typing
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from types import ModuleType
 from typing import NamedTuple
 
@@ -94,14 +97,23 @@ def own_classes(cls: type) -> list[type]:
     ]
 
 
+SYNTAX = frozenset(
+    {"__getitem__", "__iter__", "__next__", "__call__", "__enter__", "__contains__"}
+)
+"""The methods that a user calls through syntax, such as ``scenarios["a"]``."""
+
+
 def functions(cls: type) -> Iterator[tuple[str, Callable[..., object]]]:
     """Each public method and property of ``cls``, its own and inherited from
-    commol, with ``__init__`` for a class that is not a pydantic model."""
+    commol, with each method of ``SYNTAX`` and ``__init__`` for a class that
+    is not a pydantic model."""
     seen: set[str] = set()
     for klass in own_classes(cls):
         for name, member in vars(klass).items():
-            public = not name.startswith("_") or (
-                name == "__init__" and not hasattr(cls, "model_fields")
+            public = (
+                not name.startswith("_")
+                or name in SYNTAX
+                or (name == "__init__" and not hasattr(cls, "model_fields"))
             )
             if name in seen or not public:
                 continue
@@ -160,8 +172,34 @@ def signatures(item: object, given: bool = False) -> Iterator[Signature]:
         yield Signature(f"{item.__name__}.{name}", hints, returned)
 
 
+class Written(dict[str, object]):
+    """The names a quoted annotation of commol reads: the classes and aliases
+    of commol, ``typing`` and ``collections.abc``, and an `Outside` for any
+    other name that is not a builtin."""
+
+    def __init__(self) -> None:
+        super().__init__({**vars(collections.abc), **vars(typing), **NAMESPACE})
+
+    def __missing__(self, name: str) -> object:
+        if hasattr(builtins, name):
+            raise KeyError(name)
+        return Outside(name, (), {})
+
+
+def resolved(annotation: object) -> object:
+    """``annotation``, with a string or a ``ForwardRef``, such as
+    ``"dict[str, Entry]"``, read as the type it writes."""
+    if isinstance(annotation, typing.ForwardRef):
+        annotation = annotation.__forward_arg__
+    if isinstance(annotation, str):
+        return eval(annotation, {"__builtins__": builtins}, Written())
+    return annotation
+
+
 def named_types(annotation: object) -> Iterator[object]:
-    """Each class and type alias that ``annotation`` names, nested or not."""
+    """Each class and type alias that ``annotation`` names, nested or not: a
+    string or a ``ForwardRef`` at any depth reads the class it names."""
+    annotation = resolved(annotation)
     if isinstance(annotation, list | tuple):
         for item in annotation:
             yield from named_types(item)
@@ -202,12 +240,9 @@ def generic_results(cls: type) -> Iterator[type]:
     ``BootstrapResult`` of ``UncertaintyMethod[BootstrapResult]``."""
     for klass in cls.__mro__:
         metadata = getattr(klass, "__pydantic_generic_metadata__", None) or {}
-        for argument in metadata.get("args", ()):
-            if isinstance(argument, typing.ForwardRef):
-                argument = NAMESPACE[argument.__forward_arg__]
-            elif isinstance(argument, str):
-                argument = NAMESPACE[argument]
-            if isinstance(argument, type) and is_commol(argument):
+        bases = [*metadata.get("args", ()), *getattr(klass, "__orig_bases__", ())]
+        for argument in named_types(bases):
+            if is_commol(argument) and argument not in cls.__mro__:
                 yield argument
 
 
@@ -324,3 +359,36 @@ def validators(cls: type) -> list[str]:
         "model_serializers",
     )
     return [name for kind in kinds for name in getattr(decorators, kind)]
+
+
+def private_inputs() -> list[str]:
+    """Each argument of the surface that names a class of commol a user
+    cannot pass: one that is not exported, not a base of an exported class
+    and not a protocol that they implement."""
+    reachable = {item for item in exported().values() if isinstance(item, type)}
+    allowed = {base for cls in reachable for base in own_classes(cls)}
+    return sorted(
+        f"{owner}: {item.__name__}"
+        for owner, annotation in inputs()
+        for item in named_types(annotation)
+        if isinstance(item, type)
+        and is_commol(item)
+        and item not in allowed
+        and not getattr(item, "_is_protocol", False)
+    )
+
+
+def private_outputs(
+    found: Iterable[tuple[str, object]], public: set[object]
+) -> list[str]:
+    """Each class of commol that a member of ``found`` returns and that
+    ``public`` does not hold, as ``owner: Class``; ``found`` holds ``(owner,
+    annotation)``."""
+    return sorted(
+        {
+            f"{owner}: {item.__name__}"
+            for owner, annotation in found
+            for item in named_types(annotation)
+            if is_commol(item) and item not in public
+        }
+    )

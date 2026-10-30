@@ -12,7 +12,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Literal
 
-from commol._model.description import (
+from commol.description.blocks import (
     Equation,
     Equations,
     Matrix,

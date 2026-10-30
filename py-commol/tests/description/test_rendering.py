@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from commol import Aggregate, ModelBuilder
-from commol._model.description import (
+from commol.description.blocks import (
     Equation,
     EquationGroup,
     Equations,
@@ -26,7 +26,7 @@ from commol._model.description import (
     Table,
 )
 from commol._model.model import Model
-from commol._model.render import mermaid
+from commol.description.render import mermaid
 from tests.support import FactoryBuilder, abc_builder, build
 from tests.support.described import (
     every_flow,

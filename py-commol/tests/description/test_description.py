@@ -3,7 +3,7 @@
 import pytest
 
 from commol import Complete, Groups
-from commol._model.description import (
+from commol.description.blocks import (
     Equations,
     Matrix,
     ModelDescription,

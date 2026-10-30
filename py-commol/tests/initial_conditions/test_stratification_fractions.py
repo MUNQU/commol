@@ -5,7 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from commol import Aggregate, CalibrationParameter
-from commol._model.description import Table
+from commol.description.blocks import Table
 from commol._model.engine_state import calibrated_initial_state
 from commol._model.model import Model
 from tests.support import (

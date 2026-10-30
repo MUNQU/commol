@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from commol._model.description import Equation, Equations, Text
+from commol.description.blocks import Equation, Equations, Text
 from commol._model.model import Model
 
 BANNER = "=" * 40

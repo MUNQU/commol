@@ -13,7 +13,7 @@ from commol import (
     StratificationCondition,
     StratifiedRate,
 )
-from commol._model.description import Table
+from commol.description.blocks import Table
 from commol._model.model import Model
 
 GROUPS = {"g1": 0.2, "g2": 0.3, "g3": 0.5}

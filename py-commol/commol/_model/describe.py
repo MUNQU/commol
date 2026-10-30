@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Literal
 
 from commol._data.engine_json import engine_json
 from commol._model import engine_state
-from commol._model.description import (
+from commol.description.blocks import (
     Matrix,
     ModelDescription,
     Section,

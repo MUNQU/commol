@@ -236,7 +236,7 @@ To add a kind of model, such as an agent network (see
 - [ ] Give the description of the kind: override `ModelStructure.describe`
       with the sections it fills (`entities`, `dynamics`, `initialization`,
       `design_concepts`), built from the blocks of
-      `_model/description.py`; the renderers need no change.
+      `description/blocks.py`; the renderers need no change.
 - [ ] Copy the tests of `tests/model_kinds/` for the new kind, and run the
       Rust and Python suites.
 - [ ] Add the kind to [Model structure](../advanced/model-structure.md), the

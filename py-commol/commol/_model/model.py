@@ -18,7 +18,7 @@ from commol._data.engine_json import engine_json
 from commol._fit.result import CalibrationResult
 from commol._model.axis_units import AxisUnits, Origin, seconds_per_step
 from commol._model.applied_parameters import applied_parameters_report
-from commol._model.description import ModelDescription
+from commol.description.blocks import ModelDescription
 from commol._model.parameter import Parameter, SeriesValue
 from commol._model.process import Process
 from commol._model.serialization import render_json
@@ -127,7 +127,7 @@ class Model(BaseModel, Generic[StructureT]):
             )
         if variant is not None and not isinstance(variant, str):
             raise ValueError(f"The variant of a structure is a name, got {variant!r}")
-        return ModelStructure.of_kind(kind, variant).model_validate(value)
+        return ModelStructure._of_kind(kind, variant).model_validate(value)
 
     @classmethod
     def from_json(cls, file_path: str | Path) -> Self:

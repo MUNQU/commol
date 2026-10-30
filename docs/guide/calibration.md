@@ -258,10 +258,9 @@ def converged_starts(result: CalibrationResult) -> list[StartSummary]:
 print(len(converged_starts(result)), "of", len(result.starts), "starts converged")
 ```
 
-Every class that a public member returns has one public path: a result of
-the main flow, such as `SimulationResults`, is in the root, and the result of
-a method is in the module of the method, such as `BootstrapResult` in
-`commol.resampling` ([API Reference](../api/index.md)).
+Every class that a public member returns has one public path
+([API Reference](../api/index.md)): `BootstrapResult`, the result of a
+bootstrap, is in `commol.resampling`.
 
 | `Calibrator` member | What it does |
 |---|---|

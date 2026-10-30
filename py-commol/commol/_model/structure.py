@@ -23,7 +23,7 @@ from commol._data.engine_json import engine_json
 from commol.commol_rs import _commol_rs as commol_rs
 
 if TYPE_CHECKING:
-    from commol._model.description import Section
+    from commol.description.blocks import Section
     from commol._model.model import Model
     from commol._model.report import CategorySplitEntry, InitialAmountEntry
     from commol._problem.problem import CalibrationParameter, CalibrationProblem
@@ -106,7 +106,7 @@ class ModelStructure(BaseModel, ABC):
         ModelStructure._kinds[key] = cls
 
     @classmethod
-    def of_kind(cls, kind: str, variant: str | None = None) -> type["ModelStructure"]:
+    def _of_kind(cls, kind: str, variant: str | None = None) -> type["ModelStructure"]:
         """
         The structure class of a model kind, or of one of its variants.
 

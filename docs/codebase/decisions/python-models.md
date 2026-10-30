@@ -23,7 +23,7 @@ classes by module; `EXPORTS` joins them into the `__all__` of each module.
 
 | Kind of name | Rule |
 |---|---|
-| A result: a class that a public member returns, and the class of each field of such a class, recursively | Exported: by the root for the main flow (`SimulationResults`, `CalibrationResult`, `StartSummary`, `Process` and its parts, `ModelDescription` and its blocks, the types of the reports), by the module of its page for the others (`commol.resampling.BootstrapResult`). It is the return of its member, not a class to build. Its `::: path` entry is under its public path on the page of `docs/api/` of an object that returns it, or of its module. |
+| A result: a class that a public member returns, and the class of each field of such a class, recursively | Exported: by the root for the main flow (`SimulationResults`, `CalibrationResult`, `StartSummary`, `Process` and its parts, the types of the reports), by the module of its page for the others (`commol.resampling.BootstrapResult`, `commol.description.ModelDescription`). Its class lives in the package of that module, so `home_of` reads the module from where the class is defined. It is the return of its member, not a class to build. Its `::: path` entry is under its public path on the page of `docs/api/` of an object that returns it, or of its module. |
 | A choice among names | A `Literal` in the signature, such as `loss_function: Literal["sse", "rmse", "mae"]`; no enum and no public alias of strings. |
 | A union of classes, or a base that no member returns | Private: a union is a `type _Name = …` alias, and a base such as `ModelStructure` is not exported. A base that a member returns is a result, such as `SMCResult`, the base of `GibbsResult`. |
 | A pydantic validator or serializer | A name that starts with `_`. |
@@ -37,7 +37,7 @@ classes by module; `EXPORTS` joins them into the `__all__` of each module.
 | An enum for each choice | A name to import and learn for each choice; a string is checked by pydantic with the same list of values. |
 | A dict for a condition | No type check of its keys, and a second shape of one idea next to the class. |
 
-**Guards:** `tests/suite/test_architecture.py::test_the_public_surface_is_the_table` (`private_inputs`, `private_outputs`),
+**Guards:** `tests/suite/test_architecture.py::test_the_public_surface_is_the_table` (`private_inputs`, `private_outputs` of `tests/support/surface.py`),
 `tests/suite/test_architecture.py::test_a_result_is_in_the_module_of_its_page`, `tests/suite/test_architecture.py::test_a_choice_is_a_literal`,
 `tests/suite/test_architecture.py::test_no_public_member_is_internal`, `tests/docs/test_reference.py::test_each_result_is_on_the_page_of_its_object`
 and `tests/building/test_conditions.py::test_a_condition_is_one_class`.
@@ -46,8 +46,8 @@ and `tests/building/test_conditions.py::test_a_condition_is_one_class`.
 
 The root `commol` holds the main flow: build, the structures, simulate and
 calibrate. Every other public name is in the module of its page of the guide
-(`commol.engines`, `commol.plotting`, `commol.parallelism`,
-`commol.distributions`, `commol.quantities`, `commol.observations`,
+(`commol.engines`, `commol.description`, `commol.plotting`,
+`commol.parallelism`, `commol.distributions`, `commol.quantities`, `commol.observations`,
 `commol.uncertainty`, `commol.scores`, `commol.resampling`,
 `commol.profiles`, `commol.local`, `commol.smc`, `commol.conformal`,
 `commol.identifiability`, `commol.sensitivity`), and the root exports no name
@@ -78,7 +78,7 @@ the bottom:
 | Layers | What they hold |
 |---|---|
 | `commol_rs`, `_build`, `_data`, `_statistics` | The extension, the build, the base of every data object with the port of the bridge, the weighted statistics |
-| `parallelism`, `engines`, `distributions`, `quantities`, `_fit`, `observations`, `_problem` | Settings and values that read no model |
+| `parallelism`, `engines`, `distributions`, `quantities`, `_fit`, `observations`, `_problem`, `description` | Settings and values that read no model, and the blocks of a description |
 | `_model` | The model and its structure |
 | `plotting` | The one drawing layer: data types of panels and charts, and the drawing |
 | `_simulation` | Runs and replicates, their reports and the data of their figures |

@@ -21,6 +21,7 @@ ROOT = frozenset(
         "SeriesValue",
         "AxisUnits",
         "AxisPattern",
+        "UnitConsistencyError",
         # Structures and neighborhoods
         "Aggregate",
         "Complete",
@@ -159,7 +160,7 @@ page is the module ``commol.<page>``."""
 RESULTS = {
     "commol": frozenset(
         {
-            # The model, its parts and its description
+            # The model and its parts
             "Process",
             "Bin",
             "Accumulator",
@@ -170,20 +171,11 @@ RESULTS = {
             "InitialCompartment",
             "SeriesLabel",
             "ReportSections",
-            "ModelDescription",
-            "Section",
-            "Text",
-            "Table",
-            "Equations",
-            "EquationGroup",
-            "Equation",
-            "StateGraph",
-            "GraphNode",
-            "GraphEdge",
-            "Matrix",
             "AppliedParametersReport",
             "ParameterEntry",
-            "Interval",
+            "EntrySpread",
+            "InitialAmountEntry",
+            "CategorySplitEntry",
             # Simulate
             "SimulationResults",
             "SimulationReplicates",
@@ -252,6 +244,21 @@ RESULTS = {
             "SMCResult",
         }
     ),
+    "commol.description": frozenset(
+        {
+            "ModelDescription",
+            "Section",
+            "Text",
+            "Table",
+            "Equations",
+            "EquationGroup",
+            "Equation",
+            "StateGraph",
+            "GraphNode",
+            "GraphEdge",
+            "Matrix",
+        }
+    ),
     "commol.conformal": frozenset(
         {
             "ConformalResult",
@@ -316,12 +323,16 @@ annotation. A result of the main flow is in the root, and the result of a
 method in the module of the method. Each is documented on the page of an
 object that returns it."""
 
+WRITTEN = {
+    "commol": ROOT,
+    **{f"commol.{page}": frozenset(names) for page, names in PAGES.items()},
+}
+"""The names a user writes in a call, by public module."""
+
 EXPORTS = {
-    module: names | RESULTS.get(module, frozenset())
-    for module, names in {
-        "commol": ROOT,
-        **{f"commol.{page}": frozenset(names) for page, names in PAGES.items()},
-    }.items()
+    module: WRITTEN.get(module, frozenset()) | RESULTS.get(module, frozenset())
+    for module in {**WRITTEN, **RESULTS}
 }
 """The ``__all__`` of each public module of commol: the root, and one module
-per page of the guide, each with its results."""
+per page of the guide, each with its results. A page whose names a user only
+reads, such as ``commol.description``, has only results."""

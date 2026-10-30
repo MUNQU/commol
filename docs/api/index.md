@@ -12,9 +12,10 @@ as in `from commol.resampling import BayesianBootstrap`; each module has its
 page here. Every class that a public member returns is exported too, so a
 typed function names it, as in `def fit(...) -> CalibrationResult` with
 `from commol import CalibrationResult`. A result of the main flow is in the
-root, the result of a method in the module of the method, and it is on the
-page of the object that returns it, as `SimulationResults` is on the
-Simulation page. A result is the return of its member, not a class to build.
+root, and the others are in the module of their page, such as
+`commol.resampling.BootstrapResult` and `commol.description.ModelDescription`.
+A result is on the page of the object that returns it or of its module, as
+`SimulationResults` is on the Simulation page. A result is the return of its member, not a class to build.
 A choice among names is a string, such as `loss_function="sse"`.
 
 ## The root `commol`
@@ -22,12 +23,12 @@ A choice among names is a string, such as `loss_function="sse"`.
 | Page | Names |
 |---|---|
 | [ModelBuilder](model-builder.md) | `ModelBuilder`, `StratificationCondition`, `StratifiedRate` |
-| [Model](model.md) | `Model`, `Aggregate`, `Complete`, `Groups`, `SeriesValue`; the results `Process`, `InitialCompartment`, `SeriesLabel`, `ReportSections`; the parts `Bin`, `Accumulator`, `Stratification`, `CategoryMatrix`, `Parameter`, `Transition`; the description `ModelDescription` and its blocks `Section`, `Text`, `Table`, `Equations`, `EquationGroup`, `Equation`, `StateGraph`, `GraphNode`, `GraphEdge`, `Matrix` |
+| [Model](model.md) | `Model`, `Aggregate`, `Complete`, `Groups`, `SeriesValue`, `UnitConsistencyError`; the results `Process`, `InitialCompartment`, `SeriesLabel`, `ReportSections`; the parts `Bin`, `Accumulator`, `Stratification`, `CategoryMatrix`, `Parameter`, `Transition` |
 | [AxisPattern](axis-patterns.md) | `AxisPattern` |
 | [AxisUnits](axis-units.md) | `AxisUnits` |
 | [Simulation](simulation.md) | `Simulation`, `InfeasibleStateError`; the results `SimulationResults`, `ReplicateRuns`, `SimulationReplicates` and their figures `ResultsPlot`, `ReplicatesPlot` |
 | [Calibration](calibrator.md) | `Calibrator`, `CalibrationProblem`, `Quantile`, `ObservedDataPoint`, `CalibrationParameter`, `CalibrationConstraint`, `NelderMeadConfig`, `ParticleSwarmConfig`; the results `CalibrationResult`, `StartSummary`, `CalibrationHistory`, `CalibrationEvaluation` |
-| [Reports](reports.md) | the methods `Model.applied_parameters`, `SimulationResults.report`, `SimulationReplicates.report`, `Predictive.report`, `IdentifiabilityReport.report`; the types `AppliedParametersReport`, `ParameterEntry`, `Interval`, `SimulationReport`, `ObservedSeries`, `AccumulatorReport`, `WindowedAccumulator`, `PredictionIntervalsReport`, `SeriesIntervalsReport` |
+| [Reports](reports.md) | the methods `Model.applied_parameters`, `SimulationResults.report`, `SimulationReplicates.report`, `Predictive.report`, `IdentifiabilityReport.report`; the types `AppliedParametersReport`, `ParameterEntry`, `EntrySpread`, `InitialAmountEntry`, `CategorySplitEntry`, `SimulationReport`, `ObservedSeries`, `AccumulatorReport`, `WindowedAccumulator`, `PredictionIntervalsReport`, `SeriesIntervalsReport` |
 | [Package](package.md) | `__version__`, `build_info`; the result `BuildInfo` |
 
 ## One module per page of the guide
@@ -35,6 +36,7 @@ A choice among names is a string, such as `loss_function="sse"`.
 | Module | Names |
 |---|---|
 | [`commol.engines`](engines.md) | `ODESolver`, `StochasticEventsSettings`, `StochasticStepsSettings`; the result `ModelEngine` |
+| [`commol.description`](description.md) | the result of `Model.describe`, `ModelDescription`, and its parts `Section`, `Text`, `Table`, `Equations`, `EquationGroup`, `Equation`, `StateGraph`, `GraphNode`, `GraphEdge`, `Matrix` |
 | [`commol.plotting`](plotting.md) | `plot_compared`, `PlotConfig`; the methods `PRCCResult.plot`, `MorrisResult.plot`, `SobolResult.plot`, `ChaosResult.plot`, `ProfileResult.plot` |
 | [`commol.parallelism`](parallelism.md) | `set_threads`, `threads`, `get_threads`, `get_levels` |
 | [`commol.distributions`](distributions.md) | `Priors`, `Uniform`, `LogUniform`, `Beta`, `Normal`, `LogNormal`, `Gamma` |
@@ -53,8 +55,6 @@ A choice among names is a string, such as `loss_function="sse"`.
 The pages also document names that no module exports, because no public
 member returns them:
 
-- `UnitConsistencyError`, which `Model.check_unit_consistency` raises, is in
-  `commol._model.unit_checks`.
 - The bases `ModelStructure` (of `Aggregate`), `LocalResult` (of
   `LaplaceResult` and `SandwichResult`) and `ConformalMethod` (of the
   conformal methods) are under the path of their module.

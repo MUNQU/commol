@@ -18,15 +18,19 @@ describes. Guide: [Reports](../guide/reports.md).
 ## The types of the reports
 
 Each report is a `TypedDict`: a plain dictionary whose keys a type checker
-knows. The root `commol` exports the types of `Model.applied_parameters` and
-of a simulation report; the [Identifiability API](identifiability.md) holds
+knows. The root `commol` exports the types of `Model.applied_parameters`, of
+`Aggregate.report_sections` and of a simulation report; the [Identifiability API](identifiability.md) holds
 the types of the identifiability report.
 
 ::: commol.AppliedParametersReport
 
 ::: commol.ParameterEntry
 
-::: commol.Interval
+::: commol.EntrySpread
+
+::: commol.InitialAmountEntry
+
+::: commol.CategorySplitEntry
 
 ::: commol.SimulationReport
 

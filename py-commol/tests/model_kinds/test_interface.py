@@ -83,7 +83,7 @@ class TestStructureInterface:
         class Registered(DecayStructure):
             kind: Literal["registered"] = "registered"  # ty: ignore[invalid-assignment]
 
-        assert ModelStructure.of_kind("registered") is Registered
+        assert ModelStructure._of_kind("registered") is Registered
 
     def test_an_abstract_kind_is_no_structure(self, monkeypatch) -> None:
         monkeypatch.setattr(ModelStructure, "_kinds", dict(ModelStructure._kinds))
@@ -92,7 +92,7 @@ class TestStructureInterface:
             kind: Literal["test"] = "test"
 
         assert Abstract.__abstractmethods__
-        assert ModelStructure.of_kind("test") is DecayStructure
+        assert ModelStructure._of_kind("test") is DecayStructure
 
     def test_a_kind_is_the_structure_of_one_class(self, monkeypatch) -> None:
         monkeypatch.setattr(ModelStructure, "_kinds", dict(ModelStructure._kinds))
@@ -119,7 +119,7 @@ class TestStructureInterface:
 
         define()
         again = define()
-        assert ModelStructure.of_kind("again") is again
+        assert ModelStructure._of_kind("again") is again
 
     def test_a_simulation_rejects_a_structure_that_is_not_a_model_structure(
         self,

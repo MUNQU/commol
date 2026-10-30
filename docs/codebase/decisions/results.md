@@ -170,12 +170,12 @@ warnings, and, for fits of replicates, `not_converged`, at its top.
 ## A description is data, rendered apart
 
 `Model.describe(layout)` returns a `ModelDescription`
-(`_model/description.py`): sections with a key, a title and blocks from a
+(`description/blocks.py`): sections with a key, a title and blocks from a
 closed set of Pydantic models (`Text`, `Table`, `Equations`, `StateGraph`,
 `Matrix`). The sections every kind shares come from `Model`
 (`_model/describe.py`); a kind adds its own through
 `ModelStructure.describe` (`Aggregate`: `_model/aggregate_description.py`).
-The renderers (`_model/render.py`) read only blocks, so a new kind renders
+The renderers (`description/render.py`) read only blocks, so a new kind renders
 in every format with no new renderer. The form of the dynamics and the
 schedule come from the engine's list (`EngineType::dynamics_form`), because
 one structure runs as equations or as events depending on its engine.

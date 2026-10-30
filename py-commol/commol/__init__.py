@@ -21,19 +21,6 @@ from commol._model.applied_parameters import AppliedParametersReport, ParameterE
 from commol._model.axis_units import AxisUnits
 from commol._model.bin import Accumulator, Bin
 from commol._model.builder import ModelBuilder
-from commol._model.description import (
-    Equation,
-    EquationGroup,
-    Equations,
-    GraphEdge,
-    GraphNode,
-    Matrix,
-    ModelDescription,
-    Section,
-    StateGraph,
-    Table,
-    Text,
-)
 from commol._model.engine_state import InitialCompartment
 from commol._model.matrix import CategoryMatrix
 from commol._model.model import Model
@@ -41,11 +28,13 @@ from commol._model.neighbors import Complete, Groups
 from commol._model.parameter import Parameter, SeriesValue
 from commol._model.patterns import AxisPattern
 from commol._model.process import Process
-from commol._model.report_entry import Interval
+from commol._model.report import CategorySplitEntry, InitialAmountEntry
+from commol._model.report_entry import EntrySpread
 from commol._model.stratification import Stratification
 from commol._model.stratification_condition import StratificationCondition
 from commol._model.structure import ReportSections, SeriesLabel
 from commol._model.transition import StratifiedRate, Transition
+from commol._model.unit_checks import UnitConsistencyError
 from commol._problem.problem import (
     CalibrationConstraint,
     CalibrationParameter,
@@ -93,6 +82,7 @@ __all__ = [
     "SeriesValue",
     "AxisUnits",
     "AxisPattern",
+    "UnitConsistencyError",
     # Structures and neighborhoods
     "Aggregate",
     "Complete",
@@ -111,7 +101,7 @@ __all__ = [
     "Quantile",
     # Package
     "build_info",
-    # Results: the model, its parts and its description
+    # Results: the model and its parts
     "Process",
     "Bin",
     "Accumulator",
@@ -122,20 +112,11 @@ __all__ = [
     "InitialCompartment",
     "SeriesLabel",
     "ReportSections",
-    "ModelDescription",
-    "Section",
-    "Text",
-    "Table",
-    "Equations",
-    "EquationGroup",
-    "Equation",
-    "StateGraph",
-    "GraphNode",
-    "GraphEdge",
-    "Matrix",
     "AppliedParametersReport",
     "ParameterEntry",
-    "Interval",
+    "EntrySpread",
+    "InitialAmountEntry",
+    "CategorySplitEntry",
     # Results: simulate
     "SimulationResults",
     "SimulationReplicates",

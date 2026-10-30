@@ -11,7 +11,8 @@ Guide: [Core Concepts](../guide/core-concepts.md),
 [Building Models](../guide/building-models.md#the-structure-aggregate),
 [Describing a Model](../guide/describing-models.md),
 [Units](../guide/units-and-equations.md). The tree of types is in
-[Model Structure](../advanced/model-structure.md).
+[Model Structure](../advanced/model-structure.md). `Model.describe` returns a
+`ModelDescription` of the [`commol.description`](description.md) module.
 
 ::: commol.Model
 
@@ -33,7 +34,7 @@ Guide: [Core Concepts](../guide/core-concepts.md),
 
 ::: commol.SeriesValue
 
-::: commol._model.unit_checks.UnitConsistencyError
+::: commol.UnitConsistencyError
 
 ## The parts of a model
 
@@ -52,30 +53,3 @@ names the method that adds each one.
 ::: commol.Parameter
 
 ::: commol.Transition
-
-## Descriptions
-
-`Model.describe` returns a `ModelDescription`, a list of sections of
-blocks.
-
-::: commol.ModelDescription
-
-::: commol.Section
-
-::: commol.Text
-
-::: commol.Table
-
-::: commol.Equations
-
-::: commol.EquationGroup
-
-::: commol.Equation
-
-::: commol.StateGraph
-
-::: commol.GraphNode
-
-::: commol.GraphEdge
-
-::: commol.Matrix

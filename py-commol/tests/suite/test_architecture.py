@@ -8,7 +8,7 @@ import importlib
 import re
 import tomllib
 import typing
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterator
 from pathlib import Path
 from types import ModuleType
 
@@ -21,11 +21,11 @@ from tests.support.surface import (
     choice_faults,
     exported,
     home_of,
-    inputs,
     is_commol,
-    named_types,
     outputs,
     own_classes,
+    private_inputs,
+    private_outputs,
     results,
     surface,
     validators,
@@ -251,39 +251,6 @@ def test_the_check_names_each_enum_read_by_name(tmp_path: Path) -> None:
 # The public surface (#404): the names a user writes
 
 
-def private_inputs() -> list[str]:
-    """Each argument of the surface that names a class of commol a user
-    cannot pass: one that is not exported, not a base of an exported class
-    and not a protocol that they implement."""
-    reachable = {item for item in exported().values() if isinstance(item, type)}
-    allowed = {base for cls in reachable for base in own_classes(cls)}
-    return sorted(
-        f"{owner}: {item.__name__}"
-        for owner, annotation in inputs()
-        for item in named_types(annotation)
-        if isinstance(item, type)
-        and is_commol(item)
-        and item not in allowed
-        and not getattr(item, "_is_protocol", False)
-    )
-
-
-def private_outputs(
-    found: Iterable[tuple[str, object]], public: set[object]
-) -> list[str]:
-    """Each class of commol that a member of ``found`` returns and that
-    ``public`` does not hold, as ``owner: Class``; ``found`` holds ``(owner,
-    annotation)``."""
-    return sorted(
-        {
-            f"{owner}: {item.__name__}"
-            for owner, annotation in found
-            for item in named_types(annotation)
-            if is_commol(item) and item not in public
-        }
-    )
-
-
 def test_the_public_surface_is_the_table() -> None:
     """The exports are the table of ``tests/suite/public_surface.py``, a user
     can reach every class that a public signature takes, and a user can name
@@ -309,8 +276,14 @@ def test_the_check_of_outputs_names_each_private_class() -> None:
     shown = type("Shown", (), {"__module__": "commol._fit.result"})
     found = [("Runner.run", hidden), ("Runner.runs", list[shown | hidden] | None)]
     found += [("Runner.shown", shown), ("Runner.count", int)]
+    later = typing.ForwardRef("ModelStructure")
+    found += [("Runner.kind", type[later]), ("Entry.split", "list[Section]")]
+    found += [("Entry.later", typing.ForwardRef("dict[str, CategorySplitEntry]"))]
 
     assert private_outputs(found, {shown}) == [
+        "Entry.later: CategorySplitEntry",
+        "Entry.split: Section",
+        "Runner.kind: ModelStructure",
         "Runner.run: Hidden",
         "Runner.runs: Hidden",
     ]
@@ -441,6 +414,7 @@ LAYERS = (
     "_fit",
     "observations",
     "_problem",
+    "description",
     "_model",
     "plotting",
     "_simulation",

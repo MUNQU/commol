@@ -120,8 +120,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   calibrate (`Calibrator`, `CalibrationProblem`, `CalibrationParameter`,
   `CalibrationConstraint`, `ObservedDataPoint`, `NelderMeadConfig`,
   `ParticleSwarmConfig`, `Quantile`), `build_info` and the results of these
-  steps. The modules are `commol.engines`, `commol.plotting`,
-  `commol.parallelism`,
+  steps. The modules are `commol.engines`, `commol.description`,
+  `commol.plotting`, `commol.parallelism`,
   `commol.distributions`, `commol.quantities`, `commol.observations`,
   `commol.uncertainty`, `commol.scores`, `commol.resampling`,
   `commol.profiles`, `commol.local`, `commol.smc`, `commol.conformal`,
@@ -249,17 +249,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   names it, as in `def fit(...) -> CalibrationResult`: a result of the main
   flow is in the root (`SimulationResults`, `SimulationReplicates`,
   `ReplicateRuns`, `CalibrationResult`, `StartSummary`, `CalibrationHistory`,
-  `CalibrationEvaluation`, `ModelDescription` and its blocks, `Process` and
-  its parts, `BuildInfo` and the types of the reports), and the result of a
-  method is in the module of the method, such as
-  `commol.resampling.BootstrapResult`. A result is the return of its member,
-  not a class to build. The root holds 61 names, down from 147. The names
-  that no module exports are the bases `ModelStructure`, `InferenceMethod`,
+  `CalibrationEvaluation`, `Process` and its parts, `BuildInfo` and the types
+  of the reports, such as `EntrySpread`, the spread of an entry over a
+  sample), and the others are in the module of their page, such as
+  `commol.resampling.BootstrapResult` and
+  `commol.description.ModelDescription` with the blocks of a description. A
+  result is the return of its member, not a class to build. The root also
+  exports `UnitConsistencyError`, which `Model.check_unit_consistency`
+  raises, and holds 53 names, down from 147. The names that no module
+  exports are the bases `ModelStructure`, `InferenceMethod`,
   `UncertaintyMethod`, `IdentifiabilityMethod` and `SensitivityMethod`, the
   union `ObservationModel`, and the functions `sample`, `windowed_totals` and
-  `ci_percentiles`. Migration: `from commol import BootstrapResult` is `from
-  commol.resampling import BootstrapResult`; remove the import of a base, the
-  union or a function. See [API Reference](../api/index.md).
+  `ci_percentiles`; `ModelStructure.of_kind` is private. Migration: `from
+  commol import BootstrapResult` is `from commol.resampling import
+  BootstrapResult`, and `from commol import ModelDescription` is `from
+  commol.description import ModelDescription`; remove the import of a base,
+  the union or a function. See [API Reference](../api/index.md).
 - **Breaking:** a condition is a `StratificationCondition` and a stratified
   rate is a `StratifiedRate`, which the package root exports;
   `ModelBuilder.add_stratification`, `ModelBuilder.add_transition` and
