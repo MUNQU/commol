@@ -433,7 +433,7 @@ pub struct CompiledModel {
     /// The compartments of the bins whose amount the model leaves to
     /// calibrate that no value has reached since, in engine order:
     /// [`CompiledModel::set_initial_condition`] removes the compartment it
-    /// writes, and [`CompiledModel::rescale_initial_condition`] keeps it.
+    /// writes, and [`CompiledModel::keep_unvalued`] keeps it.
     pub(crate) unvalued_compartments: Vec<usize>,
 }
 

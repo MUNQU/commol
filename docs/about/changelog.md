@@ -172,12 +172,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   set has none, even when no rate reads it; it was a failed start of the
   optimizer, or a run at `0`. Migration: give every parameter and bin amount
   a value, or calibrate it.
-- **Breaking:** `Model.get_uncalibrated_parameters`,
-  `Aggregate.uncalibrated_values` (and `ModelStructure.uncalibrated_values`),
-  `Aggregate.get_uncalibrated_bins` and `Aggregate.get_categories_with_fractions`
-  are removed: no part of commol reads them, and the engine names every
-  value a run lacks. Migration: read `parameter.value is None` and
-  `structure.bin_amounts`, or run the model and read the message.
 - A qualified category id matches whole ids: `a:b:c` names the category
   `b:c` of `a` or the category `c` of `a:b`, whichever the model declares, so
   a stratification or a category whose id holds `:` resolves. The engine split
@@ -440,6 +434,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **Breaking:** `Model.get_uncalibrated_parameters`,
+  `Aggregate.uncalibrated_values` (and `ModelStructure.uncalibrated_values`),
+  `Aggregate.get_uncalibrated_bins` and `Aggregate.get_categories_with_fractions`
+  are removed: no part of commol reads them, and the engine names every
+  value a run lacks. Migration: read `parameter.value is None` and
+  `structure.bin_amounts`, or run the model and read the message.
 - **Breaking:** `commol.utils.security` is removed, with `SecurityConfig`,
   `SecurityError`, `validate_expression_security` and the `config=` argument
   of `AxisPattern.combine` and `AxisPattern.from_formula`. The parser of the

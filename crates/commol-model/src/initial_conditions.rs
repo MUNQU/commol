@@ -503,14 +503,21 @@ pub fn resolve_category<'a, S: AsRef<str>>(
         [found] => Ok(Some(*found)),
         _ => {
             let owners: Vec<&str> = matches.iter().map(|(owner, _)| *owner).collect();
+            let qualified: Vec<String> = matches
+                .iter()
+                .map(|(owner, name)| format!("'{owner}{CATEGORY_SEPARATOR}{name}'"))
+                .collect();
+            let fix = if qualified.iter().any(|other| other != &qualified[0]) {
+                format!("Qualify it as {}", qualified.join(" or "))
+            } else {
+                format!(
+                    "Each qualified id is {}, so rename a stratification or a category",
+                    qualified[0]
+                )
+            };
             Err(format!(
                 "Category '{id}' is ambiguous: it is declared by stratifications {owners:?}. \
-                 Qualify it as {}.",
-                matches
-                    .iter()
-                    .map(|(owner, name)| format!("'{owner}{CATEGORY_SEPARATOR}{name}'"))
-                    .collect::<Vec<_>>()
-                    .join(" or ")
+                 {fix}."
             ))
         }
     }
@@ -770,6 +777,16 @@ mod tests {
         assert_eq!(
             resolve_category("a:b:c", &stratification_with_separator),
             Ok(Some(("a:b", "c")))
+        );
+        let both = [("a", vec!["b:c"]), ("a:b", vec!["c"])];
+        assert_eq!(
+            resolve_category("a:b:c", &both),
+            Err(
+                "Category 'a:b:c' is ambiguous: it is declared by stratifications \
+                 [\"a\", \"a:b\"]. Each qualified id is 'a:b:c', so rename a stratification \
+                 or a category."
+                    .to_string()
+            )
         );
         assert_eq!(
             resolve_declared_category("a:x", &category_with_separator),
