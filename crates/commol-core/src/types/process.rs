@@ -268,6 +268,34 @@ impl Process {
     pub fn matrix(&self, id: &str) -> Option<&CategoryMatrix> {
         self.matrices.iter().find(|matrix| matrix.id == id)
     }
+
+    /// Check the conditions of each stratification and of each stratified
+    /// rate ([`StratificationCondition::check`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns the message of the first condition that does not fit the
+    /// process, which names the stratification or the transition that holds
+    /// it.
+    pub fn check_conditions(&self) -> Result<(), String> {
+        let stratifications = &self.stratifications;
+        for stratification in stratifications {
+            let owner = format!("Stratification '{}'", stratification.id);
+            for condition in stratification.conditions.iter().flatten() {
+                condition.check(&owner, stratifications)?;
+            }
+        }
+        for transition in &self.transitions {
+            for (index, stratified_rate) in transition.stratified_rates.iter().flatten().enumerate()
+            {
+                let owner = format!("Transition '{}', stratified rate {index}", transition.id);
+                for condition in &stratified_rate.conditions {
+                    condition.check(&owner, stratifications)?;
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]

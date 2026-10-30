@@ -102,10 +102,10 @@ def _compose_formulas(sub_formulas: list[str], mode: str) -> str:
 
 def _condition_key(
     conditions: list[StratificationCondition],
-) -> frozenset[tuple[str, str, str]]:
+) -> frozenset[tuple[str, frozenset[str], str]]:
     """Return a hashable key for a conditions list, used for duplicate detection."""
     return frozenset(
-        (c.stratification, c.category or "", c.to or "") for c in conditions
+        (c.stratification, frozenset(c.names()), c.to or "") for c in conditions
     )
 
 

@@ -179,6 +179,57 @@ class TestSplitByCategory:
             _by_group({"by": "type", "t1": {"t1": 1.0, "t2": 0.0}})
 
 
+def _on_g2_g3(
+    type_fractions: dict[str, float] | dict[str, str | dict[str, float]],
+) -> Model:
+    """``group`` splits 0.2 / 0.3 / 0.5 into ``g1`` / ``g2`` / ``g3``, and
+    ``type`` splits ``g2`` and ``g3`` by ``type_fractions``; 1000 starts in A."""
+    builder = a_to_b_builder()
+    fractions = stratify(
+        builder,
+        {"group": {"g1": 0.2, "g2": 0.3, "g3": 0.5}, "type": {"t1": 0.5, "t2": 0.5}},
+        conditions={"type": {"group": ["g2", "g3"]}},
+    )
+    builder.set_structure(
+        Aggregate(
+            bin_amounts={"A": 1000, "B": 0},
+            stratification_fractions={**fractions, "type": type_fractions},
+        )
+    )
+    return build(builder)
+
+
+def test_a_split_by_category_names_the_categories_it_reaches() -> None:
+    model = _on_g2_g3(
+        {"by": "group", "g2": {"t1": 0.25, "t2": 0.75}, "g3": {"t1": 0.5, "t2": 0.5}}
+    )
+
+    assert _amounts(model) == pytest.approx(
+        {"A_g1": 200.0, "A_g2_t1": 75.0, "A_g2_t2": 225.0, "A_g3_t1": 250.0}
+        | {"A_g3_t2": 250.0}
+    )
+    assert _fraction_rows(model)[3:5] == [
+        ["type", "t1", 0.25, "g2"],
+        ["type", "t2", 0.75, "g2"],
+    ]
+    assert model.applied_parameters({})["category_splits"]["t1 of g2"]["group"] == [
+        "g2"
+    ]
+
+
+def test_one_split_of_a_set_is_of_its_categories() -> None:
+    model = _on_g2_g3({"t1": 0.25, "t2": 0.75})
+
+    assert _fraction_rows(model)[3] == ["type", "t1", 0.25, "g2|g3"]
+    assert model.applied_parameters({})["category_splits"]["t1"]["group"] == [
+        "g2",
+        "g3",
+    ]
+    assert model.structure.subgroup_total(model.process, ["g2", "g3"]) == (
+        pytest.approx(800.0)
+    )
+
+
 def _stratified_model() -> Model:
     """One binary and one ternary stratification."""
     return build(

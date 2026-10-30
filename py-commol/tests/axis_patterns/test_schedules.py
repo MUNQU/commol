@@ -97,7 +97,8 @@ class TestScheduleUnit:
                 ),
                 ValueError,
                 "A group with conditions [StratificationCondition(stratification="
-                "'group', category='cat1', to=None)] has already been registered.",
+                "'group', category='cat1', categories=None, to=None)] has already "
+                "been registered.",
                 id="same-group-twice",
             ),
             pytest.param(

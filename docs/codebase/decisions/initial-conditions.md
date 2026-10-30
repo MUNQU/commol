@@ -38,7 +38,9 @@ stay apart in names, rates and conditions.
 (`check_stratification_fractions` in `builder.rs`, from `check_model` and
 `initial_state`): each stratification and each category named once, `by`
 declared before the stratification it splits, every compartment of that
-stratification with a category of `by`, one split per category of `by`. A
+stratification with a category of `by`, one split per category of `by` that
+those compartments have, so a split of a category that a condition leaves out
+is refused, as an extra category is. A
 field `"by"` that holds a text is the stratification, so a category may be
 named `by` in one split, and the stratification `by` names cannot have a
 category named `by`, whose split would take the key. Python sends the data and
@@ -66,6 +68,7 @@ stratifications. Pairing one compartment with one would mix the splits of
 `crates/commol-model/tests/initial_conditions.rs::the_fractions_of_each_category_sum_to_one`,
 `crates/commol-model/tests/initial_conditions.rs::a_category_of_the_stratification_a_split_differs_by_keeps_the_split`,
 `crates/commol-model/tests/initial_conditions.rs::a_category_keeps_a_chain_of_splits_that_differ_by_it`,
+`crates/commol-model/tests/initial_conditions.rs::a_split_by_category_names_no_category_it_does_not_reach`,
 `crates/commol-model/tests/initial_conditions.rs::a_side_that_starts_empty_keeps_its_declared_split`,
 `tests/calibration/test_initial_conditions.py::test_the_write_back_of_a_split_by_category_rebuilds_the_scored_state`,
 `tests/initial_conditions/test_stratification_fractions.py::test_a_stratification_splits_each_category_of_an_earlier_one`.

@@ -59,8 +59,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   has a category of it, and each split, with a message that names the
   stratification and the category. See
   [Building Models](../guide/building-models.md#fractions-that-differ-by-category).
+- `StratificationCondition(categories=[...])`: a condition of a stratification
+  or of a stratified rate matches any category of a set, such as
+  `StratificationCondition(stratification="group", categories=["g3", "g4"])`.
+  A stratification then splits only some categories of an earlier one, and
+  one stratification keeps the categories that a matrix couples, so
+  `matrix_sum`, `M_radius` and a split by category work in a model where only
+  some groups have a later stratification. A set counts as one condition when
+  the most specific stratified rate wins. The engine refuses a condition with
+  both `category` and `categories`, an empty set, a category twice, a category
+  its stratification does not have, or `to` with a set, and a condition on a
+  stratification the process does not have.
+  `Aggregate.subgroup_total` reads the categories of one stratification as a
+  set, and the description writes `where group in {g3, g4}`. See
+  [Building Models](../guide/building-models.md#a-condition-on-a-set-of-categories).
 
 ### Changed
+
+- **Breaking:** a split by category names exactly the categories of `by` that
+  the compartments of its stratification have. A `type` on `g2` only, split by
+  `group`, gives the split of `g2` alone, and a split of `g1`, which no
+  compartment reads, is refused with a message that names `type` and `g1`.
+  Migration: remove the split of each category that the conditions of the
+  stratification leave out.
 
 - The engine checks that the fractions name every stratification and each of
   its categories, from `check_model`; the messages list the ids as the engine

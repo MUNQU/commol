@@ -300,7 +300,8 @@ fn conditional(conditions: &str, rate: &str) -> Model {
 
 #[test]
 fn a_stratification_whose_condition_no_compartment_meets_expands_nothing() {
-    let model = conditional(r#"[{"stratification":"h","category":"h1"}]"#, "k");
+    // `g` has no category yet when its own condition is checked.
+    let model = conditional(r#"[{"stratification":"g","category":"g1"}]"#, "k");
 
     let compiled = CompiledModel::try_from_model(&model).unwrap();
 
@@ -310,11 +311,21 @@ fn a_stratification_whose_condition_no_compartment_meets_expands_nothing() {
 
 #[test]
 fn a_stratification_condition_without_a_category_filters_nothing() {
-    let model = conditional(r#"[{"stratification":"h"}]"#, "k");
+    let model = conditional(r#"[{"stratification":"g"}]"#, "k");
 
     let compiled = CompiledModel::try_from_model(&model).unwrap();
 
     assert_eq!(compiled.compartments(), ["A_g1", "A_g2", "B_g1", "B_g2"]);
+}
+
+#[test]
+fn a_condition_on_a_stratification_the_process_does_not_have_is_refused() {
+    let model = conditional(r#"[{"stratification":"h","category":"h1"}]"#, "k");
+
+    assert_eq!(
+        CompiledModel::try_from_model(&model).err().unwrap(),
+        "Stratification 'g': a condition names 'h', which is not a stratification of the process"
+    );
 }
 
 #[test]

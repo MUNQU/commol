@@ -43,8 +43,9 @@ Parameters = Mapping[str, float | str | None]
 Rate = str | float | AxisPattern | None
 Stratifications = Mapping[str, Mapping[str, float]]
 """Stratification id to its categories and their fractions, in declaration order."""
-Conditions = Mapping[str, Mapping[str, str]]
-"""Stratification id to the stratification and category it is conditional on."""
+Conditions = Mapping[str, Mapping[str, str | list[str]]]
+"""Stratification id to the stratification and category it is conditional on,
+or a list for a set of categories."""
 
 
 class FactoryBuilder(ModelBuilder):
@@ -111,7 +112,9 @@ def stratify(
             id=stratification_id,
             categories=list(categories),
             conditions=[
-                StratificationCondition(stratification=parent, category=category)
+                StratificationCondition(stratification=parent, categories=category)
+                if isinstance(category, list)
+                else StratificationCondition(stratification=parent, category=category)
                 for parent, category in conditions.get(stratification_id, {}).items()
             ]
             or None,

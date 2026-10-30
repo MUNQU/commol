@@ -92,6 +92,30 @@ compartments exist and what they are named.
 
 **Guard:** `tests/building/test_stratifications.py::test_the_order_of_the_stratifications_sets_the_compartments`.
 
+## A condition names one category or a set
+
+`StratificationCondition` (`crates/commol-core/src/types/transitions.rs`)
+holds `category` or `categories`, a set of which the compartment has one.
+`holds` is the one rule of a match, for the expansion
+(`stratification_conditions_met`), the stratified rates
+(`get_rate_string_for_compartment`) and their check
+(`commol-model/src/flows.rs`). A set counts as one condition when the most
+specific stratified rate wins. `Process::check_conditions`, from
+`check_model` and the planning of the flows, refuses each condition that does
+not fit its stratification
+([What building checks](../../guide/transitions.md#what-building-checks)).
+
+| Alternative | Why not |
+|---|---|
+| `category: str \| list[str]` | Each reader would check the type of the field, in Python and in the engine (S, KISS). |
+| Several conditions on one stratification read as OR | The conditions are an AND, and one list would mean two things (one idea, one name). |
+| A set weighs by its size for the rate that wins | It changes which rate wins in models without sets. |
+
+**Guards:**
+`tests/building/test_conditional_stratifications.py`,
+`crates/commol-model/tests/stratified_rates.rs::a_condition_on_a_set_counts_as_one_condition`,
+`crates/commol-model/src/flows.rs::moving_into_a_category_of_a_set_needs_the_dependent_category`.
+
 ## Outputs are resolved by label
 
 `Aggregate.outputs_by_source(model)` maps each bin or accumulator id to its

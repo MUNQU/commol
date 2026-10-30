@@ -51,20 +51,17 @@ pub(crate) fn get_rate_string_for_compartment<'a>(
         let mut matches = true;
         let mut match_count = 0;
 
-        // Check if all conditions in this stratified rate match.
-        // Conditions with category=None are target-only overrides: they never
-        // filter source compartments and do not contribute to specificity.
-        for condition in &stratified_rate.conditions {
-            if let Some(cat) = &condition.category {
-                match stratification_values.get(&condition.stratification) {
-                    Some(actual_category) if actual_category == cat => {
-                        match_count += 1;
-                    }
-                    _ => {
-                        matches = false;
-                        break;
-                    }
-                }
+        // Check if all conditions in this stratified rate match. A condition
+        // on one category or on a set counts as one; a condition that does
+        // not filter is a target-only override, which never filters source
+        // compartments and does not contribute to specificity.
+        for condition in stratified_rate.conditions.iter().filter(|c| c.filters()) {
+            let category = stratification_values.get(&condition.stratification);
+            if condition.holds(category.map(String::as_str)) {
+                match_count += 1;
+            } else {
+                matches = false;
+                break;
             }
         }
 
@@ -130,10 +127,9 @@ pub(crate) fn stratification_conditions_met(
 ) -> bool {
     match conditions {
         None => true,
-        Some(conds) => conds.iter().all(|c| match &c.category {
-            Some(cat) => applied.get(&c.stratification) == Some(cat),
-            None => true,
-        }),
+        Some(conds) => conds
+            .iter()
+            .all(|c| c.holds(applied.get(&c.stratification).map(String::as_str))),
     }
 }
 
@@ -198,6 +194,7 @@ mod tests {
                 conditions: vec![StratificationCondition {
                     stratification: "group".to_string(),
                     category: None,
+                    categories: None,
                     to: Some("g2".to_string()),
                 }],
                 rate: "1.0".to_string(),

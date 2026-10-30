@@ -817,15 +817,30 @@ pub(crate) fn check_stratification_fractions(
                         compartment.name
                     ));
                 }
-                let (missing, extra) = differences(
-                    &by_stratification.categories,
-                    splits.keys().map(String::as_str),
-                );
+                // The categories of `by` that the compartments of `id` have.
+                let reached: Vec<&str> = by_stratification
+                    .categories
+                    .iter()
+                    .map(String::as_str)
+                    .filter(|of| {
+                        compartments.iter().any(|compartment| {
+                            let category = |of: &str| {
+                                compartment
+                                    .categories
+                                    .iter()
+                                    .find(|(s, _)| s == of)
+                                    .map(|(_, category)| category.as_str())
+                            };
+                            category(id).is_some() && category(by) == Some(*of)
+                        })
+                    })
+                    .collect();
+                let (missing, extra) = differences(&reached, splits.keys().map(String::as_str));
                 if !missing.is_empty() || !extra.is_empty() {
                     return Err(format!(
                         "Stratification '{id}': its fractions by '{by}' must name exactly the \
-                         categories of '{by}'. Missing categories: {missing:?}, Extra \
-                         categories: {extra:?}."
+                         categories of '{by}' that its compartments have. Missing categories: \
+                         {missing:?}, Extra categories: {extra:?}."
                     ));
                 }
                 for (of, split) in splits {
@@ -1093,6 +1108,7 @@ pub fn subgroup_total_names(process: &Process) -> Vec<String> {
 pub fn check_model(model: &Model) -> Result<(), String> {
     let aggregate = model.aggregate()?;
     let process = &model.process;
+    process.check_conditions()?;
     aggregate.check(process)?;
     check_stratification_fractions(process, &aggregate.initial_conditions)?;
     check_formulas(model)?;
@@ -2082,6 +2098,7 @@ mod tests {
             conditions: Some(vec![StratificationCondition {
                 stratification: "group".to_string(),
                 category: Some("g1".to_string()),
+                categories: None,
                 to: None,
             }]),
         };
@@ -2143,6 +2160,7 @@ mod tests {
             conditions: Some(vec![StratificationCondition {
                 stratification: "group".to_string(),
                 category: Some("g1".to_string()),
+                categories: None,
                 to: None,
             }]),
         };
@@ -2221,6 +2239,7 @@ mod tests {
             conditions: vec![StratificationCondition {
                 stratification: "group".to_string(),
                 category: Some("g1".to_string()),
+                categories: None,
                 to: None,
             }],
             rate: "!k".to_string(),

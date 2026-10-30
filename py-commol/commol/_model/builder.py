@@ -174,7 +174,9 @@ class ModelBuilder:
         conditions : list[StratificationCondition] | None, default=None
             When set, this stratification only expands compartments whose
             already-applied categories satisfy ALL conditions. Each condition
-            names a stratification declared before this one and its category.
+            names a stratification declared before this one and its category,
+            or a set of its categories (``categories``) of which the
+            compartment has one.
 
             Example: only apply the `sub` stratification to `group1`::
 
@@ -386,9 +388,9 @@ class ModelBuilder:
             return pattern
         conditions = pattern.conditions
         if transition_id and conditions:
-            src_cats = "_".join(c.category for c in conditions if c.category)
+            src_cats = "_".join(name for c in conditions for name in c.names())
             tgt_cats = "_".join(
-                target for c in conditions if (target := c.to or c.category)
+                name for c in conditions for name in ([c.to] if c.to else c.names())
             )
             src = f"{source_bin}_{src_cats}" if source_bin else src_cats
             tgt = f"{target_bin}_{tgt_cats}" if target_bin else tgt_cats
