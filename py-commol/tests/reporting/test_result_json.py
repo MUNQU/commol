@@ -4,22 +4,36 @@ another result is refused."""
 
 import importlib
 import json
+import math
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
-from commol import CalibrationResult
+from commol import CalibrationResult, Simulation
 from commol._data.result_model import ResultModel
 from commol.identifiability import (
     Collinearity,
     IdentifiabilityReportData,
     StartsIdentifiability,
 )
+from commol.distributions import Normal
 from commol.resampling import BayesianBootstrap, BootstrapResult
+from commol.sensitivity import (
+    ChaosResult,
+    InputSpace,
+    PolynomialChaos,
+    SensitivityAnalysis,
+)
 from tests.suite.public_surface import EXPORTS
-from tests.support import flow_calibrator, line_calibrator
-from tests.support.results import EXAMPLES_OF_RESULTS, FLOWS, LINE
+from tests.support import (
+    abc_builder,
+    bounded,
+    build,
+    flow_calibrator,
+    line_calibrator,
+)
+from tests.support.results import EXAMPLES_OF_RESULTS, FLOWS, LINE, QUANTITIES
 
 
 def _public_results() -> dict[str, type[ResultModel]]:
@@ -74,6 +88,24 @@ def test_every_result_reads_back_equal(name: str, tmp_path: Path) -> None:
     assert type(read) is PUBLIC_RESULTS[name]
     assert read == result
     json.loads(path.read_text(encoding="utf-8"), parse_constant=_reject_constant)
+
+
+def test_an_infinite_bound_in_a_nested_model_reads_back_equal(tmp_path: Path) -> None:
+    space = InputSpace.independent(
+        [bounded("k1", 0.1, 0.5), bounded("k2", 0.0, math.inf)],
+        {"k1": Normal(mean=0.3, sd=0.1), "k2": Normal(mean=0.5, sd=0.1)},
+    )
+    analysis = SensitivityAnalysis(Simulation(build(abc_builder())), space, seed=7)
+    result = analysis.run(PolynomialChaos(degree=1, draws=8, quantities=QUANTITIES))
+    path = tmp_path / "chaos.json"
+
+    result.to_json(path)
+    read = ChaosResult.from_json(path)
+
+    assert read == result
+    assert read.input_space.parameters[1].max_bound == math.inf
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    assert saved["input_space"]["parameters"][1]["max_bound"] == "Infinity"
 
 
 def test_a_result_read_back_feeds_the_identifiability(tmp_path: Path) -> None:

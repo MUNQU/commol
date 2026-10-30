@@ -1,7 +1,6 @@
 """The base of every result: equality over its values, the hash of a frozen
 result model, and the JSON file of a result model."""
 
-import json
 import math
 from abc import abstractmethod
 from pathlib import Path
@@ -9,7 +8,7 @@ from typing import Self, override
 
 from pydantic import BaseModel, ConfigDict
 
-from commol._data.serialization import render_json
+from commol._data.serialization import write_json_file
 
 _NAN = object()
 """The canonical form of every NaN: one object, so a NaN equals a NaN."""
@@ -146,11 +145,11 @@ class ResultModel(ComparedByValue, BaseModel):
         """
         Read a result of this class from a JSON file that `to_json` wrote.
 
-        The method reads the file as UTF-8, the encoding of JSON. The file
-        holds the fields of the result and not the name of its class: this
-        class validates the fields, so the file of a result of another class
-        raises the ``pydantic.ValidationError`` that names each field that
-        does not fit.
+        The method reads the file as UTF-8, the encoding of JSON. This class
+        validates the fields of the file, so a file whose fields do not fit
+        this class raises the ``pydantic.ValidationError`` that names each
+        field that does not fit. The file holds no name of its class, so a
+        class with the same fields reads it.
 
         Parameters
         ----------
@@ -167,7 +166,7 @@ class ResultModel(ComparedByValue, BaseModel):
         FileNotFoundError
             If the file at `file_path` does not exist.
         pydantic.ValidationError
-            If the file does not hold a result of this class.
+            If the fields of the file do not fit this class.
         """
         return cls.model_validate_json(Path(file_path).read_text(encoding="utf-8"))
 
@@ -177,9 +176,10 @@ class ResultModel(ComparedByValue, BaseModel):
 
         The method writes UTF-8 and every field, nulls included. A number
         that is not finite is the text ``"Infinity"``, ``"-Infinity"`` or
-        ``"NaN"``, so the file is standard JSON. Long numeric arrays, such as
-        the values of a sample, are on one line. The release of commol that
-        wrote a file reads it.
+        ``"NaN"``, also in a nested model that is not a result, such as the
+        `InputSpace` of a sensitivity result, so the file is standard JSON.
+        Long numeric arrays, such as the values of a sample, are on one line.
+        The release of commol that wrote a file reads it.
 
         Parameters
         ----------
@@ -188,9 +188,4 @@ class ResultModel(ComparedByValue, BaseModel):
         indent : int, optional
             Indentation width for nested structures.
         """
-        # The JSON of pydantic writes a number that is not finite as its text
-        # (``ser_json_inf_nan``); ``model_dump(mode="json")`` keeps the float.
-        payload = json.loads(self.model_dump_json())
-        Path(file_path).write_text(
-            render_json(payload, indent=indent), encoding="utf-8"
-        )
+        write_json_file(self, file_path, indent=indent)

@@ -16,8 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Model` does: `CalibrationResult.from_json("fit.json")` returns a
   `CalibrationResult` equal to the result written. A result read back feeds
   the methods that take a result, such as `StartsIdentifiability(result=...)`
-  and `Collinearity(at=...)`, and its sample draws the same members. The file
-  of another result raises `pydantic.ValidationError`. See
+  and `Collinearity(at=...)`, and its sample draws the same members. A file
+  whose fields do not fit the class raises `pydantic.ValidationError`; the
+  file holds no name of its class, so a class with the same fields reads it.
+  `SampleMethod` refuses a setting that is not finite, which JSON cannot
+  hold. See
   [Saving a result](../guide/calibration.md#saving-a-result).
 - `ParticleSwarmConfig(polish=NelderMeadConfig(...))`: each start runs the
   swarm, then Nelder-Mead from the best point of the swarm of that start.

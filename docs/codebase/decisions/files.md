@@ -22,13 +22,23 @@ Every result model writes itself with `to_json(file_path, indent=2)` and its
 class reads it back with the class method `from_json(file_path)`, which
 returns that class (`Self`). Both live on `ResultModel`
 (`_data/result_model.py`), so a new result has them, and they write as
-`Model.to_json` does: UTF-8, every field, long numeric arrays on one line
-(`render_json`). `to_json` renders the JSON of `model_dump_json`, which
-writes a number that is not finite as the text `"Infinity"`, `"-Infinity"`
-or `"NaN"` (`ser_json_inf_nan`); `model_dump(mode="json")` keeps the float,
-and `json.dumps` would write a bare `NaN`, which is not JSON. The file holds the fields of the result and no tag of its
-class: the class that reads it validates it, so the file of another result
-raises the `ValidationError` of pydantic, which names each field. A result
+`Model.to_json` does, through one writer, `write_json_file`
+(`_data/serialization.py`): UTF-8, every field, long numeric arrays on one
+line (`render_json`). The writer serializes with
+`to_json(model.model_dump(), inf_nan_mode="strings")` of `pydantic_core`, as
+the port of the engine does, so every nested model writes its infinities
+and NaNs as the texts `"Infinity"`, `"-Infinity"` and `"NaN"`. A model that
+is not a result, such as the `InputSpace` of a sensitivity result, keeps the
+default `ser_json_inf_nan` of pydantic, so `model_dump_json` writes `null`
+for its infinite bound, which does not read back; `model_dump(mode="json")`
+keeps the float, and `json.dumps` writes a bare `NaN`, which is not JSON.
+The settings of a `SampleMethod` are plain JSON, so they refuse a number
+that is not finite, which would read back as a text; no setting of a method
+takes one. The file holds the fields of the result and no tag of its class:
+the class that reads it validates it, so a file whose fields do not fit the
+class raises the `ValidationError` of pydantic, which names each field. A
+class with the same fields reads the file: `QuantitySummary` and
+`ScenarioSummary` read each other's files. A result
 read back holds what the methods read: a private attribute that a validator
 builds, such as the Rust sample of `ParameterSample`, is built again. A file
 is read by the release that wrote it, as a model file is. JSON is the format
@@ -45,5 +55,7 @@ returned.
 **Guards:** `tests/reporting/test_result_json.py` (`test_every_result_reads_back_equal`
 takes every subclass of `ResultModel` on the public surface, so a new result
 fails until `EXAMPLES_OF_RESULTS` of `tests/support/results.py` has one;
-`test_a_file_of_another_result_is_refused`),
+`test_a_file_of_another_result_is_refused`,
+`test_an_infinite_bound_in_a_nested_model_reads_back_equal`),
+`tests/uncertainty/test_sample.py::TestInvariants::test_a_setting_that_is_not_finite_is_refused`,
 `tests/uncertainty/test_results_equality.py::test_a_result_saved_to_json_loads_back_equal_with_a_nan`.

@@ -1,9 +1,11 @@
-"""JSON rendering for the files of models and results."""
+"""The JSON file of a model or a result: one writer for both."""
 
 import json
 import re
+from pathlib import Path
 
-from pydantic import JsonValue
+from pydantic import BaseModel, JsonValue
+from pydantic_core import to_json
 
 INLINE_ARRAY_MIN_LENGTH = 8
 _INLINE_TOKEN = re.compile(r'"@@inline:(\d+)@@"')
@@ -73,3 +75,26 @@ def render_json(
     prepared = _inline_numeric_arrays(payload, inlined, inline_min_length)
     rendered = json.dumps(prepared, indent=indent)
     return _INLINE_TOKEN.sub(lambda match: inlined[int(match.group(1))], rendered)
+
+
+def write_json_file(model: BaseModel, file_path: str | Path, indent: int = 2) -> None:
+    """
+    Write `model` to a JSON file that ``model_validate_json`` of its class reads.
+
+    The file is UTF-8 and holds every field, nulls included. A number that is
+    not finite is the text ``"Infinity"``, ``"-Infinity"`` or ``"NaN"`` in every
+    nested model, whatever its own setting ``ser_json_inf_nan``, so the file is
+    standard JSON and reads back as the number. Long numeric arrays are on one
+    line (`render_json`).
+
+    Parameters
+    ----------
+    model : BaseModel
+        The model or the result to write.
+    file_path : str | Path
+        Path of the file to write.
+    indent : int, optional
+        Indentation width for nested structures.
+    """
+    payload = json.loads(to_json(model.model_dump(), inf_nan_mode="strings"))
+    Path(file_path).write_text(render_json(payload, indent=indent), encoding="utf-8")

@@ -309,7 +309,7 @@ print(fit == result)  # True
 
 | Rule | What it means |
 |---|---|
-| One class reads the file | `from_json` returns its own class: `BootstrapResult.from_json` (from `commol.resampling`) reads a bootstrap. The file holds no name of its class, so the file of another result raises `pydantic.ValidationError`, which names each field that does not fit. |
+| One class reads the file | `from_json` returns its own class: `BootstrapResult.from_json` (from `commol.resampling`) reads a bootstrap. A file whose fields do not fit the class raises `pydantic.ValidationError`, which names each field that does not fit. The file holds no name of its class, so a class with the same fields reads it. |
 | Every field is written | Nulls too, as UTF-8; a number that is not finite is the text `"Infinity"`, `"-Infinity"` or `"NaN"`, and long numeric arrays are on one line. |
 | One release | A file is read by the release of commol that wrote it, as a model file is. |
 
