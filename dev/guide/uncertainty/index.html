@@ -2102,6 +2102,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/description/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.description
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/plotting/" class="md-nav__link">
         
   
@@ -4484,8 +4512,10 @@ held-out positions above, and say whether you score a band of the model
 <p>Every method runs through <code>Calibrator.uncertainty(method)</code>. A method is a
 configuration, a subclass of <code>UncertaintyMethod[R]</code> whose type parameter <code>R</code> is
 its result; the call returns an <code>R</code>, which a static type checker infers from
-the configuration's type. Each configuration names the function that runs
-it; one that names none raises a <code>ValueError</code>.</p>
+the configuration's type. The module of the method exports <code>R</code>, so a typed
+function names it, as <code>BootstrapResult</code> of <code>from commol.resampling import
+BootstrapResult</code>. Each configuration names the function that runs it; one
+that names none raises a <code>ValueError</code>.</p>
 <p>The identifiability methods run through their own entry point,
 <code>Calibrator.identifiability(method)</code>, with a subclass of
 <code>IdentifiabilityMethod[R]</code>: they answer another question

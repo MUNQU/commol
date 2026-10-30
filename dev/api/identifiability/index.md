@@ -2,7 +2,7 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-The module `commol.identifiability`: the identifiability methods, the report they return, and its parts. Guide: [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md).
+The module `commol.identifiability`: the identifiability methods, the report they return, its parts, and the types of its plain-dictionary report (`IdentifiabilityReport.report`). Guide: [Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md).
 
 ## StructuralRank
 
@@ -1186,6 +1186,312 @@ class ProfileSection(_FrozenResult):
     """
 
     threshold: ProfileThresholdName
+    confidence_level: float
+    tolerance: float
+    verdicts: dict[str, ProfileVerdictName | None]
+    intervals: dict[str, tuple[float | None, float | None]]
+```
+
+## The types of the report
+
+`IdentifiabilityReport.report` returns an `IdentifiabilityReportData`, a `TypedDict` that holds the others.
+
+## IdentifiabilityReportData
+
+Bases: `TypedDict`
+
+The identifiability of each parameter, and the evidence of each method.
+
+`sections` holds the sections of each method, as plain data (`IdentifiabilitySections`).
+
+Source code in `commol/identifiability/report.py`
+
+```python
+class IdentifiabilityReportData(TypedDict):
+    """
+    The identifiability of each parameter, and the evidence of each method.
+
+    ``sections`` holds the sections of each method, as plain data
+    (`IdentifiabilitySections`).
+    """
+
+    parameters: dict[str, VerdictsEntry]
+    sections: IdentifiabilitySections
+```
+
+## VerdictsEntry
+
+Bases: `TypedDict`
+
+The two verdicts of a parameter; None when no evidence gives one.
+
+Source code in `commol/identifiability/report.py`
+
+```python
+class VerdictsEntry(TypedDict):
+    """The two verdicts of a parameter; None when no evidence gives one."""
+
+    structural: StructuralVerdictEntry | None
+    practical: PracticalVerdictEntry | None
+```
+
+## StructuralVerdictEntry
+
+Bases: `TypedDict`
+
+The structural verdict of a parameter (None when the evidence gives none), its reasons and combinations.
+
+Source code in `commol/identifiability/report.py`
+
+```python
+class StructuralVerdictEntry(TypedDict):
+    """The structural verdict of a parameter (None when the evidence gives
+    none), its reasons and combinations."""
+
+    verdict: str | None
+    reasons: list[str]
+    combinations: list[str]
+```
+
+## PracticalVerdictEntry
+
+Bases: `TypedDict`
+
+The practical verdict of a parameter and its reasons.
+
+Source code in `commol/identifiability/report.py`
+
+```python
+class PracticalVerdictEntry(TypedDict):
+    """The practical verdict of a parameter and its reasons."""
+
+    verdict: str
+    reasons: list[str]
+```
+
+## IdentifiabilitySections
+
+Bases: `TypedDict`
+
+The sections of each method of an identifiability report.
+
+Source code in `commol/identifiability/report.py`
+
+```python
+class IdentifiabilitySections(TypedDict):
+    """The sections of each method of an identifiability report."""
+
+    structural: list[StructuralSectionData]
+    collinearity: list[CollinearitySectionData]
+    sample: list[SampleSectionData]
+    starts: list[StartsSectionData]
+    profile: list[ProfileSectionData]
+```
+
+## StructuralSectionData
+
+Bases: `TypedDict`
+
+`StructuralSection` as plain data.
+
+Source code in `commol/identifiability/report.py`
+
+```python
+class StructuralSectionData(TypedDict):
+    """`StructuralSection` as plain data."""
+
+    design: "StructuralDesign"
+    points: list[PointRankData]
+    skipped: list[str]
+    left_out: dict[str, str]
+    generic_rank: int
+    projections: dict[str, float]
+    verdicts: "dict[str, StructuralVerdictName | None]"
+    combinations: list[CombinationData]
+    accuracy: AccuracyData
+    tighter: AccuracyData | None
+    tighter_generic_rank: int | None
+    unchecked: list[str]
+```
+
+## PointRankData
+
+Bases: `TypedDict`
+
+`PointRank` as plain data.
+
+Source code in `commol/identifiability/report.py`
+
+```python
+class PointRankData(TypedDict):
+    """`PointRank` as plain data."""
+
+    values: dict[str, float]
+    accuracy: AccuracyData
+    singular_values: list[float]
+    threshold: float
+    rank: int
+    tighter: TighterRankData | None
+```
+
+## TighterRankData
+
+Bases: `TypedDict`
+
+`TighterRank` as plain data.
+
+Source code in `commol/identifiability/report.py`
+
+```python
+class TighterRankData(TypedDict):
+    """`TighterRank` as plain data."""
+
+    accuracy: AccuracyData
+    singular_values: list[float]
+    threshold: float
+    rank: int
+```
+
+## AccuracyData
+
+Bases: `TypedDict`
+
+`Accuracy` as plain data.
+
+Source code in `commol/identifiability/report.py`
+
+```python
+class AccuracyData(TypedDict):
+    """`Accuracy` as plain data."""
+
+    relative: float
+    absolute: float
+```
+
+## CombinationData
+
+Bases: `TypedDict`
+
+`Combination` as plain data.
+
+Source code in `commol/identifiability/report.py`
+
+```python
+class CombinationData(TypedDict):
+    """`Combination` as plain data."""
+
+    exponents: dict[str, float]
+    text: str
+```
+
+## CollinearitySectionData
+
+Bases: `TypedDict`
+
+`CollinearitySection` as plain data.
+
+Source code in `commol/identifiability/report.py`
+
+```python
+class CollinearitySectionData(TypedDict):
+    """`CollinearitySection` as plain data."""
+
+    threshold: float
+    points: int
+    skipped: list[str]
+    left_out: dict[str, str]
+    sensitivity: dict[str, float]
+    pair_gamma: dict[str, dict[str, float]]
+    best_by_size: list[SubsetIndexData]
+    admissible: list[SubsetIndexData]
+```
+
+## SubsetIndexData
+
+Bases: `TypedDict`
+
+`SubsetIndex` as plain data.
+
+Source code in `commol/identifiability/report.py`
+
+```python
+class SubsetIndexData(TypedDict):
+    """`SubsetIndex` as plain data."""
+
+    parameters: list[str]
+    gamma: float
+    share_below: float
+```
+
+## SampleSectionData
+
+Bases: `TypedDict`
+
+`SampleSection` as plain data.
+
+Source code in `commol/identifiability/report.py`
+
+```python
+class SampleSectionData(TypedDict):
+    """`SampleSection` as plain data."""
+
+    reference: "SampleReference"
+    correlation_threshold: float
+    contraction: dict[str, float]
+    correlation: dict[str, dict[str, float]]
+    correlated_pairs: list[CorrelatedPairData]
+    modes: dict[str, list[float]]
+```
+
+## CorrelatedPairData
+
+Bases: `TypedDict`
+
+`CorrelatedPair` as plain data.
+
+Source code in `commol/identifiability/report.py`
+
+```python
+class CorrelatedPairData(TypedDict):
+    """`CorrelatedPair` as plain data."""
+
+    first: str
+    second: str
+    correlation: float
+```
+
+## StartsSectionData
+
+Bases: `TypedDict`
+
+`StartsSection` as plain data.
+
+Source code in `commol/identifiability/report.py`
+
+```python
+class StartsSectionData(TypedDict):
+    """`StartsSection` as plain data."""
+
+    parameter_tolerance: float
+    loss_tolerance: float
+    near_best: list[int]
+    spread: dict[str, float]
+    flagged: list[str]
+```
+
+## ProfileSectionData
+
+Bases: `TypedDict`
+
+`ProfileSection` as plain data: each interval is a pair of ends.
+
+Source code in `commol/identifiability/report.py`
+
+```python
+class ProfileSectionData(TypedDict):
+    """`ProfileSection` as plain data: each interval is a pair of ends."""
+
+    threshold: "ProfileThresholdName"
     confidence_level: float
     tolerance: float
     verdicts: dict[str, ProfileVerdictName | None]

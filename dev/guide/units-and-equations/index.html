@@ -2058,6 +2058,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/description/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.description
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/plotting/" class="md-nav__link">
         
   
@@ -3782,8 +3810,8 @@ and <code>kg/day</code> in the other. In such a model <code>total</code>, a subg
 units, so they have none, and a rate that reads one fails the check; read the
 bins or the compartments instead. A rate that reads the
 <a href="../building-models/#neighbors">neighbors of a unit</a> is checked as the sums
-they are. It raises <code>UnitConsistencyError</code> (from <code>commol._model.unit_checks</code>) and
-lists every transition that fails.</p>
+they are. It raises <code>UnitConsistencyError</code>, which the root <code>commol</code> exports, and lists
+every transition that fails.</p>
 <h3 id="what-needs-a-unit">What needs a unit<a class="headerlink" href="#what-needs-a-unit" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -3925,7 +3953,7 @@ function computes, such as <code>exp(2)</code>, stays dimensionless.</p>
 <code>p * A</code> with <code>p</code> in <code>"dimensionless"</code> is an amount of <code>&lt;bin unit&gt;</code>; <code>k * A</code>
 with <code>k</code> in <code>"1/day"</code> is a flow and fails with <code>expected '&lt;bin unit&gt;'</code>.</p>
 <h3 id="what-the-check-catches">What the check catches<a class="headerlink" href="#what-the-check-catches" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol._model.unit_checks</span><span class="w"> </span><span class="kn">import</span> <span class="n">UnitConsistencyError</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">UnitConsistencyError</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">wrong_units</span> <span class="o">=</span> <span class="p">(</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">ModelBuilder</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Wrong units&quot;</span><span class="p">,</span> <span class="n">bin_unit</span><span class="o">=</span><span class="s2">&quot;item&quot;</span><span class="p">,</span> <span class="n">step_unit</span><span class="o">=</span><span class="s2">&quot;day&quot;</span><span class="p">)</span>

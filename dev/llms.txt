@@ -47,6 +47,7 @@ Commol is a Python library, with a Rust engine, to build, simulate and calibrate
 - [AxisUnits](https://munqu.github.io/commol/latest/api/axis-units/index.md)
 - [Calibration](https://munqu.github.io/commol/latest/api/calibrator/index.md)
 - [commol.conformal](https://munqu.github.io/commol/latest/api/conformal/index.md)
+- [commol.description](https://munqu.github.io/commol/latest/api/description/index.md)
 - [commol.distributions](https://munqu.github.io/commol/latest/api/distributions/index.md)
 - [commol.engines](https://munqu.github.io/commol/latest/api/engines/index.md)
 - [commol.identifiability](https://munqu.github.io/commol/latest/api/identifiability/index.md)

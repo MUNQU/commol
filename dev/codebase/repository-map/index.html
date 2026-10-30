@@ -1892,6 +1892,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/description/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.description
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/plotting/" class="md-nav__link">
         
   
@@ -4301,9 +4329,9 @@ table, and <code>tests/suite/test_architecture.py</code> checks it.</p>
 <td>Names that depend on a model (ask the engine).</td>
 </tr>
 <tr>
-<td><code>_model/description.py</code>, <code>_model/describe.py</code>, <code>_model/render.py</code></td>
-<td><code>ModelDescription</code> and its blocks (<code>Text</code>, <code>Table</code>, <code>Equations</code>, <code>StateGraph</code>, <code>Matrix</code>): a description as data; the sections every kind shares and the layouts (<code>"default"</code>, <code>"odd"</code>); the renderers (text, Markdown with Mermaid, LaTeX, JSON, Graphviz DOT) and <code>save</code>.</td>
-<td>Sections of one kind; a renderer that reads anything but blocks.</td>
+<td><code>_model/describe.py</code></td>
+<td>The sections every kind shares and the layouts (<code>"default"</code>, <code>"odd"</code>), built from the blocks of <code>description/blocks.py</code>.</td>
+<td>Sections of one kind; a block.</td>
 </tr>
 <tr>
 <td><code>_model/</code> (other files)</td>
@@ -4376,6 +4404,11 @@ results.</p>
 <td><code>engines/engine.py</code></td>
 <td><code>ModelEngine</code> (<code>Model.engine</code>: the engine type and its settings, read with the class of that engine), the settings classes <code>ODESolver</code>, <code>StochasticEventsSettings</code> and <code>StochasticStepsSettings</code> (their defaults are constants of the engine, and each checks itself with <code>check_settings</code> of its engine), <code>Rounding</code>, and the names of the engines as the <code>Literal</code> <code>EngineName</code>.</td>
 <td>Settings validation or engine meanings: ask <code>commol_rs.engine.EngineType</code>.</td>
+</tr>
+<tr>
+<td><code>description/blocks.py</code>, <code>description/render.py</code></td>
+<td><code>ModelDescription</code> and its blocks (<code>Text</code>, <code>Table</code>, <code>Equations</code>, <code>StateGraph</code>, <code>Matrix</code>): a description as data, which reads no model; the renderers (text, Markdown with Mermaid, LaTeX, JSON, Graphviz DOT) and <code>save</code>.</td>
+<td>Sections of a model; a renderer that reads anything but blocks.</td>
 </tr>
 <tr>
 <td><code>parallelism/threads.py</code></td>
@@ -4639,8 +4672,8 @@ results.</p>
 </tr>
 <tr>
 <td>Change how a model is described</td>
-<td><code>py-commol/commol/_model/description.py</code> (blocks), <code>_model/describe.py</code> (layouts)</td>
-<td><code>ModelStructure.describe</code>, <code>_model/aggregate_description.py</code>, <code>_model/render.py</code> (renderers), <code>docs/guide/describing-models.md</code></td>
+<td><code>py-commol/commol/description/blocks.py</code> (blocks), <code>_model/describe.py</code> (layouts)</td>
+<td><code>ModelStructure.describe</code>, <code>_model/aggregate_description.py</code>, <code>description/render.py</code> (renderers), <code>docs/guide/describing-models.md</code></td>
 </tr>
 <tr>
 <td>Change reports</td>

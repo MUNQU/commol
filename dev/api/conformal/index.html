@@ -1895,6 +1895,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../description/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.description
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plotting/" class="md-nav__link">
         
   
@@ -2329,7 +2357,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.conformal.results.ConformalResult" class="md-nav__link">
+  <a href="#commol.conformal.ConformalResult" class="md-nav__link">
     <span class="md-ellipsis">
       
         ConformalResult
@@ -2340,7 +2368,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.conformal.results.PredictionIntervals" class="md-nav__link">
+  <a href="#commol.conformal.PredictionIntervals" class="md-nav__link">
     <span class="md-ellipsis">
       
         PredictionIntervals
@@ -2351,7 +2379,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.conformal.results.SeriesIntervals" class="md-nav__link">
+  <a href="#commol.conformal.SeriesIntervals" class="md-nav__link">
     <span class="md-ellipsis">
       
         SeriesIntervals
@@ -3660,7 +3688,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.conformal.results.ConformalResult" class="md-nav__link">
+  <a href="#commol.conformal.ConformalResult" class="md-nav__link">
     <span class="md-ellipsis">
       
         ConformalResult
@@ -3671,7 +3699,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.conformal.results.PredictionIntervals" class="md-nav__link">
+  <a href="#commol.conformal.PredictionIntervals" class="md-nav__link">
     <span class="md-ellipsis">
       
         PredictionIntervals
@@ -3682,7 +3710,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.conformal.results.SeriesIntervals" class="md-nav__link">
+  <a href="#commol.conformal.SeriesIntervals" class="md-nav__link">
     <span class="md-ellipsis">
       
         SeriesIntervals
@@ -3731,7 +3759,7 @@ result. Guide: <a href="../../guide/uncertainty/conformal/">Conformal Prediction
 
     <div class="doc doc-contents first">
             <p class="doc doc-class-bases">
-              Bases: <code><span title="commol._calibration.method.UncertaintyMethod">UncertaintyMethod</span>[<a class="autorefs autorefs-internal" title="ConformalResult (commol.conformal.results.ConformalResult)" href="#commol.conformal.results.ConformalResult">ConformalResult</a>]</code></p>
+              Bases: <code><span title="commol._calibration.method.UncertaintyMethod">UncertaintyMethod</span>[<a class="autorefs autorefs-internal" title="ConformalResult (commol.conformal.results.ConformalResult)" href="#commol.conformal.ConformalResult">ConformalResult</a>]</code></p>
 
 
 
@@ -4796,11 +4824,11 @@ long-run share of misses tends to <code>α</code>, with no assumption on the dat
 
 
 
-<h2 id="commol.conformal.results.ConformalResult" class="doc doc-heading">
+<h2 id="commol.conformal.ConformalResult" class="doc doc-heading">
             <span class="doc doc-object-name doc-class-name">ConformalResult</span>
 
 
-<a href="#commol.conformal.results.ConformalResult" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#commol.conformal.ConformalResult" class="headerlink" title="Permanent link">&para;</a></h2>
 
 
     <div class="doc doc-contents first">
@@ -4823,9 +4851,9 @@ long-run share of misses tends to <code>α</code>, with no assumption on the dat
       </thead>
       <tbody>
           <tr class="doc-section-item">
-            <td><code><span title="commol.conformal.results.ConformalResult.intervals">intervals</span></code></td>
+            <td><code><span title="commol.conformal.ConformalResult.intervals">intervals</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="PredictionIntervals (commol.conformal.results.PredictionIntervals)" href="#commol.conformal.results.PredictionIntervals">PredictionIntervals</a></code>
+                  <code><a class="autorefs autorefs-internal" title="PredictionIntervals (commol.conformal.results.PredictionIntervals)" href="#commol.conformal.PredictionIntervals">PredictionIntervals</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4834,7 +4862,7 @@ long-run share of misses tends to <code>α</code>, with no assumption on the dat
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="commol.conformal.results.ConformalResult.scores">scores</span></code></td>
+            <td><code><span title="commol.conformal.ConformalResult.scores">scores</span></code></td>
             <td>
                   <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="list">list</span>[<span title="float">float</span>]]</code>
             </td>
@@ -4846,7 +4874,7 @@ them.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="commol.conformal.results.ConformalResult.guarantee">guarantee</span></code></td>
+            <td><code><span title="commol.conformal.ConformalResult.guarantee">guarantee</span></code></td>
             <td>
                   <code><span title="str">str</span></code>
             </td>
@@ -4857,7 +4885,7 @@ them.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="commol.conformal.results.ConformalResult.failed">failed</span></code></td>
+            <td><code><span title="commol.conformal.ConformalResult.failed">failed</span></code></td>
             <td>
                   <code><span title="list">list</span>[<span title="str">str</span>]</code>
             </td>
@@ -4872,7 +4900,7 @@ that does not refit.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="commol.conformal.results.ConformalResult.not_converged">not_converged</span></code></td>
+            <td><code><span title="commol.conformal.ConformalResult.not_converged">not_converged</span></code></td>
             <td>
                   <code><span title="int">int</span></code>
             </td>
@@ -4884,7 +4912,7 @@ method that does not refit.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="commol.conformal.results.ConformalResult.block_length">block_length</span></code></td>
+            <td><code><span title="commol.conformal.ConformalResult.block_length">block_length</span></code></td>
             <td>
                   <code><span title="int">int</span> | None</code>
             </td>
@@ -4896,7 +4924,7 @@ with; None for a method without blocks.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="commol.conformal.results.ConformalResult.block_length_estimates">block_length_estimates</span></code></td>
+            <td><code><span title="commol.conformal.ConformalResult.block_length_estimates">block_length_estimates</span></code></td>
             <td>
                   <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="float">float</span>] | None</code>
             </td>
@@ -5028,11 +5056,11 @@ otherwise None.</p>
 
 
 
-<h2 id="commol.conformal.results.PredictionIntervals" class="doc doc-heading">
+<h2 id="commol.conformal.PredictionIntervals" class="doc doc-heading">
             <span class="doc doc-object-name doc-class-name">PredictionIntervals</span>
 
 
-<a href="#commol.conformal.results.PredictionIntervals" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#commol.conformal.PredictionIntervals" class="headerlink" title="Permanent link">&para;</a></h2>
 
 
     <div class="doc doc-contents first">
@@ -5056,7 +5084,7 @@ series fall, at a confidence level.</p>
       </thead>
       <tbody>
           <tr class="doc-section-item">
-            <td><code><span title="commol.conformal.results.PredictionIntervals.confidence_level">confidence_level</span></code></td>
+            <td><code><span title="commol.conformal.PredictionIntervals.confidence_level">confidence_level</span></code></td>
             <td>
                   <code><span title="float">float</span></code>
             </td>
@@ -5067,9 +5095,9 @@ series fall, at a confidence level.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="commol.conformal.results.PredictionIntervals.series">series</span></code></td>
+            <td><code><span title="commol.conformal.PredictionIntervals.series">series</span></code></td>
             <td>
-                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="SeriesIntervals (commol.conformal.results.SeriesIntervals)" href="#commol.conformal.results.SeriesIntervals">SeriesIntervals</a>]</code>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="SeriesIntervals (commol.conformal.results.SeriesIntervals)" href="#commol.conformal.SeriesIntervals">SeriesIntervals</a>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5078,7 +5106,7 @@ series fall, at a confidence level.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="commol.conformal.results.PredictionIntervals.unbounded">unbounded</span></code></td>
+            <td><code><span title="commol.conformal.PredictionIntervals.unbounded">unbounded</span></code></td>
             <td>
                   <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="list">list</span>[<span title="float">float</span>]]</code>
             </td>
@@ -5173,11 +5201,11 @@ is not a key.</p>
 
 
 
-<h2 id="commol.conformal.results.SeriesIntervals" class="doc doc-heading">
+<h2 id="commol.conformal.SeriesIntervals" class="doc doc-heading">
             <span class="doc doc-object-name doc-class-name">SeriesIntervals</span>
 
 
-<a href="#commol.conformal.results.SeriesIntervals" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#commol.conformal.SeriesIntervals" class="headerlink" title="Permanent link">&para;</a></h2>
 
 
     <div class="doc doc-contents first">
@@ -5200,7 +5228,7 @@ is not a key.</p>
       </thead>
       <tbody>
           <tr class="doc-section-item">
-            <td><code><span title="commol.conformal.results.SeriesIntervals.positions">positions</span></code></td>
+            <td><code><span title="commol.conformal.SeriesIntervals.positions">positions</span></code></td>
             <td>
                   <code><span title="list">list</span>[<span title="float">float</span>]</code>
             </td>
@@ -5211,7 +5239,7 @@ is not a key.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="commol.conformal.results.SeriesIntervals.prediction">prediction</span></code></td>
+            <td><code><span title="commol.conformal.SeriesIntervals.prediction">prediction</span></code></td>
             <td>
                   <code><span title="list">list</span>[<span title="float">float</span>]</code>
             </td>
@@ -5222,7 +5250,7 @@ is not a key.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="commol.conformal.results.SeriesIntervals.lower">lower</span></code></td>
+            <td><code><span title="commol.conformal.SeriesIntervals.lower">lower</span></code></td>
             <td>
                   <code><span title="list">list</span>[<span title="float">float</span>]</code>
             </td>
@@ -5233,7 +5261,7 @@ is not a key.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="commol.conformal.results.SeriesIntervals.upper">upper</span></code></td>
+            <td><code><span title="commol.conformal.SeriesIntervals.upper">upper</span></code></td>
             <td>
                   <code><span title="list">list</span>[<span title="float">float</span>]</code>
             </td>

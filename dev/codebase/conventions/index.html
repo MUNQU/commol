@@ -1892,6 +1892,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/description/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.description
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/plotting/" class="md-nav__link">
         
   
@@ -3980,7 +4008,7 @@ agents, to features, fixes, refactors, dependency updates and CI changes.</p>
 <tbody>
 <tr>
 <td>Adds or changes a public Python name, argument, default or error</td>
-<td>Its docstring; for a new public name, the name in <code>ROOT</code> or in the module of its page in <code>PAGES</code> of <code>py-commol/tests/suite/public_surface.py</code>, its <code>__all__</code>, a <code>commol.&lt;module&gt;.&lt;Name&gt;</code> entry on the page of its module in <code>docs/api/</code> and a place in the tables of <code>docs/api/index.md</code>; for a new result, the result in <code>RESULTS</code> of that file and its <code>path</code> entry on the page of the object that returns it; the guide page that uses it</td>
+<td>Its docstring; for a new public name, the name in <code>ROOT</code> or in the module of its page in <code>PAGES</code> of <code>py-commol/tests/suite/public_surface.py</code>, its <code>__all__</code>, a <code>commol.&lt;module&gt;.&lt;Name&gt;</code> entry on the page of its module in <code>docs/api/</code> and a place in the tables of <code>docs/api/index.md</code>; for a new result (a class that a public member returns, or the class of a field of one), the result in <code>RESULTS</code> of that file under the module that exports it (the root for the main flow, the module of its page for the others), its <code>__all__</code>, a <code>commol.&lt;module&gt;.&lt;Name&gt;</code> entry on the page of the object that returns it and a place in the tables of <code>docs/api/index.md</code>; the guide page that uses it</td>
 </tr>
 <tr>
 <td>Changes model behavior (expansion, rates, initial conditions, simulation)</td>
@@ -4101,7 +4129,7 @@ every match.</p>
 <td>CI (Python Coverage, and Test of Build)</td>
 </tr>
 <tr>
-<td>The exports of each module are the names of <code>tests/suite/public_surface.py</code>, each public name has one module, and the packages of <code>commol</code> are its public modules and private packages; a public signature names no enum, no public alias and no private type that a user passes in; every validator of a public class starts with <code>_</code></td>
+<td>The exports of each module are the names of <code>tests/suite/public_surface.py</code>, each public name has one module, and the packages of <code>commol</code> are its public modules and private packages; a public signature names no enum, no public alias and no private type that a user passes in or gets back; every validator of a public class starts with <code>_</code></td>
 <td><code>pytest</code> (<code>tests/suite/test_architecture.py</code>)</td>
 <td>CI (Python Coverage, and Test of Build)</td>
 </tr>

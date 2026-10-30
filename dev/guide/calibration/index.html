@@ -2069,6 +2069,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/description/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.description
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/plotting/" class="md-nav__link">
         
   
@@ -4221,6 +4249,22 @@ replicate of each draw.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">converged</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">termination_reason</span><span class="p">)</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;loss = </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">final_loss</span><span class="si">:</span><span class="s2">.3g</span><span class="si">}</span><span class="s2"> after </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">iterations</span><span class="si">}</span><span class="s2"> iterations&quot;</span><span class="p">)</span>
 </span></code></pre></div>
+<p>The root <code>commol</code> exports <code>CalibrationResult</code> and the class of each of its
+fields, such as <code>StartSummary</code>, so a typed function names them with no
+import from a private module:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="n">CalibrationResult</span><span class="p">,</span> <span class="n">StartSummary</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">converged_starts</span><span class="p">(</span><span class="n">result</span><span class="p">:</span> <span class="n">CalibrationResult</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">StartSummary</span><span class="p">]:</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;The starts whose optimizer met its convergence test.&quot;&quot;&quot;</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="k">return</span> <span class="p">[</span><span class="n">start</span> <span class="k">for</span> <span class="n">start</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">starts</span> <span class="k">if</span> <span class="n">start</span><span class="o">.</span><span class="n">converged</span><span class="p">]</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">converged_starts</span><span class="p">(</span><span class="n">result</span><span class="p">)),</span> <span class="s2">&quot;of&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">starts</span><span class="p">),</span> <span class="s2">&quot;starts converged&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Every class that a public member returns has one public path
+(<a href="../../api/">API Reference</a>): <code>BootstrapResult</code>, the result of a
+bootstrap, is in <code>commol.resampling</code>.</p>
 <table>
 <thead>
 <tr>

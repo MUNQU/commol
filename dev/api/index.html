@@ -1964,6 +1964,34 @@
   
   
     <li class="md-nav__item">
+      <a href="description/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.description
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="plotting/" class="md-nav__link">
         
   
@@ -3566,10 +3594,14 @@ explain how to use them; these pages list every argument, attribute and error.</
 structure, simulate it and calibrate it, as in <code>from commol import
 Simulation</code>. Every other name lives in the module of its page of the guide,
 as in <code>from commol.resampling import BayesianBootstrap</code>; each module has its
-page here. A name you only read is not exported: a result is typed as the
-return of the member that gives it, and it is on the page of that object, as
-<code>SimulationResults</code> is on the Simulation page. A choice among names is a
-string, such as <code>loss_function="sse"</code>.</p>
+page here. Every class that a public member returns is exported too, so a
+typed function names it, as in <code>def fit(...) -&gt; CalibrationResult</code> with
+<code>from commol import CalibrationResult</code>. A result of the main flow is in the
+root, and the others are in the module of their page, such as
+<code>commol.resampling.BootstrapResult</code> and <code>commol.description.ModelDescription</code>.
+A result is on the page of the object that returns it or of its module, as
+<code>SimulationResults</code> is on the Simulation page. A result is the return of its member, not a class to build.
+A choice among names is a string, such as <code>loss_function="sse"</code>.</p>
 <h2 id="the-root-commol">The root <code>commol</code><a class="headerlink" href="#the-root-commol" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -3585,7 +3617,7 @@ string, such as <code>loss_function="sse"</code>.</p>
 </tr>
 <tr>
 <td><a href="model/">Model</a></td>
-<td><code>Model</code>, <code>Aggregate</code>, <code>Complete</code>, <code>Groups</code>, <code>SeriesValue</code>; the results <code>Process</code>, <code>ModelDescription</code> and its blocks</td>
+<td><code>Model</code>, <code>Aggregate</code>, <code>Complete</code>, <code>Groups</code>, <code>SeriesValue</code>, <code>UnitConsistencyError</code>; the results <code>Process</code>, <code>InitialCompartment</code>, <code>SeriesLabel</code>, <code>ReportSections</code>; the parts <code>Bin</code>, <code>Accumulator</code>, <code>Stratification</code>, <code>CategoryMatrix</code>, <code>Parameter</code>, <code>Transition</code></td>
 </tr>
 <tr>
 <td><a href="axis-patterns/">AxisPattern</a></td>
@@ -3597,7 +3629,7 @@ string, such as <code>loss_function="sse"</code>.</p>
 </tr>
 <tr>
 <td><a href="simulation/">Simulation</a></td>
-<td><code>Simulation</code>, <code>InfeasibleStateError</code>; the results <code>SimulationResults</code>, <code>ReplicateRuns</code>, <code>SimulationReplicates</code> and their figures</td>
+<td><code>Simulation</code>, <code>InfeasibleStateError</code>; the results <code>SimulationResults</code>, <code>ReplicateRuns</code>, <code>SimulationReplicates</code> and their figures <code>ResultsPlot</code>, <code>ReplicatesPlot</code></td>
 </tr>
 <tr>
 <td><a href="calibrator/">Calibration</a></td>
@@ -3605,7 +3637,7 @@ string, such as <code>loss_function="sse"</code>.</p>
 </tr>
 <tr>
 <td><a href="reports/">Reports</a></td>
-<td>the methods <code>Model.applied_parameters</code>, <code>SimulationResults.report</code>, <code>SimulationReplicates.report</code>, <code>Predictive.report</code>, <code>IdentifiabilityReport.report</code></td>
+<td>the methods <code>Model.applied_parameters</code>, <code>SimulationResults.report</code>, <code>SimulationReplicates.report</code>, <code>Predictive.report</code>, <code>IdentifiabilityReport.report</code>; the types <code>AppliedParametersReport</code>, <code>ParameterEntry</code>, <code>EntrySpread</code>, <code>InitialAmountEntry</code>, <code>CategorySplitEntry</code>, <code>SimulationReport</code>, <code>ObservedSeries</code>, <code>AccumulatorReport</code>, <code>WindowedAccumulator</code>, <code>PredictionIntervalsReport</code>, <code>SeriesIntervalsReport</code></td>
 </tr>
 <tr>
 <td><a href="package/">Package</a></td>
@@ -3624,7 +3656,11 @@ string, such as <code>loss_function="sse"</code>.</p>
 <tbody>
 <tr>
 <td><a href="engines/"><code>commol.engines</code></a></td>
-<td><code>ODESolver</code>, <code>StochasticEventsSettings</code>, <code>StochasticStepsSettings</code></td>
+<td><code>ODESolver</code>, <code>StochasticEventsSettings</code>, <code>StochasticStepsSettings</code>; the result <code>ModelEngine</code></td>
+</tr>
+<tr>
+<td><a href="description/"><code>commol.description</code></a></td>
+<td>the result of <code>Model.describe</code>, <code>ModelDescription</code>, and its parts <code>Section</code>, <code>Text</code>, <code>Table</code>, <code>Equations</code>, <code>EquationGroup</code>, <code>Equation</code>, <code>StateGraph</code>, <code>GraphNode</code>, <code>GraphEdge</code>, <code>Matrix</code></td>
 </tr>
 <tr>
 <td><a href="plotting/"><code>commol.plotting</code></a></td>
@@ -3648,7 +3684,7 @@ string, such as <code>loss_function="sse"</code>.</p>
 </tr>
 <tr>
 <td><a href="uncertainty/"><code>commol.uncertainty</code></a></td>
-<td><code>ParameterSample</code>, <code>SampleMethod</code>, <code>Predictive</code>, <code>Scenarios</code>, <code>weighted_quantiles</code>, <code>member_statistics</code>; the results <code>ParameterSummary</code>, <code>PredictiveBand</code>, <code>SeriesBand</code>, <code>ObservationDraws</code>, <code>ScenarioSummary</code> and the figures of a predictive</td>
+<td><code>ParameterSample</code>, <code>SampleMethod</code>, <code>Predictive</code>, <code>Scenarios</code>, <code>weighted_quantiles</code>, <code>member_statistics</code>; the results <code>ParameterSummary</code>, <code>PredictiveBand</code>, <code>SeriesBand</code>, <code>ObservationDraws</code>, <code>ScenarioSummary</code> and the figures of a predictive, <code>PredictivePlot</code></td>
 </tr>
 <tr>
 <td><a href="scores/"><code>commol.scores</code></a></td>
@@ -3664,7 +3700,7 @@ string, such as <code>loss_function="sse"</code>.</p>
 </tr>
 <tr>
 <td><a href="local/"><code>commol.local</code></a></td>
-<td><code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>, <code>LikelihoodTarget</code>, <code>GibbsTarget</code>; the results <code>LocalResult</code>, <code>LaplaceResult</code>, <code>SandwichResult</code>, <code>ImportanceResult</code>, <code>MixtureComponent</code>, <code>DeltaBand</code></td>
+<td><code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>, <code>LikelihoodTarget</code>, <code>GibbsTarget</code>; the results <code>LaplaceResult</code>, <code>SandwichResult</code>, <code>ImportanceResult</code>, <code>MixtureComponent</code>, <code>DeltaBand</code></td>
 </tr>
 <tr>
 <td><a href="smc/"><code>commol.smc</code></a></td>
@@ -3676,7 +3712,7 @@ string, such as <code>loss_function="sse"</code>.</p>
 </tr>
 <tr>
 <td><a href="identifiability/"><code>commol.identifiability</code></a></td>
-<td><code>StructuralRank</code>, <code>Collinearity</code>, <code>SampleIdentifiability</code>, <code>StartsIdentifiability</code>, <code>ProfileIdentifiability</code>; the result <code>IdentifiabilityReport</code> and its parts</td>
+<td><code>StructuralRank</code>, <code>Collinearity</code>, <code>SampleIdentifiability</code>, <code>StartsIdentifiability</code>, <code>ProfileIdentifiability</code>; the result <code>IdentifiabilityReport</code> and its parts <code>ParameterVerdicts</code>, <code>StructuralVerdict</code>, <code>PracticalVerdict</code>, <code>StructuralSection</code>, <code>PointRank</code>, <code>TighterRank</code>, <code>Accuracy</code>, <code>Combination</code>, <code>CollinearitySection</code>, <code>SubsetIndex</code>, <code>SampleSection</code>, <code>CorrelatedPair</code>, <code>StartsSection</code>, <code>ProfileSection</code>; the types of its report <code>IdentifiabilityReportData</code>, <code>VerdictsEntry</code>, <code>StructuralVerdictEntry</code>, <code>PracticalVerdictEntry</code>, <code>IdentifiabilitySections</code>, <code>StructuralSectionData</code>, <code>PointRankData</code>, <code>TighterRankData</code>, <code>AccuracyData</code>, <code>CombinationData</code>, <code>CollinearitySectionData</code>, <code>SubsetIndexData</code>, <code>SampleSectionData</code>, <code>CorrelatedPairData</code>, <code>StartsSectionData</code>, <code>ProfileSectionData</code></td>
 </tr>
 <tr>
 <td><a href="sensitivity/"><code>commol.sensitivity</code></a></td>
@@ -3684,11 +3720,14 @@ string, such as <code>loss_function="sse"</code>.</p>
 </tr>
 </tbody>
 </table>
-<p>The pages also document names that no module exports:</p>
+<p>The pages also document names that no module exports, because no public
+member returns them:</p>
 <ul>
-<li><code>UnitConsistencyError</code> is in <code>commol._model.unit_checks</code>.</li>
-<li>The types of a model, such as <code>ModelStructure</code>, the type of
-  <code>Model.structure</code>, are in <a href="../advanced/model-structure/">Model Structure</a>.</li>
+<li>The bases <code>ModelStructure</code> (of <code>Aggregate</code>), <code>LocalResult</code> (of
+  <code>LaplaceResult</code> and <code>SandwichResult</code>) and <code>ConformalMethod</code> (of the
+  conformal methods) are under the path of their module.</li>
+<li><code>InitialConditions</code>, whose fields and methods <code>Aggregate</code> holds, is in
+  <a href="../advanced/model-structure/">Model Structure</a>.</li>
 </ul>
 
 

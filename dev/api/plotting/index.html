@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://munqu.github.io/commol/dev/api/plotting/">
       
       
-        <link rel="prev" href="../engines/">
+        <link rel="prev" href="../description/">
       
       
         <link rel="next" href="../parallelism/">
@@ -1892,6 +1892,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../description/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.description
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -1966,7 +1994,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.sensitivity.results.PRCCResult.plot" class="md-nav__link">
+  <a href="#commol.sensitivity.PRCCResult.plot" class="md-nav__link">
     <span class="md-ellipsis">
       
         plot
@@ -1977,7 +2005,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.sensitivity.results.MorrisResult.plot" class="md-nav__link">
+  <a href="#commol.sensitivity.MorrisResult.plot" class="md-nav__link">
     <span class="md-ellipsis">
       
         plot
@@ -1988,7 +2016,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.sensitivity.results.SobolResult.plot" class="md-nav__link">
+  <a href="#commol.sensitivity.SobolResult.plot" class="md-nav__link">
     <span class="md-ellipsis">
       
         plot
@@ -1999,7 +2027,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.sensitivity.results.ChaosResult.plot" class="md-nav__link">
+  <a href="#commol.sensitivity.ChaosResult.plot" class="md-nav__link">
     <span class="md-ellipsis">
       
         plot
@@ -2010,7 +2038,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.profiles.results.ProfileResult.plot" class="md-nav__link">
+  <a href="#commol.profiles.ProfileResult.plot" class="md-nav__link">
     <span class="md-ellipsis">
       
         plot
@@ -3639,7 +3667,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.sensitivity.results.PRCCResult.plot" class="md-nav__link">
+  <a href="#commol.sensitivity.PRCCResult.plot" class="md-nav__link">
     <span class="md-ellipsis">
       
         plot
@@ -3650,7 +3678,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.sensitivity.results.MorrisResult.plot" class="md-nav__link">
+  <a href="#commol.sensitivity.MorrisResult.plot" class="md-nav__link">
     <span class="md-ellipsis">
       
         plot
@@ -3661,7 +3689,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.sensitivity.results.SobolResult.plot" class="md-nav__link">
+  <a href="#commol.sensitivity.SobolResult.plot" class="md-nav__link">
     <span class="md-ellipsis">
       
         plot
@@ -3672,7 +3700,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.sensitivity.results.ChaosResult.plot" class="md-nav__link">
+  <a href="#commol.sensitivity.ChaosResult.plot" class="md-nav__link">
     <span class="md-ellipsis">
       
         plot
@@ -3683,7 +3711,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.profiles.results.ProfileResult.plot" class="md-nav__link">
+  <a href="#commol.profiles.ProfileResult.plot" class="md-nav__link">
     <span class="md-ellipsis">
       
         plot
@@ -3833,7 +3861,7 @@ color of their key. The observations are drawn once.</p>
                 <code>results</code>
             </td>
             <td>
-                  <code><span title="collections.abc.Mapping">Mapping</span>[<span title="str">str</span>, <span title="SimulationResults">SimulationResults</span> | <span title="SimulationReplicates">SimulationReplicates</span> | <span title="Predictive">Predictive</span>]</code>
+                  <code><span title="collections.abc.Mapping">Mapping</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="SimulationResults (commol._simulation.results.SimulationResults)" href="../simulation/#commol.SimulationResults">SimulationResults</a> | <a class="autorefs autorefs-internal" title="SimulationReplicates (commol._simulation.results.SimulationReplicates)" href="../simulation/#commol.SimulationReplicates">SimulationReplicates</a> | <span title="Predictive">Predictive</span>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4410,11 +4438,11 @@ accumulator id of the model.</p>
 <div class="doc doc-object doc-function">
 
 
-<h2 id="commol.sensitivity.results.PRCCResult.plot" class="doc doc-heading">
+<h2 id="commol.sensitivity.PRCCResult.plot" class="doc doc-heading">
             <span class="doc doc-object-name doc-function-name">plot</span>
 
 
-<a href="#commol.sensitivity.results.PRCCResult.plot" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#commol.sensitivity.PRCCResult.plot" class="headerlink" title="Permanent link">&para;</a></h2>
 <div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">plot</span><span class="p">(</span><span class="n">output_file</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="PlotConfig (commol.plotting.config.PlotConfig)" href="#commol.plotting.PlotConfig">PlotConfig</a></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">x_label</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">=</span> <span class="s1">&#39;Step&#39;</span><span class="p">,</span> <span class="n">axes</span><span class="p">:</span> <span class="n"><span title="matplotlib.figure.Figure">Figure</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="matplotlib.figure.Figure">Figure</span></span>
 </span></code></pre></div>
 
@@ -4655,11 +4683,11 @@ label is the name of its series. If None, a new figure.</p>
 <div class="doc doc-object doc-function">
 
 
-<h2 id="commol.sensitivity.results.MorrisResult.plot" class="doc doc-heading">
+<h2 id="commol.sensitivity.MorrisResult.plot" class="doc doc-heading">
             <span class="doc doc-object-name doc-function-name">plot</span>
 
 
-<a href="#commol.sensitivity.results.MorrisResult.plot" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#commol.sensitivity.MorrisResult.plot" class="headerlink" title="Permanent link">&para;</a></h2>
 <div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">plot</span><span class="p">(</span><span class="n">output_file</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="PlotConfig (commol.plotting.config.PlotConfig)" href="#commol.plotting.PlotConfig">PlotConfig</a></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">axes</span><span class="p">:</span> <span class="n"><span title="matplotlib.figure.Figure">Figure</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="matplotlib.figure.Figure">Figure</span></span>
 </span></code></pre></div>
 
@@ -4877,11 +4905,11 @@ label is the label of its quantity. If None, a new figure.</p>
 <div class="doc doc-object doc-function">
 
 
-<h2 id="commol.sensitivity.results.SobolResult.plot" class="doc doc-heading">
+<h2 id="commol.sensitivity.SobolResult.plot" class="doc doc-heading">
             <span class="doc doc-object-name doc-function-name">plot</span>
 
 
-<a href="#commol.sensitivity.results.SobolResult.plot" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#commol.sensitivity.SobolResult.plot" class="headerlink" title="Permanent link">&para;</a></h2>
 <div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">plot</span><span class="p">(</span><span class="n">output_file</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="PlotConfig (commol.plotting.config.PlotConfig)" href="#commol.plotting.PlotConfig">PlotConfig</a></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">axes</span><span class="p">:</span> <span class="n"><span title="matplotlib.figure.Figure">Figure</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="matplotlib.figure.Figure">Figure</span></span>
 </span></code></pre></div>
 
@@ -5091,11 +5119,11 @@ label is the label of its quantity. If None, a new figure.</p>
 <div class="doc doc-object doc-function">
 
 
-<h2 id="commol.sensitivity.results.ChaosResult.plot" class="doc doc-heading">
+<h2 id="commol.sensitivity.ChaosResult.plot" class="doc doc-heading">
             <span class="doc doc-object-name doc-function-name">plot</span>
 
 
-<a href="#commol.sensitivity.results.ChaosResult.plot" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#commol.sensitivity.ChaosResult.plot" class="headerlink" title="Permanent link">&para;</a></h2>
 <div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">plot</span><span class="p">(</span><span class="n">output_file</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="PlotConfig (commol.plotting.config.PlotConfig)" href="#commol.plotting.PlotConfig">PlotConfig</a></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">axes</span><span class="p">:</span> <span class="n"><span title="matplotlib.figure.Figure">Figure</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="matplotlib.figure.Figure">Figure</span></span>
 </span></code></pre></div>
 
@@ -5305,11 +5333,11 @@ label is the label of its quantity. If None, a new figure.</p>
 <div class="doc doc-object doc-function">
 
 
-<h2 id="commol.profiles.results.ProfileResult.plot" class="doc doc-heading">
+<h2 id="commol.profiles.ProfileResult.plot" class="doc doc-heading">
             <span class="doc doc-object-name doc-function-name">plot</span>
 
 
-<a href="#commol.profiles.results.ProfileResult.plot" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#commol.profiles.ProfileResult.plot" class="headerlink" title="Permanent link">&para;</a></h2>
 <div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">plot</span><span class="p">(</span><span class="n">output_file</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="PlotConfig (commol.plotting.config.PlotConfig)" href="#commol.plotting.PlotConfig">PlotConfig</a></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">axes</span><span class="p">:</span> <span class="n"><span title="matplotlib.figure.Figure">Figure</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="matplotlib.figure.Figure">Figure</span></span>
 </span></code></pre></div>
 

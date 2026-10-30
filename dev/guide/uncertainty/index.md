@@ -273,7 +273,7 @@ The functions of `commol.scores` compare a predictive with observations, and ret
 
 ## The entry point
 
-Every method runs through `Calibrator.uncertainty(method)`. A method is a configuration, a subclass of `UncertaintyMethod[R]` whose type parameter `R` is its result; the call returns an `R`, which a static type checker infers from the configuration's type. Each configuration names the function that runs it; one that names none raises a `ValueError`.
+Every method runs through `Calibrator.uncertainty(method)`. A method is a configuration, a subclass of `UncertaintyMethod[R]` whose type parameter `R` is its result; the call returns an `R`, which a static type checker infers from the configuration's type. The module of the method exports `R`, so a typed function names it, as `BootstrapResult` of `from commol.resampling import BootstrapResult`. Each configuration names the function that runs it; one that names none raises a `ValueError`.
 
 The identifiability methods run through their own entry point, `Calibrator.identifiability(method)`, with a subclass of `IdentifiabilityMethod[R]`: they answer another question ([Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/index.md)). Both kinds subclass `InferenceMethod[R]`; each entry point refuses the other kind with a `TypeError` that names the right one. The sensitivity methods, subclasses of `SensitivityMethod[R]`, run with no data through `SensitivityAnalysis(simulation, inputs).run(method)`, the third entry point ([Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md)).
 

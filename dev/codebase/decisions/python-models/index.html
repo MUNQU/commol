@@ -1892,6 +1892,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../api/description/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.description
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../api/plotting/" class="md-nav__link">
         
   
@@ -3687,11 +3715,11 @@ An unknown field, such as a misspelt or an old name (<code>window_steps</code>),
 <code>ValidationError</code> that names it, instead of being dropped with no error.</p>
 <p><strong>Guard:</strong> <code>tests/building/test_unknown_fields.py</code>.</p>
 <h2 id="the-public-surface-holds-only-what-a-user-writes">The public surface holds only what a user writes<a class="headerlink" href="#the-public-surface-holds-only-what-a-user-writes" title="Permanent link">&para;</a></h2>
-<p>The public modules hold the names a user writes: the builder and its
-conditions (<code>StratificationCondition</code>, <code>StratifiedRate</code>), the structures, the
-entry points, the settings and the methods. The data of the surface is
-<code>py-commol/tests/suite/public_surface.py</code>: <code>EXPORTS</code>, the names of each public
-module, and <code>RESULTS</code>, the results that public objects return.</p>
+<p>The public modules hold the names a user writes, in a call or in an
+annotation, so every class that a public member returns is public, as in
+<code>def fit(...) -&gt; CalibrationResult</code>. <code>py-commol/tests/suite/public_surface.py</code>
+holds <code>ROOT</code> and <code>PAGES</code>, the names of a call, and <code>RESULTS</code>, the returned
+classes by module; <code>EXPORTS</code> joins them into the <code>__all__</code> of each module.</p>
 <table>
 <thead>
 <tr>
@@ -3701,16 +3729,16 @@ module, and <code>RESULTS</code>, the results that public objects return.</p>
 </thead>
 <tbody>
 <tr>
-<td>A result</td>
-<td>Not exported. The member that gives it has it as its return type, and its <code>path</code> entry is on the page of <code>docs/api/</code> of that object.</td>
+<td>A result: a class that a public member returns, and the class of each field of such a class, recursively</td>
+<td>Exported: by the root for the main flow (<code>SimulationResults</code>, <code>CalibrationResult</code>, <code>StartSummary</code>, <code>Process</code> and its parts, the types of the reports), by the module of its page for the others (<code>commol.resampling.BootstrapResult</code>, <code>commol.description.ModelDescription</code>). Its class lives in the package of that module, so <code>home_of</code> reads the module from where the class is defined. It is the return of its member, not a class to build. Its <code>path</code> entry is under its public path on the page of <code>docs/api/</code> of an object that returns it, or of its module.</td>
 </tr>
 <tr>
 <td>A choice among names</td>
 <td>A <code>Literal</code> in the signature, such as <code>loss_function: Literal["sse", "rmse", "mae"]</code>; no enum and no public alias of strings.</td>
 </tr>
 <tr>
-<td>A union of classes, a base, a part that the builder makes</td>
-<td>Private: a union is a <code>type _Name = …</code> alias, and a base is not exported.</td>
+<td>A union of classes, or a base that no member returns</td>
+<td>Private: a union is a <code>type _Name = …</code> alias, and a base such as <code>ModelStructure</code> is not exported. A base that a member returns is a result, such as <code>SMCResult</code>, the base of <code>GibbsResult</code>.</td>
 </tr>
 <tr>
 <td>A pydantic validator or serializer</td>
@@ -3731,8 +3759,16 @@ module, and <code>RESULTS</code>, the results that public objects return.</p>
 </thead>
 <tbody>
 <tr>
-<td>Export each class a signature names</td>
-<td>About half the names are results, enums and unions a user never writes.</td>
+<td>A result reached only from its object</td>
+<td>A typed caller cannot name it: a function with no annotation fails <code>ANN</code> of ruff and a strict type checker, and an import from a private package breaks when the code moves.</td>
+</tr>
+<tr>
+<td>One module of every result, or every result in the root</td>
+<td>A second path for each idea, or about a hundred and fifty names in the root.</td>
+</tr>
+<tr>
+<td><code>Protocol</code> classes, or private imports under <code>TYPE_CHECKING</code></td>
+<td>Each field written twice and drifting from the class; a private use that a strict checker reports.</td>
 </tr>
 <tr>
 <td>An enum for each choice</td>
@@ -3744,16 +3780,15 @@ module, and <code>RESULTS</code>, the results that public objects return.</p>
 </tr>
 </tbody>
 </table>
-<p><strong>Guards:</strong> <code>tests/suite/test_architecture.py::test_the_public_surface_is_the_table</code>,
-<code>tests/suite/test_architecture.py::test_a_choice_is_a_literal</code>,
-<code>tests/suite/test_architecture.py::test_no_public_member_is_internal</code>,
-<code>tests/docs/test_reference.py::test_each_result_is_on_the_page_of_its_object</code>
+<p><strong>Guards:</strong> <code>tests/suite/test_architecture.py::test_the_public_surface_is_the_table</code> (<code>private_inputs</code>, <code>private_outputs</code> of <code>tests/support/surface.py</code>),
+<code>tests/suite/test_architecture.py::test_a_result_is_in_the_module_of_its_page</code>, <code>tests/suite/test_architecture.py::test_a_choice_is_a_literal</code>,
+<code>tests/suite/test_architecture.py::test_no_public_member_is_internal</code>, <code>tests/docs/test_reference.py::test_each_result_is_on_the_page_of_its_object</code>
 and <code>tests/building/test_conditions.py::test_a_condition_is_one_class</code>.</p>
 <h2 id="one-module-per-page-of-the-guide">One module per page of the guide<a class="headerlink" href="#one-module-per-page-of-the-guide" title="Permanent link">&para;</a></h2>
 <p>The root <code>commol</code> holds the main flow: build, the structures, simulate and
 calibrate. Every other public name is in the module of its page of the guide
-(<code>commol.engines</code>, <code>commol.plotting</code>, <code>commol.parallelism</code>,
-<code>commol.distributions</code>, <code>commol.quantities</code>, <code>commol.observations</code>,
+(<code>commol.engines</code>, <code>commol.description</code>, <code>commol.plotting</code>,
+<code>commol.parallelism</code>, <code>commol.distributions</code>, <code>commol.quantities</code>, <code>commol.observations</code>,
 <code>commol.uncertainty</code>, <code>commol.scores</code>, <code>commol.resampling</code>,
 <code>commol.profiles</code>, <code>commol.local</code>, <code>commol.smc</code>, <code>commol.conformal</code>,
 <code>commol.identifiability</code>, <code>commol.sensitivity</code>), and the root exports no name
@@ -3809,8 +3844,8 @@ the bottom:</p>
 <td>The extension, the build, the base of every data object with the port of the bridge, the weighted statistics</td>
 </tr>
 <tr>
-<td><code>parallelism</code>, <code>engines</code>, <code>distributions</code>, <code>quantities</code>, <code>_fit</code>, <code>observations</code>, <code>_problem</code></td>
-<td>Settings and values that read no model</td>
+<td><code>parallelism</code>, <code>engines</code>, <code>distributions</code>, <code>quantities</code>, <code>_fit</code>, <code>observations</code>, <code>_problem</code>, <code>description</code></td>
+<td>Settings and values that read no model, and the blocks of a description</td>
 </tr>
 <tr>
 <td><code>_model</code></td>

@@ -1895,6 +1895,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../description/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.description
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plotting/" class="md-nav__link">
         
   
@@ -2189,7 +2217,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.scores.rules.Score" class="md-nav__link">
+  <a href="#commol.scores.Score" class="md-nav__link">
     <span class="md-ellipsis">
       
         Score
@@ -3638,7 +3666,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commol.scores.rules.Score" class="md-nav__link">
+  <a href="#commol.scores.Score" class="md-nav__link">
     <span class="md-ellipsis">
       
         Score
@@ -3682,7 +3710,7 @@ Guide: <a href="../../guide/uncertainty/">Uncertainty</a>.</p>
 
 
 <a href="#commol.scores.coverage" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">coverage</span><span class="p">(</span><span class="n">predictive</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="Predictive (commol.uncertainty.predictive.Predictive)" href="../uncertainty/#commol.uncertainty.Predictive">Predictive</a></span><span class="p">,</span> <span class="n">observations</span><span class="p">:</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="ObservedDataPoint (commol._problem.problem.ObservedDataPoint)" href="../calibrator/#commol.ObservedDataPoint">ObservedDataPoint</a></span><span class="p">],</span> <span class="n">noise</span><span class="p">:</span> <span class="n"><span title="commol.observations.noise._ObservationNoise">_ObservationNoise</span></span><span class="p">,</span> <span class="n">confidence_level</span><span class="p">:</span> <span class="n"><span title="float">float</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.rules.Score">Score</a></span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">coverage</span><span class="p">(</span><span class="n">predictive</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="Predictive (commol.uncertainty.predictive.Predictive)" href="../uncertainty/#commol.uncertainty.Predictive">Predictive</a></span><span class="p">,</span> <span class="n">observations</span><span class="p">:</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="ObservedDataPoint (commol._problem.problem.ObservedDataPoint)" href="../calibrator/#commol.ObservedDataPoint">ObservedDataPoint</a></span><span class="p">],</span> <span class="n">noise</span><span class="p">:</span> <span class="n"><span title="commol.observations.noise._ObservationNoise">_ObservationNoise</span></span><span class="p">,</span> <span class="n">confidence_level</span><span class="p">:</span> <span class="n"><span title="float">float</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.Score">Score</a></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -3780,7 +3808,7 @@ Guide: <a href="../../guide/uncertainty/">Uncertainty</a>.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.rules.Score">Score</a></code>
+                  <code><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.Score">Score</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3864,7 +3892,7 @@ the coverage. A calibrated interval covers about <code>confidence_level</code>.<
 
 
 <a href="#commol.scores.interval_score" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">interval_score</span><span class="p">(</span><span class="n">predictive</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="Predictive (commol.uncertainty.predictive.Predictive)" href="../uncertainty/#commol.uncertainty.Predictive">Predictive</a></span><span class="p">,</span> <span class="n">observations</span><span class="p">:</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="ObservedDataPoint (commol._problem.problem.ObservedDataPoint)" href="../calibrator/#commol.ObservedDataPoint">ObservedDataPoint</a></span><span class="p">],</span> <span class="n">noise</span><span class="p">:</span> <span class="n"><span title="commol.observations.noise._ObservationNoise">_ObservationNoise</span></span><span class="p">,</span> <span class="n">confidence_level</span><span class="p">:</span> <span class="n"><span title="float">float</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.rules.Score">Score</a></span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">interval_score</span><span class="p">(</span><span class="n">predictive</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="Predictive (commol.uncertainty.predictive.Predictive)" href="../uncertainty/#commol.uncertainty.Predictive">Predictive</a></span><span class="p">,</span> <span class="n">observations</span><span class="p">:</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="ObservedDataPoint (commol._problem.problem.ObservedDataPoint)" href="../calibrator/#commol.ObservedDataPoint">ObservedDataPoint</a></span><span class="p">],</span> <span class="n">noise</span><span class="p">:</span> <span class="n"><span title="commol.observations.noise._ObservationNoise">_ObservationNoise</span></span><span class="p">,</span> <span class="n">confidence_level</span><span class="p">:</span> <span class="n"><span title="float">float</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.Score">Score</a></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -3962,7 +3990,7 @@ the coverage. A calibrated interval covers about <code>confidence_level</code>.<
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.rules.Score">Score</a></code>
+                  <code><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.Score">Score</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4043,7 +4071,7 @@ the coverage. A calibrated interval covers about <code>confidence_level</code>.<
 
 
 <a href="#commol.scores.weighted_interval_score" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">weighted_interval_score</span><span class="p">(</span><span class="n">predictive</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="Predictive (commol.uncertainty.predictive.Predictive)" href="../uncertainty/#commol.uncertainty.Predictive">Predictive</a></span><span class="p">,</span> <span class="n">observations</span><span class="p">:</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="ObservedDataPoint (commol._problem.problem.ObservedDataPoint)" href="../calibrator/#commol.ObservedDataPoint">ObservedDataPoint</a></span><span class="p">],</span> <span class="n">noise</span><span class="p">:</span> <span class="n"><span title="commol.observations.noise._ObservationNoise">_ObservationNoise</span></span><span class="p">,</span> <span class="n">confidence_levels</span><span class="p">:</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><span title="float">float</span></span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.rules.Score">Score</a></span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">weighted_interval_score</span><span class="p">(</span><span class="n">predictive</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="Predictive (commol.uncertainty.predictive.Predictive)" href="../uncertainty/#commol.uncertainty.Predictive">Predictive</a></span><span class="p">,</span> <span class="n">observations</span><span class="p">:</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="ObservedDataPoint (commol._problem.problem.ObservedDataPoint)" href="../calibrator/#commol.ObservedDataPoint">ObservedDataPoint</a></span><span class="p">],</span> <span class="n">noise</span><span class="p">:</span> <span class="n"><span title="commol.observations.noise._ObservationNoise">_ObservationNoise</span></span><span class="p">,</span> <span class="n">confidence_levels</span><span class="p">:</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><span title="float">float</span></span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.Score">Score</a></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -4143,7 +4171,7 @@ the coverage. A calibrated interval covers about <code>confidence_level</code>.<
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.rules.Score">Score</a></code>
+                  <code><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.Score">Score</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4259,7 +4287,7 @@ epidemic forecasts in an interval format. PLOS Computational Biology,
 
 
 <a href="#commol.scores.crps" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">crps</span><span class="p">(</span><span class="n">predictive</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="Predictive (commol.uncertainty.predictive.Predictive)" href="../uncertainty/#commol.uncertainty.Predictive">Predictive</a></span><span class="p">,</span> <span class="n">observations</span><span class="p">:</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="ObservedDataPoint (commol._problem.problem.ObservedDataPoint)" href="../calibrator/#commol.ObservedDataPoint">ObservedDataPoint</a></span><span class="p">],</span> <span class="n">noise</span><span class="p">:</span> <span class="n"><span title="commol.observations.noise._ObservationNoise">_ObservationNoise</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.rules.Score">Score</a></span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">crps</span><span class="p">(</span><span class="n">predictive</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="Predictive (commol.uncertainty.predictive.Predictive)" href="../uncertainty/#commol.uncertainty.Predictive">Predictive</a></span><span class="p">,</span> <span class="n">observations</span><span class="p">:</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="ObservedDataPoint (commol._problem.problem.ObservedDataPoint)" href="../calibrator/#commol.ObservedDataPoint">ObservedDataPoint</a></span><span class="p">],</span> <span class="n">noise</span><span class="p">:</span> <span class="n"><span title="commol.observations.noise._ObservationNoise">_ObservationNoise</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.Score">Score</a></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -4343,7 +4371,7 @@ stochastic calibration uses.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.rules.Score">Score</a></code>
+                  <code><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.Score">Score</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4424,7 +4452,7 @@ stochastic calibration uses.</p>
 
 
 <a href="#commol.scores.pit" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">pit</span><span class="p">(</span><span class="n">predictive</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="Predictive (commol.uncertainty.predictive.Predictive)" href="../uncertainty/#commol.uncertainty.Predictive">Predictive</a></span><span class="p">,</span> <span class="n">observations</span><span class="p">:</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="ObservedDataPoint (commol._problem.problem.ObservedDataPoint)" href="../calibrator/#commol.ObservedDataPoint">ObservedDataPoint</a></span><span class="p">],</span> <span class="n">noise</span><span class="p">:</span> <span class="n"><span title="commol.observations.noise._ObservationNoise">_ObservationNoise</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.rules.Score">Score</a></span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">pit</span><span class="p">(</span><span class="n">predictive</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="Predictive (commol.uncertainty.predictive.Predictive)" href="../uncertainty/#commol.uncertainty.Predictive">Predictive</a></span><span class="p">,</span> <span class="n">observations</span><span class="p">:</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="ObservedDataPoint (commol._problem.problem.ObservedDataPoint)" href="../calibrator/#commol.ObservedDataPoint">ObservedDataPoint</a></span><span class="p">],</span> <span class="n">noise</span><span class="p">:</span> <span class="n"><span title="commol.observations.noise._ObservationNoise">_ObservationNoise</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.Score">Score</a></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -4511,7 +4539,7 @@ seed of the draws, so the same draws give the same values.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.rules.Score">Score</a></code>
+                  <code><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.Score">Score</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4598,7 +4626,7 @@ seed of the draws, so the same draws give the same values.</p>
 
 
 <a href="#commol.scores.log_score" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">log_score</span><span class="p">(</span><span class="n">predictive</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="Predictive (commol.uncertainty.predictive.Predictive)" href="../uncertainty/#commol.uncertainty.Predictive">Predictive</a></span><span class="p">,</span> <span class="n">observations</span><span class="p">:</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="ObservedDataPoint (commol._problem.problem.ObservedDataPoint)" href="../calibrator/#commol.ObservedDataPoint">ObservedDataPoint</a></span><span class="p">],</span> <span class="n">noise</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="DistributionNoise (commol.observations.noise.DistributionNoise)" href="../observations/#commol.observations.DistributionNoise">DistributionNoise</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.rules.Score">Score</a></span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">log_score</span><span class="p">(</span><span class="n">predictive</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="Predictive (commol.uncertainty.predictive.Predictive)" href="../uncertainty/#commol.uncertainty.Predictive">Predictive</a></span><span class="p">,</span> <span class="n">observations</span><span class="p">:</span> <span class="n"><span title="collections.abc.Sequence">Sequence</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="ObservedDataPoint (commol._problem.problem.ObservedDataPoint)" href="../calibrator/#commol.ObservedDataPoint">ObservedDataPoint</a></span><span class="p">],</span> <span class="n">noise</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="DistributionNoise (commol.observations.noise.DistributionNoise)" href="../observations/#commol.observations.DistributionNoise">DistributionNoise</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.Score">Score</a></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -4686,7 +4714,7 @@ better, and an observation the predictive gives no mass scores <code>-inf</code>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.rules.Score">Score</a></code>
+                  <code><a class="autorefs autorefs-internal" title="Score (commol.scores.rules.Score)" href="#commol.scores.Score">Score</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -4834,11 +4862,11 @@ a sensitivity analysis, which has no observation models.</p>
 
 
 
-<h2 id="commol.scores.rules.Score" class="doc doc-heading">
+<h2 id="commol.scores.Score" class="doc doc-heading">
             <span class="doc doc-object-name doc-class-name">Score</span>
 
 
-<a href="#commol.scores.rules.Score" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#commol.scores.Score" class="headerlink" title="Permanent link">&para;</a></h2>
 
 
     <div class="doc doc-contents first">
@@ -4861,7 +4889,7 @@ a sensitivity analysis, which has no observation models.</p>
       </thead>
       <tbody>
           <tr class="doc-section-item">
-            <td><code><span title="commol.scores.rules.Score.per_observation">per_observation</span></code></td>
+            <td><code><span title="commol.scores.Score.per_observation">per_observation</span></code></td>
             <td>
                   <code><span title="list">list</span>[<span title="float">float</span>]</code>
             </td>
@@ -4872,7 +4900,7 @@ a sensitivity analysis, which has no observation models.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="commol.scores.rules.Score.per_series">per_series</span></code></td>
+            <td><code><span title="commol.scores.Score.per_series">per_series</span></code></td>
             <td>
                   <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="float">float</span>]</code>
             </td>
@@ -4884,7 +4912,7 @@ appearance.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="commol.scores.rules.Score.mean">mean</span></code></td>
+            <td><code><span title="commol.scores.Score.mean">mean</span></code></td>
             <td>
                   <code><span title="float">float</span></code>
             </td>

@@ -460,3 +460,210 @@ def report(self) -> IdentifiabilityReportData:
     """
     return identifiability_report(self)
 ```
+
+## The types of the reports
+
+Each report is a `TypedDict`: a plain dictionary whose keys a type checker knows. The root `commol` exports the types of `Model.applied_parameters`, of `Aggregate.report_sections` and of a simulation report; the [Identifiability API](https://munqu.github.io/commol/latest/api/identifiability/index.md) holds the types of the identifiability report.
+
+## AppliedParametersReport
+
+Bases: `ReportSections`
+
+Every parameter of a calibrated model, and the sections of its kind (`ReportSections`, which `ModelStructure.report_sections` gives).
+
+Source code in `commol/_model/applied_parameters.py`
+
+```python
+class AppliedParametersReport(ReportSections):
+    """
+    Every parameter of a calibrated model, and the sections of its kind
+    (`ReportSections`, which `ModelStructure.report_sections` gives).
+    """
+
+    confidence_level: NotRequired[float]
+    parameters: dict[str, ParameterEntry]
+```
+
+## ParameterEntry
+
+Bases: `TypedDict`
+
+Reported value of one parameter.
+
+Source code in `commol/_model/applied_parameters.py`
+
+```python
+class ParameterEntry(TypedDict):
+    """Reported value of one parameter."""
+
+    value: float
+    calibrated: bool
+    interval: NotRequired[EntrySpread]
+```
+
+## EntrySpread
+
+Bases: `TypedDict`
+
+Weighted spread of one reported entry across the draws of a sample: the block under the key `interval` of the entry.
+
+Source code in `commol/_model/report_entry.py`
+
+```python
+class EntrySpread(TypedDict):
+    """Weighted spread of one reported entry across the draws of a sample: the
+    block under the key `interval` of the entry."""
+
+    mean: float
+    median: float
+    ci_lower: float
+    ci_upper: float
+    min: float
+    max: float
+    std: float
+```
+
+## InitialAmountEntry
+
+Bases: `TypedDict`
+
+Reported initial amount of one bin or one overridden compartment.
+
+Source code in `commol/_model/report.py`
+
+```python
+class InitialAmountEntry(TypedDict):
+    """Reported initial amount of one bin or one overridden compartment."""
+
+    amount: float | None
+    unit: str | None
+    calibrated: bool
+    interval: NotRequired[EntrySpread]
+```
+
+## CategorySplitEntry
+
+Bases: `TypedDict`
+
+Reported split of one category within the group it splits.
+
+Source code in `commol/_model/report.py`
+
+```python
+class CategorySplitEntry(TypedDict):
+    """Reported split of one category within the group it splits."""
+
+    group: list[str]
+    fraction: float
+    calibrated: bool
+    interval: NotRequired[EntrySpread]
+```
+
+## SimulationReport
+
+Bases: `TypedDict`
+
+Observed data, compartment series and accumulators of a run, and the prediction intervals when the report has them.
+
+Source code in `commol/_simulation/reports.py`
+
+```python
+class SimulationReport(TypedDict):
+    """
+    Observed data, compartment series and accumulators of a run, and the
+    prediction intervals when the report has them.
+    """
+
+    observed: dict[str, ObservedSeries]
+    series: dict[str, _ReportLeaf]
+    accumulators: dict[str, AccumulatorReport]
+    prediction_intervals: NotRequired[PredictionIntervalsReport]
+```
+
+## ObservedSeries
+
+Bases: `TypedDict`
+
+One observed series on the reported window axis.
+
+Source code in `commol/_simulation/reports.py`
+
+```python
+class ObservedSeries(TypedDict):
+    """One observed series on the reported window axis."""
+
+    values: list[float | None]
+    weights: NotRequired[list[float | None]]
+    scales: NotRequired[list[float | None]]
+    outputs: NotRequired[list[str]]
+    factor_id: NotRequired[str]
+```
+
+## AccumulatorReport
+
+Bases: `TypedDict`
+
+Both readings of one accumulator.
+
+Source code in `commol/_simulation/reports.py`
+
+```python
+class AccumulatorReport(TypedDict):
+    """Both readings of one accumulator."""
+
+    total: _ReportLeaf
+    windowed: WindowedAccumulator
+    cumulative: WindowedAccumulator
+```
+
+## WindowedAccumulator
+
+Bases: `TypedDict`
+
+One reading of an accumulator, as a total and per output.
+
+Source code in `commol/_simulation/reports.py`
+
+```python
+class WindowedAccumulator(TypedDict):
+    """One reading of an accumulator, as a total and per output."""
+
+    total: _ReportLeaf
+    by_output: dict[str, _ReportLeaf]
+```
+
+## PredictionIntervalsReport
+
+Bases: `TypedDict`
+
+Prediction intervals at a confidence level, by series, and the unbounded ones.
+
+Source code in `commol/_simulation/reports.py`
+
+```python
+class PredictionIntervalsReport(TypedDict):
+    """Prediction intervals at a confidence level, by series, and the unbounded
+    ones."""
+
+    confidence_level: float
+    series: dict[str, SeriesIntervalsReport]
+    unbounded: dict[str, list[float]]
+```
+
+## SeriesIntervalsReport
+
+Bases: `TypedDict`
+
+The prediction intervals of one series.
+
+Source code in `commol/_simulation/reports.py`
+
+```python
+class SeriesIntervalsReport(TypedDict):
+    """The prediction intervals of one series."""
+
+    positions: list[float]
+    prediction: list[float]
+    lower: list[float]
+    upper: list[float]
+```

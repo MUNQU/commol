@@ -1888,6 +1888,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/description/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.description
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/plotting/" class="md-nav__link">
         
   
@@ -5184,8 +5212,9 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>Complete</code>, <code>Groups</code>), simulate (<code>Simulation</code>, <code>InfeasibleStateError</code>),
   calibrate (<code>Calibrator</code>, <code>CalibrationProblem</code>, <code>CalibrationParameter</code>,
   <code>CalibrationConstraint</code>, <code>ObservedDataPoint</code>, <code>NelderMeadConfig</code>,
-  <code>ParticleSwarmConfig</code>, <code>Quantile</code>) and <code>build_info</code>. The modules are
-  <code>commol.engines</code>, <code>commol.plotting</code>, <code>commol.parallelism</code>,
+  <code>ParticleSwarmConfig</code>, <code>Quantile</code>), <code>build_info</code> and the results of these
+  steps. The modules are <code>commol.engines</code>, <code>commol.description</code>,
+  <code>commol.plotting</code>, <code>commol.parallelism</code>,
   <code>commol.distributions</code>, <code>commol.quantities</code>, <code>commol.observations</code>,
   <code>commol.uncertainty</code>, <code>commol.scores</code>, <code>commol.resampling</code>,
   <code>commol.profiles</code>, <code>commol.local</code>, <code>commol.smc</code>, <code>commol.conformal</code>,
@@ -5308,20 +5337,28 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   Another value of <code>keep</code> raises <code>ValueError</code> with the message of the
   engine, <code>unknown variant `median`, expected `survival` or `mean`</code>.
   See <a href="../../guide/core-concepts/#units-of-the-axis">Units of the axis</a>.</li>
-<li><strong>Breaking:</strong> the package root exports only the names a user writes: 99
-  names, down from 147. A result is reached from the object that returns it,
-  typed as the return of that member and documented on its page; it is not
-  an import. The names that leave <code>commol</code> are the results
-  (<code>SimulationResults</code>, <code>SimulationReplicates</code>, <code>ReplicateRuns</code>,
-  <code>CalibrationResult</code>, <code>CalibrationEvaluation</code>, <code>CalibrationHistory</code>,
-  <code>StartSummary</code>, <code>ModelDescription</code>, <code>Process</code>, <code>BuildInfo</code>, and the result
-  of every uncertainty, identifiability and sensitivity method with its
-  parts), the bases <code>ModelStructure</code>, <code>InferenceMethod</code>,
+<li><strong>Breaking:</strong> the public modules export only the names a user writes, in
+  a call or in an annotation. Every class that a public member returns, and
+  the class of each field of one, has one public path, so a typed function
+  names it, as in <code>def fit(...) -&gt; CalibrationResult</code>: a result of the main
+  flow is in the root (<code>SimulationResults</code>, <code>SimulationReplicates</code>,
+  <code>ReplicateRuns</code>, <code>CalibrationResult</code>, <code>StartSummary</code>, <code>CalibrationHistory</code>,
+  <code>CalibrationEvaluation</code>, <code>Process</code> and its parts, <code>BuildInfo</code> and the types
+  of the reports, such as <code>EntrySpread</code>, the spread of an entry over a
+  sample), and the others are in the module of their page, such as
+  <code>commol.resampling.BootstrapResult</code> and
+  <code>commol.description.ModelDescription</code> with the blocks of a description. A
+  result is the return of its member, not a class to build. The root also
+  exports <code>UnitConsistencyError</code>, which <code>Model.check_unit_consistency</code>
+  raises, and holds 53 names, down from 147. The names that no module
+  exports are the bases <code>ModelStructure</code>, <code>InferenceMethod</code>,
   <code>UncertaintyMethod</code>, <code>IdentifiabilityMethod</code> and <code>SensitivityMethod</code>, the
-  union <code>ObservationModel</code>, and the functions <code>sample</code>, <code>windowed_totals</code>
-  and <code>ci_percentiles</code>. Migration: remove the import and annotate with the
-  class of its module, such as <code>commol.api.results.SimulationResults</code>, or
-  with no annotation. See <a href="../../api/">API Reference</a>.</li>
+  union <code>ObservationModel</code>, and the functions <code>sample</code>, <code>windowed_totals</code> and
+  <code>ci_percentiles</code>; <code>ModelStructure.of_kind</code> is private. Migration: <code>from
+  commol import BootstrapResult</code> is <code>from commol.resampling import
+  BootstrapResult</code>, and <code>from commol import ModelDescription</code> is <code>from
+  commol.description import ModelDescription</code>; remove the import of a base,
+  the union or a function. See <a href="../../api/">API Reference</a>.</li>
 <li><strong>Breaking:</strong> a condition is a <code>StratificationCondition</code> and a stratified
   rate is a <code>StratifiedRate</code>, which the package root exports;
   <code>ModelBuilder.add_stratification</code>, <code>ModelBuilder.add_transition</code> and

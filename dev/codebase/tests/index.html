@@ -1892,6 +1892,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/description/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.description
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/plotting/" class="md-nav__link">
         
   
@@ -3828,12 +3856,12 @@ kind that is not aggregate through every generic layer.</p>
 </tr>
 <tr>
 <td><code>suite/</code></td>
-<td>The rules of this page that a program can check, for the Python tests (<code>test_rules.py</code>) and for the Rust tests (<code>test_rust_rules.py</code>), the rules of what the engine holds: the names and ranges of the settings, the windows and the stub of the extension (<code>test_engine_rules.py</code>), the layers: no crate of <code>crates/</code> depends on PyO3 or on the bridge, each class of the bridge is a handle or a result, no module of commol converts to Rust, no binding reads a value of an enum from its name and the public surface: the exports of each module are the names of <code>public_surface.py</code>, each public name has one module, the packages are the public modules and private packages, a choice among names is a <code>Literal</code>, no validator or base is public and the dependencies point one way, by the layers of <code>LAYERS</code> (<code>test_architecture.py</code>), the methods: each method names its runner, each runner sends its method whole and calls the bridge at most once, and no method excludes a field (<code>test_methods.py</code>), the names a user writes and the results that public objects return (<code>public_surface.py</code>), the two shapes of a value: the engine reads back the <code>model_dump()</code> of each data class whose JSON it reads (<code>test_bridge.py</code>), the plugin that records how long each test takes (<code>durations.py</code>), the settings of commol that the rules read: their names and the range constraints of the pydantic models (<code>settings.py</code>), the checks of the package as a whole: its version (<code>test_version.py</code>) and its logging, in a fresh interpreter (<code>test_logging.py</code>), the checks of CI: its rights, its pinned tools, the workspace of the crates and the commands the documentation shows (<code>test_workflows.py</code>), and the checks of the scripts of <code>.github/scripts/</code>: the next issues and what can run in parallel (<code>test_planning.py</code>), the precedence levels (<code>test_levels.py</code>), the links of the releases (<code>test_releases.py</code>), the REST calls (<code>test_github.py</code>), the affected issues (<code>test_affected.py</code>), the release notes (<code>test_release_notes.py</code>) and the Rust lines no test runs (<code>test_rust_uncovered.py</code>). No test calls GitHub: each one patches the REST calls (<code>support/planning.py</code>)</td>
+<td>The rules of this page that a program can check, for the Python tests (<code>test_rules.py</code>) and for the Rust tests (<code>test_rust_rules.py</code>), the rules of what the engine holds: the names and ranges of the settings, the windows and the stub of the extension (<code>test_engine_rules.py</code>), the layers: no crate of <code>crates/</code> depends on PyO3 or on the bridge, each class of the bridge is a handle or a result, no module of commol converts to Rust, no binding reads a value of an enum from its name and the public surface: the exports of each module are the names of <code>public_surface.py</code>, each public name has one module, the packages are the public modules and private packages, every class that a public member returns is exported (<code>private_outputs</code>), in the module of the package that defines it (<code>test_a_result_is_in_the_module_of_its_page</code>), a user can pass every class that a public signature takes (<code>private_inputs</code>), a choice among names is a <code>Literal</code>, no validator is public, no base is public unless a member returns it, and the dependencies point one way, by the layers of <code>LAYERS</code> (<code>test_architecture.py</code>), the methods: each method names its runner, each runner sends its method whole and calls the bridge at most once, and no method excludes a field (<code>test_methods.py</code>), the names a user writes and the results that public objects return (<code>public_surface.py</code>), the two shapes of a value: the engine reads back the <code>model_dump()</code> of each data class whose JSON it reads (<code>test_bridge.py</code>), the plugin that records how long each test takes (<code>durations.py</code>), the settings of commol that the rules read: their names and the range constraints of the pydantic models (<code>settings.py</code>), the checks of the package as a whole: its version (<code>test_version.py</code>) and its logging, in a fresh interpreter (<code>test_logging.py</code>), the checks of CI: its rights, its pinned tools, the workspace of the crates and the commands the documentation shows (<code>test_workflows.py</code>), and the checks of the scripts of <code>.github/scripts/</code>: the next issues and what can run in parallel (<code>test_planning.py</code>), the precedence levels (<code>test_levels.py</code>), the links of the releases (<code>test_releases.py</code>), the REST calls (<code>test_github.py</code>), the affected issues (<code>test_affected.py</code>), the release notes (<code>test_release_notes.py</code>) and the Rust lines no test runs (<code>test_rust_uncovered.py</code>). No test calls GitHub: each one patches the REST calls (<code>support/planning.py</code>)</td>
 <td>—</td>
 </tr>
 <tr>
 <td><code>support/</code></td>
-<td>No tests: the code the tests share, with a valid object of each data class whose JSON the engine reads (<code>support/data_objects.py</code>) and the walk of the public surface: the members of each exported name, the types their signatures name and the results they return (<code>support/surface.py</code>). <code>support/plotted.py</code> reads figures and imports matplotlib, so <code>tests/support</code> does not import it: a module of <code>plotting/</code> imports it by name</td>
+<td>No tests: the code the tests share, with a valid object of each data class whose JSON the engine reads (<code>support/data_objects.py</code>) and the walk of the public surface: the members of each exported name, the types their signatures name, quoted or not, the results they return, and the checks of the inputs and the outputs, <code>private_inputs</code> and <code>private_outputs</code> (<code>support/surface.py</code>). <code>support/plotted.py</code> reads figures and imports matplotlib, so <code>tests/support</code> does not import it: a module of <code>plotting/</code> imports it by name</td>
 <td>—</td>
 </tr>
 </tbody>

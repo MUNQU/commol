@@ -1892,6 +1892,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../api/description/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.description
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../api/plotting/" class="md-nav__link">
         
   
@@ -3896,12 +3924,12 @@ warnings, and, for fits of replicates, <code>not_converged</code>, at its top.</
 <code>tests/uncertainty/test_resampling.py::test_every_method_lists_its_failed_replicates_in_failed</code>.</p>
 <h2 id="a-description-is-data-rendered-apart">A description is data, rendered apart<a class="headerlink" href="#a-description-is-data-rendered-apart" title="Permanent link">&para;</a></h2>
 <p><code>Model.describe(layout)</code> returns a <code>ModelDescription</code>
-(<code>_model/description.py</code>): sections with a key, a title and blocks from a
+(<code>description/blocks.py</code>): sections with a key, a title and blocks from a
 closed set of Pydantic models (<code>Text</code>, <code>Table</code>, <code>Equations</code>, <code>StateGraph</code>,
 <code>Matrix</code>). The sections every kind shares come from <code>Model</code>
 (<code>_model/describe.py</code>); a kind adds its own through
 <code>ModelStructure.describe</code> (<code>Aggregate</code>: <code>_model/aggregate_description.py</code>).
-The renderers (<code>_model/render.py</code>) read only blocks, so a new kind renders
+The renderers (<code>description/render.py</code>) read only blocks, so a new kind renders
 in every format with no new renderer. The form of the dynamics and the
 schedule come from the engine's list (<code>EngineType::dynamics_form</code>), because
 one structure runs as equations or as events depending on its engine.</p>

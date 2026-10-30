@@ -1892,6 +1892,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/description/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.description
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/plotting/" class="md-nav__link">
         
   
@@ -4029,8 +4057,8 @@ changing it (<a href="../decisions/uncertainty/#methods-plug-into-one-entry-poin
       in <code>tests/parallelism/test_threads.py</code>.</li>
 <li>[ ] The configuration, a subclass of <code>UncertaintyMethod[YourResult]</code>, and
       the result, a subclass of <code>ResultModel</code>, in the module of its family
-      (<code>resampling/methods.py</code>, …), which exports the configuration (<code>PAGES</code>
-      of <code>tests/suite/public_surface.py</code>); a result with draws holds a <code>ParameterSample</code>.</li>
+      (<code>resampling/methods.py</code>, …), which exports the configuration (<code>PAGES</code> of <code>tests/suite/public_surface.py</code>)
+      and the result with the class of each of its fields (<code>RESULTS</code>); a result with draws holds a <code>ParameterSample</code>.</li>
 <li>[ ] A method that fits several times fits its perturbations with
       <code>ReplicateRunner::fit_all</code> and checks them with <code>ReplicateFits::require</code>;
       its result has <code>failed</code> (the entries of <code>FitUnit::failed</code>, logged as
@@ -4136,7 +4164,7 @@ seed of the analysis (<code>Stream</code>, <code>crates/commol-random/src/stream
 <li>[ ] Give the description of the kind: override <code>ModelStructure.describe</code>
       with the sections it fills (<code>entities</code>, <code>dynamics</code>, <code>initialization</code>,
       <code>design_concepts</code>), built from the blocks of
-      <code>_model/description.py</code>; the renderers need no change.</li>
+      <code>description/blocks.py</code>; the renderers need no change.</li>
 <li>[ ] Copy the tests of <code>tests/model_kinds/</code> for the new kind, and run the
       Rust and Python suites.</li>
 <li>[ ] Add the kind to <a href="../../advanced/model-structure/">Model structure</a>, the

@@ -2,7 +2,7 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-The module `commol.engines`: the settings of the engines that take them, the solver of the ODE engine and the stochastic engines. Guide: [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md) and [Stochastic Simulation](https://munqu.github.io/commol/latest/guide/stochastic/index.md).
+The module `commol.engines`: the settings of the engines that take them, the solver of the ODE engine and the stochastic engines, and `ModelEngine`, the engine of a model (`Model.engine`). Guide: [Running Simulations](https://munqu.github.io/commol/latest/guide/simulations/index.md) and [Stochastic Simulation](https://munqu.github.io/commol/latest/guide/stochastic/index.md).
 
 ## ODESolver
 
@@ -158,4 +158,68 @@ class StochasticStepsSettings(BaseModel):
     def _check_with_the_engine(self) -> Self:
         """Ask the engine's list whether it takes the settings."""
         return _checked(self)
+```
+
+## ModelEngine
+
+Bases: `BaseModel`
+
+The engine that runs a model, and its settings.
+
+Attributes:
+
+| Name       | Type             | Description                                                                                                                                                                                     |
+| ---------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`     | `str`            | Name of an engine of the engine's list, such as "DifferenceEquations" (discrete time) or "DifferentialEquations" (continuous time). The engine must run the kind of the structure of the model. |
+| `settings` | \`EngineSettings | None\`                                                                                                                                                                                          |
+
+Source code in `commol/engines/engine.py`
+
+```python
+class ModelEngine(BaseModel):
+    """
+    The engine that runs a model, and its settings.
+
+    Attributes
+    ----------
+    type : str
+        Name of an engine of the engine's list, such as
+        ``"DifferenceEquations"`` (discrete time) or
+        ``"DifferentialEquations"`` (continuous time). The engine must run the
+        kind of the structure of the model.
+    settings : EngineSettings | None
+        Settings of that engine; None uses its defaults.
+        ``DifferentialEquations`` takes `ODESolver`, ``StochasticEvents``
+        takes `StochasticEventsSettings` and ``StochasticSteps`` takes
+        `StochasticStepsSettings`.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: str = Field(..., description="Name of the engine.")
+    settings: EngineSettings | None = Field(
+        default=None, description="Settings of the engine; None uses its defaults."
+    )
+
+    @field_validator("settings", mode="before")
+    @classmethod
+    def _settings_of_the_engine(
+        cls,
+        value: EngineSettings | Mapping[str, JsonValue] | None,
+        info: ValidationInfo,
+    ) -> EngineSettings | Mapping[str, JsonValue] | None:
+        """Read settings given as a mapping with the class of their engine."""
+        settings_class = _SETTINGS.get(info.data.get("type", ""))
+        if isinstance(value, Mapping) and settings_class is not None:
+            return settings_class.model_validate(value)
+        return value
+
+    @model_validator(mode="after")
+    def _check_settings(self) -> Self:
+        """Ask the engine's list whether it has the engine and the settings."""
+        settings_json = None if self.settings is None else engine_json(self.settings)
+        commol_rs.engine.EngineType(engine_json(self.type)).check_settings(
+            settings_json
+        )
+        return self
 ```
