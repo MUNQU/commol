@@ -315,16 +315,21 @@ fn conditional(conditions: &str) -> Model {
 }
 
 #[test]
-fn a_stratification_condition_without_a_category_filters_nothing() {
-    let model = conditional(r#"[{"stratification":"h"}]"#);
-
-    let compiled = CompiledModel::try_from_model(&model).unwrap();
-
+fn a_stratification_condition_filters_by_a_category() {
+    let compiled =
+        CompiledModel::try_from_model(&conditional(r#"[{"stratification":"h","category":"h2"}]"#))
+            .unwrap();
     assert_eq!(
         compiled.compartments(),
-        [
-            "A_h1_g1", "A_h1_g2", "A_h2_g1", "A_h2_g2", "B_h1_g1", "B_h1_g2", "B_h2_g1", "B_h2_g2"
-        ]
+        ["A_h1", "A_h2_g1", "A_h2_g2", "B_h1", "B_h2_g1", "B_h2_g2"]
+    );
+
+    let model = conditional(r#"[{"stratification":"h"}]"#);
+
+    assert_eq!(
+        CompiledModel::try_from_model(&model).err().unwrap(),
+        "Stratification 'g': the condition on 'h' gives neither a category nor a set of \
+         categories; give one of them"
     );
 }
 

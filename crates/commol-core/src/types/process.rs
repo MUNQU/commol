@@ -271,8 +271,9 @@ impl Process {
 
     /// Check the conditions of each stratification and of each stratified
     /// rate ([`StratificationCondition::check`]). A condition of a
-    /// stratification names a stratification declared before it, and a
-    /// condition of a stratified rate one of the process.
+    /// stratification names a stratification declared before it and gives
+    /// `category` or `categories`, and a condition of a stratified rate names
+    /// one of the process.
     ///
     /// # Errors
     ///
@@ -292,6 +293,13 @@ impl Process {
                         condition.stratification
                     ));
                 };
+                if !condition.filters() {
+                    return Err(format!(
+                        "{owner}: the condition on '{}' gives neither a category nor a set \
+                         of categories; give one of them",
+                        condition.stratification
+                    ));
+                }
                 condition.check(&owner, named)?;
             }
         }

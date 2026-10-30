@@ -15,6 +15,7 @@ from commol import (
 )
 from commol._model.description import Table
 from commol._model.model import Model
+from tests.support import assert_accepted
 
 GROUPS = {"g1": 0.2, "g2": 0.3, "g3": 0.5}
 
@@ -143,26 +144,37 @@ REFUSED = [
         _condition(category="g2", categories=["g3"]),
         r"""the condition on 'group' gives both the category 'g2' and the """
         r"""categories \["g3"\]""",
+        True,
     ),
-    (_condition(categories=[]), "the condition on 'group' has an empty set"),
+    (_condition(categories=[]), "the condition on 'group' has an empty set", True),
     (
         _condition(categories=["g2", "g3", "g2"]),
         "the condition on 'group' names the category 'g2' twice",
+        True,
     ),
     (
         _condition(categories=["g2", "g9"]),
         "the condition on 'group' names 'g9', which is not a category of 'group'",
+        True,
     ),
     (
         _condition(categories=["g2", "g3"], to="g1"),
         "the condition on 'group' moves to 'g1' from a set of categories",
+        True,
+    ),
+    (
+        _condition(),
+        "the condition on 'group' gives neither a category nor a set of categories",
+        False,
     ),
 ]
+"""Each condition, the message of its refusal, and whether a stratified rate
+refuses it too: the condition of a rate without a category filters nothing."""
 
 
-@pytest.mark.parametrize(("condition", "message"), REFUSED)
+@pytest.mark.parametrize(("condition", "message", "of_a_rate_too"), REFUSED)
 def test_a_condition_on_a_set_is_checked(
-    condition: StratificationCondition, message: str
+    condition: StratificationCondition, message: str, of_a_rate_too: bool
 ) -> None:
     of_a_stratification = _builder(condition=condition)
     of_a_rate = _builder(
@@ -171,10 +183,13 @@ def test_a_condition_on_a_set_is_checked(
 
     with pytest.raises(ValueError, match=f"Stratification 'type': {message}"):
         _build(of_a_stratification)
-    with pytest.raises(
-        ValueError, match=f"Transition 'ab', stratified rate 0: {message}"
-    ):
-        _build(of_a_rate)
+    if of_a_rate_too:
+        with pytest.raises(
+            ValueError, match=f"Transition 'ab', stratified rate 0: {message}"
+        ):
+            _build(of_a_rate)
+    else:
+        assert_accepted(_build, of_a_rate)
 
 
 def test_a_condition_on_one_category_is_unchanged() -> None:

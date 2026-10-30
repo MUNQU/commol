@@ -84,13 +84,14 @@ The cost: a model of one unit writes the amount of each bin, such as
 stratifications in declaration order. A stratification with `conditions` only
 expands the compartments whose earlier categories satisfy all of them, so the
 result can be a non-uniform product. A condition may only reference a
-stratification declared before it (`ModelBuilder.add_stratification` checks
-this).
+stratification declared before it (`Process::check_conditions` checks this
+at build).
 
 **Rule:** changing the order of `add_stratification` calls changes which
 compartments exist and what they are named.
 
-**Guard:** `tests/building/test_stratifications.py::test_the_order_of_the_stratifications_sets_the_compartments`.
+**Guards:** `tests/building/test_stratifications.py::test_the_order_of_the_stratifications_sets_the_compartments`,
+`tests/building/test_stratifications.py::TestConditionalStratification::test_a_condition_names_a_stratification_declared_before_it`.
 
 ## A condition names one category or a set
 
@@ -104,17 +105,21 @@ most specific stratified rate wins. `Process::check_conditions`, from
 `check_model` and the planning of the flows, refuses each condition that does
 not fit its stratification
 ([What building checks](../../guide/transitions.md#what-building-checks)):
-the condition of a stratification names one declared before it, and the
-condition of a stratified rate one of the process.
+the condition of a stratification names one declared before it and gives
+`category` or `categories`, and the condition of a stratified rate names one
+of the process. Python holds no copy of these rules: `add_stratification`
+stores the conditions, and `build` gets the message of the engine.
 
 | Alternative | Why not |
 |---|---|
 | `category: str \| list[str]` | Each reader would check the type of the field, in Python and in the engine (S, KISS). |
 | Several conditions on one stratification read as OR | The conditions are an AND, and one list would mean two things (one idea, one name). |
 | A set weighs by its size for the rate that wins | It changes which rate wins in models without sets. |
+| `add_stratification` asks the engine to check the conditions of the stratifications declared so far | It needs a binding for a part of a process, to give at the call the message that `build` gives (KISS). |
 
 **Guards:**
 `tests/building/test_conditional_stratifications.py`,
+`crates/commol-model/tests/flows.rs::a_stratification_condition_filters_by_a_category`,
 `crates/commol-model/tests/stratified_rates.rs::a_condition_on_a_set_counts_as_one_condition`,
 `crates/commol-model/src/flows.rs::moving_into_a_category_of_a_set_needs_the_dependent_category`.
 

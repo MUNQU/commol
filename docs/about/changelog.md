@@ -96,6 +96,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   names 'g9', which is not a category of 'group' (["g1", "g2"])`. Migration:
   name in each condition a stratification declared before it and one of its
   categories.
+- **Breaking:** the engine refuses a condition of a stratification that gives
+  neither `category` nor `categories`, with the message `Stratification
+  'type': the condition on 'group' gives neither a category nor a set of
+  categories; give one of them`. A model in JSON with such a condition built
+  and split every compartment. The condition of a stratified rate that only
+  sets `to` is unchanged. `ModelBuilder.add_stratification` no longer checks
+  its conditions: a condition that names a stratification not declared before
+  it, or that gives no category, raises `ValueError` at `build`, with the
+  message of the engine, and no longer at the call. Migration: catch the error
+  of a condition at `build`.
 - The engine checks that the fractions name every stratification and each of
   its categories, from `check_model`; the messages list the ids as the engine
   writes them, `Missing ids: ["g"], Extra ids: []`, and the message of the
