@@ -5092,6 +5092,15 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><code>ParticleSwarmConfig(polish=NelderMeadConfig(...))</code>: each start runs the
+  swarm, then Nelder-Mead from the best point of the swarm of that start.
+  The start ends at the point, the loss and the convergence of Nelder-Mead,
+  <code>iterations</code> counts both stages and <code>termination_reason</code> is that of
+  Nelder-Mead. Every fit of the problem polishes: the starts of
+  <code>Calibrator.run</code>, which <code>StartsIdentifiability</code> reads, the refits of an
+  uncertainty method and the subproblems of a profile. The <code>verbose</code> of the
+  polish writes the table of Nelder-Mead. See
+  <a href="../../guide/calibration-optimizers/#polish-with-nelder-mead">Optimizers</a>.</li>
 <li><code>ObservedDataPoint(scale=...)</code>: a known positive number, 1 by default, that
   multiplies the prediction of the observation, with its factor. A count
   model reads the mean <code>scale · model</code>, so a count observed on a known share

@@ -2916,6 +2916,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-swarm-polishes-each-start-with-nelder-mead" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A swarm polishes each start with Nelder-Mead
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#one-function-runs-the-starts-and-chooses-the-best" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3620,6 +3631,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-swarm-polishes-each-start-with-nelder-mead" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A swarm polishes each start with Nelder-Mead
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#one-function-runs-the-starts-and-chooses-the-best" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3765,6 +3787,60 @@ profile under a swarm (<a href="../profiles/">Profiles</a>).</p>
 <code>a_stop_rule_out_of_its_range_names_itself</code>);
 <code>crates/commol-inference/tests/test_profiles.rs::a_swarm_fits_a_subproblem_and_repeats_from_its_seed</code>;
 <code>tests/calibration/test_optimizers.py::TestConverged::test_a_swarm_that_stagnates_stops_and_converges</code>.</p>
+<h2 id="a-swarm-polishes-each-start-with-nelder-mead">A swarm polishes each start with Nelder-Mead<a class="headerlink" href="#a-swarm-polishes-each-start-with-nelder-mead" title="Permanent link">&para;</a></h2>
+<p><code>ParticleSwarmConfig::polish</code> holds a <code>NelderMeadConfig</code>. With it,
+<code>optimization::run</code> runs the swarm, then Nelder-Mead on the same cost from
+the best point of the swarm, in the same call, so each start polishes its own
+end on the threads of the start. The result is that of Nelder-Mead, with the
+iterations of both stages (<code>polished</code>). Every fit goes through <code>run</code>, so a
+calibration, the refit of a replicate and a subproblem with a held parameter
+polish alike; a held prediction runs the augmented Lagrangian again with
+Nelder-Mead from the end, the multiplier and the penalty of the swarm
+(<code>optimize_subproblem</code>). The tolerance <code>τ</code> of a profile under a polished
+swarm is the <code>sd_tolerance</code> of the polish. Each stage has its own copy of
+the observer (<code>O: Clone</code>), and <code>OptimizerSettings::progress</code> gives the table
+of each stage from its own <code>verbose</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>An argument of <code>Calibrator.run</code></td>
+<td>The methods that refit read the problem, not the call, so their replicates would not polish.</td>
+</tr>
+<tr>
+<td>Nelder-Mead from the best point of all starts</td>
+<td>The starts would end at one point, and <code>StartsIdentifiability</code> would read no spread.</td>
+</tr>
+<tr>
+<td>The polishes in one pool after every swarm</td>
+<td>A start that ends early would wait for the slowest swarm.</td>
+</tr>
+<tr>
+<td>A chain of any optimizers</td>
+<td>Only a swarm followed by Nelder-Mead has a use.</td>
+</tr>
+<tr>
+<td><code>iterations</code> of the polish only</td>
+<td>The cost of the start would hide the swarm.</td>
+</tr>
+<tr>
+<td>A composite solver in the argmin fork</td>
+<td>The fork has one solver per run; two runs on one cost need no change there.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_starts.rs</code>
+(<code>a_polished_start_counts_both_stages</code>,
+<code>a_swarm_with_no_polish_is_unchanged</code>);
+<code>crates/commol-inference/tests/test_profiles.rs::a_polished_swarm_ends_a_subproblem_with_nelder_mead</code>;
+<code>tests/calibration/test_polish.py::test_a_polish_is_nelder_mead_from_the_end_of_the_swarm</code>;
+<code>tests/uncertainty/test_identifiability.py::test_the_starts_of_a_polished_fit_are_its_polished_ends</code>;
+<code>tests/uncertainty/test_resampling.py::test_a_replicate_polishes_as_the_fit</code>.</p>
 <h2 id="one-function-runs-the-starts-and-chooses-the-best">One function runs the starts and chooses the best<a class="headerlink" href="#one-function-runs-the-starts-and-chooses-the-best" title="Permanent link">&para;</a></h2>
 <p><code>optimize_starts</code> (<code>crates/commol-calibration/src/starts.rs</code>) takes the start
 points and one seed, runs the starts in parallel and returns every outcome

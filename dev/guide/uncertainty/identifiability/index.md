@@ -249,7 +249,7 @@ A parameter is `poorly_determined` when it is in a correlated pair or its margin
 
 ### Starts
 
-`StartsIdentifiability` compares the converged starts whose loss exceeds the best by at most `loss_tolerance` of the best loss, and flags a parameter whose ends among them differ by more than `parameter_tolerance` of its bound width. A loss near zero, as with data made by the model itself, leaves no start within a relative tolerance but the best; use data with noise.
+`StartsIdentifiability` compares the converged starts whose loss exceeds the best by at most `loss_tolerance` of the best loss, and flags a parameter whose ends among them differ by more than `parameter_tolerance` of its bound width. A loss near zero, as with data made by the model itself, leaves no start within a relative tolerance but the best; use data with noise. A particle swarm without a stop rule converges at no start; with a [polish](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#polish-with-nelder-mead), each start ends with Nelder-Mead, and the method reads the polished ends.
 
 ## The report
 

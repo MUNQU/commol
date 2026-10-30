@@ -1202,6 +1202,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#polish-with-nelder-mead" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Polish with Nelder-Mead
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3727,6 +3738,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#polish-with-nelder-mead" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Polish with Nelder-Mead
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3892,8 +3914,9 @@ unknown inside its bounds.</p>
 </tr>
 </tbody>
 </table>
-<p>A common pattern: run particle swarm first, then Nelder-Mead from its result
-with <code>initial_guess</code>.</p>
+<p>To search the whole box and still end precise, give a swarm a
+<a href="#polish-with-nelder-mead">polish</a>: each start then ends with Nelder-Mead
+from the best point of the swarm.</p>
 <h2 id="nelder-mead">Nelder-Mead<a class="headerlink" href="#nelder-mead" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">nelder_mead</span> <span class="o">=</span> <span class="n">NelderMeadConfig</span><span class="p">(</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">max_iterations</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
@@ -3985,8 +4008,9 @@ with the message <code>Nelder-Mead needs finite bounds</code>.</p>
 </table>
 <p><code>converged</code> comes from <code>converged</code> in
 <code>crates/commol-calibration/src/optimization.rs</code>. A particle swarm
-without a <a href="#stop-rules">stop rule</a> always stops at <code>max_iterations</code>, so it
-reports <code>converged=False</code>; judge it by <code>final_loss</code>.</p>
+without a <a href="#stop-rules">stop rule</a> or a <a href="#polish-with-nelder-mead">polish</a>
+always stops at <code>max_iterations</code>, so it reports <code>converged=False</code>; judge it
+by <code>final_loss</code>. A polished swarm reports the convergence of Nelder-Mead.</p>
 <h2 id="particle-swarm">Particle swarm<a class="headerlink" href="#particle-swarm" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">swarm</span> <span class="o">=</span> <span class="n">ParticleSwarmConfig</span><span class="p">(</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">particles</span><span class="o">=</span><span class="mi">40</span><span class="p">,</span>
@@ -4108,6 +4132,11 @@ ignored: <code>ParticleSwarmConfig(inertia_factor=0.5)</code> fails with
 <td><code>None</code></td>
 <td>The radius <a href="#stop-rules">stop rule</a>.</td>
 </tr>
+<tr>
+<td><code>polish</code></td>
+<td><code>None</code></td>
+<td>A <code>NelderMeadConfig</code>: each start ends with Nelder-Mead from the best point of the swarm (<a href="#polish-with-nelder-mead">Polish with Nelder-Mead</a>).</td>
+</tr>
 </tbody>
 </table>
 <h3 id="stop-rules">Stop rules<a class="headerlink" href="#stop-rules" title="Permanent link">&para;</a></h3>
@@ -4163,6 +4192,64 @@ spread, so with them the radius can stay above <code>radius_tol</code>. Neither 
 draws random numbers: with the same seed, a run with a rule is the run without
 it up to the iteration where it stops. In a <a href="../uncertainty/profiles/">profile</a>,
 the improvement rule also sets the tolerance of a swarm.</p>
+<h3 id="polish-with-nelder-mead">Polish with Nelder-Mead<a class="headerlink" href="#polish-with-nelder-mead" title="Permanent link">&para;</a></h3>
+<p>A swarm stops before it converges; Nelder-Mead from its end converges. With
+<code>polish=NelderMeadConfig(...)</code>, each start runs the swarm from its point, then
+Nelder-Mead from the best point of the swarm of that start, on the threads of
+the start (<code>run</code> in <code>crates/commol-calibration/src/optimization.rs</code>).</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">polished</span> <span class="o">=</span> <span class="n">ParticleSwarmConfig</span><span class="p">(</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">particles</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">max_iterations</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">polish</span><span class="o">=</span><span class="n">NelderMeadConfig</span><span class="p">(</span><span class="n">max_iterations</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span> <span class="n">sd_tolerance</span><span class="o">=</span><span class="mf">1e-10</span><span class="p">),</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="p">)</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">observed_data</span><span class="p">,</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">parameters</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="p">],</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="n">loss_function</span><span class="o">=</span><span class="s2">&quot;sse&quot;</span><span class="p">,</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">polished</span><span class="p">,</span>
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>    <span class="n">seed</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span>
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="p">)</span>
+</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="n">result</span> <span class="o">=</span> <span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)),</span> <span class="n">problem</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">starts</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="nb">print</span><span class="p">(</span><span class="nb">all</span><span class="p">(</span><span class="n">start</span><span class="o">.</span><span class="n">converged</span> <span class="k">for</span> <span class="n">start</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">starts</span><span class="p">))</span>  <span class="c1"># True</span>
+</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">termination_reason</span><span class="p">)</span>  <span class="c1"># Terminated(SolverConverged)</span>
+</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="nb">print</span><span class="p">({</span><span class="n">name</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">best_parameters</span><span class="o">.</span><span class="n">items</span><span class="p">()})</span>  <span class="c1"># {&#39;k1&#39;: 0.4, &#39;k2&#39;: 0.1}</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>What</th>
+<th>With a polish</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>StartSummary</code></td>
+<td><code>start</code> is the start point of the swarm; <code>end</code>, <code>loss</code> and <code>converged</code> are those of Nelder-Mead</td>
+</tr>
+<tr>
+<td><code>iterations</code></td>
+<td>The iterations of the swarm and of Nelder-Mead of the best start</td>
+</tr>
+<tr>
+<td><code>converged</code>, <code>termination_reason</code></td>
+<td>Those of Nelder-Mead</td>
+</tr>
+<tr>
+<td>Uncertainty methods</td>
+<td>Every fit of the problem polishes: the refits of a bootstrap, the subproblems of a profile, the starts that <code>StartsIdentifiability</code> reads</td>
+</tr>
+<tr>
+<td><code>verbose</code>, <code>header_interval</code></td>
+<td>Those of the swarm write the table of the swarm; those of the polish, the table of Nelder-Mead</td>
+</tr>
+</tbody>
+</table>
+<p>Each start polishes its own end, so the starts stay apart, and
+<a href="../uncertainty/identifiability/#starts"><code>StartsIdentifiability</code></a> reads the
+spread of the polished ends. A swarm polishes only with Nelder-Mead.</p>
 <h2 id="several-starts">Several starts<a class="headerlink" href="#several-starts" title="Permanent link">&para;</a></h2>
 <p><code>Calibrator.run(starts=n)</code> runs the optimizer from <code>n</code> start points in
 parallel and returns the best result. Start 0 is the initial guess of each
@@ -4178,20 +4265,20 @@ from the problem's <code>seed</code>, so start 0 of <code>run(starts=n)</code> i
 the order of the particles, so the result does not depend on the number of
 threads. <code>commol.parallelism.threads</code> chooses the threads and whether the particles run
 in parallel: see <a href="../parallelism/">Threads and Parallelism</a>.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">observed_data</span><span class="p">,</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">parameters</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="p">],</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">loss_function</span><span class="o">=</span><span class="s2">&quot;sse&quot;</span><span class="p">,</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">NelderMeadConfig</span><span class="p">(</span><span class="n">max_iterations</span><span class="o">=</span><span class="mi">2000</span><span class="p">),</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="n">seed</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="p">)</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="n">result</span> <span class="o">=</span> <span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)),</span> <span class="n">problem</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">starts</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">starts</span><span class="p">),</span> <span class="n">result</span><span class="o">.</span><span class="n">failed</span><span class="p">)</span>  <span class="c1"># 4 []</span>
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">starts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">start</span><span class="p">)</span>  <span class="c1"># {&#39;k1&#39;: 0.5, &#39;k2&#39;: 0.5}</span>
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="nb">print</span><span class="p">({</span><span class="n">name</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">best_parameters</span><span class="o">.</span><span class="n">items</span><span class="p">()})</span>  <span class="c1"># {&#39;k1&#39;: 0.4, &#39;k2&#39;: 0.1}</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">observed_data</span><span class="o">=</span><span class="n">observed_data</span><span class="p">,</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">parameters</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k1&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>        <span class="n">CalibrationParameter</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&quot;k2&quot;</span><span class="p">,</span> <span class="n">parameter_type</span><span class="o">=</span><span class="s2">&quot;parameter&quot;</span><span class="p">,</span> <span class="n">min_bound</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">max_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="p">],</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">loss_function</span><span class="o">=</span><span class="s2">&quot;sse&quot;</span><span class="p">,</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="n">optimization_config</span><span class="o">=</span><span class="n">NelderMeadConfig</span><span class="p">(</span><span class="n">max_iterations</span><span class="o">=</span><span class="mi">2000</span><span class="p">),</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="n">seed</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="p">)</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="n">result</span> <span class="o">=</span> <span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)),</span> <span class="n">problem</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">starts</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">starts</span><span class="p">),</span> <span class="n">result</span><span class="o">.</span><span class="n">failed</span><span class="p">)</span>  <span class="c1"># 4 []</span>
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">starts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">start</span><span class="p">)</span>  <span class="c1"># {&#39;k1&#39;: 0.5, &#39;k2&#39;: 0.5}</span>
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="nb">print</span><span class="p">({</span><span class="n">name</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">best_parameters</span><span class="o">.</span><span class="n">items</span><span class="p">()})</span>  <span class="c1"># {&#39;k1&#39;: 0.4, &#39;k2&#39;: 0.1}</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -4223,8 +4310,8 @@ run. Without a seed, the engine draws one when the calibrator is built;
 <code>Calibrator.seed</code> gives it and the calibrator logs it. The result keeps it in <code>CalibrationResult.seed</code>, and the sample of
 each uncertainty method in <code>sample.method.settings["seed"]</code>: set it as
 <code>problem.seed</code> to repeat the run, also from a result read back from JSON.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">again</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">model_copy</span><span class="p">(</span><span class="n">update</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;seed&quot;</span><span class="p">:</span> <span class="n">result</span><span class="o">.</span><span class="n">seed</span><span class="p">})</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)),</span> <span class="n">again</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">starts</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span> <span class="o">==</span> <span class="n">result</span><span class="p">)</span>  <span class="c1"># True</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">again</span> <span class="o">=</span> <span class="n">problem</span><span class="o">.</span><span class="n">model_copy</span><span class="p">(</span><span class="n">update</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;seed&quot;</span><span class="p">:</span> <span class="n">result</span><span class="o">.</span><span class="n">seed</span><span class="p">})</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">Calibrator</span><span class="p">(</span><span class="n">Simulation</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)),</span> <span class="n">again</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">starts</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span> <span class="o">==</span> <span class="n">result</span><span class="p">)</span>  <span class="c1"># True</span>
 </span></code></pre></div>
 <h2 id="history-of-evaluations">History of evaluations<a class="headerlink" href="#history-of-evaluations" title="Permanent link">&para;</a></h2>
 <p><code>Calibrator.run_with_history()</code> optimizes from the initial guess and returns a
@@ -4246,7 +4333,7 @@ order. A point the objective penalizes is not kept.</p>
 </tr>
 <tr>
 <td><code>converged=False</code></td>
-<td>Check <code>termination_reason</code>: with <code>MaxItersReached</code>, raise <code>max_iterations</code>; a particle swarm needs a <a href="#stop-rules">stop rule</a> to converge</td>
+<td>Check <code>termination_reason</code>: with <code>MaxItersReached</code>, raise <code>max_iterations</code>; a particle swarm needs a <a href="#stop-rules">stop rule</a> or a <a href="#polish-with-nelder-mead">polish</a> to converge</td>
 </tr>
 <tr>
 <td>Different results on each run</td>

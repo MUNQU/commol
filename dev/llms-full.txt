@@ -3713,15 +3713,15 @@ With one replicate the CRPS is the absolute error. The [predictive](https://munq
 
 `Calibrator(simulation, problem)` checks the problem against the model, and `run()` returns a `CalibrationResult`:
 
-| `CalibrationResult` field | Meaning                                                                                                                                                                                                                                                              |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `best_parameters`         | `dict[str, float]`: the best value of every unknown, in the order of `problem.parameters`                                                                                                                                                                            |
-| `final_loss`              | The loss at `best_parameters`; with observation models, the negative log-likelihood                                                                                                                                                                                  |
-| `iterations`              | The optimizer iterations performed                                                                                                                                                                                                                                   |
-| `converged`               | `True` only when the optimizer met its convergence test (a stop rule for a particle swarm); a run that used all `max_iterations` is `False`. See [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#converged-and-termination_reason). |
-| `termination_reason`      | Why it stopped                                                                                                                                                                                                                                                       |
-| `starts`, `failed`        | Every start that finished, and each start that failed with its reason. See [Several starts](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts).                                                                                     |
-| `seed`                    | The seed of the calibration's random numbers (`Calibrator.seed`). See [Reproducibility](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#reproducibility).                                                                                        |
+| `CalibrationResult` field | Meaning                                                                                                                                                                                                                                                                                                                    |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `best_parameters`         | `dict[str, float]`: the best value of every unknown, in the order of `problem.parameters`                                                                                                                                                                                                                                  |
+| `final_loss`              | The loss at `best_parameters`; with observation models, the negative log-likelihood                                                                                                                                                                                                                                        |
+| `iterations`              | The optimizer iterations performed                                                                                                                                                                                                                                                                                         |
+| `converged`               | `True` only when the optimizer met its convergence test (a stop rule for a particle swarm, or the test of Nelder-Mead for a swarm with a polish); a run that used all `max_iterations` is `False`. See [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#converged-and-termination_reason). |
+| `termination_reason`      | Why it stopped                                                                                                                                                                                                                                                                                                             |
+| `starts`, `failed`        | Every start that finished, and each start that failed with its reason. See [Several starts](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts).                                                                                                                                           |
+| `seed`                    | The seed of the calibration's random numbers (`Calibrator.seed`). See [Reproducibility](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#reproducibility).                                                                                                                                              |
 
 ```python
 print(result.converged, result.termination_reason)
@@ -4291,7 +4291,7 @@ print(calibrate(ParticleSwarmConfig(particles=30, max_iterations=300)))  # {'k1'
 | Nelder-Mead    | Few evaluations; precise near the answer       | Local: can stop at a bound or a local minimum | Few unknowns, a good `initial_guess`     |
 | Particle swarm | Searches the whole box; robust to local minima | Many evaluations                              | Several unknowns, no good starting point |
 
-A common pattern: run particle swarm first, then Nelder-Mead from its result with `initial_guess`.
+To search the whole box and still end precise, give a swarm a [polish](#polish-with-nelder-mead): each start then ends with Nelder-Mead from the best point of the swarm.
 
 ## Nelder-Mead
 
@@ -4329,7 +4329,7 @@ The search starts at `initial_guess`, or at the midpoint of the bounds; a start 
 | `Terminated(MaxItersReached)` | `False`     | The run used all `max_iterations`                                                                                        |
 | Any other reason              | `False`     | The run stopped for another reason that argmin reports                                                                   |
 
-`converged` comes from `converged` in `crates/commol-calibration/src/optimization.rs`. A particle swarm without a [stop rule](#stop-rules) always stops at `max_iterations`, so it reports `converged=False`; judge it by `final_loss`.
+`converged` comes from `converged` in `crates/commol-calibration/src/optimization.rs`. A particle swarm without a [stop rule](#stop-rules) or a [polish](#polish-with-nelder-mead) always stops at `max_iterations`, so it reports `converged=False`; judge it by `final_loss`. A polished swarm reports the convergence of Nelder-Mead.
 
 ## Particle swarm
 
@@ -4377,6 +4377,7 @@ Each strategy of the swarm is a name, and its numbers are fields of their own. A
 | `velocity_mutation_threshold`                                            | `None`      | Restarts the velocity of particles slower than it (0.001–0.01).                                                                                                                                                                              |
 | `improvement_window`, `improvement_tol_abs`, `improvement_tol_rel`       | `None`      | The improvement [stop rule](#stop-rules): all three or none.                                                                                                                                                                                 |
 | `radius_tol`                                                             | `None`      | The radius [stop rule](#stop-rules).                                                                                                                                                                                                         |
+| `polish`                                                                 | `None`      | A `NelderMeadConfig`: each start ends with Nelder-Mead from the best point of the swarm ([Polish with Nelder-Mead](#polish-with-nelder-mead)).                                                                                               |
 
 ### Stop rules
 
@@ -4410,6 +4411,42 @@ print(result.converged, result.iterations < 2000)  # True True
 ```
 
 A swarm can stall for some iterations and then improve again, so a short `improvement_window` can stop it early. Mutation and velocity mutation scatter the particles again, and unknowns that the data cannot tell apart keep them spread, so with them the radius can stay above `radius_tol`. Neither rule draws random numbers: with the same seed, a run with a rule is the run without it up to the iteration where it stops. In a [profile](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md), the improvement rule also sets the tolerance of a swarm.
+
+### Polish with Nelder-Mead
+
+A swarm stops before it converges; Nelder-Mead from its end converges. With `polish=NelderMeadConfig(...)`, each start runs the swarm from its point, then Nelder-Mead from the best point of the swarm of that start, on the threads of the start (`run` in `crates/commol-calibration/src/optimization.rs`).
+
+```python
+polished = ParticleSwarmConfig(
+    particles=20,
+    max_iterations=30,
+    polish=NelderMeadConfig(max_iterations=2000, sd_tolerance=1e-10),
+)
+problem = CalibrationProblem(
+    observed_data=observed_data,
+    parameters=[
+        CalibrationParameter(id="k1", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
+        CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
+    ],
+    loss_function="sse",
+    optimization_config=polished,
+    seed=7,
+)
+result = Calibrator(Simulation(model(None, None)), problem).run(starts=4)
+print(all(start.converged for start in result.starts))  # True
+print(result.termination_reason)  # Terminated(SolverConverged)
+print({name: round(value, 4) for name, value in result.best_parameters.items()})  # {'k1': 0.4, 'k2': 0.1}
+```
+
+| What                              | With a polish                                                                                                                             |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `StartSummary`                    | `start` is the start point of the swarm; `end`, `loss` and `converged` are those of Nelder-Mead                                           |
+| `iterations`                      | The iterations of the swarm and of Nelder-Mead of the best start                                                                          |
+| `converged`, `termination_reason` | Those of Nelder-Mead                                                                                                                      |
+| Uncertainty methods               | Every fit of the problem polishes: the refits of a bootstrap, the subproblems of a profile, the starts that `StartsIdentifiability` reads |
+| `verbose`, `header_interval`      | Those of the swarm write the table of the swarm; those of the polish, the table of Nelder-Mead                                            |
+
+Each start polishes its own end, so the starts stay apart, and [`StartsIdentifiability`](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#starts) reads the spread of the polished ends. A swarm polishes only with Nelder-Mead.
 
 ## Several starts
 
@@ -4459,7 +4496,7 @@ print(Calibrator(Simulation(model(None, None)), again).run(starts=4) == result) 
 | Symptom                            | Try                                                                                                                                                                                                         |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A result sits at a bound           | Check the bounds, give a better `initial_guess`, or use particle swarm                                                                                                                                      |
-| `converged=False`                  | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations`; a particle swarm needs a [stop rule](#stop-rules) to converge                                                                   |
+| `converged=False`                  | Check `termination_reason`: with `MaxItersReached`, raise `max_iterations`; a particle swarm needs a [stop rule](#stop-rules) or a [polish](#polish-with-nelder-mead) to converge                           |
 | Different results on each run      | Set `seed`; use more particles or iterations                                                                                                                                                                |
 | A local minimum                    | `run(starts=n)` from several points                                                                                                                                                                         |
 | A good loss but implausible values | Unknowns that the data cannot tell apart; fix one, or add observations                                                                                                                                      |
@@ -5418,7 +5455,7 @@ A parameter is `poorly_determined` when it is in a correlated pair or its margin
 
 ### Starts
 
-`StartsIdentifiability` compares the converged starts whose loss exceeds the best by at most `loss_tolerance` of the best loss, and flags a parameter whose ends among them differ by more than `parameter_tolerance` of its bound width. A loss near zero, as with data made by the model itself, leaves no start within a relative tolerance but the best; use data with noise.
+`StartsIdentifiability` compares the converged starts whose loss exceeds the best by at most `loss_tolerance` of the best loss, and flags a parameter whose ends among them differ by more than `parameter_tolerance` of its bound width. A loss near zero, as with data made by the model itself, leaves no start within a relative tolerance but the best; use data with noise. A particle swarm without a stop rule converges at no start; with a [polish](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#polish-with-nelder-mead), each start ends with Nelder-Mead, and the method reads the polished ends.
 
 ## The report
 
@@ -6286,7 +6323,7 @@ for threshold in (
 | Start of each refit | Every parameter extrapolated along the line through the two points before, as in Data2Dynamics                                                                                                                                                              |
 | End of a side       | Past the threshold (`"crossed"`), at a bound (`"bound"`), after `max_steps` points (`"max_steps"`), or at a prediction no values within the bounds give (`"unreachable"`)                                                                                   |
 
-Every side of every quantity runs in parallel. A held parameter leaves the values the optimizer searches, so Nelder-Mead searches one dimension less. A held prediction `g(θ) = c` is met as an equality constraint, by an augmented Lagrangian whose inner solver is the problem's optimizer. Its final multiplier is minus the slope of the profile (`Profile.multipliers`). With a particle swarm, each refit draws from a seed of its own, derived from the problem's seed, so a profile repeats; a swarm runs each outer iteration of a held prediction to its `max_iterations`, or until one of its [stop rules](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#stop-rules) holds.
+Every side of every quantity runs in parallel. A held parameter leaves the values the optimizer searches, so Nelder-Mead searches one dimension less. A held prediction `g(θ) = c` is met as an equality constraint, by an augmented Lagrangian whose inner solver is the problem's optimizer. Its final multiplier is minus the slope of the profile (`Profile.multipliers`). With a particle swarm, each refit draws from a seed of its own, derived from the problem's seed, so a profile repeats; a swarm runs each outer iteration of a held prediction to its `max_iterations`, or until one of its [stop rules](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#stop-rules) holds. With a [polish](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#polish-with-nelder-mead), a held parameter refits with the swarm and then Nelder-Mead, and a held prediction runs a second augmented Lagrangian with Nelder-Mead as its inner solver, from the end, the multiplier and the penalty of the swarm; `Profile.multipliers` then comes from that second run.
 
 ## Prediction profiles
 
@@ -6300,7 +6337,7 @@ Every side of every quantity runs in parallel. A held parameter leaves the value
 | `practically_non_identifiable`  | Stays below on at least one side, up to a bound or `max_steps`                                                    | Practical `poorly_determined`                                                                                                |
 | `structurally_non_identifiable` | Flat within `tolerance` over its whole range inside the box of the parameters, or proven flat by the resets below | Structural `in_combination` or `non_identifiable` from the resets; with no structural verdict, practical `poorly_determined` |
 
-`tolerance` is `ε = max(τ, ν)`. `τ` is the `sd_tolerance` of Nelder-Mead, an absolute amount: argmin stops when the costs of its simplex spread by less. For a particle swarm with the improvement stop rule, `τ` is the improvement the rule allows at the fit, `tol_abs + tol_rel · |objective at the fit|`: the swarm stops when its best value improves by less. A swarm without that rule has no tolerance on the objective, and `τ` is `1e-6 · max(1, |objective at the fit|)`. `ν`, the noise floor, is the error of one evaluation of the objective at the fit, from the accuracy of a run: `Σ |∂ℓᵢ/∂mᵢ| · eᵢ`, with `eᵢ = rtol · |mᵢ| + k · atol` the error of a run on an observation that sums `k` outputs, its prediction `mᵢ`, and the accuracy of the engine (machine epsilon for a difference model, the `rtol` and `atol` of the ODE solver). A solver holds its tolerances at each step, so `ν` is an estimate, not a bound. A threshold at or below `ε` gives no verdict: the profile cannot tell a rise from numerical error, and `notes` says so.
+`tolerance` is `ε = max(τ, ν)`. `τ` is the `sd_tolerance` of Nelder-Mead, an absolute amount: argmin stops when the costs of its simplex spread by less. For a particle swarm with the improvement stop rule, `τ` is the improvement the rule allows at the fit, `tol_abs + tol_rel · |objective at the fit|`: the swarm stops when its best value improves by less. A swarm without that rule has no tolerance on the objective, and `τ` is `1e-6 · max(1, |objective at the fit|)`. A swarm with a [polish](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#polish-with-nelder-mead) ends with Nelder-Mead, so `τ` is the `sd_tolerance` of the polish. `ν`, the noise floor, is the error of one evaluation of the objective at the fit, from the accuracy of a run: `Σ |∂ℓᵢ/∂mᵢ| · eᵢ`, with `eᵢ = rtol · |mᵢ| + k · atol` the error of a run on an observation that sums `k` outputs, its prediction `mᵢ`, and the accuracy of the engine (machine epsilon for a difference model, the `rtol` and `atol` of the ODE solver). A solver holds its tolerances at each step, so `ν` is an estimate, not a bound. A threshold at or below `ε` gives no verdict: the profile cannot tell a rise from numerical error, and `notes` says so.
 
 The box of the parameters is the space inside their bounds. A free parameter of a refit is on a bound when it is within `1e-8` of the width of its bounds, or of the larger of 1 and the size of its one finite bound, the rule of the [local approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/index.md). When it is on a bound that it is not on at the fit, the refit has left the box: the bound makes its rise, not the data. The flatness reads only the points inside the box, and a note names the parameter and the value where the ridge leaves it. When the crossing point of a side has such a parameter, and the parameter is not on that bound over the whole side, the side crosses because of the box. It counts as open, and its interval end stays, with a note. A parameter on its bound at every point from the fit to the crossing does not count: the verdict then holds within the box.
 
@@ -11688,7 +11725,7 @@ Attributes:
 | `gamma`                | \`float       | None\`                                                                                                                                                                                                                                          |
 | `rho`                  | \`float       | None\`                                                                                                                                                                                                                                          |
 | `sigma`                | \`float       | None\`                                                                                                                                                                                                                                          |
-| `verbose`              | `bool`        | Enable verbose output during optimization (default: False)                                                                                                                                                                                      |
+| `verbose`              | `bool`        | Enable verbose output during optimization (default: False). As the polish of a ParticleSwarmConfig, it writes the table of Nelder-Mead, and the swarm writes its own by its own verbose.                                                        |
 | `header_interval`      | `int`         | Number of iterations between table header repeats in verbose output (default: 100)                                                                                                                                                              |
 
 Source code in `commol/_problem/problem.py`
@@ -11723,7 +11760,9 @@ class NelderMeadConfig(RangeChecked):
     sigma : float | None
         Shrink coefficient (default: None, uses argmin's default)
     verbose : bool
-        Enable verbose output during optimization (default: False)
+        Enable verbose output during optimization (default: False). As the
+        `polish` of a `ParticleSwarmConfig`, it writes the table of
+        Nelder-Mead, and the swarm writes its own by its own `verbose`.
     header_interval: int
         Number of iterations between table header repeats in verbose output
         (default: 100)
@@ -11812,6 +11851,7 @@ Attributes:
 | `improvement_tol_abs`                | \`float                                        | None\`                                                                              |
 | `improvement_tol_rel`                | \`float                                        | None\`                                                                              |
 | `radius_tol`                         | \`float                                        | None\`                                                                              |
+| `polish`                             | \`NelderMeadConfig                             | None\`                                                                              |
 
 References
 
@@ -11914,6 +11954,15 @@ class ParticleSwarmConfig(RangeChecked):
         bounds), is at most `radius_tol`, and report ``converged=True``
         (Zielinski and Laur, 2007). Mutation and velocity mutation scatter the
         swarm again, so with them the radius can stay above it.
+    polish : NelderMeadConfig | None
+        Nelder-Mead from the best point of the swarm of each start (default:
+        None, the swarm alone). The start then ends at the point, the loss
+        and the convergence of Nelder-Mead; ``iterations`` counts the
+        iterations of both stages and ``termination_reason`` is that of
+        Nelder-Mead. Every fit of the problem polishes, the refits of an
+        uncertainty method and the subproblems of a profile included. The
+        `verbose` and `header_interval` of the polish set the table of
+        Nelder-Mead, and those of the swarm the table of the swarm.
 
     References
     ----------
@@ -12016,6 +12065,9 @@ class ParticleSwarmConfig(RangeChecked):
     )
     radius_tol: float | None = Field(
         default=None, description="The tolerance of the radius stop rule"
+    )
+    polish: NelderMeadConfig | None = Field(
+        default=None, description="Nelder-Mead from the best point of the swarm"
     )
 
     @model_validator(mode="after")
@@ -39443,6 +39495,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- `ParticleSwarmConfig(polish=NelderMeadConfig(...))`: each start runs the swarm, then Nelder-Mead from the best point of the swarm of that start. The start ends at the point, the loss and the convergence of Nelder-Mead, `iterations` counts both stages and `termination_reason` is that of Nelder-Mead. Every fit of the problem polishes: the starts of `Calibrator.run`, which `StartsIdentifiability` reads, the refits of an uncertainty method and the subproblems of a profile. The `verbose` of the polish writes the table of Nelder-Mead. See [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#polish-with-nelder-mead).
 - `ObservedDataPoint(scale=...)`: a known positive number, 1 by default, that multiplies the prediction of the observation, with its factor. A count model reads the mean `scale · model`, so a count observed on a known share of the model output stays whole. The loss, the likelihood, the predictive, the scores, the figures, the `observed` block of a report (`scales`) and a `PredictionSpec(scale=...)` of a prediction profile read it. See [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#known-shares-scales).
 - `ModelBuilder.add_matrix(id, stratification, values, unit, description)` adds a matrix between the categories of a stratification, and a transition rate reads it with `matrix_sum(M, e)`: in a compartment of category `i`, `Σ_j M[i, j] · e_j`, with each bin of `e` read as its amount in category `j` and `total` as the total of `j`. Every engine runs it. A rate or a formula parameter reads the entries as `M_<i>_<j>` and the spectral radius of the matrix as `M_radius`. The unit check, the equations and `Model.describe` read the matrix. See [Matrix sums](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#matrix-sums).
 - `ModelBuilder.add_matrix(row_scales=..., column_scales=...)`: a constant or a parameter to calibrate multiplies the row or the column of a category, so the model reads `diag(a) · values · diag(b)`. A calibration constraint reads `M_<i>_<j>` and `M_radius` of the scaled matrix at the values of each point, so a bound such as `2 - k * M_radius` is one constraint; a rate reads them at the values of its run. See [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/#a-bound-on-a-matrix).

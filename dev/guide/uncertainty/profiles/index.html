@@ -4028,7 +4028,12 @@ multiplier is minus the slope of the profile (<code>Profile.multipliers</code>).
 particle swarm, each refit draws from a seed of its own, derived from the
 problem's seed, so a profile repeats; a swarm runs each outer iteration of a
 held prediction to its <code>max_iterations</code>, or until one of its
-<a href="../../calibration-optimizers/#stop-rules">stop rules</a> holds.</p>
+<a href="../../calibration-optimizers/#stop-rules">stop rules</a> holds. With a
+<a href="../../calibration-optimizers/#polish-with-nelder-mead">polish</a>, a held
+parameter refits with the swarm and then Nelder-Mead, and a held prediction
+runs a second augmented Lagrangian with Nelder-Mead as its inner solver, from
+the end, the multiplier and the penalty of the swarm; <code>Profile.multipliers</code>
+then comes from that second run.</p>
 <h2 id="prediction-profiles">Prediction profiles<a class="headerlink" href="#prediction-profiles" title="Permanent link">&para;</a></h2>
 <p><code>PredictionProfile(specs, threshold)</code> profiles the value of each prediction: a
 <code>PredictionSpec</code> reads an output, or a sum of outputs, at a position, with a
@@ -4070,7 +4075,9 @@ For a particle swarm with the improvement stop rule, <code>τ</code> is the impr
 the rule allows at the fit, <code>tol_abs + tol_rel · |objective at the fit|</code>: the
 swarm stops when its best value improves by less. A swarm without that rule
 has no tolerance on the objective, and <code>τ</code> is
-<code>1e-6 · max(1, |objective at the fit|)</code>. <code>ν</code>, the noise floor, is the error of one
+<code>1e-6 · max(1, |objective at the fit|)</code>. A swarm with a
+<a href="../../calibration-optimizers/#polish-with-nelder-mead">polish</a> ends with
+Nelder-Mead, so <code>τ</code> is the <code>sd_tolerance</code> of the polish. <code>ν</code>, the noise floor, is the error of one
 evaluation of the objective at the fit, from the accuracy of a run:
 <code>Σ |∂ℓᵢ/∂mᵢ| · eᵢ</code>, with <code>eᵢ = rtol · |mᵢ| + k · atol</code> the error of a run on
 an observation that sums <code>k</code> outputs, its prediction <code>mᵢ</code>, and the accuracy

@@ -4294,7 +4294,10 @@ marginal has two or more modes.</p>
 best by at most <code>loss_tolerance</code> of the best loss, and flags a parameter whose
 ends among them differ by more than <code>parameter_tolerance</code> of its bound width.
 A loss near zero, as with data made by the model itself, leaves no start
-within a relative tolerance but the best; use data with noise.</p>
+within a relative tolerance but the best; use data with noise. A particle
+swarm without a stop rule converges at no start; with a
+<a href="../../calibration-optimizers/#polish-with-nelder-mead">polish</a>, each start
+ends with Nelder-Mead, and the method reads the polished ends.</p>
 <h2 id="the-report">The report<a class="headerlink" href="#the-report" title="Permanent link">&para;</a></h2>
 <p>An <code>IdentifiabilityReport</code> holds, for each parameter, a <strong>structural</strong> and a
 <strong>practical</strong> verdict, and the sections of the methods that ran
