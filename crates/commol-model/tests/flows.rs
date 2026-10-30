@@ -247,6 +247,21 @@ fn a_partial_bin_total_leaves_out_the_compartments() {
 }
 
 #[test]
+fn a_subgroup_total_of_a_stratification_that_expands_nothing_names_none() {
+    // `subgroup_total_names` reads a process before its conditions are checked:
+    // a condition no compartment meets leaves every compartment without a
+    // category.
+    let process: commol_core::Process = serde_json::from_str(
+        r#"{"bins":[{"id":"A","name":"A"}],"stratifications":[{"id":"g",
+        "categories":["g1","g2"],"conditions":[{"stratification":"h","category":"h1"}]}],
+        "transitions":[]}"#,
+    )
+    .expect("valid process JSON");
+
+    assert!(subgroup_total_names(&process).is_empty());
+}
+
+#[test]
 fn an_inflow_chooses_its_compartment_with_a_category_and_has_no_to() {
     let inflow = |condition: &str| {
         model(&[&transition(
@@ -282,39 +297,52 @@ fn a_bin_in_a_rate_is_the_total_of_the_bin_without_per_compartment() {
     assert_eq!(rates, [0.3 * 700.0, 0.3 * 700.0]);
 }
 
-/// Bins A and B with a stratification `g` of the given `conditions`, A → B
-/// at `rate`.
-fn conditional(conditions: &str, rate: &str) -> Model {
+/// Bins A and B with a stratification `h` and then a stratification `g` of the
+/// given `conditions`, A → B at `k`.
+fn conditional(conditions: &str) -> Model {
     let json = format!(
         r#"{{"name":"m","parameters":[{{"id":"k","value":0.1}}],
         "engine":{{"type":"DifferenceEquations"}},
         "process":{{"bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}}],
         "accumulators":[],
-        "stratifications":[{{"id":"g","categories":["g1","g2"],"conditions":{conditions}}}],
-        "transitions":[{{"id":"ab","source":["A"],"target":["B"],"rate":"{rate}"}}]}},
+        "stratifications":[{{"id":"h","categories":["h1","h2"]}},
+        {{"id":"g","categories":["g1","g2"],"conditions":{conditions}}}],
+        "transitions":[{{"id":"ab","source":["A"],"target":["B"],"rate":"k"}}]}},
         "structure":{{"kind":"aggregate","bin_amounts":{{"A":1000.0,"B":0.0}},
-        "stratification_fractions":{{"g":{{"g1":0.5,"g2":0.5}}}}}}}}"#
+        "stratification_fractions":{{"h":{{"h1":0.5,"h2":0.5}},"g":{{"g1":0.5,"g2":0.5}}}}}}}}"#
     );
     serde_json::from_str(&json).expect("valid model JSON")
 }
 
 #[test]
-fn a_stratification_whose_condition_no_compartment_meets_expands_nothing() {
-    let model = conditional(r#"[{"stratification":"h","category":"h1"}]"#, "k");
+fn a_stratification_condition_without_a_category_filters_nothing() {
+    let model = conditional(r#"[{"stratification":"h"}]"#);
 
     let compiled = CompiledModel::try_from_model(&model).unwrap();
 
-    assert_eq!(compiled.compartments(), ["A", "B"]);
-    assert!(subgroup_total_names(&model.process).is_empty());
+    assert_eq!(
+        compiled.compartments(),
+        [
+            "A_h1_g1", "A_h1_g2", "A_h2_g1", "A_h2_g2", "B_h1_g1", "B_h1_g2", "B_h2_g1", "B_h2_g2"
+        ]
+    );
 }
 
 #[test]
-fn a_stratification_condition_without_a_category_filters_nothing() {
-    let model = conditional(r#"[{"stratification":"h"}]"#, "k");
+fn a_condition_names_a_stratification_declared_before_it() {
+    for named in ["g", "z"] {
+        let model = conditional(&format!(
+            r#"[{{"stratification":"{named}","category":"g1"}}]"#
+        ));
 
-    let compiled = CompiledModel::try_from_model(&model).unwrap();
-
-    assert_eq!(compiled.compartments(), ["A_g1", "A_g2", "B_g1", "B_g2"]);
+        assert_eq!(
+            CompiledModel::try_from_model(&model).err().unwrap(),
+            format!(
+                "Stratification 'g': a condition names '{named}', which is not a stratification \
+                 declared before it"
+            )
+        );
+    }
 }
 
 #[test]

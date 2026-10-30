@@ -269,20 +269,67 @@ builder = builder.add_stratification(
 | `conditions` | `list[StratificationCondition] \| None` | `None` | Splits only the compartments whose earlier categories match **all** conditions. |
 
 Each condition is `StratificationCondition(stratification=<id>,
-category=<category>)`, and may only name a stratification declared before this one; otherwise the call raises
-`ValueError`.
+category=<category>)`, or `categories=[...]` for a set of categories of which
+the compartment has one. It may only name a stratification declared before
+this one; otherwise the call raises `ValueError`.
 
 | Rule | Effect |
 |---|---|
 | Expansion | Every bin and accumulator gets one compartment per category: `A_g1`, `A_g2`. |
 | Several stratifications | The expansion is the product of their categories, in declaration order: `A_g1_s1`. |
 | Conditional stratification | Only matching compartments are split: with the code above, `A_g1`, `A_g2_s1`, `A_g2_s2`. |
+| Condition on a set | A compartment matches when its category is one of the set: `categories=["g2", "g3"]` splits `A_g2` and `A_g3`, and leaves `A_g1`. |
 | Order | Changing the order of `add_stratification` calls changes the compartments and their names. |
 | Case | Names are case-sensitive: `A_g1` is not `A_G1`. |
 
 See [Core Concepts](core-concepts.md#stratifications) for worked examples, and
 [Transitions](transitions.md#stratified-rates) for rates that depend on the
 category.
+
+### A condition on a set of categories
+
+A set lets a later stratification split only some categories of an earlier
+one, and the model keeps one stratification for the categories that a
+[matrix](#matrices-between-categories) couples:
+
+```python
+on_a_set = (
+    ModelBuilder(name="Type of g2 and g3")
+    .add_bin(id="A", name="State A")
+    .add_bin(id="B", name="State B")
+    .add_stratification(id="group", categories=["g1", "g2", "g3"])
+    .add_stratification(
+        id="type",
+        categories=["t1", "t2"],
+        conditions=[
+            StratificationCondition(stratification="group", categories=["g2", "g3"])
+        ],
+    )
+    .add_parameter(id="k1", value=0.1)
+    .add_transition(id="t_ab", source=["A"], target=["B"], rate="k1")
+    .build(
+        Aggregate(
+            bin_amounts={"A": 1000, "B": 0},
+            stratification_fractions={
+                "group": {"g1": 0.2, "g2": 0.3, "g3": 0.5},
+                "type": {"t1": 0.5, "t2": 0.5},
+            },
+        ),
+        engine="DifferenceEquations",
+    )
+)
+
+state = on_a_set.structure.initial_state(on_a_set.process)
+print([c.name for c in state if c.bin == "A"])
+# ['A_g1', 'A_g2_t1', 'A_g2_t2', 'A_g3_t1', 'A_g3_t2']
+```
+
+| Rule | Effect |
+|---|---|
+| A condition gives `category` or `categories` | Both, an empty set, a category twice or a category its stratification does not have: `build` raises `ValueError` with the stratification and the category. |
+| A set takes no `to` | `to` moves one category; a condition with `to` and a set is refused. |
+| Fractions | The split of `type` is of the subgroup of `g2` and `g3`; `subgroup_total(process, ["g2", "g3"])` sums it. |
+| Description | The table of stratifications says `where group in {g2, g3}`. |
 
 ## Matrices between categories
 
@@ -416,7 +463,7 @@ structure = Aggregate(
 |---|---|
 | Every amount is finite and not negative; `0` is an amount. The engine holds the rule (`check_bin_amount` and `check_compartment_amount` in `crates/commol-model/src/rules.rs`) | `Aggregate(...)` and each update of an amount |
 | Every bin has an amount, and no other id | `build` |
-| Every stratification has a fraction for each of its categories, and no other category; a split by category has one split for each category of the stratification it differs by. The engine holds the rule (`check_stratification_fractions` in `crates/commol-model/src/builder.rs`) | `build` |
+| Every stratification has a fraction for each of its categories, and no other category; a split by category has one split for each category of the stratification it differs by that its compartments have. The engine holds the rule (`check_stratification_fractions` in `crates/commol-model/src/builder.rs`) | `build` |
 | Every fraction is from 0 to 1, and each split sums to 1 within 1e-6. The engine holds the rule (`check_fractions` in `crates/commol-model/src/rules.rs`) | `Aggregate(...)` and each `update_stratification_fractions` |
 | Override names are expanded compartments | `build` |
 | With a stochastic engine, the amount of each bin is a whole number | `build` |
@@ -473,7 +520,7 @@ category that joins `g1` and `t1`.
 | Rule | Effect |
 |---|---|
 | `"by"` | Names a stratification declared before this one. Every compartment of this stratification must have a category of it, so a conditional stratification that leaves some of them out cannot be named. |
-| Splits | One split for each category of the `"by"` stratification, each with every category of this one. The message of a wrong split names the stratification and the category. |
+| Splits | One split for each category of the `"by"` stratification that the compartments of this one have, each with every category of this one. A `type` on `g2` and `g3` gives the splits of `g2` and `g3`, and a split of `g1` is refused. The message of a wrong split names the stratification and the category. |
 | A calibrated bin amount | Its compartments keep the split, also when the amount is `None` before calibration. |
 | Reading one fraction | `get_category_fraction` raises `ValueError` for such a stratification: it has one fraction per split. |
 | Setting a fraction | `update_stratification_fractions({"t1": 0.3})` sets `t1` to 0.3 in every split. |

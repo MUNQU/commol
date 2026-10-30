@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, NotRequired, TypedDict
 
 from commol._model.aggregate import split_groups
 from commol._model.engine_state import InitialCompartment
-from commol._model.initial_conditions import CATEGORY_SEPARATOR
+from commol._model.initial_conditions import CATEGORY_SEPARATOR, split_by
 from commol._model.report_entry import Interval, entry_interval
 
 if TYPE_CHECKING:
@@ -174,7 +174,8 @@ def category_splits_report(
     for an aggregate model. A category has no amount of its own, because it
     can split bins of different units; its row gives the declared fraction
     and ``group``, the categories that select the subgroup a conditional
-    stratification splits (empty when it splits every bin). A category name
+    stratification splits (empty when it splits every bin; the categories of
+    one stratification are a set, of which the subgroup has one). A category name
     two stratifications declare is reported under its qualified id, so the
     rows do not overwrite each other. A stratification split by the category
     of an earlier one gives a row per split, under ``<category> of
@@ -183,7 +184,7 @@ def category_splits_report(
     report: dict[str, CategorySplitEntry] = {}
     for stratification in structure.stratification_fractions:
         splits = split_groups(structure, process, stratification)
-        conditions = structure.get_conditioning_categories(process, stratification)
+        by = split_by(structure.stratification_fractions[stratification])
         for group, split in splits:
             for category, fraction in split.items():
                 ids = _category_ids(structure, stratification, category)
@@ -194,7 +195,6 @@ def category_splits_report(
                     "calibrated": entry_id in calibrated_ids,
                 }
                 _interval(entry, entry_id, parameter_statistics)
-                of = group[len(conditions) :]
-                key = f"{ids[0]} of {of[0]}" if of else ids[0]
+                key = ids[0] if by is None else f"{ids[0]} of {group[-1]}"
                 report[key] = entry
     return report

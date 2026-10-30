@@ -471,7 +471,8 @@ fn a_split_by_category_names_an_earlier_stratification() {
             "",
             fractions_with(r#"{"by":"group","g1":{"t1":0.5,"t2":0.5},"g3":{"t1":1.0,"t2":0.0}}"#),
             "Stratification 'type': its fractions by 'group' must name exactly the \
-             categories of 'group'. Missing categories: [\"g2\"], Extra categories: [\"g3\"].",
+             categories of 'group' that its compartments have. Missing categories: \
+             [\"g2\"], Extra categories: [\"g3\"].",
         ),
         (
             "",
@@ -522,6 +523,25 @@ fn a_split_by_category_needs_its_category_in_every_compartment() {
         initial_state_error(&model),
         "Stratification 'level': its fractions differ by 'type', but the compartment \
          'A_g2_l1' has a category of 'level' and none of 'type'"
+    );
+}
+
+#[test]
+fn a_split_by_category_names_no_category_it_does_not_reach() {
+    // `type` applies only to `g2`, so no compartment of `type` has `g1`.
+    let mut model = stratified_model(
+        "",
+        r#"{"A":1000.0,"B":0.0}"#,
+        &fractions_with(TYPE_BY_GROUP),
+    );
+    model.process.stratifications[1].conditions =
+        Some(serde_json::from_str(r#"[{"stratification":"group","categories":["g2"]}]"#).unwrap());
+
+    assert_eq!(
+        initial_state_error(&model),
+        "Stratification 'type': its fractions by 'group' must name exactly the categories \
+         of 'group' that its compartments have. Missing categories: [], Extra categories: \
+         [\"g1\"]."
     );
 }
 

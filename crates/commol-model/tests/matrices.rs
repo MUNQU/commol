@@ -251,6 +251,7 @@ fn a_compartment_without_a_category_of_the_matrix_is_rejected() {
             conditions: Some(vec![commol_core::StratificationCondition {
                 stratification: "other".to_string(),
                 category: Some("o1".to_string()),
+                categories: None,
                 to: None,
             }]),
         });

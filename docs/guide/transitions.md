@@ -305,11 +305,13 @@ print(group_rates.describe().render("text"))
 |---|---|
 | `stratification` | The stratification id. |
 | `category` | Optional. The category the **source** must have. |
+| `categories` | Optional. A set of categories: the **source** must have one of them. Give it instead of `category`; it takes no `to`. |
 | `to` | Optional. The category the **target** gets instead; see below. |
 
 **Which rate applies:** for each source compartment, the entry that matches
-with the **most** conditions wins; on a tie, the first one in the list. With no
-match, the fallback `rate` applies. With three stratifications and one entry for
+with the **most** conditions wins; on a tie, the first one in the list. A
+condition on a set counts as one condition, as a condition on one category
+does. With no match, the fallback `rate` applies. With three stratifications and one entry for
 `g2`, `t1`, `v2`:
 
 | Source compartment | Conditions matched | Rate |
@@ -317,6 +319,10 @@ match, the fallback `rate` applies. With three stratifications and one entry for
 | `A_g2_t1_v2` | 3 of 3 | The entry |
 | `A_g2_t1_v1` | not all | Fallback |
 | `A_g1_t1_v1` | not all | Fallback |
+
+An entry on `group` in `{g2, g3}` and another on `group` `g3` and `type` `t2`
+give `A_g2_t1` the first rate and `A_g3_t2` the second, which matches two
+conditions (`crates/commol-model/tests/stratified_rates.rs`).
 
 ### Redirecting the target with `to`
 
@@ -477,6 +483,7 @@ simulate as written:
 | A rate variable that is not a parameter, bin, compartment or special variable | The variable and the available names |
 | Several sources with a proportional rate | The transition; use an absolute rate or `$compartment` |
 | A stratified rate whose `category` conditions match no source compartment | The transition; use `to` to reach another stratification |
+| A condition on a stratification the process does not have, with both `category` and `categories`, an empty set, a category twice, a category its stratification does not have, or `to` with `categories` (`Process::check_conditions` and `StratificationCondition::check` in `crates/commol-core/src/types/`) | The transition, the stratification and the category |
 | A `to` condition on a transition without a source | The transition; use `category` to choose the compartment it enters |
 | A flow that ends in categories no compartment has | The transition; add a `to` condition |
 | `impulse_at` and `impulse_every` together, an `impulse_at` with no step, a step that is negative or not finite, a period that is not positive, or a negative offset; the `Transition` fails when it is made, with the rule of the engine (`check_impulse` in `crates/commol-model/src/rules.rs`) | The transition |

@@ -104,9 +104,21 @@ def _conditions(conditions: list | None) -> str:
         return "every compartment"
     return "where " + " and ".join(
         f"{condition.stratification} = {condition.category}"
-        for condition in conditions
         if condition.category is not None
+        else f"{condition.stratification} in {{{', '.join(condition.names())}}}"
+        for condition in conditions
+        if condition.names()
     )
+
+
+def _group(structure: "Aggregate", group: tuple[str, ...]) -> str:
+    """The categories of a split group, as the column ``Of`` names them: the
+    categories of one stratification, a set, joined by ``|``, and the
+    stratifications by ``+``."""
+    sets: dict[str, list[str]] = {}
+    for category in group:
+        sets.setdefault(structure.resolve_category(category)[0], []).append(category)
+    return "+".join("|".join(names) for names in sets.values()) or "each bin"
 
 
 def _neighbors[S: "Aggregate"](model: "Model[S]") -> list[_Block]:
@@ -191,7 +203,7 @@ def _initialization[S: "Aggregate"](model: "Model[S]") -> list[_Block]:
                             stratification,
                             category,
                             fraction,
-                            "+".join(group) or "each bin",
+                            _group(structure, group),
                         ]
                     )
         blocks.append(

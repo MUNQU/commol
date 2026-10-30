@@ -60,36 +60,6 @@ class Process(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def _validate_stratified_rates(self) -> Self:
-        """Validate that stratified rates name stratifications and categories."""
-        strat_map = {strat.id: strat for strat in self.stratifications}
-
-        for transition in self.transitions:
-            for idx, stratified_rate in enumerate(transition.stratified_rates or []):
-                for condition in stratified_rate.conditions:
-                    if condition.stratification not in strat_map:
-                        raise ValueError(
-                            f"In transition '{transition.id}', stratified rate "
-                            f"{idx}: Stratification "
-                            f"'{condition.stratification}' not found. "
-                            f"Available: {list(strat_map.keys())}"
-                        )
-
-                    # A condition without a category only redirects the target.
-                    strat = strat_map[condition.stratification]
-                    if (
-                        condition.category is not None
-                        and condition.category not in strat.categories
-                    ):
-                        raise ValueError(
-                            f"In transition '{transition.id}', stratified rate "
-                            f"{idx}: Category '{condition.category}' not found "
-                            f"in stratification '{condition.stratification}'. "
-                            f"Available: {strat.categories}"
-                        )
-        return self
-
-    @model_validator(mode="after")
     def _validate_transition_ids(self) -> Self:
         """
         Check that each transition moves between bins, or between the

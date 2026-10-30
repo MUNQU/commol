@@ -146,6 +146,7 @@ pub(crate) fn plan_transition_flows(
                 .any(|v| compartment_names.contains(v.as_str()) || subgroup_total_names.contains(v))
         })
     };
+    process.check_conditions()?;
     for matrix in &process.matrices {
         matrix.check(process)?;
     }
@@ -396,11 +397,10 @@ fn check_stratified_rates_match(
         }
         let matches_some = driving.iter().any(|&idx| {
             let label = &layout.labels()[idx];
-            stratified_rate.conditions.iter().all(|condition| {
-                condition.category.as_deref().is_none_or(|category| {
-                    label.category(&condition.stratification) == Some(category)
-                })
-            })
+            stratified_rate
+                .conditions
+                .iter()
+                .all(|condition| condition.holds(label.category(&condition.stratification)))
         });
         if !matches_some {
             return Err(format!(
@@ -686,6 +686,34 @@ mod tests {
         let stratifications = r#"{"id":"group","categories":["g1","g2"]},
                {"id":"type","categories":["t1","t2"],
                 "conditions":[{"stratification":"group","category":"g2"}]}"#;
+        let bare = model(
+            &["A"],
+            stratifications,
+            r#"{"id":"move","source":["g1"],"target":["g2"],"rate":"a"}"#,
+        );
+        let routed = model(
+            &["A"],
+            stratifications,
+            r#"{"id":"move","source":["g1"],"target":["g2"],"stratified_rates":[{
+                "conditions":[{"stratification":"type","to":"t1"}],"rate":"a"}]}"#,
+        );
+
+        assert!(
+            describe_flows(&bare, None)
+                .unwrap_err()
+                .contains("'to' condition")
+        );
+        assert_eq!(
+            flows(&routed),
+            vec![(some("A_g1"), some("A_g2_t1"), "a".to_string(), false)]
+        );
+    }
+
+    #[test]
+    fn moving_into_a_category_of_a_set_needs_the_dependent_category() {
+        let stratifications = r#"{"id":"group","categories":["g1","g2","g3"]},
+               {"id":"type","categories":["t1","t2"],
+                "conditions":[{"stratification":"group","categories":["g2","g3"]}]}"#;
         let bare = model(
             &["A"],
             stratifications,

@@ -59,9 +59,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   has a category of it, and each split, with a message that names the
   stratification and the category. See
   [Building Models](../guide/building-models.md#fractions-that-differ-by-category).
+- `StratificationCondition(categories=[...])`: a condition of a stratification
+  or of a stratified rate matches any category of a set, such as
+  `StratificationCondition(stratification="group", categories=["g3", "g4"])`.
+  A stratification then splits only some categories of an earlier one, and
+  one stratification keeps the categories that a matrix couples, so
+  `matrix_sum`, `M_radius` and a split by category work in a model where only
+  some groups have a later stratification. A set counts as one condition when
+  the most specific stratified rate wins. The engine refuses a condition with
+  both `category` and `categories`, an empty set, a category twice, a category
+  its stratification does not have, or `to` with a set.
+  `Aggregate.subgroup_total` reads the categories of one stratification as a
+  set, and the description writes `where group in {g3, g4}`. See
+  [Building Models](../guide/building-models.md#a-condition-on-a-set-of-categories).
 
 ### Changed
 
+- **Breaking:** a split by category names exactly the categories of `by` that
+  the compartments of its stratification have. A `type` on `g2` only, split by
+  `group`, gives the split of `g2` alone, and a split of `g1`, which no
+  compartment reads, is refused with a message that names `type` and `g1`.
+  Migration: remove the split of each category that the conditions of the
+  stratification leave out.
+- **Breaking:** the engine checks the stratification each condition names,
+  and its category, from `check_model`. The condition of a stratification
+  names one declared before it, and the condition of a stratified rate one of
+  the process. A model in JSON whose condition names another stratification
+  built and expanded nothing for it; it is now refused, with a message that
+  names the stratification. `ModelBuilder.add_stratification` refused it
+  already. A condition of a stratification on a category its stratification
+  does not have, such as `StratificationCondition(stratification="group",
+  category="g9")`, built and expanded nothing; it is now refused, with a
+  message that names the stratification and the category. The
+  unknown stratification or category of a stratified rate gets the message of
+  the engine, `Transition 'ab', stratified rate 0: the condition on 'group'
+  names 'g9', which is not a category of 'group' (["g1", "g2"])`. Migration:
+  name in each condition a stratification declared before it and one of its
+  categories.
 - The engine checks that the fractions name every stratification and each of
   its categories, from `check_model`; the messages list the ids as the engine
   writes them, `Missing ids: ["g"], Extra ids: []`, and the message of the

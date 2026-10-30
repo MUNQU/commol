@@ -433,9 +433,10 @@ class Aggregate(ModelStructure, InitialConditions):
         -------
         tuple[str, ...]
             Ids of the categories selecting the subgroup this stratification
-            subdivides, empty for an unconditional stratification. A category
-            name another stratification also declares is qualified, as in
-            ``group:g1``.
+            subdivides, empty for an unconditional stratification. The
+            categories of one stratification are a set: the subgroup has one
+            of them (`subgroup_total`). A category name another
+            stratification also declares is qualified, as in ``group:g1``.
 
         Raises
         ------
@@ -445,9 +446,9 @@ class Aggregate(ModelStructure, InitialConditions):
         for stratification in process.stratifications:
             if stratification.id == stratification_id:
                 return tuple(
-                    self.category_id(condition.stratification, condition.category)
+                    self.category_id(condition.stratification, category)
                     for condition in (stratification.conditions or [])
-                    if condition.category is not None
+                    for category in condition.names()
                 )
         raise ValueError(
             f"Stratification '{stratification_id}' not found. Available: "
@@ -459,8 +460,10 @@ class Aggregate(ModelStructure, InitialConditions):
         Get the initial sum of the compartments of a subgroup.
 
         The sum is taken of the state the engine builds, overrides included,
-        over every compartment that has each of the categories. Passing no
-        categories gives the sum of every compartment. It adds every bin it
+        over every compartment that has, in each stratification the categories
+        name, one of the categories of that stratification: ``["g2", "g3",
+        "s1"]`` sums the compartments of ``g2`` or ``g3`` that have ``s1``.
+        Passing no categories gives the sum of every compartment. It adds every bin it
         covers, so over bins of different units it has no unit.
 
         Parameters
@@ -480,13 +483,16 @@ class Aggregate(ModelStructure, InitialConditions):
         ValueError
             If a category is not found or a bare name is ambiguous.
         """
-        resolved = [self.resolve_category(c) for c in categories]
+        sets: dict[str, set[str]] = {}
+        for category in categories:
+            stratification, name = self.resolve_category(category)
+            sets.setdefault(stratification, set()).add(name)
         return sum(
             compartment.amount
             for compartment in self.initial_state(process)
             if all(
-                compartment.categories.get(stratification) == name
-                for stratification, name in resolved
+                compartment.categories.get(stratification) in names
+                for stratification, names in sets.items()
             )
         )
 
@@ -516,7 +522,8 @@ def split_groups(
     The group of one split is the group the conditions of the stratification
     select (`Aggregate.get_conditioning_categories`). The group of each split
     of a split by category adds the category of the stratification it differs
-    by, so ``("g1",)`` for the split of ``g1``.
+    by, last, so ``("g1",)`` for the split of ``g1``; that category takes the
+    place of the categories a condition names in that stratification.
 
     Parameters
     ----------
@@ -536,15 +543,14 @@ def split_groups(
     conditions = structure.get_conditioning_categories(process, stratification)
     fractions = structure.stratification_fractions[stratification]
     by = split_by(fractions)
-    return [
-        (
-            conditions
-            if of is None or by is None
-            else (*conditions, structure.category_id(by, of)),
-            split,
-        )
-        for of, split in category_splits(fractions)
-    ]
+    if by is None:
+        return [(conditions, split) for _, split in category_splits(fractions)]
+    others = tuple(c for c in conditions if structure.resolve_category(c)[0] != by)
+    groups = []
+    for of, split in category_splits(fractions):
+        assert of is not None, "each split of a split by category has its category"
+        groups.append(((*others, structure.category_id(by, of)), split))
+    return groups
 
 
 def _unit_name(unit: str | None) -> str:
