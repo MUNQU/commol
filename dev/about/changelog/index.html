@@ -5204,6 +5204,19 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li>Ctrl-C stops a method that logs its steps: it starts no new step, waits
+  for the steps already running, and raises <code>KeyboardInterrupt</code>, whatever
+  the level of the logger. See
+  <a href="../../getting-started/quickstart/#stop-a-long-method">Stop a long method</a>.</li>
+<li>More long methods log their steps at <code>INFO</code>, on the logger of their
+  module: each block of a block jackknife (<code>commol.resampling</code>); each fit
+  of jackknife+, EnbPI and rolling conformal (<code>commol.conformal</code>); each
+  generation of a Gibbs posterior, a Bayesian posterior and ABC-SMC, with
+  its level, and each replicate and round of a calibrated <code>η</code>
+  (<code>commol.smc</code>); and the model runs of ABC rejection (<code>commol.smc</code>), a
+  Laplace mixture (<code>commol.local</code>), each sensitivity method
+  (<code>commol.sensitivity</code>) and a predictive, at each 1 % of the runs. See
+  <a href="../../getting-started/quickstart/#log-messages">Log messages</a>.</li>
 <li><code>ObservedDataPoint(outputs=[...], coefficients=[...])</code>: one known
   coefficient per output, so the observation predicts the weighted sum
   <code>Σ coefficient · output</code>, then times its scale and its factor. A count

@@ -175,7 +175,24 @@ Simulation(model).run(num_steps=10)
 
 Each message shows its level and its logger, such as `INFO:commol:Running simulation for 10 steps.`
 
-At `INFO`, a method that runs for long tells where it is: a calibration logs each start when it ends, a bootstrap each replicate, and a profile each stage (the fit, the replicate fits, the refits of its threshold, the walk) and each side it walks. A record gives the count done over the total, such as `Replicate 12 finished (37/100): loss 1.280412e3, converged`, and no estimate of the time left. A build logs one record with the size of the model. `DEBUG` adds each element a builder adds and the starts of each replicate.
+At `INFO`, a method that runs for long tells where it is, on the logger of its module:
+
+| Method                                                               | One record per                                                                      |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| A calibration                                                        | Start that ends                                                                     |
+| A bootstrap, EnbPI                                                   | Replicate                                                                           |
+| A block jackknife, jackknife+                                        | Block left out                                                                      |
+| Rolling conformal                                                    | Origin                                                                              |
+| A profile                                                            | Stage (the fit, the replicate fits, the refits of its threshold, the walk) and side |
+| A Gibbs or Bayesian posterior, ABC-SMC                               | Generation, with its level and the last level                                       |
+| A calibrated `η` by bootstrap coverage                               | Replicate, and round that raises `η`                                                |
+| ABC rejection, a Laplace mixture, a sensitivity method, a predictive | Each 1 % of the model runs, at most 100 records                                     |
+
+A record gives the count done over the total, such as `Replicate 12 finished (37/100): loss 1.280412e3, converged`, and no estimate of the time left. A generation of SMC gives the level it reached and the last level instead, such as `Generation 4: level 2.500000e-1 toward 1.000000e0, effective size 812.0, acceptance 0.310`. A build logs one record with the size of the model. `DEBUG` adds each element a builder adds, the starts of each replicate and the generations of each replicate of a calibrated `η`.
+
+### Stop a long method
+
+Press Ctrl-C to stop a method that logs its steps. It starts no new step, waits for the steps already running, and raises `KeyboardInterrupt`; it returns no partial result. The stop works whatever the level of the logger.
 
 | To                                                  | Call                                                                        |
 | --------------------------------------------------- | --------------------------------------------------------------------------- |

@@ -3906,7 +3906,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-core/src/progress.rs</code></td>
-<td><code>Steps</code>, the port of the events of the loops of a long method, and <code>NoSteps</code>, which drops them; each crate owns the events of its loops (<code>StartEvent</code>, <code>RunnerEvent</code>, <code>SideEvent</code>).</td>
+<td><code>Steps</code>, the port of the events of the loops of a long method and of their stop (<code>stopped</code>), <code>NoSteps</code>, which drops them and never stops, and <code>STOPPED</code>, the reason of a step a stop kept from running; each crate owns the events of its loops (<code>StartEvent</code>, <code>RunnerEvent</code>, <code>SideEvent</code>, <code>SmcEvent</code>, <code>RunEvent</code> of <code>commol_inference::runs</code>).</td>
 <td>A log record, or a logger of Python.</td>
 </tr>
 <tr>
@@ -4130,6 +4130,11 @@
 <td>Noise models of one method; a second band reducer or layout.</td>
 </tr>
 <tr>
+<td><code>crates/commol-inference/src/runs.rs</code></td>
+<td><code>RunEvent</code>, the events of a loop of model runs (the points of a design, the sets of a predictive, the draws of an importance sampler or of the prior of ABC), and <code>stopped</code>, the error of a point a stop kept from running.</td>
+<td>How often a record is written: the extension groups the points.</td>
+</tr>
+<tr>
 <td><code>crates/commol-inference/src/resampling/</code></td>
 <td>Fits to reweighted or resampled data: <code>blocks.rs</code> (<code>BlockScheme</code>, the automatic block length, and the one resolution of a block length, given or automatic, with its estimates: <code>BlockScheme::resolve</code>, <code>BlockScheme::at_fit</code>, which the sandwich, the bootstraps, the jackknife, the calibration of <code>η</code> and the conformal methods call), <code>residuals.rs</code> (<code>Residuals</code> on a scale, residuals by series and position), <code>resamplers.rs</code> (the <code>Resampler</code> port, <code>Perturbation</code>, the Bayesian, residual and wild bootstraps, <code>ParametricResampler</code>), <code>runner.rs</code> (<code>ReplicateRunner</code> and its one loop <code>fit_all</code>, <code>ReplicateFits</code>, <code>FitUnit</code>, <code>bootstrap</code>), <code>jackknife.rs</code> (<code>block_jackknife</code>), <code>noise.rs</code> (<code>ResidualNoise</code>).</td>
 <td>Changes to the problem other than through <code>with_data</code>.</td>
@@ -4308,7 +4313,7 @@
 </tr>
 <tr>
 <td><code>py-commol/src/records.rs</code></td>
-<td>The log records of the steps of a long method: <code>ChannelSteps</code>, the receiver the workers send to, and the drain that counts the steps and writes their records from the calling thread.</td>
+<td>The log records of the steps of a long method: <code>ChannelSteps</code>, the receiver the workers send to, and the drain that counts the steps, writes their records from the calling thread and reads the signals of Python, setting the stop of the job on a Ctrl-C.</td>
 <td>Where records go: the application chooses it.</td>
 </tr>
 <tr>

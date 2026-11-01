@@ -656,6 +656,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Log messages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stop-a-long-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stop a long method
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3786,6 +3803,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Log messages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stop-a-long-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stop a long method
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4061,14 +4095,62 @@ logger once, at the start of your program:</p>
 </span></code></pre></div>
 <p>Each message shows its level and its logger, such as
 <code>INFO:commol:Running simulation for 10 steps.</code></p>
-<p>At <code>INFO</code>, a method that runs for long tells where it is: a calibration
-logs each start when it ends, a bootstrap each replicate, and a profile each
-stage (the fit, the replicate fits, the refits of its threshold, the walk)
-and each side it walks. A record gives the count done over the total, such
-as <code>Replicate 12 finished (37/100): loss 1.280412e3, converged</code>, and no
-estimate of the time left. A build logs one record with the size of the
-model. <code>DEBUG</code> adds each element a builder adds and the starts of each
-replicate.</p>
+<p>At <code>INFO</code>, a method that runs for long tells where it is, on the logger of
+its module:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>One record per</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A calibration</td>
+<td>Start that ends</td>
+</tr>
+<tr>
+<td>A bootstrap, EnbPI</td>
+<td>Replicate</td>
+</tr>
+<tr>
+<td>A block jackknife, jackknife+</td>
+<td>Block left out</td>
+</tr>
+<tr>
+<td>Rolling conformal</td>
+<td>Origin</td>
+</tr>
+<tr>
+<td>A profile</td>
+<td>Stage (the fit, the replicate fits, the refits of its threshold, the walk) and side</td>
+</tr>
+<tr>
+<td>A Gibbs or Bayesian posterior, ABC-SMC</td>
+<td>Generation, with its level and the last level</td>
+</tr>
+<tr>
+<td>A calibrated <code>η</code> by bootstrap coverage</td>
+<td>Replicate, and round that raises <code>η</code></td>
+</tr>
+<tr>
+<td>ABC rejection, a Laplace mixture, a sensitivity method, a predictive</td>
+<td>Each 1 % of the model runs, at most 100 records</td>
+</tr>
+</tbody>
+</table>
+<p>A record gives the count done over the total, such as
+<code>Replicate 12 finished (37/100): loss 1.280412e3, converged</code>, and no
+estimate of the time left. A generation of SMC gives the level it reached
+and the last level instead, such as
+<code>Generation 4: level 2.500000e-1 toward 1.000000e0, effective size 812.0, acceptance 0.310</code>.
+A build logs one record with the size of the model. <code>DEBUG</code> adds each
+element a builder adds, the starts of each replicate and the generations of
+each replicate of a calibrated <code>η</code>.</p>
+<h3 id="stop-a-long-method">Stop a long method<a class="headerlink" href="#stop-a-long-method" title="Permanent link">&para;</a></h3>
+<p>Press Ctrl-C to stop a method that logs its steps. It starts no new step,
+waits for the steps already running, and raises <code>KeyboardInterrupt</code>; it
+returns no partial result. The stop works whatever the level of the logger.</p>
 <table>
 <thead>
 <tr>

@@ -354,7 +354,24 @@ Simulation(model).run(num_steps=10)
 
 Each message shows its level and its logger, such as `INFO:commol:Running simulation for 10 steps.`
 
-At `INFO`, a method that runs for long tells where it is: a calibration logs each start when it ends, a bootstrap each replicate, and a profile each stage (the fit, the replicate fits, the refits of its threshold, the walk) and each side it walks. A record gives the count done over the total, such as `Replicate 12 finished (37/100): loss 1.280412e3, converged`, and no estimate of the time left. A build logs one record with the size of the model. `DEBUG` adds each element a builder adds and the starts of each replicate.
+At `INFO`, a method that runs for long tells where it is, on the logger of its module:
+
+| Method                                                               | One record per                                                                      |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| A calibration                                                        | Start that ends                                                                     |
+| A bootstrap, EnbPI                                                   | Replicate                                                                           |
+| A block jackknife, jackknife+                                        | Block left out                                                                      |
+| Rolling conformal                                                    | Origin                                                                              |
+| A profile                                                            | Stage (the fit, the replicate fits, the refits of its threshold, the walk) and side |
+| A Gibbs or Bayesian posterior, ABC-SMC                               | Generation, with its level and the last level                                       |
+| A calibrated `η` by bootstrap coverage                               | Replicate, and round that raises `η`                                                |
+| ABC rejection, a Laplace mixture, a sensitivity method, a predictive | Each 1 % of the model runs, at most 100 records                                     |
+
+A record gives the count done over the total, such as `Replicate 12 finished (37/100): loss 1.280412e3, converged`, and no estimate of the time left. A generation of SMC gives the level it reached and the last level instead, such as `Generation 4: level 2.500000e-1 toward 1.000000e0, effective size 812.0, acceptance 0.310`. A build logs one record with the size of the model. `DEBUG` adds each element a builder adds, the starts of each replicate and the generations of each replicate of a calibrated `η`.
+
+### Stop a long method
+
+Press Ctrl-C to stop a method that logs its steps. It starts no new step, waits for the steps already running, and raises `KeyboardInterrupt`; it returns no partial result. The stop works whatever the level of the logger.
 
 | To                                                  | Call                                                                        |
 | --------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -10203,7 +10220,7 @@ class Calibrator:
         PredictiveProtocol
             The runs, computed in Rust.
         """
-        return self._engine_problem.predictive(sample._rust, positions)
+        return self._engine_problem.predictive(sample._rust, positions, logger)
 
     def with_model(self, model: "Model") -> "Calibrator":
         """
@@ -27437,7 +27454,7 @@ class SensitivityAnalysis:
         PredictiveProtocol
             The runs, computed in Rust.
         """
-        return self._rust.predictive(sample._rust, positions)
+        return self._rust.predictive(sample._rust, positions, logger)
 
     def with_model(self, model: "Model") -> "SensitivityAnalysis":
         """
@@ -38663,6 +38680,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- Ctrl-C stops a method that logs its steps: it starts no new step, waits for the steps already running, and raises `KeyboardInterrupt`, whatever the level of the logger. See [Stop a long method](https://munqu.github.io/commol/latest/getting-started/quickstart/#stop-a-long-method).
+- More long methods log their steps at `INFO`, on the logger of their module: each block of a block jackknife (`commol.resampling`); each fit of jackknife+, EnbPI and rolling conformal (`commol.conformal`); each generation of a Gibbs posterior, a Bayesian posterior and ABC-SMC, with its level, and each replicate and round of a calibrated `η` (`commol.smc`); and the model runs of ABC rejection (`commol.smc`), a Laplace mixture (`commol.local`), each sensitivity method (`commol.sensitivity`) and a predictive, at each 1 % of the runs. See [Log messages](https://munqu.github.io/commol/latest/getting-started/quickstart/#log-messages).
 - `ObservedDataPoint(outputs=[...], coefficients=[...])`: one known coefficient per output, so the observation predicts the weighted sum `Σ coefficient · output`, then times its scale and its factor. A count model reads that sum as one count. Each coefficient is finite and 0 or more, and one is above 0; `coefficients` with `output` is refused. The loss, the likelihood, the predictive, the figures, the `observed` block of a report (`coefficients`), the noise floor of a profile and the dense design of finite differences read them. See [Weighted sums](https://munqu.github.io/commol/latest/guide/calibration-observations/#weighted-sums).
 - A method that runs for long logs each step it finishes, at `INFO`, on the logger of its module: each start of `Calibrator.run` (`commol`), each replicate of a bootstrap (`commol.resampling`), and each stage and side of a profile (`commol.profiles`), with the count done over the total, such as `Replicate 12 finished (37/100): loss 1.280412e3, converged`. The starts of a replicate log at `DEBUG`. An identifiability method logs its start and its end with its duration (`commol.identifiability`). A handler that raises an `Exception` loses its record, never the result. See [Log messages](https://munqu.github.io/commol/latest/getting-started/quickstart/#log-messages).
 - Every result writes itself to a JSON file with `to_json(file_path, indent=2)`, and its class reads it back with `from_json(file_path)`, as `Model` does: `CalibrationResult.from_json("fit.json")` returns a `CalibrationResult` equal to the result written. A result read back feeds the methods that take a result, such as `StartsIdentifiability(result=...)` and `Collinearity(at=...)`, and its sample draws the same members. A file whose fields do not fit the class raises `pydantic.ValidationError`; the file holds no name of its class, so a class with the same fields reads it. `SampleMethod` refuses a setting that is not finite, which JSON cannot hold. See [Saving a result](https://munqu.github.io/commol/latest/guide/calibration/#saving-a-result).

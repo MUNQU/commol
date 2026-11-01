@@ -90,7 +90,7 @@ class Calibrator:
         PredictiveProtocol
             The runs, computed in Rust.
         """
-        return self._engine_problem.predictive(sample._rust, positions)
+        return self._engine_problem.predictive(sample._rust, positions, logger)
 
     def with_model(self, model: "Model") -> "Calibrator":
         """
