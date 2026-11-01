@@ -13,7 +13,7 @@ use crate::types::{
     CalibrationParameter, CalibrationParameterType, ObservedDataPoint, ReplicateSummary,
     Replicates, check_parameters,
 };
-use crate::values::ValueWriter;
+use crate::values::{ValueSource, ValueWriter};
 
 /// The buffers of one thread's evaluations, reused from one to the next.
 #[derive(Debug, Default, Clone)]
@@ -95,17 +95,26 @@ impl<E: SimulationEngine> ForwardModel<E> {
     /// deterministic engine runs once, and reads neither. Its schedule is
     /// empty: it runs at the positions it is given ([`Self::run_at`]).
     ///
+    /// `source` says whether the method varies the values or writes numbers
+    /// it knows. The first numbers of `source` are written to a copy of the
+    /// engine, which checks that the model then has every value a run needs.
+    ///
     /// # Errors
     ///
     /// Returns the message of [`check_unobserved`], or a message when
     /// `replicates` is 0
     /// ([`crate::ranges::REPLICATES`]), the engine is stochastic and
-    /// `replicates` or `seed` is not set, or the engine does not resolve a
-    /// value of its model kind or the remainder.
+    /// `replicates` or `seed` is not set, the engine does not resolve a
+    /// value of its model kind or the remainder, a varied source has a value
+    /// of which the engine does not take every number
+    /// ([`SimulationEngine::check_varied_values`]), the engine rejects a
+    /// first number, or a value is missing once they are written
+    /// ([`SimulationEngine::check_values`]).
     pub fn unobserved(
         base_engine: E,
         parameters: Vec<CalibrationParameter>,
         remainder: Option<&str>,
+        source: ValueSource<'_>,
         replicates: Option<usize>,
         seed: Option<u64>,
     ) -> Result<Self, String> {
@@ -131,7 +140,8 @@ impl<E: SimulationEngine> ForwardModel<E> {
         } else {
             None
         };
-        let values = ValueWriter::new(&base_engine, &parameters, remainder)?;
+        let values = ValueWriter::of_source(&base_engine, &parameters, remainder, source)?;
+        values.check_written(&base_engine, &parameters, source)?;
         let observation =
             ObservationOperator::new(&[], &parameters, &base_engine.output_names(), &[])?;
         let mut model = Self::new(base_engine, parameters, values, Vec::new(), observation);

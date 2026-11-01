@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, TypeVar
 
 from pydantic import BaseModel
 
-from commol._calibration.calibrator import check_values
 from commol._calibration.method import SensitivityMethod, run_method
 from commol._data.engine_json import engine_handles, engine_json
 from commol._problem.problem import ObservedDataPoint
@@ -73,26 +72,34 @@ class SensitivityAnalysis:
         Raises
         ------
         ValueError
-            If an input is not a value of the model, the replicates or the
-            seed do not fit the engine, `replicates` is below 1 (a negative
-            number included), or the seed is not a whole number from 0 to
-            ``2**64 - 1``.
+            If an input is not a value of the model, the model lacks a value
+            once the first numbers of the design are written, the engine does
+            not take every number of an independent input (an
+            ``initial_condition`` on an engine of whole units with no
+            rounding), the engine rejects the first draw of a sample, the
+            replicates or the seed do not fit the engine, `replicates` is
+            below 1 (a negative number included), or the seed is not a whole
+            number from 0 to ``2**64 - 1``.
         """
         self.simulation: Simulation = simulation
         self.inputs: InputSpace = inputs
         self.replicates: int | None = replicates
-        check_values(
-            simulation.model_definition,
-            simulation.engine,
-            inputs.parameters,
-            inputs.initial_condition_remainder,
-        )
+        # The engine checks the values: it resolves them, refuses independent
+        # inputs of which it does not take every number, and writes the
+        # first numbers of the design to check that no value is missing.
         self._rust: "ForwardAnalysisProtocol" = commol_rs.inference.ForwardAnalysis(
             simulation.engine,
             engine_json(inputs),
             **engine_handles(inputs),
             replicates=replicates,
             seed=None if seed is None else check_seed(seed),
+        )
+        model = simulation.model_definition
+        model.structure.check_calibration_values(
+            model,
+            simulation.engine,
+            inputs.parameters,
+            inputs.initial_condition_remainder,
         )
         if seed is None:
             logger.info(

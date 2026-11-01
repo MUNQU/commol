@@ -483,7 +483,7 @@ def check_values(
     remainder: str | None,
 ) -> None:
     """
-    Check that a model has every value a calibration or an analysis sets.
+    Check that a model has every value a calibration sets.
 
     The engine checks that a factor has positive bounds, and each parameter
     as its ``set_parameter`` does: one the model does not have, or one that

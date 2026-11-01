@@ -648,12 +648,22 @@ fn calibrated_initial_conditions_go_through_the_rounding() {
     let start = &engine.run_at(&[0.0]).unwrap()[0];
     assert_eq!(start, &vec![988.0, 12.0, 0.0]);
 
+    // With no rounding, a method that varies B is refused, whatever its
+    // bounds; a known value is checked when it is written: 12 is taken, and
+    // 12.3 is refused.
     let mut whole_only = steps(&chain("StochasticSteps", "null"));
+    let varied = whole_only.check_varied_values(&values).unwrap_err();
+    for part in ["StochasticSteps", "'B'", "largest_remainder", "random"] {
+        assert!(varied.contains(part), "{part} in {varied}");
+    }
     let plan = whole_only.plan_values(&values, Some("A")).unwrap();
+    assert_eq!(whole_only.apply_values(&plan, &[12.0]).unwrap(), 0.0);
     let error = whole_only.apply_values(&plan, &[12.3]).unwrap_err();
-    for part in ["StochasticSteps", "largest_remainder", "random"] {
+    for part in ["StochasticSteps", "12.3 is not whole", "largest_remainder"] {
         assert!(error.contains(part), "{part} in {error}");
     }
+    assert!(engine.check_varied_values(&values).is_ok());
+    assert!(whole_only.check_varied_values(&[]).is_ok());
 }
 
 // ----------------------------------------------------------------------

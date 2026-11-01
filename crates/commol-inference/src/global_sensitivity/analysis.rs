@@ -8,7 +8,7 @@
 //! the replicates of a stochastic engine, the bootstrap of Sobol and the runs
 //! of a propagation never draw from one sequence.
 
-use commol_calibration::{CalibrationParameter, ForwardModel};
+use commol_calibration::{CalibrationParameter, ForwardModel, ValueSource};
 use commol_core::SimulationEngine;
 
 use crate::batch::BatchRunner;
@@ -62,7 +62,11 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
     ///
     /// [`MethodError::Invalid`] when the inputs are not the parameters, in
     /// order and with their bounds, or as [`ForwardModel::unobserved`], which
-    /// refuses a stochastic engine with no replicates or no seed.
+    /// refuses a stochastic engine with no replicates or no seed, independent
+    /// inputs of which the engine does not take every number, and a model
+    /// that lacks a value once the first numbers are written (the point of
+    /// each bound nearest 0 for independent inputs, the first draw of a
+    /// sample).
     pub fn new(
         engine: E,
         parameters: Vec<CalibrationParameter>,
@@ -84,10 +88,17 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
                 inputs.bounds()
             )));
         }
+        // A sample is the design, so its draws are the numbers the analysis
+        // writes; independent inputs are varied.
+        let source = match &inputs {
+            InputSpace::Independent(_) => ValueSource::Varied,
+            InputSpace::Sample(sample) => ValueSource::Known(&sample.values()[0]),
+        };
         let forward = ForwardModel::unobserved(
             engine,
             parameters,
             remainder,
+            source,
             replicates,
             seed.map(|seed| Stream::SensitivityReplicates.seed(seed)),
         )

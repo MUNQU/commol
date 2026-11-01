@@ -575,6 +575,10 @@ impl ValuePlan for NoPlan {
 }
 
 impl SimulationEngine for Brittle {
+    fn check_varied_values(&self, _values: &[commol_core::ModelValue]) -> Result<(), String> {
+        Ok(())
+    }
+
     fn check_values(&self) -> Result<(), String> {
         Ok(())
     }
