@@ -153,6 +153,10 @@ impl Steps<StartEvent<'_>> for StartsOf<'_> {
             event,
         });
     }
+
+    fn stopped(&self) -> bool {
+        self.steps.stopped()
+    }
 }
 
 /// The fits of the replicates of a method, in the order of their indices.

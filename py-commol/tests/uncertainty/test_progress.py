@@ -465,29 +465,78 @@ def test_every_long_method_logs_its_steps(
     check(messages)
 
 
-def test_an_interrupt_stops_the_steps() -> None:
-    calibrator = line_calibrator(VALUES, seed=5)
-    # About 10 s on one thread: 2000 replicates of 8 starts.
-    bootstrap = BayesianBootstrap(replicates=2000, block_length=1, starts=8)
+@contextmanager
+def _sigint() -> Iterator[None]:
+    """A handler of SIGINT that raises `KeyboardInterrupt` within the block
+    only, so a signal that comes after the method has ended raises
+    nothing."""
     armed = threading.Event()
     armed.set()
 
     def interrupt(_signum: int, _frame: FrameType | None) -> None:
-        # A signal after the method has ended raises nothing.
         if armed.is_set():
             raise KeyboardInterrupt
 
     previous = signal.signal(signal.SIGINT, interrupt)
-    timer = threading.Timer(0.2, _thread.interrupt_main, (signal.SIGINT,))
     try:
-        began = time.perf_counter()
-        timer.start()
-        with threads(1), caplog_off(), pytest.raises(KeyboardInterrupt):
+        yield
+    finally:
+        armed.clear()
+        signal.signal(signal.SIGINT, previous)
+
+
+class _Interrupting(logging.Handler):
+    """A handler that sends SIGINT to the main thread at the first record of
+    a start of a replicate, and keeps the time it did."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.at: float | None = None
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if self.at is None and re.fullmatch(
+            r"Replicate \d+: start \d+ finished .*", record.getMessage()
+        ):
+            self.at = time.perf_counter()
+            _thread.interrupt_main(signal.SIGINT)
+
+
+def test_an_interrupt_stops_the_steps(caplog: pytest.LogCaptureFixture) -> None:
+    calibrator = line_calibrator(VALUES, seed=5)
+    # On one thread, each fit of 3000 starts takes about 3 s: a replicate
+    # that ran its starts after the interrupt would take that long to stop.
+    bootstrap = BayesianBootstrap(replicates=4, block_length=1, starts=3000)
+    handler = _Interrupting()
+    logger = logging.getLogger("commol.resampling")
+    logger.addHandler(handler)
+    try:
+        with (
+            caplog.at_level(logging.DEBUG, logger="commol.resampling"),
+            threads(1),
+            _sigint(),
+            pytest.raises(KeyboardInterrupt),
+        ):
+            calibrator.uncertainty(bootstrap)
+        stopped = time.perf_counter()
+    finally:
+        logger.removeHandler(handler)
+
+    assert handler.at is not None
+    assert stopped - handler.at < 0.3
+
+
+def test_an_interrupt_stops_a_method_that_logs_nothing() -> None:
+    calibrator = line_calibrator(VALUES, seed=5)
+    # About 10 s on one thread: 2000 replicates of 8 starts.
+    bootstrap = BayesianBootstrap(replicates=2000, block_length=1, starts=8)
+    timer = threading.Timer(0.2, _thread.interrupt_main, (signal.SIGINT,))
+    began = time.perf_counter()
+    try:
+        with threads(1), caplog_off(), _sigint(), pytest.raises(KeyboardInterrupt):
+            timer.start()
             calibrator.uncertainty(bootstrap)
         elapsed = time.perf_counter() - began
     finally:
-        armed.clear()
         timer.cancel()
-        signal.signal(signal.SIGINT, previous)
 
     assert elapsed < 2.0

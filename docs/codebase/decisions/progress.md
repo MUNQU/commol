@@ -72,6 +72,12 @@ step that begins once it is set does not run: it fails with `STOPPED`, the
 error of its method. The method ends soon, and the binding drops its result
 for the `KeyboardInterrupt`.
 
+The step is the unit of the stop, so a step that has begun runs to its end:
+the moves of a generation of SMC, the walk of a side of a profile, and the
+draws of the prior that start a run of Gibbs, Bayesian or ABC SMC, or a
+replicate of a calibrated eta, all end before the method sees the stop. Each
+draw of ABC rejection is a step of its own, which reads the stop.
+
 `ChannelSteps` reads a flag that it shares with the drain. The drain waits
 for a step at most 100 ms (`recv_timeout`), and reads the signals of Python
 (`check_signals`, with the GIL) at least that often, also when the logger
@@ -93,18 +99,23 @@ The cost is one atomic load per step, and a wake of the calling thread every
 **Guards:** `crates/commol-core/src/progress.rs` `tests`;
 `crates/commol-calibration/tests/test_starts.rs::no_start_runs_once_the_steps_stop`;
 `crates/commol-inference/tests/test_profiles.rs::no_replicate_and_no_refit_runs_once_the_steps_stop`,
-`::no_side_runs_once_the_steps_stop`;
+`::no_side_runs_once_the_steps_stop`,
+`::no_start_of_a_replicate_runs_once_the_steps_stop`;
 `crates/commol-inference/tests/test_smc.rs::a_run_sends_each_generation_with_its_level`,
 `::the_runs_of_a_calibrated_eta_send_their_replicates_and_generations`,
 `::no_generation_runs_once_the_steps_stop`,
+`::a_calibrated_eta_stops_inside_a_round`,
+`::a_draw_of_abc_rejection_that_fails_is_sent_as_run`,
 `::no_draw_of_abc_rejection_runs_once_the_steps_stop`;
 `crates/commol-inference/tests/test_predictive.rs::a_predictive_sends_each_draw_and_runs_none_once_the_steps_stop`;
-`crates/commol-inference/tests/test_local.rs::a_mixture_sends_each_draw_and_runs_none_once_the_steps_stop`;
+`crates/commol-inference/tests/test_local.rs::a_mixture_sends_each_draw_and_runs_none_once_the_steps_stop`,
+`::a_draw_of_an_importance_sample_that_fails_is_sent_as_run`;
 `crates/commol-inference/tests/test_global_sensitivity.rs` (the batch runner);
 `crates/commol-calibration/tests/test_starts.rs::the_starts_send_their_beginning_then_each_start_that_finishes`;
 `crates/commol-inference/tests/test_profiles.rs::a_bootstrap_threshold_sends_its_fits_then_its_refits`;
 `py-commol/src/records.rs` `tests`;
 `tests/calibration/test_progress.py::test_each_finished_start_is_logged`;
 `tests/uncertainty/test_progress.py` (`test_every_long_method_logs_its_steps`,
-`test_an_interrupt_stops_the_steps`);
+`test_an_interrupt_stops_the_steps`,
+`test_an_interrupt_stops_a_method_that_logs_nothing`);
 `tests/suite/test_logging.py::test_a_build_logs_one_record`.

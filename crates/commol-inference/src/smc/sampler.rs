@@ -311,9 +311,9 @@ impl<K: Kernel> SmcSampler<K> {
                     return Err(STOPPED.to_string());
                 }
                 let values = target.sample_prior(stream);
-                let kept = target.evaluate(&values, stream, workspace)?;
+                let kept = target.evaluate(&values, stream, workspace);
                 steps.send(RunEvent::Ran { index });
-                Ok((values, kept))
+                Ok((values, kept?))
             })
             .collect::<Result<_, String>>()
             .map_err(MethodError::Failed)?;

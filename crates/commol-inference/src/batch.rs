@@ -89,9 +89,10 @@ impl<'a, E: SimulationEngine + Send + Sync> BatchRunner<'a, E> {
                 let runs = if self.steps.stopped() {
                     Err(crate::runs::stopped())
                 } else {
-                    self.forward.run_at(values, self.quantities.schedule())
+                    let runs = self.forward.run_at(values, self.quantities.schedule());
+                    self.steps.send(RunEvent::Ran { index: draw });
+                    runs
                 };
-                self.steps.send(RunEvent::Ran { index: draw });
                 let runs = runs.map_err(|error| PredictiveError::Draw { draw, error })?;
                 Ok(runs
                     .iter()

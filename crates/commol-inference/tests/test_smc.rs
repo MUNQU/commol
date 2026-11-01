@@ -1022,3 +1022,33 @@ fn a_calibrated_eta_stops_inside_a_round() {
     .unwrap_err();
     assert_eq!(error.to_string(), STOPPED);
 }
+
+/// The indices of the points that a loop of model runs sends as run.
+#[derive(Default)]
+struct RanPoints(Mutex<Vec<usize>>);
+
+impl Steps<commol_inference::runs::RunEvent> for RanPoints {
+    fn send(&self, event: commol_inference::runs::RunEvent) {
+        if let commol_inference::runs::RunEvent::Ran { index } = event {
+            self.0.lock().unwrap().push(index);
+        }
+    }
+}
+
+#[test]
+fn a_draw_of_abc_rejection_that_fails_is_sent_as_run() {
+    // The runs above 0.7 fail, and the prior is uniform on [0, 1].
+    let (problem, priors) = brittle_problem(false);
+    let target = AbcTarget::new(&problem, &priors, Distance::Loss).unwrap();
+    let ran = RanPoints::default();
+    let error = abc_rejection(&target, 100, 0.1, 4, &ran).unwrap_err();
+    assert!(error.to_string().contains("the run failed"), "{error}");
+
+    let draw = |index: usize| {
+        let mut stream =
+            Generator::from_seed(commol_random::Stream::SmcParticles.replicate(4, index as u64));
+        target.sample_prior(&mut stream)[0]
+    };
+    let ran = ran.0.into_inner().unwrap();
+    assert!(ran.iter().any(|&index| draw(index) > 0.7), "{ran:?}");
+}

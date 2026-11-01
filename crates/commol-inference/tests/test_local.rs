@@ -1025,3 +1025,45 @@ fn a_mixture_sends_each_draw_and_runs_none_once_the_steps_stop() {
     let error = mixture(&Stopped).unwrap_err();
     assert!(error.to_string().contains(STOPPED), "{error}");
 }
+
+/// A target whose density fails at every point, and a proposal that draws
+/// 0.
+struct Failing;
+
+impl Target for Failing {
+    fn dimension(&self) -> usize {
+        1
+    }
+
+    fn log_density(&self, _values: &[f64], _workspace: &mut Workspace) -> Result<f64, String> {
+        Err("the run failed".to_string())
+    }
+}
+
+impl commol_inference::importance::Proposal for Failing {
+    fn draw(&self, _generator: &mut commol_random::Generator) -> Vec<f64> {
+        vec![0.0]
+    }
+
+    fn log_density(&self, _unbounded: &[f64]) -> f64 {
+        0.0
+    }
+}
+
+#[test]
+fn a_draw_of_an_importance_sample_that_fails_is_sent_as_run() {
+    let kept = KeptRuns::default();
+    let error = commol_inference::importance::importance_sample(
+        &Failing,
+        &Failing,
+        &Transform::new(&[(f64::NEG_INFINITY, f64::INFINITY)]),
+        10,
+        3,
+        &kept,
+    )
+    .unwrap_err();
+    assert_eq!(error, "the run failed");
+    let events = kept.events();
+    assert_eq!(events[0], "began 10");
+    assert!(events.len() > 1, "{events:?}");
+}

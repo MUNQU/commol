@@ -118,10 +118,10 @@ where
             let unbounded = proposal.draw(&mut generator);
             let values = transform.from_unbounded(&unbounded);
             // A target of `−∞` gives a weight of 0 whatever the rest.
-            let log_weight = target.log_density(&values, workspace)?
-                + transform.log_jacobian(&values)
-                - proposal.log_density(&unbounded);
+            let density = target.log_density(&values, workspace);
             steps.send(RunEvent::Ran { index: i });
+            let log_weight =
+                density? + transform.log_jacobian(&values) - proposal.log_density(&unbounded);
             Ok((values, log_weight))
         })
         .collect::<Result<_, String>>()?;

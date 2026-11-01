@@ -514,7 +514,8 @@ impl Counts {
             }
             Step::Ran => {
                 *done += 1;
-                let percent = *done * 100 / *total;
+                // A point of a loop that sent no beginning has no record.
+                let percent = (*done * 100).checked_div(*total)?;
                 if percent == (*done - 1) * 100 / *total {
                     return None;
                 }
@@ -732,6 +733,22 @@ mod tests {
         counts.message(began(Counted::Runs, 2));
         let few: Vec<_> = (0..2).filter_map(|_| counts.message(Step::Ran)).collect();
         assert_eq!(few, ["Ran 1 of 2 points (50%)", "Ran 2 of 2 points (100%)"]);
+
+        for (total, records) in [(1, 1), (99, 99), (100, 100), (101, 100)] {
+            let mut counts = Counts::new(Vec::new(), FitUnit::Replicate);
+            counts.message(began(Counted::Runs, total));
+            let logged = (0..total)
+                .filter_map(|_| counts.message(Step::Ran))
+                .collect::<Vec<_>>();
+            assert_eq!(logged.len(), records, "{total}");
+            assert_eq!(
+                logged.last().unwrap(),
+                &format!("Ran {total} of {total} points (100%)")
+            );
+        }
+        // A point of a loop that sent no beginning has no record.
+        let mut counts = Counts::new(Vec::new(), FitUnit::Replicate);
+        assert_eq!(counts.message(Step::Ran), None);
     }
 
     #[test]
