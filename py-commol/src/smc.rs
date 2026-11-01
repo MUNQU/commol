@@ -91,7 +91,7 @@ impl PyDistribution {
 }
 
 /// A run of the sequential Monte Carlo sampler, as the runners return it
-#[pyclass(name = "SMCRun", frozen, get_all, skip_from_py_object)]
+#[pyclass(name = "SMCRun", frozen, get_all)]
 #[derive(Clone)]
 pub struct PySmcRun {
     /// One row per particle, in problem order
