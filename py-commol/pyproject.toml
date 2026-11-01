@@ -169,4 +169,4 @@ exclude = [".vulture_allowlist.py"]
 # it with `version-file`).
 [tool.uv]
 package = false
-required-version = "==0.11.33"
+required-version = "==0.13.5"
