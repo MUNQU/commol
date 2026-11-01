@@ -5315,6 +5315,14 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   (<code>Model.applied_parameters</code>, <code>ModelStructure.report_sections</code>) holds its
   <code>EntrySpread</code> under the key <code>spread</code>, not <code>interval</code>. A report saved as JSON
   before this change has the key <code>interval</code>: read <code>spread</code>.</li>
+<li><strong>Breaking:</strong> the engine holds the one rule of a fit of a problem: a
+  <code>CalibrationResult</code> that lacks a parameter of the problem or has one the
+  problem does not have is refused, with the message <code>The fit is not a fit
+  of this problem: it lacks ["k1"] and has ["k2"], which the problem does not
+  have</code>. <code>Calibrator.point_sample</code>, <code>ResidualNoise(fit=...)</code> and
+  <code>Collinearity(at=result)</code> refuse such a fit, and <code>StartsIdentifiability</code>
+  refuses such a start (<code>A start is not a start of this problem: ...</code>).
+  Before, all of them except <code>point_sample</code> accepted an extra parameter.</li>
 <li><strong>Breaking:</strong> the engine holds every rule of a calibration problem and of
   an uncertainty method, and Python holds no copy: each class sends its JSON
   to the engine when it is built and raises the message of the engine. A

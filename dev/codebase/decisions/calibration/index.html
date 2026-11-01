@@ -2932,6 +2932,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-engine-says-what-a-fit-of-a-problem-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The engine says what a fit of a problem is
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#parallel-work-runs-in-the-pool-of-the-setting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3809,6 +3820,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-engine-says-what-a-fit-of-a-problem-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The engine says what a fit of a problem is
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#parallel-work-runs-in-the-pool-of-the-setting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4000,6 +4022,25 @@ sample a runner makes (<code>sample_method</code> in <code>resampling/runners.py
 (<code>test_the_seed_of_a_result_repeats_a_particle_swarm</code>);
 <code>tests/calibration/test_starts.py</code>
 (<code>test_a_verbose_swarm_repeats_its_fit_from_the_seed</code>).</p>
+<h2 id="the-engine-says-what-a-fit-of-a-problem-is">The engine says what a fit of a problem is<a class="headerlink" href="#the-engine-says-what-a-fit-of-a-problem-is" title="Permanent link">&para;</a></h2>
+<p>A point of a problem, the best values of a fit or the end of one of its
+starts, has a value of each parameter of the problem and of nothing else.
+<code>values_of</code> (<code>crates/commol-calibration/src/settings.rs</code>) holds this rule
+once: <code>FitRecord::values</code> and <code>StartRecord::end_values</code> give the values in
+problem order, or refuse a point with a message that names the parameters it
+lacks and those it has that the problem does not have. Each caller asks the
+engine: <code>Calibrator.point_sample</code> (through <code>CalibrationProblem.fit_values</code>),
+the residual noise of a fit, <code>Collinearity(at=result)</code> and
+<code>StartsIdentifiability</code>. An extra parameter is refused, not ignored,
+because it says that the fit is of another problem.</p>
+<p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_json.rs</code>
+(<code>a_fit_gives_the_values_of_the_parameters_it_has</code>,
+<code>a_start_gives_the_values_of_the_parameters_its_end_has</code>);
+<code>tests/calibration/test_problem.py</code>
+(<code>test_a_fit_of_another_problem_is_refused</code>);
+<code>tests/uncertainty/test_identifiability.py</code>
+(<code>test_a_result_holds_the_parameters_of_the_problem</code>,
+<code>test_a_start_of_another_problem_is_rejected</code>).</p>
 <h2 id="parallel-work-runs-in-the-pool-of-the-setting">Parallel work runs in the pool of the setting<a class="headerlink" href="#parallel-work-runs-in-the-pool-of-the-setting" title="Permanent link">&para;</a></h2>
 <p>Every binding that runs parallel work calls <code>parallel</code> or <code>parallel_logged</code> (<code>py-commol/src/parallelism.rs</code>),
 which releases the GIL and runs the job in <code>Parallelism::install</code>

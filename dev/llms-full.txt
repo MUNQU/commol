@@ -5021,12 +5021,13 @@ point = Scenarios(
 print(round(at_fit.median), at_fit.lower)  # -72 None
 ```
 
-| Case                                                | Result                                                                    |
-| --------------------------------------------------- | ------------------------------------------------------------------------- |
-| A scenario sets a parameter of the sample           | `ValueError` that names the scenario and the parameter: each draw sets it |
-| A scenario sets a parameter the model does not have | `ValueError` that names the scenario and the parameter                    |
-| A quantity reads a position the runs lack           | `ValueError` that lists each such position with its quantity              |
-| A quantity is NaN in a run                          | `ValueError` that names the quantity                                      |
+| Case                                                                                               | Result                                                                    |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `point_sample` of a fit that lacks a parameter of the problem or has one the problem does not have | `ValueError` that names both lists                                        |
+| A scenario sets a parameter of the sample                                                          | `ValueError` that names the scenario and the parameter: each draw sets it |
+| A scenario sets a parameter the model does not have                                                | `ValueError` that names the scenario and the parameter                    |
+| A quantity reads a position the runs lack                                                          | `ValueError` that lists each such position with its quantity              |
+| A quantity is NaN in a run                                                                         | `ValueError` that names the quantity                                      |
 
 ## Scores
 
@@ -10254,21 +10255,13 @@ class Calibrator:
         Raises
         ------
         ValueError
-            If the names of `result` are not those of the problem; the message
-            names the names that differ.
+            If `result` lacks a parameter of the problem or has one the
+            problem does not have; the message names both lists.
         """
-        names = self.parameter_names
-        missing = [name for name in names if name not in result.best_parameters]
-        extra = [name for name in result.best_parameters if name not in names]
-        if missing or extra:
-            raise ValueError(
-                f"The result is not a fit of this problem: it lacks {missing} and "
-                f"has {extra}, which the problem does not have."
-            )
         return ParameterSample.equally_weighted(
-            names,
+            self.parameter_names,
             [(p.min_bound, p.max_bound) for p in self.problem.parameters],
-            [[result.best_parameters[name] for name in names]],
+            [self._engine_problem.fit_values(engine_json(result))],
             SampleMethod(name="point", settings={"seed": result.seed}),
         )
 
@@ -10765,9 +10758,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                   |
-| ------------ | --------------------------------------------------------------------------------------------- |
-| `ValueError` | If the names of result are not those of the problem; the message names the names that differ. |
+| Type         | Description                                                                                                    |
+| ------------ | -------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If result lacks a parameter of the problem or has one the problem does not have; the message names both lists. |
 
 Source code in `commol/_calibration/calibrator.py`
 
@@ -10794,21 +10787,13 @@ def point_sample(self, result: CalibrationResult) -> ParameterSample:
     Raises
     ------
     ValueError
-        If the names of `result` are not those of the problem; the message
-        names the names that differ.
+        If `result` lacks a parameter of the problem or has one the
+        problem does not have; the message names both lists.
     """
-    names = self.parameter_names
-    missing = [name for name in names if name not in result.best_parameters]
-    extra = [name for name in result.best_parameters if name not in names]
-    if missing or extra:
-        raise ValueError(
-            f"The result is not a fit of this problem: it lacks {missing} and "
-            f"has {extra}, which the problem does not have."
-        )
     return ParameterSample.equally_weighted(
-        names,
+        self.parameter_names,
         [(p.min_bound, p.max_bound) for p in self.problem.parameters],
-        [[result.best_parameters[name] for name in names]],
+        [self._engine_problem.fit_values(engine_json(result))],
         SampleMethod(name="point", settings={"seed": result.seed}),
     )
 ```
@@ -38694,6 +38679,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - **Breaking:** a build logs one `INFO` record, with the number of bins, parameters, transitions and outputs; the records of each bin, accumulator, stratification, matrix, parameter and transition of a `ModelBuilder` are at `DEBUG`. Set the logger `commol` to `DEBUG` to read them.
 - **Breaking:** with a `sample`, each entry of a report (`Model.applied_parameters`, `ModelStructure.report_sections`) holds its `EntrySpread` under the key `spread`, not `interval`. A report saved as JSON before this change has the key `interval`: read `spread`.
+- **Breaking:** the engine holds the one rule of a fit of a problem: a `CalibrationResult` that lacks a parameter of the problem or has one the problem does not have is refused, with the message `The fit is not a fit of this problem: it lacks ["k1"] and has ["k2"], which the problem does not have`. `Calibrator.point_sample`, `ResidualNoise(fit=...)` and `Collinearity(at=result)` refuse such a fit, and `StartsIdentifiability` refuses such a start (`A start is not a start of this problem: ...`). Before, all of them except `point_sample` accepted an extra parameter.
 - **Breaking:** the engine holds every rule of a calibration problem and of an uncertainty method, and Python holds no copy: each class sends its JSON to the engine when it is built and raises the message of the engine. A problem or a method written as JSON meets the same rules. Several messages change: two parameters with one id say `Two parameters have the id 'k'`, a loss with observation models says `not both`, a problem with neither says `There is no default`, and a list of names in a message is written as Rust writes it, `["k1"]`. See [Calibration](https://munqu.github.io/commol/latest/guide/calibration/#unknowns).
 - **Breaking:** a `CalibrationParameter` with a NaN bound, `max_bound` not above `min_bound`, or an `initial_guess` that is not finite or outside its bounds is refused by the engine too, so a problem in JSON can no longer calibrate a parameter of zero width. An infinite bound stays valid for a prior; every run of an optimizer refuses it with a message that names the parameter (before, a swarm panicked and Nelder-Mead named no parameter), and so do `StructuralRank` and `SampleIdentifiability(reference="bounds")`, which gave a contraction of 1 and the verdict `determined`. See [Infinite bounds](https://munqu.github.io/commol/latest/guide/calibration/#infinite-bounds).
 - **Breaking:** an `InputSpace` with neither distributions nor a sample is refused when `SensitivityAnalysis` reads it; before, the engine drew each input uniform on its bounds. One with both is refused; before, the engine ignored the distributions. The check of the names and the bounds of a sample moves from `InputSpace.from_sample` to `SensitivityAnalysis`, and a `Uniform()` on an infinite bound is refused by `InputSpace.uniform_on_bounds`. See [Input spaces](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md).

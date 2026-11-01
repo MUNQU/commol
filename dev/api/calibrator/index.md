@@ -142,21 +142,13 @@ class Calibrator:
         Raises
         ------
         ValueError
-            If the names of `result` are not those of the problem; the message
-            names the names that differ.
+            If `result` lacks a parameter of the problem or has one the
+            problem does not have; the message names both lists.
         """
-        names = self.parameter_names
-        missing = [name for name in names if name not in result.best_parameters]
-        extra = [name for name in result.best_parameters if name not in names]
-        if missing or extra:
-            raise ValueError(
-                f"The result is not a fit of this problem: it lacks {missing} and "
-                f"has {extra}, which the problem does not have."
-            )
         return ParameterSample.equally_weighted(
-            names,
+            self.parameter_names,
             [(p.min_bound, p.max_bound) for p in self.problem.parameters],
-            [[result.best_parameters[name] for name in names]],
+            [self._engine_problem.fit_values(engine_json(result))],
             SampleMethod(name="point", settings={"seed": result.seed}),
         )
 
@@ -653,9 +645,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                   |
-| ------------ | --------------------------------------------------------------------------------------------- |
-| `ValueError` | If the names of result are not those of the problem; the message names the names that differ. |
+| Type         | Description                                                                                                    |
+| ------------ | -------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If result lacks a parameter of the problem or has one the problem does not have; the message names both lists. |
 
 Source code in `commol/_calibration/calibrator.py`
 
@@ -682,21 +674,13 @@ def point_sample(self, result: CalibrationResult) -> ParameterSample:
     Raises
     ------
     ValueError
-        If the names of `result` are not those of the problem; the message
-        names the names that differ.
+        If `result` lacks a parameter of the problem or has one the
+        problem does not have; the message names both lists.
     """
-    names = self.parameter_names
-    missing = [name for name in names if name not in result.best_parameters]
-    extra = [name for name in result.best_parameters if name not in names]
-    if missing or extra:
-        raise ValueError(
-            f"The result is not a fit of this problem: it lacks {missing} and "
-            f"has {extra}, which the problem does not have."
-        )
     return ParameterSample.equally_weighted(
-        names,
+        self.parameter_names,
         [(p.min_bound, p.max_bound) for p in self.problem.parameters],
-        [[result.best_parameters[name] for name in names]],
+        [self._engine_problem.fit_values(engine_json(result))],
         SampleMethod(name="point", settings={"seed": result.seed}),
     )
 ```
