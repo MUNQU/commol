@@ -86,7 +86,7 @@ fn ordered(names: &[String], values: &commol_core::json::Pairs<f64>) -> Vec<f64>
 }
 
 /// The rank of the scaled sensitivities at one point
-#[pyclass(name = "PointRank", frozen, get_all, skip_from_py_object)]
+#[pyclass(name = "PointRank", frozen, get_all)]
 #[derive(Clone)]
 pub struct PyPointRank {
     /// The parameter values of the point
@@ -105,7 +105,7 @@ pub struct PyPointRank {
 
 /// The rank of the scaled sensitivities at a point evaluated again at a
 /// tighter accuracy
-#[pyclass(name = "TighterRank", frozen, get_all, skip_from_py_object)]
+#[pyclass(name = "TighterRank", frozen, get_all)]
 #[derive(Clone)]
 pub struct PyTighterRank {
     /// The accuracy of the runs
@@ -153,7 +153,7 @@ pub struct PyStructuralAnalysis {
 }
 
 /// The tighter accuracy of a structural rank and the settings that set it
-#[pyclass(name = "Tightening", frozen, get_all, skip_from_py_object)]
+#[pyclass(name = "Tightening", frozen, get_all)]
 #[derive(Clone)]
 pub struct PyTightening {
     /// The accuracy of the runs
@@ -163,7 +163,7 @@ pub struct PyTightening {
 }
 
 /// The accuracy of the runs of an engine
-#[pyclass(name = "Accuracy", frozen, get_all, skip_from_py_object)]
+#[pyclass(name = "Accuracy", frozen, get_all)]
 #[derive(Clone)]
 pub struct PyAccuracy {
     /// The relative accuracy
@@ -262,7 +262,7 @@ fn structural_rank(
 }
 
 /// The verdict of one parameter of a collinearity analysis and its causes
-#[pyclass(name = "CollinearityVerdict", frozen, get_all, skip_from_py_object)]
+#[pyclass(name = "CollinearityVerdict", frozen, get_all)]
 #[derive(Clone)]
 pub struct PyCollinearityVerdict {
     /// "determined" or "poorly_determined"
@@ -388,7 +388,7 @@ fn collinearity(
 }
 
 /// The verdict of one parameter of a sample and its causes
-#[pyclass(name = "SampleVerdict", frozen, get_all, skip_from_py_object)]
+#[pyclass(name = "SampleVerdict", frozen, get_all)]
 #[derive(Clone)]
 pub struct PySampleVerdict {
     /// "determined" or "poorly_determined"

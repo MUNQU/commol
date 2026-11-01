@@ -27,7 +27,7 @@ use crate::inference::{
 type BoxExit = (f64, usize);
 
 /// One profile, as the runner returns it
-#[pyclass(name = "Profile", frozen, get_all, skip_from_py_object)]
+#[pyclass(name = "Profile", frozen, get_all)]
 #[derive(Clone)]
 pub struct PyProfile {
     /// The value of the quantity at the fit
@@ -75,7 +75,7 @@ pub struct PyProfile {
 }
 
 /// What the resets of a flat profile say, as the runner returns it
-#[pyclass(name = "ProfileStructure", frozen, get_all, skip_from_py_object)]
+#[pyclass(name = "ProfileStructure", frozen, get_all)]
 #[derive(Clone)]
 pub struct PyStructure {
     /// "in_combination", "non_identifiable", or None
