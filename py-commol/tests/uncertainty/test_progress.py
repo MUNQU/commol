@@ -503,12 +503,14 @@ class _Interrupting(logging.Handler):
 
 def test_an_interrupt_stops_the_steps(caplog: pytest.LogCaptureFixture) -> None:
     calibrator = line_calibrator(VALUES, seed=5)
-    # On one thread, each fit of 3000 starts takes about 3 s: a replicate
-    # that ran its starts after the interrupt would take that long to stop.
-    bootstrap = BayesianBootstrap(replicates=4, block_length=1, starts=3000)
+    # The main fit and each replicate run 1000 starts on one thread: a
+    # replicate that ran its starts after the interrupt would take about as
+    # long to stop as the main fit took, whatever the speed of the machine.
+    bootstrap = BayesianBootstrap(replicates=4, block_length=1, starts=1000)
     handler = _Interrupting()
     logger = logging.getLogger("commol.resampling")
     logger.addHandler(handler)
+    began = time.perf_counter()
     try:
         with (
             caplog.at_level(logging.DEBUG, logger="commol.resampling"),
@@ -522,7 +524,7 @@ def test_an_interrupt_stops_the_steps(caplog: pytest.LogCaptureFixture) -> None:
         logger.removeHandler(handler)
 
     assert handler.at is not None
-    assert stopped - handler.at < 0.3
+    assert stopped - handler.at < (handler.at - began) / 2
 
 
 def test_an_interrupt_stops_a_method_that_logs_nothing() -> None:
