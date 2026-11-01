@@ -118,6 +118,7 @@ profile under a swarm ([Profiles](profiles.md)).
 **Guards:** `crates/commol-calibration/tests/test_model_values.rs::a_particle_swarm_with_a_stop_rule_converges`;
 `crates/commol-calibration/src/optimization.rs` `tests`
 (`a_swarm_gathered_around_its_best_stops_by_the_radius_rule`,
+`the_radius_rule_does_not_stop_a_swarm_in_a_box_whose_size_overflows`,
 `a_stop_rule_out_of_its_range_names_itself`);
 `crates/commol-inference/tests/test_profiles.rs::a_swarm_fits_a_subproblem_and_repeats_from_its_seed`;
 `tests/calibration/test_optimizers.py::TestConverged::test_a_swarm_that_stagnates_stops_and_converges`.

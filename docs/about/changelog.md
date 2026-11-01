@@ -574,6 +574,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the bounds are too far apart. ...`, the error of the argmin fork, which
   checks its own bounds. A bound that is not finite still raises the
   message that names the parameter.
+- The radius rule of a particle swarm (`radius_tol`) stopped a run at its
+  first iteration, as converged, when the size of the box of its bounds
+  overflowed, such as for `±1e200` in two parameters. The argmin fork now
+  scales the box and the radius before it compares them.
 - The error of a failed optimizer run shows the whole chain of the error of
   the argmin fork. Before, a constrained particle swarm (a profile of a
   prediction) showed only `` `AugmentedLagrangian`: the inner solver failed in

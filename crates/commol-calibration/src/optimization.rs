@@ -1486,6 +1486,25 @@ mod tests {
     }
 
     #[test]
+    fn the_radius_rule_does_not_stop_a_swarm_in_a_box_whose_size_overflows() {
+        // The L2 norm of this box overflows. The rule scales the box and the radius before
+        // it compares them.
+        let space = SearchSpace {
+            bounds: vec![(-1e200, 1e200), (-1e200, 1e200)],
+            names: vec!["x".to_string(), "y".to_string()],
+        };
+        let config = ParticleSwarmConfig {
+            max_iterations: 5,
+            radius_stop: Some(1e-3),
+            ..ParticleSwarmConfig::default()
+        };
+        let (fit, _) =
+            optimize_particle_swarm(&space, Bowl, &config, 2, None::<NoObserver>).unwrap();
+        assert!(!fit.converged, "{fit:?}");
+        assert_eq!(fit.iterations, 5);
+    }
+
+    #[test]
     fn a_stop_rule_out_of_its_range_names_itself() {
         let bounds = [(0.0, 1.0)];
         let build = |improvement_stop, radius_stop| {
