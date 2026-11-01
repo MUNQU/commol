@@ -196,8 +196,9 @@ pub fn plan_model_values<E: SimulationEngine>(
 ///
 /// Returns a message that names a factor with a bound at or below 0, or the
 /// engine's message when it does not set a parameter, a value or the
-/// remainder does not resolve, the kind does not accept a type of value, or
-/// a value the calibration does not write is missing.
+/// remainder does not resolve, the kind does not accept a type of value or
+/// every value of an initial condition (an engine of whole units with no
+/// rounding), or a value the calibration does not write is missing.
 pub fn check_model_values<E: SimulationEngine>(
     engine: &E,
     parameters: &[CalibrationParameter],

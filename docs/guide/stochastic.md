@@ -176,9 +176,11 @@ print(sum(start[f"B_g{i}"][0] for i in range(10)) + sum(start[f"A_g{i}"][0] for 
 # 1000.0
 ```
 
-Initial conditions that calibration sets go through the same rounding. With
-no rounding, a calibrated value that is not whole is an error that lists the
-two options.
+Initial conditions that calibration sets go through the same rounding. An
+optimizer writes values that are not whole, so a calibrated initial condition
+needs a rounding, whatever its bounds: with no rounding, the `Calibrator`
+raises `ValueError` when it is built, and the message names the initial
+condition and the two options.
 
 ## Seeds and replicates
 
@@ -295,7 +297,8 @@ print(0.05 < result.best_parameters["k2"] < 0.2)  # True: near 0.1
 - [ ] The engine is `StochasticEvents` (continuous time) or `StochasticSteps`
       (per-step probabilities), as the rates of the model mean.
 - [ ] The amount of each bin is whole, and the settings name a `rounding` when
-      the amount of a compartment is not.
+      the amount of a compartment is not, or when a calibration sets an
+      initial condition.
 - [ ] Every run has a seed, or keeps the one commol drew (`results.seed`).
 - [ ] A large total uses `"tau_leaping"` or a deterministic engine.
 - [ ] A calibration sets `replicates`, `replicate_summary` and `seed`.
