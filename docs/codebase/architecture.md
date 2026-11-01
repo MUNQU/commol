@@ -79,8 +79,8 @@ flowchart TB
 | Inference | `commol-inference` | What every uncertainty method returns or reads: the weighted parameter sample, the predictive of a sample, its observation noise and its scores; the resampling methods, which fit copies of the problem with other data (`CalibrationProblem::with_data`); the conformal prediction intervals; the port of sensitivities and the identifiability analyses; the distributions and priors, and the sequential Monte Carlo sampler with its targets (Gibbs posterior, ABC, the posterior of observation models); the noise, the parametric bootstrap and the log score of observation models; the input spaces, designs, quantities of interest and estimators of global sensitivity, which run on a forward model with no observations; the profile likelihood of parameters and predictions and its thresholds. It depends on calibration, never the reverse. |
 
 Every box uses `commol-core` (shared types, rate formulas, the
-`SimulationEngine` trait). The stochastic engines and calibration also use
-`commol-random` (random numbers), and so does inference. Calibration and
+`SimulationEngine` trait, the port `Steps` of the steps of a long method).
+The stochastic engines and calibration also use `commol-random` (random numbers), and so does inference. Calibration and
 inference also use `commol-statistics`, whose quantile the summary of the
 replicates and every method of inference take; `commol-core` uses its
 spectral radius for the matrices of a process (`ScaledMatrix::variables`),

@@ -79,7 +79,10 @@ check some of these rules. The rest depend on the author and the reviewer.
 - Log with the standard `logging` module. Library code never writes to the
   standard error of the process: a failure is part of the result and the
   caller logs it (`CalibrationResult.failed`). Output the user asks for,
-  such as a verbose optimizer's table, goes to Python's `sys.stdout`.
+  such as a verbose optimizer's table, goes to Python's `sys.stdout`. A
+  Rust loop never logs: it sends its events to a `Steps`, and the extension
+  writes their records
+  ([Design decisions](decisions/progress.md#a-long-method-logs-each-step-from-the-calling-thread)).
 
 ## Rust
 

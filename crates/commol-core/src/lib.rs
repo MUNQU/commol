@@ -23,6 +23,7 @@
 //!   its structure
 //! - [`ScaledMatrix`]: A matrix between categories at the values of the
 //!   parameters that scale it, with its spectral radius
+//! - [`Steps`]: The receiver of the events of the loops of a long method
 
 #![warn(missing_docs)]
 
@@ -30,6 +31,7 @@ pub mod json;
 pub mod math_expression;
 pub mod parallelism;
 pub mod position;
+pub mod progress;
 pub mod range;
 pub mod scaled_matrix;
 pub mod simulation_engine;
@@ -46,6 +48,8 @@ pub use math_expression::{
 pub use parallelism::{Levels, Parallelism, inner_levels_in_parallel};
 
 pub use position::{POSITION_TOLERANCE, same_position};
+
+pub use progress::{NoSteps, Steps};
 
 pub use range::{Bound, CONFIDENCE_LEVEL, Count, Ranges, Real, Rule, Setting, check_object};
 

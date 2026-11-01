@@ -5,7 +5,8 @@
 //! trace every profile in Rust and return them as plain values; Python
 //! builds the result.
 
-use crate::parallelism::parallel;
+use crate::parallelism::{parallel, parallel_logged};
+use crate::records::StepLog;
 use commol_inference::profiles::{
     Profile, ProfileEnd, ProfileTracer, ProfileVerdict, ProfiledQuantity, StructuralReading,
     Structure, Undetermined, beale, bootstrap_thresholds, chi_square,
@@ -117,7 +118,7 @@ impl From<Structure> for PyStructure {
     }
 }
 
-fn end_name(end: ProfileEnd) -> String {
+pub(crate) fn end_name(end: ProfileEnd) -> String {
     match end {
         ProfileEnd::Crossed => "crossed",
         ProfileEnd::Bound => "bound",
@@ -189,7 +190,8 @@ pub struct PyProfileRun {
 }
 
 /// Fit the problem with `starts` starts and trace the profile of each of
-/// `quantities` from the fit, with `threshold`.
+/// `quantities` from the fit, with `threshold`, with a record of each step
+/// in `log`.
 fn trace(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
@@ -197,8 +199,9 @@ fn trace(
     quantities: Vec<ProfiledQuantity>,
     threshold: &Threshold,
     max_steps: usize,
+    log: &StepLog,
 ) -> PyResult<(PyStarts, PyProfileRun)> {
-    let fitted = problem.fit(py, starts)?;
+    let fitted = problem.fit_logged(py, starts, log)?;
     let fit = best_values(&fitted);
     let problem_ref = &problem.inner;
     let confidence_level = threshold.confidence_level;
@@ -229,9 +232,9 @@ fn trace(
             let runner = problem.runner(&fit, bootstrap.starts())?;
             let (resampler, _) = problem.resampler(&ResamplerSpec::of(bootstrap), runner.fit())?;
             let count = bootstrap.replicates();
-            let run = parallel(py, || {
+            let run = parallel_logged(py, log, |steps| {
                 bootstrap_thresholds(
-                    &runner,
+                    &runner.with_steps(steps),
                     resampler.as_ref(),
                     count,
                     &quantities,
@@ -247,7 +250,9 @@ fn trace(
             run.thresholds
         }
     };
-    let traced = parallel(py, || tracer.trace_all(&quantities, &thresholds, max_steps))?;
+    let traced = parallel_logged(py, log, |steps| {
+        tracer.trace_all(&quantities, &thresholds, max_steps, steps)
+    })?;
     let mut profiles = Vec::with_capacity(traced.len());
     for (index, (profile, quantity)) in traced.into_iter().zip(&quantities).enumerate() {
         let profile = profile.map_err(method_error)?;
@@ -297,6 +302,8 @@ fn trace(
 /// Args:
 ///     problem: The calibration problem
 ///     settings: The JSON of a `ProfileLikelihood`
+///     logger: The logger of a record of each step of the fit, of the
+///         threshold and of the sides
 ///
 /// Returns:
 ///     The starts of the fit, and the profiles in the order of the
@@ -313,6 +320,7 @@ fn profile_likelihood(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
     settings: &str,
+    logger: Py<PyAny>,
 ) -> PyResult<(PyStarts, PyProfileRun)> {
     let settings: ProfileLikelihoodSettings = crate::json::read(settings)?;
     let names = problem.names();
@@ -339,6 +347,7 @@ fn profile_likelihood(
         quantities,
         &settings.threshold,
         settings.max_steps,
+        &StepLog::new(logger).with_quantities(settings.parameters.clone()),
     )
 }
 
@@ -347,6 +356,8 @@ fn profile_likelihood(
 /// Args:
 ///     problem: The calibration problem
 ///     settings: The JSON of a `PredictionProfile`
+///     logger: The logger of a record of each step of the fit, of the
+///         threshold and of the sides
 ///
 /// Returns:
 ///     The starts of the fit, and the profiles in the order of the
@@ -363,12 +374,14 @@ fn prediction_profile(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
     settings: &str,
+    logger: Py<PyAny>,
 ) -> PyResult<(PyStarts, PyProfileRun)> {
     let settings: PredictionProfileSettings = crate::json::read(settings)?;
-    let quantities = settings
-        .specs
-        .iter()
-        .map(|spec| ProfiledQuantity::Prediction(spec.point()))
+    let points: Vec<_> = settings.specs.iter().map(|spec| spec.point()).collect();
+    let names = points.iter().map(|point| point.label.clone()).collect();
+    let quantities = points
+        .into_iter()
+        .map(ProfiledQuantity::Prediction)
         .collect();
     trace(
         py,
@@ -377,6 +390,7 @@ fn prediction_profile(
         quantities,
         &settings.threshold,
         settings.max_steps,
+        &StepLog::new(logger).with_quantities(names),
     )
 }
 

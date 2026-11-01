@@ -223,7 +223,7 @@ sample a runner makes (`sample_method` in `resampling/runners.py`) or
 
 ## Parallel work runs in the pool of the setting
 
-Every binding that runs parallel work calls `parallel` (`py-commol/src/parallelism.rs`),
+Every binding that runs parallel work calls `parallel` or `parallel_logged` (`py-commol/src/parallelism.rs`),
 which releases the GIL and runs the job in `Parallelism::install`
 (`crates/commol-core/src/parallelism.rs`): a `rayon` pool of the number of
 threads of `commol.parallelism.threads`, built at its first use and kept for the next job

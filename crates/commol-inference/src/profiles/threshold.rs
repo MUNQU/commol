@@ -15,7 +15,7 @@ use rayon::prelude::*;
 
 use crate::error::MethodError;
 use crate::profiles::tracer::ProfiledQuantity;
-use crate::resampling::{FitUnit, ReplicateRunner, Resampler};
+use crate::resampling::{FitUnit, ReplicateRunner, Resampler, RunnerEvent, RunnerStage};
 use crate::special::{f_one_quantile, normal_quantile};
 use commol_random::Stream;
 
@@ -116,7 +116,9 @@ pub struct BootstrapThresholds {
 /// and each quantity is held at its center on the replicate's data from
 /// `θ̂_b`: the rise is `PL_b(center) − L_b(θ̂_b)`, at least 0. The threshold
 /// of a quantity is the quantile `confidence_level` of its rises.
-/// Replicates run in parallel.
+/// Replicates run in parallel. The steps of `runner` take the events of
+/// its fits, then a [`RunnerStage::Refits`] stage of one
+/// [`RunnerEvent::Refitted`] per replicate that fitted.
 ///
 /// # Errors
 ///
@@ -147,6 +149,11 @@ where
     }
     let perturbations = runner.perturbations(resampler, replicates);
     let fits = runner.fit_all(&perturbations);
+    let steps = runner.steps();
+    steps.send(RunnerEvent::Began {
+        stage: RunnerStage::Refits,
+        total: fits.fits.len(),
+    });
     let outcomes: Vec<(usize, bool, Result<Vec<f64>, String>)> = fits
         .fits
         .par_iter()
@@ -177,6 +184,10 @@ where
                         })
                         .collect()
                 });
+            steps.send(RunnerEvent::Refitted {
+                index,
+                outcome: &rises,
+            });
             (index, fit.converged, rises)
         })
         .collect();

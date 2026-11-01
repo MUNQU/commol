@@ -9,12 +9,17 @@ use commol_calibration::{
     ObservedDataPoint, OptimizationConfig, ParticleSwarmConfig, Subproblem, Workspace, optimize,
     optimize_subproblem,
 };
-use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
+use std::sync::Mutex;
+
+use commol_calibration::StartEvent;
+use commol_core::{ModelValue, SimulationEngine, SimulationError, Steps, ValuePlan};
 use commol_inference::MethodError;
 use commol_inference::profiles::{
-    ProfileEnd, ProfileTracer, ProfiledQuantity, beale, bootstrap_thresholds, chi_square,
+    ProfileEnd, ProfileTracer, ProfiledQuantity, SideEvent, beale, bootstrap_thresholds, chi_square,
 };
-use commol_inference::resampling::{Perturbation, ReplicateRunner, Resampler};
+use commol_inference::resampling::{
+    Perturbation, ReplicateRunner, Resampler, RunnerEvent, RunnerStage,
+};
 use commol_inference::transform::{Transform, on_bound};
 use commol_random::Generator;
 use commol_random::Stream;
@@ -991,4 +996,124 @@ fn each_parameter_and_each_prediction_is_profiled_once() {
         "Two predictions have the label 'B': give each a label of its own"
     );
     assert!(predictions(&format!("[{}, {}]", spec(""), spec("late"))).is_ok());
+}
+
+/// The events of a runner and of the sides of a tracer, as text, in the
+/// order they come.
+#[derive(Default)]
+struct KeptEvents(Mutex<Vec<String>>);
+
+impl KeptEvents {
+    fn keep(&self, text: String) {
+        self.0.lock().unwrap().push(text);
+    }
+
+    fn events(self) -> Vec<String> {
+        self.0.into_inner().unwrap()
+    }
+}
+
+impl Steps<RunnerEvent<'_>> for KeptEvents {
+    fn send(&self, event: RunnerEvent<'_>) {
+        self.keep(match event {
+            RunnerEvent::Began { stage, total } => format!("{stage:?} {total}"),
+            RunnerEvent::Fitted { index, outcome } => format!("fitted {index} {}", outcome.is_ok()),
+            RunnerEvent::Start { index, event } => match event {
+                StartEvent::Began { total } => format!("starts of {index}: {total}"),
+                StartEvent::Finished { index: start, .. } => format!("start {start} of {index}"),
+            },
+            RunnerEvent::Refitted { index, outcome } => {
+                format!("refitted {index} {}", outcome.is_ok())
+            }
+        });
+    }
+}
+
+impl Steps<SideEvent<'_>> for KeptEvents {
+    fn send(&self, event: SideEvent<'_>) {
+        self.keep(match event {
+            SideEvent::Began { total } => format!("sides {total}"),
+            SideEvent::Finished {
+                quantity,
+                side,
+                outcome,
+            } => format!(
+                "side {side} of {quantity}: {:?}",
+                outcome.map(|end| end.end)
+            ),
+        });
+    }
+}
+
+/// The position of `event` in `events`.
+fn position(events: &[String], event: &str) -> usize {
+    events
+        .iter()
+        .position(|kept| kept == event)
+        .unwrap_or_else(|| panic!("no event {event} in {events:?}"))
+}
+
+#[test]
+fn a_bootstrap_threshold_sends_its_fits_then_its_refits() {
+    let problem = line_problem(&VALUES);
+    let config = config();
+    let fit = optimize(&problem, &config, 0).unwrap();
+    let kept = KeptEvents::default();
+    let runner = ReplicateRunner::new(&problem, &config, &fit.best_parameters, 2, 9)
+        .unwrap()
+        .with_steps(&kept);
+    let quantity = [ProfiledQuantity::Parameter(1)];
+    let run = bootstrap_thresholds(
+        &runner,
+        &Noisy,
+        3,
+        &quantity,
+        &[fit.best_parameters[1]],
+        0.9,
+    )
+    .unwrap();
+    assert_eq!(run.replicates, [0, 1, 2]);
+    let events = kept.events();
+
+    assert_eq!(events.len(), 1 + 3 * 4 + 1 + 3, "{events:?}");
+    assert_eq!(events[0], format!("{:?} 3", RunnerStage::Fits));
+    let refits = position(&events, &format!("{:?} 3", RunnerStage::Refits));
+    for replicate in 0..3 {
+        let began = position(&events, &format!("starts of {replicate}: 2"));
+        let fitted = position(&events, &format!("fitted {replicate} true"));
+        for start in 0..2 {
+            let finished = position(&events, &format!("start {start} of {replicate}"));
+            assert!(began < finished && finished < fitted, "{events:?}");
+        }
+        assert!(fitted < refits, "{events:?}");
+        assert!(refits < position(&events, &format!("refitted {replicate} true")));
+    }
+}
+
+#[test]
+fn the_tracer_sends_each_side_that_ends() {
+    let problem = line_problem(&VALUES);
+    let config = config();
+    let fit = optimize(&problem, &config, 0).unwrap();
+    let tracer = ProfileTracer::new(&problem, &config, &fit.best_parameters, 7).unwrap();
+    let kept = KeptEvents::default();
+    let quantities = [
+        ProfiledQuantity::Parameter(0),
+        ProfiledQuantity::Parameter(1),
+    ];
+    let profiles = tracer.trace_all(&quantities, &[1.0, 1.0], 100, &kept);
+    assert!(profiles.iter().all(Result::is_ok));
+    let mut events = kept.events();
+
+    assert_eq!(events.remove(0), "sides 4");
+    events.sort();
+    assert_eq!(
+        events,
+        [
+            "side 0 of 0: Ok(Crossed)",
+            "side 0 of 1: Ok(Crossed)",
+            "side 1 of 0: Ok(Crossed)",
+            "side 1 of 1: Ok(Crossed)",
+        ]
+    );
 }

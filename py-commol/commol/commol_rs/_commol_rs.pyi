@@ -1,4 +1,5 @@
 from contextvars import ContextVar
+from logging import Logger
 from typing import Literal, Protocol
 
 class EngineProtocol(Protocol):
@@ -188,7 +189,7 @@ class CalibrationProblemProtocol(Protocol):
     def __init__(self, engine: EngineProtocol, problem: str) -> None: ...
     @property
     def seed(self) -> int: ...
-    def optimize(self, starts: int) -> StartsProtocol: ...
+    def optimize(self, starts: int, logger: Logger) -> StartsProtocol: ...
     def optimize_with_history(self) -> CalibrationResultWithHistoryProtocol: ...
     def predict_observations(
         self, parameter_sets: list[list[float]]
@@ -680,16 +681,16 @@ class InferenceModule(Protocol):
     SobolRun: type[SobolRunProtocol]
     ChaosRun: type[ChaosRunProtocol]
     def bootstrap(
-        self, problem: CalibrationProblemProtocol, settings: str
+        self, problem: CalibrationProblemProtocol, settings: str, logger: Logger
     ) -> tuple[StartsProtocol, BootstrapRunProtocol]: ...
     def block_jackknife(
         self, problem: CalibrationProblemProtocol, settings: str
     ) -> tuple[StartsProtocol, JackknifeRunProtocol]: ...
     def profile_likelihood(
-        self, problem: CalibrationProblemProtocol, settings: str
+        self, problem: CalibrationProblemProtocol, settings: str, logger: Logger
     ) -> tuple[StartsProtocol, ProfileRunProtocol]: ...
     def prediction_profile(
-        self, problem: CalibrationProblemProtocol, settings: str
+        self, problem: CalibrationProblemProtocol, settings: str, logger: Logger
     ) -> tuple[StartsProtocol, ProfileRunProtocol]: ...
     def chaos_evaluate(
         self,

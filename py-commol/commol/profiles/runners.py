@@ -202,7 +202,7 @@ def run_profile_likelihood(
         fit the problem.
     """
     starts, run = commol_rs.inference.profile_likelihood(
-        calibrator._engine_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method), logger
     )
     fit = fit_result(starts, calibrator.parameter_names, calibrator.seed, logger)
     return _result(
@@ -235,7 +235,7 @@ def run_prediction_profile(
         the problem.
     """
     starts, run = commol_rs.inference.prediction_profile(
-        calibrator._engine_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method), logger
     )
     fit = fit_result(starts, calibrator.parameter_names, calibrator.seed, logger)
     return _result(

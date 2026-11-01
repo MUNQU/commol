@@ -3,15 +3,16 @@
 //! with its seed.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 use commol_calibration::{
     CalibrationParameter, CalibrationProblem, ConstraintSettings, LossConfig, NelderMeadConfig,
-    ObservedDataPoint, OptimizationConfig, ParticleSwarmConfig, Starts, Subproblem, optimize,
-    optimize_from, optimize_starts, optimize_subproblem, optimize_with_history, start_points,
+    NoObserver, ObservedDataPoint, OptimizationConfig, ParticleSwarmConfig, StartEvent, Starts,
+    Subproblem, optimize, optimize_from, optimize_starts, optimize_starts_with_observer,
+    optimize_subproblem, optimize_with_history, start_points,
 };
-use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
+use commol_core::{ModelValue, SimulationEngine, SimulationError, Steps, ValuePlan};
 
 /// One output `x = k` at every position, or `x = 0.4` when it is flat; a
 /// run with `k > 2/3` fails, and so does every run after the first `limit`
@@ -409,4 +410,46 @@ fn a_polish_of_a_held_prediction_that_fails_gives_its_reason() {
         error.contains(&format!("run {} is over the limit", limit + 1)),
         "{error}"
     );
+}
+
+/// The events of the starts, as text, in the order they come.
+#[derive(Default)]
+struct KeptEvents(Mutex<Vec<String>>);
+
+impl Steps<StartEvent<'_>> for KeptEvents {
+    fn send(&self, event: StartEvent<'_>) {
+        let text = match event {
+            StartEvent::Began { total } => format!("began {total}"),
+            StartEvent::Finished { index, outcome } => {
+                format!("start {index} failed: {}", outcome.result.is_err())
+            }
+        };
+        self.0.lock().unwrap().push(text);
+    }
+}
+
+#[test]
+fn the_starts_send_their_beginning_then_each_start_that_finishes() {
+    let problem = problem();
+    let events = KeptEvents::default();
+    let starts = optimize_starts_with_observer(
+        &problem,
+        &config(),
+        start_points(problem.parameters(), 4, 11),
+        11,
+        || NoObserver,
+        &events,
+    )
+    .unwrap();
+
+    let mut events = events.0.into_inner().unwrap();
+    assert_eq!(events.remove(0), "began 4");
+    events.sort();
+    let expected: Vec<String> = starts
+        .outcomes()
+        .iter()
+        .enumerate()
+        .map(|(index, outcome)| format!("start {index} failed: {}", outcome.result.is_err()))
+        .collect();
+    assert_eq!(events, expected);
 }

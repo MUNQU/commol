@@ -7,7 +7,8 @@
 use argmin::core::observers::Observe;
 use argmin::core::{KV, State};
 use commol_calibration::{
-    CalibrationProblem, NelderMeadState, OptimizationConfig, ParticleSwarmState, Progress, Starts,
+    CalibrationProblem, NelderMeadState, OptimizationConfig, ParticleSwarmState, Progress,
+    StartSteps, Starts,
 };
 use commol_core::SimulationEngine;
 use pyo3::prelude::*;
@@ -131,7 +132,8 @@ impl PythonObserver {
 }
 
 /// Run the starts of `points` seeded with `seed`, with an observer of each
-/// that writes to Python's stdout instead of Rust's
+/// that writes to Python's stdout instead of Rust's, sending the events of
+/// the starts to `steps`
 ///
 /// It runs `commol_calibration::optimize_starts_with_observer`, so a verbose
 /// calibration takes the starts and the seeds of one that is not; the
@@ -142,6 +144,7 @@ pub fn optimize_with_python_observer<E: SimulationEngine + Send + Sync>(
     points: Vec<Vec<f64>>,
     seed: u64,
     progress: Progress,
+    steps: &StartSteps<'_>,
 ) -> Result<Starts, String> {
     let initial_params = problem.initial_parameters();
     let parameter_names = problem.parameter_names();
@@ -187,10 +190,14 @@ pub fn optimize_with_python_observer<E: SimulationEngine + Send + Sync>(
     };
     write_optimization_header(&header);
 
-    let starts =
-        commol_calibration::optimize_starts_with_observer(problem, config, points, seed, || {
-            PythonObserver::new(progress)
-        })?;
+    let starts = commol_calibration::optimize_starts_with_observer(
+        problem,
+        config,
+        points,
+        seed,
+        || PythonObserver::new(progress),
+        steps,
+    )?;
     let result = starts.best();
 
     // Print final calibrated parameters

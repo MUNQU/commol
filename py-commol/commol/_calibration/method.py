@@ -8,6 +8,8 @@ Three kinds of method share one base: an uncertainty method
 point takes only its kind, and imports no method.
 """
 
+import logging
+import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING, ClassVar, Generic, Protocol, TypeVar, cast
 
@@ -63,7 +65,9 @@ class InferenceMethod(BaseModel, Generic[ResultT]):
     whole to the engine, as the JSON of its dump
     (`commol._data.engine_json.engine_json`); a field that holds a result
     with behavior in the engine, such as a sample, is named in
-    ``_engine_handles`` and crosses as its handle.
+    ``_engine_handles`` and crosses as its handle. A kind that names a
+    logger in ``_logger`` logs the start of each of its methods, and its end
+    with its duration.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -71,6 +75,7 @@ class InferenceMethod(BaseModel, Generic[ResultT]):
     _engine_handles: ClassVar[tuple[str, ...]] = ()
     _runner: ClassVar[Callable[..., BaseModel] | None] = None
     _entry_point: ClassVar[str] = ""
+    _logger: ClassVar[str | None] = None
 
 
 class UncertaintyMethod(InferenceMethod[ResultT], Generic[ResultT]):
@@ -97,6 +102,7 @@ class IdentifiabilityMethod(InferenceMethod[ResultT], Generic[ResultT]):
     """
 
     _entry_point: ClassVar[str] = "Calibrator.identifiability"
+    _logger: ClassVar[str | None] = "commol.identifiability"
 
 
 class SensitivityMethod(InferenceMethod[ResultT], Generic[ResultT]):
@@ -150,4 +156,12 @@ def run_method(
             f"{type(method).__name__} declares no runner: set its _runner to the "
             "function that runs it."
         )
-    return cast("OutT", runner(entry_point, method))
+    if method._logger is None:
+        return cast("OutT", runner(entry_point, method))
+    logger = logging.getLogger(method._logger)
+    name = type(method).__name__
+    logger.info(f"{name} started.")
+    began = time.perf_counter()
+    result = cast("OutT", runner(entry_point, method))
+    logger.info(f"{name} finished in {time.perf_counter() - began:.2f} s.")
+    return result

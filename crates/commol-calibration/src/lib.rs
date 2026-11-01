@@ -105,7 +105,8 @@ pub use settings::{
     PolishSettings, ProblemSettings, Progress, StartRecord, observed_data,
 };
 pub use starts::{
-    StartOutcome, Starts, optimize_starts, optimize_starts_with_observer, start_points,
+    StartEvent, StartOutcome, StartSteps, Starts, optimize_starts, optimize_starts_with_observer,
+    start_points,
 };
 pub use subproblem::{ConstraintSettings, Subproblem, SubproblemResult, predict};
 pub use types::{

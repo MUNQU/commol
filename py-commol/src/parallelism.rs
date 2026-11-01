@@ -1,6 +1,7 @@
 //! The threads of the parallel methods: the setting that
 //! `commol.set_threads` and `commol.threads` change, and the one helper,
-//! [`parallel`], through which every binding runs its work.
+//! [`parallel`], through which every binding runs its work, with its
+//! sibling [`parallel_logged`] for a job that logs its steps.
 //!
 //! The setting is a `contextvars.ContextVar` that holds a [`PyParallelism`],
 //! so each Python thread, and each block of `commol.threads`, has its own.
@@ -11,6 +12,8 @@ use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::PyDict;
+
+use crate::records::{ChannelSteps, StepLog};
 
 /// The context variable of the setting, built at its first use.
 static SETTING: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
@@ -104,6 +107,39 @@ pub(crate) fn parallel<T: Send>(py: Python<'_>, job: impl FnOnce() -> T + Send) 
     let parallelism = current_setting(py)?;
     py.detach(|| parallelism.install(job))
         .map_err(PyRuntimeError::new_err)
+}
+
+/// [`parallel`], with the steps of `log` lent to `job`: the job runs on a
+/// thread of its own, which waits for the pool, while this thread writes
+/// the record of each step the job sends ([`crate::records`]). The GIL is
+/// held only for each record.
+///
+/// # Errors
+///
+/// As [`parallel`]; the error of the logger when it cannot say which
+/// levels it takes; and an error that is no `Exception` (a
+/// `KeyboardInterrupt`) of a record, raised once the job has ended.
+pub(crate) fn parallel_logged<T: Send>(
+    py: Python<'_>,
+    log: &StepLog,
+    job: impl FnOnce(&ChannelSteps) -> T + Send,
+) -> PyResult<T> {
+    let parallelism = current_setting(py)?;
+    let (steps, drain) = log.channel(py)?;
+    let (result, interrupt) = py.detach(|| {
+        std::thread::scope(|scope| {
+            let worker = scope.spawn(move || parallelism.install(|| job(&steps)));
+            let interrupt = drain.drain();
+            let result = worker
+                .join()
+                .unwrap_or_else(|panic| std::panic::resume_unwind(panic));
+            (result, interrupt)
+        })
+    });
+    match interrupt {
+        Some(error) => Err(error),
+        None => result.map_err(PyRuntimeError::new_err),
+    }
 }
 
 /// Register the setting of the threads.

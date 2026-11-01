@@ -16,7 +16,7 @@
 //! replicate.
 
 use argmin::core::observers::Observe;
-use commol_core::SimulationEngine;
+use commol_core::{NoSteps, SimulationEngine, Steps};
 use commol_random::{Generator, Stream, latin_hypercube};
 use rayon::prelude::*;
 
@@ -170,11 +170,34 @@ pub fn optimize_starts<E>(
 where
     E: SimulationEngine + Send + Sync,
 {
-    optimize_starts_with_observer(problem, config, points, seed, || NoObserver)
+    optimize_starts_with_observer(problem, config, points, seed, || NoObserver, &NoSteps)
 }
 
+/// An event of the starts of a multi-start optimization
+/// ([`optimize_starts_with_observer`]).
+#[derive(Debug, Clone, Copy)]
+pub enum StartEvent<'a> {
+    /// The starts begin: `total` of them.
+    Began {
+        /// The number of starts.
+        total: usize,
+    },
+    /// Start `index` finished with `outcome`.
+    Finished {
+        /// The index of the start, in the order of the points.
+        index: usize,
+        /// What the start returned.
+        outcome: &'a StartOutcome,
+    },
+}
+
+/// The receiver of the events of the starts.
+pub type StartSteps<'s> = dyn for<'e> Steps<StartEvent<'e>> + 's;
+
 /// [`optimize_starts`], with an observer of every iteration of each start
-/// from `observer`.
+/// from `observer`, sending the events of the starts to `steps`: one
+/// [`StartEvent::Began`], then one [`StartEvent::Finished`] per start, from
+/// the thread that ran it, as soon as it ends.
 ///
 /// # Errors
 ///
@@ -185,6 +208,7 @@ pub fn optimize_starts_with_observer<E, O, F>(
     points: Vec<Vec<f64>>,
     seed: u64,
     observer: F,
+    steps: &StartSteps<'_>,
 ) -> Result<Starts, String>
 where
     E: SimulationEngine + Send + Sync,
@@ -192,6 +216,9 @@ where
     F: Fn() -> O + Sync,
 {
     let space = SearchSpace::of(problem);
+    steps.send(StartEvent::Began {
+        total: points.len(),
+    });
     let outcomes = points
         .into_par_iter()
         .enumerate()
@@ -205,7 +232,12 @@ where
                 Some(observer()),
             )
             .map(|(result, _)| result);
-            StartOutcome { start, result }
+            let outcome = StartOutcome { start, result };
+            steps.send(StartEvent::Finished {
+                index,
+                outcome: &outcome,
+            });
+            outcome
         })
         .collect();
     Starts::new(outcomes)

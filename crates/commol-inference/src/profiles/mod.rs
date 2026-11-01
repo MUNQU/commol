@@ -21,5 +21,8 @@ pub mod verdict;
 
 pub use resets::{StructuralReading, Structure, Undetermined};
 pub use threshold::{BootstrapThresholds, beale, bootstrap_thresholds, chi_square};
-pub use tracer::{Profile, ProfileEnd, ProfilePoint, ProfileTracer, ProfiledQuantity};
+pub use tracer::{
+    Profile, ProfileEnd, ProfilePoint, ProfileTracer, ProfiledQuantity, SideEnd, SideEvent,
+    SideSteps,
+};
 pub use verdict::ProfileVerdict;
