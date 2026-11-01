@@ -7,10 +7,13 @@ from commol.commol_rs import _commol_rs as commol_rs
 
 
 def total_series(
-    results: Mapping[str, Sequence[float]], outputs: Sequence[str]
+    results: Mapping[str, Sequence[float]],
+    outputs: Sequence[str],
+    coefficients: Sequence[float] | None = None,
 ) -> list[float]:
     """
-    The sum of some outputs at each position.
+    The sum of some outputs at each position, each output times its
+    coefficient when `coefficients` is given.
 
     Parameters
     ----------
@@ -18,6 +21,9 @@ def total_series(
         Simulation results, such as those of `Simulation.run`.
     outputs : Sequence[str]
         Output names.
+    coefficients : Sequence[float] | None
+        The coefficient of each output, in the order of `outputs`; None sums
+        the outputs as they are.
 
     Returns
     -------
@@ -32,8 +38,12 @@ def total_series(
     missing = [name for name in outputs if name not in results]
     if missing:
         raise KeyError(f"Missing output series in results: {sorted(missing)}")
+    columns = (results[name] for name in outputs)
+    if coefficients is None:
+        return [sum(values) for values in zip(*columns, strict=True)]
     return [
-        sum(values) for values in zip(*(results[name] for name in outputs), strict=True)
+        sum(value * coefficient for value, coefficient in zip(values, coefficients))
+        for values in zip(*columns, strict=True)
     ]
 
 

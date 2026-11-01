@@ -190,15 +190,16 @@ def _predictive_band(
 
     When the observations of the series do not share one operator with no
     window, each draw is read through the operator of each observation at its
-    position, as the loss reads it. With one operator and a factor or a
-    scale, each draw is read through it at every position of the predictive.
-    Otherwise, the band of the sum of the outputs.
+    position, as the loss reads it. With one operator and coefficients, a
+    factor or a scale, each draw is read through it at every position of the
+    predictive. Otherwise, the band of the sum of the outputs.
     """
     if reads_each_observation(observed):
         points = [
             ObservedDataPoint(
                 at=point.at,
                 outputs=point.outputs or outputs.components(series_id),
+                coefficients=point.coefficients,
                 label=series_id,
                 value=0.0,
                 window=point.window,
@@ -215,12 +216,14 @@ def _predictive_band(
     )
     factor_id = observed[0].factor_id if observed else None
     scale = observed[0].scale if observed else 1.0
-    if factor_id is None and scale == 1.0:
+    coefficients = observed[0].coefficients if observed else None
+    if factor_id is None and scale == 1.0 and coefficients is None:
         return predictive.series_band(components, confidence_level)
     points = [
         ObservedDataPoint(
             at=at,
             outputs=components,
+            coefficients=coefficients,
             label=series_id,
             value=0.0,
             factor_id=factor_id,

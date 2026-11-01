@@ -39,6 +39,11 @@ pub struct ObservedDataPoint {
     /// Outputs summed before comparison; at least one.
     pub outputs: Vec<String>,
 
+    /// The known coefficient of each output in the sum, in the order of
+    /// `outputs`: the share of the output that the observation sees.
+    /// `None` is 1 for each output.
+    pub coefficients: Option<Vec<f64>>,
+
     /// Observed value of the summed outputs
     pub value: f64,
 
@@ -72,6 +77,7 @@ impl ObservedDataPoint {
             at,
             label: output.clone(),
             outputs: vec![output],
+            coefficients: None,
             value,
             weight: 1.0,
             factor_id: None,
@@ -112,6 +118,52 @@ impl ObservedDataPoint {
     pub fn window_start(&self) -> Option<f64> {
         self.window
             .map(|window| crate::observation::window_start(self.at, window))
+    }
+
+    /// The coefficient of each output in the sum: `coefficients`, or 1 for
+    /// each output.
+    pub fn output_coefficients(&self) -> Vec<f64> {
+        self.coefficients
+            .clone()
+            .unwrap_or_else(|| vec![1.0; self.outputs.len()])
+    }
+
+    /// Check the coefficients of the outputs: one per output, each a finite
+    /// number 0 or more, and at least one above 0. An observation without
+    /// coefficients passes.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the label of the observation and the
+    /// rule, or the coefficient, that it breaks.
+    pub fn check_coefficients(&self) -> Result<(), String> {
+        let Some(coefficients) = &self.coefficients else {
+            return Ok(());
+        };
+        let label = &self.label;
+        if coefficients.len() != self.outputs.len() {
+            return Err(format!(
+                "Observation '{label}' has {} coefficients for {} outputs; give one \
+                 coefficient per output.",
+                coefficients.len(),
+                self.outputs.len()
+            ));
+        }
+        for (output, &coefficient) in self.outputs.iter().zip(coefficients) {
+            if !(coefficient.is_finite() && coefficient >= 0.0) {
+                return Err(format!(
+                    "Observation '{label}' has the coefficient {coefficient} for output \
+                     '{output}'; a coefficient is a finite number, 0 or more."
+                ));
+            }
+        }
+        if coefficients.iter().all(|&coefficient| coefficient == 0.0) {
+            return Err(format!(
+                "Observation '{label}' has every coefficient 0; at least one coefficient \
+                 must be above 0."
+            ));
+        }
+        Ok(())
     }
 
     /// Check the position, the value, the weight, the scale, the window and

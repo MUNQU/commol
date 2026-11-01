@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ObservedDataPoint(outputs=[...], coefficients=[...])`: one known
+  coefficient per output, so the observation predicts the weighted sum
+  `Σ coefficient · output`, then times its scale and its factor. A count
+  model reads that sum as one count. Each coefficient is finite and 0 or
+  more, and one is above 0; `coefficients` with `output` is refused. The
+  loss, the likelihood, the predictive, the figures, the `observed` block of
+  a report (`coefficients`), the noise floor of a profile and the dense design
+  of finite differences read them. See
+  [Weighted sums](../guide/calibration-observations.md#weighted-sums).
 - A method that runs for long logs each step it finishes, at `INFO`, on the
   logger of its module: each start of `Calibrator.run` (`commol`), each
   replicate of a bootstrap (`commol.resampling`), and each stage and side of

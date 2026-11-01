@@ -295,10 +295,10 @@ fn reason(violation: &Violation) -> String {
     }
 }
 
-/// Every series of `observed_data` (its label, outputs, factor and window,
-/// with the scale of its first observation) at every unit position from 0 up
-/// to the last observation, and at the positions of the observations; a
-/// series with a window starts once a whole window fits.
+/// Every series of `observed_data` (its label, outputs, coefficients, factor
+/// and window, with the scale of its first observation) at every unit
+/// position from 0 up to the last observation, and at the positions of the
+/// observations; a series with a window starts once a whole window fits.
 fn dense_observations(observed_data: &[ObservedDataPoint]) -> Vec<ObservedDataPoint> {
     let last = observed_data.iter().map(|obs| obs.at).fold(0.0, f64::max);
     let mut series: Vec<&ObservedDataPoint> = Vec::new();
@@ -306,6 +306,7 @@ fn dense_observations(observed_data: &[ObservedDataPoint]) -> Vec<ObservedDataPo
         let same = |other: &&ObservedDataPoint| {
             other.label == obs.label
                 && other.outputs == obs.outputs
+                && other.output_coefficients() == obs.output_coefficients()
                 && other.factor_id == obs.factor_id
                 && other.window == obs.window
         };
@@ -334,4 +335,34 @@ fn dense_observations(observed_data: &[ObservedDataPoint]) -> Vec<ObservedDataPo
                 })
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn observations_with_other_coefficients_are_another_series() {
+        let plain = ObservedDataPoint::of_sum(
+            1.0,
+            "seen".to_string(),
+            vec!["A".to_string(), "B".to_string()],
+            0.0,
+        );
+        let ones = ObservedDataPoint {
+            coefficients: Some(vec![1.0, 1.0]),
+            ..plain.clone()
+        };
+        let weighted = ObservedDataPoint {
+            coefficients: Some(vec![1.0, 0.6]),
+            ..plain.clone()
+        };
+
+        // Coefficients of 1 are the plain sum: one series at 0 and 1.
+        assert_eq!(dense_observations(&[plain.clone(), ones]).len(), 2);
+        // Other coefficients are a second series.
+        let dense = dense_observations(&[plain, weighted]);
+        assert_eq!(dense.len(), 4);
+        assert_eq!(dense[3].coefficients, Some(vec![1.0, 0.6]));
+    }
 }

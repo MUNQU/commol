@@ -537,9 +537,9 @@ fn a_conformal_method_needs_its_lists_and_a_score_it_can_scale() {
     );
     let with_spread = commol_core::json::read::<SplitConformalSettings>(
         r#"{"score": "spread", "by": "all", "confidence_level": 0.9,
-        "calibration_data": [{"at": 1.0, "output": "B", "outputs": null, "label": "B",
-        "value": 2.0, "weight": 1.0, "factor_id": null, "scale": 1.0, "window": null,
-        "trials": null}], "positions": [1.0], "starts": 1}"#,
+        "calibration_data": [{"at": 1.0, "output": "B", "outputs": null, "coefficients": null,
+        "label": "B", "value": 2.0, "weight": 1.0, "factor_id": null, "scale": 1.0,
+        "window": null, "trials": null}], "positions": [1.0], "starts": 1}"#,
     )
     .unwrap();
     assert!(with_spread.check_predictor(true).is_ok());

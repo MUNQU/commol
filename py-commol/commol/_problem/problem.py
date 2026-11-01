@@ -27,7 +27,8 @@ class ObservedDataPoint(EngineChecked, RangeChecked):
     Represents a single observed data point for calibration.
 
     An observation compares one output, or the sum of several outputs, with an
-    observed value at a position on the axis.
+    observed value at a position on the axis. Each output of a sum can have a
+    known coefficient, the share of that output that the observation sees.
 
     Attributes
     ----------
@@ -41,6 +42,12 @@ class ObservedDataPoint(EngineChecked, RangeChecked):
     outputs : list[str] | None
         Outputs summed before comparing with this observation. Needs a
         `label`.
+    coefficients : list[float] | None
+        The known coefficient of each output of `outputs`, in its order: the
+        prediction is ``Σ coefficient · output``, then times `scale` and the
+        factor (default: None, 1 for each output). Each coefficient is a
+        finite number, 0 or more, and at least one is above 0. Only with
+        `outputs`; the share of one output is `scale`.
     label : str
         Name of the observed series, used by reports, plots and the
         per-series normalization. Defaults to `output`.
@@ -79,6 +86,10 @@ class ObservedDataPoint(EngineChecked, RangeChecked):
     outputs: list[str] | None = Field(
         default=None,
         description="Outputs summed before comparison",
+    )
+    coefficients: list[float] | None = Field(
+        default=None,
+        description="Known coefficient of each output of `outputs`, in its order",
     )
     label: str = Field(
         default="",
@@ -127,6 +138,14 @@ class ObservedDataPoint(EngineChecked, RangeChecked):
     def observed_outputs(self) -> list[str]:
         """The outputs whose sum is compared: `outputs`, or `output` alone."""
         return list(self.outputs) if self.outputs is not None else [self.output or ""]
+
+    @property
+    def observed_coefficients(self) -> list[float]:
+        """The coefficient of each of `observed_outputs`: `coefficients`, or 1
+        for each output."""
+        if self.coefficients is not None:
+            return list(self.coefficients)
+        return [1.0] * len(self.observed_outputs)
 
 
 class CalibrationParameter(EngineChecked):

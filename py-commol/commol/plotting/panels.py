@@ -676,12 +676,19 @@ def warn_missing_factors(
 def reads_each_observation(observed: list[ObservedDataPoint]) -> bool:
     """
     Whether the model of a series is read at each observation: when one has
-    a window, or the observations differ in outputs, factor or scale.
+    a window, or the observations differ in outputs, coefficients, factor or
+    scale.
 
     Otherwise one operator reads every observation, and the model line covers
     every position of the results.
     """
     operators = {
-        (tuple(point.outputs or ()), point.factor_id, point.scale) for point in observed
+        (
+            tuple(point.outputs or ()),
+            tuple(point.coefficients or ()),
+            point.factor_id,
+            point.scale,
+        )
+        for point in observed
     }
     return any(point.window for point in observed) or len(operators) > 1
