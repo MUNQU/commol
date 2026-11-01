@@ -15,7 +15,12 @@ from commol import (
     StratificationCondition,
     StratifiedRate,
 )
-from commol._model.engine_state import calibrated_initial_state
+from commol._model.engine_state import (
+    TargetCoverage,
+    build_engine,
+    calibrated_initial_state,
+    initial_condition_coverage,
+)
 from commol._model.model import Model
 from commol.uncertainty import ParameterSample, Predictive, SampleMethod
 from tests.support import (
@@ -308,6 +313,33 @@ def _split_by_group(a_amount: float | None) -> Model:
         )
     )
     return build(builder)
+
+
+def test_the_kind_of_each_target_comes_from_the_engine() -> None:
+    model = build(
+        a_to_b_builder(
+            amounts={"A": 900, "B": 100},
+            stratifications={"group": {"g1": 0.5, "g2": 0.5}},
+        )
+    )
+    parameters = [
+        bounded("A", 0, 1000, kind="initial_condition"),
+        bounded("B_g1", 0, 1000, kind="initial_condition"),
+        bounded("g1", 0, 1, kind="initial_condition"),
+    ]
+
+    coverage, remainder = initial_condition_coverage(
+        build_engine(model), parameters, None
+    )
+    scored = calibrated_initial_state(model, parameters, [800, 50, 0.5])
+
+    assert coverage == [
+        TargetCoverage("bin", ["A_g1", "A_g2"]),
+        TargetCoverage("compartment", ["B_g1"]),
+        TargetCoverage("category", []),
+    ]
+    assert remainder == []
+    assert scored.categories == ["g1"]
 
 
 def test_a_calibrated_amount_keeps_the_split_by_category() -> None:

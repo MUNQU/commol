@@ -11,7 +11,7 @@ use commol_core::{
 };
 use commol_difference::DifferenceEquations;
 use commol_differential::DifferentialEquations;
-use commol_model::{CompartmentalEngine, InitialConditionPlan};
+use commol_model::{CompartmentalEngine, InitialConditionPlan, InitialTargetKind};
 use commol_stochastic::{StochasticEvents, StochasticSteps};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -166,8 +166,21 @@ macro_rules! compartmental {
     };
 }
 
-/// The initial state of a compartmental engine, and the compartments a
-/// plan of initial conditions covers.
+/// The name of the kind of each initial-condition value and the compartments
+/// it sets, in the order of the values.
+pub type ValueCoverage = Vec<(&'static str, Vec<usize>)>;
+
+/// The coverage of the values of a plan, with the name of each kind.
+fn named(values: Vec<(InitialTargetKind, Vec<usize>)>) -> ValueCoverage {
+    values
+        .into_iter()
+        .map(|(kind, compartments)| (kind.name(), compartments))
+        .collect()
+}
+
+/// The initial state of a compartmental engine, the compartments a plan of
+/// initial conditions covers, and the kind and the compartments of each of
+/// its values.
 ///
 /// # Errors
 ///
@@ -176,10 +189,12 @@ macro_rules! compartmental {
 pub fn compartmental_state(
     engine: &Engine,
     plan: &EngineValuePlan,
-) -> Result<(Vec<f64>, Vec<usize>), String> {
+) -> Result<(Vec<f64>, Vec<usize>, ValueCoverage), String> {
     let state = compartmental!(engine, engine => engine.initial_state())?;
     match plan {
-        EngineValuePlan::Aggregate(plan) => Ok((state, plan.covered_compartments())),
+        EngineValuePlan::Aggregate(plan) => {
+            Ok((state, plan.covered_compartments(), named(plan.coverage().0)))
+        }
         // coverage: an arm for the test model kind: compartmental! rejects the engine of a test
         // plan first
         #[cfg(feature = "test-kind")]
@@ -187,17 +202,20 @@ pub fn compartmental_state(
     }
 }
 
-/// The compartments each initial-condition value of a plan sets, in the
-/// order of the values, and those of the remainder.
+/// The kind and the compartments of each initial-condition value of a plan,
+/// in the order of the values, and the compartments of the remainder.
 ///
 /// # Errors
 ///
 /// Returns a message when the plan is not of an aggregate model.
 pub fn compartmental_coverage(
     plan: &EngineValuePlan,
-) -> Result<(Vec<Vec<usize>>, Vec<usize>), String> {
+) -> Result<(ValueCoverage, Vec<usize>), String> {
     match plan {
-        EngineValuePlan::Aggregate(plan) => Ok(plan.coverage()),
+        EngineValuePlan::Aggregate(plan) => {
+            let (values, remainder) = plan.coverage();
+            Ok((named(values), remainder))
+        }
         // coverage: an arm for the test model kind: only Aggregate asks the coverage (aggregate.py,
         // initial_condition_coverage)
         #[cfg(feature = "test-kind")]

@@ -8,7 +8,7 @@ This module only asks the engine; it does not reproduce any of those rules.
 
 from collections.abc import Sequence
 from functools import lru_cache
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, Literal, NamedTuple
 
 from commol._data.engine_json import engine_json
 from commol._model.formula_tree import Node, Variable, product, read_tree
@@ -270,13 +270,37 @@ def check_model_values(
     )
 
 
+InitialTargetKind = Literal["bin", "compartment", "category"]
+"""What the id of an initial-condition value names, as the engine resolves it."""
+
+
+class TargetCoverage(NamedTuple):
+    """
+    The kind of an initial-condition value and the compartments it sets.
+
+    Attributes
+    ----------
+    kind : InitialTargetKind
+        What the id of the value names: a bin or a bin prefix, an expanded
+        compartment, or a category whose value is a split. An id that names
+        an expanded compartment is a compartment.
+    compartments : list[str]
+        The compartments whose amount the value sets, in engine order; none
+        for a category split, which keeps the totals of its pairs.
+    """
+
+    kind: InitialTargetKind
+    compartments: list[str]
+
+
 def initial_condition_coverage(
     engine: "EngineProtocol",
     parameters: Sequence["CalibrationParameter"],
     remainder: str | None,
-) -> tuple[list[list[str]], list[str]]:
+) -> tuple[list[TargetCoverage], list[str]]:
     """
-    The compartments each initial-condition value sets, and the remainder's.
+    The kind and the compartments of each initial-condition value, and the
+    compartments of the remainder.
 
     Parameters
     ----------
@@ -289,9 +313,9 @@ def initial_condition_coverage(
 
     Returns
     -------
-    tuple[list[list[str]], list[str]]
-        For each parameter, the compartments it sets (none for a category
-        split), and the compartments of the remainder (none without one).
+    tuple[list[TargetCoverage], list[str]]
+        For each parameter, its kind and the compartments it sets, and the
+        compartments of the remainder (none without one).
     """
     values, remainder_indices = commol_rs.calibration.initial_condition_coverage(
         engine,
@@ -300,7 +324,10 @@ def initial_condition_coverage(
     )
     names = engine.compartments
     return (
-        [[names[index] for index in indices] for indices in values],
+        [
+            TargetCoverage(kind, [names[index] for index in indices])
+            for kind, indices in values
+        ],
         [names[index] for index in remainder_indices],
     )
 
@@ -319,7 +346,8 @@ class CalibratedInitialState(NamedTuple):
         Compartments whose amount a calibrated bin or compartment value, or
         the remainder, sets.
     categories : list[str]
-        The parameter ids the engine resolves as the split of a category.
+        The parameter ids whose kind the engine resolves as ``category``: the
+        split of a category.
     """
 
     values: dict[str, float]
@@ -340,14 +368,15 @@ def calibrated_initial_state[S: "Aggregate"](
     The engine applies the values as the calibration objective does: clamped
     to their bounds, written as bins, then category splits, then exact
     compartments, with the remainder taking what the others leave of the
-    amounts the model states.
+    amounts the model states. The state, the covered compartments and the
+    kind of each value come from the one plan the engine writes them with.
 
     Parameters
     ----------
     model : Model[Aggregate]
         The model definition the calibration problem was built on.
     parameters : Sequence[CalibrationParameter]
-        Calibration parameters, in problem order.
+        Initial-condition calibration parameters, in problem order.
     values : Sequence[float]
         Value of each parameter, parallel to ``parameters``.
     remainder : str | None
@@ -366,21 +395,20 @@ def calibrated_initial_state[S: "Aggregate"](
         values leave the remainder below zero.
     """
     engine = build_engine(model)
-    applied, state, covered = commol_rs.calibration.calibrated_initial_state(
+    applied, state, covered, targets = commol_rs.calibration.calibrated_initial_state(
         engine,
         engine_json(list(parameters)),
         list(values),
         initial_condition_remainder=remainder,
     )
-    coverage, _ = initial_condition_coverage(engine, parameters, remainder)
     return CalibratedInitialState(
         values=dict(zip((param.id for param in parameters), applied, strict=True)),
         state=dict(zip(engine.compartments, state, strict=True)),
         covered=[engine.compartments[index] for index in covered],
         categories=[
             param.id
-            for param, compartments in zip(parameters, coverage, strict=True)
-            if not compartments
+            for param, (kind, _) in zip(parameters, targets, strict=True)
+            if kind == "category"
         ],
     )
 

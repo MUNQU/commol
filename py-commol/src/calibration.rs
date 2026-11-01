@@ -173,12 +173,18 @@ impl PyStarts {
     }
 }
 
+/// The values applied, the initial state, the covered compartments and the
+/// coverage of each initial-condition value ([`calibrated_initial_state`]).
+type CalibratedState = (Vec<f64>, Vec<f64>, Vec<usize>, crate::engine::ValueCoverage);
+
 /// Initial state a compartmental engine starts from once calibration
 /// values are applied
 ///
 /// The values are applied exactly as the calibration objective scores them:
-/// clamped to their bounds, with the remainder initial condition
-/// auto-calculated, and written in parameter order.
+/// clamped to their bounds, written in layers (bins, category splits,
+/// compartments), with the remainder taking what the others leave. The
+/// state, the covered compartments and the kinds come from the one plan of
+/// the values that writes them.
 ///
 /// Args:
 ///     engine: Engine built from a compartmental model, before calibration
@@ -188,10 +194,13 @@ impl PyStarts {
 ///         other compartments leave of the amounts the model states, if any
 ///
 /// Returns:
-///     A `(values, state, covered)` tuple: the values the engine applied,
-///     parallel to `parameters`; the initial amount of each compartment,
-///     in engine order; and the indices of the compartments a calibrated bin
-///     or compartment value, or the remainder, sets
+///     A `(values, state, covered, targets)` tuple: the values the engine
+///     applied, parallel to `parameters`; the initial amount of each
+///     compartment, in engine order; the indices of the compartments a
+///     calibrated bin or compartment value, or the remainder, sets; and, for
+///     each initial-condition parameter in order, its kind (`bin`,
+///     `compartment` or `category`) and the indices of the compartments it
+///     sets (none for a category split)
 ///
 /// Raises:
 ///     ValueError: If the engine is not compartmental, an initial-condition id
@@ -204,7 +213,7 @@ fn calibrated_initial_state(
     parameters: &str,
     values: Vec<f64>,
     initial_condition_remainder: Option<String>,
-) -> PyResult<(Vec<f64>, Vec<f64>, Vec<usize>)> {
+) -> PyResult<CalibratedState> {
     let parameters: Vec<CalibrationParameter> = crate::json::read(parameters)?;
     let (configured, applied, plan) = commol_calibration::configured_engine(
         &engine.engine(),
@@ -213,9 +222,9 @@ fn calibrated_initial_state(
         &values,
     )
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
-    let (state, covered) = crate::engine::compartmental_state(&configured, &plan)
+    let (state, covered, targets) = crate::engine::compartmental_state(&configured, &plan)
         .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
-    Ok((applied, state, covered))
+    Ok((applied, state, covered, targets))
 }
 
 /// Check that the engine sets every parameter and resolves every value of
@@ -253,8 +262,8 @@ fn check_model_values(
     .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
 }
 
-/// The compartments each initial-condition value sets, and those of the
-/// remainder, as the engine resolves them
+/// The kind of each initial-condition value and the compartments it sets,
+/// and the compartments of the remainder, as the engine resolves them
 ///
 /// Args:
 ///     engine: Engine built from a compartmental model
@@ -264,9 +273,10 @@ fn check_model_values(
 ///         if any
 ///
 /// Returns:
-///     A `(values, remainder)` tuple: for each parameter, the indices of the
-///     compartments it sets (none for a category split), and the indices of
-///     the compartments of the remainder (none without one)
+///     A `(values, remainder)` tuple: for each parameter, its kind (`bin`,
+///     `compartment` or `category`) and the indices of the compartments it
+///     sets (none for a category split), and the indices of the compartments
+///     of the remainder (none without one)
 ///
 /// Raises:
 ///     ValueError: If the engine is not compartmental, or a value or the
@@ -277,7 +287,7 @@ fn initial_condition_coverage(
     engine: PyRef<'_, PyEngine>,
     parameters: &str,
     initial_condition_remainder: Option<String>,
-) -> PyResult<(Vec<Vec<usize>>, Vec<usize>)> {
+) -> PyResult<(crate::engine::ValueCoverage, Vec<usize>)> {
     let parameters: Vec<CalibrationParameter> = crate::json::read(parameters)?;
     commol_calibration::plan_model_values(
         &engine.engine(),

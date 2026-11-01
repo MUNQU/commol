@@ -5,7 +5,7 @@
 use commol_core::{
     Model, ModelValue, ModelValueType, SimulationEngine, SimulationError, ValuePlan,
 };
-use commol_model::{CompartmentalEngine, CompiledModel, OutputLabels};
+use commol_model::{CompartmentalEngine, CompiledModel, InitialTargetKind, OutputLabels};
 
 /// A compartmental engine that holds its state and does not move it: one bin
 /// of the compiled model per compartment, or the compartments of a
@@ -366,6 +366,32 @@ fn the_plan_covers_what_its_values_and_remainder_set() {
     // A covers 0 and 1, the remainder B covers 3 and 4; a category split and
     // the fixed C cover nothing.
     assert_eq!(plan.covered_compartments(), vec![0, 1, 3, 4]);
+}
+
+#[test]
+fn the_plan_gives_the_kind_and_the_compartments_of_each_value() {
+    let engine = FrozenEngine::with_fixed_c();
+    let plan = engine
+        .plan_values(
+            &initial_conditions(&["A", "B_cat0", "cat1", "C"]),
+            Some("B_cat1"),
+        )
+        .unwrap();
+
+    // C is a bin and its one compartment, so it is a compartment: the
+    // compartment comes first. The remainder is not a value, so it has no
+    // kind.
+    let (values, remainder) = plan.coverage();
+    assert_eq!(
+        values,
+        vec![
+            (InitialTargetKind::Bin, vec![0, 1]),
+            (InitialTargetKind::Compartment, vec![3]),
+            (InitialTargetKind::Category, vec![]),
+            (InitialTargetKind::Compartment, vec![2]),
+        ]
+    );
+    assert_eq!(remainder, vec![4]);
 }
 
 #[test]

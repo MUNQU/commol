@@ -2,6 +2,9 @@ from contextvars import ContextVar
 from logging import Logger
 from typing import Literal, Protocol
 
+type InitialTargetKind = Literal["bin", "compartment", "category"]
+"""What the id of an initial-condition value names."""
+
 class EngineProtocol(Protocol):
     """The engine a model names, built from the JSON of the model."""
 
@@ -176,14 +179,16 @@ class CalibrationModule(Protocol):
         engine: EngineProtocol,
         parameters: str,
         initial_condition_remainder: str | None = None,
-    ) -> tuple[list[list[int]], list[int]]: ...
+    ) -> tuple[list[tuple[InitialTargetKind, list[int]]], list[int]]: ...
     def calibrated_initial_state(
         self,
         engine: EngineProtocol,
         parameters: str,
         values: list[float],
         initial_condition_remainder: str | None = None,
-    ) -> tuple[list[float], list[float], list[int]]: ...
+    ) -> tuple[
+        list[float], list[float], list[int], list[tuple[InitialTargetKind, list[int]]]
+    ]: ...
 
 class CalibrationProblemProtocol(Protocol):
     def __init__(self, engine: EngineProtocol, problem: str) -> None: ...
