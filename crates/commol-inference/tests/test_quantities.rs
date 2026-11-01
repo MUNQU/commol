@@ -3,6 +3,7 @@
 //! across runs, and the ratio of two quantities.
 
 use commol_calibration::{CalibrationParameter, ForwardModel};
+use commol_core::NoSteps;
 use commol_core::{Model, SimulationEngine};
 use commol_difference::DifferenceEquations;
 use commol_inference::batch::BatchRunner;
@@ -409,8 +410,8 @@ fn a_nan_run_is_named_by_its_point_and_inputs() {
         },
     ];
 
-    let propagation = analysis.propagate(Some(4), &quantities).unwrap();
-    let error = analysis.prcc(Some(4), &quantities).unwrap_err();
+    let propagation = analysis.propagate(Some(4), &quantities, &NoSteps).unwrap();
+    let error = analysis.prcc(Some(4), &quantities, &NoSteps).unwrap_err();
 
     // A propagation keeps the NaN of each run.
     assert!(propagation.values.iter().all(|row| row[1].is_nan()));
@@ -764,14 +765,20 @@ fn a_zero_denominator_follows_the_nan_rule_in_every_method() {
     ] {
         let quantities = a_over_gain(rule);
         let errors = [
-            analysis.prcc(Some(8), &quantities).map(|_| ()).unwrap_err(),
-            analysis.morris(3, 4, &quantities).map(|_| ()).unwrap_err(),
             analysis
-                .sobol(4, 2, 0.9, &quantities)
+                .prcc(Some(8), &quantities, &NoSteps)
                 .map(|_| ())
                 .unwrap_err(),
             analysis
-                .chaos(1, Truncation::TOTAL_DEGREE, 8, &quantities)
+                .morris(3, 4, &quantities, &NoSteps)
+                .map(|_| ())
+                .unwrap_err(),
+            analysis
+                .sobol(4, 2, 0.9, &quantities, &NoSteps)
+                .map(|_| ())
+                .unwrap_err(),
+            analysis
+                .chaos(1, Truncation::TOTAL_DEGREE, 8, &quantities, &NoSteps)
                 .map(|_| ())
                 .unwrap_err(),
         ];
@@ -785,7 +792,7 @@ fn a_zero_denominator_follows_the_nan_rule_in_every_method() {
     }
     // A propagation keeps the NaN of each run, which its quantiles reject.
     let propagation = analysis
-        .propagate(Some(8), &a_over_gain(ReplicateRule::Within))
+        .propagate(Some(8), &a_over_gain(ReplicateRule::Within), &NoSteps)
         .unwrap();
     let ratios: Vec<f64> = propagation.values.iter().map(|row| row[0]).collect();
     let undefined: Vec<usize> = (0..ratios.len())

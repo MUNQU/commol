@@ -6,7 +6,8 @@
 //! the method, the fit and the calibration of `η` too, and returns the run
 //! as plain values; Python builds the result.
 
-use crate::parallelism::parallel;
+use crate::parallelism::parallel_logged;
+use crate::records::StepLog;
 use commol_inference::resampling::{BlockDrawing, BlockScheme, FitUnit};
 use commol_inference::settings::PriorsSettings;
 use commol_inference::settings::smc::{
@@ -193,17 +194,19 @@ fn gibbs_sampler(settings: &GibbsPosteriorSettings) -> SmcSampler<RandomWalk> {
     )
 }
 
-/// The `η` of `calibration`, from a fit of the problem.
+/// The `η` of `calibration`, from a fit of the problem, with the records of
+/// its steps in `log`.
 fn calibrated_eta(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
     settings: &GibbsPosteriorSettings,
     priors: &Priors,
     calibration: &EtaCalibration,
+    log: &StepLog,
 ) -> PyResult<(PyStarts, PyEtaCalibration)> {
     match calibration {
         EtaCalibration::InformationMatching(calibration) => {
-            let starts = problem.fit(py, calibration.starts)?;
+            let starts = problem.fit_logged(py, calibration.starts, log)?;
             let found = smc::information_matching_eta(
                 &problem.inner,
                 &best_values(&starts),
@@ -222,7 +225,7 @@ fn calibrated_eta(
             ))
         }
         EtaCalibration::BootstrapCoverage(calibration) => {
-            let starts = problem.fit(py, calibration.starts)?;
+            let starts = problem.fit_logged(py, calibration.starts, log)?;
             let fit = best_values(&starts);
             let blocks = BlockScheme::at_fit(
                 &problem.inner,
@@ -232,7 +235,7 @@ fn calibrated_eta(
             )
             .map_err(method_error)?;
             let mut sampler = gibbs_sampler(settings);
-            let found = parallel(py, || {
+            let found = parallel_logged(py, log, |steps| {
                 smc::bootstrap_coverage_eta(
                     &problem.inner,
                     priors,
@@ -242,6 +245,7 @@ fn calibrated_eta(
                     calibration.replicates,
                     calibration.confidence_level,
                     problem.seed,
+                    steps,
                 )
             })?
             .map_err(method_error)?;
@@ -265,6 +269,8 @@ fn calibrated_eta(
 /// Args:
 ///     problem: The calibration problem
 ///     settings: The JSON of a `GibbsPosterior`
+///     logger: The logger of a record of each generation, and of the steps
+///         of the calibration of `η`
 ///
 /// Returns:
 ///     The starts of the fit, or None for a given `η`; the run; and the `η`
@@ -280,9 +286,11 @@ fn gibbs_posterior(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
     settings: &str,
+    logger: Py<PyAny>,
 ) -> PyResult<(Option<PyStarts>, PySmcRun, PyEtaCalibration)> {
     let settings: GibbsPosteriorSettings = crate::json::read(settings)?;
     let priors = problem_priors(problem, &settings.priors)?;
+    let log = StepLog::new(logger);
     let (starts, eta) = match &settings.eta {
         Eta::Value(eta) => (
             None,
@@ -295,13 +303,20 @@ fn gibbs_posterior(
             },
         ),
         Eta::Calibrated(calibration) => {
-            let (starts, eta) = calibrated_eta(py, problem, &settings, &priors, calibration)?;
+            let (starts, eta) = calibrated_eta(py, problem, &settings, &priors, calibration, &log)?;
             (Some(starts), eta)
         }
     };
     let mut sampler = gibbs_sampler(&settings);
-    let run = parallel(py, || {
-        smc::gibbs_posterior(&problem.inner, &priors, eta.eta, &mut sampler, problem.seed)
+    let run = parallel_logged(py, &log, |steps| {
+        smc::gibbs_posterior(
+            &problem.inner,
+            &priors,
+            eta.eta,
+            &mut sampler,
+            problem.seed,
+            steps,
+        )
     })?
     .map_err(method_error)?;
     Ok((starts, PySmcRun::of(run.run), eta))
@@ -312,6 +327,7 @@ fn gibbs_posterior(
 /// Args:
 ///     problem: The calibration problem, with observation models
 ///     settings: The JSON of a `BayesianPosterior`
+///     logger: The logger of a record of each generation
 ///
 /// Raises:
 ///     ValueError: If the problem has a loss, or a prior or a setting is not
@@ -322,6 +338,7 @@ fn bayesian_posterior(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
     settings: &str,
+    logger: Py<PyAny>,
 ) -> PyResult<PySmcRun> {
     let settings: BayesianPosteriorSettings = crate::json::read(settings)?;
     let priors = problem_priors(problem, &settings.priors)?;
@@ -331,8 +348,8 @@ fn bayesian_posterior(
         settings.target_cess,
         settings.stay_probability,
     );
-    let run = parallel(py, || {
-        smc::bayesian_posterior(&problem.inner, &priors, &mut sampler, problem.seed)
+    let run = parallel_logged(py, &StepLog::new(logger), |steps| {
+        smc::bayesian_posterior(&problem.inner, &priors, &mut sampler, problem.seed, steps)
     })?
     .map_err(method_error)?;
     Ok(PySmcRun::of(run))
@@ -343,6 +360,7 @@ fn bayesian_posterior(
 /// Args:
 ///     problem: The calibration problem
 ///     settings: The JSON of an `ABCSMC`
+///     logger: The logger of a record of each generation
 ///
 /// Returns:
 ///     The run and whether each distance read one fresh replicate of a
@@ -356,6 +374,7 @@ fn abc_smc(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
     settings: &str,
+    logger: Py<PyAny>,
 ) -> PyResult<(PySmcRun, bool)> {
     let settings: AbcSmcSettings = crate::json::read(settings)?;
     let priors = problem_priors(problem, &settings.priors)?;
@@ -371,7 +390,10 @@ fn abc_smc(
     .map_err(method_error)?;
     let target = AbcTarget::new(&problem.inner, &priors, settings.distance.distance())
         .map_err(method_error)?;
-    let run = parallel(py, || sampler.run(&target, problem.seed))?.map_err(method_error)?;
+    let run = parallel_logged(py, &StepLog::new(logger), |steps| {
+        sampler.run(&target, problem.seed, steps)
+    })?
+    .map_err(method_error)?;
     Ok((PySmcRun::of(run), target.stochastic()))
 }
 
@@ -380,6 +402,7 @@ fn abc_smc(
 /// Args:
 ///     problem: The calibration problem
 ///     settings: The JSON of an `ABCRejection`
+///     logger: The logger of a record of the draws at each 1 %
 ///
 /// Returns:
 ///     The run and whether each distance read one fresh replicate of a
@@ -393,13 +416,20 @@ fn abc_rejection(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
     settings: &str,
+    logger: Py<PyAny>,
 ) -> PyResult<(PySmcRun, bool)> {
     let settings: AbcRejectionSettings = crate::json::read(settings)?;
     let priors = problem_priors(problem, &settings.priors)?;
     let target = AbcTarget::new(&problem.inner, &priors, settings.distance.distance())
         .map_err(method_error)?;
-    let run = parallel(py, || {
-        smc::abc_rejection(&target, settings.draws, settings.quantile, problem.seed)
+    let run = parallel_logged(py, &StepLog::new(logger), |steps| {
+        smc::abc_rejection(
+            &target,
+            settings.draws,
+            settings.quantile,
+            problem.seed,
+            steps,
+        )
     })?
     .map_err(method_error)?;
     Ok((PySmcRun::of(run), target.stochastic()))

@@ -7,11 +7,13 @@
 //! Jacobian of [`Transform`], as the moves of the SMC kernel do.
 
 use commol_calibration::Workspace;
+use commol_core::STOPPED;
 use commol_random::Generator;
 use commol_statistics::statistics::effective_size;
 use rayon::prelude::*;
 
 use crate::psis::smooth;
+use crate::runs::{RunEvent, RunSteps};
 use crate::smc::TemperedTarget;
 use crate::target::Target;
 use crate::transform::Transform;
@@ -85,10 +87,12 @@ pub struct ImportanceRun {
 /// Draw `draws` points of `proposal`, map them back with `transform`, and
 /// weight each by `target` over `proposal`, smoothed by PSIS. Draw `i` comes
 /// from its own stream of `seed`, so a run repeats whatever the threads.
+/// Each draw is a step of `steps` ([`crate::runs`]).
 ///
 /// # Errors
 ///
-/// Returns a message when the target fails, or PSIS refuses the weights
+/// Returns a message when the target fails, a stop of `steps` keeps a draw
+/// from running ([`commol_core::STOPPED`]), or PSIS refuses the weights
 /// ([`smooth`]).
 pub fn importance_sample<T, P>(
     target: &T,
@@ -96,22 +100,28 @@ pub fn importance_sample<T, P>(
     transform: &Transform,
     draws: usize,
     seed: u64,
+    steps: &RunSteps<'_>,
 ) -> Result<ImportanceRun, String>
 where
     T: Target + Sync,
     P: Proposal,
 {
+    steps.send(RunEvent::Began { total: draws });
     let points: Vec<(Vec<f64>, f64)> = (0..draws)
         .into_par_iter()
         .map_init(Workspace::default, |workspace, i| {
+            if steps.stopped() {
+                return Err(STOPPED.to_string());
+            }
             let mut generator =
                 Generator::from_seed(Stream::ImportanceDraws.replicate(seed, i as u64));
             let unbounded = proposal.draw(&mut generator);
             let values = transform.from_unbounded(&unbounded);
             // A target of `−∞` gives a weight of 0 whatever the rest.
-            let log_weight = target.log_density(&values, workspace)?
-                + transform.log_jacobian(&values)
-                - proposal.log_density(&unbounded);
+            let density = target.log_density(&values, workspace);
+            steps.send(RunEvent::Ran { index: i });
+            let log_weight =
+                density? + transform.log_jacobian(&values) - proposal.log_density(&unbounded);
             Ok((values, log_weight))
         })
         .collect::<Result<_, String>>()?;

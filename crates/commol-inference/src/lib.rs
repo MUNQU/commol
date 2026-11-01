@@ -24,6 +24,7 @@
 //! | [`design`] | [`design::InputSpace`]: independent distributions or a sample, and the designs on it |
 //! | [`quantity`] | [`quantity::Quantity`]: the scalars a method reads from each run |
 //! | [`batch`] | [`batch::BatchRunner`]: every point of a design through a forward model, reduced to its quantities |
+//! | [`runs`] | [`runs::RunEvent`]: the events of a loop of model runs, for the records of its steps |
 //! | [`global_sensitivity`] | The estimators of global sensitivity: PRCC, Morris, Sobol and polynomial chaos |
 //! | [`profiles`] | Profile likelihood of parameters and predictions: the tracer and the thresholds |
 //! | [`ranges`] | The range rule of each setting of a method, a prior and a quantity |
@@ -54,6 +55,7 @@ pub mod psis;
 pub mod quantity;
 pub mod ranges;
 pub mod resampling;
+pub mod runs;
 pub mod sample;
 pub mod scores;
 pub mod sensitivity;

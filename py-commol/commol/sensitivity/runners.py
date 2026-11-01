@@ -7,6 +7,7 @@ through the forward model with no observations and estimates, and the runner
 builds the result from the values it returns.
 """
 
+import logging
 from typing import TYPE_CHECKING
 
 from commol._data.engine_json import engine_json
@@ -30,6 +31,9 @@ if TYPE_CHECKING:
         Propagation,
         Sobol,
     )
+
+
+logger = logging.getLogger("commol.sensitivity")
 
 
 def _sample(
@@ -82,7 +86,7 @@ def run_propagation(
     """
     labels = quantity_labels(method.quantities) if method.quantities else []
     draws, values, weights, draw_seeds = commol_rs.inference.propagation(
-        analysis._rust, engine_json(method)
+        analysis._rust, engine_json(method), logger
     )
     return PropagationResult(
         sample=_sample(analysis, "propagation", draws),
@@ -118,7 +122,7 @@ def run_prcc(analysis: "SensitivityAnalysis", method: "PRCC") -> PRCCResult:
     """
     labels = quantity_labels(method.quantities)
     draws, coefficients, p_values, effective_size = commol_rs.inference.prcc(
-        analysis._rust, engine_json(method)
+        analysis._rust, engine_json(method), logger
     )
     axes = [pair for quantity in method.quantities for pair in quantity.axes()]
     return PRCCResult(
@@ -157,7 +161,7 @@ def run_morris(analysis: "SensitivityAnalysis", method: "Morris") -> MorrisResul
     """
     labels = quantity_labels(method.quantities)
     mu, mu_star, sigma, runs = commol_rs.inference.morris(
-        analysis._rust, engine_json(method)
+        analysis._rust, engine_json(method), logger
     )
     return MorrisResult(
         inputs=analysis.inputs.names,
@@ -192,7 +196,7 @@ def run_sobol(analysis: "SensitivityAnalysis", method: "Sobol") -> SobolResult:
         model or is NaN at a point.
     """
     labels = quantity_labels(method.quantities)
-    run = commol_rs.inference.sobol(analysis._rust, engine_json(method))
+    run = commol_rs.inference.sobol(analysis._rust, engine_json(method), logger)
     return SobolResult(
         inputs=analysis.inputs.names,
         labels=labels,
@@ -233,7 +237,9 @@ def run_chaos(
         NaN at a point.
     """
     labels = quantity_labels(method.quantities)
-    run = commol_rs.inference.polynomial_chaos(analysis._rust, engine_json(method))
+    run = commol_rs.inference.polynomial_chaos(
+        analysis._rust, engine_json(method), logger
+    )
     return ChaosResult(
         inputs=analysis.inputs.names,
         input_space=analysis.inputs,

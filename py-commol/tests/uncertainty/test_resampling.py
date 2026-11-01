@@ -360,9 +360,11 @@ def _gibbs(monkeypatch: pytest.MonkeyPatch) -> _Result:
     # failed replicate of a calibration of η that gives 0.1.
     found = commol_rs.inference.gibbs_posterior
 
-    def calibrated(problem: object, settings: str) -> tuple[object, ...]:
+    def calibrated(
+        problem: object, settings: str, logger: logging.Logger
+    ) -> tuple[object, ...]:
         starts, run, eta = found(
-            problem, json.dumps(json.loads(settings) | {"eta": 0.1})
+            problem, json.dumps(json.loads(settings) | {"eta": 0.1}), logger
         )
         return starts, run, _OneMoreFailed(eta, f"Replicate 2 failed: {_NO_WEIGHT}")
 

@@ -111,14 +111,16 @@ pub(crate) fn parallel<T: Send>(py: Python<'_>, job: impl FnOnce() -> T + Send) 
 
 /// [`parallel`], with the steps of `log` lent to `job`: the job runs on a
 /// thread of its own, which waits for the pool, while this thread writes
-/// the record of each step the job sends ([`crate::records`]). The GIL is
-/// held only for each record.
+/// the record of each step the job sends and reads the signals of Python
+/// ([`crate::records`]): a Ctrl-C stops the loops of the job, which start
+/// no step. The GIL is held only for each record and each read.
 ///
 /// # Errors
 ///
 /// As [`parallel`]; the error of the logger when it cannot say which
-/// levels it takes; and an error that is no `Exception` (a
-/// `KeyboardInterrupt`) of a record, raised once the job has ended.
+/// levels it takes; and the error of the signals (a `KeyboardInterrupt`),
+/// or an error that is no `Exception` of a record, raised once the job has
+/// ended.
 pub(crate) fn parallel_logged<T: Send>(
     py: Python<'_>,
     log: &StepLog,

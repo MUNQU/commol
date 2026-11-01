@@ -19,12 +19,13 @@ use commol_calibration::likelihood::log_location;
 use commol_calibration::{
     CalibrationProblem, EvaluationError, ForwardModel, Likelihood, Noise, ObservedDataPoint,
 };
-use commol_core::{CONFIDENCE_LEVEL, SimulationEngine};
+use commol_core::{CONFIDENCE_LEVEL, NoSteps, SimulationEngine};
 use commol_random::sample::{binomial, gamma, normal, poisson};
 use commol_random::{Generator, replicate_seed};
 use commol_statistics::statistics;
 use rayon::prelude::*;
 
+use crate::runs::{RunEvent, RunSteps};
 use crate::sample::ParameterSample;
 use commol_random::Stream;
 
@@ -395,7 +396,7 @@ impl Predictive {
     /// Run every draw of `sample` at `positions` through `forward`, the
     /// forward model of a calibration problem or of an analysis, in
     /// parallel; the replicates of a stochastic engine are seeded from
-    /// `seed` ([`run_sets`]).
+    /// `seed` ([`run_sets`]), and each draw is a step of `steps`.
     ///
     /// # Errors
     ///
@@ -409,6 +410,7 @@ impl Predictive {
         sample: &ParameterSample,
         positions: &[f64],
         seed: u64,
+        steps: &RunSteps<'_>,
     ) -> Result<Self, PredictiveError>
     where
         E: SimulationEngine + Send + Sync,
@@ -417,7 +419,7 @@ impl Predictive {
         let engine = forward.base_engine();
         commol_core::check_positions(positions, 0.0, |position| engine.check_position(position))
             .map_err(PredictiveError::Mismatch)?;
-        let runs = run_sets(forward, sample.values(), positions, Some(seed))?;
+        let runs = run_sets(forward, sample.values(), positions, Some(seed), steps)?;
         let (trajectories, weights) = share_among_replicates(runs, sample.weights());
         Ok(Self {
             positions: positions.to_vec(),
@@ -644,20 +646,22 @@ where
         .with_observations(observations)
         .map_err(PredictiveError::Mismatch)?;
     let operator = observed.observation();
-    Ok(run_sets(&observed, sets, observed.schedule(), seed)?
-        .into_iter()
-        .zip(sets)
-        .map(|(replicates, values)| {
-            replicates
-                .iter()
-                .map(|rows| {
-                    let mut out = vec![0.0; operator.count()];
-                    operator.apply(rows, values, &mut out);
-                    out
-                })
-                .collect()
-        })
-        .collect())
+    Ok(
+        run_sets(&observed, sets, observed.schedule(), seed, &NoSteps)?
+            .into_iter()
+            .zip(sets)
+            .map(|(replicates, values)| {
+                replicates
+                    .iter()
+                    .map(|rows| {
+                        let mut out = vec![0.0; operator.count()];
+                        operator.apply(rows, values, &mut out);
+                        out
+                    })
+                    .collect()
+            })
+            .collect(),
+    )
 }
 
 /// The seed of each of `count` draws of a sample run from `seed`: draw `j`
@@ -685,21 +689,30 @@ pub fn draw_seeds(seed: u64, count: usize) -> Vec<u64> {
 /// # Errors
 ///
 /// [`PredictiveError::Draw`] with the index of the first set that has no
-/// run.
+/// run, or that a stop of `steps` kept from running; each set is one step
+/// ([`crate::runs`]).
 pub fn run_sets<E>(
     forward: &ForwardModel<E>,
     sets: &[Vec<f64>],
     positions: &[f64],
     seed: Option<u64>,
+    steps: &RunSteps<'_>,
 ) -> Result<Vec<Vec<Vec<Vec<f64>>>>, PredictiveError>
 where
     E: SimulationEngine + Send + Sync,
 {
     let replicates = forward.replicates().map(|r| r.seeds.len());
     let seeds = seed.map(|seed| draw_seeds(seed, sets.len()));
+    steps.send(RunEvent::Began { total: sets.len() });
     sets.par_iter()
         .enumerate()
         .map(|(draw, values)| {
+            if steps.stopped() {
+                return Err(PredictiveError::Draw {
+                    draw,
+                    error: crate::runs::stopped(),
+                });
+            }
             let runs = match (replicates, &seeds) {
                 (Some(count), Some(seeds)) => (0..count as u64)
                     .map(|r| {
@@ -709,6 +722,7 @@ where
                     .collect::<Result<Vec<_>, _>>(),
                 _ => forward.run_at(values, positions),
             };
+            steps.send(RunEvent::Ran { index: draw });
             runs.map_err(|error| PredictiveError::Draw { draw, error })
         })
         .collect()

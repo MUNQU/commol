@@ -12,7 +12,7 @@ use commol_random::Generator;
 use super::TemperedTarget;
 use super::gibbs::reached_the_posterior;
 use super::kernel::Kernel;
-use super::sampler::{SmcRun, SmcSampler};
+use super::sampler::{SmcRun, SmcSampler, SmcSteps};
 use crate::error::MethodError;
 use crate::priors::Priors;
 use crate::target::discrepancy_in_support;
@@ -99,11 +99,12 @@ pub fn bayesian_posterior<E, K>(
     priors: &Priors,
     sampler: &mut SmcSampler<K>,
     seed: u64,
+    steps: &SmcSteps<'_>,
 ) -> Result<SmcRun, MethodError>
 where
     E: SimulationEngine + Sync,
     K: Kernel,
 {
     let target = LikelihoodTarget::new(problem, priors)?;
-    reached_the_posterior(sampler.run(&target, seed)?, "The posterior")
+    reached_the_posterior(sampler.run(&target, seed, steps)?, "The posterior")
 }

@@ -5,7 +5,9 @@ use commol_calibration::{
     CalibrationParameter, CalibrationProblem, EvaluationError, ForwardModel, LossConfig,
     ObservedDataPoint, Violation, Workspace,
 };
+use commol_core::NoSteps;
 use commol_core::{Model, SimulationEngine};
+use commol_core::{STOPPED, Steps};
 use commol_difference::DifferenceEquations;
 use commol_inference::Priors;
 use commol_inference::batch::BatchRunner;
@@ -14,9 +16,11 @@ use commol_inference::global_sensitivity::{
     ChaosExpansion, ForwardAnalysis, Truncation, morris, prcc, sobol,
 };
 use commol_inference::quantity::{Quantities, Quantity, Series};
+use commol_inference::runs::RunEvent;
 use commol_inference::{MethodError, ParameterSample, Predictive, PredictiveError};
 use commol_stochastic::StochasticSteps;
 use nalgebra::{DMatrix, DVector};
+use std::sync::Mutex;
 
 /// A → B at the proportional rate `k`, from A = 1000, run by `engine`.
 fn decay(engine: &str) -> Model {
@@ -86,6 +90,19 @@ fn quantities_equal_hand_computations() {
     let runner = BatchRunner::new(&forward, &quantities).unwrap();
 
     let values = runner.means(&[vec![0.2]]).unwrap();
+    let kept = KeptRuns::default();
+    let twice = runner
+        .with_steps(&kept)
+        .means(&[vec![0.2], vec![0.2]])
+        .unwrap();
+    assert_eq!(twice, [values[0].clone(), values[0].clone()]);
+    assert_eq!(kept.events(), ["began 2", "ran 0", "ran 1"]);
+    let error = BatchRunner::new(&forward, &quantities)
+        .unwrap()
+        .with_steps(&Stopped)
+        .means(&[vec![0.2]])
+        .unwrap_err();
+    assert!(error.to_string().contains(STOPPED), "{error}");
 
     // A = 1000 · 0.8ᵗ and A + B = 1000.
     let expected = [640.0, 1000.0, 288.0, 800.0, 3.0];
@@ -560,9 +577,15 @@ fn a_propagation_runs_the_draws_as_their_predictive() {
     let engine = StochasticSteps::try_from_model(&decay("StochasticSteps")).unwrap();
     let analysis = analysis(engine, Some(3));
 
-    let result = analysis.propagate(Some(4), &a_at(5.0)).unwrap();
-    let predictive =
-        Predictive::new(analysis.forward(), &result.sample, &[5.0], analysis.seed()).unwrap();
+    let result = analysis.propagate(Some(4), &a_at(5.0), &NoSteps).unwrap();
+    let predictive = Predictive::new(
+        analysis.forward(),
+        &result.sample,
+        &[5.0],
+        analysis.seed(),
+        &NoSteps,
+    )
+    .unwrap();
 
     assert_eq!(result.values.len(), 4 * 3);
     let from_predictive: Vec<Vec<f64>> = predictive
@@ -619,7 +642,7 @@ fn an_analysis_takes_draws_by_its_inputs() {
     assert!(unset.contains("leave draws unset"), "{unset}");
     assert_eq!(drawn.len(), 6);
     assert_eq!(of_sample.draws("PRCC", None).unwrap(), sample);
-    let (design, result) = of_sample.prcc(None, &a_at(3.0)).unwrap();
+    let (design, result) = of_sample.prcc(None, &a_at(3.0), &NoSteps).unwrap();
     assert_eq!(design, sample);
     // A is a falling function of k alone.
     assert!((result.coefficients[0][0] + 1.0).abs() < 1e-12);
@@ -719,7 +742,7 @@ fn a_propagation_names_the_draw_that_has_no_run() {
     )
     .unwrap();
 
-    let error = analysis.propagate(None, &a_at(3.0)).unwrap_err();
+    let error = analysis.propagate(None, &a_at(3.0), &NoSteps).unwrap_err();
 
     let MethodError::Prediction(PredictiveError::Draw {
         draw: 1,
@@ -739,10 +762,10 @@ fn an_analysis_runs_each_method_in_one_call() {
     let engine = DifferenceEquations::try_from_model(&decay("DifferenceEquations")).unwrap();
     let analysis = analysis(engine, None);
 
-    let (screening, morris_runs) = analysis.morris(3, 4, &a_at(3.0)).unwrap();
-    let (indices, sobol_runs) = analysis.sobol(16, 20, 0.9, &a_at(3.0)).unwrap();
+    let (screening, morris_runs) = analysis.morris(3, 4, &a_at(3.0), &NoSteps).unwrap();
+    let (indices, sobol_runs) = analysis.sobol(16, 20, 0.9, &a_at(3.0), &NoSteps).unwrap();
     let (chaos, chaos_runs) = analysis
-        .chaos(2, Truncation::TOTAL_DEGREE, 10, &a_at(3.0))
+        .chaos(2, Truncation::TOTAL_DEGREE, 10, &a_at(3.0), &NoSteps)
         .unwrap();
 
     assert_eq!(morris_runs, 3 * 2);
@@ -753,15 +776,15 @@ fn an_analysis_runs_each_method_in_one_call() {
     assert_eq!(chaos_runs, 10);
     assert!((chaos.total()[0][0] - 1.0).abs() < 1e-9);
     let few = analysis
-        .chaos(2, Truncation::TOTAL_DEGREE, 3, &a_at(3.0))
+        .chaos(2, Truncation::TOTAL_DEGREE, 3, &a_at(3.0), &NoSteps)
         .unwrap_err()
         .to_string();
     assert!(
         few.contains("has 3 terms and needs more points than terms, got 3"),
         "{few}"
     );
-    assert!(analysis.sobol(16, 1, 0.9, &a_at(3.0)).is_err());
-    assert!(analysis.sobol(16, 20, 1.0, &a_at(3.0)).is_err());
+    assert!(analysis.sobol(16, 1, 0.9, &a_at(3.0), &NoSteps).is_err());
+    assert!(analysis.sobol(16, 20, 1.0, &a_at(3.0), &NoSteps).is_err());
     let unknown = analysis
         .morris(
             2,
@@ -771,6 +794,7 @@ fn an_analysis_runs_each_method_in_one_call() {
                 series: level(&["C"]),
                 at: 1.0,
             }],
+            &NoSteps,
         )
         .unwrap_err()
         .to_string();
@@ -825,4 +849,35 @@ fn the_inputs_are_distributions_or_a_sample() {
             .unwrap_err()
             .contains("There is no default")
     );
+}
+
+/// A receiver whose loops have stopped before their first step.
+struct Stopped;
+
+impl<E> Steps<E> for Stopped {
+    fn stopped(&self) -> bool {
+        true
+    }
+}
+
+/// The events of a loop of model runs, as text: the beginning first, then
+/// the points that ran, sorted.
+#[derive(Default)]
+struct KeptRuns(Mutex<Vec<String>>);
+
+impl KeptRuns {
+    fn events(self) -> Vec<String> {
+        let mut events = self.0.into_inner().unwrap();
+        events[1..].sort();
+        events
+    }
+}
+
+impl Steps<RunEvent> for KeptRuns {
+    fn send(&self, event: RunEvent) {
+        self.0.lock().unwrap().push(match event {
+            RunEvent::Began { total } => format!("began {total}"),
+            RunEvent::Ran { index } => format!("ran {index}"),
+        });
+    }
 }

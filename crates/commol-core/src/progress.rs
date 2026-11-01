@@ -11,6 +11,14 @@
 //!
 //! A loop holds its receiver as `&(dyn for<'e> Steps<Event<'e>> + '_)`, so
 //! it can send an event that borrows a value of its own closure.
+//!
+//! The receiver also tells a loop to stop ([`Steps::stopped`]): a loop
+//! reads it before each step, and once it is set starts no step. A step
+//! that sees it ends at once with the error of its method, since whoever
+//! stopped the job drops its result.
+
+/// The reason of a step that a stop kept from running.
+pub const STOPPED: &str = "Stopped before it ran";
 
 /// The receiver of the events `E` of the loops of a method.
 ///
@@ -19,6 +27,12 @@
 pub trait Steps<E>: Sync {
     /// Take `event`. The default drops it.
     fn send(&self, _event: E) {}
+
+    /// Whether the loops stop: once it is `true`, a loop starts no step.
+    /// The default never stops.
+    fn stopped(&self) -> bool {
+        false
+    }
 }
 
 /// The receiver that drops every event: the receiver of a loop that nobody
@@ -58,7 +72,8 @@ mod tests {
     }
 
     #[test]
-    fn no_steps_drops_every_event() {
+    fn no_steps_drops_every_event_and_never_stops() {
         send_all(&NoSteps, &[3, 1, 2]);
+        assert!(!Steps::<&usize>::stopped(&NoSteps));
     }
 }

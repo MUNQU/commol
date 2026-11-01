@@ -120,7 +120,7 @@ class SensitivityAnalysis:
         PredictiveProtocol
             The runs, computed in Rust.
         """
-        return self._rust.predictive(sample._rust, positions)
+        return self._rust.predictive(sample._rust, positions, logger)
 
     def with_model(self, model: "Model") -> "SensitivityAnalysis":
         """

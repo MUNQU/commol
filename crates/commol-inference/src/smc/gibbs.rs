@@ -7,14 +7,14 @@
 //! common random numbers, so the loss is a function of the parameters.
 
 use commol_calibration::{CalibrationProblem, LossConfig, Workspace};
-use commol_core::{CONFIDENCE_LEVEL, SimulationEngine};
+use commol_core::{CONFIDENCE_LEVEL, SimulationEngine, Steps};
 use commol_random::Generator;
 use commol_statistics::statistics::{interval_levels, normalized_weights, quantiles};
 use nalgebra::DMatrix;
 
 use super::TemperedTarget;
 use super::kernel::Kernel;
-use super::sampler::{SmcRun, SmcSampler, SmcState, Stop};
+use super::sampler::{SmcEvent, SmcRun, SmcSampler, SmcState, SmcSteps, Stop, stopped};
 use crate::error::MethodError;
 use crate::local::{CurvatureKind, block_meat, blocks_at, curvature_at};
 use crate::priors::Priors;
@@ -119,13 +119,14 @@ pub fn gibbs_posterior<E, K>(
     eta: f64,
     sampler: &mut SmcSampler<K>,
     seed: u64,
+    steps: &SmcSteps<'_>,
 ) -> Result<GibbsRun, MethodError>
 where
     E: SimulationEngine + Sync,
     K: Kernel,
 {
     let target = GibbsTarget::new(problem, priors, eta)?;
-    let run = reached_the_posterior(sampler.run(&target, seed)?, "The Gibbs posterior")?;
+    let run = reached_the_posterior(sampler.run(&target, seed, steps)?, "The Gibbs posterior")?;
     Ok(GibbsRun { run, eta })
 }
 
@@ -407,6 +408,7 @@ pub fn bootstrap_coverage_eta<E, K>(
     replicates: usize,
     confidence_level: f64,
     seed: u64,
+    steps: &SmcSteps<'_>,
 ) -> Result<CoverageCalibration, MethodError>
 where
     E: SimulationEngine + Send + Sync,
@@ -450,15 +452,30 @@ where
 
     // One run per replicate, with a snapshot of the particles at each step.
     let mut runs: Vec<(usize, SmcState, Vec<Snapshot>)> = Vec::new();
+    steps.send(SmcEvent::Replicates { total: replicates });
     for (b, replicate) in &problems {
+        if steps.stopped() {
+            return Err(stopped());
+        }
         let target = GibbsTarget::new(replicate, priors, eta_max)?;
+        let generations = GenerationsOf {
+            replicate: *b,
+            steps,
+        };
         let start = sampler.start(&target, Stream::EtaSamplers.replicate(seed, *b as u64));
         let outcome = start.and_then(|mut state| {
             let mut snapshots = vec![Snapshot::of(&state, eta_max)];
-            sampler.advance(&mut state, &target, |s| {
-                snapshots.push(Snapshot::of(s, eta_max))
-            })?;
-            Ok((state, snapshots))
+            let advanced = sampler.advance(
+                &mut state,
+                &target,
+                |s| snapshots.push(Snapshot::of(s, eta_max)),
+                &generations,
+            );
+            advanced.map(|()| (state, snapshots))
+        });
+        steps.send(SmcEvent::Replicate {
+            index: *b,
+            outcome: outcome.as_ref().map(|_| ()),
         });
         match outcome {
             Ok((state, snapshots)) => runs.push((*b, state, snapshots)),
@@ -498,9 +515,22 @@ where
                 .1;
             let target = GibbsTarget::new(replicate, priors, grown)?;
             state.rescale_level(1.0 / ETA_GROWTH);
-            sampler.advance(state, &target, |s| snapshots.push(Snapshot::of(s, grown)))?;
+            let generations = GenerationsOf {
+                replicate: *b,
+                steps,
+            };
+            sampler.advance(
+                state,
+                &target,
+                |s| snapshots.push(Snapshot::of(s, grown)),
+                &generations,
+            )?;
         }
         eta_max = grown;
+        steps.send(SmcEvent::Growth {
+            round: growths,
+            eta: eta_max,
+        });
     }
 
     let bracket = (eta_max * f64::EPSILON, eta_max);
@@ -516,6 +546,34 @@ where
         coverage: coverage(&runs, eta),
         failed,
     })
+}
+
+/// The receiver of the generations of the run of `replicate`: it sends
+/// them to `steps` as generations of that replicate. A run sends only
+/// generations.
+struct GenerationsOf<'a, 's> {
+    replicate: usize,
+    steps: &'a SmcSteps<'s>,
+}
+
+impl Steps<SmcEvent<'_>> for GenerationsOf<'_, '_> {
+    fn send(&self, event: SmcEvent<'_>) {
+        if let SmcEvent::Generation {
+            index, step, last, ..
+        } = event
+        {
+            self.steps.send(SmcEvent::Generation {
+                replicate: Some(self.replicate),
+                index,
+                step,
+                last,
+            });
+        }
+    }
+
+    fn stopped(&self) -> bool {
+        self.steps.stopped()
+    }
 }
 
 #[cfg(test)]

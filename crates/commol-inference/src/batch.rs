@@ -4,20 +4,23 @@
 //! The points run in parallel. With a stochastic engine each point runs the
 //! replicates of the forward model, the same seeds at every point (common
 //! random numbers), so two points differ only by their values, and
-//! [`Quantities::combine`] combines the replicates of each point.
+//! [`Quantities::combine`] combines the replicates of each point. Each point
+//! is one step of the loop ([`crate::runs`]).
 
 use commol_calibration::ForwardModel;
-use commol_core::SimulationEngine;
+use commol_core::{NoSteps, SimulationEngine};
 use rayon::prelude::*;
 
 use crate::predictive::{NanRun, PredictiveError};
 use crate::quantity::{Quantities, Term, Undefined};
+use crate::runs::{RunEvent, RunSteps};
 
 /// A forward model and the quantities each of its runs is reduced to.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct BatchRunner<'a, E: SimulationEngine> {
     forward: &'a ForwardModel<E>,
     quantities: &'a Quantities,
+    steps: &'a RunSteps<'a>,
 }
 
 impl<'a, E: SimulationEngine + Send + Sync> BatchRunner<'a, E> {
@@ -44,7 +47,14 @@ impl<'a, E: SimulationEngine + Send + Sync> BatchRunner<'a, E> {
         Ok(Self {
             forward,
             quantities,
+            steps: &NoSteps,
         })
+    }
+
+    /// This runner, sending the events of its points to `steps`.
+    #[must_use]
+    pub fn with_steps(self, steps: &'a RunSteps<'a>) -> Self {
+        Self { steps, ..self }
     }
 
     /// The quantities of every replicate of every point,
@@ -53,7 +63,7 @@ impl<'a, E: SimulationEngine + Send + Sync> BatchRunner<'a, E> {
     /// # Errors
     ///
     /// [`PredictiveError::Draw`] with the index of the first point that has
-    /// no run.
+    /// no run, or that a stop kept from running.
     pub fn replicates(&self, points: &[Vec<f64>]) -> Result<Vec<Vec<Vec<f64>>>, PredictiveError> {
         Ok(self
             .terms(points)?
@@ -69,14 +79,21 @@ impl<'a, E: SimulationEngine + Send + Sync> BatchRunner<'a, E> {
     /// The [`Quantities::terms`] of every replicate of every point,
     /// `[point][replicate][quantity]`.
     fn terms(&self, points: &[Vec<f64>]) -> Result<Vec<Vec<Vec<Term>>>, PredictiveError> {
+        self.steps.send(RunEvent::Began {
+            total: points.len(),
+        });
         points
             .par_iter()
             .enumerate()
             .map(|(draw, values)| {
-                let runs = self
-                    .forward
-                    .run_at(values, self.quantities.schedule())
-                    .map_err(|error| PredictiveError::Draw { draw, error })?;
+                let runs = if self.steps.stopped() {
+                    Err(crate::runs::stopped())
+                } else {
+                    let runs = self.forward.run_at(values, self.quantities.schedule());
+                    self.steps.send(RunEvent::Ran { index: draw });
+                    runs
+                };
+                let runs = runs.map_err(|error| PredictiveError::Draw { draw, error })?;
                 Ok(runs
                     .iter()
                     .map(|rows| self.quantities.terms(rows))
