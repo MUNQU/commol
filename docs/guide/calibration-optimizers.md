@@ -111,9 +111,9 @@ their transform, and a particle swarm draws its particles inside them. A run
 with an infinite bound fails with a message that names the parameter,
 `An optimizer searches inside the bounds, so they must be finite`. A particle
 swarm also draws the velocity of each particle between `−(hi − lo)` and
-`hi − lo`, so twice the width of the bounds must be finite too: bounds such as
-`(-1e308, 1e308)` fail with `Optimization failed: ...`, the error of the argmin
-fork.
+`hi − lo`. So twice the width of the bounds must be finite too. Bounds such as
+`(-1e308, 1e308)` fail with the error of the argmin fork:
+`Optimization failed: ... the bounds are too far apart. ...`.
 
 ## `converged` and `termination_reason`
 

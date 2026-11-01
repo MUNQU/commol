@@ -689,7 +689,7 @@ where
             let mut result = Executor::new(bounded, lagrangian(factory, settings)?)
                 .configure(|state| outer(state, u0))
                 .run()
-                .map_err(|e| format!("Optimization failed: {e}"))?;
+                .map_err(|e| format!("Optimization failed: {e:#}"))?;
             let best = transform.to_x(result.state.get_best_param().ok_or(NO_POINT)?);
             let cost = result.problem.take_problem().ok_or(NO_COST)?.into_inner();
             (best, result.state, cost)
@@ -708,7 +708,7 @@ where
             let mut result = Executor::new(cost, lagrangian(factory, settings)?)
                 .configure(|state| outer(state, space.clamp(start)))
                 .run()
-                .map_err(|e| format!("Optimization failed: {e}"))?;
+                .map_err(|e| format!("Optimization failed: {e:#}"))?;
             let best = space.clamp(result.state.get_best_param().ok_or(NO_POINT)?);
             let cost = result.problem.take_problem().ok_or(NO_COST)?;
             (best, result.state, cost)
@@ -893,7 +893,7 @@ where
     }
     let mut result = executor
         .run()
-        .map_err(|e| format!("Optimization failed: {}", e))?;
+        .map_err(|e| format!("Optimization failed: {e:#}"))?;
 
     let state = &result.state;
     let best = state
@@ -939,7 +939,7 @@ where
     }
     let mut result = executor
         .run()
-        .map_err(|e| format!("Optimization failed: {}", e))?;
+        .map_err(|e| format!("Optimization failed: {e:#}"))?;
 
     let state = &result.state;
     let best = state
@@ -1486,6 +1486,25 @@ mod tests {
     }
 
     #[test]
+    fn the_radius_rule_does_not_stop_a_swarm_in_a_box_whose_size_overflows() {
+        // The L2 norm of this box overflows. The rule scales the box and the radius before
+        // it compares them.
+        let space = SearchSpace {
+            bounds: vec![(-1e200, 1e200), (-1e200, 1e200)],
+            names: vec!["x".to_string(), "y".to_string()],
+        };
+        let config = ParticleSwarmConfig {
+            max_iterations: 5,
+            radius_stop: Some(1e-3),
+            ..ParticleSwarmConfig::default()
+        };
+        let (fit, _) =
+            optimize_particle_swarm(&space, Bowl, &config, 2, None::<NoObserver>).unwrap();
+        assert!(!fit.converged, "{fit:?}");
+        assert_eq!(fit.iterations, 5);
+    }
+
+    #[test]
     fn a_stop_rule_out_of_its_range_names_itself() {
         let bounds = [(0.0, 1.0)];
         let build = |improvement_stop, radius_stop| {
@@ -1584,7 +1603,38 @@ mod tests {
             .expect("bounds too far apart");
         assert!(
             error.starts_with("Optimization failed: ")
-                && error.contains("every bound must be finite, and so must twice the distance"),
+                && error.contains("the bounds are too far apart"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn a_constrained_swarm_names_the_reason_of_bounds_too_far_apart() {
+        let problem = two_rates();
+        let spec = crate::ObservedDataPoint::new(8.0, "C".to_string(), 0.0);
+        let (observing, operator) = problem.observing(&[spec]).unwrap();
+        let held = &crate::subproblem::HeldPrediction {
+            observing,
+            operator,
+            value: 200.0,
+            settings: ConstraintSettings::for_value(200.0),
+        };
+        let mut space = SearchSpace::of(&problem);
+        space.bounds[1] = (-1e308, 1e308);
+        let swarm = OptimizationConfig::ParticleSwarm(ParticleSwarmConfig::default());
+        let error = run_constrained(
+            &space,
+            PredictionCost::new(held),
+            &swarm,
+            &[0.5, 0.5],
+            5,
+            &held.settings,
+        )
+        .err()
+        .expect("bounds too far apart");
+        assert!(
+            error.starts_with("Optimization failed: ")
+                && error.contains("the bounds are too far apart"),
             "{error}"
         );
     }

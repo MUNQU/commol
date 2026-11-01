@@ -37,14 +37,28 @@ refuses it too: `structural_rank` draws its points in them and
 `sample_identifiability` with `Reference::Bounds` takes the variance of the
 uniform distribution on them.
 
+The swarm of the argmin fork checks its own bounds too. It refuses a bound
+that is not finite. It also refuses finite bounds when twice the distance
+between them is not finite, because it draws each velocity between
+`−(hi − lo)` and `hi − lo`. Its error names the lower bound, the upper bound or
+the distance, but not the parameter, since the fork sees only numbers. So
+`check_finite` stays before every run, and a bound that is not finite gets a
+message that names the parameter. Only bounds too far apart reach the error of
+the fork. A run shows the whole chain of an error of the fork (`{e:#}`). So a
+constrained swarm shows the error of the swarm under the error of
+`AugmentedLagrangian`.
+
 | Alternative | Why not |
 |---|---|
 | Refuse every infinite bound | A prior on `[0, inf]` is a documented use of a sampler. |
 | Refuse it for a swarm problem when it is built | The problem of a sampler would depend on an optimizer it never runs. |
-| Let the swarm draw | The draw of the argmin fork panics on a bound that is not finite (#445). |
+| Rely on the check of the fork | Its message cannot name the parameter, and Nelder-Mead would give another message. |
+| Check the width of the bounds in commol | The limit of twice the width is a detail of how the swarm draws, which only the fork knows. |
 
 **Guards:** `optimization::tests::a_particle_swarm_refuses_an_infinite_bound`,
-`a_constrained_run_refuses_an_infinite_bound_with_either_optimizer`;
+`a_constrained_run_refuses_an_infinite_bound_with_either_optimizer`,
+`a_particle_swarm_refuses_finite_bounds_too_far_apart_to_draw_between`,
+`a_constrained_swarm_names_the_reason_of_bounds_too_far_apart`;
 `crates/commol-inference/tests/test_identifiability.rs::a_measure_over_the_bounds_refuses_an_infinite_bound`;
 `tests/calibration/test_optimizers.py::test_an_optimizer_refuses_an_infinite_bound`.
 
@@ -104,6 +118,7 @@ profile under a swarm ([Profiles](profiles.md)).
 **Guards:** `crates/commol-calibration/tests/test_model_values.rs::a_particle_swarm_with_a_stop_rule_converges`;
 `crates/commol-calibration/src/optimization.rs` `tests`
 (`a_swarm_gathered_around_its_best_stops_by_the_radius_rule`,
+`the_radius_rule_does_not_stop_a_swarm_in_a_box_whose_size_overflows`,
 `a_stop_rule_out_of_its_range_names_itself`);
 `crates/commol-inference/tests/test_profiles.rs::a_swarm_fits_a_subproblem_and_repeats_from_its_seed`;
 `tests/calibration/test_optimizers.py::TestConverged::test_a_swarm_that_stagnates_stops_and_converges`.
