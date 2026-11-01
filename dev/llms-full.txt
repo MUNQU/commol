@@ -20623,8 +20623,8 @@ class Aggregate(ModelStructure, InitialConditions):
             return None if bin_item is None else bin_item.unit
 
         remainder_unit = unit(kept[0])
-        for param, compartments in zip(initial_conditions, covered, strict=True):
-            for compartment in compartments:
+        for param, target in zip(initial_conditions, covered, strict=True):
+            for compartment in target.compartments:
                 if unit(compartment) != remainder_unit:
                     raise ValueError(
                         f"The initial-condition remainder '{remainder}' is in "
@@ -21127,8 +21127,8 @@ def check_calibration_values(
         return None if bin_item is None else bin_item.unit
 
     remainder_unit = unit(kept[0])
-    for param, compartments in zip(initial_conditions, covered, strict=True):
-        for compartment in compartments:
+    for param, target in zip(initial_conditions, covered, strict=True):
+        for compartment in target.compartments:
             if unit(compartment) != remainder_unit:
                 raise ValueError(
                     f"The initial-condition remainder '{remainder}' is in "
