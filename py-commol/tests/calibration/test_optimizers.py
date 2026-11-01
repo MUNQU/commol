@@ -507,7 +507,7 @@ def test_an_optimizer_refuses_an_infinite_bound() -> None:
             _calibrate(problem)
     # Finite bounds too far apart for the swarm to draw between.
     wide = _k_problem(ParticleSwarmConfig(), bounds=(-1e308, 1e308))
-    too_wide = r"Optimization failed: .*every bound must be finite"
+    too_wide = r"Optimization failed: .*the bounds are too far apart"
     with pytest.raises(RuntimeError, match=too_wide):
         _calibrate(wide)
     with pytest.raises(ValueError, match=r"bounds of parameter 'k' must be numbers"):

@@ -570,9 +570,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `B` is `\frac{a}{b} \cdot B`, no longer `\frac{a}{b \cdot B}`.
 - A particle swarm whose bounds are finite but too far apart, such as
   `(-1e308, 1e308)`, raised a `PanicException` when it drew its first
-  particles. It now raises a `RuntimeError`, `Optimization failed: ...`,
-  with the error of the argmin fork, which checks its own bounds. A bound
-  that is not finite still raises the message that names the parameter.
+  particles. It now raises a `RuntimeError`, `Optimization failed: ...
+  the bounds are too far apart. ...`, the error of the argmin fork, which
+  checks its own bounds. A bound that is not finite still raises the
+  message that names the parameter.
+- The error of a failed optimizer run shows the whole chain of the error of
+  the argmin fork. Before, a constrained particle swarm (a profile of a
+  prediction) showed only `` `AugmentedLagrangian`: the inner solver failed in
+  outer iteration 0 ``, without the reason of the swarm.
 
 ### Documentation
 
