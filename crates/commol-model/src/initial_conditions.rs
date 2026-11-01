@@ -35,6 +35,41 @@ pub const CATEGORY_SEPARATOR: char = ':';
 /// is taken to be zero.
 const EXCESS_TOLERANCE: f64 = 1e-9;
 
+/// What the id of an initial-condition value names, and so what the value
+/// is: an amount of a bin, an amount of a compartment or a split of a
+/// category. An id that names an expanded compartment is a compartment,
+/// because the compartment comes first in the order of resolution
+/// ([`InitialConditionPlan::new`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InitialTargetKind {
+    /// A bin or a bin prefix. The value is the amount its compartments hold.
+    Bin,
+    /// One expanded compartment. The value is its amount.
+    Compartment,
+    /// A category of a binary stratification. The value is a split.
+    Category,
+}
+
+impl InitialTargetKind {
+    /// The name of the kind: `bin`, `compartment` or `category`.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Bin => "bin",
+            Self::Compartment => "compartment",
+            Self::Category => "category",
+        }
+    }
+
+    /// Layer in which a value of this kind is written.
+    fn layer(self) -> u8 {
+        match self {
+            Self::Bin => 0,
+            Self::Category => 1,
+            Self::Compartment => 2,
+        }
+    }
+}
+
 /// Compartments an initial-condition value is written to.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum InitialConditionTarget {
@@ -143,12 +178,12 @@ impl InitialConditionTarget {
         }
     }
 
-    /// Layer in which the value is written.
-    fn layer(&self) -> u8 {
+    /// What the id of the value names.
+    fn kind(&self) -> InitialTargetKind {
         match self {
-            Self::Aggregate { .. } => 0,
-            Self::PairedCategory { .. } => 1,
-            Self::Exact { .. } => 2,
+            Self::Aggregate { .. } => InitialTargetKind::Bin,
+            Self::Exact { .. } => InitialTargetKind::Compartment,
+            Self::PairedCategory { .. } => InitialTargetKind::Category,
         }
     }
 }
@@ -283,14 +318,15 @@ impl InitialConditionPlan {
         covered
     }
 
-    /// The compartments each value sets, in the order of the values, and the
-    /// compartments of the remainder (empty without one). A category split
-    /// keeps the pair totals, so it sets none.
-    pub fn coverage(&self) -> (Vec<Vec<usize>>, Vec<usize>) {
+    /// The kind of each value and the compartments it sets, in the order of
+    /// the values, and the compartments of the remainder (empty without
+    /// one). A category split keeps the pair totals, so it sets none. The
+    /// remainder is not a value, so it has no kind.
+    pub fn coverage(&self) -> (Vec<(InitialTargetKind, Vec<usize>)>, Vec<usize>) {
         let values = self
             .targets
             .iter()
-            .map(|(_, target)| target.covered_compartments())
+            .map(|(_, target)| (target.kind(), target.covered_compartments()))
             .collect();
         let remainder = self
             .remainder
@@ -332,7 +368,7 @@ impl InitialConditionPlan {
         }
         for layer in 0..3 {
             for ((id, target), value) in self.targets.iter().zip(values) {
-                if target.layer() == layer {
+                if target.kind().layer() == layer {
                     write_target(engine, target, *value).map_err(|e| {
                         format!("Failed to set initial condition for '{}': {}", id, e)
                     })?;

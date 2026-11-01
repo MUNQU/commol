@@ -141,8 +141,17 @@ category id, never a split at one `:`, because ids have no rule on their
 characters. A bare category that two stratifications declare is an error
 that names them and the qualified ids. The write-back of a calibration
 (`_model/calibration_write_back.py`) takes as categories the values the
-engine resolves as category splits (`CalibratedInitialState.categories`,
-from `initial_condition_coverage`).
+engine resolves as category splits (`CalibratedInitialState.categories`).
+
+**Rule:** the engine says the kind of each value (`InitialTargetKind`: `bin`,
+`compartment` or `category`), together with the compartments it sets
+(`InitialConditionPlan::coverage`), and Python reads the kind and infers
+nothing from the compartments. The kind is what the id names in the order
+above, so an id that names an expanded compartment is a compartment, also
+when it is the id of a bin with one compartment. The remainder has no kind:
+it is not a value, and the plan keeps it apart. The binding
+`calibrated_initial_state` returns the state, the covered compartments and
+the kinds from the one plan that writes them, so they agree by construction.
 
 **Rule:** the plan reads the initial state of the engine
 (`CompartmentalEngine::initial_state`), never its current state: the split of
@@ -164,6 +173,8 @@ nothing.
 `tests/calibration/test_initial_conditions.py::test_a_calibrated_amount_keeps_the_split_by_category`,
 `crates/commol-model/src/initial_conditions.rs::category_shared_by_two_stratifications_is_ambiguous`,
 `tests/initial_conditions/test_stratification_fractions.py::test_an_ambiguous_category_is_refused`,
+`crates/commol-model/tests/initial_conditions.rs::the_plan_gives_the_kind_and_the_compartments_of_each_value`,
+`tests/calibration/test_initial_conditions.py::test_the_kind_of_each_target_comes_from_the_engine`,
 `tests/calibration/test_initial_conditions.py::test_a_calibrator_on_a_simulation_that_has_run_splits_a_bin_by_the_initial_state`.
 
 ## The remainder keeps the sum the model declares
@@ -189,6 +200,8 @@ Units live only in Python (the Rust `Bin` has none), so
 `Aggregate.check_calibration_values` rejects a remainder whose unit is not the
 unit of every compartment a value sets, from the coverage the engine resolves
 (`InitialConditionPlan::coverage`, the binding `initial_condition_coverage`).
+It reads the compartments a value sets, never its kind, so a kind of value
+that sets amounts is checked without a change there.
 
 | Alternative | Why not |
 |---|---|
