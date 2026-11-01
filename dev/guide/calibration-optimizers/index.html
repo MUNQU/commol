@@ -4092,7 +4092,11 @@ optimum exactly at a bound is reached only asymptotically, so it can take more
 iterations. Every optimizer needs finite bounds: Nelder-Mead searches through
 their transform, and a particle swarm draws its particles inside them. A run
 with an infinite bound fails with a message that names the parameter,
-<code>An optimizer searches inside the bounds, so they must be finite</code>.</p>
+<code>An optimizer searches inside the bounds, so they must be finite</code>. A particle
+swarm also draws the velocity of each particle between <code>−(hi − lo)</code> and
+<code>hi − lo</code>, so twice the width of the bounds must be finite too: bounds such as
+<code>(-1e308, 1e308)</code> fail with <code>Optimization failed: ...</code>, the error of the argmin
+fork.</p>
 <h2 id="converged-and-termination_reason"><code>converged</code> and <code>termination_reason</code><a class="headerlink" href="#converged-and-termination_reason" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

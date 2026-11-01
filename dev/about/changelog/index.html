@@ -5762,6 +5762,11 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   such a model failed. In LaTeX, a division followed by a product is a
   fraction times the product: the flow of a proportional rate <code>a / b</code> from
   <code>B</code> is <code>\frac{a}{b} \cdot B</code>, no longer <code>\frac{a}{b \cdot B}</code>.</li>
+<li>A particle swarm whose bounds are finite but too far apart, such as
+  <code>(-1e308, 1e308)</code>, raised a <code>PanicException</code> when it drew its first
+  particles. It now raises a <code>RuntimeError</code>, <code>Optimization failed: ...</code>,
+  with the error of the argmin fork, which checks its own bounds. A bound
+  that is not finite still raises the message that names the parameter.</li>
 </ul>
 <h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h3>
 <ul>
