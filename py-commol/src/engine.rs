@@ -336,6 +336,10 @@ impl SimulationEngine for Engine {
         }
     }
 
+    fn check_varied_values(&self, values: &[ModelValue]) -> Result<(), String> {
+        dispatch!(self, engine => engine.check_varied_values(values))
+    }
+
     fn apply_values(&mut self, plan: &EngineValuePlan, values: &[f64]) -> Result<f64, String> {
         match (self, plan) {
             (Self::Difference(engine), EngineValuePlan::Aggregate(plan)) => {

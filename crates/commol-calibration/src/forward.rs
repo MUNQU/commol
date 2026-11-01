@@ -101,7 +101,8 @@ impl<E: SimulationEngine> ForwardModel<E> {
     /// `replicates` is 0
     /// ([`crate::ranges::REPLICATES`]), the engine is stochastic and
     /// `replicates` or `seed` is not set, or the engine does not resolve a
-    /// value of its model kind or the remainder.
+    /// value of its model kind or the remainder, or does not take every
+    /// number of a value ([`SimulationEngine::check_varied_values`]).
     pub fn unobserved(
         base_engine: E,
         parameters: Vec<CalibrationParameter>,
@@ -131,7 +132,7 @@ impl<E: SimulationEngine> ForwardModel<E> {
         } else {
             None
         };
-        let values = ValueWriter::new(&base_engine, &parameters, remainder)?;
+        let values = ValueWriter::varied(&base_engine, &parameters, remainder)?;
         let observation =
             ObservationOperator::new(&[], &parameters, &base_engine.output_names(), &[])?;
         let mut model = Self::new(base_engine, parameters, values, Vec::new(), observation);

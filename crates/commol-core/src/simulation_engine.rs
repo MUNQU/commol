@@ -499,6 +499,23 @@ pub trait SimulationEngine: Clone {
         remainder: Option<&str>,
     ) -> Result<Self::ValuePlan, String>;
 
+    /// Check that the engine takes every number that a method which varies
+    /// `values` can write, whatever their bounds, such as an optimizer or a
+    /// sampler. A method that writes known numbers does not call it: the
+    /// engine checks each number when it writes it ([`Self::apply_values`]).
+    ///
+    /// By default the engine takes every number. The values are resolved
+    /// first ([`Self::plan_values`]), so an id that does not resolve gets the
+    /// message of the plan.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names a value when the engine takes only some
+    /// of its numbers.
+    fn check_varied_values(&self, _values: &[ModelValue]) -> Result<(), String> {
+        Ok(())
+    }
+
     /// Write values of the model kind into the state the engine starts from.
     ///
     /// # Arguments

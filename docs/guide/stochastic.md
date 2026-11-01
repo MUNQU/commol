@@ -176,11 +176,14 @@ print(sum(start[f"B_g{i}"][0] for i in range(10)) + sum(start[f"A_g{i}"][0] for 
 # 1000.0
 ```
 
-Initial conditions that calibration sets go through the same rounding. An
-optimizer writes values that are not whole, so a calibrated initial condition
-needs a rounding, whatever its bounds: with no rounding, the `Calibrator`
-raises `ValueError` when it is built, and the message names the initial
-condition and the two options.
+Initial conditions that calibration sets go through the same rounding. A
+method that varies an initial condition, such as an optimizer or a sampler,
+writes values that are not whole, so it needs a rounding, whatever the bounds:
+with no rounding, a `Calibrator` or a `SensitivityAnalysis` with an
+`initial_condition` raises `ValueError` when it is built, and the message names
+the initial condition and the two options. Known values need no rounding when
+they are whole: `Model.apply_calibration_parameters` writes `{"B": 12.0}`, and
+refuses `{"B": 12.3}` with a message that names the value.
 
 ## Seeds and replicates
 

@@ -243,8 +243,10 @@ fn calibrated_initial_state(
 ///         does not have, or one a formula or a series sets), the kind does
 ///         not accept a type of value, or a value or the remainder cannot be
 ///         resolved; for example a category of a stratification that is not
-///         binary; or if the model still lacks a value that the
-///         calibration does not set
+///         binary; if the engine does not take every number of a value that
+///         calibration varies, such as an initial condition on an engine of
+///         whole units with no rounding; or if the model still lacks a value
+///         that the calibration does not set
 #[pyfunction]
 #[pyo3(signature = (engine, parameters, initial_condition_remainder=None))]
 fn check_model_values(

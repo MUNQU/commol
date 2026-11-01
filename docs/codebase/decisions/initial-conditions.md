@@ -217,22 +217,35 @@ that sets amounts is checked without a change there.
 and the targets of an id, and
 `the_remainder_keeps_the_declared_sum_of_what_it_covers`).
 
-## An engine of whole units refuses a calibrated initial condition with no rounding
+## Whole units need a rounding to vary an initial condition
 
-`InitialConditionPlan::new` asks the engine about each id it resolves
-(`CompartmentalEngine::check_calibrated_initial_condition`). The deterministic
-engines take every value. `StochasticEvents` and `StochasticSteps` answer
-through `Units`: with no `rounding`, they refuse the id, whatever its bounds,
-and the message names the id and the two roundings. An optimizer writes values
-that are not whole, and `check_model_values` writes only one value, the point of
-the bounds nearest 0, which is whole when a bound is.
+A method that varies the values, such as an optimizer or a sampler, builds its
+writer with `ValueWriter::varied` (`crates/commol-calibration/src/values.rs`):
+`CalibrationProblem::new`, `with_initial_condition_remainder`,
+`ForwardModel::unobserved` and `check_model_values`. After the plan resolves
+the values, the writer asks the engine whether it takes every number of them
+(`SimulationEngine::check_varied_values`). By default it does.
+`StochasticEvents` and `StochasticSteps` answer through `Units`: with no
+`rounding`, they refuse an initial condition, whatever its bounds, and the
+message names it and the two roundings. An optimizer writes values that are not
+whole, and `check_model_values` writes only one value, the point of the bounds
+nearest 0, which is whole when a bound is.
+
+A write of known values (`configured_engine`, the write-back of
+`Model.apply_calibration_parameters`) and a query of the plan
+(`plan_model_values`) do not ask: the engine checks each number when it writes
+it (`Units::set_initial_condition`), so a whole value needs no rounding.
 
 | Alternative | Why not |
 |---|---|
-| Check the bounds in `check_model_values` of `commol-calibration` | The calibration would hold a rule of the engine, and the other users of the plan (SMC, sensitivity, the predictive) would not have it. |
+| Check the bounds in `check_model_values` of `commol-calibration` | The calibration would hold a rule of the engine, against the golden rule, and the Rust builders that do not call it (`CalibrationProblem::new`, `ForwardModel::unobserved`) would not have it. |
+| Refuse when the plan is built (`InitialConditionPlan::new`) | Every plan is built, also for a write of known values, so a whole value written back would need a rounding for a reason that does not apply to it. |
 | Refuse only when a bound is not whole | Bounds `[0, 50]` pass, and every start fails on the first value that is not whole. |
 
 **Guards:**
+`crates/commol-calibration/tests/test_varied_values.rs`,
+`crates/commol-stochastic/tests/oracles.rs` (`calibrated_initial_conditions_go_through_the_rounding`),
 `tests/stochastic/test_calibration.py::test_a_calibrated_amount_needs_a_rounding`,
-`tests/stochastic/test_calibration.py::test_a_calibrated_amount_with_a_rounding_is_calibrated`,
-`crates/commol-stochastic/tests/oracles.rs` (`calibrated_initial_conditions_go_through_the_rounding`).
+`tests/stochastic/test_calibration.py::test_an_analysis_that_varies_an_amount_needs_a_rounding`,
+`tests/stochastic/test_calibration.py::test_a_known_amount_is_written_back_when_it_is_whole`,
+`tests/stochastic/test_calibration.py::test_a_calibrated_amount_with_a_rounding_is_calibrated`.

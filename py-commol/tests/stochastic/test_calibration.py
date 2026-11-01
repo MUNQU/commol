@@ -20,6 +20,7 @@ from commol import (
 from commol._fit.result import CalibrationResult
 from commol.engines import StochasticEventsSettings, StochasticStepsSettings
 from commol.engines.engine import EngineName
+from commol.sensitivity import InputSpace, SensitivityAnalysis
 from commol.uncertainty import weighted_quantiles
 from tests.support import STOCHASTIC_ENGINES, a_to_b_builder, bounded, build_stochastic
 
@@ -147,13 +148,9 @@ def test_the_engine_asks_for_replicates() -> None:
     )
 
 
-def _amount_calibrator(
-    engine: EngineName,
-    low: float,
-    settings: StochasticEventsSettings | StochasticStepsSettings | None = None,
-) -> Calibrator:
+def _amount_problem(low: float) -> CalibrationProblem:
     """A calibration of the initial amount of bin B in ``[low, 50]``."""
-    problem = CalibrationProblem(
+    return CalibrationProblem(
         observed_data=[ObservedDataPoint(at=2.0, output="A", value=800.0)],
         parameters=[bounded("B", low, 50.0, kind="initial_condition")],
         loss_function="sse",
@@ -162,22 +159,49 @@ def _amount_calibrator(
         replicate_summary="mean",
         seed=7,
     )
-    model = build_stochastic(a_to_b_builder(), engine, settings)
-    return Calibrator(Simulation(model), problem)
+
+
+def _needs_a_rounding(engine: EngineName) -> str:
+    return (
+        f"The {engine} engine moves whole units, and a method that varies the "
+        "initial condition 'B' can write amounts that are not whole. Name a "
+        'rounding in the settings of the engine: "largest_remainder" or "random"'
+    )
 
 
 @pytest.mark.parametrize("engine", STOCHASTIC_ENGINES)
 @pytest.mark.parametrize("low", [0.0, 0.5])
 def test_a_calibrated_amount_needs_a_rounding(engine: EngineName, low: float) -> None:
-    with pytest.raises(ValueError) as error:
-        _amount_calibrator(engine, low)
+    simulation = Simulation(build_stochastic(a_to_b_builder(), engine))
 
-    assert str(error.value) == (
-        f"The {engine} engine moves whole units, and the calibration sets the "
-        "initial condition 'B', so the amounts it writes are not always whole. "
-        'Name a rounding in the settings of the engine: "largest_remainder" or '
-        '"random"'
+    with pytest.raises(ValueError) as error:
+        Calibrator(simulation, _amount_problem(low))
+
+    assert str(error.value) == _needs_a_rounding(engine)
+
+
+def test_an_analysis_that_varies_an_amount_needs_a_rounding() -> None:
+    simulation = Simulation(build_stochastic(a_to_b_builder(), "StochasticSteps"))
+    inputs = InputSpace.uniform_on_bounds(
+        [bounded("B", 0.0, 50.0, kind="initial_condition")]
     )
+
+    with pytest.raises(ValueError) as error:
+        SensitivityAnalysis(simulation, inputs, replicates=2, seed=1)
+
+    assert str(error.value) == _needs_a_rounding("StochasticSteps")
+
+
+def test_a_known_amount_is_written_back_when_it_is_whole() -> None:
+    model = build_stochastic(a_to_b_builder(), "StochasticSteps")
+    problem = _amount_problem(0.0)
+
+    with pytest.raises(ValueError, match=r"12\.3 is not whole"):
+        model.apply_calibration_parameters({"B": 12.3}, problem)
+    model.apply_calibration_parameters({"B": 12.0}, problem)
+    start = Simulation(model).run_at([0.0], seed=1)
+
+    assert start["B"] == [12.0]
 
 
 @pytest.mark.parametrize(
@@ -190,6 +214,11 @@ def test_a_calibrated_amount_needs_a_rounding(engine: EngineName, low: float) ->
 def test_a_calibrated_amount_with_a_rounding_is_calibrated(
     engine: EngineName, settings: StochasticEventsSettings | StochasticStepsSettings
 ) -> None:
-    result = _amount_calibrator(engine, 0.0, settings).run()
+    model = build_stochastic(a_to_b_builder(), engine, settings)
+    problem = _amount_problem(0.0)
 
-    assert 0.0 <= result.best_parameters["B"] <= 50.0
+    result = Calibrator(Simulation(model), problem).run()
+    model.apply_calibration_parameters(result.best_parameters, problem)
+    start = Simulation(model).run_at([0.0], seed=1)
+
+    assert start["B"][0] == round(start["B"][0])
