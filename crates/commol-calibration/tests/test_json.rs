@@ -14,8 +14,8 @@ use commol_core::json;
 fn problem_json(swarm: &str, problem: &str) -> String {
     format!(
         r#"{{
-        "observed_data": [{{"at": 1.0, "output": "B", "outputs": null, "label": "B",
-            "value": 2.0, "weight": 1.0, "factor_id": null, "scale": 1.0, "window": null, "trials": null}}],
+        "observed_data": [{{"at": 1.0, "output": "B", "outputs": null, "coefficients": null,
+            "label": "B", "value": 2.0, "weight": 1.0, "factor_id": null, "scale": 1.0, "window": null, "trials": null}}],
         "parameters": [{{"id": "k", "parameter_type": "parameter", "min_bound": 0.0,
             "max_bound": 1.0, "initial_guess": null}}],
         "constraints": [],

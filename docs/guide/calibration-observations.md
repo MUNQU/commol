@@ -3,9 +3,10 @@
 [Back to Model Calibration](calibration.md)
 
 An `ObservedDataPoint` says what the model must reproduce: an output at a
-position on the axis. This page shows how to observe several outputs, sums of
-outputs, partial observations (factors and known scales), counts per period
-(windows) and positions between integers, and how to weigh them.
+position on the axis. This page shows how to observe several outputs, sums
+and weighted sums of outputs, partial observations (factors and known
+scales), counts per period (windows) and positions between integers, and how
+to weigh them.
 
 ## Quick path
 
@@ -76,6 +77,7 @@ plots and the per-series normalization; it defaults to `output`.
 | `at` | `float` | required | The position on the axis. The engine decides which positions its model type accepts. |
 | `output` | `str \| None` | `None` | The observed output. Give `output` or `outputs`, not both. |
 | `outputs` | `list[str] \| None` | `None` | Outputs summed before the comparison; needs a `label`. |
+| `coefficients` | `list[float] \| None` | `None` (1 each) | The known coefficient of each of `outputs`, in its order; see [Weighted sums](#weighted-sums). |
 | `label` | `str` | `output` | The name of the observed series. |
 | `value` | `float` | required | The observed value, zero or more. |
 | `weight` | `float` | `1.0` | Above zero. How much the observation counts in every loss, and the power of its term of a likelihood; see [Losses](calibration.md#losses). |
@@ -107,6 +109,40 @@ print(calibrate_k1(b_and_c))  # 0.4
 
 `outputs` may name compartments and accumulators, and works with `factor_id`
 and `window`. It must not be empty.
+
+### Weighted sums
+
+When a measurement sees the whole of one output and a known share of
+another, give one coefficient per output in `coefficients`, in the order of
+`outputs`. The prediction is `Σ coefficient · output`, then times `scale` and
+the factor:
+
+```python
+b_and_half_c = [
+    ObservedDataPoint(
+        at=step,
+        label="B_plus_half_C",
+        outputs=["B", "C"],
+        coefficients=[1.0, 0.5],
+        value=truth["B"][step] + 0.5 * truth["C"][step],
+    )
+    for step in range(10, 51, 10)
+]
+print(calibrate_k1(b_and_half_c))  # 0.4
+```
+
+| Rule | Why |
+|---|---|
+| One coefficient per output | Each output has its known share. |
+| Each coefficient finite and 0 or more, at least one above 0 | A negative coefficient can give a count model a negative mean. A 0 is an output the measurement does not see. |
+| Only with `outputs` | The share of one output is `scale` ([Known shares](#known-shares-scales)). |
+| A known number | An unknown share is a factor (`factor_id`) or a parameter of the model. |
+
+A count model reads the weighted sum as one count, so its variance belongs to
+the count the measurement saw. Two observations, one per output, would split
+a value that nobody measured by output. The figures and the `observed` block
+of a report read the coefficients; the report records them next to
+`outputs`.
 
 ## Weights and normalization
 

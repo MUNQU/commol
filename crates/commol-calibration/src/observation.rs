@@ -219,16 +219,17 @@ pub fn window_increments(
         .collect()
 }
 
-/// How each observation reads a run: the outputs it sums, the row of its
-/// position, the row its window starts at, and its scale and the factor that
-/// multiply it.
+/// How each observation reads a run: the outputs it sums with their
+/// coefficients, the row of its position, the row its window starts at, and
+/// its scale and the factor that multiply it.
 ///
 /// The rows are those of a run at the positions of the schedule the operator
 /// was built with ([`ObservationOperator::new`]).
 #[derive(Debug, Clone)]
 pub struct ObservationOperator {
-    /// Indices of the outputs each observation sums.
-    outputs: Vec<Vec<usize>>,
+    /// Indices of the outputs each observation sums, each with its
+    /// coefficient.
+    outputs: Vec<Vec<(usize, f64)>>,
     /// Row of each observation's position.
     rows: Vec<usize>,
     /// Row of the start of each observation's window, if it has one.
@@ -248,8 +249,10 @@ impl ObservationOperator {
     ///
     /// # Errors
     ///
-    /// Returns a message when an observation has no outputs or names an
-    /// unknown output, or its factor is not a factor parameter.
+    /// Returns a message when an observation has no outputs, names an
+    /// unknown output, has coefficients that break
+    /// [`ObservedDataPoint::check_coefficients`], or its factor is not a
+    /// factor parameter.
     pub fn new(
         observed_data: &[ObservedDataPoint],
         parameters: &[CalibrationParameter],
@@ -312,11 +315,13 @@ impl ObservationOperator {
                     obs.label, obs.at
                 ));
             }
+            obs.check_coefficients()?;
             let indices = obs
                 .outputs
                 .iter()
-                .map(|name| {
-                    output_map.get(name.as_str()).copied().ok_or_else(|| {
+                .zip(obs.output_coefficients())
+                .map(|(name, coefficient)| {
+                    let index = output_map.get(name.as_str()).copied().ok_or_else(|| {
                         format!(
                             "Invalid observed output name '{}' for observation '{}' \
                              (available: {})",
@@ -324,9 +329,10 @@ impl ObservationOperator {
                             obs.label,
                             output_names.join(", ")
                         )
-                    })
+                    })?;
+                    Ok((index, coefficient))
                 })
-                .collect::<Result<Vec<_>, _>>()?;
+                .collect::<Result<Vec<_>, String>>()?;
             outputs.push(indices);
             factors.push(match &obs.factor_id {
                 None => None,
@@ -367,8 +373,8 @@ impl ObservationOperator {
     }
 
     /// Write the prediction of each observation into `out`: the sum of its
-    /// outputs, or its increment over its window, times its scale and times
-    /// its factor.
+    /// outputs, each times its coefficient, or the increment of that sum over
+    /// its window, times its scale and times its factor.
     ///
     /// `rows` are the rows of a run at the schedule; `parameters` are the
     /// values of the calibration parameters, which hold the factors.
@@ -378,9 +384,14 @@ impl ObservationOperator {
     /// Panics when `out` does not hold one value per observation.
     pub fn apply(&self, rows: &[Vec<f64>], parameters: &[f64], out: &mut [f64]) {
         assert_eq!(out.len(), self.count(), "one prediction per observation");
-        let sum_at = |row: usize, outputs: &[usize]| -> f64 {
+        let sum_at = |row: usize, outputs: &[(usize, f64)]| -> f64 {
             rows.get(row)
-                .map(|values| outputs.iter().filter_map(|&i| values.get(i)).sum())
+                .map(|values| {
+                    outputs
+                        .iter()
+                        .filter_map(|&(i, coefficient)| values.get(i).map(|v| v * coefficient))
+                        .sum()
+                })
                 .unwrap_or(0.0)
         };
         for (index, slot) in out.iter_mut().enumerate() {

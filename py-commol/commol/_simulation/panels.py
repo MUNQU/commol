@@ -164,9 +164,9 @@ def run_observation_panels(
     of their first observation.
 
     The model value of each observation is read through its own operator, as
-    the loss reads it: the sum of its outputs at its position, or its
-    increment over its window, times the value of its factor in
-    `calibration_result`.
+    the loss reads it: the sum of its outputs times their coefficients at its
+    position, or its increment over its window, times its scale and the value
+    of its factor in `calibration_result`.
 
     Raises
     ------
@@ -262,7 +262,8 @@ def _at_observations(
 ) -> list[float]:
     """
     The model value of each observation in one run, through its own
-    operator: the sum of its outputs, its window, its scale and its factor.
+    operator: the sum of its outputs times their coefficients, its window, its
+    scale and its factor.
     """
     return [
         _read(results, point.observed_outputs, point) * model_multiplier(point, factors)
@@ -274,10 +275,11 @@ def _read(
     results: "SimulationResults", outputs: list[str], point: ObservedDataPoint
 ) -> float:
     """
-    The sum of `outputs` of one run as `point` reads it: at its position, or
-    its increment over its window (`windowed_totals`).
+    The sum of `outputs` of one run, each times its coefficient in `point`, as
+    `point` reads it: at its position, or its increment over its window
+    (`windowed_totals`).
     """
-    series = total_series(results, outputs)
+    series = total_series(results, outputs, point.coefficients)
     if point.window:
         return _windowed_totals(series, results.positions, point.window, [point.at])[0]
     return _sample(series, results.positions, [point.at])[0]
@@ -295,10 +297,11 @@ def _model_line(
 
     When the observations of the series do not share one operator with no
     window, each observation is read through its own operator, as the loss
-    reads it: the sum of its outputs at its position, or its increment over
-    its window (`windowed_totals`), times its scale and its factor. Otherwise
-    the sum of the outputs of their operator at every position of the results,
-    times its scale and its factor.
+    reads it: the sum of its outputs times their coefficients at its position,
+    or its increment over its window (`windowed_totals`), times its scale and
+    its factor. Otherwise the sum of the outputs of their operator, times
+    their coefficients, at every position of the results, times its scale and
+    its factor.
 
     Raises
     ------
@@ -317,9 +320,10 @@ def _model_line(
         if observed and observed[0].outputs
         else outputs.components(series_id)
     )
+    coefficients = observed[0].coefficients if observed else None
     multiplier = model_multiplier(observed[0] if observed else None, factors)
     return list(results.positions), [
-        value * multiplier for value in total_series(results, components)
+        value * multiplier for value in total_series(results, components, coefficients)
     ]
 
 

@@ -54,6 +54,9 @@ pub struct Observation {
     pub output: Option<String>,
     /// The outputs summed, or `None` with `output`.
     pub outputs: Option<Vec<String>>,
+    /// The known coefficient of each output of `outputs`, or `None` for 1
+    /// each.
+    pub coefficients: Option<Vec<f64>>,
     /// The name of the series.
     pub label: String,
     /// The observed value.
@@ -86,7 +89,9 @@ checked!(
 
 impl Observation {
     /// Check that the observation has one of `output` and `outputs`, a
-    /// label, and a window that starts at 0 or after it.
+    /// label, coefficients only with `outputs` and that pass
+    /// [`ObservedDataPoint::check_coefficients`], and a window that starts at
+    /// 0 or after it.
     ///
     /// # Errors
     ///
@@ -109,6 +114,14 @@ impl Observation {
             }
             .to_string());
         }
+        if self.output.is_some() && self.coefficients.is_some() {
+            return Err(format!(
+                "Observation '{}' gives 'coefficients' with 'output'; give them with \
+                 'outputs', or give the share of one output as 'scale'.",
+                self.label
+            ));
+        }
+        ObservedDataPoint::from(self).check_coefficients()?;
         self.window.map_or(Ok(()), |window| {
             crate::observation::check_window_end(self.at, window).map(|_| ())
         })
@@ -124,6 +137,7 @@ impl From<&Observation> for ObservedDataPoint {
                 (Some(output), _) => vec![output.clone()],
                 (None, outputs) => outputs.clone().unwrap_or_default(),
             },
+            coefficients: observation.coefficients.clone(),
             value: observation.value,
             weight: observation.weight,
             factor_id: observation.factor_id.clone(),

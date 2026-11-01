@@ -98,6 +98,7 @@ impl PredictionSpec {
             at: self.at,
             output: self.output.clone(),
             outputs: self.outputs.clone(),
+            coefficients: None,
             label,
             value: 0.0,
             weight: 1.0,

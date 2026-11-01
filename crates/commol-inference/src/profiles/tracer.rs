@@ -708,6 +708,13 @@ where
     }
 }
 
+/// The error of the prediction `mean` of `obs` from a run whose outputs
+/// have the accuracy `relative` and `absolute`: the relative error of the
+/// mean, and the absolute error of each output times its coefficient.
+fn prediction_error(obs: &ObservedDataPoint, mean: f64, relative: f64, absolute: f64) -> f64 {
+    relative * mean.abs() + obs.output_coefficients().iter().sum::<f64>() * absolute
+}
+
 /// The noise floor `ν₁` and the evaluation floor of the objective at `fit`
 /// ([`ProfileTracer::noise_floor`], [`ProfileTracer::evaluation_floor`]);
 /// `None` when the term derivatives cannot be computed.
@@ -725,7 +732,7 @@ fn floors<E: SimulationEngine>(problem: &CalibrationProblem<E>, fit: &[f64]) -> 
         .observed_data()
         .iter()
         .zip(&predictions)
-        .map(|(obs, mean)| relative * mean.abs() + obs.outputs.len() as f64 * absolute)
+        .map(|(obs, &mean)| prediction_error(obs, mean, relative, absolute))
         .collect();
     let first: f64 = terms
         .iter()
@@ -849,6 +856,23 @@ fn quadratic_root(x: [f64; 3], y: [f64; 3], level: f64) -> Option<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_absolute_error_of_a_prediction_counts_each_output_by_its_coefficient() {
+        let mut obs = ObservedDataPoint::of_sum(
+            1.0,
+            "seen".to_string(),
+            vec!["A".to_string(), "B".to_string()],
+            0.0,
+        );
+        // A plain sum counts one absolute error per output.
+        assert_eq!(prediction_error(&obs, -10.0, 0.1, 0.5), 2.0);
+
+        obs.coefficients = Some(vec![1.0, 0.6]);
+
+        // 0.1 · 10 + (1 + 0.6) · 0.5.
+        assert!((prediction_error(&obs, -10.0, 0.1, 0.5) - 1.8).abs() < 1e-12);
+    }
 
     #[test]
     fn the_root_of_a_quadratic_is_found_between_its_last_two_points() {

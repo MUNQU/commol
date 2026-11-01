@@ -181,7 +181,7 @@ An observation at `at` with `window = W` is compared with
 `output(at) - output(at - W)`, anchored at its own position. The Rust loss and
 `windowed_totals` (`_simulation/windows.py`) give the same number from one rule
 (`window_increments`), and the predictive reads windows through the observation operator
-([One observation operator](calibration.md#one-observation-operator)). Window `w`
+([One observation operator](observations.md#one-observation-operator)). Window `w`
 covers `(w · W, (w + 1) · W]`; `window_index` places a position with
 `max(ceil(at / W) − 1, 0)`, and the `observed` block of a report (`_observed_report` in `_simulation/reports.py`) calls it.
 `plot.series` of results reads the model of a windowed observation the

@@ -36,6 +36,7 @@ class ObservedSeries(TypedDict):
     weights: NotRequired[list[float | None]]
     scales: NotRequired[list[float | None]]
     outputs: NotRequired[list[str]]
+    coefficients: NotRequired[list[float]]
     factor_id: NotRequired[str]
 
 
@@ -132,9 +133,9 @@ def _observed_report(
     where there is no observation, so it lines up index for index with the
     windowed accumulator series. An observation goes to the window that holds
     its position (`window_index` of the engine, as `AxisUnits.window_index`
-    gives it). ``weights``, ``scales``, ``outputs`` and ``factor_id`` appear
-    only on series that use them; a series whose weights, or scales, are all
-    1.0 omits them.
+    gives it). ``weights``, ``scales``, ``outputs``, ``coefficients`` and
+    ``factor_id`` appear only on series that use them; a series whose
+    weights, or scales, are all 1.0 omits them.
     """
     series: dict[str, ObservedSeries] = {}
     for point in observed_data:
@@ -154,6 +155,8 @@ def _observed_report(
         entry["scales"][index] = point.scale
         if point.outputs:
             entry["outputs"] = list(point.outputs)
+        if point.coefficients is not None:
+            entry["coefficients"] = list(point.coefficients)
         if point.factor_id:
             entry["factor_id"] = point.factor_id
 
