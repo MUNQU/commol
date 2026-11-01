@@ -3101,6 +3101,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/progress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Progress
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/figures/" class="md-nav__link">
         
   
@@ -4000,7 +4028,10 @@ check some of these rules. The rest depend on the author and the reviewer.</p>
 <li>Log with the standard <code>logging</code> module. Library code never writes to the
   standard error of the process: a failure is part of the result and the
   caller logs it (<code>CalibrationResult.failed</code>). Output the user asks for,
-  such as a verbose optimizer's table, goes to Python's <code>sys.stdout</code>.</li>
+  such as a verbose optimizer's table, goes to Python's <code>sys.stdout</code>. A
+  Rust loop never logs: it sends its events to a <code>Steps</code>, and the extension
+  writes their records
+  (<a href="../decisions/progress/#a-long-method-logs-each-step-from-the-calling-thread">Design decisions</a>).</li>
 </ul>
 <h2 id="rust">Rust<a class="headerlink" href="#rust" title="Permanent link">&para;</a></h2>
 <ul>

@@ -80,7 +80,7 @@ class ModelBuilder:
         self._parameters: list[Parameter] = []
         self._series_counter: int = 0
 
-        logger.info(
+        logger.debug(
             (
                 f"Initialized ModelBuilder: name='{self._name}', "
                 f"version='{self._version or 'N/A'}'"
@@ -108,7 +108,7 @@ class ModelBuilder:
         # Use bin-specific unit, or fall back to model-level bin_unit
         final_unit = unit if unit is not None else self._bin_unit
         self._bins.append(Bin(id=id, name=name, unit=final_unit))
-        logger.info(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
+        logger.debug(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
         return self
 
     def add_accumulator(self, id: str, name: str) -> Self:
@@ -134,7 +134,7 @@ class ModelBuilder:
             Self for method chaining.
         """
         self._accumulators.append(Accumulator(id=id, name=name))
-        logger.info(f"Added accumulator: id='{id}', name='{name}'")
+        logger.debug(f"Added accumulator: id='{id}', name='{name}'")
         return self
 
     def add_stratification(
@@ -187,7 +187,7 @@ class ModelBuilder:
                 conditions=list(conditions) if conditions else None,
             )
         )
-        logger.info(f"Added stratification: id='{id}', categories={categories}")
+        logger.debug(f"Added stratification: id='{id}', categories={categories}")
         return self
 
     def add_matrix(
@@ -263,7 +263,7 @@ class ModelBuilder:
                 column_scales=dict(column_scales or {}),
             )
         )
-        logger.info(f"Added matrix: id='{id}', stratification='{stratification}'")
+        logger.debug(f"Added matrix: id='{id}', stratification='{stratification}'")
         return self
 
     def add_parameter(
@@ -335,7 +335,7 @@ class ModelBuilder:
         self._parameters.append(
             Parameter(id=id, value=param_value, description=description, unit=unit)
         )
-        logger.info(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
+        logger.debug(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
         return self
 
     def _register_series_pattern(
@@ -575,7 +575,7 @@ class ModelBuilder:
                 impulse_every=impulse_every,
             )
         )
-        logger.info(
+        logger.debug(
             (
                 f"Added transition: id='{id}', source={source}, target={target}, "
                 f"rate='{rate}', stratified_rates={
@@ -682,7 +682,7 @@ class ModelBuilder:
             compartments = target
             expand_type = "target"
 
-        logger.info(
+        logger.debug(
             (
                 f"Expanding transition '{id}' with $compartment placeholder: "
                 f"{len(compartments)} {expand_type} compartments will create "
@@ -728,7 +728,7 @@ class ModelBuilder:
                 if expanded_stratified_rates
                 else ""
             )
-            logger.info(
+            logger.debug(
                 (
                     f"  Created expanded transition: id='{expanded_id}', "
                     f"source=['{compartment}'], target={target}, "
@@ -736,7 +736,7 @@ class ModelBuilder:
                 )
             )
 
-        logger.info(
+        logger.debug(
             f"Successfully expanded transition '{id}' into {len(compartments)} "
             "transitions"
         )
@@ -889,7 +889,15 @@ class ModelBuilder:
             origin=self._origin,
         )
 
-        logger.info(f"Model '{self._name}' successfully built for the {engine} engine.")
+        if logger.isEnabledFor(logging.INFO):
+            outputs = sum(
+                len(names) for names in structure.outputs_by_source(model).values()
+            )
+            logger.info(
+                f"Model '{self._name}' built for the {engine} engine: "
+                f"{len(self._bins)} bin(s), {len(self._parameters)} parameter(s), "
+                f"{len(self._transitions)} transition(s) and {outputs} output(s)."
+            )
 
         return model
 ```
@@ -973,7 +981,7 @@ def __init__(
     self._parameters: list[Parameter] = []
     self._series_counter: int = 0
 
-    logger.info(
+    logger.debug(
         (
             f"Initialized ModelBuilder: name='{self._name}', "
             f"version='{self._version or 'N/A'}'"
@@ -1027,7 +1035,7 @@ def add_bin(self, id: str, name: str, unit: str | None = None) -> Self:
     # Use bin-specific unit, or fall back to model-level bin_unit
     final_unit = unit if unit is not None else self._bin_unit
     self._bins.append(Bin(id=id, name=name, unit=final_unit))
-    logger.info(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
+    logger.debug(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
     return self
 ```
 
@@ -1080,7 +1088,7 @@ def add_accumulator(self, id: str, name: str) -> Self:
         Self for method chaining.
     """
     self._accumulators.append(Accumulator(id=id, name=name))
-    logger.info(f"Added accumulator: id='{id}', name='{name}'")
+    logger.debug(f"Added accumulator: id='{id}', name='{name}'")
     return self
 ```
 
@@ -1164,7 +1172,7 @@ def add_stratification(
             conditions=list(conditions) if conditions else None,
         )
     )
-    logger.info(f"Added stratification: id='{id}', categories={categories}")
+    logger.debug(f"Added stratification: id='{id}', categories={categories}")
     return self
 ```
 
@@ -1276,7 +1284,7 @@ def add_matrix(
             column_scales=dict(column_scales or {}),
         )
     )
-    logger.info(f"Added matrix: id='{id}', stratification='{stratification}'")
+    logger.debug(f"Added matrix: id='{id}', stratification='{stratification}'")
     return self
 ```
 
@@ -1382,7 +1390,7 @@ def add_parameter(
     self._parameters.append(
         Parameter(id=id, value=param_value, description=description, unit=unit)
     )
-    logger.info(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
+    logger.debug(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
     return self
 ```
 
@@ -1638,7 +1646,7 @@ def add_transition(
             impulse_every=impulse_every,
         )
     )
-    logger.info(
+    logger.debug(
         (
             f"Added transition: id='{id}', source={source}, target={target}, "
             f"rate='{rate}', stratified_rates={
@@ -1912,7 +1920,15 @@ def build(
         origin=self._origin,
     )
 
-    logger.info(f"Model '{self._name}' successfully built for the {engine} engine.")
+    if logger.isEnabledFor(logging.INFO):
+        outputs = sum(
+            len(names) for names in structure.outputs_by_source(model).values()
+        )
+        logger.info(
+            f"Model '{self._name}' built for the {engine} engine: "
+            f"{len(self._bins)} bin(s), {len(self._parameters)} parameter(s), "
+            f"{len(self._transitions)} transition(s) and {outputs} output(s)."
+        )
 
     return model
 ```

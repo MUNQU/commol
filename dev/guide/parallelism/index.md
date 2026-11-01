@@ -44,6 +44,8 @@ A number below 1, or `levels` other than `"all"` and `"outer"`, raises `ValueErr
 
 One run of a model is never split: each thread runs whole runs.
 
+A method that logs its steps, such as a bootstrap, writes each record from the thread that called it, in the order the steps end, so a record carries the name and the `contextvars` of that thread. See [Log messages](https://munqu.github.io/commol/latest/getting-started/quickstart/#log-messages).
+
 ## The number of threads
 
 Every parallel method runs in a pool of `n` threads that commol builds from the setting, and uses at most those threads, nested levels included. The setting is a `contextvars` variable: it holds in the Python thread, or the `asyncio` task, that sets it, and another thread starts with the default.

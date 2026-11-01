@@ -3253,6 +3253,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/progress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Progress
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/figures/" class="md-nav__link">
         
   
@@ -3849,6 +3877,11 @@
 <td>A pool of its own elsewhere; the global pool of <code>rayon</code>.</td>
 </tr>
 <tr>
+<td><code>crates/commol-core/src/progress.rs</code></td>
+<td><code>Steps</code>, the port of the events of the loops of a long method, and <code>NoSteps</code>, which drops them; each crate owns the events of its loops (<code>StartEvent</code>, <code>RunnerEvent</code>, <code>SideEvent</code>).</td>
+<td>A log record, or a logger of Python.</td>
+</tr>
+<tr>
 <td><code>crates/commol-core/src/math_expression/</code></td>
 <td>The language of formulas (<code>language.rs</code>: <code>FUNCTIONS</code> and the check of a formula, <code>MathExpression::check</code>), the engine variables (<code>variables.rs</code>); the parser of formulas and its limits (<code>jit/parser.rs</code>: <code>MAX_NESTING</code>, <code>MAX_NODES</code>), the cut of a formula that a message quotes (<code>math_expression/error.rs</code>: <code>quoted</code>), the tree of a formula (<code>jit/ast.rs</code>) and its JSON, the port through which Python reads it (<code>tree.rs</code>: <code>MathExpression::tree_json</code>), the Cranelift JIT and its global cache (<code>jit/</code>).</td>
 <td>Model-specific variables.</td>
@@ -4242,8 +4275,13 @@
 </tr>
 <tr>
 <td><code>py-commol/src/parallelism.rs</code></td>
-<td><code>commol_rs.parallelism</code>: the setting of the threads (a <code>contextvars</code> variable that holds a <code>Parallelism</code>), <code>current</code>, and <code>parallel</code>, the one helper through which every binding releases the GIL and runs its work in the pool of the setting.</td>
+<td><code>commol_rs.parallelism</code>: the setting of the threads (a <code>contextvars</code> variable that holds a <code>Parallelism</code>), <code>current</code>, and <code>parallel</code>, the one helper through which every binding releases the GIL and runs its work in the pool of the setting, with <code>parallel_logged</code>, which also writes the records of the steps of its job.</td>
 <td>A call of <code>py.detach</code> in another binding.</td>
+</tr>
+<tr>
+<td><code>py-commol/src/records.rs</code></td>
+<td>The log records of the steps of a long method: <code>ChannelSteps</code>, the receiver the workers send to, and the drain that counts the steps and writes their records from the calling thread.</td>
+<td>Where records go: the application chooses it.</td>
 </tr>
 <tr>
 <td><code>py-commol/src/python_observer.rs</code></td>

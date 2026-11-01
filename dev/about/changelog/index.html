@@ -3087,6 +3087,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/progress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Progress
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/figures/" class="md-nav__link">
         
   
@@ -5148,6 +5176,15 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li>A method that runs for long logs each step it finishes, at <code>INFO</code>, on the
+  logger of its module: each start of <code>Calibrator.run</code> (<code>commol</code>), each
+  replicate of a bootstrap (<code>commol.resampling</code>), and each stage and side of
+  a profile (<code>commol.profiles</code>), with the count done over the total, such as
+  <code>Replicate 12 finished (37/100): loss 1.280412e3, converged</code>. The starts
+  of a replicate log at <code>DEBUG</code>. An identifiability method logs its start
+  and its end with its duration (<code>commol.identifiability</code>). A handler that
+  raises an <code>Exception</code> loses its record, never the result. See
+  <a href="../../getting-started/quickstart/#log-messages">Log messages</a>.</li>
 <li>Every result writes itself to a JSON file with <code>to_json(file_path,
   indent=2)</code>, and its class reads it back with <code>from_json(file_path)</code>, as
   <code>Model</code> does: <code>CalibrationResult.from_json("fit.json")</code> returns a
@@ -5232,6 +5269,11 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><strong>Breaking:</strong> a build logs one <code>INFO</code> record, with the number of bins,
+  parameters, transitions and outputs; the records of each bin,
+  accumulator, stratification, matrix, parameter and transition of a
+  <code>ModelBuilder</code> are at <code>DEBUG</code>. Set the logger <code>commol</code> to <code>DEBUG</code> to read
+  them.</li>
 <li><strong>Breaking:</strong> with a <code>sample</code>, each entry of a report
   (<code>Model.applied_parameters</code>, <code>ModelStructure.report_sections</code>) holds its
   <code>EntrySpread</code> under the key <code>spread</code>, not <code>interval</code>. A report saved as JSON

@@ -354,6 +354,8 @@ Simulation(model).run(num_steps=10)
 
 Each message shows its level and its logger, such as `INFO:commol:Running simulation for 10 steps.`
 
+At `INFO`, a method that runs for long tells where it is: a calibration logs each start when it ends, a bootstrap each replicate, and a profile each stage (the fit, the replicate fits, the refits of its threshold, the walk) and each side it walks. A record gives the count done over the total, such as `Replicate 12 finished (37/100): loss 1.280412e3, converged`, and no estimate of the time left. A build logs one record with the size of the model. `DEBUG` adds each element a builder adds and the starts of each replicate.
+
 | To                                                  | Call                                                                        |
 | --------------------------------------------------- | --------------------------------------------------------------------------- |
 | See the messages of every library                   | `logging.basicConfig(level=logging.INFO)`                                   |
@@ -7327,6 +7329,8 @@ A number below 1, or `levels` other than `"all"` and `"outer"`, raises `ValueErr
 
 One run of a model is never split: each thread runs whole runs.
 
+A method that logs its steps, such as a bootstrap, writes each record from the thread that called it, in the order the steps end, so a record carries the name and the `contextvars` of that thread. See [Log messages](https://munqu.github.io/commol/latest/getting-started/quickstart/#log-messages).
+
 ## The number of threads
 
 Every parallel method runs in a pool of `n` threads that commol builds from the setting, and uses at most those threads, nested levels included. The setting is a `contextvars` variable: it holds in the Python thread, or the `asyncio` task, that sets it, and another thread starts with the default.
@@ -10363,7 +10367,7 @@ class Calibrator:
             f"algorithm, {measure} and {starts} start(s)."
         )
         result = fit_result(
-            self._engine_problem.optimize(starts),
+            self._engine_problem.optimize(starts, logger),
             self.parameter_names,
             self.seed,
             logger,
@@ -10858,7 +10862,7 @@ def run(self, starts: int = 1) -> CalibrationResult:
         f"algorithm, {measure} and {starts} start(s)."
     )
     result = fit_result(
-        self._engine_problem.optimize(starts),
+        self._engine_problem.optimize(starts, logger),
         self.parameter_names,
         self.seed,
         logger,
@@ -16381,7 +16385,7 @@ class ModelBuilder:
         self._parameters: list[Parameter] = []
         self._series_counter: int = 0
 
-        logger.info(
+        logger.debug(
             (
                 f"Initialized ModelBuilder: name='{self._name}', "
                 f"version='{self._version or 'N/A'}'"
@@ -16409,7 +16413,7 @@ class ModelBuilder:
         # Use bin-specific unit, or fall back to model-level bin_unit
         final_unit = unit if unit is not None else self._bin_unit
         self._bins.append(Bin(id=id, name=name, unit=final_unit))
-        logger.info(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
+        logger.debug(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
         return self
 
     def add_accumulator(self, id: str, name: str) -> Self:
@@ -16435,7 +16439,7 @@ class ModelBuilder:
             Self for method chaining.
         """
         self._accumulators.append(Accumulator(id=id, name=name))
-        logger.info(f"Added accumulator: id='{id}', name='{name}'")
+        logger.debug(f"Added accumulator: id='{id}', name='{name}'")
         return self
 
     def add_stratification(
@@ -16488,7 +16492,7 @@ class ModelBuilder:
                 conditions=list(conditions) if conditions else None,
             )
         )
-        logger.info(f"Added stratification: id='{id}', categories={categories}")
+        logger.debug(f"Added stratification: id='{id}', categories={categories}")
         return self
 
     def add_matrix(
@@ -16564,7 +16568,7 @@ class ModelBuilder:
                 column_scales=dict(column_scales or {}),
             )
         )
-        logger.info(f"Added matrix: id='{id}', stratification='{stratification}'")
+        logger.debug(f"Added matrix: id='{id}', stratification='{stratification}'")
         return self
 
     def add_parameter(
@@ -16636,7 +16640,7 @@ class ModelBuilder:
         self._parameters.append(
             Parameter(id=id, value=param_value, description=description, unit=unit)
         )
-        logger.info(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
+        logger.debug(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
         return self
 
     def _register_series_pattern(
@@ -16876,7 +16880,7 @@ class ModelBuilder:
                 impulse_every=impulse_every,
             )
         )
-        logger.info(
+        logger.debug(
             (
                 f"Added transition: id='{id}', source={source}, target={target}, "
                 f"rate='{rate}', stratified_rates={
@@ -16983,7 +16987,7 @@ class ModelBuilder:
             compartments = target
             expand_type = "target"
 
-        logger.info(
+        logger.debug(
             (
                 f"Expanding transition '{id}' with $compartment placeholder: "
                 f"{len(compartments)} {expand_type} compartments will create "
@@ -17029,7 +17033,7 @@ class ModelBuilder:
                 if expanded_stratified_rates
                 else ""
             )
-            logger.info(
+            logger.debug(
                 (
                     f"  Created expanded transition: id='{expanded_id}', "
                     f"source=['{compartment}'], target={target}, "
@@ -17037,7 +17041,7 @@ class ModelBuilder:
                 )
             )
 
-        logger.info(
+        logger.debug(
             f"Successfully expanded transition '{id}' into {len(compartments)} "
             "transitions"
         )
@@ -17190,7 +17194,15 @@ class ModelBuilder:
             origin=self._origin,
         )
 
-        logger.info(f"Model '{self._name}' successfully built for the {engine} engine.")
+        if logger.isEnabledFor(logging.INFO):
+            outputs = sum(
+                len(names) for names in structure.outputs_by_source(model).values()
+            )
+            logger.info(
+                f"Model '{self._name}' built for the {engine} engine: "
+                f"{len(self._bins)} bin(s), {len(self._parameters)} parameter(s), "
+                f"{len(self._transitions)} transition(s) and {outputs} output(s)."
+            )
 
         return model
 ```
@@ -17274,7 +17286,7 @@ def __init__(
     self._parameters: list[Parameter] = []
     self._series_counter: int = 0
 
-    logger.info(
+    logger.debug(
         (
             f"Initialized ModelBuilder: name='{self._name}', "
             f"version='{self._version or 'N/A'}'"
@@ -17328,7 +17340,7 @@ def add_bin(self, id: str, name: str, unit: str | None = None) -> Self:
     # Use bin-specific unit, or fall back to model-level bin_unit
     final_unit = unit if unit is not None else self._bin_unit
     self._bins.append(Bin(id=id, name=name, unit=final_unit))
-    logger.info(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
+    logger.debug(f"Added bin: id='{id}', name='{name}', unit='{final_unit}'")
     return self
 ```
 
@@ -17381,7 +17393,7 @@ def add_accumulator(self, id: str, name: str) -> Self:
         Self for method chaining.
     """
     self._accumulators.append(Accumulator(id=id, name=name))
-    logger.info(f"Added accumulator: id='{id}', name='{name}'")
+    logger.debug(f"Added accumulator: id='{id}', name='{name}'")
     return self
 ```
 
@@ -17465,7 +17477,7 @@ def add_stratification(
             conditions=list(conditions) if conditions else None,
         )
     )
-    logger.info(f"Added stratification: id='{id}', categories={categories}")
+    logger.debug(f"Added stratification: id='{id}', categories={categories}")
     return self
 ```
 
@@ -17577,7 +17589,7 @@ def add_matrix(
             column_scales=dict(column_scales or {}),
         )
     )
-    logger.info(f"Added matrix: id='{id}', stratification='{stratification}'")
+    logger.debug(f"Added matrix: id='{id}', stratification='{stratification}'")
     return self
 ```
 
@@ -17683,7 +17695,7 @@ def add_parameter(
     self._parameters.append(
         Parameter(id=id, value=param_value, description=description, unit=unit)
     )
-    logger.info(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
+    logger.debug(f"Added parameter: id='{id}', value={value}, unit='{unit}'")
     return self
 ```
 
@@ -17939,7 +17951,7 @@ def add_transition(
             impulse_every=impulse_every,
         )
     )
-    logger.info(
+    logger.debug(
         (
             f"Added transition: id='{id}', source={source}, target={target}, "
             f"rate='{rate}', stratified_rates={
@@ -18213,7 +18225,15 @@ def build(
         origin=self._origin,
     )
 
-    logger.info(f"Model '{self._name}' successfully built for the {engine} engine.")
+    if logger.isEnabledFor(logging.INFO):
+        outputs = sum(
+            len(names) for names in structure.outputs_by_source(model).values()
+        )
+        logger.info(
+            f"Model '{self._name}' built for the {engine} engine: "
+            f"{len(self._bins)} bin(s), {len(self._parameters)} parameter(s), "
+            f"{len(self._transitions)} transition(s) and {outputs} output(s)."
+        )
 
     return model
 ```
@@ -38601,6 +38621,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- A method that runs for long logs each step it finishes, at `INFO`, on the logger of its module: each start of `Calibrator.run` (`commol`), each replicate of a bootstrap (`commol.resampling`), and each stage and side of a profile (`commol.profiles`), with the count done over the total, such as `Replicate 12 finished (37/100): loss 1.280412e3, converged`. The starts of a replicate log at `DEBUG`. An identifiability method logs its start and its end with its duration (`commol.identifiability`). A handler that raises an `Exception` loses its record, never the result. See [Log messages](https://munqu.github.io/commol/latest/getting-started/quickstart/#log-messages).
 - Every result writes itself to a JSON file with `to_json(file_path, indent=2)`, and its class reads it back with `from_json(file_path)`, as `Model` does: `CalibrationResult.from_json("fit.json")` returns a `CalibrationResult` equal to the result written. A result read back feeds the methods that take a result, such as `StartsIdentifiability(result=...)` and `Collinearity(at=...)`, and its sample draws the same members. A file whose fields do not fit the class raises `pydantic.ValidationError`; the file holds no name of its class, so a class with the same fields reads it. `SampleMethod` refuses a setting that is not finite, which JSON cannot hold. See [Saving a result](https://munqu.github.io/commol/latest/guide/calibration/#saving-a-result).
 - `ParticleSwarmConfig(polish=NelderMeadConfig(...))`: each start runs the swarm, then Nelder-Mead from the best point of the swarm of that start. The start ends at the point, the loss and the convergence of Nelder-Mead, `iterations` counts both stages and `termination_reason` is that of Nelder-Mead. Every fit of the problem polishes: the starts of `Calibrator.run`, which `StartsIdentifiability` reads, the refits of an uncertainty method and the subproblems of a profile. The `verbose` of the polish writes the table of Nelder-Mead. See [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#polish-with-nelder-mead).
 - `ObservedDataPoint(scale=...)`: a known positive number, 1 by default, that multiplies the prediction of the observation, with its factor. A count model reads the mean `scale · model`, so a count observed on a known share of the model output stays whole. The loss, the likelihood, the predictive, the scores, the figures, the `observed` block of a report (`scales`) and a `PredictionSpec(scale=...)` of a prediction profile read it. See [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#known-shares-scales).
@@ -38613,6 +38634,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+- **Breaking:** a build logs one `INFO` record, with the number of bins, parameters, transitions and outputs; the records of each bin, accumulator, stratification, matrix, parameter and transition of a `ModelBuilder` are at `DEBUG`. Set the logger `commol` to `DEBUG` to read them.
 - **Breaking:** with a `sample`, each entry of a report (`Model.applied_parameters`, `ModelStructure.report_sections`) holds its `EntrySpread` under the key `spread`, not `interval`. A report saved as JSON before this change has the key `interval`: read `spread`.
 - **Breaking:** the engine holds every rule of a calibration problem and of an uncertainty method, and Python holds no copy: each class sends its JSON to the engine when it is built and raises the message of the engine. A problem or a method written as JSON meets the same rules. Several messages change: two parameters with one id say `Two parameters have the id 'k'`, a loss with observation models says `not both`, a problem with neither says `There is no default`, and a list of names in a message is written as Rust writes it, `["k1"]`. See [Calibration](https://munqu.github.io/commol/latest/guide/calibration/#unknowns).
 - **Breaking:** a `CalibrationParameter` with a NaN bound, `max_bound` not above `min_bound`, or an `initial_guess` that is not finite or outside its bounds is refused by the engine too, so a problem in JSON can no longer calibrate a parameter of zero width. An infinite bound stays valid for a prior; every run of an optimizer refuses it with a message that names the parameter (before, a swarm panicked and Nelder-Mead named no parameter), and so do `StructuralRank` and `SampleIdentifiability(reference="bounds")`, which gave a contraction of 1 and the verdict `determined`. See [Infinite bounds](https://munqu.github.io/commol/latest/guide/calibration/#infinite-bounds).

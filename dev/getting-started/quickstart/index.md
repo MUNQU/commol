@@ -175,6 +175,8 @@ Simulation(model).run(num_steps=10)
 
 Each message shows its level and its logger, such as `INFO:commol:Running simulation for 10 steps.`
 
+At `INFO`, a method that runs for long tells where it is: a calibration logs each start when it ends, a bootstrap each replicate, and a profile each stage (the fit, the replicate fits, the refits of its threshold, the walk) and each side it walks. A record gives the count done over the total, such as `Replicate 12 finished (37/100): loss 1.280412e3, converged`, and no estimate of the time left. A build logs one record with the size of the model. `DEBUG` adds each element a builder adds and the starts of each replicate.
+
 | To                                                  | Call                                                                        |
 | --------------------------------------------------- | --------------------------------------------------------------------------- |
 | See the messages of every library                   | `logging.basicConfig(level=logging.INFO)`                                   |

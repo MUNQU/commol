@@ -3547,6 +3547,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/progress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Progress
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/figures/" class="md-nav__link">
         
   
@@ -5152,7 +5180,7 @@ that one problem.</p>
 </span><span id="__span-0-313"><a id="__codelineno-0-313" name="__codelineno-0-313"></a>            <span class="sa">f</span><span class="s2">&quot;algorithm, </span><span class="si">{</span><span class="n">measure</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="n">starts</span><span class="si">}</span><span class="s2"> start(s).&quot;</span>
 </span><span id="__span-0-314"><a id="__codelineno-0-314" name="__codelineno-0-314"></a>        <span class="p">)</span>
 </span><span id="__span-0-315"><a id="__codelineno-0-315" name="__codelineno-0-315"></a>        <span class="n">result</span> <span class="o">=</span> <span class="n">fit_result</span><span class="p">(</span>
-</span><span id="__span-0-316"><a id="__codelineno-0-316" name="__codelineno-0-316"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">_engine_problem</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">starts</span><span class="p">),</span>
+</span><span id="__span-0-316"><a id="__codelineno-0-316" name="__codelineno-0-316"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">_engine_problem</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">starts</span><span class="p">,</span> <span class="n">logger</span><span class="p">),</span>
 </span><span id="__span-0-317"><a id="__codelineno-0-317" name="__codelineno-0-317"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">parameter_names</span><span class="p">,</span>
 </span><span id="__span-0-318"><a id="__codelineno-0-318" name="__codelineno-0-318"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">seed</span><span class="p">,</span>
 </span><span id="__span-0-319"><a id="__codelineno-0-319" name="__codelineno-0-319"></a>            <span class="n">logger</span><span class="p">,</span>
@@ -6207,7 +6235,7 @@ start.</p>
 </span><span id="__span-0-313"><a id="__codelineno-0-313" name="__codelineno-0-313"></a>        <span class="sa">f</span><span class="s2">&quot;algorithm, </span><span class="si">{</span><span class="n">measure</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="n">starts</span><span class="si">}</span><span class="s2"> start(s).&quot;</span>
 </span><span id="__span-0-314"><a id="__codelineno-0-314" name="__codelineno-0-314"></a>    <span class="p">)</span>
 </span><span id="__span-0-315"><a id="__codelineno-0-315" name="__codelineno-0-315"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">fit_result</span><span class="p">(</span>
-</span><span id="__span-0-316"><a id="__codelineno-0-316" name="__codelineno-0-316"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_engine_problem</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">starts</span><span class="p">),</span>
+</span><span id="__span-0-316"><a id="__codelineno-0-316" name="__codelineno-0-316"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_engine_problem</span><span class="o">.</span><span class="n">optimize</span><span class="p">(</span><span class="n">starts</span><span class="p">,</span> <span class="n">logger</span><span class="p">),</span>
 </span><span id="__span-0-317"><a id="__codelineno-0-317" name="__codelineno-0-317"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">parameter_names</span><span class="p">,</span>
 </span><span id="__span-0-318"><a id="__codelineno-0-318" name="__codelineno-0-318"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">seed</span><span class="p">,</span>
 </span><span id="__span-0-319"><a id="__codelineno-0-319" name="__codelineno-0-319"></a>        <span class="n">logger</span><span class="p">,</span>

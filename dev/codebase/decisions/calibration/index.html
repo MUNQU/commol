@@ -3260,6 +3260,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../progress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Progress
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../figures/" class="md-nav__link">
         
   
@@ -4066,7 +4094,7 @@ sample a runner makes (<code>sample_method</code> in <code>resampling/runners.py
 <code>tests/calibration/test_starts.py</code>
 (<code>test_a_verbose_swarm_repeats_its_fit_from_the_seed</code>).</p>
 <h2 id="parallel-work-runs-in-the-pool-of-the-setting">Parallel work runs in the pool of the setting<a class="headerlink" href="#parallel-work-runs-in-the-pool-of-the-setting" title="Permanent link">&para;</a></h2>
-<p>Every binding that runs parallel work calls <code>parallel</code> (<code>py-commol/src/parallelism.rs</code>),
+<p>Every binding that runs parallel work calls <code>parallel</code> or <code>parallel_logged</code> (<code>py-commol/src/parallelism.rs</code>),
 which releases the GIL and runs the job in <code>Parallelism::install</code>
 (<code>crates/commol-core/src/parallelism.rs</code>): a <code>rayon</code> pool of the number of
 threads of <code>commol.parallelism.threads</code>, built at its first use and kept for the next job

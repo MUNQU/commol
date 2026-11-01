@@ -3227,6 +3227,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/progress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Progress
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/figures/" class="md-nav__link">
         
   
@@ -3860,6 +3888,10 @@ same result whatever you choose.</p>
 </tbody>
 </table>
 <p>One run of a model is never split: each thread runs whole runs.</p>
+<p>A method that logs its steps, such as a bootstrap, writes each record from
+the thread that called it, in the order the steps end, so a record carries
+the name and the <code>contextvars</code> of that thread. See
+<a href="../../getting-started/quickstart/#log-messages">Log messages</a>.</p>
 <h2 id="the-number-of-threads">The number of threads<a class="headerlink" href="#the-number-of-threads" title="Permanent link">&para;</a></h2>
 <p>Every parallel method runs in a pool of <code>n</code> threads that commol builds from
 the setting, and uses at most those threads, nested levels included. The

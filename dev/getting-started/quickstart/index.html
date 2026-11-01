@@ -3229,6 +3229,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/progress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Progress
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/figures/" class="md-nav__link">
         
   
@@ -4005,6 +4033,14 @@ logger once, at the start of your program:</p>
 </span></code></pre></div>
 <p>Each message shows its level and its logger, such as
 <code>INFO:commol:Running simulation for 10 steps.</code></p>
+<p>At <code>INFO</code>, a method that runs for long tells where it is: a calibration
+logs each start when it ends, a bootstrap each replicate, and a profile each
+stage (the fit, the replicate fits, the refits of its threshold, the walk)
+and each side it walks. A record gives the count done over the total, such
+as <code>Replicate 12 finished (37/100): loss 1.280412e3, converged</code>, and no
+estimate of the time left. A build logs one record with the size of the
+model. <code>DEBUG</code> adds each element a builder adds and the starts of each
+replicate.</p>
 <table>
 <thead>
 <tr>

@@ -283,7 +283,7 @@ class Calibrator:
             f"algorithm, {measure} and {starts} start(s)."
         )
         result = fit_result(
-            self._engine_problem.optimize(starts),
+            self._engine_problem.optimize(starts, logger),
             self.parameter_names,
             self.seed,
             logger,
@@ -778,7 +778,7 @@ def run(self, starts: int = 1) -> CalibrationResult:
         f"algorithm, {measure} and {starts} start(s)."
     )
     result = fit_result(
-        self._engine_problem.optimize(starts),
+        self._engine_problem.optimize(starts, logger),
         self.parameter_names,
         self.seed,
         logger,
