@@ -3,7 +3,7 @@
 
 use commol_calibration::{
     CalibrationParameter, CalibrationParameterType, CalibrationProblem, ForwardModel, LossConfig,
-    ObservedDataPoint,
+    ObservedDataPoint, ValueSource,
 };
 use commol_core::Model;
 use commol_difference::DifferenceEquations;
@@ -50,7 +50,15 @@ fn parameters() -> Vec<CalibrationParameter> {
 
 #[test]
 fn an_unobserved_model_runs_as_the_forward_model_of_a_problem() {
-    let unobserved = ForwardModel::unobserved(engine(), parameters(), None, None, None).unwrap();
+    let unobserved = ForwardModel::unobserved(
+        engine(),
+        parameters(),
+        None,
+        ValueSource::Varied,
+        None,
+        None,
+    )
+    .unwrap();
     let problem = CalibrationProblem::new(
         engine(),
         vec![ObservedDataPoint::new(1.0, "A".to_string(), 0.0)],
@@ -81,9 +89,16 @@ fn an_unobserved_model_has_no_factors_or_noise_parameters() {
         2.0,
     );
 
-    let error = ForwardModel::unobserved(engine(), vec![factor], None, None, None)
-        .err()
-        .unwrap();
+    let error = ForwardModel::unobserved(
+        engine(),
+        vec![factor],
+        None,
+        ValueSource::Varied,
+        None,
+        None,
+    )
+    .err()
+    .unwrap();
 
     assert!(error.contains("'f' is a factor"), "{error}");
     let noise = CalibrationParameter::with_type(
@@ -92,20 +107,29 @@ fn an_unobserved_model_has_no_factors_or_noise_parameters() {
         0.1,
         2.0,
     );
-    let error = ForwardModel::unobserved(engine(), vec![noise], None, None, None)
-        .err()
-        .unwrap();
+    let error =
+        ForwardModel::unobserved(engine(), vec![noise], None, ValueSource::Varied, None, None)
+            .err()
+            .unwrap();
     assert!(error.contains("'sigma' is a noise parameter"), "{error}");
 }
 
 #[test]
 fn an_unobserved_model_needs_parameters_and_replicates() {
-    let no_parameters = ForwardModel::unobserved(engine(), vec![], None, None, None)
-        .err()
-        .unwrap();
-    let no_replicates = ForwardModel::unobserved(engine(), parameters(), None, Some(0), None)
-        .err()
-        .unwrap();
+    let no_parameters =
+        ForwardModel::unobserved(engine(), vec![], None, ValueSource::Varied, None, None)
+            .err()
+            .unwrap();
+    let no_replicates = ForwardModel::unobserved(
+        engine(),
+        parameters(),
+        None,
+        ValueSource::Varied,
+        Some(0),
+        None,
+    )
+    .err()
+    .unwrap();
 
     assert_eq!(no_parameters, "Give at least one parameter to vary");
     assert_eq!(
@@ -116,12 +140,26 @@ fn an_unobserved_model_needs_parameters_and_replicates() {
 
 #[test]
 fn a_stochastic_engine_needs_replicates_and_a_seed() {
-    let no_replicates = ForwardModel::unobserved(stochastic(), parameters(), None, None, Some(7))
-        .err()
-        .unwrap();
-    let no_seed = ForwardModel::unobserved(stochastic(), parameters(), None, Some(3), None)
-        .err()
-        .unwrap();
+    let no_replicates = ForwardModel::unobserved(
+        stochastic(),
+        parameters(),
+        None,
+        ValueSource::Varied,
+        None,
+        Some(7),
+    )
+    .err()
+    .unwrap();
+    let no_seed = ForwardModel::unobserved(
+        stochastic(),
+        parameters(),
+        None,
+        ValueSource::Varied,
+        Some(3),
+        None,
+    )
+    .err()
+    .unwrap();
 
     assert!(no_replicates.contains("set replicates"), "{no_replicates}");
     assert!(no_seed.contains("set seed"), "{no_seed}");
@@ -129,7 +167,15 @@ fn a_stochastic_engine_needs_replicates_and_a_seed() {
 
 #[test]
 fn a_deterministic_engine_runs_once_whatever_the_replicates() {
-    let model = ForwardModel::unobserved(engine(), parameters(), None, Some(3), Some(7)).unwrap();
+    let model = ForwardModel::unobserved(
+        engine(),
+        parameters(),
+        None,
+        ValueSource::Varied,
+        Some(3),
+        Some(7),
+    )
+    .unwrap();
 
     assert!(model.replicates().is_none());
 }
@@ -143,17 +189,31 @@ fn an_unknown_initial_condition_gives_the_engine_message() {
         1.0,
     );
 
-    let error = ForwardModel::unobserved(engine(), vec![unknown], None, None, None)
-        .err()
-        .unwrap();
+    let error = ForwardModel::unobserved(
+        engine(),
+        vec![unknown],
+        None,
+        ValueSource::Varied,
+        None,
+        None,
+    )
+    .err()
+    .unwrap();
 
     assert!(error.contains('C'), "{error}");
 }
 
 #[test]
 fn the_replicates_of_an_unobserved_model_are_seeded_from_its_seed() {
-    let model =
-        ForwardModel::unobserved(stochastic(), parameters(), None, Some(3), Some(7)).unwrap();
+    let model = ForwardModel::unobserved(
+        stochastic(),
+        parameters(),
+        None,
+        ValueSource::Varied,
+        Some(3),
+        Some(7),
+    )
+    .unwrap();
 
     let seeds = &model.replicates().unwrap().seeds;
 
@@ -163,7 +223,15 @@ fn the_replicates_of_an_unobserved_model_are_seeded_from_its_seed() {
 
 #[test]
 fn observations_of_an_unknown_output_name_it() {
-    let model = ForwardModel::unobserved(engine(), parameters(), None, None, None).unwrap();
+    let model = ForwardModel::unobserved(
+        engine(),
+        parameters(),
+        None,
+        ValueSource::Varied,
+        None,
+        None,
+    )
+    .unwrap();
 
     let error = model
         .with_observations(&[ObservedDataPoint::new(1.0, "C".to_string(), 0.0)])

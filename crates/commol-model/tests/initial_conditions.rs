@@ -72,6 +72,10 @@ impl FrozenEngine {
 }
 
 impl SimulationEngine for FrozenEngine {
+    fn check_varied_values(&self, _values: &[commol_core::ModelValue]) -> Result<(), String> {
+        Ok(())
+    }
+
     commol_model::delegate_to_compiled_model!();
 
     fn check_position(&self, _position: f64) -> Result<(), String> {
