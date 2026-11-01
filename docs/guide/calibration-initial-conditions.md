@@ -217,4 +217,4 @@ its complement the rest, in every split of a stratification whose fractions
 |---|---|
 | The rules of initial conditions | [Building Models](building-models.md#the-structure-aggregate) |
 | Reporting fitted initial conditions | [Reports](reports.md) |
-| The design behind this page | [Initial conditions](../codebase/decisions/initial-conditions.md) |
+| The design behind this page | [Calibrated initial conditions](../codebase/decisions/calibrated-initial-conditions.md) |
