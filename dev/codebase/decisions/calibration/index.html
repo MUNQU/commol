@@ -18,7 +18,7 @@
         <link rel="prev" href="../engines/">
       
       
-        <link rel="next" href="../settings/">
+        <link rel="next" href="../observations/">
       
       
         
@@ -2899,28 +2899,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#one-observation-operator" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        One observation operator
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-known-scale-is-a-number-of-the-observation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A known scale is a number of the observation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#constraints-bound-the-support" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2968,6 +2946,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../observations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3770,28 +3776,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#one-observation-operator" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        One observation operator
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-known-scale-is-a-number-of-the-observation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A known scale is a number of the observation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#constraints-bound-the-support" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3857,7 +3841,7 @@
 
 <h1 id="calibration">Calibration<a class="headerlink" href="#calibration" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
-<p>What weights, bounds, the observation operator and constraints mean in a calibration, and how its work runs in parallel. How the optimizers search is on <a href="../optimizers/">Optimizers</a>.</p>
+<p>What weights, bounds and constraints mean in a calibration, and how its work runs in parallel. How an observation reads a run is on <a href="../observations/">Observations</a>; how the optimizers search is on <a href="../optimizers/">Optimizers</a>.</p>
 <h2 id="one-meaning-of-an-observation-weight">One meaning of an observation weight<a class="headerlink" href="#one-meaning-of-an-observation-weight" title="Permanent link">&para;</a></h2>
 <p><code>LossConfig::term</code> and <code>LossConfig::finish</code> in
 <code>crates/commol-calibration/src/types.rs</code> compute every loss: <code>sse</code> is
@@ -3934,83 +3918,6 @@ are checked by <code>CalibrationProblem::new</code> alone, and Python passes eac
 message with no prefix.</p>
 <p><strong>Guards:</strong> <code>crates/commol-model/tests/parameters.rs</code>,
 <code>tests/calibration/test_problem.py::TestProblemAgainstTheModel</code>.</p>
-<h2 id="one-observation-operator">One observation operator<a class="headerlink" href="#one-observation-operator" title="Permanent link">&para;</a></h2>
-<p><code>ObservationOperator</code> (<code>crates/commol-calibration/src/observation.rs</code>) is the
-only code of the engine that turns a run into observed quantities: the row of
-each observation, the sum of its outputs, its increment over its window, its
-scale and its factor. The loss, the predictions of <code>PyCalibrationProblem</code>, the
-predictive's <code>at_observations</code> and every score read it, and the figures of a
-predictive read a series with a window, a factor or a scale through it. The
-figures of a run and of its replicates have no problem to read, and repeat
-its rules in Python (<a href="#a-known-scale-is-a-number-of-the-observation">A known scale is a number of the
-observation</a>).
-The calibration problem is split into one layer per job, each in its own
-module: <code>ForwardModel</code> (<code>forward.rs</code>) is the only code that clones, resets,
-writes values to or runs the engine; <code>Feasibility</code> (<code>feasibility.rs</code>) checks
-bounds and constraints; <code>Discrepancy</code> (<code>discrepancy.rs</code>) compares predictions
-with data; <code>OptimizationObjective</code> (<code>objective.rs</code>) is the argmin cost
-function. <code>CalibrationProblem</code> holds them, is built once and has no interior
-mutability; the buffers of an evaluation are a <code>Workspace</code> per thread.</p>
-<p><strong>Rule:</strong> Python never transforms a prediction of a calibration problem or of
-a sample: their windows, sums, factors, normalization, quantiles and scores
-come from Rust. <code>Calibrator</code> builds the Rust problem once
-(<code>commol_rs.inference.CalibrationProblem</code>) and every call reads it. The
-helpers that present results already computed, such as <code>windowed_totals</code>
-(<code>_simulation/windows.py</code>) for a run or its replicates, are not predictions; they
-read the rules of the operator through bindings (<code>index_at</code> and
-<code>window_increments</code> of <code>observation.rs</code>), which
-<code>tests/simulation/test_windows.py::TestAgreementWithTheCalibrationLoss</code> and
-<code>tests/simulation/test_windows.py::test_windowed_totals_equal_the_prediction_of_a_windowed_observation</code>
-check.</p>
-<p>An observation is given by <code>at</code> and <code>window</code>, so its window starts at
-<code>at − window</code> (<code>observation::window_start</code>), read as 0 when
-<code>|at − window|</code> is at most <code>1e-9</code> times the larger of <code>|at|</code>, <code>window</code> and 1:
-the rounding of the subtraction grows with its operands, and <code>same_position</code>
-near 0 loses that scale, so a window of <code>1000 + 1e-7</code> has one verdict whether
-it ends at 1000 or at 2000. <code>check_positions</code>, <code>schedule_of</code>, the windows of a
-quantity, <code>window_increments</code> and the checks of Python (<code>ObservedDataPoint</code>,
-<code>Increments</code>, through the binding) read this one rule. A quantity given by its start, <code>Gain(start, end)</code>, passes the
-start itself (<code>ObservationOperator::with_starts</code>): <code>end − (end − start)</code> can
-round away from <code>start</code>, as <code>0.4 − (0.4 − 0.1)</code> is <code>0.09999999999999998</code>.
-The operator finds the row of each position and of each start with the
-tolerance of the axis (<code>observation::index_at</code>: equal within <code>1e-9</code> of the
-larger of their magnitudes and 1), so a start computed as <code>at − window</code>
-(<code>window_start</code>) reads the row of the position it rounds away from. Results
-read a position with the same <code>index_at</code>.</p>
-<p><strong>Guards:</strong> <code>observation::tests</code>,
-<code>crates/commol-calibration/tests/test_positions.rs::a_window_that_starts_at_zero_within_the_rounding_of_its_end_is_accepted</code>,
-<code>tests/calibration/test_observations.py::TestPositionsAndEngines::test_a_window_that_starts_at_zero_within_its_rounding_is_calibrated</code>,
-<code>crates/commol-inference/tests/test_predictive.rs::observation_draws_are_the_predictions_the_loss_compares</code>,
-<code>tests/uncertainty/test_predictive.py::TestObservations</code>,
-<code>crates/commol-inference/tests/test_global_sensitivity.rs::a_gain_reads_its_start_exactly</code>,
-<code>tests/uncertainty/test_propagation.py::TestPropagation::test_a_gain_reads_its_start_exactly</code>.</p>
-<h2 id="a-known-scale-is-a-number-of-the-observation">A known scale is a number of the observation<a class="headerlink" href="#a-known-scale-is-a-number-of-the-observation" title="Permanent link">&para;</a></h2>
-<p>A known share of the model output that an observation sees, such as the
-share of the units that report, is <code>ObservedDataPoint.scale</code> (1 by default),
-or the <code>scale</code> of a <code>PredictionSpec</code>. The operator multiplies the prediction
-by it with the factor, so every reader in the engine (the loss, the
-predictive, the scores, the profiles) applies it with no code of its own. The
-figures of a <code>SimulationResults</code> and of its replicates have no calibration
-problem to read: they repeat scale times factor in Python (<code>model_multiplier</code>
-of <code>plotting/panels.py</code>). The cumulative figures of a run, of its replicates
-and of a predictive divide each observation by it in Python, a predictive with
-the weighted median of the factor; a predictive checks the factors of its
-observations in the engine first, with no run
-(<code>ForwardModel::with_observations</code>, the binding <code>check_observations</code>). A
-target that copies the first observation of its series (conformal <code>targets</code>,
-the dense design of finite differences) keeps its scale. Not a <code>factor</code> with
-equal bounds: <code>CalibrationParameter</code> refuses them, and a parameter that
-nothing fits would enter every method that reads the parameter vector. Not a
-scale of the series: <code>factor_id</code>, <code>window</code> and <code>trials</code> change by
-observation, and a loss has no observation model.</p>
-<p><strong>Guards:</strong> <code>observation::tests::a_scale_and_a_factor_multiply</code>,
-<code>tests/calibration/test_observations.py::test_an_observation_reads_the_model_times_its_scale</code>,
-<code>tests/uncertainty/test_profiles.py::TestPredictionProfiles::test_a_prediction_profile_reads_the_scale_of_its_prediction</code>,
-<code>tests/plotting/test_figures.py::TestObservationOperator::test_a_scale_multiplies_the_line_and_each_point_of_its_own</code>,
-<code>tests/plotting/test_run_figures.py::TestRunFigures::test_cumulative_observations_are_divided_by_their_scale</code>,
-<code>tests/plotting/test_figures.py::TestObservationOperator::test_a_missing_factor_warns_once_per_factor</code>,
-<code>tests/plotting/test_figures.py::TestObservationOperator::test_a_predictive_refuses_a_factor_the_problem_lacks</code>,
-<code>tests/plotting/test_figures.py::TestObservationOperator::test_a_predictive_cumulative_figure_runs_no_draw_to_check_a_factor</code>.</p>
 <h2 id="constraints-bound-the-support">Constraints bound the support<a class="headerlink" href="#constraints-bound-the-support" title="Permanent link">&para;</a></h2>
 <p>A point is feasible, or it violates the problem by an amount: a bound, a
 constraint, an infeasible start or run, a value that is not finite, or a

@@ -2807,6 +2807,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/observations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/settings/" class="md-nav__link">
         
   
@@ -5176,6 +5204,15 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li><code>ObservedDataPoint(outputs=[...], coefficients=[...])</code>: one known
+  coefficient per output, so the observation predicts the weighted sum
+  <code>Σ coefficient · output</code>, then times its scale and its factor. A count
+  model reads that sum as one count. Each coefficient is finite and 0 or
+  more, and one is above 0; <code>coefficients</code> with <code>output</code> is refused. The
+  loss, the likelihood, the predictive, the figures, the <code>observed</code> block of
+  a report (<code>coefficients</code>), the noise floor of a profile and the dense design
+  of finite differences read them. See
+  <a href="../../guide/calibration-observations/#weighted-sums">Weighted sums</a>.</li>
 <li>A method that runs for long logs each step it finishes, at <code>INFO</code>, on the
   logger of its module: each start of <code>Calibrator.run</code> (<code>commol</code>), each
   replicate of a bootstrap (<code>commol.resampling</code>), and each stage and side of

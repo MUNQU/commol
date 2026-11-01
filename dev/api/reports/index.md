@@ -596,6 +596,7 @@ class ObservedSeries(TypedDict):
     weights: NotRequired[list[float | None]]
     scales: NotRequired[list[float | None]]
     outputs: NotRequired[list[str]]
+    coefficients: NotRequired[list[float]]
     factor_id: NotRequired[str]
 ```
 

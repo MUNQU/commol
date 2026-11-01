@@ -4,16 +4,16 @@
 
 Calibration finds the parameter values (and, if you want, initial conditions and the factors of observations) that make a model reproduce observed data. You describe the observations and the unknowns in a `CalibrationProblem`, and a `Calibrator` runs an optimizer in the Rust engine.
 
-| Topic                                                                      | Page                                                                                                                  |
-| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| The workflow, the problem, losses and results                              | This page                                                                                                             |
-| Maximum likelihood with a model of the noise of each series                | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md)             |
-| Calibrating initial conditions                                             | [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md) |
-| Several outputs, aggregates, weights, factors, known scales, windowed data | [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md)                         |
-| Nelder-Mead and particle swarm settings                                    | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md)                             |
-| Relations the result must respect                                          | [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/index.md)                           |
-| Reports of a calibrated model and run                                      | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                                               |
-| Samples, predictive bands and scores                                       | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)                                       |
+| Topic                                                                                     | Page                                                                                                                  |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| The workflow, the problem, losses and results                                             | This page                                                                                                             |
+| Maximum likelihood with a model of the noise of each series                               | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md)             |
+| Calibrating initial conditions                                                            | [Calibrating Initial Conditions](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/index.md) |
+| Several outputs, aggregates, weighted sums, weights, factors, known scales, windowed data | [Observations](https://munqu.github.io/commol/latest/guide/calibration-observations/index.md)                         |
+| Nelder-Mead and particle swarm settings                                                   | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/index.md)                             |
+| Relations the result must respect                                                         | [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/index.md)                           |
+| Reports of a calibrated model and run                                                     | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                                               |
+| Samples, predictive bands and scores                                                      | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)                                       |
 
 ## Quick path
 

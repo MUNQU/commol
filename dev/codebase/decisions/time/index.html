@@ -2958,6 +2958,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../observations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../settings/" class="md-nav__link">
         
   
@@ -3960,7 +3988,7 @@ impulse step and restarts from the new state, so <code>diffsol</code> needs no e
 <code>output(at) - output(at - W)</code>, anchored at its own position. The Rust loss and
 <code>windowed_totals</code> (<code>_simulation/windows.py</code>) give the same number from one rule
 (<code>window_increments</code>), and the predictive reads windows through the observation operator
-(<a href="../calibration/#one-observation-operator">One observation operator</a>). Window <code>w</code>
+(<a href="../observations/#one-observation-operator">One observation operator</a>). Window <code>w</code>
 covers <code>(w · W, (w + 1) · W]</code>; <code>window_index</code> places a position with
 <code>max(ceil(at / W) − 1, 0)</code>, and the <code>observed</code> block of a report (<code>_observed_report</code> in <code>_simulation/reports.py</code>) calls it.
 <code>plot.series</code> of results reads the model of a windowed observation the
