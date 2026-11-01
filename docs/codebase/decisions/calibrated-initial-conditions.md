@@ -125,25 +125,26 @@ A method says where the numbers of its values come from
 (`ValueSource` of `crates/commol-calibration/src/values.rs`): it varies them,
 such as an optimizer or a sampler, or it writes numbers it knows, such as the
 draws of a sample. A varied source builds its writer with `ValueWriter::varied`:
-after the plan resolves the values, the writer asks the engine whether it takes
-every number of them (`SimulationEngine::check_varied_values`, a required
-method, so a new engine states its answer). `StochasticEvents` and
-`StochasticSteps` answer through `Units`: with no `rounding`, they refuse an
+it asks the engine whether it takes every number of the values of the plan
+(`SimulationEngine::check_varied_values`, a required method that takes the
+plan, so the values are resolved first and a new engine states its answer).
+`StochasticEvents` and `StochasticSteps` answer through `Units`: with no `rounding`, they refuse an
 initial condition, whatever its bounds, and the message names it and the two
 roundings. The deterministic engines take every number.
 
 | Builder | Source |
 |---|---|
 | `CalibrationProblem::new`, `with_initial_condition_remainder`, `check_model_values` | Varied |
-| `ForwardModel::unobserved` | Its argument: `SensitivityAnalysis::new` passes varied for independent inputs, and known (the first draw) for a sample, which is the design of the analysis |
+| `ForwardModel::unobserved` | Its argument: `ForwardAnalysis::new` passes varied for independent inputs, and known (every draw) for a sample, which is the design of the analysis |
 | `configured_engine` (the write-back of `Model.apply_calibration_parameters`), `plan_model_values` | Known (`ValueWriter::known`): the engine checks each number when it writes it (`Units::set_initial_condition`) |
 
-A builder then writes the first numbers of its source to a copy of the engine
-and checks that no value is missing (`ValueWriter::check_written`): for a
-varied source, the point of the bounds of each value nearest 0, which is whole
-when 0 is within the bounds or the bound nearest 0 is whole, so it does not
-show that every number is taken; for a known source, its first numbers, which
-the method writes.
+A builder then writes numbers of its source to a copy of the engine and checks
+that no value is missing (`ValueWriter::check_written`, before the replicates
+and the seed of `ForwardModel::unobserved`). A varied source writes the point
+of the bounds of each value nearest 0, which is whole when 0 is within the
+bounds or the bound nearest 0 is whole, so it does not show that every number
+is taken. A known source writes each of its sets, so every draw of a sample is
+checked when the analysis is built, and the message names its set.
 
 | Alternative | Why not |
 |---|---|
@@ -160,5 +161,6 @@ the method writes.
 `tests/stochastic/test_calibration.py::test_every_initial_condition_that_varies_needs_a_rounding`,
 `tests/stochastic/test_calibration.py::test_an_analysis_that_varies_an_amount_needs_a_rounding`,
 `tests/stochastic/test_calibration.py::test_an_analysis_of_a_sample_writes_its_draws_as_known_amounts`,
+`tests/stochastic/test_calibration.py::test_every_draw_of_a_sample_is_checked_when_the_analysis_is_built`,
 `tests/stochastic/test_calibration.py::test_a_known_amount_is_written_back_when_it_is_whole`,
 `tests/stochastic/test_calibration.py::test_a_calibrated_amount_with_a_rounding_is_calibrated`.

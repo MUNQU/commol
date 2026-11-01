@@ -639,8 +639,8 @@ enum Change {
 impl commol_core::SimulationEngine for StochasticEvents {
     commol_model::delegate_to_compiled_model!(except set_parameter);
 
-    fn check_varied_values(&self, values: &[commol_core::ModelValue]) -> Result<(), String> {
-        self.units.check_varied_values(values)
+    fn check_varied_values(&self, plan: &Self::ValuePlan) -> Result<(), String> {
+        self.units.check_varied_values(plan)
     }
 
     fn check_position(&self, position: f64) -> Result<(), String> {

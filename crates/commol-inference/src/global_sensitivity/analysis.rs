@@ -64,10 +64,10 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
     /// [`MethodError::Invalid`] when the inputs are not the parameters, in
     /// order and with their bounds, or as [`ForwardModel::unobserved`], which
     /// refuses a stochastic engine with no replicates or no seed, independent
-    /// inputs of which the engine does not take every number, and a model
-    /// that lacks a value once the first numbers are written (the point of
-    /// each bound nearest 0 for independent inputs, the first draw of a
-    /// sample).
+    /// inputs of which the engine does not take every number, a draw of a
+    /// sample with a number the engine rejects, and a model that lacks a
+    /// value once the numbers are written (the point of each bound nearest 0
+    /// for independent inputs, every draw of a sample).
     pub fn new(
         engine: E,
         parameters: Vec<CalibrationParameter>,
@@ -93,7 +93,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         // writes; independent inputs are varied.
         let source = match &inputs {
             InputSpace::Independent(_) => ValueSource::Varied,
-            InputSpace::Sample(sample) => ValueSource::Known(&sample.values()[0]),
+            InputSpace::Sample(sample) => ValueSource::Known(sample.values()),
         };
         let forward = ForwardModel::unobserved(
             engine,

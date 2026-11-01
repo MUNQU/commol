@@ -214,7 +214,7 @@ impl IntegerStepper for DifferenceEquations {
 
 impl commol_core::SimulationEngine for DifferenceEquations {
     // A deterministic engine takes every number within the bounds.
-    fn check_varied_values(&self, _values: &[commol_core::ModelValue]) -> Result<(), String> {
+    fn check_varied_values(&self, _plan: &Self::ValuePlan) -> Result<(), String> {
         Ok(())
     }
 

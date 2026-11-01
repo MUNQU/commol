@@ -198,8 +198,8 @@ moves to another bin, such as from a concentration to a count:
 
 The engine rounds at the start of a run, not when it is built, so a value that
 calibration writes (`InitialConditionPlan`) goes through the same rounding, and
-`"random"` draws after the values are written. With no rounding, a known value that is not whole is refused when it is written, and a method that varies an
-initial condition is refused when it is built ([Calibrated initial conditions](calibrated-initial-conditions.md#whole-units-need-a-rounding-to-vary-an-initial-condition)).
+`"random"` draws after the values are written. With no rounding, a value that
+is not whole is refused, and a method that varies an initial condition is refused when it is built ([Calibrated initial conditions](calibrated-initial-conditions.md#whole-units-need-a-rounding-to-vary-an-initial-condition)).
 
 | Alternative | Why not |
 |---|---|

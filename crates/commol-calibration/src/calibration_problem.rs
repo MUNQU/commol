@@ -126,8 +126,9 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     /// rejects, an observation names an unknown output or factor, a factor
     /// has a bound at or below 0, the engine does not resolve a value of its
     /// model kind or does not take every number of one
-    /// ([`SimulationEngine::check_varied_values`]), a constraint is invalid, or the observation models do not
-    /// fit the observations and parameters ([`crate::Likelihood::new`]).
+    /// ([`SimulationEngine::check_varied_values`]), a constraint is invalid,
+    /// or the observation models do not fit the observations and parameters
+    /// ([`crate::Likelihood::new`]).
     pub fn new(
         base_engine: E,
         observed_data: Vec<ObservedDataPoint>,

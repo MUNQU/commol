@@ -48,7 +48,7 @@ impl ValuePlan for StartPlan {
 }
 
 impl SimulationEngine for StartEngine {
-    fn check_varied_values(&self, _values: &[commol_core::ModelValue]) -> Result<(), String> {
+    fn check_varied_values(&self, _plan: &Self::ValuePlan) -> Result<(), String> {
         Ok(())
     }
 

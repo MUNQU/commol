@@ -73,10 +73,10 @@ class SensitivityAnalysis:
         ------
         ValueError
             If an input is not a value of the model, the model lacks a value
-            once the first numbers of the design are written, the engine does
-            not take every number of an independent input (an
-            ``initial_condition`` on an engine of whole units with no
-            rounding), the engine rejects the first draw of a sample, the
+            once the point of the bounds nearest 0 or the draws of a sample
+            are written, the engine does not take every number of an
+            independent input (an ``initial_condition`` on an engine of whole
+            units with no rounding), the engine rejects a draw of a sample, the
             replicates or the seed do not fit the engine, `replicates` is
             below 1 (a negative number included), or the seed is not a whole
             number from 0 to ``2**64 - 1``.
@@ -85,8 +85,9 @@ class SensitivityAnalysis:
         self.inputs: InputSpace = inputs
         self.replicates: int | None = replicates
         # The engine checks the values: it resolves them, refuses independent
-        # inputs of which it does not take every number, and writes the
-        # first numbers of the design to check that no value is missing.
+        # inputs of which it does not take every number, and writes the point
+        # of the bounds nearest 0, or every draw of a sample, to check that it
+        # takes them and that no value is missing.
         self._rust: "ForwardAnalysisProtocol" = commol_rs.inference.ForwardAnalysis(
             simulation.engine,
             engine_json(inputs),

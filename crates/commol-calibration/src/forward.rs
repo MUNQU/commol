@@ -96,8 +96,9 @@ impl<E: SimulationEngine> ForwardModel<E> {
     /// empty: it runs at the positions it is given ([`Self::run_at`]).
     ///
     /// `source` says whether the method varies the values or writes numbers
-    /// it knows. The first numbers of `source` are written to a copy of the
-    /// engine, which checks that the model then has every value a run needs.
+    /// it knows. The numbers of `source` are written to a copy of the engine
+    /// ([`ValueSource`]), which checks that the model then has every value a
+    /// run needs, before the replicates and the seed are checked.
     ///
     /// # Errors
     ///
@@ -108,8 +109,8 @@ impl<E: SimulationEngine> ForwardModel<E> {
     /// value of its model kind or the remainder, a varied source has a value
     /// of which the engine does not take every number
     /// ([`SimulationEngine::check_varied_values`]), the engine rejects a
-    /// first number, or a value is missing once they are written
-    /// ([`SimulationEngine::check_values`]).
+    /// number of a known source, or a value is missing once they are
+    /// written ([`SimulationEngine::check_values`]).
     pub fn unobserved(
         base_engine: E,
         parameters: Vec<CalibrationParameter>,
@@ -119,6 +120,8 @@ impl<E: SimulationEngine> ForwardModel<E> {
         seed: Option<u64>,
     ) -> Result<Self, String> {
         check_unobserved(&parameters)?;
+        let values = ValueWriter::of_source(&base_engine, &parameters, remainder, source)?;
+        values.check_written(&base_engine, &parameters, source)?;
         if let Some(count) = replicates {
             crate::ranges::REPLICATES.check(count)?;
         }
@@ -140,8 +143,6 @@ impl<E: SimulationEngine> ForwardModel<E> {
         } else {
             None
         };
-        let values = ValueWriter::of_source(&base_engine, &parameters, remainder, source)?;
-        values.check_written(&base_engine, &parameters, source)?;
         let observation =
             ObservationOperator::new(&[], &parameters, &base_engine.output_names(), &[])?;
         let mut model = Self::new(base_engine, parameters, values, Vec::new(), observation);

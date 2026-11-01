@@ -68,7 +68,7 @@ impl ValuePlan for NoPlan {
 }
 
 impl SimulationEngine for Curve {
-    fn check_varied_values(&self, _values: &[commol_core::ModelValue]) -> Result<(), String> {
+    fn check_varied_values(&self, _plan: &Self::ValuePlan) -> Result<(), String> {
         Ok(())
     }
 

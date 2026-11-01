@@ -80,22 +80,31 @@ fn known_values_are_checked_when_they_are_written() {
 }
 
 #[test]
-fn a_forward_model_of_known_values_writes_its_first_numbers() {
-    let known = |numbers: &[f64]| {
+fn a_forward_model_of_known_values_checks_every_set_before_any_run() {
+    let known = |sets: &[Vec<f64>]| {
         ForwardModel::unobserved(
             whole_only(),
             amount_of_b(),
             None,
-            ValueSource::Known(numbers),
+            ValueSource::Known(sets),
             Some(2),
             Some(7),
         )
     };
 
-    let not_whole = known(&[12.3]).err().unwrap();
-    let too_few = known(&[]).err().unwrap();
+    let second_not_whole = known(&[vec![10.0], vec![12.3]]).err().unwrap();
+    let too_few = known(&[vec![10.0], vec![]]).err().unwrap();
+    let none = known(&[]).err().unwrap();
 
-    assert!(known(&[12.0]).is_ok());
-    assert!(not_whole.contains("12.3 is not whole"), "{not_whole}");
-    assert_eq!(too_few, "Expected 1 known values, one per parameter, got 0");
+    assert!(known(&[vec![10.0], vec![12.0]]).is_ok());
+    assert!(
+        second_not_whole.starts_with("Parameter set 1: ")
+            && second_not_whole.contains("12.3 is not whole"),
+        "{second_not_whole}"
+    );
+    assert_eq!(
+        too_few,
+        "Parameter set 1 needs one number per parameter (1), got 0"
+    );
+    assert_eq!(none, "A known source needs a set of numbers");
 }

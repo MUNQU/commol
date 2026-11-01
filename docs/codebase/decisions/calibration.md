@@ -64,9 +64,9 @@ parameter to calibrate, and rejects any other id
 the model does not have, or a formula or a series parameter, which the model
 writes again at each evaluation, so a value set on it is lost. A calibration
 or any method on `ForwardModel` sets each parameter on a copy of the engine
-when it is built (`ValueWriter::new` in `crates/commol-calibration/src/values.rs`),
+when it is built (`ValueWriter::known` in `crates/commol-calibration/src/values.rs`),
 so the engine's message reaches the user before any run, and Python checks no
-parameter id (`check_values` in `_calibration/calibrator.py`). `ValueWriter::new` also
+parameter id (`check_values` in `_calibration/calibrator.py`). `ValueWriter::known` also
 checks that a factor has positive bounds, the observed outputs and positions
 are checked by `CalibrationProblem::new` alone, and Python passes each
 message with no prefix.

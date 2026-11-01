@@ -216,27 +216,37 @@ def test_an_analysis_that_varies_an_amount_needs_a_rounding() -> None:
     assert str(error.value) == _needs_a_rounding("StochasticSteps")
 
 
-def _sample_of_b(draws: list[float]) -> InputSpace:
-    """The initial amount of bin B, from a sample of ``draws``."""
+def _sample_of_b(draws: list[float], low: float = 0.0) -> InputSpace:
+    """The initial amount of bin B in ``[low, 50]``, from a sample of ``draws``."""
     sample = ParameterSample.equally_weighted(
-        ["B"], [(0.0, 50.0)], [[draw] for draw in draws], SampleMethod(name="grid")
+        ["B"], [(low, 50.0)], [[draw] for draw in draws], SampleMethod(name="grid")
     )
     return InputSpace.from_sample(
-        sample, [bounded("B", 0.0, 50.0, kind="initial_condition")]
+        sample, [bounded("B", low, 50.0, kind="initial_condition")]
     )
 
 
-def test_an_analysis_of_a_sample_writes_its_draws_as_known_amounts() -> None:
+@pytest.mark.parametrize("low", [0.0, 0.5])
+def test_an_analysis_of_a_sample_writes_its_draws_as_known_amounts(
+    low: float,
+) -> None:
     simulation = Simulation(build_stochastic(a_to_b_builder(), "StochasticSteps"))
     analysis = SensitivityAnalysis(
-        simulation, _sample_of_b([10.0, 20.0, 30.0]), replicates=2, seed=1
+        simulation, _sample_of_b([10.0, 20.0, 30.0], low), replicates=2, seed=1
     )
 
     result = analysis.run(Propagation(quantities=[ValueAt(series="B", at=0)]))
 
     assert [run[0] for run in result.values] == [10.0, 10.0, 20.0, 20.0, 30.0, 30.0]
-    with pytest.raises(ValueError, match=r"12\.3 is not whole"):
-        SensitivityAnalysis(simulation, _sample_of_b([12.3]), replicates=2, seed=1)
+
+
+def test_every_draw_of_a_sample_is_checked_when_the_analysis_is_built() -> None:
+    simulation = Simulation(build_stochastic(a_to_b_builder(), "StochasticSteps"))
+
+    with pytest.raises(ValueError, match=r"^Parameter set 1: .*12\.3 is not whole"):
+        SensitivityAnalysis(
+            simulation, _sample_of_b([10.0, 12.3]), replicates=2, seed=1
+        )
 
 
 def test_a_known_amount_is_written_back_when_it_is_whole() -> None:

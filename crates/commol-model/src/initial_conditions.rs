@@ -299,6 +299,11 @@ impl InitialConditionPlan {
         Ok(self)
     }
 
+    /// The id of each value, in the order their numbers come.
+    pub fn ids(&self) -> impl Iterator<Item = &str> {
+        self.targets.iter().map(|(id, _)| id.as_str())
+    }
+
     /// Compartments whose amount a calibrated bin or compartment value, or
     /// the remainder, sets, in engine order. Category splits keep the pair
     /// totals, so they cover none.

@@ -1,8 +1,8 @@
 //! What `StochasticEvents` and `StochasticSteps` share: the generator, whole
 //! units and their start, and impulses that move whole units.
 
-use commol_core::{EngineType, ModelValue, ModelValueType, Rounding, SimulationError};
-use commol_model::{CompiledModel, as_whole, rounded};
+use commol_core::{EngineType, Rounding, SimulationError};
+use commol_model::{CompiledModel, InitialConditionPlan, as_whole, rounded};
 use commol_random::{Generator, sample};
 
 /// The compiled model of a stochastic engine, its generator and its state of
@@ -113,7 +113,8 @@ impl Units {
     }
 
     /// Check that the engine takes every number that a method which varies
-    /// `values` can write ([`commol_core::SimulationEngine::check_varied_values`]).
+    /// the values of `plan` can write
+    /// ([`commol_core::SimulationEngine::check_varied_values`]).
     ///
     /// A method that varies an initial condition, such as an optimizer,
     /// writes amounts that are not whole, so it needs a rounding, whatever
@@ -123,20 +124,13 @@ impl Units {
     ///
     /// Returns a message that names the first initial condition and the
     /// roundings when the settings name no rounding.
-    pub(crate) fn check_varied_values(&self, values: &[ModelValue]) -> Result<(), String> {
-        if self.rounding.is_some() {
-            return Ok(());
-        }
-        let initial_condition = values
-            .iter()
-            .find(|value| value.value_type == ModelValueType::InitialCondition);
-        match initial_condition {
-            Some(value) => Err(self.needs_a_rounding(&format!(
-                "a method that varies the initial condition '{}' can write amounts that \
-                 are not whole",
-                value.id
+    pub(crate) fn check_varied_values(&self, plan: &InitialConditionPlan) -> Result<(), String> {
+        match (self.rounding, plan.ids().next()) {
+            (None, Some(id)) => Err(self.needs_a_rounding(&format!(
+                "a method that varies the initial condition '{id}' can write amounts that \
+                 are not whole"
             ))),
-            None => Ok(()),
+            _ => Ok(()),
         }
     }
 

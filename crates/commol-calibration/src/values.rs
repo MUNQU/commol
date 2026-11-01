@@ -48,8 +48,9 @@ pub enum ValueSource<'a> {
     /// within the bounds of each value.
     Varied,
     /// A method writes numbers it knows, such as the draws of a sample:
-    /// the first numbers it writes, one per parameter in problem order.
-    Known(&'a [f64]),
+    /// every set of numbers it writes, each with one number per parameter
+    /// in problem order.
+    Known(&'a [Vec<f64>]),
 }
 
 /// How the values of a set of calibration parameters reach an engine.
@@ -122,7 +123,7 @@ impl<E: SimulationEngine> ValueWriter<E> {
         remainder: Option<&str>,
     ) -> Result<Self, String> {
         let writer = Self::known(engine, parameters, remainder)?;
-        engine.check_varied_values(&model_values(parameters).1)?;
+        engine.check_varied_values(&writer.plan)?;
         Ok(writer)
     }
 
@@ -143,41 +144,51 @@ impl<E: SimulationEngine> ValueWriter<E> {
         }
     }
 
-    /// Write the first numbers of `source` to a copy of the engine and check
-    /// that the model then has every value a run needs
+    /// Write the numbers of `source` to a copy of the engine and check that
+    /// the model then has every value a run needs
     /// ([`SimulationEngine::check_values`]). A varied source writes, for each
-    /// value, the point of its bounds nearest 0; a known source writes its
-    /// numbers.
+    /// value, the point of its bounds nearest 0. A known source writes each
+    /// of its sets of numbers, so the engine checks every number the method
+    /// writes before any run.
     ///
     /// # Errors
     ///
-    /// Returns a message when a known source does not hold one number per
-    /// parameter, the engine's message when it rejects a number, or the
-    /// message of [`SimulationEngine::check_values`].
+    /// Returns a message when a known source holds no set of numbers or a
+    /// set without one number per parameter, the engine's message when it
+    /// rejects a number (with the index of its set for a known source), or
+    /// the message of [`SimulationEngine::check_values`].
     pub(crate) fn check_written(
         &self,
         engine: &E,
         parameters: &[CalibrationParameter],
         source: ValueSource<'_>,
     ) -> Result<(), String> {
-        let numbers: Vec<f64> = match source {
-            ValueSource::Varied => parameters
-                .iter()
-                .map(|parameter| 0.0_f64.max(parameter.min_bound).min(parameter.max_bound))
-                .collect(),
-            ValueSource::Known(numbers) if numbers.len() == parameters.len() => numbers.to_vec(),
-            ValueSource::Known(numbers) => {
-                return Err(format!(
-                    "Expected {} known values, one per parameter, got {}",
-                    parameters.len(),
-                    numbers.len()
-                ));
-            }
+        let write = |numbers: &[f64]| {
+            let mut written = engine.clone();
+            written.reset();
+            self.apply(&mut written, parameters, numbers)?;
+            written.check_values()
         };
-        let mut written = engine.clone();
-        written.reset();
-        self.apply(&mut written, parameters, &numbers)?;
-        written.check_values()
+        match source {
+            ValueSource::Varied => {
+                let nearest_zero: Vec<f64> = parameters
+                    .iter()
+                    .map(|parameter| 0.0_f64.max(parameter.min_bound).min(parameter.max_bound))
+                    .collect();
+                write(&nearest_zero)
+            }
+            ValueSource::Known([]) => Err("A known source needs a set of numbers".to_string()),
+            ValueSource::Known(sets) => sets.iter().enumerate().try_for_each(|(index, numbers)| {
+                if numbers.len() != parameters.len() {
+                    return Err(format!(
+                        "Parameter set {index} needs one number per parameter ({}), got {}",
+                        parameters.len(),
+                        numbers.len()
+                    ));
+                }
+                write(numbers).map_err(|error| format!("Parameter set {index}: {error}"))
+            }),
+        }
     }
 
     /// The values of the model kind, as the engine resolved them.
