@@ -2,19 +2,21 @@
 //! tempering with its evidence, a target near a bound, the rule of the moves
 //! and of the levels, and ABC rejection.
 
+use commol_core::NoSteps;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use commol_calibration::{
     CalibrationParameter, CalibrationProblem, LossConfig, ObservedDataPoint, Workspace,
 };
-use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
+use commol_core::{ModelValue, STOPPED, SimulationEngine, SimulationError, Steps, ValuePlan};
 use commol_inference::resampling::BlockScheme;
 use commol_inference::smc::{
-    AbcTarget, Distance, GibbsTarget, RandomWalk, SmcRun, SmcSampler, TemperedTarget,
+    AbcTarget, Distance, GibbsTarget, RandomWalk, SmcEvent, SmcRun, SmcSampler, TemperedTarget,
     abc_rejection, bootstrap_coverage_eta, information_matching_eta, next_level,
 };
 use commol_inference::{Distribution, Family, MethodError, Priors};
 use commol_random::Generator;
+use std::sync::Mutex;
 
 /// A prior of independent distributions and a kernel `exp(−level · v)`,
 /// with a value `v` that the target computes from the parameters; it counts
@@ -180,7 +182,7 @@ fn gaussian_target_gives_the_closed_form_and_evidence() {
     // precision P = I + A and mean P⁻¹ A m, and the evidence is
     // |P|^{−1/2} exp(½ (Am)ᵀ P⁻¹ (Am) − ½ mᵀ A m).
     let target = Tempered::new(vec![standard_normal(), standard_normal()], quadratic);
-    let run = sampler(4000, 0.02).run(&target, 7).unwrap();
+    let run = sampler(4000, 0.02).run(&target, 7, &NoSteps).unwrap();
 
     let p = [[1.0 + A[0][0], A[0][1]], [A[1][0], 1.0 + A[1][1]]];
     let det = p[0][0] * p[1][1] - p[0][1] * p[1][0];
@@ -237,9 +239,9 @@ fn gaussian_target_gives_the_closed_form_and_evidence() {
 #[test]
 fn one_seed_gives_one_result() {
     let target = Tempered::new(vec![standard_normal(), standard_normal()], quadratic);
-    let first = sampler(300, 0.1).run(&target, 11).unwrap();
-    let second = sampler(300, 0.1).run(&target, 11).unwrap();
-    let other = sampler(300, 0.1).run(&target, 12).unwrap();
+    let first = sampler(300, 0.1).run(&target, 11, &NoSteps).unwrap();
+    let second = sampler(300, 0.1).run(&target, 11, &NoSteps).unwrap();
+    let other = sampler(300, 0.1).run(&target, 12, &NoSteps).unwrap();
     assert_eq!(first, second);
     assert_ne!(first.values, other.values);
 }
@@ -247,7 +249,7 @@ fn one_seed_gives_one_result() {
 #[test]
 fn reweighting_runs_no_model() {
     let target = Tempered::new(vec![standard_normal(), standard_normal()], quadratic);
-    let run = sampler(300, 0.1).run(&target, 3).unwrap();
+    let run = sampler(300, 0.1).run(&target, 3, &NoSteps).unwrap();
 
     // One evaluation per particle of the prior and one per proposed move;
     // choosing the levels and reweighting add none.
@@ -262,7 +264,7 @@ fn moves_on_an_unbounded_scale_stay_inside_the_bounds() {
     // Uniform prior on [0, 1] and kernel exp(−50 θ): a truncated
     // exponential of rate 50, whose mass lies against the lower bound.
     let target = Tempered::new(vec![unit_uniform()], |values| 50.0 * values[0]);
-    let run = sampler(2000, 0.05).run(&target, 5).unwrap();
+    let run = sampler(2000, 0.05).run(&target, 5, &NoSteps).unwrap();
 
     assert_eq!(target.outside.load(Ordering::Relaxed), 0);
     let rate: f64 = 50.0;
@@ -279,7 +281,9 @@ fn moves_on_an_unbounded_scale_stay_inside_the_bounds() {
 fn move_count_follows_the_acceptance_rate() {
     let target = Tempered::new(vec![standard_normal(), standard_normal()], quadratic);
     for stay_probability in [0.01, 0.3, 0.99] {
-        let run = sampler(300, stay_probability).run(&target, 2).unwrap();
+        let run = sampler(300, stay_probability)
+            .run(&target, 2, &NoSteps)
+            .unwrap();
         for step in &run.steps {
             let expected = (stay_probability.ln() / (1.0 - step.acceptance_rate).ln()).ceil();
             assert_eq!(step.moves, (expected as usize).max(1), "{step:?}");
@@ -313,7 +317,7 @@ fn abc_rejection_keeps_the_closest_draws() {
         bounds: vec![(0.0, 1.0)],
         distance: |values| (values[0] - 0.3).abs(),
     };
-    let run = abc_rejection(&target, 1000, 0.1, 4).unwrap();
+    let run = abc_rejection(&target, 1000, 0.1, 4, &NoSteps).unwrap();
 
     assert_eq!(run.values.len(), 1000);
     let kept: Vec<usize> = (0..1000)
@@ -340,7 +344,7 @@ fn abc_rejection_needs_two_draws() {
         bounds: vec![(0.0, 1.0)],
         distance: |values| values[0],
     };
-    let error = abc_rejection(&target, 1, 0.5, 1).unwrap_err();
+    let error = abc_rejection(&target, 1, 0.5, 1, &NoSteps).unwrap_err();
     assert_eq!(
         error,
         MethodError::Invalid("draws is a whole number of at least 2, got 1".to_string())
@@ -394,7 +398,7 @@ fn abc_smc_stops_when_the_moves_stop_accepting() {
         .unwrap()
         .with_min_acceptance(0.2)
         .unwrap()
-        .run(&target, 6)
+        .run(&target, 6, &NoSteps)
         .unwrap();
     for pair in run.steps.windows(2) {
         assert!(pair[1].level < pair[0].level, "{:?}", run.steps);
@@ -470,7 +474,9 @@ const PARTICLES: usize = 200;
 #[test]
 fn a_prior_entirely_outside_the_support_is_an_error() {
     let target = Scripted::new(unit_uniform(), |_, _| Ok(None));
-    let error = sampler(PARTICLES, 0.1).run(&target, 1).unwrap_err();
+    let error = sampler(PARTICLES, 0.1)
+        .run(&target, 1, &NoSteps)
+        .unwrap_err();
     assert!(matches!(error, MethodError::Invalid(_)), "{error}");
     assert!(
         error
@@ -486,7 +492,9 @@ fn moves_that_accept_nothing_are_an_error() {
     let target = Scripted::new(unit_uniform(), |values, call| {
         Ok((call < PARTICLES).then(|| 50.0 * values[0]))
     });
-    let error = sampler(PARTICLES, 0.1).run(&target, 2).unwrap_err();
+    let error = sampler(PARTICLES, 0.1)
+        .run(&target, 2, &NoSteps)
+        .unwrap_err();
     assert!(matches!(error, MethodError::Failed(_)), "{error}");
     assert!(error.to_string().contains("accept no proposal"), "{error}");
 }
@@ -500,7 +508,9 @@ fn a_failure_of_the_model_in_a_move_stops_the_run() {
             Err("the engine failed".to_string())
         }
     });
-    let error = sampler(PARTICLES, 0.1).run(&target, 3).unwrap_err();
+    let error = sampler(PARTICLES, 0.1)
+        .run(&target, 3, &NoSteps)
+        .unwrap_err();
     assert_eq!(error, MethodError::Failed("the engine failed".to_string()));
 
     // The first move of the step runs; a later one fails.
@@ -511,7 +521,9 @@ fn a_failure_of_the_model_in_a_move_stops_the_run() {
             Err("the engine failed".to_string())
         }
     });
-    let error = sampler(PARTICLES, 0.01).run(&later, 3).unwrap_err();
+    let error = sampler(PARTICLES, 0.01)
+        .run(&later, 3, &NoSteps)
+        .unwrap_err();
     assert_eq!(error, MethodError::Failed("the engine failed".to_string()));
 }
 
@@ -525,7 +537,7 @@ fn particles_outside_the_support_keep_no_weight_and_do_not_move() {
     // stay and are not moved.
     let run = SmcSampler::new(PARTICLES, RandomWalk::new(), 0.01, 0.5, 0.1)
         .unwrap()
-        .run(&target, 4)
+        .run(&target, 4, &NoSteps)
         .unwrap();
     assert!(run.steps.iter().all(|step| !step.resampled));
     assert!(run.weights().contains(&0.0));
@@ -551,7 +563,7 @@ fn a_proposal_the_prior_rules_out_runs_no_model() {
     )
     .unwrap();
     let target = Scripted::new(prior, |values, _| Ok(Some(values[0])));
-    let run = sampler(PARTICLES, 0.1).run(&target, 5).unwrap();
+    let run = sampler(PARTICLES, 0.1).run(&target, 5, &NoSteps).unwrap();
     let moved: usize = run.steps.iter().map(|step| step.moves * PARTICLES).sum();
     assert!(run.evaluations < PARTICLES + moved, "{}", run.evaluations);
     assert!(run.values.iter().all(|values| values[0] > 0.0));
@@ -701,6 +713,7 @@ fn bootstrap_coverage_fails_when_every_replicate_fails() {
         5,
         0.8,
         7,
+        &NoSteps,
     )
     .unwrap_err()
     .to_string();
@@ -725,6 +738,7 @@ fn bootstrap_coverage_fails_when_no_eta_narrows_the_intervals() {
         5,
         0.8,
         8,
+        &NoSteps,
     )
     .unwrap_err();
     assert!(matches!(error, MethodError::Failed(_)), "{error}");
@@ -745,6 +759,7 @@ fn a_calibration_of_eta_needs_a_fit_inside_the_support() {
         5,
         0.8,
         8,
+        &NoSteps,
     )
     .unwrap_err();
     assert_eq!(
@@ -822,4 +837,188 @@ fn a_null_prior_or_eta_names_its_field_once() {
         eta.starts_with("eta: null is not an eta: give a number above 0"),
         "{eta}"
     );
+}
+
+/// A receiver whose loops have stopped before their first step.
+struct Stopped;
+
+impl<E> Steps<E> for Stopped {
+    fn stopped(&self) -> bool {
+        true
+    }
+}
+
+/// The events of the runs of a sampler, as text, in the order they come.
+#[derive(Default)]
+struct KeptEvents(Mutex<Vec<String>>);
+
+impl KeptEvents {
+    fn events(self) -> Vec<String> {
+        self.0.into_inner().unwrap()
+    }
+}
+
+impl Steps<SmcEvent<'_>> for KeptEvents {
+    fn send(&self, event: SmcEvent<'_>) {
+        let text = match event {
+            SmcEvent::Generation {
+                replicate,
+                index,
+                step,
+                last,
+            } => format!(
+                "generation {index} of {replicate:?} at {} to {last}",
+                step.level
+            ),
+            SmcEvent::Replicates { total } => format!("replicates {total}"),
+            SmcEvent::Replicate { index, outcome } => {
+                format!("replicate {index} {}", outcome.is_ok())
+            }
+            SmcEvent::Growth { round, .. } => format!("growth {round}"),
+        };
+        self.0.lock().unwrap().push(text);
+    }
+}
+
+#[test]
+fn a_run_sends_each_generation_with_its_level() {
+    let target = Tempered::new(vec![standard_normal(), standard_normal()], quadratic);
+    let kept = KeptEvents::default();
+    let run = sampler(300, 0.1).run(&target, 11, &kept).unwrap();
+
+    let expected: Vec<String> = run
+        .steps
+        .iter()
+        .enumerate()
+        .map(|(i, step)| format!("generation {} of None at {} to 1", i + 1, step.level))
+        .collect();
+    assert_eq!(kept.events(), expected);
+}
+
+#[test]
+fn the_runs_of_a_calibrated_eta_send_their_replicates_and_generations() {
+    let (problem, priors) = brittle_problem(true);
+    let blocks = BlockScheme::new(problem.observed_data(), 1).unwrap();
+    let kept = KeptEvents::default();
+    bootstrap_coverage_eta(
+        &problem,
+        &priors,
+        &[0.5],
+        &mut sampler(PARTICLES, 0.1),
+        &blocks,
+        5,
+        0.8,
+        8,
+        &kept,
+    )
+    .unwrap_err();
+    let events = kept.events();
+
+    assert_eq!(events[0], "replicates 5");
+    let position = |event: &str| {
+        events
+            .iter()
+            .position(|kept| kept == event)
+            .unwrap_or_else(|| panic!("{event} {events:?}"))
+    };
+    assert!(position("replicate 0 true") < position("replicate 1 true"));
+    assert!(position("replicate 4 true") < position("growth 1"));
+    let generations = |replicate: usize| {
+        events
+            .iter()
+            .filter(|event| event.contains(&format!(" of Some({replicate}) ")))
+            .count()
+    };
+    assert!(generations(0) > 0 && generations(1) > 0, "{events:?}");
+}
+
+#[test]
+fn no_generation_runs_once_the_steps_stop() {
+    let target = Tempered::new(vec![standard_normal(), standard_normal()], quadratic);
+    let error = sampler(300, 0.1).run(&target, 11, &Stopped).unwrap_err();
+    assert_eq!(error.to_string(), STOPPED);
+
+    let (problem, priors) = brittle_problem(false);
+    let blocks = BlockScheme::new(problem.observed_data(), 1).unwrap();
+    let error = bootstrap_coverage_eta(
+        &problem,
+        &priors,
+        &[0.21],
+        &mut sampler(PARTICLES, 0.1),
+        &blocks,
+        5,
+        0.8,
+        7,
+        &Stopped,
+    )
+    .unwrap_err();
+    assert_eq!(error.to_string(), STOPPED);
+}
+
+#[test]
+fn no_draw_of_abc_rejection_runs_once_the_steps_stop() {
+    let target = Abc {
+        prior: vec![unit_uniform()],
+        bounds: vec![(0.0, 1.0)],
+        distance: |values| (values[0] - 0.3).abs(),
+    };
+    let error = abc_rejection(&target, 100, 0.1, 4, &Stopped).unwrap_err();
+    assert!(error.to_string().contains(STOPPED), "{error}");
+}
+
+/// A receiver that stops at the first generation after `after` replicates
+/// of a calibrated eta have ended.
+struct StopsAfter {
+    after: usize,
+    replicates: AtomicUsize,
+    stop: std::sync::atomic::AtomicBool,
+}
+
+impl StopsAfter {
+    fn new(after: usize) -> Self {
+        Self {
+            after,
+            replicates: AtomicUsize::new(0),
+            stop: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+}
+
+impl Steps<SmcEvent<'_>> for StopsAfter {
+    fn send(&self, event: SmcEvent<'_>) {
+        match event {
+            SmcEvent::Replicate { .. } => {
+                self.replicates.fetch_add(1, Ordering::SeqCst);
+            }
+            SmcEvent::Generation { .. } if self.replicates.load(Ordering::SeqCst) >= self.after => {
+                self.stop.store(true, Ordering::SeqCst);
+            }
+            _ => {}
+        }
+    }
+
+    fn stopped(&self) -> bool {
+        self.stop.load(Ordering::SeqCst)
+    }
+}
+
+#[test]
+fn a_calibrated_eta_stops_inside_a_round() {
+    let (problem, priors) = brittle_problem(true);
+    let blocks = BlockScheme::new(problem.observed_data(), 1).unwrap();
+    // The stop comes at the first generation after the 5 replicates: inside
+    // the first round that raises eta.
+    let error = bootstrap_coverage_eta(
+        &problem,
+        &priors,
+        &[0.5],
+        &mut sampler(PARTICLES, 0.1),
+        &blocks,
+        5,
+        0.8,
+        8,
+        &StopsAfter::new(5),
+    )
+    .unwrap_err();
+    assert_eq!(error.to_string(), STOPPED);
 }

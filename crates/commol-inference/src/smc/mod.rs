@@ -31,7 +31,9 @@ pub use gibbs::{
 };
 pub use kernel::{Kernel, RandomWalk};
 pub use likelihood::{LikelihoodTarget, bayesian_posterior};
-pub use sampler::{SmcRun, SmcSampler, SmcState, SmcStep, Stop, abc_rejection, next_level};
+pub use sampler::{
+    SmcEvent, SmcRun, SmcSampler, SmcState, SmcStep, SmcSteps, Stop, abc_rejection, next_level,
+};
 
 /// The port of a target of the sampler: the distribution at each level is
 /// `π_ℓ(θ) ∝ prior(θ) · exp(log_kernel(v(θ), ℓ))`, where `v(θ)` is the value

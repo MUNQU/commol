@@ -6,12 +6,16 @@ use commol_calibration::{
     Violation, Workspace,
 };
 use commol_core::Model;
+use commol_core::NoSteps;
+use commol_core::{STOPPED, Steps};
 use commol_difference::DifferenceEquations;
+use commol_inference::runs::RunEvent;
 use commol_inference::{
     Band, NoNoise, ObservationDraws, ParameterSample, Predictive, PredictiveError, draw_seeds,
     observation_draws, scores, share_among_replicates,
 };
 use commol_random::replicate_seed;
+use std::sync::Mutex;
 
 /// A → B at the proportional rate `k`, in discrete steps from A = 1000.
 fn problem() -> CalibrationProblem<DifferenceEquations> {
@@ -53,8 +57,14 @@ fn sample(values: Vec<Vec<f64>>) -> ParameterSample {
 #[test]
 fn the_band_of_one_draw_is_that_draw() {
     let problem = problem();
-    let predictive =
-        Predictive::new(problem.forward(), &sample(vec![vec![0.2]]), &[1.0, 2.0], 0).unwrap();
+    let predictive = Predictive::new(
+        problem.forward(),
+        &sample(vec![vec![0.2]]),
+        &[1.0, 2.0],
+        0,
+        &NoSteps,
+    )
+    .unwrap();
     let band = predictive.band(0.9).unwrap();
 
     // A = 1000 · 0.8ᵗ.
@@ -99,7 +109,7 @@ fn a_sample_of_other_parameters_is_named_in_the_error() {
     )
     .unwrap();
 
-    let error = Predictive::new(problem().forward(), &other, &[1.0], 0)
+    let error = Predictive::new(problem().forward(), &other, &[1.0], 0, &NoSteps)
         .expect_err("the sample does not match the problem")
         .to_string();
 
@@ -120,7 +130,7 @@ fn positions_the_engine_cannot_run_are_rejected_before_any_draw() {
     ];
 
     for (positions, message) in cases {
-        let error = Predictive::new(problem.forward(), &draws, positions, 0)
+        let error = Predictive::new(problem.forward(), &draws, positions, 0, &NoSteps)
             .expect_err("the engine cannot run these positions");
 
         assert!(
@@ -176,8 +186,14 @@ fn a_forward_model_observed_again_at_its_observations_predicts_the_same() {
 #[test]
 fn a_band_of_an_output_the_rows_lack_is_an_error() {
     let problem = problem();
-    let predictive =
-        Predictive::new(problem.forward(), &sample(vec![vec![0.2]]), &[1.0, 2.0], 0).unwrap();
+    let predictive = Predictive::new(
+        problem.forward(),
+        &sample(vec![vec![0.2]]),
+        &[1.0, 2.0],
+        0,
+        &NoSteps,
+    )
+    .unwrap();
 
     let error = predictive.series_band(&[9], false, 0.9).err();
 
@@ -190,8 +206,14 @@ fn a_band_of_an_output_the_rows_lack_is_an_error() {
 #[test]
 fn a_band_of_a_series_checks_its_confidence_level() {
     let problem = problem();
-    let predictive =
-        Predictive::new(problem.forward(), &sample(vec![vec![0.2]]), &[1.0, 2.0], 0).unwrap();
+    let predictive = Predictive::new(
+        problem.forward(),
+        &sample(vec![vec![0.2]]),
+        &[1.0, 2.0],
+        0,
+        &NoSteps,
+    )
+    .unwrap();
 
     let error = predictive.series_band(&[0], false, 1.5).unwrap_err();
 
@@ -234,9 +256,9 @@ fn every_draw_of_a_stochastic_predictive_draws_its_own_noise() {
     // problem they would run the same two paths.
     let draws = sample(vec![vec![0.2]; 3]);
 
-    let predictive = Predictive::new(problem.forward(), &draws, &[5.0], 11).unwrap();
-    let again = Predictive::new(problem.forward(), &draws, &[5.0], 11).unwrap();
-    let other = Predictive::new(problem.forward(), &draws, &[5.0], 12).unwrap();
+    let predictive = Predictive::new(problem.forward(), &draws, &[5.0], 11, &NoSteps).unwrap();
+    let again = Predictive::new(problem.forward(), &draws, &[5.0], 11, &NoSteps).unwrap();
+    let other = Predictive::new(problem.forward(), &draws, &[5.0], 12, &NoSteps).unwrap();
 
     let a_at_5: Vec<f64> = predictive
         .trajectories()
@@ -264,11 +286,31 @@ fn every_draw_of_a_stochastic_predictive_draws_its_own_noise() {
 #[test]
 fn a_draw_keeps_its_runs_when_the_replicates_change() {
     let draws = sample(vec![vec![0.2], vec![0.3], vec![0.4]]);
-    let two = Predictive::new(stochastic_problem(2).forward(), &draws, &[5.0], 11).unwrap();
-    let four = Predictive::new(stochastic_problem(4).forward(), &draws, &[5.0], 11).unwrap();
+    let two = Predictive::new(
+        stochastic_problem(2).forward(),
+        &draws,
+        &[5.0],
+        11,
+        &NoSteps,
+    )
+    .unwrap();
+    let four = Predictive::new(
+        stochastic_problem(4).forward(),
+        &draws,
+        &[5.0],
+        11,
+        &NoSteps,
+    )
+    .unwrap();
     let fewer_draws = sample(vec![vec![0.2], vec![0.3]]);
-    let of_two_draws =
-        Predictive::new(stochastic_problem(2).forward(), &fewer_draws, &[5.0], 11).unwrap();
+    let of_two_draws = Predictive::new(
+        stochastic_problem(2).forward(),
+        &fewer_draws,
+        &[5.0],
+        11,
+        &NoSteps,
+    )
+    .unwrap();
 
     assert_eq!(two.draw_seeds(), draw_seeds(11, 3).as_slice());
     assert_eq!(four.draw_seeds(), two.draw_seeds());
@@ -369,4 +411,47 @@ fn each_replicate_has_its_share_of_the_weight_of_its_draw() {
 
     assert_eq!(weights, [0.05, 0.05, 0.05, 0.05, 0.8]);
     assert!((band.mean[0][0] - 0.2).abs() < 1e-12);
+}
+
+/// A receiver whose loops have stopped before their first step.
+struct Stopped;
+
+impl<E> Steps<E> for Stopped {
+    fn stopped(&self) -> bool {
+        true
+    }
+}
+
+/// The events of a loop of model runs, as text: the beginning first, then
+/// the points that ran, sorted.
+#[derive(Default)]
+struct KeptRuns(Mutex<Vec<String>>);
+
+impl KeptRuns {
+    fn events(self) -> Vec<String> {
+        let mut events = self.0.into_inner().unwrap();
+        events[1..].sort();
+        events
+    }
+}
+
+impl Steps<RunEvent> for KeptRuns {
+    fn send(&self, event: RunEvent) {
+        self.0.lock().unwrap().push(match event {
+            RunEvent::Began { total } => format!("began {total}"),
+            RunEvent::Ran { index } => format!("ran {index}"),
+        });
+    }
+}
+
+#[test]
+fn a_predictive_sends_each_draw_and_runs_none_once_the_steps_stop() {
+    let problem = problem();
+    let draws = sample(vec![vec![0.2], vec![0.3], vec![0.4]]);
+    let kept = KeptRuns::default();
+    Predictive::new(problem.forward(), &draws, &[1.0], 0, &kept).unwrap();
+    assert_eq!(kept.events(), ["began 3", "ran 0", "ran 1", "ran 2"]);
+
+    let error = Predictive::new(problem.forward(), &draws, &[1.0], 0, &Stopped).unwrap_err();
+    assert!(error.to_string().contains(STOPPED), "{error}");
 }

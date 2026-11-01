@@ -5,6 +5,7 @@ use commol_calibration::{
     CalibrationParameter, CalibrationProblem, LossConfig, NelderMeadConfig, ObservedDataPoint,
     OptimizationConfig,
 };
+use commol_core::NoSteps;
 use commol_core::{CONFIDENCE_LEVEL, Model, Real};
 use commol_difference::DifferenceEquations;
 use commol_inference::conformal::{AdaptiveLevel, ConformalSettings, NonconformityScore, Pooling};
@@ -128,7 +129,9 @@ fn every_share_has_one_check() {
         ),
         (
             "quantile",
-            abc_rejection(&target, 10, 1.0, 0).unwrap_err().to_string(),
+            abc_rejection(&target, 10, 1.0, 0, &NoSteps)
+                .unwrap_err()
+                .to_string(),
         ),
         (
             "correlation_threshold",

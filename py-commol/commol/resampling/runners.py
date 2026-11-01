@@ -192,7 +192,7 @@ def run_block_jackknife(
         The fit, the jackknife statistics and the diagnostics.
     """
     starts, run = commol_rs.inference.block_jackknife(
-        calibrator._engine_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method), logger
     )
     names = calibrator.parameter_names
     fit = fit_result(starts, names, calibrator.seed, logger)

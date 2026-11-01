@@ -127,7 +127,7 @@ def run_rolling_conformal(
         the scores of every origin and horizon; and the guarantee.
     """
     starts, run = commol_rs.inference.rolling_conformal(
-        calibrator._engine_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method), logger
     )
     return _result(
         starts,
@@ -159,7 +159,7 @@ def run_jackknife_plus(
         guarantee, with the CV+ bound of its blocks.
     """
     starts, run = commol_rs.inference.jackknife_plus(
-        calibrator._engine_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method), logger
     )
     return _result(
         starts,
@@ -191,7 +191,7 @@ def run_enbpi(calibrator: CalibrationPort, method: "EnbPI") -> ConformalResult:
         guarantee.
     """
     starts, run = commol_rs.inference.enbpi(
-        calibrator._engine_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method), logger
     )
     return _result(
         starts,

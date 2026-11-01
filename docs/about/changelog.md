@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Ctrl-C stops a method that logs its steps: it starts no new step, waits
+  for the steps already running, and raises `KeyboardInterrupt`, whatever
+  the level of the logger. See
+  [Stop a long method](../getting-started/quickstart.md#stop-a-long-method).
+- More long methods log their steps at `INFO`, on the logger of their
+  module: each block of a block jackknife (`commol.resampling`); each fit
+  of jackknife+, EnbPI and rolling conformal (`commol.conformal`); each
+  generation of a Gibbs posterior, a Bayesian posterior and ABC-SMC, with
+  its level, and each replicate and round of a calibrated `η`
+  (`commol.smc`); and the model runs of ABC rejection (`commol.smc`), a
+  Laplace mixture (`commol.local`), each sensitivity method
+  (`commol.sensitivity`) and a predictive, at each 1 % of the runs. See
+  [Log messages](../getting-started/quickstart.md#log-messages).
 - `ObservedDataPoint(outputs=[...], coefficients=[...])`: one known
   coefficient per output, so the observation predicts the weighted sum
   `Σ coefficient · output`, then times its scale and its factor. A count

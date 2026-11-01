@@ -196,7 +196,7 @@ class CalibrationProblemProtocol(Protocol):
         self, parameter_sets: list[list[float]]
     ) -> list[list[list[float]]]: ...
     def predictive(
-        self, sample: ParameterSampleProtocol, positions: list[float]
+        self, sample: ParameterSampleProtocol, positions: list[float], logger: Logger
     ) -> PredictiveProtocol: ...
     def observation_draws(
         self, sample: ParameterSampleProtocol, observations: str, noise: str
@@ -644,7 +644,7 @@ class ForwardAnalysisProtocol(Protocol):
     @property
     def seed(self) -> int: ...
     def predictive(
-        self, sample: ParameterSampleProtocol, positions: list[float]
+        self, sample: ParameterSampleProtocol, positions: list[float], logger: Logger
     ) -> PredictiveProtocol: ...
     def observation_draws(
         self, sample: ParameterSampleProtocol, observations: str
@@ -685,7 +685,7 @@ class InferenceModule(Protocol):
         self, problem: CalibrationProblemProtocol, settings: str, logger: Logger
     ) -> tuple[StartsProtocol, BootstrapRunProtocol]: ...
     def block_jackknife(
-        self, problem: CalibrationProblemProtocol, settings: str
+        self, problem: CalibrationProblemProtocol, settings: str, logger: Logger
     ) -> tuple[StartsProtocol, JackknifeRunProtocol]: ...
     def profile_likelihood(
         self, problem: CalibrationProblemProtocol, settings: str, logger: Logger
@@ -747,16 +747,16 @@ class InferenceModule(Protocol):
         self, problem: CalibrationProblemProtocol, settings: str, result: EngineHandle
     ) -> StartsAnalysisProtocol: ...
     def gibbs_posterior(
-        self, problem: CalibrationProblemProtocol, settings: str
+        self, problem: CalibrationProblemProtocol, settings: str, logger: Logger
     ) -> tuple[StartsProtocol | None, SMCRunProtocol, EtaCalibrationProtocol]: ...
     def bayesian_posterior(
-        self, problem: CalibrationProblemProtocol, settings: str
+        self, problem: CalibrationProblemProtocol, settings: str, logger: Logger
     ) -> SMCRunProtocol: ...
     def abc_smc(
-        self, problem: CalibrationProblemProtocol, settings: str
+        self, problem: CalibrationProblemProtocol, settings: str, logger: Logger
     ) -> tuple[SMCRunProtocol, bool]: ...
     def abc_rejection(
-        self, problem: CalibrationProblemProtocol, settings: str
+        self, problem: CalibrationProblemProtocol, settings: str, logger: Logger
     ) -> tuple[SMCRunProtocol, bool]: ...
     def laplace(
         self, problem: CalibrationProblemProtocol, settings: str
@@ -771,7 +771,7 @@ class InferenceModule(Protocol):
         list[tuple[str, float]] | None,
     ]: ...
     def laplace_mixture(
-        self, problem: CalibrationProblemProtocol, settings: str
+        self, problem: CalibrationProblemProtocol, settings: str, logger: Logger
     ) -> tuple[StartsProtocol, MixtureRunProtocol]: ...
     def delta_band(
         self,
@@ -791,13 +791,13 @@ class InferenceModule(Protocol):
         sample: EngineHandle = None,
     ) -> tuple[StartsProtocol | None, ConformalRunProtocol]: ...
     def rolling_conformal(
-        self, problem: CalibrationProblemProtocol, settings: str
+        self, problem: CalibrationProblemProtocol, settings: str, logger: Logger
     ) -> tuple[StartsProtocol, ConformalRunProtocol]: ...
     def jackknife_plus(
-        self, problem: CalibrationProblemProtocol, settings: str
+        self, problem: CalibrationProblemProtocol, settings: str, logger: Logger
     ) -> tuple[StartsProtocol, ConformalRunProtocol]: ...
     def enbpi(
-        self, problem: CalibrationProblemProtocol, settings: str
+        self, problem: CalibrationProblemProtocol, settings: str, logger: Logger
     ) -> tuple[StartsProtocol, ConformalRunProtocol]: ...
     def adaptive_conformal(
         self,
@@ -806,19 +806,19 @@ class InferenceModule(Protocol):
         sample: EngineHandle = None,
     ) -> tuple[StartsProtocol | None, ConformalRunProtocol]: ...
     def propagation(
-        self, analysis: ForwardAnalysisProtocol, settings: str
+        self, analysis: ForwardAnalysisProtocol, settings: str, logger: Logger
     ) -> tuple[_Draws, list[list[float]], list[float], list[int]]: ...
     def prcc(
-        self, analysis: ForwardAnalysisProtocol, settings: str
+        self, analysis: ForwardAnalysisProtocol, settings: str, logger: Logger
     ) -> tuple[_Draws, list[list[float]], list[list[float]], float]: ...
     def morris(
-        self, analysis: ForwardAnalysisProtocol, settings: str
+        self, analysis: ForwardAnalysisProtocol, settings: str, logger: Logger
     ) -> tuple[list[list[float]], list[list[float]], list[list[float]], int]: ...
     def sobol(
-        self, analysis: ForwardAnalysisProtocol, settings: str
+        self, analysis: ForwardAnalysisProtocol, settings: str, logger: Logger
     ) -> SobolRunProtocol: ...
     def polynomial_chaos(
-        self, analysis: ForwardAnalysisProtocol, settings: str
+        self, analysis: ForwardAnalysisProtocol, settings: str, logger: Logger
     ) -> ChaosRunProtocol: ...
 
 class MathExpressionProtocol(Protocol):

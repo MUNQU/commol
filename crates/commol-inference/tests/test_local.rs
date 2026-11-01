@@ -3,7 +3,11 @@
 //! mixture, importance sampling and PSIS, on an engine whose outputs are
 //! closed forms of its parameters.
 
+use commol_core::NoSteps;
+use commol_core::{STOPPED, Steps};
+use commol_inference::runs::{RunEvent, RunSteps};
 use std::collections::HashMap;
+use std::sync::Mutex;
 
 use commol_calibration::Workspace;
 use commol_calibration::{
@@ -323,6 +327,7 @@ fn mixture_finds_both_modes_in_proportion() {
         4000,
         CurvatureKind::GaussNewton,
         3,
+        &NoSteps,
     )
     .unwrap();
 
@@ -389,6 +394,7 @@ fn an_end_on_a_bound_worse_than_every_component_is_only_noted() {
         400,
         CurvatureKind::GaussNewton,
         3,
+        &NoSteps,
     )
     .unwrap();
 
@@ -416,6 +422,7 @@ fn an_end_on_a_bound_better_than_a_component_marks_the_sample_unreliable() {
         400,
         CurvatureKind::GaussNewton,
         3,
+        &NoSteps,
     )
     .unwrap();
 
@@ -461,6 +468,7 @@ fn banana_target_gives_a_large_k_hat() {
         2000,
         CurvatureKind::GaussNewton,
         5,
+        &NoSteps,
     )
     .unwrap();
 
@@ -708,6 +716,7 @@ fn a_posterior_is_minus_infinity_outside_its_support() {
         100,
         CurvatureKind::GaussNewton,
         1,
+        &NoSteps,
     )
     .unwrap_err();
     assert!(error.to_string().contains("outside the support"), "{error}");
@@ -735,6 +744,7 @@ fn an_end_whose_curvature_is_singular_gives_no_component() {
         200,
         CurvatureKind::GaussNewton,
         1,
+        &NoSteps,
     )
     .unwrap();
 
@@ -912,6 +922,7 @@ fn a_mixture_whose_optima_the_prior_rules_out_is_refused() {
         100,
         CurvatureKind::GaussNewton,
         1,
+        &NoSteps,
     )
     .unwrap_err();
 
@@ -941,4 +952,76 @@ fn a_one_dimensional_student_t_has_the_density_of_an_observation_model() {
             "{point}: {observation} {local}"
         );
     }
+}
+
+/// A receiver whose loops have stopped before their first step.
+struct Stopped;
+
+impl<E> Steps<E> for Stopped {
+    fn stopped(&self) -> bool {
+        true
+    }
+}
+
+/// The events of a loop of model runs, as text: the beginning first, then
+/// the points that ran, sorted.
+#[derive(Default)]
+struct KeptRuns(Mutex<Vec<String>>);
+
+impl KeptRuns {
+    fn events(self) -> Vec<String> {
+        let mut events = self.0.into_inner().unwrap();
+        events[1..].sort();
+        events
+    }
+}
+
+impl Steps<RunEvent> for KeptRuns {
+    fn send(&self, event: RunEvent) {
+        self.0.lock().unwrap().push(match event {
+            RunEvent::Began { total } => format!("began {total}"),
+            RunEvent::Ran { index } => format!("ran {index}"),
+        });
+    }
+}
+
+#[test]
+fn a_mixture_sends_each_draw_and_runs_none_once_the_steps_stop() {
+    let values: Vec<f64> = (0..10).map(|i| 4.0 + [0.2, -0.3, 0.1][i % 3]).collect();
+    let problem = CalibrationProblem::new(
+        Curve::new(Shape::Square),
+        observed("x", &values),
+        vec![CalibrationParameter::new("a".to_string(), -5.0, 5.0)],
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.5))]),
+    )
+    .unwrap();
+    let priors = Priors::new(
+        &["a".to_string()],
+        &[(-5.0, 5.0)],
+        &[("a".to_string(), Family::Normal { mean: 0.5, sd: 1.0 })],
+    )
+    .unwrap();
+    let target = LikelihoodTarget::new(&problem, &priors).unwrap();
+    let mixture = |steps: &RunSteps<'_>| {
+        laplace_mixture(
+            &problem,
+            &TemperedPosterior::new(&target, 3),
+            1.0,
+            &[vec![2.0]],
+            30,
+            CurvatureKind::GaussNewton,
+            3,
+            steps,
+        )
+    };
+
+    let kept = KeptRuns::default();
+    mixture(&kept).unwrap();
+    let events = kept.events();
+    assert_eq!(events[0], "began 30");
+    assert_eq!(events.len(), 31);
+
+    let error = mixture(&Stopped).unwrap_err();
+    assert!(error.to_string().contains(STOPPED), "{error}");
 }

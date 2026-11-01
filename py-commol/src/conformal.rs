@@ -6,7 +6,8 @@
 //! problem when the method needs a fit and returns the intervals and scores
 //! as plain values; Python builds the result.
 
-use crate::parallelism::parallel;
+use crate::parallelism::{parallel, parallel_logged};
+use crate::records::StepLog;
 use commol_calibration::observed_data;
 use commol_inference::conformal::{self, ConformalRun, Predictor};
 use commol_inference::resampling::{BlockDrawing, BlockScheme, FitUnit, ReplicateRunner};
@@ -90,13 +91,15 @@ fn predictor<'a>(
     }
 }
 
-/// The fit of a method that refits, and the runner of its refits.
+/// The fit of a method that refits, with a record of each start in `log`,
+/// and the runner of its refits.
 fn refits<'a>(
     py: Python<'_>,
     problem: &'a PyCalibrationProblem,
     starts: usize,
+    log: &StepLog,
 ) -> PyResult<(PyStarts, ReplicateRunner<'a, crate::engine::Engine>)> {
-    let fitted = problem.fit(py, starts)?;
+    let fitted = problem.fit_logged(py, starts, log)?;
     let runner = problem.runner(&best_values(&fitted), starts)?;
     Ok((PyStarts { inner: fitted }, runner))
 }
@@ -168,6 +171,8 @@ fn split_conformal(
 /// Args:
 ///     problem: The calibration problem
 ///     settings: The JSON of a `RollingConformal`
+///     logger: The logger of a record of each start and origin that
+///         finishes
 ///
 /// Returns:
 ///     The starts of the fit of every observation, and the intervals
@@ -181,12 +186,19 @@ fn rolling_conformal(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
     settings: &str,
+    logger: Py<PyAny>,
 ) -> PyResult<(PyStarts, PyConformalRun)> {
     let settings: RollingConformalSettings = crate::json::read(settings)?;
     let conformal = settings.conformal().map_err(method_error)?;
-    let (starts, runner) = refits(py, problem, settings.starts)?;
-    let run = parallel(py, || {
-        conformal::rolling_conformal(&runner, &settings.origins, &settings.positions, conformal)
+    let log = StepLog::new(logger).with_unit(FitUnit::Origin);
+    let (starts, runner) = refits(py, problem, settings.starts, &log)?;
+    let run = parallel_logged(py, &log, |steps| {
+        conformal::rolling_conformal(
+            &runner.with_steps(steps),
+            &settings.origins,
+            &settings.positions,
+            conformal,
+        )
     })?
     .map_err(method_error)?;
     Ok((starts, PyConformalRun::of(run, FitUnit::Origin)))
@@ -208,6 +220,8 @@ fn blocks(
 /// Args:
 ///     problem: The calibration problem
 ///     settings: The JSON of a `JackknifePlus`
+///     logger: The logger of a record of each start and block that
+///         finishes
 ///
 /// Returns:
 ///     The starts of the fit, and the intervals
@@ -221,17 +235,24 @@ fn jackknife_plus(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
     settings: &str,
+    logger: Py<PyAny>,
 ) -> PyResult<(PyStarts, PyConformalRun)> {
     let settings: JackknifePlusSettings = crate::json::read(settings)?;
     let conformal = settings.conformal().map_err(method_error)?;
-    let (starts, runner) = refits(py, problem, settings.starts)?;
+    let log = StepLog::new(logger).with_unit(FitUnit::Block);
+    let (starts, runner) = refits(py, problem, settings.starts, &log)?;
     let scheme = blocks(
         &runner,
         settings.block_length.0,
         BlockDrawing::NonOverlapping,
     )?;
-    let run = parallel(py, || {
-        conformal::jackknife_plus(&runner, &scheme, &settings.positions, conformal)
+    let run = parallel_logged(py, &log, |steps| {
+        conformal::jackknife_plus(
+            &runner.with_steps(steps),
+            &scheme,
+            &settings.positions,
+            conformal,
+        )
     })?
     .map_err(method_error)?;
     let run = PyConformalRun {
@@ -250,6 +271,8 @@ fn jackknife_plus(
 /// Args:
 ///     problem: The calibration problem
 ///     settings: The JSON of an `EnbPI`
+///     logger: The logger of a record of each start and replicate that
+///         finishes
 ///
 /// Returns:
 ///     The starts of the fit, and the intervals
@@ -263,18 +286,20 @@ fn enbpi(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
     settings: &str,
+    logger: Py<PyAny>,
 ) -> PyResult<(PyStarts, PyConformalRun)> {
     let settings: EnbPiSettings = crate::json::read(settings)?;
     let conformal = settings.conformal().map_err(method_error)?;
-    let (starts, runner) = refits(py, problem, settings.starts)?;
+    let log = StepLog::new(logger);
+    let (starts, runner) = refits(py, problem, settings.starts, &log)?;
     let scheme = blocks(
         &runner,
         settings.block_length.0,
         BlockDrawing::NonOverlapping,
     )?;
-    let run = parallel(py, || {
+    let run = parallel_logged(py, &log, |steps| {
         conformal::enbpi(
-            &runner,
+            &runner.with_steps(steps),
             &scheme,
             settings.replicates,
             &settings.positions,

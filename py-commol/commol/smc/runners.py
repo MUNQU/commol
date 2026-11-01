@@ -83,7 +83,7 @@ def run_gibbs_posterior(
         of the automatic length.
     """
     starts, run, eta = commol_rs.inference.gibbs_posterior(
-        calibrator._engine_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method), logger
     )
     fit = (
         None
@@ -128,7 +128,7 @@ def run_bayesian_posterior(
         The sample, the temperatures, the log evidence and the diagnostics.
     """
     run = commol_rs.inference.bayesian_posterior(
-        calibrator._engine_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method), logger
     )
     return SMCResult(
         sample=_sample(
@@ -160,7 +160,7 @@ def run_abc_smc(calibrator: CalibrationPort, method: "ABCSMC") -> SMCResult:
         The sample, the tolerances, the log evidence and the diagnostics.
     """
     run, stochastic = commol_rs.inference.abc_smc(
-        calibrator._engine_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method), logger
     )
     return SMCResult(
         sample=_sample(
@@ -192,7 +192,7 @@ def run_abc_rejection(calibrator: CalibrationPort, method: "ABCRejection") -> SM
         The kept draws, the tolerance, the log evidence and the diagnostics.
     """
     run, stochastic = commol_rs.inference.abc_rejection(
-        calibrator._engine_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method), logger
     )
     return SMCResult(
         sample=_sample(

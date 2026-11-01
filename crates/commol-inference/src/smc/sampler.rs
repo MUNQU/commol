@@ -26,8 +26,15 @@
 //! The sampler stops at the last level, or, with a `min_acceptance`, when
 //! the first move of a step accepts less: it then keeps the particles of
 //! the step before, the last one whose moves completed.
+//!
+//! Each step is a generation of the run: the sampler sends a
+//! [`SmcEvent::Generation`] after each one, and starts none once its
+//! receiver stops ([`commol_core::Steps`]). The number of generations is not
+//! known before the run, so an event gives the level reached and the last
+//! level, not a count over a total.
 
 use commol_calibration::Workspace;
+use commol_core::{NoSteps, STOPPED, Steps};
 use commol_random::Generator;
 use commol_statistics::statistics::{effective_size, normalized_weights};
 use rayon::prelude::*;
@@ -39,6 +46,7 @@ use crate::ranges::{
     MIN_ACCEPTANCE, PARTICLES, QUANTILE, RESAMPLE_THRESHOLD, STAY_PROBABILITY, TARGET_CESS,
     TWO_DRAWS,
 };
+use crate::runs::{RunEvent, RunSteps};
 use commol_random::Stream;
 
 /// One step of a run.
@@ -54,6 +62,52 @@ pub struct SmcStep {
     pub acceptance_rate: f64,
     /// How many times each particle moved.
     pub moves: usize,
+}
+
+/// An event of a run of the sampler, or of the runs of a calibrated `η`
+/// ([`super::bootstrap_coverage_eta`]).
+#[derive(Debug, Clone, Copy)]
+pub enum SmcEvent<'e> {
+    /// Generation `index`, from 1, of a run ended with `step`, on the way to
+    /// the level `last`; `replicate` is the replicate of a calibrated `η`
+    /// that the run belongs to, or `None` for the method's own run.
+    Generation {
+        /// The replicate of the run, if it belongs to one.
+        replicate: Option<usize>,
+        /// The number of the generation, from 1.
+        index: usize,
+        /// The step of the generation.
+        step: &'e SmcStep,
+        /// The last level of the run.
+        last: f64,
+    },
+    /// The runs of `total` replicates begin.
+    Replicates {
+        /// The number of replicates.
+        total: usize,
+    },
+    /// The run of replicate `index` ended, or failed.
+    Replicate {
+        /// The index of the replicate.
+        index: usize,
+        /// The reason it failed, if it did.
+        outcome: Result<(), &'e MethodError>,
+    },
+    /// Round `round`, from 1, raised the largest `η` to `eta`.
+    Growth {
+        /// The number of the round, from 1.
+        round: usize,
+        /// The largest `η` after the round.
+        eta: f64,
+    },
+}
+
+/// The receiver of the events of a run of the sampler.
+pub type SmcSteps<'s> = dyn for<'e> Steps<SmcEvent<'e>> + 's;
+
+/// The error of a generation, or a replicate, that a stop kept from running.
+pub(crate) fn stopped() -> MethodError {
+    MethodError::Failed(STOPPED.to_string())
 }
 
 /// Why a run stopped before its last level.
@@ -206,17 +260,23 @@ impl<K: Kernel> SmcSampler<K> {
     }
 
     /// Run from the prior to the last level of `target`, with every random
-    /// number drawn from `seed`.
+    /// number drawn from `seed`, sending the event of each generation to
+    /// `steps`.
     ///
     /// # Errors
     ///
     /// [`MethodError::Invalid`] when every draw of the prior is outside the
     /// support; [`MethodError::Failed`] when the model fails, the kernel
-    /// cannot fit the particles, or a step accepts no proposal and no
-    /// `min_acceptance` stops it.
-    pub fn run<T: TemperedTarget>(&mut self, target: &T, seed: u64) -> Result<SmcRun, MethodError> {
+    /// cannot fit the particles, a step accepts no proposal and no
+    /// `min_acceptance` stops it, or `steps` stop.
+    pub fn run<T: TemperedTarget>(
+        &mut self,
+        target: &T,
+        seed: u64,
+        steps: &SmcSteps<'_>,
+    ) -> Result<SmcRun, MethodError> {
         let mut state = self.start(target, seed)?;
-        self.advance(&mut state, target, |_| {})?;
+        self.advance(&mut state, target, |_| {}, steps)?;
         Ok(state.run())
     }
 
@@ -226,14 +286,33 @@ impl<K: Kernel> SmcSampler<K> {
     ///
     /// As [`Self::run`].
     pub fn start<T: TemperedTarget>(&self, target: &T, seed: u64) -> Result<SmcState, MethodError> {
+        self.start_with(target, seed, &NoSteps)
+    }
+
+    /// [`Self::start`], each draw of the prior a step of `steps`
+    /// ([`crate::runs`]).
+    fn start_with<T: TemperedTarget>(
+        &self,
+        target: &T,
+        seed: u64,
+        steps: &RunSteps<'_>,
+    ) -> Result<SmcState, MethodError> {
         let mut streams: Vec<Generator> = (0..self.particles)
             .map(|i| Generator::from_seed(Stream::SmcParticles.replicate(seed, i as u64)))
             .collect();
+        steps.send(RunEvent::Began {
+            total: self.particles,
+        });
         let draws: Vec<(Vec<f64>, Option<f64>)> = streams
             .par_iter_mut()
-            .map_init(Workspace::default, |workspace, stream| {
+            .enumerate()
+            .map_init(Workspace::default, |workspace, (index, stream)| {
+                if steps.stopped() {
+                    return Err(STOPPED.to_string());
+                }
                 let values = target.sample_prior(stream);
                 let kept = target.evaluate(&values, stream, workspace)?;
+                steps.send(RunEvent::Ran { index });
                 Ok((values, kept))
             })
             .collect::<Result<_, String>>()
@@ -267,7 +346,9 @@ impl<K: Kernel> SmcSampler<K> {
     }
 
     /// Run the steps of `state` until the last level of `target`, calling
-    /// `after_step` after each completed step.
+    /// `after_step` after each completed step and sending its
+    /// [`SmcEvent::Generation`] to `steps`; once `steps` stop, start no
+    /// step.
     ///
     /// # Errors
     ///
@@ -277,9 +358,13 @@ impl<K: Kernel> SmcSampler<K> {
         state: &mut SmcState,
         target: &T,
         mut after_step: impl FnMut(&SmcState),
+        steps: &SmcSteps<'_>,
     ) -> Result<(), MethodError> {
         let last = target.last_level();
         while state.level != last {
+            if steps.stopped() {
+                return Err(stopped());
+            }
             let before = state.clone();
             let level = next_level(
                 target,
@@ -337,6 +422,12 @@ impl<K: Kernel> SmcSampler<K> {
                 moves,
             });
             after_step(state);
+            steps.send(SmcEvent::Generation {
+                replicate: None,
+                index: state.steps.len(),
+                step: state.steps.last().expect("a step was pushed"),
+                last,
+            });
         }
         Ok(())
     }
@@ -555,12 +646,14 @@ pub fn next_level<T: TemperedTarget>(
 /// # Errors
 ///
 /// [`MethodError::Invalid`] when `draws` is below 2 or `quantile` is not
-/// strictly between 0 and 1; otherwise as [`SmcSampler::run`].
+/// strictly between 0 and 1; otherwise as [`SmcSampler::run`]. Each draw is
+/// a step of `steps` ([`crate::runs`]).
 pub fn abc_rejection<T: TemperedTarget>(
     target: &T,
     draws: usize,
     quantile: f64,
     seed: u64,
+    steps: &RunSteps<'_>,
 ) -> Result<SmcRun, MethodError> {
     TWO_DRAWS
         .check(draws)
@@ -568,7 +661,7 @@ pub fn abc_rejection<T: TemperedTarget>(
         .map_err(MethodError::Invalid)?;
     let sampler = SmcSampler::new(draws, super::RandomWalk::new(), 1.0, quantile, 0.5)
         .expect("the draws and the quantile are in the ranges of a sampler");
-    let mut state = sampler.start(target, seed)?;
+    let mut state = sampler.start_with(target, seed, steps)?;
     let level = next_level(
         target,
         &state.kept,

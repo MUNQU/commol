@@ -6,7 +6,7 @@ use commol_calibration::{
     CalibrationProblem, CalibrationResult, NoObserver, OptimizationConfig, StartEvent,
     optimize_starts_with_observer, start_points,
 };
-use commol_core::{NoSteps, SimulationEngine, Steps};
+use commol_core::{NoSteps, STOPPED, SimulationEngine, Steps};
 use commol_random::Generator;
 use rayon::prelude::*;
 
@@ -323,7 +323,9 @@ where
     }
 
     /// Fit one replicate per perturbation, in parallel: replicate `b` has
-    /// the data of `perturbations[b]` ([`ReplicateRunner::fit_one`]).
+    /// the data of `perturbations[b]` ([`ReplicateRunner::fit_one`]). A
+    /// replicate that begins once the steps stop does not run, and fails
+    /// with [`STOPPED`].
     pub fn fit_all(&self, perturbations: &[Perturbation]) -> ReplicateFits {
         self.steps.send(RunnerEvent::Began {
             stage: RunnerStage::Fits,
@@ -333,6 +335,9 @@ where
             .par_iter()
             .enumerate()
             .map(|(index, perturbation)| {
+                if self.steps.stopped() {
+                    return Err(MethodError::Failed(STOPPED.to_string()));
+                }
                 let outcome = self.fit_one(index, perturbation);
                 self.steps.send(RunnerEvent::Fitted {
                     index,

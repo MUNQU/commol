@@ -20,6 +20,7 @@ use crate::global_sensitivity::{
 use crate::predictive::{draw_seeds, run_sets, share_among_replicates};
 use crate::quantity::{Quantities, Quantity};
 use crate::ranges;
+use crate::runs::RunSteps;
 use crate::sample::ParameterSample;
 use commol_random::Stream;
 
@@ -163,6 +164,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         &self,
         draws: Option<usize>,
         quantities: &[Quantity],
+        steps: &RunSteps<'_>,
     ) -> Result<Propagation, MethodError> {
         let sample = self.draws("Propagation", draws)?;
         let (values, weights) = if quantities.is_empty() {
@@ -174,6 +176,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
                 sample.values(),
                 compiled.schedule(),
                 Some(self.seed),
+                steps,
             )?;
             let evaluated = runs.iter().map(|replicates| {
                 replicates
@@ -202,9 +205,10 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         &self,
         draws: Option<usize>,
         quantities: &[Quantity],
+        steps: &RunSteps<'_>,
     ) -> Result<(ParameterSample, Prcc), MethodError> {
         let sample = self.draws("PRCC", draws)?;
-        let outputs = self.means(sample.values(), quantities)?;
+        let outputs = self.means(sample.values(), quantities, steps)?;
         let result = prcc(sample.values(), &outputs, sample.weights())?;
         Ok((sample, result))
     }
@@ -221,12 +225,13 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         trajectories: usize,
         levels: usize,
         quantities: &[Quantity],
+        steps: &RunSteps<'_>,
     ) -> Result<(Morris, usize), MethodError> {
         let design = self
             .inputs
             .morris("Morris", trajectories, levels, self.design_seed())
             .map_err(MethodError::Invalid)?;
-        let outputs = self.means(&design.points, quantities)?;
+        let outputs = self.means(&design.points, quantities, steps)?;
         let result = morris(&design, &outputs)?;
         Ok((result, design.points.len()))
     }
@@ -245,6 +250,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         replicates: usize,
         confidence_level: f64,
         quantities: &[Quantity],
+        steps: &RunSteps<'_>,
     ) -> Result<(Sobol, usize), MethodError> {
         ranges::TWO_REPLICATES
             .check(replicates)
@@ -256,7 +262,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
             .inputs
             .saltelli("Sobol", draws, self.design_seed())
             .map_err(MethodError::Invalid)?;
-        let outputs = self.means(&design.points, quantities)?;
+        let outputs = self.means(&design.points, quantities, steps)?;
         sobol(
             &design,
             &outputs,
@@ -282,6 +288,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
         truncation: Truncation,
         draws: usize,
         quantities: &[Quantity],
+        steps: &RunSteps<'_>,
     ) -> Result<(ChaosExpansion, usize), MethodError> {
         let method = "PolynomialChaos";
         ranges::DEGREE
@@ -307,7 +314,7 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
             .inputs
             .to_unit(method, &points)
             .map_err(MethodError::Invalid)?;
-        let outputs = self.means(&points, quantities)?;
+        let outputs = self.means(&points, quantities, steps)?;
         let expansion = ChaosExpansion::fit(&unit, &outputs, degree, truncation)?;
         Ok((expansion, points.len()))
     }
@@ -322,14 +329,17 @@ impl<E: SimulationEngine + Send + Sync> ForwardAnalysis<E> {
     }
 
     /// The quantities of every point, the mean of its replicates on common
-    /// seeds.
+    /// seeds, each point a step of `steps`.
     fn means(
         &self,
         points: &[Vec<f64>],
         quantities: &[Quantity],
+        steps: &RunSteps<'_>,
     ) -> Result<Vec<Vec<f64>>, MethodError> {
         let compiled = self.compile(quantities)?;
-        Ok(BatchRunner::new(&self.forward, &compiled)?.means(points)?)
+        Ok(BatchRunner::new(&self.forward, &compiled)?
+            .with_steps(steps)
+            .means(points)?)
     }
 
     fn design_seed(&self) -> u64 {

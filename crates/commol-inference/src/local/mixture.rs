@@ -23,6 +23,7 @@ use super::gaussian::{Gaussian, inverse};
 use crate::error::MethodError;
 use crate::importance::{ImportanceRun, Proposal, importance_sample};
 use crate::psis::RELIABLE_K_HAT;
+use crate::runs::RunSteps;
 use crate::target::{Target, discrepancy_in_support};
 use crate::transform::Transform;
 
@@ -92,7 +93,8 @@ pub struct MixtureRun {
 
 /// The Laplace mixture at the optima `ends` of `problem` as the proposal of
 /// `draws` draws of `target`, whose log density has the curvature
-/// `curvature_scale` per unit of the objective.
+/// `curvature_scale` per unit of the objective. Each draw is a step of
+/// `steps` ([`crate::runs`]).
 ///
 /// # Errors
 ///
@@ -110,6 +112,7 @@ pub fn laplace_mixture<E, T>(
     draws: usize,
     kind: CurvatureKind,
     seed: u64,
+    steps: &RunSteps<'_>,
 ) -> Result<MixtureRun, MethodError>
 where
     E: SimulationEngine + Send + Sync,
@@ -207,7 +210,7 @@ where
         log_weights: components.iter().map(|c| c.log_evidence - total).collect(),
         components: &components,
     };
-    let sample = importance_sample(target, &mixture, &transform, draws, seed)
+    let sample = importance_sample(target, &mixture, &transform, draws, seed, steps)
         .map_err(MethodError::Failed)?;
     if !sample.reliable {
         notes.push(format!(

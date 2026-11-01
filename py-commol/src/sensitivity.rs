@@ -7,7 +7,8 @@
 //! runs it and estimates. The results cross as plain values, and Python
 //! builds the result classes.
 
-use crate::parallelism::parallel;
+use crate::parallelism::{parallel, parallel_logged};
+use crate::records::StepLog;
 use commol_inference::global_sensitivity::{ChaosExpansion, ForwardAnalysis, Truncation};
 use commol_inference::settings::sensitivity::{
     InputSpaceSettings, MorrisSettings, PolynomialChaosSettings, PrccSettings, PropagationSettings,
@@ -98,7 +99,8 @@ impl PyForwardAnalysis {
     }
 
     /// The run of every draw of `sample` at `positions`, in parallel, each
-    /// replicate of a stochastic engine seeded from the seed of the analysis
+    /// replicate of a stochastic engine seeded from the seed of the analysis,
+    /// with a record at each 1 % of the draws in `logger`
     ///
     /// Raises:
     ///     ValueError: Before any draw runs, if the sample's inputs are not
@@ -110,13 +112,15 @@ impl PyForwardAnalysis {
         py: Python<'_>,
         sample: &PyParameterSample,
         positions: Vec<f64>,
+        logger: Py<PyAny>,
     ) -> PyResult<PyPredictive> {
-        parallel(py, || {
+        parallel_logged(py, &StepLog::new(logger), |steps| {
             Predictive::new(
                 self.inner.forward(),
                 &sample.inner,
                 &positions,
                 self.inner.seed(),
+                steps,
             )
         })?
         .map(|inner| PyPredictive { inner })
@@ -183,6 +187,7 @@ impl PyForwardAnalysis {
 /// Args:
 ///     analysis: The forward analysis
 ///     settings: The JSON of a `Propagation`
+///     logger: The logger of a record of the points at each 1 %
 ///
 /// Raises:
 ///     ValueError: If a setting is not valid, the draws do not fit the
@@ -193,12 +198,13 @@ fn propagation(
     py: Python<'_>,
     analysis: &PyForwardAnalysis,
     settings: &str,
+    logger: Py<PyAny>,
 ) -> PyResult<PropagationValues> {
     let settings: PropagationSettings = crate::json::read(settings)?;
-    let result = parallel(py, || {
+    let result = parallel_logged(py, &StepLog::new(logger), |steps| {
         analysis
             .inner
-            .propagate(settings.draws, &settings.quantities)
+            .propagate(settings.draws, &settings.quantities, steps)
     })?
     .map_err(method_error)?;
     let draws = (result.sample.values().to_vec(), result.sample.log_weights());
@@ -211,6 +217,7 @@ fn propagation(
 /// Args:
 ///     analysis: The forward analysis
 ///     settings: The JSON of a `PRCC`
+///     logger: The logger of a record of the points at each 1 %
 ///
 /// Raises:
 ///     ValueError: If a setting is not valid, the draws do not fit the
@@ -218,10 +225,17 @@ fn propagation(
 ///         the ranks of the inputs are collinear
 ///     InfeasibleStateError: If a point leaves the values its model allows
 #[pyfunction]
-fn prcc(py: Python<'_>, analysis: &PyForwardAnalysis, settings: &str) -> PyResult<PrccValues> {
+fn prcc(
+    py: Python<'_>,
+    analysis: &PyForwardAnalysis,
+    settings: &str,
+    logger: Py<PyAny>,
+) -> PyResult<PrccValues> {
     let settings: PrccSettings = crate::json::read(settings)?;
-    let (sample, result) = parallel(py, || {
-        analysis.inner.prcc(settings.draws, &settings.quantities)
+    let (sample, result) = parallel_logged(py, &StepLog::new(logger), |steps| {
+        analysis
+            .inner
+            .prcc(settings.draws, &settings.quantities, steps)
     })?
     .map_err(method_error)?;
     Ok((
@@ -238,6 +252,7 @@ fn prcc(py: Python<'_>, analysis: &PyForwardAnalysis, settings: &str) -> PyResul
 /// Args:
 ///     analysis: The forward analysis
 ///     settings: The JSON of a `Morris`
+///     logger: The logger of a record of the points at each 1 %
 ///
 /// Raises:
 ///     ValueError: If a setting is not valid, the inputs come from a sample,
@@ -245,12 +260,20 @@ fn prcc(py: Python<'_>, analysis: &PyForwardAnalysis, settings: &str) -> PyResul
 ///         is NaN at a point
 ///     InfeasibleStateError: If a point leaves the values its model allows
 #[pyfunction]
-fn morris(py: Python<'_>, analysis: &PyForwardAnalysis, settings: &str) -> PyResult<MorrisValues> {
+fn morris(
+    py: Python<'_>,
+    analysis: &PyForwardAnalysis,
+    settings: &str,
+    logger: Py<PyAny>,
+) -> PyResult<MorrisValues> {
     let settings: MorrisSettings = crate::json::read(settings)?;
-    let (result, runs) = parallel(py, || {
-        analysis
-            .inner
-            .morris(settings.trajectories, settings.levels, &settings.quantities)
+    let (result, runs) = parallel_logged(py, &StepLog::new(logger), |steps| {
+        analysis.inner.morris(
+            settings.trajectories,
+            settings.levels,
+            &settings.quantities,
+            steps,
+        )
     })?
     .map_err(method_error)?;
     Ok((result.mu, result.mu_star, result.sigma, runs))
@@ -261,20 +284,27 @@ fn morris(py: Python<'_>, analysis: &PyForwardAnalysis, settings: &str) -> PyRes
 /// Args:
 ///     analysis: The forward analysis
 ///     settings: The JSON of a `Sobol`
+///     logger: The logger of a record of the points at each 1 %
 ///
 /// Raises:
 ///     ValueError: If a setting is not valid, the inputs come from a sample,
 ///         or a quantity does not fit the model or is NaN at a point
 ///     InfeasibleStateError: If a point leaves the values its model allows
 #[pyfunction]
-fn sobol(py: Python<'_>, analysis: &PyForwardAnalysis, settings: &str) -> PyResult<SobolValues> {
+fn sobol(
+    py: Python<'_>,
+    analysis: &PyForwardAnalysis,
+    settings: &str,
+    logger: Py<PyAny>,
+) -> PyResult<SobolValues> {
     let settings: SobolSettings = crate::json::read(settings)?;
-    let (result, runs) = parallel(py, || {
+    let (result, runs) = parallel_logged(py, &StepLog::new(logger), |steps| {
         analysis.inner.sobol(
             settings.draws,
             settings.replicates,
             settings.confidence_level,
             &settings.quantities,
+            steps,
         )
     })?
     .map_err(method_error)?;
@@ -299,6 +329,7 @@ fn sobol(py: Python<'_>, analysis: &PyForwardAnalysis, settings: &str) -> PyResu
 /// Args:
 ///     analysis: The forward analysis
 ///     settings: The JSON of a `PolynomialChaos`
+///     logger: The logger of a record of the points at each 1 %
 ///
 /// Raises:
 ///     ValueError: If a setting or the truncation is not valid, the inputs
@@ -310,16 +341,18 @@ fn polynomial_chaos(
     py: Python<'_>,
     analysis: &PyForwardAnalysis,
     settings: &str,
+    logger: Py<PyAny>,
 ) -> PyResult<PyChaosRun> {
     let settings: PolynomialChaosSettings = crate::json::read(settings)?;
     let truncation =
         Truncation::new(settings.q_norm, settings.max_interaction).map_err(method_error)?;
-    let (expansion, runs) = parallel(py, || {
+    let (expansion, runs) = parallel_logged(py, &StepLog::new(logger), |steps| {
         analysis.inner.chaos(
             settings.degree,
             truncation,
             settings.draws,
             &settings.quantities,
+            steps,
         )
     })?
     .map_err(method_error)?;

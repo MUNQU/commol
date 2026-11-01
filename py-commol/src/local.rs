@@ -7,7 +7,8 @@
 //! and returns the starts of the fit and plain values; Python builds the
 //! result.
 
-use crate::parallelism::parallel;
+use crate::parallelism::{parallel, parallel_logged};
+use crate::records::StepLog;
 use commol_inference::importance::TemperedPosterior;
 use commol_inference::local::{self, Gaussian, MixtureRun};
 use commol_inference::sensitivity::Matrix;
@@ -264,6 +265,8 @@ impl PyMixtureRun {
 /// Args:
 ///     problem: The calibration problem
 ///     settings: The JSON of a `LaplaceMixture`
+///     logger: The logger of a record of each start, and of the draws at
+///         each 1 %
 ///
 /// Returns:
 ///     The starts of the fit, and the mixture with its sample
@@ -278,10 +281,12 @@ fn laplace_mixture(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
     settings: &str,
+    logger: Py<PyAny>,
 ) -> PyResult<(PyStarts, PyMixtureRun)> {
     let settings: LaplaceMixtureSettings = crate::json::read(settings)?;
     let priors = problem_priors(problem, settings.target.priors())?;
-    let starts = problem.fit(py, settings.starts)?;
+    let log = StepLog::new(logger);
+    let starts = problem.fit_logged(py, settings.starts, &log)?;
     let ends = start_ends(&starts);
     let inner = &problem.inner;
     let seed = problem.seed;
@@ -289,7 +294,7 @@ fn laplace_mixture(
     let run = match &settings.target {
         MixtureTarget::Likelihood { .. } => {
             let target = LikelihoodTarget::new(inner, &priors).map_err(method_error)?;
-            parallel(py, || {
+            parallel_logged(py, &log, |steps| {
                 local::laplace_mixture(
                     inner,
                     &TemperedPosterior::new(&target, seed),
@@ -298,12 +303,13 @@ fn laplace_mixture(
                     draws,
                     curvature,
                     seed,
+                    steps,
                 )
             })?
         }
         MixtureTarget::Gibbs(gibbs) => {
             let target = GibbsTarget::new(inner, &priors, gibbs.eta).map_err(method_error)?;
-            parallel(py, || {
+            parallel_logged(py, &log, |steps| {
                 local::laplace_mixture(
                     inner,
                     &TemperedPosterior::new(&target, seed),
@@ -312,6 +318,7 @@ fn laplace_mixture(
                     draws,
                     curvature,
                     seed,
+                    steps,
                 )
             })?
         }

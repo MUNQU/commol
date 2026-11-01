@@ -2,6 +2,7 @@
 //! when a setting, an input, the data or the model does not fit the method,
 //! `Failed` when a computation that could start fails.
 
+use commol_core::NoSteps;
 use std::collections::HashMap;
 
 use commol_calibration::{
@@ -223,9 +224,10 @@ fn a_setting_out_of_range_is_invalid_in_every_method() {
             1,
             0.9,
             5,
+            &NoSteps,
         )),
         kind_of(SmcSampler::new(1, RandomWalk::new(), 0.5, 0.5, 0.01)),
-        kind_of(analysis.sobol(8, 1, 0.9, &[])),
+        kind_of(analysis.sobol(8, 1, 0.9, &[], &NoSteps)),
         kind_of(bootstrap_thresholds(
             &runner,
             &resampler,
@@ -323,7 +325,14 @@ fn a_computation_that_fails_is_failed_in_every_method() {
             &[1.0],
             0.5,
         )),
-        kind_of(gibbs_posterior(&problem, &priors, 1.0, &mut stopping, 3)),
+        kind_of(gibbs_posterior(
+            &problem,
+            &priors,
+            1.0,
+            &mut stopping,
+            3,
+            &NoSteps,
+        )),
         kind_of(structural_rank(&source, 2, 7)),
         kind_of(Residuals::new(&no_run, &FIT, ResidualScale::Additive)),
     ];

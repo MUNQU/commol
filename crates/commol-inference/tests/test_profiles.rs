@@ -12,17 +12,18 @@ use commol_calibration::{
 use std::sync::Mutex;
 
 use commol_calibration::StartEvent;
-use commol_core::{ModelValue, SimulationEngine, SimulationError, Steps, ValuePlan};
+use commol_core::{ModelValue, STOPPED, SimulationEngine, SimulationError, Steps, ValuePlan};
 use commol_inference::MethodError;
 use commol_inference::profiles::{
     ProfileEnd, ProfileTracer, ProfiledQuantity, SideEvent, beale, bootstrap_thresholds, chi_square,
 };
 use commol_inference::resampling::{
-    Perturbation, ReplicateRunner, Resampler, RunnerEvent, RunnerStage,
+    Perturbation, ReplicateRunner, Resampler, RunnerEvent, RunnerStage, RunnerSteps,
 };
 use commol_inference::transform::{Transform, on_bound};
 use commol_random::Generator;
 use commol_random::Stream;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 type Formula = fn(&HashMap<String, f64>, f64) -> f64;
 
@@ -1116,4 +1117,75 @@ fn the_tracer_sends_each_side_that_ends() {
             "side 1 of 1: Ok(Crossed)",
         ]
     );
+}
+
+/// A receiver whose loops have stopped before their first step.
+struct Stopped;
+
+impl<E> Steps<E> for Stopped {
+    fn stopped(&self) -> bool {
+        true
+    }
+}
+
+/// A receiver that stops once the refits of a threshold begin.
+#[derive(Default)]
+struct StopsAtRefits(AtomicBool);
+
+impl Steps<RunnerEvent<'_>> for StopsAtRefits {
+    fn send(&self, event: RunnerEvent<'_>) {
+        if let RunnerEvent::Began {
+            stage: RunnerStage::Refits,
+            ..
+        } = event
+        {
+            self.0.store(true, Ordering::Relaxed);
+        }
+    }
+
+    fn stopped(&self) -> bool {
+        self.0.load(Ordering::Relaxed)
+    }
+}
+
+#[test]
+fn no_replicate_and_no_refit_runs_once_the_steps_stop() {
+    let problem = line_problem(&VALUES);
+    let config = config();
+    let fit = optimize(&problem, &config, 0).unwrap();
+    let quantity = [ProfiledQuantity::Parameter(1)];
+    let thresholds = |steps: &RunnerSteps<'_>| {
+        let runner = ReplicateRunner::new(&problem, &config, &fit.best_parameters, 2, 9)
+            .unwrap()
+            .with_steps(steps);
+        bootstrap_thresholds(
+            &runner,
+            &Noisy,
+            3,
+            &quantity,
+            &[fit.best_parameters[1]],
+            0.9,
+        )
+        .unwrap_err()
+        .to_string()
+    };
+
+    let fits = thresholds(&Stopped);
+    assert_eq!(fits.matches(STOPPED).count(), 3, "{fits}");
+    let refits = thresholds(&StopsAtRefits::default());
+    assert_eq!(refits.matches(STOPPED).count(), 3, "{refits}");
+}
+
+#[test]
+fn no_side_runs_once_the_steps_stop() {
+    let problem = line_problem(&VALUES);
+    let config = config();
+    let fit = optimize(&problem, &config, 0).unwrap();
+    let tracer = ProfileTracer::new(&problem, &config, &fit.best_parameters, 7).unwrap();
+    let quantities = [ProfiledQuantity::Parameter(0)];
+
+    let profiles = tracer.trace_all(&quantities, &[1.0], 100, &Stopped);
+
+    let error = profiles[0].as_ref().unwrap_err().to_string();
+    assert!(error.contains(STOPPED), "{error}");
 }

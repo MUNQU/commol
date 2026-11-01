@@ -49,7 +49,7 @@ pub use parallelism::{Levels, Parallelism, inner_levels_in_parallel};
 
 pub use position::{POSITION_TOLERANCE, same_position};
 
-pub use progress::{NoSteps, Steps};
+pub use progress::{NoSteps, STOPPED, Steps};
 
 pub use range::{Bound, CONFIDENCE_LEVEL, Count, Ranges, Real, Rule, Setting, check_object};
 

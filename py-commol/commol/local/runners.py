@@ -134,7 +134,7 @@ def run_laplace_mixture(
         effective size.
     """
     starts, run = commol_rs.inference.laplace_mixture(
-        calibrator._engine_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method), logger
     )
     names = calibrator.parameter_names
     fit = fit_result(starts, names, calibrator.seed, logger)

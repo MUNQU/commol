@@ -2,6 +2,7 @@
 //! parametric bootstrap and the log score, on an engine whose output is a
 //! line.
 
+use commol_core::NoSteps;
 use std::collections::HashMap;
 
 use commol_calibration::{
@@ -196,7 +197,7 @@ fn the_posterior_of_a_normal_mean_and_its_evidence_have_their_closed_forms() {
     .unwrap();
     let mut sampler = SmcSampler::new(2000, RandomWalk::new(), 0.5, 0.5, 0.01).unwrap();
 
-    let run = bayesian_posterior(&problem, &priors, &mut sampler, 7).unwrap();
+    let run = bayesian_posterior(&problem, &priors, &mut sampler, 7, &NoSteps).unwrap();
 
     let n = values.len() as f64;
     let precision = n + 1.0 / 4.0;

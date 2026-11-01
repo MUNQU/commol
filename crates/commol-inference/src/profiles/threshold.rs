@@ -8,7 +8,7 @@
 //! | [`bootstrap_thresholds`] | Any loss | That the bootstrap mimics the data |
 
 use commol_calibration::{CalibrationProblem, LossConfig, Subproblem, optimize_subproblem};
-use commol_core::{CONFIDENCE_LEVEL, SimulationEngine};
+use commol_core::{CONFIDENCE_LEVEL, STOPPED, SimulationEngine};
 use commol_random::replicate_seed;
 use commol_statistics::statistics;
 use rayon::prelude::*;
@@ -159,31 +159,35 @@ where
         .par_iter()
         .map(|(index, fit)| {
             let index = *index;
-            let rises = runner
-                .replicate_problem(&perturbations[index])
-                .map_err(|error| error.to_string())
-                .and_then(|problem| {
-                    let seed = Stream::ThresholdRefits.replicate(runner.seed(), index as u64);
-                    quantities
-                        .iter()
-                        .zip(centers)
-                        .enumerate()
-                        .map(|(q, (quantity, &center))| {
-                            let held = hold(&problem, quantity, center)?;
-                            let mut start = fit.best_parameters.clone();
-                            if let ProfiledQuantity::Parameter(j) = quantity {
-                                start[*j] = center;
-                            }
-                            let refit = optimize_subproblem(
-                                &held,
-                                runner.config(),
-                                &start,
-                                replicate_seed(seed, q as u64),
-                            )?;
-                            Ok((refit.fit.final_loss - fit.final_loss).max(0.0))
-                        })
-                        .collect()
-                });
+            let rises = if steps.stopped() {
+                Err(STOPPED.to_string())
+            } else {
+                runner
+                    .replicate_problem(&perturbations[index])
+                    .map_err(|error| error.to_string())
+                    .and_then(|problem| {
+                        let seed = Stream::ThresholdRefits.replicate(runner.seed(), index as u64);
+                        quantities
+                            .iter()
+                            .zip(centers)
+                            .enumerate()
+                            .map(|(q, (quantity, &center))| {
+                                let held = hold(&problem, quantity, center)?;
+                                let mut start = fit.best_parameters.clone();
+                                if let ProfiledQuantity::Parameter(j) = quantity {
+                                    start[*j] = center;
+                                }
+                                let refit = optimize_subproblem(
+                                    &held,
+                                    runner.config(),
+                                    &start,
+                                    replicate_seed(seed, q as u64),
+                                )?;
+                                Ok((refit.fit.final_loss - fit.final_loss).max(0.0))
+                            })
+                            .collect()
+                    })
+            };
             steps.send(RunnerEvent::Refitted {
                 index,
                 outcome: &rises,

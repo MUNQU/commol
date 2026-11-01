@@ -17,7 +17,7 @@ use commol_calibration::{
     CalibrationProblem, ConstraintSettings, LossConfig, ObservedDataPoint, OptimizationConfig,
     OptimizationObjective, Subproblem, SubproblemResult, Workspace, optimize_subproblem, predict,
 };
-use commol_core::{Accuracy, NoSteps, SimulationEngine, Steps};
+use commol_core::{Accuracy, NoSteps, STOPPED, SimulationEngine, Steps};
 use commol_random::replicate_seed;
 use rayon::prelude::*;
 
@@ -419,16 +419,20 @@ where
             .into_par_iter()
             .map(|task| {
                 let index = task / 2;
-                let side = centers[index].clone().and_then(|center| {
-                    self.walk(
-                        &quantities[index],
-                        index as u64,
-                        task % 2,
-                        center,
-                        thresholds[index],
-                        max_steps,
-                    )
-                });
+                let side = if steps.stopped() {
+                    Err(MethodError::Failed(STOPPED.to_string()))
+                } else {
+                    centers[index].clone().and_then(|center| {
+                        self.walk(
+                            &quantities[index],
+                            index as u64,
+                            task % 2,
+                            center,
+                            thresholds[index],
+                            max_steps,
+                        )
+                    })
+                };
                 steps.send(SideEvent::Finished {
                     quantity: index,
                     side: task % 2,

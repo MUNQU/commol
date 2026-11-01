@@ -16,7 +16,7 @@
 //! replicate.
 
 use argmin::core::observers::Observe;
-use commol_core::{NoSteps, SimulationEngine, Steps};
+use commol_core::{NoSteps, STOPPED, SimulationEngine, Steps};
 use commol_random::{Generator, Stream, latin_hypercube};
 use rayon::prelude::*;
 
@@ -197,7 +197,8 @@ pub type StartSteps<'s> = dyn for<'e> Steps<StartEvent<'e>> + 's;
 /// [`optimize_starts`], with an observer of every iteration of each start
 /// from `observer`, sending the events of the starts to `steps`: one
 /// [`StartEvent::Began`], then one [`StartEvent::Finished`] per start, from
-/// the thread that ran it, as soon as it ends.
+/// the thread that ran it, as soon as it ends. A start that begins once
+/// `steps` stop does not run, and fails with [`STOPPED`].
 ///
 /// # Errors
 ///
@@ -223,6 +224,12 @@ where
         .into_par_iter()
         .enumerate()
         .map(|(index, start)| {
+            if steps.stopped() {
+                return StartOutcome {
+                    start,
+                    result: Err(STOPPED.to_string()),
+                };
+            }
             let result = run(
                 &space,
                 OptimizationObjective::new(problem),

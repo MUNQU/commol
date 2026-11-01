@@ -12,7 +12,7 @@ use commol_calibration::{
     Subproblem, optimize, optimize_from, optimize_starts, optimize_starts_with_observer,
     optimize_subproblem, optimize_with_history, start_points,
 };
-use commol_core::{ModelValue, SimulationEngine, SimulationError, Steps, ValuePlan};
+use commol_core::{ModelValue, STOPPED, SimulationEngine, SimulationError, Steps, ValuePlan};
 
 /// One output `x = k` at every position, or `x = 0.4` when it is flat; a
 /// run with `k > 2/3` fails, and so does every run after the first `limit`
@@ -452,4 +452,29 @@ fn the_starts_send_their_beginning_then_each_start_that_finishes() {
         .map(|(index, outcome)| format!("start {index} failed: {}", outcome.result.is_err()))
         .collect();
     assert_eq!(events, expected);
+}
+
+/// A receiver whose loops have stopped before their first step.
+struct Stopped;
+
+impl<E> Steps<E> for Stopped {
+    fn stopped(&self) -> bool {
+        true
+    }
+}
+
+#[test]
+fn no_start_runs_once_the_steps_stop() {
+    let problem = problem();
+    let error = optimize_starts_with_observer(
+        &problem,
+        &config(),
+        start_points(problem.parameters(), 3, 11),
+        11,
+        || NoObserver,
+        &Stopped,
+    )
+    .unwrap_err();
+
+    assert_eq!(error.matches(STOPPED).count(), 3, "{error}");
 }

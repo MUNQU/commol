@@ -455,7 +455,8 @@ impl PyCalibrationProblem {
     }
 
     /// The run of every draw of `sample` at `positions`, in parallel, each
-    /// replicate of a stochastic engine seeded from the seed of the problem
+    /// replicate of a stochastic engine seeded from the seed of the problem,
+    /// with a record at each 1 % of the draws in `logger`
     ///
     /// Raises:
     ///     ValueError: Before any draw runs, if the sample's parameters are
@@ -467,9 +468,16 @@ impl PyCalibrationProblem {
         py: Python<'_>,
         sample: &PyParameterSample,
         positions: Vec<f64>,
+        logger: Py<PyAny>,
     ) -> PyResult<PyPredictive> {
-        parallel(py, || {
-            Predictive::new(self.inner.forward(), &sample.inner, &positions, self.seed)
+        parallel_logged(py, &StepLog::new(logger), |steps| {
+            Predictive::new(
+                self.inner.forward(),
+                &sample.inner,
+                &positions,
+                self.seed,
+                steps,
+            )
         })?
         .map(|inner| PyPredictive { inner })
         .map_err(method_error)
@@ -635,6 +643,8 @@ fn bootstrap(
 /// Args:
 ///     problem: The calibration problem
 ///     settings: The JSON of a `BlockJackknife`
+///     logger: The logger of a record of each start and block that
+///         finishes
 ///
 /// Returns:
 ///     The starts of the fit, and the jackknife
@@ -648,9 +658,11 @@ fn block_jackknife(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
     settings: &str,
+    logger: Py<PyAny>,
 ) -> PyResult<(PyStarts, PyJackknifeRun)> {
     let settings: BlockJackknifeSettings = crate::json::read(settings)?;
-    let starts = problem.fit(py, settings.starts)?;
+    let log = StepLog::new(logger).with_unit(FitUnit::Block);
+    let starts = problem.fit_logged(py, settings.starts, &log)?;
     let runner = problem.runner(&best_values(&starts), settings.starts)?;
     let scheme = BlockScheme::at_fit(
         &problem.inner,
@@ -659,8 +671,8 @@ fn block_jackknife(
         BlockDrawing::NonOverlapping,
     )
     .map_err(method_error)?;
-    let jackknife = parallel(py, || {
-        commol_inference::resampling::block_jackknife(&runner, &scheme)
+    let jackknife = parallel_logged(py, &log, |steps| {
+        commol_inference::resampling::block_jackknife(&runner.with_steps(steps), &scheme)
     })?
     .map_err(method_error)?;
     let spans = scheme.spans();
