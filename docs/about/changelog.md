@@ -122,6 +122,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`Model.applied_parameters`, `ModelStructure.report_sections`) holds its
   `EntrySpread` under the key `spread`, not `interval`. A report saved as JSON
   before this change has the key `interval`: read `spread`.
+- **Breaking:** the engine holds the one rule of a fit of a problem: a
+  `CalibrationResult` that lacks a parameter of the problem or has one the
+  problem does not have is refused, with the message `The fit is not a fit
+  of this problem: it lacks ["k1"] and has ["k2"], which the problem does not
+  have`. `Calibrator.point_sample`, `ResidualNoise(fit=...)` and
+  `Collinearity(at=result)` refuse such a fit, and `StartsIdentifiability`
+  refuses such a start (`A start is not a start of this problem: ...`).
+  Before, all of them except `point_sample` accepted an extra parameter.
 - **Breaking:** the engine holds every rule of a calibration problem and of
   an uncertainty method, and Python holds no copy: each class sends its JSON
   to the engine when it is built and raises the message of the engine. A

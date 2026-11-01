@@ -136,6 +136,28 @@ sample a runner makes (`sample_method` in `resampling/runners.py`) or
 `tests/calibration/test_starts.py`
 (`test_a_verbose_swarm_repeats_its_fit_from_the_seed`).
 
+## The engine says what a fit of a problem is
+
+A point of a problem, the best values of a fit or the end of one of its
+starts, has a value of each parameter of the problem and of nothing else.
+`values_of` (`crates/commol-calibration/src/settings.rs`) holds this rule
+once: `FitRecord::values` and `StartRecord::end_values` give the values in
+problem order, or refuse a point with a message that names the parameters it
+lacks and those it has that the problem does not have. Each caller asks the
+engine: `Calibrator.point_sample` (through `CalibrationProblem.fit_values`),
+the residual noise of a fit, `Collinearity(at=result)` and
+`StartsIdentifiability`. An extra parameter is refused, not ignored,
+because it says that the fit is of another problem.
+
+**Guards:** `crates/commol-calibration/tests/test_json.rs`
+(`a_fit_gives_the_values_of_the_parameters_it_has`,
+`a_start_gives_the_values_of_the_parameters_its_end_has`);
+`tests/calibration/test_problem.py`
+(`test_a_fit_of_another_problem_is_refused`);
+`tests/uncertainty/test_identifiability.py`
+(`test_a_result_holds_the_parameters_of_the_problem`,
+`test_a_start_of_another_problem_is_rejected`).
+
 ## Parallel work runs in the pool of the setting
 
 Every binding that runs parallel work calls `parallel` or `parallel_logged` (`py-commol/src/parallelism.rs`),

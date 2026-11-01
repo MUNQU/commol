@@ -12,9 +12,9 @@
 use crate::parallelism::{parallel, parallel_logged};
 use crate::records::StepLog;
 use commol_calibration::{
-    CalibrationProblem, EvaluationError, NoObserver, OptimizationConfig, ProblemSettings, Progress,
-    StartSteps, Starts, Violation, Workspace, observed_data, optimize_starts_with_observer,
-    optimize_with_history, start_points,
+    CalibrationProblem, EvaluationError, FitRecord, NoObserver, OptimizationConfig,
+    ProblemSettings, Progress, StartSteps, Starts, Violation, Workspace, observed_data,
+    optimize_starts_with_observer, optimize_with_history, start_points,
 };
 use commol_core::NoSteps;
 use commol_inference::resampling::{
@@ -362,6 +362,22 @@ impl PyCalibrationProblem {
     #[getter]
     fn seed(&self) -> u64 {
         self.seed
+    }
+
+    /// The best value of each parameter of a fit of this problem, in problem
+    /// order
+    ///
+    /// Args:
+    ///     result: The JSON of a `CalibrationResult`
+    ///
+    /// Raises:
+    ///     ValueError: If the JSON is not a result, or the fit lacks a
+    ///         parameter of the problem or has one the problem does not
+    ///         have; the message names both lists
+    fn fit_values(&self, result: &str) -> PyResult<Vec<f64>> {
+        crate::json::read::<FitRecord>(result)?
+            .values(&self.names())
+            .map_err(value_error)
     }
 
     /// Optimize from `starts` start points in parallel, and choose the best

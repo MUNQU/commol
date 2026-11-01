@@ -14,7 +14,6 @@ from commol import (
     ObservedDataPoint,
     Simulation,
 )
-from commol._fit.result import CalibrationResult
 from commol.quantities import Trajectory, ValueAt
 from commol.quantities.quantities import quantity_labels
 from commol.sensitivity import InputSpace, SensitivityAnalysis
@@ -260,17 +259,3 @@ def test_a_fit_is_compared_as_a_sample_of_one_draw() -> None:
     difference = _run(fit, 0.02)["C"][30] - _run(fit, 0.1)["C"][30]
     assert compared.median == pytest.approx(difference)
     assert (compared.lower, compared.upper) == (None, None)
-
-
-def test_a_point_sample_needs_the_names_of_the_problem() -> None:
-    result = CalibrationResult(
-        best_parameters={"k2": 0.1},
-        final_loss=0.0,
-        iterations=0,
-        converged=True,
-        termination_reason="test",
-        seed=0,
-    )
-
-    with pytest.raises(ValueError, match=r"it lacks \['k1'\] and has \['k2'\]"):
-        _calibrator().point_sample(result)

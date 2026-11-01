@@ -292,6 +292,38 @@ class TestProblemAgainstTheModel:
             )
 
 
+@pytest.mark.parametrize(
+    ("best_parameters", "lacks", "has"),
+    [({"k1": 0.3, "k2": 0.1}, "[]", '["k2"]'), ({"k2": 0.1}, '["k1"]', '["k2"]')],
+)
+def test_a_fit_of_another_problem_is_refused(
+    truth: Model, best_parameters: dict[str, float], lacks: str, has: str
+) -> None:
+    """The engine refuses a fit that lacks a parameter or has one more."""
+    problem = CalibrationProblem(
+        observed_data=[ObservedDataPoint(at=0, output="B", value=10.0)],
+        parameters=[bounded("k1")],
+        loss_function="sse",
+        optimization_config=NelderMeadConfig(max_iterations=1, verbose=False),
+    )
+    result = CalibrationResult(
+        best_parameters=best_parameters,
+        final_loss=0.0,
+        iterations=0,
+        converged=True,
+        termination_reason="given",
+        seed=0,
+    )
+
+    with pytest.raises(ValueError) as error:
+        Calibrator(Simulation(truth), problem).point_sample(result)
+
+    assert str(error.value) == (
+        f"The fit is not a fit of this problem: it lacks {lacks} and has {has}, "
+        "which the problem does not have"
+    )
+
+
 def test_a_subclass_keeps_the_rules_of_the_engine() -> None:
     class Rate(CalibrationParameter):
         """A parameter of a rate, with the rules of every parameter."""

@@ -397,7 +397,41 @@ fn a_fit_gives_the_values_of_the_parameters_it_has() {
     assert_eq!(fit.values(&["k".to_string()]), Ok(vec![0.5]));
     assert_eq!(
         fit.values(&["k".to_string(), "m".to_string()]),
-        Err(r#"The fit is not a fit of this problem: it lacks ["m"]"#.to_string())
+        Err(
+            r#"The fit is not a fit of this problem: it lacks ["m"] and has [], which the problem does not have"#
+                .to_string()
+        )
+    );
+    assert_eq!(
+        fit.values(&["m".to_string()]),
+        Err(
+            r#"The fit is not a fit of this problem: it lacks ["m"] and has ["k"], which the problem does not have"#
+                .to_string()
+        )
+    );
+}
+
+#[test]
+fn a_start_gives_the_values_of_the_parameters_its_end_has() {
+    let fit: FitRecord = json::read(
+        r#"{"best_parameters": {"k": 0.5}, "final_loss": 1.0, "iterations": 3,
+        "converged": true, "termination_reason": "done",
+        "starts": [{"start": {"k": 0.1}, "end": {"k": 0.5, "m": 2.0}, "loss": 1.0,
+        "converged": true}], "failed": [], "seed": 1}"#,
+    )
+    .unwrap();
+    let start = &fit.starts[0];
+
+    assert_eq!(
+        start.end_values(&["m".to_string(), "k".to_string()]),
+        Ok(vec![2.0, 0.5])
+    );
+    assert_eq!(
+        start.end_values(&["k".to_string()]),
+        Err(
+            r#"A start is not a start of this problem: it lacks [] and has ["m"], which the problem does not have"#
+                .to_string()
+        )
     );
 }
 

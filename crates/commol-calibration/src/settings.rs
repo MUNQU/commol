@@ -739,6 +739,50 @@ pub struct StartRecord {
     pub converged: bool,
 }
 
+impl StartRecord {
+    /// The value of each of `names` at the end of the start, in their order.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the parameters the end lacks and those
+    /// it has that `names` does not have.
+    pub fn end_values(&self, names: &[String]) -> Result<Vec<f64>, String> {
+        values_of(names, &self.end)
+            .map_err(|detail| format!("A start is not a start of this problem: {detail}"))
+    }
+}
+
+/// The value of each of `names` in `values`, in the order of `names`: the
+/// one rule of a point of a problem, which has a value of each parameter of
+/// the problem and of nothing else.
+///
+/// # Errors
+///
+/// Returns a text that names the names `values` lacks and those it has that
+/// `names` does not have.
+fn values_of(names: &[String], values: &Pairs<f64>) -> Result<Vec<f64>, String> {
+    let missing: Vec<&str> = names
+        .iter()
+        .filter(|name| values.get(name).is_none())
+        .map(String::as_str)
+        .collect();
+    let extra: Vec<&str> = values
+        .0
+        .iter()
+        .map(|(name, _)| name.as_str())
+        .filter(|name| !names.iter().any(|known| known == name))
+        .collect();
+    if !missing.is_empty() || !extra.is_empty() {
+        return Err(format!(
+            "it lacks {missing:?} and has {extra:?}, which the problem does not have"
+        ));
+    }
+    Ok(names
+        .iter()
+        .map(|name| *values.get(name).expect("checked above"))
+        .collect())
+}
+
 /// The result of a calibration, as the Python class `CalibrationResult`
 /// writes it: what a method that reads a fit takes.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -773,21 +817,10 @@ impl FitRecord {
     ///
     /// # Errors
     ///
-    /// Returns a message that names the parameters the fit lacks.
+    /// Returns a message that names the parameters the fit lacks and those
+    /// it has that `names` does not have.
     pub fn values(&self, names: &[String]) -> Result<Vec<f64>, String> {
-        let missing: Vec<&str> = names
-            .iter()
-            .filter(|name| self.best_parameters.get(name).is_none())
-            .map(String::as_str)
-            .collect();
-        if !missing.is_empty() {
-            return Err(format!(
-                "The fit is not a fit of this problem: it lacks {missing:?}"
-            ));
-        }
-        Ok(names
-            .iter()
-            .map(|name| *self.best_parameters.get(name).expect("checked above"))
-            .collect())
+        values_of(names, &self.best_parameters)
+            .map_err(|detail| format!("The fit is not a fit of this problem: {detail}"))
     }
 }

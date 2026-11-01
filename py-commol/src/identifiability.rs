@@ -68,23 +68,6 @@ fn problem_sample<'a>(
     Ok(&sample.inner)
 }
 
-/// The names of `names` that `values` has no value of.
-fn missing(names: &[String], values: &commol_core::json::Pairs<f64>) -> Vec<String> {
-    names
-        .iter()
-        .filter(|name| values.get(name).is_none())
-        .cloned()
-        .collect()
-}
-
-/// The values of `values` in the order of `names`, which it has all of.
-fn ordered(names: &[String], values: &commol_core::json::Pairs<f64>) -> Vec<f64> {
-    names
-        .iter()
-        .map(|name| *values.get(name).expect("checked by missing"))
-        .collect()
-}
-
 /// The rank of the scaled sensitivities at one point
 #[pyclass(name = "PointRank", frozen, get_all)]
 #[derive(Clone)]
@@ -336,8 +319,9 @@ enum At<'py> {
 ///
 /// Raises:
 ///     ValueError: If a setting is not valid, the engine is stochastic, the
-///         fit lacks a parameter or the sample's parameters are not the
-///         problem's, or every point is infeasible
+///         fit is not a fit of the problem (it lacks a parameter or has
+///         one the problem does not have), the sample's parameters are not
+///         the problem's, or every point is infeasible
 #[pyfunction]
 fn collinearity(
     py: Python<'_>,
@@ -351,14 +335,7 @@ fn collinearity(
     let (points, weights) = match &at {
         At::Fit(fit) => {
             let fit: FitRecord = crate::json::read(fit)?;
-            let missing = missing(&names, &fit.best_parameters);
-            if !missing.is_empty() {
-                return Err(value_error(format!(
-                    "The result has no value of {}.",
-                    python_list(&missing)
-                )));
-            }
-            (vec![ordered(&names, &fit.best_parameters)], vec![1.0])
+            (vec![fit.values(&names).map_err(value_error)?], vec![1.0])
         }
         At::Sample(sample) => {
             let sample = problem_sample(problem, sample)?;
@@ -484,8 +461,9 @@ pub struct PyStartsAnalysis {
 ///     result: The JSON of the `CalibrationResult` whose starts are compared
 ///
 /// Raises:
-///     ValueError: If a setting is not valid, a start lacks a parameter, or
-///         fewer than two starts converged
+///     ValueError: If a setting is not valid, a start lacks a parameter or
+///         has one the problem does not have, or fewer than two starts
+///         converged
 #[pyfunction]
 fn starts_identifiability(
     problem: &PyCalibrationProblem,
@@ -497,14 +475,7 @@ fn starts_identifiability(
     let names = problem.names();
     let mut ends = Vec::with_capacity(result.starts.len());
     for start in &result.starts {
-        let missing = missing(&names, &start.end);
-        if !missing.is_empty() {
-            return Err(value_error(format!(
-                "A start has no value of {}.",
-                python_list(&missing)
-            )));
-        }
-        ends.push(ordered(&names, &start.end));
+        ends.push(start.end_values(&names).map_err(value_error)?);
     }
     let losses: Vec<f64> = result.starts.iter().map(|start| start.loss).collect();
     let converged: Vec<bool> = result.starts.iter().map(|start| start.converged).collect();

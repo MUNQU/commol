@@ -327,6 +327,7 @@ print(round(at_fit.median), at_fit.lower)  # -72 None
 
 | Case | Result |
 |---|---|
+| `point_sample` of a fit that lacks a parameter of the problem or has one the problem does not have | `ValueError` that names both lists |
 | A scenario sets a parameter of the sample | `ValueError` that names the scenario and the parameter: each draw sets it |
 | A scenario sets a parameter the model does not have | `ValueError` that names the scenario and the parameter |
 | A quantity reads a position the runs lack | `ValueError` that lists each such position with its quantity |
