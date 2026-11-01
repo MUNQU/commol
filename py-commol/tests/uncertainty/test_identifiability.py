@@ -267,11 +267,11 @@ class TestCollinearity:
             ["Collinearity: no observation is sensitive to it."],
         )
 
-    def test_a_result_holds_every_parameter_of_the_problem(
+    def test_a_result_holds_the_parameters_of_the_problem(
         self, product: Calibrator
     ) -> None:
         at = CalibrationResult(
-            best_parameters={"k1": 0.3, "k2": 0.1},
+            best_parameters={"k1": 0.3, "k2": 0.1, "x": 1.0},
             final_loss=0.0,
             iterations=0,
             converged=True,
@@ -279,7 +279,7 @@ class TestCollinearity:
             seed=0,
         )
 
-        with pytest.raises(ValueError, match=r"The result has no value of \['s'\]"):
+        with pytest.raises(ValueError, match=r'it lacks \["s"\] and has \["x"\]'):
             product.identifiability(
                 Collinearity(at=at, max_subset_size=2, threshold=20)
             )
@@ -526,19 +526,21 @@ class TestPractical:
             ),
         }
 
-    def test_a_start_without_a_parameter_is_rejected(self, product: Calibrator) -> None:
+    def test_a_start_of_another_problem_is_rejected(self, product: Calibrator) -> None:
         result = _result(
-            [{"k1": 0.2, "s": 1.5}, {"k1": 0.5, "s": 0.6, "k2": 0.1}], [1.0, 1.0]
+            [{"k1": 0.2, "x": 0.0}, {"k1": 0.5, "s": 0.6, "k2": 0.1}], [1.0, 1.0]
         )
 
-        with pytest.raises(ValueError) as error:
+        with pytest.raises(
+            ValueError,
+            match=r'^A start is not a start of this problem: it lacks \["s", "k2"\] '
+            r'and has \["x"\], which the problem does not have$',
+        ):
             product.identifiability(
                 StartsIdentifiability(
                     result=result, parameter_tolerance=0.05, loss_tolerance=1e-3
                 )
             )
-
-        assert str(error.value) == "A start has no value of ['k2']."
 
     def test_starts_identifiability_needs_two_starts(self, product: Calibrator) -> None:
         one = _result([{"k1": 0.3, "s": 1.0, "k2": 0.1}], [1.0])
