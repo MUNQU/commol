@@ -163,7 +163,7 @@ def run_bootstrap(
         The fit, one draw per replicate and the diagnostics.
     """
     starts, run = commol_rs.inference.bootstrap(
-        calibrator._engine_problem, engine_json(method)
+        calibrator._engine_problem, engine_json(method), logger
     )
     return _bootstrap_result(
         calibrator,

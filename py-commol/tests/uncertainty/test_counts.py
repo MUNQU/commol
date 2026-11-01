@@ -4,6 +4,7 @@ negative, at the path of its field when it is part of the JSON of an object;
 and so does a seed of each entry point of the Python API."""
 
 import json
+import logging
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -77,7 +78,7 @@ CASES: dict[str, tuple[str, Callable[[Bindings], object]]] = {
     ),
     "starts of CalibrationProblem.optimize": (
         "starts",
-        lambda b: _problem(b).optimize(-1),
+        lambda b: _problem(b).optimize(-1, logging.getLogger("commol")),
     ),
     "count of ParameterSample.resample": (
         "count",
@@ -137,7 +138,7 @@ def test_a_count_that_is_not_a_whole_number_is_a_type_error(
     bindings: Bindings,
 ) -> None:
     with pytest.raises(TypeError):
-        _problem(bindings).optimize(1.5)  # ty: ignore[invalid-argument-type]
+        _problem(bindings).optimize(1.5, logging.getLogger("commol"))  # ty: ignore[invalid-argument-type]
 
 
 def json_counts() -> list[tuple[str, str, str]]:

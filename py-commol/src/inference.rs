@@ -9,11 +9,14 @@
 //! problem, the JSON of its settings ([`commol_inference::settings`]) and
 //! the handles of the results it reads.
 
-use crate::parallelism::parallel;
+use crate::parallelism::{parallel, parallel_logged};
+use crate::records::StepLog;
 use commol_calibration::{
-    CalibrationProblem, EvaluationError, OptimizationConfig, ProblemSettings, Progress, Starts,
-    Violation, Workspace, observed_data, optimize_starts, optimize_with_history, start_points,
+    CalibrationProblem, EvaluationError, NoObserver, OptimizationConfig, ProblemSettings, Progress,
+    StartSteps, Starts, Violation, Workspace, observed_data, optimize_starts_with_observer,
+    optimize_with_history, start_points,
 };
+use commol_core::NoSteps;
 use commol_inference::resampling::{
     BayesianBootstrap, BlockDrawing, BlockScheme, FitUnit, Multipliers, ParametricResampler,
     ReplicateRunner, Resampler, ResidualBlocks, ResidualBootstrap, ResidualNoise, ResidualScale,
@@ -159,26 +162,62 @@ impl PyCalibrationProblem {
     /// A `ValueError` when a verbose optimizer has more than one start, and
     /// a `RuntimeError` when every start fails.
     pub(crate) fn fit(&self, py: Python<'_>, starts: usize) -> PyResult<Starts> {
+        let points = self.start_points(starts)?;
+        parallel(py, || self.run_starts(points, &NoSteps))?
+            .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)
+    }
+
+    /// [`Self::fit`], with a record of each start in `log`.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::fit`] and [`parallel_logged`].
+    pub(crate) fn fit_logged(
+        &self,
+        py: Python<'_>,
+        starts: usize,
+        log: &StepLog,
+    ) -> PyResult<Starts> {
+        let points = self.start_points(starts)?;
+        parallel_logged(py, log, |steps| self.run_starts(points, steps))?
+            .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)
+    }
+
+    /// The `starts` start points of a fit.
+    ///
+    /// # Errors
+    ///
+    /// A `ValueError` when a verbose optimizer has more than one start.
+    fn start_points(&self, starts: usize) -> PyResult<Vec<Vec<f64>>> {
         if self.progress.any() && starts > 1 {
             return Err(value_error(
                 "A verbose optimizer shows one start; set starts=1 or verbose=False".to_string(),
             ));
         }
-        let points = start_points(self.inner.parameters(), starts, self.seed);
-        parallel(py, || {
-            if self.progress.any() {
-                crate::python_observer::optimize_with_python_observer(
-                    &self.inner,
-                    &self.optimizer,
-                    points,
-                    self.seed,
-                    self.progress,
-                )
-            } else {
-                optimize_starts(&self.inner, &self.optimizer, points, self.seed)
-            }
-        })?
-        .map_err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>)
+        Ok(start_points(self.inner.parameters(), starts, self.seed))
+    }
+
+    /// Run the starts from `points`, sending their events to `steps`.
+    fn run_starts(&self, points: Vec<Vec<f64>>, steps: &StartSteps<'_>) -> Result<Starts, String> {
+        if self.progress.any() {
+            crate::python_observer::optimize_with_python_observer(
+                &self.inner,
+                &self.optimizer,
+                points,
+                self.seed,
+                self.progress,
+                steps,
+            )
+        } else {
+            optimize_starts_with_observer(
+                &self.inner,
+                &self.optimizer,
+                points,
+                self.seed,
+                || NoObserver,
+                steps,
+            )
+        }
     }
 
     /// The runner of the refits of a method from `fit`, with `starts`
@@ -333,6 +372,7 @@ impl PyCalibrationProblem {
     ///
     /// Args:
     ///     starts: Number of starts, at least 1
+    ///     logger: The logger of a record of each start that finishes
     ///
     /// Returns:
     ///     The outcome of each start, in order, and the index of the best
@@ -342,9 +382,10 @@ impl PyCalibrationProblem {
     ///         more than one start
     ///     RuntimeError: If every start fails; the message gives the reason
     ///         of each
-    fn optimize(&self, py: Python<'_>, starts: i64) -> PyResult<PyStarts> {
+    fn optimize(&self, py: Python<'_>, starts: i64, logger: Py<PyAny>) -> PyResult<PyStarts> {
         let starts: usize = crate::counts::count(&commol_calibration::ranges::STARTS, starts)?;
-        self.fit(py, starts).map(|inner| PyStarts { inner })
+        self.fit_logged(py, starts, &StepLog::new(logger))
+            .map(|inner| PyStarts { inner })
     }
 
     /// Optimize from the initial guess, as start 0 of `optimize`, and keep
@@ -522,6 +563,8 @@ impl PyCalibrationProblem {
 ///     problem: The calibration problem
 ///     settings: The JSON of a `BayesianBootstrap`, `ParametricBootstrap`,
 ///         `ResidualBootstrap` or `WildBootstrap`, by its `kind`
+///     logger: The logger of a record of each start and replicate that
+///         finishes
 ///
 /// Returns:
 ///     The starts of the fit, and the replicates
@@ -537,13 +580,19 @@ fn bootstrap(
     py: Python<'_>,
     problem: &PyCalibrationProblem,
     settings: &str,
+    logger: Py<PyAny>,
 ) -> PyResult<(PyStarts, PyBootstrapRun)> {
     let settings: Bootstrap = crate::json::read(settings)?;
-    let starts = problem.fit(py, settings.starts())?;
+    let log = StepLog::new(logger);
+    let starts = problem.fit_logged(py, settings.starts(), &log)?;
     let runner = problem.runner(&best_values(&starts), settings.starts())?;
     let (resampler, scheme) = problem.resampler(&ResamplerSpec::of(&settings), runner.fit())?;
-    let run = parallel(py, || {
-        run_replicates(&runner, resampler.as_ref(), settings.replicates())
+    let run = parallel_logged(py, &log, |steps| {
+        run_replicates(
+            &runner.with_steps(steps),
+            resampler.as_ref(),
+            settings.replicates(),
+        )
     })?
     .map_err(method_error)?;
     let run = PyBootstrapRun {

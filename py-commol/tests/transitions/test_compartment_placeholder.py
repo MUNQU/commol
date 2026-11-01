@@ -165,7 +165,7 @@ class TestExpansionOverTargets:
             builder.add_bin(id=bin_id, name=bin_id)
 
         caplog.clear()
-        with caplog.at_level("INFO", logger="commol"):
+        with caplog.at_level("DEBUG", logger="commol"):
             builder.add_transition(
                 id="merge", source=["A", "B"], target=["C"], rate="k * $compartment"
             )
@@ -201,7 +201,7 @@ class TestExpansionOverTargets:
             builder.add_bin(id=bin_id, name=bin_id)
 
         caplog.clear()
-        with caplog.at_level("INFO", logger="commol"):
+        with caplog.at_level("DEBUG", logger="commol"):
             builder.add_transition(
                 id="split",
                 source=["A"],

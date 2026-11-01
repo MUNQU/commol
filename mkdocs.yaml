@@ -220,6 +220,7 @@ nav:
               - Results: codebase/decisions/results.md
               - Files: codebase/decisions/files.md
               - Python Models: codebase/decisions/python-models.md
+              - Progress: codebase/decisions/progress.md
               - Figures: codebase/decisions/figures.md
               - Formulas: codebase/decisions/formulas.md
           - Conventions: codebase/conventions.md

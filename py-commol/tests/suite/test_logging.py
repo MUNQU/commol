@@ -81,3 +81,19 @@ def test_a_record_names_the_public_module(caplog: pytest.LogCaptureFixture) -> N
         "commol",
         "commol.sensitivity",
     }
+
+
+def test_a_build_logs_one_record(caplog: pytest.LogCaptureFixture) -> None:
+    """A build logs one ``INFO`` record with the size of the model, the
+    outputs read from the engine; each element of the builder logs at
+    ``DEBUG``."""
+    with caplog.at_level(logging.DEBUG, logger="commol"):
+        build(abc_builder(stratifications={"age": {"young": 0.4, "old": 0.6}}))
+
+    info = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
+    assert info == [
+        "Model 'ABC' built for the DifferenceEquations engine: 3 bin(s), "
+        "2 parameter(s), 2 transition(s) and 6 output(s)."
+    ]
+    debug = [r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG]
+    assert "Added bin: id='A', name='State A', unit='None'" in debug

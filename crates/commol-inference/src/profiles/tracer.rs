@@ -17,7 +17,7 @@ use commol_calibration::{
     CalibrationProblem, ConstraintSettings, LossConfig, ObservedDataPoint, OptimizationConfig,
     OptimizationObjective, Subproblem, SubproblemResult, Workspace, optimize_subproblem, predict,
 };
-use commol_core::{Accuracy, SimulationEngine};
+use commol_core::{Accuracy, NoSteps, SimulationEngine, Steps};
 use commol_random::replicate_seed;
 use rayon::prelude::*;
 
@@ -126,6 +126,37 @@ impl Profile {
         self.interval
     }
 }
+
+/// How one side of a profile ended: its number of points and why it ends.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SideEnd {
+    /// The number of points of the side.
+    pub points: usize,
+    /// Why the side ends.
+    pub end: ProfileEnd,
+}
+
+/// An event of the sides of the profiles ([`ProfileTracer::trace_all`]).
+#[derive(Debug, Clone, Copy)]
+pub enum SideEvent<'a> {
+    /// The sides begin: `total` of them, two per quantity.
+    Began {
+        /// The number of sides.
+        total: usize,
+    },
+    /// Side `side` of quantity `quantity` finished with `outcome`.
+    Finished {
+        /// The index of the quantity, in the order of the quantities.
+        quantity: usize,
+        /// 0 below the fit, 1 above it.
+        side: usize,
+        /// How the side ended, or why it failed.
+        outcome: Result<SideEnd, &'a MethodError>,
+    },
+}
+
+/// The receiver of the events of the sides.
+pub type SideSteps<'s> = dyn for<'e> Steps<SideEvent<'e>> + 's;
 
 /// One side of a profile, outward from the fit.
 struct Side {
@@ -348,13 +379,21 @@ where
         threshold: f64,
         max_steps: usize,
     ) -> Result<Profile, MethodError> {
-        self.trace_all(std::slice::from_ref(quantity), &[threshold], max_steps)
-            .pop()
-            .expect("one profile per quantity")
+        self.trace_all(
+            std::slice::from_ref(quantity),
+            &[threshold],
+            max_steps,
+            &NoSteps,
+        )
+        .pop()
+        .expect("one profile per quantity")
     }
 
     /// The profile of each of `quantities` up to its threshold, every side
     /// of every quantity in parallel; each is a result as of [`Self::trace`].
+    /// It sends one [`SideEvent::Began`] to `steps`, then one
+    /// [`SideEvent::Finished`] per side, from the thread that walked it, as
+    /// soon as it ends; a side of a quantity with no center fails at once.
     ///
     /// # Panics
     ///
@@ -364,6 +403,7 @@ where
         quantities: &[ProfiledQuantity],
         thresholds: &[f64],
         max_steps: usize,
+        steps: &SideSteps<'_>,
     ) -> Vec<Result<Profile, MethodError>> {
         assert_eq!(
             quantities.len(),
@@ -372,19 +412,32 @@ where
         );
         let centers: Vec<Result<f64, MethodError>> =
             quantities.iter().map(|q| self.center(q)).collect();
+        steps.send(SideEvent::Began {
+            total: 2 * quantities.len(),
+        });
         let sides: Vec<Result<Side, MethodError>> = (0..2 * quantities.len())
             .into_par_iter()
             .map(|task| {
                 let index = task / 2;
-                let center = centers[index].clone()?;
-                self.walk(
-                    &quantities[index],
-                    index as u64,
-                    task % 2,
-                    center,
-                    thresholds[index],
-                    max_steps,
-                )
+                let side = centers[index].clone().and_then(|center| {
+                    self.walk(
+                        &quantities[index],
+                        index as u64,
+                        task % 2,
+                        center,
+                        thresholds[index],
+                        max_steps,
+                    )
+                });
+                steps.send(SideEvent::Finished {
+                    quantity: index,
+                    side: task % 2,
+                    outcome: side.as_ref().map(|side| SideEnd {
+                        points: side.points.len(),
+                        end: side.end,
+                    }),
+                });
+                side
             })
             .collect();
         let mut sides = sides.into_iter();

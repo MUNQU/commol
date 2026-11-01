@@ -3,9 +3,10 @@
 //! shares.
 
 use commol_calibration::{
-    CalibrationProblem, CalibrationResult, OptimizationConfig, optimize_starts, start_points,
+    CalibrationProblem, CalibrationResult, NoObserver, OptimizationConfig, StartEvent,
+    optimize_starts_with_observer, start_points,
 };
-use commol_core::SimulationEngine;
+use commol_core::{NoSteps, SimulationEngine, Steps};
 use commol_random::Generator;
 use rayon::prelude::*;
 
@@ -90,6 +91,70 @@ impl FitUnit {
     }
 }
 
+/// A stage of the fits of a runner.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunnerStage {
+    /// One fit per perturbation ([`ReplicateRunner::fit_all`]).
+    Fits,
+    /// The refits of the fits with a quantity held, such as the refits of a
+    /// bootstrap threshold of a profile.
+    Refits,
+}
+
+/// An event of the fits of a runner, which it sends to its steps
+/// ([`ReplicateRunner::with_steps`]).
+#[derive(Debug, Clone, Copy)]
+pub enum RunnerEvent<'a> {
+    /// A stage begins, with `total` steps.
+    Began {
+        /// The stage.
+        stage: RunnerStage,
+        /// The number of its steps.
+        total: usize,
+    },
+    /// The fit of perturbation `index` finished with `outcome`.
+    Fitted {
+        /// The index of the perturbation.
+        index: usize,
+        /// The best fit, or why it failed.
+        outcome: &'a Result<CalibrationResult, MethodError>,
+    },
+    /// An event of the starts of the fit of perturbation `index`.
+    Start {
+        /// The index of the perturbation.
+        index: usize,
+        /// The event of its starts.
+        event: StartEvent<'a>,
+    },
+    /// The refit of the fit of perturbation `index` finished with
+    /// `outcome`.
+    Refitted {
+        /// The index of the perturbation.
+        index: usize,
+        /// What the refit gave, or why it failed.
+        outcome: &'a Result<Vec<f64>, String>,
+    },
+}
+
+/// The receiver of the events of a runner.
+pub type RunnerSteps<'s> = dyn for<'e> Steps<RunnerEvent<'e>> + 's;
+
+/// The steps of the starts of the fit of perturbation `index`, sent on as
+/// [`RunnerEvent::Start`].
+struct StartsOf<'s> {
+    index: usize,
+    steps: &'s RunnerSteps<'s>,
+}
+
+impl Steps<StartEvent<'_>> for StartsOf<'_> {
+    fn send(&self, event: StartEvent<'_>) {
+        self.steps.send(RunnerEvent::Start {
+            index: self.index,
+            event,
+        });
+    }
+}
+
 /// The fits of the replicates of a method, in the order of their indices.
 #[derive(Debug, Clone)]
 pub struct ReplicateFits {
@@ -128,6 +193,7 @@ pub struct ReplicateRunner<'a, E: SimulationEngine> {
     seed: u64,
     values: Vec<f64>,
     weights: Vec<f64>,
+    steps: &'a RunnerSteps<'a>,
 }
 
 impl<'a, E> ReplicateRunner<'a, E>
@@ -166,7 +232,20 @@ where
             seed,
             values: problem.observed_data().iter().map(|o| o.value).collect(),
             weights: problem.observed_data().iter().map(|o| o.weight).collect(),
+            steps: &NoSteps,
         })
+    }
+
+    /// This runner, sending the events of its fits to `steps`: one
+    /// [`RunnerEvent::Began`] per stage, then, from the thread that ran it,
+    /// one event per step as soon as it ends.
+    pub fn with_steps(self, steps: &'a RunnerSteps<'a>) -> Self {
+        Self { steps, ..self }
+    }
+
+    /// The receiver of the events of this runner.
+    pub fn steps(&self) -> &'a RunnerSteps<'a> {
+        self.steps
     }
 
     /// The problem.
@@ -221,7 +300,11 @@ where
         let seed = Stream::ReplicateFits.replicate(self.seed, index as u64);
         let mut points = start_points(problem.parameters(), self.starts, seed);
         points[0] = self.fit.clone();
-        optimize_starts(&problem, self.config, points, seed)
+        let steps = StartsOf {
+            index,
+            steps: self.steps,
+        };
+        optimize_starts_with_observer(&problem, self.config, points, seed, || NoObserver, &steps)
             .map(|starts| starts.into_best())
             .map_err(MethodError::Failed)
     }
@@ -242,10 +325,21 @@ where
     /// Fit one replicate per perturbation, in parallel: replicate `b` has
     /// the data of `perturbations[b]` ([`ReplicateRunner::fit_one`]).
     pub fn fit_all(&self, perturbations: &[Perturbation]) -> ReplicateFits {
+        self.steps.send(RunnerEvent::Began {
+            stage: RunnerStage::Fits,
+            total: perturbations.len(),
+        });
         let outcomes: Vec<_> = perturbations
             .par_iter()
             .enumerate()
-            .map(|(index, perturbation)| self.fit_one(index, perturbation))
+            .map(|(index, perturbation)| {
+                let outcome = self.fit_one(index, perturbation);
+                self.steps.send(RunnerEvent::Fitted {
+                    index,
+                    outcome: &outcome,
+                });
+                outcome
+            })
             .collect();
         let mut fits = Vec::new();
         let mut failed = Vec::new();

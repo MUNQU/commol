@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A method that runs for long logs each step it finishes, at `INFO`, on the
+  logger of its module: each start of `Calibrator.run` (`commol`), each
+  replicate of a bootstrap (`commol.resampling`), and each stage and side of
+  a profile (`commol.profiles`), with the count done over the total, such as
+  `Replicate 12 finished (37/100): loss 1.280412e3, converged`. The starts
+  of a replicate log at `DEBUG`. An identifiability method logs its start
+  and its end with its duration (`commol.identifiability`). A handler that
+  raises an `Exception` loses its record, never the result. See
+  [Log messages](../getting-started/quickstart.md#log-messages).
 - Every result writes itself to a JSON file with `to_json(file_path,
   indent=2)`, and its class reads it back with `from_json(file_path)`, as
   `Model` does: `CalibrationResult.from_json("fit.json")` returns a
@@ -95,6 +104,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** a build logs one `INFO` record, with the number of bins,
+  parameters, transitions and outputs; the records of each bin,
+  accumulator, stratification, matrix, parameter and transition of a
+  `ModelBuilder` are at `DEBUG`. Set the logger `commol` to `DEBUG` to read
+  them.
 - **Breaking:** with a `sample`, each entry of a report
   (`Model.applied_parameters`, `ModelStructure.report_sections`) holds its
   `EntrySpread` under the key `spread`, not `interval`. A report saved as JSON

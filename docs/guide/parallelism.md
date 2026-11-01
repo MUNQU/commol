@@ -50,6 +50,11 @@ A number below 1, or `levels` other than `"all"` and `"outer"`, raises
 
 One run of a model is never split: each thread runs whole runs.
 
+A method that logs its steps, such as a bootstrap, writes each record from
+the thread that called it, in the order the steps end, so a record carries
+the name and the `contextvars` of that thread. See
+[Log messages](../getting-started/quickstart.md#log-messages).
+
 ## The number of threads
 
 Every parallel method runs in a pool of `n` threads that commol builds from

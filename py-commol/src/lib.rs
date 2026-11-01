@@ -53,6 +53,7 @@ mod profiles;
 pub(crate) mod python_observer;
 mod quantity;
 mod ranges;
+mod records;
 mod sensitivity;
 mod smc;
 #[cfg(feature = "test-kind")]
