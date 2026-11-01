@@ -103,19 +103,44 @@ impl Units {
     /// negative, or the value is not whole and the settings name no rounding.
     pub(crate) fn set_initial_condition(&mut self, index: usize, value: f64) -> Result<(), String> {
         if self.rounding.is_none() && value >= 0.0 && as_whole(value).is_none() {
-            return Err(format!(
-                "The {} engine moves whole units, and {value} is not whole. Name a \
-                 rounding in the settings of the engine: \"{}\" or \"{}\"",
-                self.engine.name(),
-                Rounding::LargestRemainder.name(),
-                Rounding::Random.name(),
-            ));
+            return Err(self.needs_a_rounding(&format!("{value} is not whole")));
         }
         self.model.set_initial_condition(index, value)?;
         if !self.started {
             self.state[index] = value;
         }
         Ok(())
+    }
+
+    /// Check that a calibration can set the initial condition `id`.
+    ///
+    /// An optimizer writes values that are not whole, so a calibrated
+    /// initial condition needs a rounding, whatever its bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names `id` and the roundings when the settings
+    /// name no rounding.
+    pub(crate) fn check_calibrated_initial_condition(&self, id: &str) -> Result<(), String> {
+        match self.rounding {
+            Some(_) => Ok(()),
+            None => Err(self.needs_a_rounding(&format!(
+                "the calibration sets the initial condition '{id}', so the amounts it \
+                 writes are not always whole"
+            ))),
+        }
+    }
+
+    /// The message of an amount that is not whole and no rounding: the
+    /// engine moves whole units, `reason`, and the roundings to name.
+    fn needs_a_rounding(&self, reason: &str) -> String {
+        format!(
+            "The {} engine moves whole units, and {reason}. Name a rounding in the \
+             settings of the engine: \"{}\" or \"{}\"",
+            self.engine.name(),
+            Rounding::LargestRemainder.name(),
+            Rounding::Random.name(),
+        )
     }
 
     /// Apply the impulses that act at position `t`.

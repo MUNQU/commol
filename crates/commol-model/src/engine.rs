@@ -64,6 +64,22 @@ pub trait CompartmentalEngine: SimulationEngine {
     /// negative.
     fn set_initial_condition(&mut self, compartment_index: usize, value: f64)
     -> Result<(), String>;
+
+    /// Check that a calibration can set the initial condition `id` (a bin,
+    /// a compartment or a category), whatever values it writes.
+    ///
+    /// The plan of the initial conditions ([`crate::InitialConditionPlan`])
+    /// asks it for each value it resolves. By default every engine takes
+    /// every value.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names `id` when the engine does not take
+    /// every value that the calibration can write.
+    fn check_calibrated_initial_condition(&self, id: &str) -> Result<(), String> {
+        let _ = id;
+        Ok(())
+    }
 }
 
 /// The methods of [`SimulationEngine`] that an engine of the aggregate kind

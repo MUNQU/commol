@@ -220,7 +220,10 @@ impl InitialConditionPlan {
     /// Returns a message when a value is not an initial condition, when an id
     /// matches none of these, names a category declared by more than one
     /// stratification, or names a category of a stratification that is not
-    /// binary for some compartment, or when the remainder does not resolve.
+    /// binary for some compartment, when the engine does not take every value
+    /// of a resolved id
+    /// ([`CompartmentalEngine::check_calibrated_initial_condition`]), or when
+    /// the remainder does not resolve.
     pub fn new<E: CompartmentalEngine>(
         engine: &E,
         values: &[ModelValue],
@@ -243,7 +246,10 @@ impl InitialConditionPlan {
                     fractions,
                     splits_by,
                 )
-                .map(|target| (value.id.clone(), target)),
+                .and_then(|target| {
+                    engine.check_calibrated_initial_condition(&value.id)?;
+                    Ok((value.id.clone(), target))
+                }),
             })
             .collect::<Result<Vec<_>, String>>()?;
 

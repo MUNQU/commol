@@ -16,7 +16,13 @@ fn engine() -> DifferenceEquations {
 
 /// The model of [`engine`], in whole units on the stochastic engine of steps.
 fn stochastic() -> StochasticSteps {
-    StochasticSteps::try_from_model(&model("StochasticSteps")).unwrap()
+    // The rounding lets the calibration set the initial amount of A.
+    let mut model = model("StochasticSteps");
+    model.engine = serde_json::from_str(
+        r#"{"type":"StochasticSteps","settings":{"rounding":"largest_remainder"}}"#,
+    )
+    .expect("valid engine JSON");
+    StochasticSteps::try_from_model(&model).unwrap()
 }
 
 fn model(engine: &str) -> Model {

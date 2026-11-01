@@ -712,4 +712,8 @@ impl CompartmentalEngine for StochasticEvents {
         }
         Ok(())
     }
+
+    fn check_calibrated_initial_condition(&self, id: &str) -> Result<(), String> {
+        self.units.check_calibrated_initial_condition(id)
+    }
 }

@@ -228,6 +228,16 @@ fn without_remainder_values_are_applied_as_given() {
 }
 
 #[test]
+fn a_value_that_the_engine_rejects_names_its_initial_condition() {
+    let error = written_state(FrozenEngine::two_bins(), &["A_cat0"], None, &[-1.0]).unwrap_err();
+
+    assert!(
+        error.starts_with("Failed to set initial condition for 'A_cat0': Compartment 'A_cat0'"),
+        "{error}"
+    );
+}
+
+#[test]
 fn without_remainder_any_amount_is_feasible() {
     let state = written_state(FrozenEngine::two_bins(), &["A_cat0"], None, &[5000.0]).unwrap();
 

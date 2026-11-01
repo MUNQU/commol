@@ -216,3 +216,23 @@ that sets amounts is checked without a change there.
 `crates/commol-model/tests/initial_conditions.rs` (the layers, the remainder
 and the targets of an id, and
 `the_remainder_keeps_the_declared_sum_of_what_it_covers`).
+
+## An engine of whole units refuses a calibrated initial condition with no rounding
+
+`InitialConditionPlan::new` asks the engine about each id it resolves
+(`CompartmentalEngine::check_calibrated_initial_condition`). The deterministic
+engines take every value. `StochasticEvents` and `StochasticSteps` answer
+through `Units`: with no `rounding`, they refuse the id, whatever its bounds,
+and the message names the id and the two roundings. An optimizer writes values
+that are not whole, and `check_model_values` writes only one value, the point of
+the bounds nearest 0, which is whole when a bound is.
+
+| Alternative | Why not |
+|---|---|
+| Check the bounds in `check_model_values` of `commol-calibration` | The calibration would hold a rule of the engine, and the other users of the plan (SMC, sensitivity, the predictive) would not have it. |
+| Refuse only when a bound is not whole | Bounds `[0, 50]` pass, and every start fails on the first value that is not whole. |
+
+**Guards:**
+`tests/stochastic/test_calibration.py::test_a_calibrated_amount_needs_a_rounding`,
+`tests/stochastic/test_calibration.py::test_a_calibrated_amount_with_a_rounding_is_calibrated`,
+`crates/commol-stochastic/tests/oracles.rs` (`calibrated_initial_conditions_go_through_the_rounding`).

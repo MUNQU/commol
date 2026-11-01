@@ -239,11 +239,13 @@ def check_model_values(
     remainder as the calibration objective does (``plan_values`` of the
     engine of the kind), so its message names the problem: a type of value
     the kind does not take (the test kind takes none), an unknown id, an
-    ambiguous category, or a category of a stratification that is not
-    binary. The engine then writes the values to a copy of itself and checks
-    that the model has every value a run needs: a parameter or an initial
-    amount that the model leaves without a value and the calibration does
-    not set is refused here, before the calibration starts.
+    ambiguous category, a category of a stratification that is not binary,
+    or an initial condition on an engine of whole units with no rounding,
+    whatever its bounds. The engine then writes the values to a copy of
+    itself and checks that the model has every value a run needs: a
+    parameter or an initial amount that the model leaves without a value
+    and the calibration does not set is refused here, before the
+    calibration starts.
 
     Parameters
     ----------
@@ -259,9 +261,10 @@ def check_model_values(
     ------
     ValueError
         If the engine does not set a parameter, the kind does not accept a
-        type of value, a value or the remainder cannot be resolved, or a
-        value the calibration does not set is missing; the message of the
-        engine names the parameter or the initial condition.
+        type of value, a value or the remainder cannot be resolved, the
+        engine moves whole units and names no rounding for an initial
+        condition, or a value the calibration does not set is missing; the
+        message of the engine names the parameter or the initial condition.
     """
     commol_rs.calibration.check_model_values(
         engine,

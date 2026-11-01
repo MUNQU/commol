@@ -538,6 +538,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A calibrated initial condition on `StochasticEvents` or `StochasticSteps`
+  with no `rounding` built when its bounds were whole, such as `[0, 50]`, and
+  then every start failed, because the optimizer writes values that are not
+  whole. The `Calibrator` now refuses it when it is built, whatever its
+  bounds, with a message that names the initial condition and the two
+  roundings. See [Whole units](../guide/stochastic.md#whole-units).
 - `Collinearity` at a point where a parameter with an infinite bound is 0
   scaled its column by an infinite width: an infinite sensitivity and an
   index below 1, with no error. The magnitude of the parameter there is now
