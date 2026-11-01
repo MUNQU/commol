@@ -3,7 +3,7 @@
 
 use commol_calibration::{
     CalibrationParameter, CalibrationProblem, EvaluationError, ForwardModel, LossConfig,
-    ObservedDataPoint, Violation, Workspace,
+    ObservedDataPoint, ValueSource, Violation, Workspace,
 };
 use commol_core::{Model, SimulationEngine};
 use commol_difference::DifferenceEquations;
@@ -48,7 +48,9 @@ fn level(outputs: &[&str]) -> Series {
 #[test]
 fn quantities_equal_hand_computations() {
     let engine = DifferenceEquations::try_from_model(&decay("DifferenceEquations")).unwrap();
-    let forward = ForwardModel::unobserved(engine.clone(), k(), None, None, None).unwrap();
+    let forward =
+        ForwardModel::unobserved(engine.clone(), k(), None, ValueSource::Varied, None, None)
+            .unwrap();
     let quantities = Quantities::new(
         &[
             Quantity::ValueAt {
@@ -156,7 +158,15 @@ fn a_gain_reads_its_start_exactly() {
 #[test]
 fn stochastic_points_average_replicates_with_common_seeds() {
     let engine = StochasticSteps::try_from_model(&decay("StochasticSteps")).unwrap();
-    let forward = ForwardModel::unobserved(engine.clone(), k(), None, Some(4), Some(9)).unwrap();
+    let forward = ForwardModel::unobserved(
+        engine.clone(),
+        k(),
+        None,
+        ValueSource::Varied,
+        Some(4),
+        Some(9),
+    )
+    .unwrap();
     let quantities = Quantities::new(
         &[Quantity::ValueAt {
             label: None,
@@ -185,7 +195,9 @@ fn stochastic_points_average_replicates_with_common_seeds() {
 #[test]
 fn a_quantity_reads_only_what_the_model_has() {
     let engine = DifferenceEquations::try_from_model(&decay("DifferenceEquations")).unwrap();
-    let forward = ForwardModel::unobserved(engine.clone(), k(), None, None, None).unwrap();
+    let forward =
+        ForwardModel::unobserved(engine.clone(), k(), None, ValueSource::Varied, None, None)
+            .unwrap();
     let outputs = engine.output_names();
     let quantity = |quantity: Quantity| Quantities::new(&[quantity], &outputs);
 

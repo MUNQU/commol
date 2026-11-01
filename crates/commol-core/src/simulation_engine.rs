@@ -195,6 +195,10 @@ pub trait ValuePlan: Clone + Debug + Send + Sync {
 /// }
 ///
 /// impl SimulationEngine for Constant {
+///     fn check_varied_values(&self, _values: &[commol_core::ModelValue]) -> Result<(), String> {
+///         Ok(())
+///     }
+///
 ///     fn check_values(&self) -> Result<(), String> {
 ///         Ok(())
 ///     }
@@ -504,17 +508,15 @@ pub trait SimulationEngine: Clone {
     /// sampler. A method that writes known numbers does not call it: the
     /// engine checks each number when it writes it ([`Self::apply_values`]).
     ///
-    /// By default the engine takes every number. The values are resolved
-    /// first ([`Self::plan_values`]), so an id that does not resolve gets the
-    /// message of the plan.
+    /// An engine that takes every number within the bounds returns
+    /// `Ok(())`. The values are resolved first ([`Self::plan_values`]), so an
+    /// id that does not resolve gets the message of the plan.
     ///
     /// # Errors
     ///
     /// Returns a message that names a value when the engine takes only some
     /// of its numbers.
-    fn check_varied_values(&self, _values: &[ModelValue]) -> Result<(), String> {
-        Ok(())
-    }
+    fn check_varied_values(&self, values: &[ModelValue]) -> Result<(), String>;
 
     /// Write values of the model kind into the state the engine starts from.
     ///

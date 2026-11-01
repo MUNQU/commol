@@ -94,7 +94,8 @@ class StochasticEventsSettings(BaseModel):
         Relative tolerance of the time of an event when a rate reads ``t``.
     rounding : Rounding | None
         How to make whole the initial amounts that are not. None requires
-        whole amounts.
+        whole amounts, and refuses a method that varies an initial
+        condition, such as a calibration of one.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -131,7 +132,8 @@ class StochasticStepsSettings(BaseModel):
     ----------
     rounding : Rounding | None
         How to make whole the initial amounts that are not. None requires
-        whole amounts.
+        whole amounts, and refuses a method that varies an initial
+        condition, such as a calibration of one.
     """
 
     model_config = ConfigDict(extra="forbid")

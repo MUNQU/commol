@@ -183,7 +183,10 @@ with no rounding, a `Calibrator` or a `SensitivityAnalysis` with an
 `initial_condition` raises `ValueError` when it is built, and the message names
 the initial condition and the two options. Known values need no rounding when
 they are whole: `Model.apply_calibration_parameters` writes `{"B": 12.0}`, and
-refuses `{"B": 12.3}` with a message that names the value.
+refuses `{"B": 12.3}` with a message that names the value. The draws of a
+sample are known values too: a `SensitivityAnalysis` of
+`InputSpace.from_sample` writes them, and the engine checks each one when it
+writes it.
 
 ## Seeds and replicates
 

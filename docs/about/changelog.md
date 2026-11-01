@@ -531,8 +531,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whole. A `Calibrator` or a `SensitivityAnalysis` that varies an initial
   condition on these engines now refuses it when it is built, whatever its
   bounds, with a message that names the initial condition and the two
-  roundings. `Model.apply_calibration_parameters` writes known values as
-  before, each checked when it is written. See
+  roundings. `Model.apply_calibration_parameters` and a `SensitivityAnalysis`
+  of `InputSpace.from_sample` write known values as before, each checked when
+  it is written. See
   [Whole units](../guide/stochastic.md#whole-units).
 - `Collinearity` at a point where a parameter with an infinite bound is 0
   scaled its column by an infinite width: an infinite sensitivity and an

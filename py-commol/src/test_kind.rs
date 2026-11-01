@@ -172,6 +172,10 @@ fn test_model(model: &Model) -> Result<(&TestStructure, HashMap<String, f64>), S
 }
 
 impl SimulationEngine for TestEngine {
+    fn check_varied_values(&self, _values: &[commol_core::ModelValue]) -> Result<(), String> {
+        Ok(())
+    }
+
     type ValuePlan = TestValuePlan;
 
     fn check_position(&self, position: f64) -> Result<(), String> {
@@ -360,6 +364,10 @@ impl TestStochasticEngine {
 }
 
 impl SimulationEngine for TestStochasticEngine {
+    fn check_varied_values(&self, _values: &[commol_core::ModelValue]) -> Result<(), String> {
+        Ok(())
+    }
+
     type ValuePlan = TestValuePlan;
 
     fn check_position(&self, position: f64) -> Result<(), String> {

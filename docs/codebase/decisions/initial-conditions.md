@@ -219,33 +219,44 @@ and the targets of an id, and
 
 ## Whole units need a rounding to vary an initial condition
 
-A method that varies the values, such as an optimizer or a sampler, builds its
-writer with `ValueWriter::varied` (`crates/commol-calibration/src/values.rs`):
-`CalibrationProblem::new`, `with_initial_condition_remainder`,
-`ForwardModel::unobserved` and `check_model_values`. After the plan resolves
-the values, the writer asks the engine whether it takes every number of them
-(`SimulationEngine::check_varied_values`). By default it does.
-`StochasticEvents` and `StochasticSteps` answer through `Units`: with no
-`rounding`, they refuse an initial condition, whatever its bounds, and the
-message names it and the two roundings. An optimizer writes values that are not
-whole, and `check_model_values` writes only one value, the point of the bounds
-nearest 0, which is whole when a bound is.
+A method says where the numbers of its values come from
+(`ValueSource` of `crates/commol-calibration/src/values.rs`): it varies them,
+such as an optimizer or a sampler, or it writes numbers it knows, such as the
+draws of a sample. A varied source builds its writer with `ValueWriter::varied`:
+after the plan resolves the values, the writer asks the engine whether it takes
+every number of them (`SimulationEngine::check_varied_values`, a required
+method, so a new engine states its answer). `StochasticEvents` and
+`StochasticSteps` answer through `Units`: with no `rounding`, they refuse an
+initial condition, whatever its bounds, and the message names it and the two
+roundings. The deterministic engines take every number.
 
-A write of known values (`configured_engine`, the write-back of
-`Model.apply_calibration_parameters`) and a query of the plan
-(`plan_model_values`) do not ask: the engine checks each number when it writes
-it (`Units::set_initial_condition`), so a whole value needs no rounding.
+| Builder | Source |
+|---|---|
+| `CalibrationProblem::new`, `with_initial_condition_remainder`, `check_model_values` | Varied |
+| `ForwardModel::unobserved` | Its argument: `SensitivityAnalysis::new` passes varied for independent inputs, and known (the first draw) for a sample, which is the design of the analysis |
+| `configured_engine` (the write-back of `Model.apply_calibration_parameters`), `plan_model_values` | Known (`ValueWriter::known`): the engine checks each number when it writes it (`Units::set_initial_condition`) |
+
+A builder then writes the first numbers of its source to a copy of the engine
+and checks that no value is missing (`ValueWriter::check_written`): for a
+varied source, the point of the bounds of each value nearest 0, which is whole
+when 0 is within the bounds or the bound nearest 0 is whole, so it does not
+show that every number is taken; for a known source, its first numbers, which
+the method writes.
 
 | Alternative | Why not |
 |---|---|
 | Check the bounds in `check_model_values` of `commol-calibration` | The calibration would hold a rule of the engine, against the golden rule, and the Rust builders that do not call it (`CalibrationProblem::new`, `ForwardModel::unobserved`) would not have it. |
 | Refuse when the plan is built (`InitialConditionPlan::new`) | Every plan is built, also for a write of known values, so a whole value written back would need a rounding for a reason that does not apply to it. |
+| Treat every input of an analysis as varied | A sample writes only its draws: a sample of whole amounts would be refused for numbers it never writes. |
+| A default `check_varied_values` that takes every number | A new engine of whole units that forgets it would take every number with no error. |
 | Refuse only when a bound is not whole | Bounds `[0, 50]` pass, and every start fails on the first value that is not whole. |
 
 **Guards:**
 `crates/commol-calibration/tests/test_varied_values.rs`,
 `crates/commol-stochastic/tests/oracles.rs` (`calibrated_initial_conditions_go_through_the_rounding`),
 `tests/stochastic/test_calibration.py::test_a_calibrated_amount_needs_a_rounding`,
+`tests/stochastic/test_calibration.py::test_every_initial_condition_that_varies_needs_a_rounding`,
 `tests/stochastic/test_calibration.py::test_an_analysis_that_varies_an_amount_needs_a_rounding`,
+`tests/stochastic/test_calibration.py::test_an_analysis_of_a_sample_writes_its_draws_as_known_amounts`,
 `tests/stochastic/test_calibration.py::test_a_known_amount_is_written_back_when_it_is_whole`,
 `tests/stochastic/test_calibration.py::test_a_calibrated_amount_with_a_rounding_is_calibrated`.

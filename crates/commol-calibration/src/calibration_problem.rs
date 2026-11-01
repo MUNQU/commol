@@ -263,8 +263,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     ///
     /// Returns the engine's message when the id does not resolve, for example
     /// when it is not a compartment, bin or bin prefix, or overlaps a
-    /// calibrated bin or compartment, or when the engine does not take every
-    /// number of a value ([`SimulationEngine::check_varied_values`]).
+    /// calibrated bin or compartment.
     pub fn with_initial_condition_remainder(mut self, remainder: &str) -> Result<Self, String> {
         let values = ValueWriter::varied(
             self.forward.base_engine(),

@@ -4,7 +4,7 @@
 
 use commol_calibration::{
     CalibrationParameter, CalibrationParameterType, CalibrationProblem, ForwardModel, LossConfig,
-    ObservedDataPoint, check_model_values, configured_engine, plan_model_values,
+    ObservedDataPoint, ValueSource, check_model_values, configured_engine, plan_model_values,
 };
 use commol_core::Model;
 use commol_stochastic::StochasticSteps;
@@ -48,7 +48,14 @@ fn every_method_that_varies_an_amount_needs_a_rounding() {
         vec![],
         LossConfig::SumSquaredError,
     );
-    let unobserved = ForwardModel::unobserved(whole_only(), amount_of_b(), None, Some(2), Some(7));
+    let unobserved = ForwardModel::unobserved(
+        whole_only(),
+        amount_of_b(),
+        None,
+        ValueSource::Varied,
+        Some(2),
+        Some(7),
+    );
 
     assert_needs_a_rounding(&check_model_values(&whole_only(), &amount_of_b(), None).unwrap_err());
     assert_needs_a_rounding(&problem.err().unwrap());
@@ -70,4 +77,25 @@ fn known_values_are_checked_when_they_are_written() {
     );
     assert!(error.contains("12.3 is not whole"), "{error}");
     assert!(plan_model_values(&whole_only(), &amount_of_b(), None).is_ok());
+}
+
+#[test]
+fn a_forward_model_of_known_values_writes_its_first_numbers() {
+    let known = |numbers: &[f64]| {
+        ForwardModel::unobserved(
+            whole_only(),
+            amount_of_b(),
+            None,
+            ValueSource::Known(numbers),
+            Some(2),
+            Some(7),
+        )
+    };
+
+    let not_whole = known(&[12.3]).err().unwrap();
+    let too_few = known(&[]).err().unwrap();
+
+    assert!(known(&[12.0]).is_ok());
+    assert!(not_whole.contains("12.3 is not whole"), "{not_whole}");
+    assert_eq!(too_few, "Expected 1 known values, one per parameter, got 0");
 }
