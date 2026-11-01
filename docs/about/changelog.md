@@ -560,6 +560,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   such a model failed. In LaTeX, a division followed by a product is a
   fraction times the product: the flow of a proportional rate `a / b` from
   `B` is `\frac{a}{b} \cdot B`, no longer `\frac{a}{b \cdot B}`.
+- A particle swarm whose bounds are finite but too far apart, such as
+  `(-1e308, 1e308)`, raised a `PanicException` when it drew its first
+  particles. It now raises a `RuntimeError`, `Optimization failed: ...`,
+  with the error of the argmin fork, which checks its own bounds. A bound
+  that is not finite still raises the message that names the parameter.
 
 ### Documentation
 

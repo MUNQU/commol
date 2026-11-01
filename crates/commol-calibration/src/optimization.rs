@@ -1573,6 +1573,23 @@ mod tests {
     }
 
     #[test]
+    fn a_particle_swarm_refuses_finite_bounds_too_far_apart_to_draw_between() {
+        let space = SearchSpace {
+            bounds: vec![(-1e308, 1e308)],
+            names: vec!["x".to_string()],
+        };
+        let config = ParticleSwarmConfig::default();
+        let error = optimize_particle_swarm(&space, Bowl, &config, 1, None::<NoObserver>)
+            .err()
+            .expect("bounds too far apart");
+        assert!(
+            error.starts_with("Optimization failed: ")
+                && error.contains("every bound must be finite, and so must twice the distance"),
+            "{error}"
+        );
+    }
+
+    #[test]
     fn nelder_mead_refuses_an_infinite_bound() {
         let space = SearchSpace {
             bounds: vec![(0.0, f64::INFINITY)],
