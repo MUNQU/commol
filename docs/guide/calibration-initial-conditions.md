@@ -92,6 +92,7 @@ the optimization starts:
 | Names nothing in the model | `Invalid bin, compartment or category 'X'`, with the compartments |
 | A category of a stratification with three or more categories, such as `"g1"` of `group = [g1, g2, g3]` | `Initial condition category 'group:g1' needs a binary stratification` |
 | A category name that two stratifications declare | `Category 'c1' is ambiguous`, with the stratifications and the qualified names (`resolve_category`, which `Aggregate.resolve_category` also asks) |
+| Any id, on `StochasticEvents` or `StochasticSteps` with no `rounding` | `The ... engine moves whole units, and a method that varies the initial condition 'B' can write amounts that are not whole`, with the two roundings ([Whole units](stochastic.md#whole-units)) |
 
 ## The remainder
 

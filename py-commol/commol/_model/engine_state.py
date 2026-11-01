@@ -239,9 +239,11 @@ def check_model_values(
     remainder as the calibration objective does (``plan_values`` of the
     engine of the kind), so its message names the problem: a type of value
     the kind does not take (the test kind takes none), an unknown id, an
-    ambiguous category, a category of a stratification that is not binary,
-    or an initial condition on an engine of whole units with no rounding,
-    whatever its bounds. The engine then writes the values to a copy of
+    ambiguous category, or a category of a stratification that is not
+    binary. The engine then checks that it takes every number of each value
+    (``check_varied_values``), so an initial condition on an engine of whole
+    units with no rounding is refused, whatever its bounds. The engine then
+    writes the values to a copy of
     itself and checks that the model has every value a run needs: a
     parameter or an initial amount that the model leaves without a value
     and the calibration does not set is refused here, before the

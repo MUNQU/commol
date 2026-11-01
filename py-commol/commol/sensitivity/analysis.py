@@ -73,7 +73,9 @@ class SensitivityAnalysis:
         Raises
         ------
         ValueError
-            If an input is not a value of the model, the replicates or the
+            If an input is not a value of the model, the engine does not take
+            every number of an input (an ``initial_condition`` on an engine of
+            whole units with no rounding), the replicates or the
             seed do not fit the engine, `replicates` is below 1 (a negative
             number included), or the seed is not a whole number from 0 to
             ``2**64 - 1``.

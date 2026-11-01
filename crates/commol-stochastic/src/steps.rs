@@ -258,6 +258,10 @@ impl IntegerStepper for StochasticSteps {
 impl commol_core::SimulationEngine for StochasticSteps {
     commol_model::delegate_to_compiled_model!();
 
+    fn check_varied_values(&self, values: &[commol_core::ModelValue]) -> Result<(), String> {
+        self.units.check_varied_values(values)
+    }
+
     fn check_position(&self, position: f64) -> Result<(), String> {
         EngineType::StochasticSteps.check_position(position)
     }
@@ -313,9 +317,5 @@ impl CompartmentalEngine for StochasticSteps {
             commol_core::SimulationEngine::reset(self);
         }
         Ok(())
-    }
-
-    fn check_calibrated_initial_condition(&self, id: &str) -> Result<(), String> {
-        self.units.check_calibrated_initial_condition(id)
     }
 }
