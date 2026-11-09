@@ -1,9 +1,11 @@
 """Check the rules of the Rust tests that a program can judge: every Rust
-test checks a result, every ignored test says how it runs, and commol takes a
-quantile in one place. The rules are in ``docs/codebase/tests.md`` and
+test checks a result, a test with its own ``main`` runs without the harness of
+libtest, every ignored test says how it runs, and commol takes a quantile in
+one place. The rules are in ``docs/codebase/tests.md`` and
 ``docs/codebase/decisions/results.md``."""
 
 import re
+import tomllib
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -84,9 +86,23 @@ def rust_functions(path: Path) -> Iterator[RustFunction]:
         )
 
 
+def targets_with_own_main(root: Path) -> set[Path]:
+    """The files of the test targets of the crate at ``root`` that run their
+    own ``main``: each ``[[test]]`` of its ``Cargo.toml`` with
+    ``harness = false``."""
+    manifest = tomllib.loads((root / "Cargo.toml").read_text(encoding="utf-8"))
+    return {
+        root / target.get("path", f"tests/{target['name']}.rs")
+        for target in manifest.get("test", [])
+        if target.get("harness", True) is False
+    }
+
+
 def rust_checks(root: Path) -> tuple[list[RustFunction], set[str]]:
     """The tests of the crate at ``root`` and the names of its functions that
-    check a result, themselves or through another function of the crate."""
+    check a result, themselves or through another function of the crate. A
+    test is a function marked ``#[test]``, or the ``main`` of a test target
+    without the harness of libtest."""
     functions = [
         function
         for path in sorted((root / "src").rglob("*.rs"))
@@ -106,8 +122,12 @@ def rust_checks(root: Path) -> tuple[list[RustFunction], set[str]]:
             ):
                 checking.add(function.name)
                 changed = True
+    own_main = targets_with_own_main(root)
     tests = [
-        function for function in functions if RUST_TEST.search(function.attributes)
+        function
+        for function in functions
+        if RUST_TEST.search(function.attributes)
+        or (function.name == "main" and function.path in own_main)
     ]
     return tests, checking
 
@@ -126,6 +146,26 @@ def test_every_rust_test_asserts() -> None:
             and "Result" not in test.signature
         ]
     assert not unchecked, "These Rust tests check no result:\n" + "\n".join(unchecked)
+
+
+def test_a_rust_test_with_its_own_main_runs_without_the_harness() -> None:
+    """Every file of ``tests/`` that defines ``main`` is a ``[[test]]`` with
+    ``harness = false``: under the harness of libtest its ``main`` never runs,
+    and the target passes with 0 tests. Each such target names a file that
+    exists."""
+    wrong = []
+    for root in RUST_ROOTS:
+        own_main = targets_with_own_main(root)
+        wrong += [
+            f"{relative(path)}: declare it as a [[test]] with harness = false"
+            for path in sorted((root / "tests").glob("*.rs"))
+            if path not in own_main
+            and any(function.name == "main" for function in rust_functions(path))
+        ]
+        wrong += [
+            f"{relative(path)}: no such file" for path in own_main if not path.is_file()
+        ]
+    assert not wrong, "These Rust tests with a main do not run it:\n" + "\n".join(wrong)
 
 
 def test_every_ignored_rust_test_says_how_it_runs() -> None:

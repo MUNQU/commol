@@ -3,7 +3,7 @@
 [Back to Design decisions](../design-decisions.md)
 
 How a formula is checked before it reaches the engine, which limits it
-has, and how Python reads it.
+has, how Python reads it, and where the JIT puts its code.
 
 ## The parser of the engine is the only check of a formula
 
@@ -162,3 +162,34 @@ JIT quotes the formula cut after its first 80 characters (`quoted`,
 `crates/commol-core/src/math_expression/error.rs::a_long_formula_is_cut_after_its_first_characters`,
 `crates/commol-core/src/math_expression/mod.rs::a_formula_that_does_not_compile_is_quoted_cut`,
 `py-commol/tests/rates/test_formula_rules.py::test_a_formula_gets_the_message_of_the_engine_parser`.
+
+## The JIT maps the memory of its code, never the heap
+
+`JITCompiler::compile` (`crates/commol-core/src/math_expression/jit/compiler.rs`)
+makes each `JITModule` with the default memory provider of Cranelift.
+`commol-core` turns on the feature `selinux-fix` of `cranelift-jit`
+(`crates/commol-core/Cargo.toml`). On Linux and macOS that provider then maps
+the memory of compiled code (`mmap`) and makes it readable and executable.
+Without the feature, the provider takes that memory from the global allocator
+(`SystemMemoryProvider` of `cranelift-jit`). On the
+main thread, the thread of a Python session, glibc serves it from the heap of
+`brk`. SELinux forbids an executable heap by default on Fedora and RHEL
+(`execheap`), so there no formula compiled. SELinux allows an executable
+mapping (`execmem`). On Windows the provider takes the memory from
+`VirtualAlloc`, with or without the feature.
+
+**Rule:** the JIT keeps the default memory provider of Cranelift, with
+`selinux-fix` on. A memory provider of commol (`JITBuilder::memory_provider`)
+maps its memory and never takes it from the heap.
+
+| Alternative | Why not |
+|---|---|
+| The allocator of Cranelift, as it is by default | No formula compiles under an SELinux that forbids an executable heap, the default of Fedora and RHEL. |
+| A memory provider of commol (`JITBuilder::memory_provider`) | Code of commol that does what the feature of Cranelift already does. |
+| A policy that allows an executable heap (`setsebool selinuxuser_execheap 1`) | It asks each user to weaken a protection of the whole system. |
+
+**Guard:** `crates/commol-core/tests/jit_memory.rs` (on the main thread,
+`harness = false`): a formula compiles, runs, and no part of the `[heap]` of
+`/proc/self/maps` is executable.
+`py-commol/tests/suite/test_rust_rules.py::test_a_rust_test_with_its_own_main_runs_without_the_harness`
+keeps that test running.

@@ -117,6 +117,15 @@ of this that a program can read: every Python test has an `assert`, a
 `unreachable!`, calls a function of its crate that has one, is
 `#[should_panic]`, or returns a `Result`. Review checks the rest.
 
+A Rust test that must run on the main thread is a file of `tests/` with its
+own `main`, declared as a `[[test]]` with `harness = false` in the manifest
+of its crate: `crates/commol-core/tests/jit_memory.rs`, declared in
+`crates/commol-core/Cargo.toml`. Its
+`main` checks a result as a `#[test]` does. Under the harness of libtest, a
+`main` never runs and the target passes with 0 tests, so
+`test_rust_rules.py` checks that every file of `tests/` that defines `main`
+is declared so.
+
 ## Duplicates
 
 Two tests do not check the same behavior with the same inputs. Candidates

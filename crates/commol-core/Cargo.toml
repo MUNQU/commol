@@ -25,8 +25,16 @@ indexmap = { version = "2.12", features = ["serde"] }
 rayon = { workspace = true }
 thiserror = "2.0"
 
-# Cranelift JIT compiler
+# Cranelift JIT compiler. On Linux and macOS, `selinux-fix` maps the memory of
+# compiled code (`mmap`) instead of taking it from the heap, which SELinux
+# forbids to make executable (`execheap`): `tests/jit_memory.rs`.
 cranelift = "0.126"
-cranelift-jit = "0.126"
+cranelift-jit = { version = "0.126", features = ["selinux-fix"] }
 cranelift-module = "0.126"
 cranelift-codegen = "0.126"
+
+# `jit_memory` runs its own `main` on the main thread, where glibc serves the
+# allocator from the heap of `brk`.
+[[test]]
+name = "jit_memory"
+harness = false
