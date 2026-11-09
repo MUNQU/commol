@@ -106,5 +106,8 @@ fn a_forward_model_of_known_values_checks_every_set_before_any_run() {
         too_few,
         "Parameter set 1 needs one number per parameter (1), got 0"
     );
-    assert_eq!(none, "A known source needs a set of numbers");
+    assert_eq!(
+        none,
+        "There is no parameter set to write: give at least one"
+    );
 }

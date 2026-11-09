@@ -127,67 +127,64 @@ impl<E: SimulationEngine> ValueWriter<E> {
         Ok(writer)
     }
 
-    /// The writer of `source`: [`Self::varied`] or [`Self::known`].
-    ///
-    /// # Errors
-    ///
-    /// Returns the message of the constructor of `source`.
-    pub(crate) fn of_source(
-        engine: &E,
-        parameters: &[CalibrationParameter],
-        remainder: Option<&str>,
-        source: ValueSource<'_>,
-    ) -> Result<Self, String> {
-        match source {
-            ValueSource::Varied => Self::varied(engine, parameters, remainder),
-            ValueSource::Known(_) => Self::known(engine, parameters, remainder),
-        }
-    }
-
-    /// Write the numbers of `source` to a copy of the engine and check that
-    /// the model then has every value a run needs
+    /// The writer of `source` ([`Self::varied`] or [`Self::known`]), once
+    /// the numbers of `source` are written to a copy of the engine and the
+    /// model then has every value a run needs
     /// ([`SimulationEngine::check_values`]). A varied source writes, for each
     /// value, the point of its bounds nearest 0. A known source writes each
     /// of its sets of numbers, so the engine checks every number the method
     /// writes before any run.
     ///
+    /// One copy takes every set: each set writes the same values, and
+    /// [`SimulationEngine::reset`] keeps the values last written.
+    ///
     /// # Errors
     ///
-    /// Returns a message when a known source holds no set of numbers or a
-    /// set without one number per parameter, the engine's message when it
-    /// rejects a number (with the index of its set for a known source), or
-    /// the message of [`SimulationEngine::check_values`].
-    pub(crate) fn check_written(
-        &self,
+    /// Returns the message of the constructor of `source`, a message when a
+    /// known source holds no parameter set or a set without one number per
+    /// parameter, the engine's message when it rejects a number (with the
+    /// index of its set for a known source), or the message of
+    /// [`SimulationEngine::check_values`].
+    pub(crate) fn checked(
         engine: &E,
         parameters: &[CalibrationParameter],
+        remainder: Option<&str>,
         source: ValueSource<'_>,
-    ) -> Result<(), String> {
-        let write = |numbers: &[f64]| {
-            let mut written = engine.clone();
+    ) -> Result<Self, String> {
+        let mut written = engine.clone();
+        let mut write = |writer: &Self, numbers: &[f64]| {
             written.reset();
-            self.apply(&mut written, parameters, numbers)?;
+            writer.apply(&mut written, parameters, numbers)?;
             written.check_values()
         };
         match source {
             ValueSource::Varied => {
+                let writer = Self::varied(engine, parameters, remainder)?;
                 let nearest_zero: Vec<f64> = parameters
                     .iter()
                     .map(|parameter| 0.0_f64.max(parameter.min_bound).min(parameter.max_bound))
                     .collect();
-                write(&nearest_zero)
+                write(&writer, &nearest_zero)?;
+                Ok(writer)
             }
-            ValueSource::Known([]) => Err("A known source needs a set of numbers".to_string()),
-            ValueSource::Known(sets) => sets.iter().enumerate().try_for_each(|(index, numbers)| {
-                if numbers.len() != parameters.len() {
-                    return Err(format!(
-                        "Parameter set {index} needs one number per parameter ({}), got {}",
-                        parameters.len(),
-                        numbers.len()
-                    ));
+            ValueSource::Known(sets) => {
+                let writer = Self::known(engine, parameters, remainder)?;
+                if sets.is_empty() {
+                    return Err("There is no parameter set to write: give at least one".to_string());
                 }
-                write(numbers).map_err(|error| format!("Parameter set {index}: {error}"))
-            }),
+                for (index, numbers) in sets.iter().enumerate() {
+                    if numbers.len() != parameters.len() {
+                        return Err(format!(
+                            "Parameter set {index} needs one number per parameter ({}), got {}",
+                            parameters.len(),
+                            numbers.len()
+                        ));
+                    }
+                    write(&writer, numbers)
+                        .map_err(|error| format!("Parameter set {index}: {error}"))?;
+                }
+                Ok(writer)
+            }
         }
     }
 
@@ -270,8 +267,9 @@ pub(crate) fn configure_engine<E: SimulationEngine>(
 /// Check that every factor has positive bounds and the engine sets every
 /// parameter and resolves every value of its model kind and the remainder,
 /// and return the plan it resolves them to: [`check_model_values`] without
-/// its check that no value is missing, for a query of some of the values,
-/// such as the compartments each initial condition sets.
+/// its checks that the engine takes every number of a varied value and that
+/// no value is missing, for a query of some of the values, such as the
+/// compartments each initial condition sets. It writes no number.
 ///
 /// # Errors
 ///
@@ -313,9 +311,8 @@ pub fn check_model_values<E: SimulationEngine>(
     parameters: &[CalibrationParameter],
     remainder: Option<&str>,
 ) -> Result<E::ValuePlan, String> {
-    let writer = ValueWriter::varied(engine, parameters, remainder)?;
-    writer.check_written(engine, parameters, ValueSource::Varied)?;
-    Ok(writer.plan)
+    ValueWriter::checked(engine, parameters, remainder, ValueSource::Varied)
+        .map(|writer| writer.plan)
 }
 
 /// An engine with calibration values applied exactly as the calibration

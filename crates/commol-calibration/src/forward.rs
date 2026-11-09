@@ -108,9 +108,10 @@ impl<E: SimulationEngine> ForwardModel<E> {
     /// `replicates` or `seed` is not set, the engine does not resolve a
     /// value of its model kind or the remainder, a varied source has a value
     /// of which the engine does not take every number
-    /// ([`SimulationEngine::check_varied_values`]), the engine rejects a
-    /// number of a known source, or a value is missing once they are
-    /// written ([`SimulationEngine::check_values`]).
+    /// ([`SimulationEngine::check_varied_values`]), a known source holds no
+    /// parameter set or a set without one number per parameter, the engine
+    /// rejects a number of a known source, or a value is missing once they
+    /// are written ([`SimulationEngine::check_values`]).
     pub fn unobserved(
         base_engine: E,
         parameters: Vec<CalibrationParameter>,
@@ -120,8 +121,7 @@ impl<E: SimulationEngine> ForwardModel<E> {
         seed: Option<u64>,
     ) -> Result<Self, String> {
         check_unobserved(&parameters)?;
-        let values = ValueWriter::of_source(&base_engine, &parameters, remainder, source)?;
-        values.check_written(&base_engine, &parameters, source)?;
+        let values = ValueWriter::checked(&base_engine, &parameters, remainder, source)?;
         if let Some(count) = replicates {
             crate::ranges::REPLICATES.check(count)?;
         }
