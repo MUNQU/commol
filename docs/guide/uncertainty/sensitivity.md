@@ -92,6 +92,9 @@ you build the input space.
 
 An initial condition is an amount in the unit of its bin, or a category split
 in `[0, 1]`, with `initial_condition_remainder` as in a calibration problem.
+On `StochasticEvents` or `StochasticSteps`, independent inputs that set an
+initial condition need a `rounding`, and the analysis checks every draw of a
+sample when it is built ([Whole units](../stochastic.md#whole-units)).
 A factor or a noise parameter is not an input: both belong to observations,
 and an analysis has none.
 

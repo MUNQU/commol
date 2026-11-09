@@ -171,6 +171,11 @@ impl DifferentialEquations {
 }
 
 impl commol_core::SimulationEngine for DifferentialEquations {
+    // A deterministic engine takes every number within the bounds.
+    fn check_varied_values(&self, _plan: &Self::ValuePlan) -> Result<(), String> {
+        Ok(())
+    }
+
     commol_model::delegate_to_compiled_model!();
 
     fn check_position(&self, position: f64) -> Result<(), String> {

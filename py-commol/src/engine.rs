@@ -336,6 +336,36 @@ impl SimulationEngine for Engine {
         }
     }
 
+    fn check_varied_values(&self, plan: &EngineValuePlan) -> Result<(), String> {
+        match (self, plan) {
+            (Self::Difference(engine), EngineValuePlan::Aggregate(plan)) => {
+                engine.check_varied_values(plan)
+            }
+            (Self::Differential(engine), EngineValuePlan::Aggregate(plan)) => {
+                engine.check_varied_values(plan)
+            }
+            (Self::StochasticEvents(engine), EngineValuePlan::Aggregate(plan)) => {
+                engine.check_varied_values(plan)
+            }
+            (Self::StochasticSteps(engine), EngineValuePlan::Aggregate(plan)) => {
+                engine.check_varied_values(plan)
+            }
+            #[cfg(feature = "test-kind")]
+            (Self::Test(engine), EngineValuePlan::Test(plan)) => engine.check_varied_values(plan),
+            #[cfg(feature = "test-kind")]
+            (Self::TestStochastic(engine), EngineValuePlan::Test(plan)) => {
+                engine.check_varied_values(plan)
+            }
+            // coverage: an arm for the test model kind: an engine checks only the plans of its own
+            // plan_values
+            #[cfg(feature = "test-kind")]
+            (engine, _) => Err(format!(
+                "The plan of values is not a plan of the {} engine",
+                engine.engine_type().name()
+            )),
+        }
+    }
+
     fn apply_values(&mut self, plan: &EngineValuePlan, values: &[f64]) -> Result<f64, String> {
         match (self, plan) {
             (Self::Difference(engine), EngineValuePlan::Aggregate(plan)) => {

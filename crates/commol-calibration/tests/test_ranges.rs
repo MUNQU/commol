@@ -7,7 +7,7 @@ use commol_calibration::ranges::{self, RANGES};
 use commol_calibration::{
     AccelerationStrategy, CalibrationConstraint, CalibrationParameter, ForwardModel,
     ImprovementStop, InertiaWeightStrategy, MutationStrategy, NelderMeadConfig, ObservedDataPoint,
-    ParticleSwarmConfig,
+    ParticleSwarmConfig, ValueSource,
 };
 use commol_core::{Count, Model, Real, Rule, Setting};
 use commol_difference::DifferenceEquations;
@@ -93,6 +93,7 @@ fn every_setting_outside_its_range_is_rejected() {
         engine(),
         vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
         None,
+        ValueSource::Varied,
         Some(0),
         None,
     )

@@ -4,6 +4,9 @@ A total that is not whole is an error. Initial amounts that are not whole
 need a rounding in the settings of the engine, with no default:
 ``"largest_remainder"`` (the same whole amounts in every run) or ``"random"``
 (a multinomial draw per run, whose mean is the amounts of the model).
+A method that varies an initial condition needs a rounding too, and the
+engine checks known values, such as a write-back or the draws of a sample,
+when it writes them.
 """
 
 import math
@@ -13,7 +16,17 @@ import pytest
 from commol import Simulation
 from commol.engines import StochasticEventsSettings, StochasticStepsSettings
 from commol.engines.engine import EngineName
-from tests.support import STOCHASTIC_ENGINES, a_to_b_builder, build_stochastic
+from commol.quantities import ValueAt
+from commol.sensitivity import InputSpace, Propagation, SensitivityAnalysis
+from commol.uncertainty import ParameterSample, SampleMethod
+from tests.support import (
+    STOCHASTIC_ENGINES,
+    a_to_b_builder,
+    bounded,
+    build_stochastic,
+    initial_condition_problem,
+    needs_a_rounding,
+)
 
 GROUPS = {"group": {f"g{index}": 0.1 for index in range(10)}}
 """Ten groups of a tenth each: half a unit of B in each group."""
@@ -96,3 +109,60 @@ class TestWholeUnits:
             mean = sum(values) / len(values)
             error = math.sqrt(0.5 * 0.5 / len(values))
             assert abs(mean - 0.5) < 4.5 * error, index
+
+
+def test_an_analysis_that_varies_an_amount_needs_a_rounding() -> None:
+    simulation = Simulation(build_stochastic(a_to_b_builder(), "StochasticSteps"))
+    inputs = InputSpace.uniform_on_bounds(
+        [bounded("B", 0.0, 50.0, kind="initial_condition")]
+    )
+
+    with pytest.raises(ValueError) as error:
+        SensitivityAnalysis(simulation, inputs, replicates=2, seed=1)
+
+    assert str(error.value) == needs_a_rounding("StochasticSteps")
+
+
+def _sample_of_b(draws: list[float], low: float = 0.0) -> InputSpace:
+    """The initial amount of bin B in ``[low, 50]``, from a sample of ``draws``."""
+    sample = ParameterSample.equally_weighted(
+        ["B"], [(low, 50.0)], [[draw] for draw in draws], SampleMethod(name="grid")
+    )
+    return InputSpace.from_sample(
+        sample, [bounded("B", low, 50.0, kind="initial_condition")]
+    )
+
+
+@pytest.mark.parametrize("low", [0.0, 0.5])
+def test_an_analysis_of_a_sample_writes_its_draws_as_known_amounts(
+    low: float,
+) -> None:
+    simulation = Simulation(build_stochastic(a_to_b_builder(), "StochasticSteps"))
+    analysis = SensitivityAnalysis(
+        simulation, _sample_of_b([10.0, 20.0, 30.0], low), replicates=2, seed=1
+    )
+
+    result = analysis.run(Propagation(quantities=[ValueAt(series="B", at=0)]))
+
+    assert [run[0] for run in result.values] == [10.0, 10.0, 20.0, 20.0, 30.0, 30.0]
+
+
+def test_every_draw_of_a_sample_is_checked_when_the_analysis_is_built() -> None:
+    simulation = Simulation(build_stochastic(a_to_b_builder(), "StochasticSteps"))
+
+    with pytest.raises(ValueError, match=r"^Parameter set 1: .*12\.3 is not whole"):
+        SensitivityAnalysis(
+            simulation, _sample_of_b([10.0, 12.3]), replicates=2, seed=1
+        )
+
+
+def test_a_known_amount_is_written_back_when_it_is_whole() -> None:
+    model = build_stochastic(a_to_b_builder(), "StochasticSteps")
+    problem = initial_condition_problem("B")
+
+    with pytest.raises(ValueError, match=r"12\.3 is not whole"):
+        model.apply_calibration_parameters({"B": 12.3}, problem)
+    model.apply_calibration_parameters({"B": 12.0}, problem)
+    start = Simulation(model).run_at([0.0], seed=1)
+
+    assert start["B"] == [12.0]

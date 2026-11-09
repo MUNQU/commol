@@ -2,7 +2,7 @@
 //! and NaN, the form a quantity crosses in, the NaN rule of every reduction
 //! across runs, and the ratio of two quantities.
 
-use commol_calibration::{CalibrationParameter, ForwardModel};
+use commol_calibration::{CalibrationParameter, ForwardModel, ValueSource};
 use commol_core::NoSteps;
 use commol_core::{Model, SimulationEngine};
 use commol_difference::DifferenceEquations;
@@ -631,7 +631,7 @@ fn all_over_b(at: f64, rule: ReplicateRule) -> Quantity {
 /// The forward model of [`one_unit`], 8 replicates of `k`.
 fn one_unit_forward() -> ForwardModel<StochasticSteps> {
     let k = vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)];
-    ForwardModel::unobserved(one_unit(), k, None, Some(8), Some(3)).unwrap()
+    ForwardModel::unobserved(one_unit(), k, None, ValueSource::Varied, Some(8), Some(3)).unwrap()
 }
 
 /// The replicates of `quantity` at two points of `k = 0.5`, combined.

@@ -184,9 +184,9 @@ To add an engine to the list:
       with tolerances implements `accuracy`, `accuracy_settings` and [`at_accuracy`](decisions/identifiability.md#a-rank-lost-to-the-accuracy-gives-no-verdict).
 - [ ] Add a variant to `Engine` in `py-commol/src/engine.rs`: one arm in
       `build` per kind it runs (the pair of the engine and the kind),
-      `engine_type`, `dispatch!`, `at_accuracy`, `plan_values` and
-      `apply_values` (and `compartmental!` for an engine of the aggregate
-      kind). Add the crate to `py-commol/Cargo.toml`.
+      `engine_type`, `dispatch!`, `at_accuracy`, `plan_values`,
+      `apply_values` and `check_varied_values` (and `compartmental!` for an
+      engine of the aggregate kind). Add the crate to `py-commol/Cargo.toml`.
 - [ ] Add the name to the `EngineName` `Literal` in `engines/engine.py`; if the
       engine has settings, add their Pydantic class to `EngineSettings`.
 - [ ] Run the tests of `crates/commol-core/src/types/engine.rs`,
@@ -215,8 +215,8 @@ To add a kind of model, such as an agent network (see
       `kinds` of an engine that runs it.
       Each engine implements `SimulationEngine`: `plan_values` and
       `apply_values` resolve and write the values of the kind, `check_values`
-      refuses a run that lacks one, and `state_outputs` and `output_sums`
-      name what an expression reads.
+      refuses a run that lacks one, `check_varied_values` a varied value it
+      takes in part, and `state_outputs` and `output_sums` what it reads.
 - [ ] Add a variant to `EngineValuePlan` in `py-commol/src/engine.rs`.
 - [ ] Write a `ModelStructure` subclass in `py-commol/commol/_model/`, with
       `kind` as a `Literal` default. Implement `check_model` (it asks the

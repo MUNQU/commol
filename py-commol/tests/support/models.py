@@ -92,6 +92,16 @@ def build_stochastic(
     return builder.build(builder.structure, engine=engine, settings=settings)
 
 
+def needs_a_rounding(engine: EngineName, entry_id: str = "B") -> str:
+    """The message of a stochastic `engine` with no rounding, when a method
+    varies the initial condition `entry_id`."""
+    return (
+        f"The {engine} engine moves whole units, and a method that varies the "
+        f"initial condition '{entry_id}' can write amounts that are not whole. Name "
+        'a rounding in the settings of the engine: "largest_remainder" or "random"'
+    )
+
+
 def stratify(
     builder: ModelBuilder,
     stratifications: Stratifications,

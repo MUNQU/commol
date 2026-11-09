@@ -18,9 +18,16 @@ from commol import (
     Simulation,
 )
 from commol._fit.result import CalibrationResult
+from commol.engines import StochasticEventsSettings, StochasticStepsSettings
 from commol.engines.engine import EngineName
 from commol.uncertainty import weighted_quantiles
-from tests.support import STOCHASTIC_ENGINES, a_to_b_builder, bounded, build_stochastic
+from tests.support import (
+    STOCHASTIC_ENGINES,
+    a_to_b_builder,
+    bounded,
+    build_stochastic,
+    needs_a_rounding,
+)
 
 RATE = 0.1
 POSITIONS = [2.0, 5.0, 10.0]
@@ -144,3 +151,80 @@ def test_the_engine_asks_for_replicates() -> None:
         "The StochasticEvents engine is stochastic: set replicates, how many "
         "replicates each evaluation runs."
     )
+
+
+def _amount_problem(low: float) -> CalibrationProblem:
+    """A calibration of the initial amount of bin B in ``[low, 50]``."""
+    return CalibrationProblem(
+        observed_data=[ObservedDataPoint(at=2.0, output="A", value=800.0)],
+        parameters=[bounded("B", low, 50.0, kind="initial_condition")],
+        loss_function="sse",
+        optimization_config=NelderMeadConfig(max_iterations=3),
+        replicates=2,
+        replicate_summary="mean",
+        seed=7,
+    )
+
+
+@pytest.mark.parametrize("engine", STOCHASTIC_ENGINES)
+@pytest.mark.parametrize("low", [0.0, 0.5])
+def test_a_calibrated_amount_needs_a_rounding(engine: EngineName, low: float) -> None:
+    simulation = Simulation(build_stochastic(a_to_b_builder(), engine))
+
+    with pytest.raises(ValueError) as error:
+        Calibrator(simulation, _amount_problem(low))
+
+    assert str(error.value) == needs_a_rounding(engine)
+
+
+@pytest.mark.parametrize(
+    ("entry_id", "high", "remainder"),
+    [("B_g1", 50.0, None), ("g1", 1.0, None), ("B", 50.0, "A")],
+    ids=["compartment", "category", "with a remainder"],
+)
+def test_every_initial_condition_that_varies_needs_a_rounding(
+    entry_id: str, high: float, remainder: str | None
+) -> None:
+    builder = a_to_b_builder(stratifications={"group": {"g1": 0.5, "g2": 0.5}})
+    simulation = Simulation(build_stochastic(builder, "StochasticSteps"))
+    problem = _amount_problem(0.0).model_copy(
+        update={
+            "parameters": [bounded(entry_id, 0.0, high, kind="initial_condition")],
+            "initial_condition_remainder": remainder,
+        }
+    )
+
+    with pytest.raises(ValueError) as error:
+        Calibrator(simulation, problem)
+
+    assert str(error.value) == needs_a_rounding("StochasticSteps", entry_id)
+
+
+@pytest.mark.parametrize(
+    ("engine", "settings"),
+    [
+        ("StochasticEvents", StochasticEventsSettings(rounding="largest_remainder")),
+        ("StochasticSteps", StochasticStepsSettings(rounding="largest_remainder")),
+    ],
+)
+def test_a_calibrated_amount_with_a_rounding_is_calibrated(
+    engine: EngineName, settings: StochasticEventsSettings | StochasticStepsSettings
+) -> None:
+    model = build_stochastic(a_to_b_builder(), engine, settings)
+    problem = CalibrationProblem(
+        observed_data=[ObservedDataPoint(at=0.0, output="B", value=12.3)],
+        parameters=[
+            bounded("B", 0.0, 50.0, kind="initial_condition", initial_guess=25.0)
+        ],
+        loss_function="sse",
+        optimization_config=NelderMeadConfig(max_iterations=100),
+        replicates=2,
+        replicate_summary="mean",
+        seed=7,
+    )
+
+    result = Calibrator(Simulation(model), problem).run()
+
+    # Every run starts from 12 whole units of B, the nearest to 12.3: with no
+    # rounding the loss would reach 0.
+    assert result.final_loss == pytest.approx((12.0 - 12.3) ** 2, rel=1e-9)

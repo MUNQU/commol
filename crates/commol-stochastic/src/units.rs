@@ -2,7 +2,7 @@
 //! units and their start, and impulses that move whole units.
 
 use commol_core::{EngineType, Rounding, SimulationError};
-use commol_model::{CompiledModel, as_whole, rounded};
+use commol_model::{CompiledModel, InitialConditionPlan, as_whole, rounded};
 use commol_random::{Generator, sample};
 
 /// The compiled model of a stochastic engine, its generator and its state of
@@ -103,19 +103,47 @@ impl Units {
     /// negative, or the value is not whole and the settings name no rounding.
     pub(crate) fn set_initial_condition(&mut self, index: usize, value: f64) -> Result<(), String> {
         if self.rounding.is_none() && value >= 0.0 && as_whole(value).is_none() {
-            return Err(format!(
-                "The {} engine moves whole units, and {value} is not whole. Name a \
-                 rounding in the settings of the engine: \"{}\" or \"{}\"",
-                self.engine.name(),
-                Rounding::LargestRemainder.name(),
-                Rounding::Random.name(),
-            ));
+            return Err(self.needs_a_rounding(&format!("{value} is not whole")));
         }
         self.model.set_initial_condition(index, value)?;
         if !self.started {
             self.state[index] = value;
         }
         Ok(())
+    }
+
+    /// Check that the engine takes every number that a method which varies
+    /// the values of `plan` can write
+    /// ([`commol_core::SimulationEngine::check_varied_values`]).
+    ///
+    /// A method that varies an initial condition, such as an optimizer,
+    /// writes amounts that are not whole, so it needs a rounding, whatever
+    /// the bounds of the initial condition.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the first initial condition and the
+    /// roundings when the settings name no rounding.
+    pub(crate) fn check_varied_values(&self, plan: &InitialConditionPlan) -> Result<(), String> {
+        match (self.rounding, plan.ids().next()) {
+            (None, Some(id)) => Err(self.needs_a_rounding(&format!(
+                "a method that varies the initial condition '{id}' can write amounts that \
+                 are not whole"
+            ))),
+            _ => Ok(()),
+        }
+    }
+
+    /// The message of an amount that is not whole and no rounding: the
+    /// engine moves whole units, `reason`, and the roundings to name.
+    fn needs_a_rounding(&self, reason: &str) -> String {
+        format!(
+            "The {} engine moves whole units, and {reason}. Name a rounding in the \
+             settings of the engine: \"{}\" or \"{}\"",
+            self.engine.name(),
+            Rounding::LargestRemainder.name(),
+            Rounding::Random.name(),
+        )
     }
 
     /// Apply the impulses that act at position `t`.

@@ -21,6 +21,38 @@ fn model_value_type(parameter_type: CalibrationParameterType) -> Option<ModelVal
     }
 }
 
+/// The values of the model kind among the parameters: the index of each
+/// one among the parameters, and its type and id, in problem order.
+fn model_values(parameters: &[CalibrationParameter]) -> (Vec<usize>, Vec<ModelValue>) {
+    parameters
+        .iter()
+        .enumerate()
+        .filter_map(|(index, parameter)| {
+            model_value_type(parameter.parameter_type).map(|value_type| {
+                (
+                    index,
+                    ModelValue {
+                        value_type,
+                        id: parameter.id.clone(),
+                    },
+                )
+            })
+        })
+        .unzip()
+}
+
+/// Where the numbers that a method writes for its values come from.
+#[derive(Clone, Copy, Debug)]
+pub enum ValueSource<'a> {
+    /// A method varies them, such as an optimizer or a sampler: any number
+    /// within the bounds of each value.
+    Varied,
+    /// A method writes numbers it knows, such as the draws of a sample:
+    /// every set of numbers it writes, each with one number per parameter
+    /// in problem order.
+    Known(&'a [Vec<f64>]),
+}
+
 /// How the values of a set of calibration parameters reach an engine.
 #[derive(Clone, Debug)]
 pub(crate) struct ValueWriter<E: SimulationEngine> {
@@ -32,8 +64,10 @@ pub(crate) struct ValueWriter<E: SimulationEngine> {
 }
 
 impl<E: SimulationEngine> ValueWriter<E> {
-    /// Check that every factor has positive bounds and the engine sets every
-    /// parameter, and ask it to resolve the values of its model kind.
+    /// The writer of a method that writes numbers it knows: check that every
+    /// factor has positive bounds and the engine sets every parameter, and
+    /// ask it to resolve the values of its model kind. The engine checks
+    /// each number when it writes it ([`Self::apply`]).
     ///
     /// Each parameter is set on a copy of the engine at its lower bound, so
     /// the rule of the engine ([`SimulationEngine::set_parameter`]) rejects
@@ -44,7 +78,7 @@ impl<E: SimulationEngine> ValueWriter<E> {
     /// Returns a message that names a factor with a bound at or below 0, or
     /// the engine's message when it does not set a parameter or does not
     /// accept a value, or an id or the remainder does not resolve.
-    pub(crate) fn new(
+    pub(crate) fn known(
         engine: &E,
         parameters: &[CalibrationParameter],
         remainder: Option<&str>,
@@ -68,19 +102,90 @@ impl<E: SimulationEngine> ValueWriter<E> {
                 | CalibrationParameterType::Noise => {}
             }
         }
-        let mut kind_indices = Vec::new();
-        let mut values = Vec::new();
-        for (index, parameter) in parameters.iter().enumerate() {
-            if let Some(value_type) = model_value_type(parameter.parameter_type) {
-                kind_indices.push(index);
-                values.push(ModelValue {
-                    value_type,
-                    id: parameter.id.clone(),
-                });
-            }
-        }
+        let (kind_indices, values) = model_values(parameters);
         let plan = engine.plan_values(&values, remainder)?;
         Ok(Self { kind_indices, plan })
+    }
+
+    /// The writer of a method that varies the values, such as an optimizer
+    /// or a sampler: [`Self::known`], then the engine checks that it takes
+    /// every number such a method can write
+    /// ([`SimulationEngine::check_varied_values`]), whatever the bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns the message of [`Self::known`], or the engine's message when it
+    /// takes only some numbers of a value, such as an engine of whole units
+    /// with no rounding and an initial condition.
+    pub(crate) fn varied(
+        engine: &E,
+        parameters: &[CalibrationParameter],
+        remainder: Option<&str>,
+    ) -> Result<Self, String> {
+        let writer = Self::known(engine, parameters, remainder)?;
+        engine.check_varied_values(&writer.plan)?;
+        Ok(writer)
+    }
+
+    /// The writer of `source` ([`Self::varied`] or [`Self::known`]), once
+    /// the numbers of `source` are written to a copy of the engine and the
+    /// model then has every value a run needs
+    /// ([`SimulationEngine::check_values`]). A varied source writes, for each
+    /// value, the point of its bounds nearest 0. A known source writes each
+    /// of its sets of numbers, so the engine checks every number the method
+    /// writes before any run.
+    ///
+    /// One copy takes every set: each set writes the same values, and
+    /// [`SimulationEngine::reset`] keeps the values last written.
+    ///
+    /// # Errors
+    ///
+    /// Returns the message of the constructor of `source`, a message when a
+    /// known source holds no parameter set or a set without one number per
+    /// parameter, the engine's message when it rejects a number (with the
+    /// index of its set for a known source), or the message of
+    /// [`SimulationEngine::check_values`].
+    pub(crate) fn checked(
+        engine: &E,
+        parameters: &[CalibrationParameter],
+        remainder: Option<&str>,
+        source: ValueSource<'_>,
+    ) -> Result<Self, String> {
+        let mut written = engine.clone();
+        let mut write = |writer: &Self, numbers: &[f64]| {
+            written.reset();
+            writer.apply(&mut written, parameters, numbers)?;
+            written.check_values()
+        };
+        match source {
+            ValueSource::Varied => {
+                let writer = Self::varied(engine, parameters, remainder)?;
+                let nearest_zero: Vec<f64> = parameters
+                    .iter()
+                    .map(|parameter| 0.0_f64.max(parameter.min_bound).min(parameter.max_bound))
+                    .collect();
+                write(&writer, &nearest_zero)?;
+                Ok(writer)
+            }
+            ValueSource::Known(sets) => {
+                let writer = Self::known(engine, parameters, remainder)?;
+                if sets.is_empty() {
+                    return Err("There is no parameter set to write: give at least one".to_string());
+                }
+                for (index, numbers) in sets.iter().enumerate() {
+                    if numbers.len() != parameters.len() {
+                        return Err(format!(
+                            "Parameter set {index} needs one number per parameter ({}), got {}",
+                            parameters.len(),
+                            numbers.len()
+                        ));
+                    }
+                    write(&writer, numbers)
+                        .map_err(|error| format!("Parameter set {index}: {error}"))?;
+                }
+                Ok(writer)
+            }
+        }
     }
 
     /// The values of the model kind, as the engine resolved them.
@@ -162,8 +267,9 @@ pub(crate) fn configure_engine<E: SimulationEngine>(
 /// Check that every factor has positive bounds and the engine sets every
 /// parameter and resolves every value of its model kind and the remainder,
 /// and return the plan it resolves them to: [`check_model_values`] without
-/// its check that no value is missing, for a query of some of the values,
-/// such as the compartments each initial condition sets.
+/// its checks that the engine takes every number of a varied value and that
+/// no value is missing, for a query of some of the values, such as the
+/// compartments each initial condition sets. It writes no number.
 ///
 /// # Errors
 ///
@@ -175,7 +281,7 @@ pub fn plan_model_values<E: SimulationEngine>(
     parameters: &[CalibrationParameter],
     remainder: Option<&str>,
 ) -> Result<E::ValuePlan, String> {
-    ValueWriter::new(engine, parameters, remainder).map(|writer| writer.plan)
+    ValueWriter::known(engine, parameters, remainder).map(|writer| writer.plan)
 }
 
 /// Check that every factor has positive bounds, the engine sets every
@@ -196,23 +302,17 @@ pub fn plan_model_values<E: SimulationEngine>(
 ///
 /// Returns a message that names a factor with a bound at or below 0, or the
 /// engine's message when it does not set a parameter, a value or the
-/// remainder does not resolve, the kind does not accept a type of value, or
-/// a value the calibration does not write is missing.
+/// remainder does not resolve, the kind does not accept a type of value, the
+/// engine does not take every number of a value
+/// ([`SimulationEngine::check_varied_values`]), or a value the calibration
+/// does not write is missing.
 pub fn check_model_values<E: SimulationEngine>(
     engine: &E,
     parameters: &[CalibrationParameter],
     remainder: Option<&str>,
 ) -> Result<E::ValuePlan, String> {
-    let writer = ValueWriter::new(engine, parameters, remainder)?;
-    let values: Vec<f64> = parameters
-        .iter()
-        .map(|parameter| 0.0_f64.max(parameter.min_bound).min(parameter.max_bound))
-        .collect();
-    let mut written = engine.clone();
-    written.reset();
-    writer.apply(&mut written, parameters, &values)?;
-    written.check_values()?;
-    Ok(writer.plan)
+    ValueWriter::checked(engine, parameters, remainder, ValueSource::Varied)
+        .map(|writer| writer.plan)
 }
 
 /// An engine with calibration values applied exactly as the calibration
@@ -233,7 +333,7 @@ pub fn configured_engine<E: SimulationEngine>(
     remainder: Option<&str>,
     values: &[f64],
 ) -> Result<(E, Vec<f64>, E::ValuePlan), String> {
-    let writer = ValueWriter::new(base_engine, parameters, remainder)?;
+    let writer = ValueWriter::known(base_engine, parameters, remainder)?;
     let (engine, applied) = configure_engine(base_engine, parameters, &writer, values)?;
     Ok((engine, applied, writer.plan))
 }

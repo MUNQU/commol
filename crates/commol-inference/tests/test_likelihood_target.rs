@@ -33,6 +33,10 @@ impl ValuePlan for NoPlan {
 }
 
 impl SimulationEngine for Line {
+    fn check_varied_values(&self, _plan: &Self::ValuePlan) -> Result<(), String> {
+        Ok(())
+    }
+
     fn check_values(&self) -> Result<(), String> {
         Ok(())
     }

@@ -538,6 +538,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A calibrated initial condition on `StochasticEvents` or `StochasticSteps`
+  with no `rounding` built when its bounds were whole, such as `[0, 50]`, and
+  then every start failed, because the optimizer writes values that are not
+  whole. A `Calibrator` or a `SensitivityAnalysis` that varies an initial
+  condition on these engines now refuses it when it is built, whatever its
+  bounds, with a message that names the initial condition and the two
+  roundings. `Model.apply_calibration_parameters` writes known values as
+  before, each checked when it is written. A `SensitivityAnalysis` of
+  `InputSpace.from_sample` checks every draw when it is built, not the point
+  of the bounds nearest 0: a sample of whole draws with bounds such as
+  `[0.5, 50]` now builds, and a draw that is not whole is refused there, with
+  the set of the draw, not at the run. See
+  [Whole units](../guide/stochastic.md#whole-units).
 - `Collinearity` at a point where a parameter with an infinite bound is 0
   scaled its column by an infinite width: an infinite sensitivity and an
   index below 1, with no error. The magnitude of the parameter there is now
