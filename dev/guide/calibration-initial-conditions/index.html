@@ -2876,6 +2876,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/calibrated-initial-conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibrated Initial Conditions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/time/" class="md-nav__link">
         
   
@@ -3964,6 +3992,10 @@ the optimization starts:</p>
 <td>A category name that two stratifications declare</td>
 <td><code>Category 'c1' is ambiguous</code>, with the stratifications and the qualified names (<code>resolve_category</code>, which <code>Aggregate.resolve_category</code> also asks)</td>
 </tr>
+<tr>
+<td>Any id, on <code>StochasticEvents</code> or <code>StochasticSteps</code> with no <code>rounding</code></td>
+<td><code>The ... engine moves whole units, and a method that varies the initial condition '&lt;id&gt;' can write amounts that are not whole</code>, with the two roundings (<a href="../stochastic/#whole-units">Whole units</a>)</td>
+</tr>
 </tbody>
 </table>
 <h2 id="the-remainder">The remainder<a class="headerlink" href="#the-remainder" title="Permanent link">&para;</a></h2>
@@ -4116,7 +4148,7 @@ its complement the rest, in every split of a stratification whose fractions
 </tr>
 <tr>
 <td>The design behind this page</td>
-<td><a href="../../codebase/decisions/initial-conditions/">Initial conditions</a></td>
+<td><a href="../../codebase/decisions/calibrated-initial-conditions/">Calibrated initial conditions</a></td>
 </tr>
 </tbody>
 </table>

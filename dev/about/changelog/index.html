@@ -2723,6 +2723,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/calibrated-initial-conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibrated Initial Conditions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/time/" class="md-nav__link">
         
   
@@ -5737,6 +5765,19 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>A calibrated initial condition on <code>StochasticEvents</code> or <code>StochasticSteps</code>
+  with no <code>rounding</code> built when its bounds were whole, such as <code>[0, 50]</code>, and
+  then every start failed, because the optimizer writes values that are not
+  whole. A <code>Calibrator</code> or a <code>SensitivityAnalysis</code> that varies an initial
+  condition on these engines now refuses it when it is built, whatever its
+  bounds, with a message that names the initial condition and the two
+  roundings. <code>Model.apply_calibration_parameters</code> writes known values as
+  before, each checked when it is written. A <code>SensitivityAnalysis</code> of
+  <code>InputSpace.from_sample</code> checks every draw when it is built, not the point
+  of the bounds nearest 0: a sample of whole draws with bounds such as
+  <code>[0.5, 50]</code> now builds, and a draw that is not whole is refused there, with
+  the set of the draw, not at the run. See
+  <a href="../../guide/stochastic/#whole-units">Whole units</a>.</li>
 <li><code>Collinearity</code> at a point where a parameter with an infinite bound is 0
   scaled its column by an infinite width: an infinite sensitivity and an
   index below 1, with no error. The magnitude of the parameter there is now

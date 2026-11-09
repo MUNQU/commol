@@ -3459,7 +3459,7 @@ print(sum(start[f"B_g{i}"][0] for i in range(10)) + sum(start[f"A_g{i}"][0] for 
 # 1000.0
 ```
 
-Initial conditions that calibration sets go through the same rounding. With no rounding, a calibrated value that is not whole is an error that lists the two options.
+Initial conditions that calibration sets go through the same rounding. A method that varies an initial condition, such as an optimizer or a sampler, writes values that are not whole. So it needs a rounding, whatever the bounds. With no rounding, a `Calibrator`, or a `SensitivityAnalysis` of independent inputs, with an `initial_condition` raises `ValueError` when it is built. The message names the initial condition and the two options. Known values need no rounding when they are whole: `Model.apply_calibration_parameters` writes `{"B": 12.0}`, and refuses `{"B": 12.3}` with a message that names the value. The draws of a sample are known values too: a `SensitivityAnalysis` of `InputSpace.from_sample` writes them. The engine checks every draw when the analysis is built, and the message names the set of the draw.
 
 ## Seeds and replicates
 
@@ -3539,7 +3539,7 @@ print(0.05 < result.best_parameters["k2"] < 0.2)  # True: near 0.1
 ## Checklist
 
 - [ ] The engine is `StochasticEvents` (continuous time) or `StochasticSteps` (per-step probabilities), as the rates of the model mean.
-- [ ] The amount of each bin is whole, and the settings name a `rounding` when the amount of a compartment is not.
+- [ ] The amount of each bin is whole, and the settings name a `rounding` when the amount of a compartment is not, or when a calibration or a `SensitivityAnalysis` of independent inputs sets an initial condition.
 - [ ] Every run has a seed, or keeps the one commol drew (`results.seed`).
 - [ ] A large total uses `"tau_leaping"` or a deterministic engine.
 - [ ] A calibration sets `replicates`, `replicate_summary` and `seed`.
@@ -3915,11 +3915,12 @@ A category that two stratifications share is written with its stratification, as
 
 The engine resolves every id when you create the `Calibrator` (`InitialConditionPlan` in `crates/commol-model/src/initial_conditions.rs`), so a wrong id fails before the optimization starts:
 
-| `id`                                                                                                   | Error                                                                                                                                             |
-| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Names nothing in the model                                                                             | `Invalid bin, compartment or category 'X'`, with the compartments                                                                                 |
-| A category of a stratification with three or more categories, such as `"g1"` of `group = [g1, g2, g3]` | `Initial condition category 'group:g1' needs a binary stratification`                                                                             |
-| A category name that two stratifications declare                                                       | `Category 'c1' is ambiguous`, with the stratifications and the qualified names (`resolve_category`, which `Aggregate.resolve_category` also asks) |
+| `id`                                                                                                   | Error                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Names nothing in the model                                                                             | `Invalid bin, compartment or category 'X'`, with the compartments                                                                                                                                                                           |
+| A category of a stratification with three or more categories, such as `"g1"` of `group = [g1, g2, g3]` | `Initial condition category 'group:g1' needs a binary stratification`                                                                                                                                                                       |
+| A category name that two stratifications declare                                                       | `Category 'c1' is ambiguous`, with the stratifications and the qualified names (`resolve_category`, which `Aggregate.resolve_category` also asks)                                                                                           |
+| Any id, on `StochasticEvents` or `StochasticSteps` with no `rounding`                                  | `The ... engine moves whole units, and a method that varies the initial condition '<id>' can write amounts that are not whole`, with the two roundings ([Whole units](https://munqu.github.io/commol/latest/guide/stochastic/#whole-units)) |
 
 ## The remainder
 
@@ -4020,11 +4021,11 @@ So an expanded-compartment id always becomes an override, and so does a bin or c
 
 ## Next steps
 
-| To learn                            | Read                                                                                                       |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| The rules of initial conditions     | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#the-structure-aggregate)    |
-| Reporting fitted initial conditions | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                                    |
-| The design behind this page         | [Initial conditions](https://munqu.github.io/commol/latest/codebase/decisions/initial-conditions/index.md) |
+| To learn                            | Read                                                                                                                             |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| The rules of initial conditions     | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#the-structure-aggregate)                          |
+| Reporting fitted initial conditions | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                                                          |
+| The design behind this page         | [Calibrated initial conditions](https://munqu.github.io/commol/latest/codebase/decisions/calibrated-initial-conditions/index.md) |
 
 # Observations
 
@@ -6854,7 +6855,7 @@ Each input is a `CalibrationParameter`: a model parameter or an initial conditio
 
 An input space has distributions or a sample, exactly one, with no default: how the inputs vary is a modelling choice. `InputSpace(parameters=...)` with neither, or with both, is refused when `SensitivityAnalysis` reads it, which also checks that the names and the bounds of a sample are those of the parameters. The distributions name each input once, and fit its bounds, when you build the input space.
 
-An initial condition is an amount in the unit of its bin, or a category split in `[0, 1]`, with `initial_condition_remainder` as in a calibration problem. A factor or a noise parameter is not an input: both belong to observations, and an analysis has none.
+An initial condition is an amount in the unit of its bin, or a category split in `[0, 1]`, with `initial_condition_remainder` as in a calibration problem. On `StochasticEvents` or `StochasticSteps`, independent inputs that set an initial condition need a `rounding`, and the analysis checks every draw of a sample when it is built ([Whole units](https://munqu.github.io/commol/latest/guide/stochastic/#whole-units)). A factor or a noise parameter is not an input: both belong to observations, and an analysis has none.
 
 `SensitivityAnalysis(simulation, inputs, *, replicates=None, seed=None)` holds the inputs for every method you run on it. With a stochastic engine `replicates` (at least 1) and `seed` are required. A point of the design of PRCC, Morris, Sobol or a polynomial chaos runs `replicates` replicates, on the same seeds at every point, and holds their mean: the indices are those of the mean of `replicates` replicates, and they come close to those of the expected value as `replicates` grows. A propagation, and the `Predictive` of its draws, keep every replicate, each with a seed of its own. A deterministic engine does not use `replicates`, so the same analysis runs on either engine; with no seed, the engine draws one, which `analysis.seed` gives and the analysis logs. A negative `replicates` raises `ValueError` that names the setting.
 
@@ -13981,7 +13982,8 @@ class StochasticEventsSettings(BaseModel):
         Relative tolerance of the time of an event when a rate reads ``t``.
     rounding : Rounding | None
         How to make whole the initial amounts that are not. None requires
-        whole amounts.
+        whole amounts, and refuses a method that varies an initial
+        condition, such as a calibration of one.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -14033,7 +14035,8 @@ class StochasticStepsSettings(BaseModel):
     ----------
     rounding : Rounding | None
         How to make whole the initial amounts that are not. None requires
-        whole amounts.
+        whole amounts, and refuses a method that varies an initial
+        condition, such as a calibration of one.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -27407,26 +27410,39 @@ class SensitivityAnalysis:
         Raises
         ------
         ValueError
-            If an input is not a value of the model, the replicates or the
-            seed do not fit the engine, `replicates` is below 1 (a negative
-            number included), or the seed is not a whole number from 0 to
-            ``2**64 - 1``.
+            If an input is not a value of the model, the model lacks a value
+            once the point of the bounds nearest 0 or the draws of a sample
+            are written, the engine does not take every number of an
+            independent input (an ``initial_condition`` on an engine of whole
+            units with no rounding), the engine rejects a draw of a sample, the
+            replicates or the seed do not fit the engine, `replicates` is
+            below 1 (a negative number included), or the seed is not a whole
+            number from 0 to ``2**64 - 1``.
         """
         self.simulation: Simulation = simulation
         self.inputs: InputSpace = inputs
         self.replicates: int | None = replicates
-        check_values(
-            simulation.model_definition,
-            simulation.engine,
-            inputs.parameters,
-            inputs.initial_condition_remainder,
-        )
+        # The engine checks the values: it resolves them, refuses independent
+        # inputs of which it does not take every number, and writes the point
+        # of the bounds nearest 0, or every draw of a sample, to check that it
+        # takes them and that no value is missing.
         self._rust: "ForwardAnalysisProtocol" = commol_rs.inference.ForwardAnalysis(
             simulation.engine,
             engine_json(inputs),
             **engine_handles(inputs),
             replicates=replicates,
             seed=None if seed is None else check_seed(seed),
+        )
+        # The structure checks what only the Python definition knows, such as
+        # the unit of the remainder, once the engine has resolved every value
+        # (`ModelStructure.check_calibration_values`), so after the checks of
+        # the replicates and the seed.
+        model = simulation.model_definition
+        model.structure.check_calibration_values(
+            model,
+            simulation.engine,
+            inputs.parameters,
+            inputs.initial_condition_remainder,
         )
         if seed is None:
             logger.info(
@@ -27646,9 +27662,9 @@ Parameters:
 
 Raises:
 
-| Type         | Description                                                                                                                                                                                             |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If an input is not a value of the model, the replicates or the seed do not fit the engine, replicates is below 1 (a negative number included), or the seed is not a whole number from 0 to 2\*\*64 - 1. |
+| Type         | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If an input is not a value of the model, the model lacks a value once the point of the bounds nearest 0 or the draws of a sample are written, the engine does not take every number of an independent input (an initial_condition on an engine of whole units with no rounding), the engine rejects a draw of a sample, the replicates or the seed do not fit the engine, replicates is below 1 (a negative number included), or the seed is not a whole number from 0 to 2\*\*64 - 1. |
 
 Source code in `commol/sensitivity/analysis.py`
 
@@ -27685,26 +27701,39 @@ def __init__(
     Raises
     ------
     ValueError
-        If an input is not a value of the model, the replicates or the
-        seed do not fit the engine, `replicates` is below 1 (a negative
-        number included), or the seed is not a whole number from 0 to
-        ``2**64 - 1``.
+        If an input is not a value of the model, the model lacks a value
+        once the point of the bounds nearest 0 or the draws of a sample
+        are written, the engine does not take every number of an
+        independent input (an ``initial_condition`` on an engine of whole
+        units with no rounding), the engine rejects a draw of a sample, the
+        replicates or the seed do not fit the engine, `replicates` is
+        below 1 (a negative number included), or the seed is not a whole
+        number from 0 to ``2**64 - 1``.
     """
     self.simulation: Simulation = simulation
     self.inputs: InputSpace = inputs
     self.replicates: int | None = replicates
-    check_values(
-        simulation.model_definition,
-        simulation.engine,
-        inputs.parameters,
-        inputs.initial_condition_remainder,
-    )
+    # The engine checks the values: it resolves them, refuses independent
+    # inputs of which it does not take every number, and writes the point
+    # of the bounds nearest 0, or every draw of a sample, to check that it
+    # takes them and that no value is missing.
     self._rust: "ForwardAnalysisProtocol" = commol_rs.inference.ForwardAnalysis(
         simulation.engine,
         engine_json(inputs),
         **engine_handles(inputs),
         replicates=replicates,
         seed=None if seed is None else check_seed(seed),
+    )
+    # The structure checks what only the Python definition knows, such as
+    # the unit of the remainder, once the engine has resolved every value
+    # (`ModelStructure.check_calibration_values`), so after the checks of
+    # the replicates and the seed.
+    model = simulation.model_definition
+    model.structure.check_calibration_values(
+        model,
+        simulation.engine,
+        inputs.parameters,
+        inputs.initial_condition_remainder,
     )
     if seed is None:
         logger.info(
@@ -38746,6 +38775,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- A calibrated initial condition on `StochasticEvents` or `StochasticSteps` with no `rounding` built when its bounds were whole, such as `[0, 50]`, and then every start failed, because the optimizer writes values that are not whole. A `Calibrator` or a `SensitivityAnalysis` that varies an initial condition on these engines now refuses it when it is built, whatever its bounds, with a message that names the initial condition and the two roundings. `Model.apply_calibration_parameters` writes known values as before, each checked when it is written. A `SensitivityAnalysis` of `InputSpace.from_sample` checks every draw when it is built, not the point of the bounds nearest 0: a sample of whole draws with bounds such as `[0.5, 50]` now builds, and a draw that is not whole is refused there, with the set of the draw, not at the run. See [Whole units](https://munqu.github.io/commol/latest/guide/stochastic/#whole-units).
 - `Collinearity` at a point where a parameter with an infinite bound is 0 scaled its column by an infinite width: an infinite sensitivity and an index below 1, with no error. The magnitude of the parameter there is now 1, as the step of finite differences takes it.
 - A `SampleIdentifiability(reference="prior")` without priors, or `reference="bounds"` with priors, written as JSON measured the sample against the bounds with no error; the engine now refuses it.
 - An empty list of settings is refused with a message that names the field: the `at` of a constraint (before, the constraint was never evaluated), the `origins` of a `RollingConformal` (before, `Every origin failed: 0 of 0`), the `positions` of a conformal method, the `stream` of an `AdaptiveConformal`, the `parameters` of a `ProfileLikelihood` and the `specs` of a `PredictionProfile` (before, an empty result). A parameter profiled twice, or two predictions with one label, are refused; before, one profile overwrote the other.

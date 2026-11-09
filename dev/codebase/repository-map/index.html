@@ -2889,6 +2889,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/calibrated-initial-conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibrated Initial Conditions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/time/" class="md-nav__link">
         
   
@@ -3921,7 +3949,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-core/src/simulation_engine.rs</code></td>
-<td>The <code>SimulationEngine</code> trait, for an engine of any kind: runs at positions (<code>check_position</code>), outputs (<code>output_names</code>, <code>state_outputs</code>, <code>output_sums</code>), the matrices between categories with the values of their scales (<code>matrices</code>), parameters, reset, the seed of a stochastic engine (<code>set_seed</code>), the entry of the list of engines it runs and whether it draws random numbers (<code>engine_type</code>, <code>is_stochastic</code>), the values of its kind (<code>plan_values</code>, <code>apply_values</code>, <code>ValuePlan</code>) and the values a run lacks (<code>check_values</code>, with the one message <code>check_missing_values</code>); <code>Trajectory</code>, <code>check_positions</code>, <code>run_replicates</code> (one run per seed, in parallel); the rules <code>NUM_STEPS</code>, <code>REPLICATE_COUNT</code> and <code>SEED</code> (a whole number from 0 to 2^64 - 1, the one rule of every seed). What calibration needs from any engine.</td>
+<td>The <code>SimulationEngine</code> trait, for an engine of any kind: runs at positions (<code>check_position</code>), outputs (<code>output_names</code>, <code>state_outputs</code>, <code>output_sums</code>), the matrices between categories with the values of their scales (<code>matrices</code>), parameters, reset, the seed of a stochastic engine (<code>set_seed</code>), the entry of the list of engines it runs and whether it draws random numbers (<code>engine_type</code>, <code>is_stochastic</code>), the values of its kind (<code>plan_values</code>, <code>apply_values</code>, <code>ValuePlan</code>) and the values a run lacks (<code>check_values</code>, with the one message <code>check_missing_values</code>) and the values a method varies that the engine takes only in part (<code>check_varied_values</code>); <code>Trajectory</code>, <code>check_positions</code>, <code>run_replicates</code> (one run per seed, in parallel); the rules <code>NUM_STEPS</code>, <code>REPLICATE_COUNT</code> and <code>SEED</code> (a whole number from 0 to 2^64 - 1, the one rule of every seed). What calibration needs from any engine.</td>
 <td>Code for one engine or one kind.</td>
 </tr>
 <tr>
@@ -4096,7 +4124,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/values.rs</code></td>
-<td>How calibrated values reach any engine: parameters by id, which the engine checks when a problem is built (<code>set_parameter</code> on a copy), values of the model kind through the engine (<code>ValueWriter</code>, <code>check_model_values</code>, <code>configured_engine</code>); a factor has positive bounds (<code>ValueWriter::new</code>); a problem leaves no value missing (<code>check_model_values</code> checks a copy of the engine with its values written).</td>
+<td>How calibrated values reach any engine: parameters by id, which the engine checks when a problem is built (<code>set_parameter</code> on a copy), values of the model kind through the engine (<code>ValueWriter</code>, <code>check_model_values</code>, <code>configured_engine</code>); where the numbers of a method come from (<code>ValueSource</code>: varied, through <code>ValueWriter::varied</code>, which asks <code>check_varied_values</code>, or known, through <code>ValueWriter::known</code>); a factor has positive bounds (<code>ValueWriter::known</code>); <code>check_model_values</code> and <code>ForwardModel::unobserved</code> leave no value missing (<code>ValueWriter::checked</code> writes the numbers of the source to a copy of the engine).</td>
 <td>How a kind resolves its values; a check of parameter ids in Python.</td>
 </tr>
 <tr>
@@ -4497,7 +4525,7 @@ table, and <code>tests/suite/test_architecture.py</code> checks it.</p>
 </tr>
 <tr>
 <td><code>_calibration/calibrator.py</code></td>
-<td><code>Calibrator</code>: the one conversion of a problem to Rust types, <code>run(starts=n)</code>, <code>run_with_history</code>, and the entry points <code>uncertainty</code> and <code>identifiability</code>; <code>check_values</code>, the check of the values a calibration or an analysis sets.</td>
+<td><code>Calibrator</code>: the one conversion of a problem to Rust types, <code>run(starts=n)</code>, <code>run_with_history</code>, and the entry points <code>uncertainty</code> and <code>identifiability</code>; <code>check_values</code>, the check of the values a calibration sets.</td>
 <td>Loss or optimizer logic.</td>
 </tr>
 <tr>

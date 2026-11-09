@@ -2987,6 +2987,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../codebase/decisions/calibrated-initial-conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibrated Initial Conditions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../codebase/decisions/time/" class="md-nav__link">
         
   
@@ -4185,6 +4213,9 @@ parameters. The distributions name each input once, and fit its bounds, when
 you build the input space.</p>
 <p>An initial condition is an amount in the unit of its bin, or a category split
 in <code>[0, 1]</code>, with <code>initial_condition_remainder</code> as in a calibration problem.
+On <code>StochasticEvents</code> or <code>StochasticSteps</code>, independent inputs that set an
+initial condition need a <code>rounding</code>, and the analysis checks every draw of a
+sample when it is built (<a href="../../stochastic/#whole-units">Whole units</a>).
 A factor or a noise parameter is not an input: both belong to observations,
 and an analysis has none.</p>
 <p><code>SensitivityAnalysis(simulation, inputs, *, replicates=None, seed=None)</code> holds

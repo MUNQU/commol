@@ -2739,6 +2739,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../calibrated-initial-conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibrated Initial Conditions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../time/" class="md-nav__link">
         
   
@@ -4074,8 +4102,8 @@ moves to another bin, such as from a concentration to a count:</p>
 </table>
 <p>The engine rounds at the start of a run, not when it is built, so a value that
 calibration writes (<code>InitialConditionPlan</code>) goes through the same rounding, and
-<code>"random"</code> draws after the values are written. With no rounding, a written
-value that is not whole is an error.</p>
+<code>"random"</code> draws after the values are written. With no rounding, a value that
+is not whole is refused, and a method that varies an initial condition is refused when it is built (<a href="../calibrated-initial-conditions/#whole-units-need-a-rounding-to-vary-an-initial-condition">Calibrated initial conditions</a>).</p>
 <table>
 <thead>
 <tr>

@@ -78,11 +78,12 @@ A category that two stratifications share is written with its stratification, as
 
 The engine resolves every id when you create the `Calibrator` (`InitialConditionPlan` in `crates/commol-model/src/initial_conditions.rs`), so a wrong id fails before the optimization starts:
 
-| `id`                                                                                                   | Error                                                                                                                                             |
-| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Names nothing in the model                                                                             | `Invalid bin, compartment or category 'X'`, with the compartments                                                                                 |
-| A category of a stratification with three or more categories, such as `"g1"` of `group = [g1, g2, g3]` | `Initial condition category 'group:g1' needs a binary stratification`                                                                             |
-| A category name that two stratifications declare                                                       | `Category 'c1' is ambiguous`, with the stratifications and the qualified names (`resolve_category`, which `Aggregate.resolve_category` also asks) |
+| `id`                                                                                                   | Error                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Names nothing in the model                                                                             | `Invalid bin, compartment or category 'X'`, with the compartments                                                                                                                                                                           |
+| A category of a stratification with three or more categories, such as `"g1"` of `group = [g1, g2, g3]` | `Initial condition category 'group:g1' needs a binary stratification`                                                                                                                                                                       |
+| A category name that two stratifications declare                                                       | `Category 'c1' is ambiguous`, with the stratifications and the qualified names (`resolve_category`, which `Aggregate.resolve_category` also asks)                                                                                           |
+| Any id, on `StochasticEvents` or `StochasticSteps` with no `rounding`                                  | `The ... engine moves whole units, and a method that varies the initial condition '<id>' can write amounts that are not whole`, with the two roundings ([Whole units](https://munqu.github.io/commol/latest/guide/stochastic/#whole-units)) |
 
 ## The remainder
 
@@ -183,8 +184,8 @@ So an expanded-compartment id always becomes an override, and so does a bin or c
 
 ## Next steps
 
-| To learn                            | Read                                                                                                       |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| The rules of initial conditions     | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#the-structure-aggregate)    |
-| Reporting fitted initial conditions | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                                    |
-| The design behind this page         | [Initial conditions](https://munqu.github.io/commol/latest/codebase/decisions/initial-conditions/index.md) |
+| To learn                            | Read                                                                                                                             |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| The rules of initial conditions     | [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#the-structure-aggregate)                          |
+| Reporting fitted initial conditions | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                                                          |
+| The design behind this page         | [Calibrated initial conditions](https://munqu.github.io/commol/latest/codebase/decisions/calibrated-initial-conditions/index.md) |

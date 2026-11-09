@@ -2896,6 +2896,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/calibrated-initial-conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibrated Initial Conditions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/time/" class="md-nav__link">
         
   
@@ -4132,9 +4160,17 @@ from a bin of a concentration to a bin of a count.</p>
 </span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="nb">print</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">start</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;B_g</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">))</span> <span class="o">+</span> <span class="nb">sum</span><span class="p">(</span><span class="n">start</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;A_g</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">)))</span>
 </span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a><span class="c1"># 1000.0</span>
 </span></code></pre></div>
-<p>Initial conditions that calibration sets go through the same rounding. With
-no rounding, a calibrated value that is not whole is an error that lists the
-two options.</p>
+<p>Initial conditions that calibration sets go through the same rounding. A
+method that varies an initial condition, such as an optimizer or a sampler,
+writes values that are not whole. So it needs a rounding, whatever the bounds.
+With no rounding, a <code>Calibrator</code>, or a <code>SensitivityAnalysis</code> of independent
+inputs, with an <code>initial_condition</code> raises <code>ValueError</code> when it is built. The
+message names the initial condition and the two options. Known values need no
+rounding when they are whole: <code>Model.apply_calibration_parameters</code> writes
+<code>{"B": 12.0}</code>, and refuses <code>{"B": 12.3}</code> with a message that names the value.
+The draws of a sample are known values too: a <code>SensitivityAnalysis</code> of
+<code>InputSpace.from_sample</code> writes them. The engine checks every draw when the
+analysis is built, and the message names the set of the draw.</p>
 <h2 id="seeds-and-replicates">Seeds and replicates<a class="headerlink" href="#seeds-and-replicates" title="Permanent link">&para;</a></h2>
 <p>A run is reproducible from its model and its seed:
 <code>simulation.run(…, seed=s)</code> gives one run, and
@@ -4266,7 +4302,8 @@ replicates you choose: <code>"mean"</code>, <code>"median"</code>, <code>Quantil
 <li>[ ] The engine is <code>StochasticEvents</code> (continuous time) or <code>StochasticSteps</code>
       (per-step probabilities), as the rates of the model mean.</li>
 <li>[ ] The amount of each bin is whole, and the settings name a <code>rounding</code> when
-      the amount of a compartment is not.</li>
+      the amount of a compartment is not, or when a calibration or a
+      <code>SensitivityAnalysis</code> of independent inputs sets an initial condition.</li>
 <li>[ ] Every run has a seed, or keeps the one commol drew (<code>results.seed</code>).</li>
 <li>[ ] A large total uses <code>"tau_leaping"</code> or a deterministic engine.</li>
 <li>[ ] A calibration sets <code>replicates</code>, <code>replicate_summary</code> and <code>seed</code>.</li>

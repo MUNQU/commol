@@ -2737,6 +2737,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/calibrated-initial-conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibrated Initial Conditions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/time/" class="md-nav__link">
         
   
@@ -4225,9 +4253,9 @@ seed of the analysis (<code>Stream</code>, <code>crates/commol-random/src/stream
       with tolerances implements <code>accuracy</code>, <code>accuracy_settings</code> and <a href="../decisions/identifiability/#a-rank-lost-to-the-accuracy-gives-no-verdict"><code>at_accuracy</code></a>.</li>
 <li>[ ] Add a variant to <code>Engine</code> in <code>py-commol/src/engine.rs</code>: one arm in
       <code>build</code> per kind it runs (the pair of the engine and the kind),
-      <code>engine_type</code>, <code>dispatch!</code>, <code>at_accuracy</code>, <code>plan_values</code> and
-      <code>apply_values</code> (and <code>compartmental!</code> for an engine of the aggregate
-      kind). Add the crate to <code>py-commol/Cargo.toml</code>.</li>
+      <code>engine_type</code>, <code>dispatch!</code>, <code>at_accuracy</code>, <code>plan_values</code>,
+      <code>apply_values</code> and <code>check_varied_values</code> (and <code>compartmental!</code> for an
+      engine of the aggregate kind). Add the crate to <code>py-commol/Cargo.toml</code>.</li>
 <li>[ ] Add the name to the <code>EngineName</code> <code>Literal</code> in <code>engines/engine.py</code>; if the
       engine has settings, add their Pydantic class to <code>EngineSettings</code>.</li>
 <li>[ ] Run the tests of <code>crates/commol-core/src/types/engine.rs</code>,
@@ -4255,8 +4283,8 @@ seed of the analysis (<code>Stream</code>, <code>crates/commol-random/src/stream
       <code>kinds</code> of an engine that runs it.
       Each engine implements <code>SimulationEngine</code>: <code>plan_values</code> and
       <code>apply_values</code> resolve and write the values of the kind, <code>check_values</code>
-      refuses a run that lacks one, and <code>state_outputs</code> and <code>output_sums</code>
-      name what an expression reads.</li>
+      refuses a run that lacks one, <code>check_varied_values</code> a varied value it
+      takes in part, and <code>state_outputs</code> and <code>output_sums</code> what it reads.</li>
 <li>[ ] Add a variant to <code>EngineValuePlan</code> in <code>py-commol/src/engine.rs</code>.</li>
 <li>[ ] Write a <code>ModelStructure</code> subclass in <code>py-commol/commol/_model/</code>, with
       <code>kind</code> as a <code>Literal</code> default. Implement <code>check_model</code> (it asks the

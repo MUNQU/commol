@@ -2739,6 +2739,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../calibrated-initial-conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibrated Initial Conditions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../time/" class="md-nav__link">
         
   
@@ -3932,9 +3960,9 @@ parameter to calibrate, and rejects any other id
 the model does not have, or a formula or a series parameter, which the model
 writes again at each evaluation, so a value set on it is lost. A calibration
 or any method on <code>ForwardModel</code> sets each parameter on a copy of the engine
-when it is built (<code>ValueWriter::new</code> in <code>crates/commol-calibration/src/values.rs</code>),
+when it is built (<code>ValueWriter::known</code> in <code>crates/commol-calibration/src/values.rs</code>),
 so the engine's message reaches the user before any run, and Python checks no
-parameter id (<code>check_values</code> in <code>_calibration/calibrator.py</code>). <code>ValueWriter::new</code> also
+parameter id (<code>check_values</code> in <code>_calibration/calibrator.py</code>). <code>ValueWriter::known</code> also
 checks that a factor has positive bounds, the observed outputs and positions
 are checked by <code>CalibrationProblem::new</code> alone, and Python passes each
 message with no prefix.</p>
