@@ -20,10 +20,14 @@ from commol import (
 from commol._fit.result import CalibrationResult
 from commol.engines import StochasticEventsSettings, StochasticStepsSettings
 from commol.engines.engine import EngineName
-from commol.quantities import ValueAt
-from commol.sensitivity import InputSpace, Propagation, SensitivityAnalysis
-from commol.uncertainty import ParameterSample, SampleMethod, weighted_quantiles
-from tests.support import STOCHASTIC_ENGINES, a_to_b_builder, bounded, build_stochastic
+from commol.uncertainty import weighted_quantiles
+from tests.support import (
+    STOCHASTIC_ENGINES,
+    a_to_b_builder,
+    bounded,
+    build_stochastic,
+    needs_a_rounding,
+)
 
 RATE = 0.1
 POSITIONS = [2.0, 5.0, 10.0]
@@ -162,14 +166,6 @@ def _amount_problem(low: float) -> CalibrationProblem:
     )
 
 
-def _needs_a_rounding(engine: EngineName, entry_id: str = "B") -> str:
-    return (
-        f"The {engine} engine moves whole units, and a method that varies the "
-        f"initial condition '{entry_id}' can write amounts that are not whole. Name "
-        'a rounding in the settings of the engine: "largest_remainder" or "random"'
-    )
-
-
 @pytest.mark.parametrize("engine", STOCHASTIC_ENGINES)
 @pytest.mark.parametrize("low", [0.0, 0.5])
 def test_a_calibrated_amount_needs_a_rounding(engine: EngineName, low: float) -> None:
@@ -178,7 +174,7 @@ def test_a_calibrated_amount_needs_a_rounding(engine: EngineName, low: float) ->
     with pytest.raises(ValueError) as error:
         Calibrator(simulation, _amount_problem(low))
 
-    assert str(error.value) == _needs_a_rounding(engine)
+    assert str(error.value) == needs_a_rounding(engine)
 
 
 @pytest.mark.parametrize(
@@ -201,64 +197,7 @@ def test_every_initial_condition_that_varies_needs_a_rounding(
     with pytest.raises(ValueError) as error:
         Calibrator(simulation, problem)
 
-    assert str(error.value) == _needs_a_rounding("StochasticSteps", entry_id)
-
-
-def test_an_analysis_that_varies_an_amount_needs_a_rounding() -> None:
-    simulation = Simulation(build_stochastic(a_to_b_builder(), "StochasticSteps"))
-    inputs = InputSpace.uniform_on_bounds(
-        [bounded("B", 0.0, 50.0, kind="initial_condition")]
-    )
-
-    with pytest.raises(ValueError) as error:
-        SensitivityAnalysis(simulation, inputs, replicates=2, seed=1)
-
-    assert str(error.value) == _needs_a_rounding("StochasticSteps")
-
-
-def _sample_of_b(draws: list[float], low: float = 0.0) -> InputSpace:
-    """The initial amount of bin B in ``[low, 50]``, from a sample of ``draws``."""
-    sample = ParameterSample.equally_weighted(
-        ["B"], [(low, 50.0)], [[draw] for draw in draws], SampleMethod(name="grid")
-    )
-    return InputSpace.from_sample(
-        sample, [bounded("B", low, 50.0, kind="initial_condition")]
-    )
-
-
-@pytest.mark.parametrize("low", [0.0, 0.5])
-def test_an_analysis_of_a_sample_writes_its_draws_as_known_amounts(
-    low: float,
-) -> None:
-    simulation = Simulation(build_stochastic(a_to_b_builder(), "StochasticSteps"))
-    analysis = SensitivityAnalysis(
-        simulation, _sample_of_b([10.0, 20.0, 30.0], low), replicates=2, seed=1
-    )
-
-    result = analysis.run(Propagation(quantities=[ValueAt(series="B", at=0)]))
-
-    assert [run[0] for run in result.values] == [10.0, 10.0, 20.0, 20.0, 30.0, 30.0]
-
-
-def test_every_draw_of_a_sample_is_checked_when_the_analysis_is_built() -> None:
-    simulation = Simulation(build_stochastic(a_to_b_builder(), "StochasticSteps"))
-
-    with pytest.raises(ValueError, match=r"^Parameter set 1: .*12\.3 is not whole"):
-        SensitivityAnalysis(
-            simulation, _sample_of_b([10.0, 12.3]), replicates=2, seed=1
-        )
-
-
-def test_a_known_amount_is_written_back_when_it_is_whole() -> None:
-    model = build_stochastic(a_to_b_builder(), "StochasticSteps")
-    problem = _amount_problem(0.0)
-
-    with pytest.raises(ValueError, match=r"12\.3 is not whole"):
-        model.apply_calibration_parameters({"B": 12.3}, problem)
-    model.apply_calibration_parameters({"B": 12.0}, problem)
-    start = Simulation(model).run_at([0.0], seed=1)
-
-    assert start["B"] == [12.0]
+    assert str(error.value) == needs_a_rounding("StochasticSteps", entry_id)
 
 
 @pytest.mark.parametrize(
