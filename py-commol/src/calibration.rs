@@ -228,8 +228,9 @@ fn calibrated_initial_state(
 }
 
 /// Check that the engine sets every parameter and resolves every value of
-/// its model kind, such as an initial condition, and the remainder, and that
-/// the model has every value a run needs once they are written
+/// its model kind, such as an initial condition, and the remainder, that it
+/// takes every number of a value that calibration varies, and that the model
+/// has every value a run needs once they are written
 ///
 /// Args:
 ///     engine: The simulation engine

@@ -180,11 +180,11 @@ Initial conditions that calibration sets go through the same rounding. A
 method that varies an initial condition, such as an optimizer or a sampler,
 writes values that are not whole. So it needs a rounding, whatever the bounds.
 With no rounding, a `Calibrator`, or a `SensitivityAnalysis` of independent
-inputs, with an `initial_condition` raises `ValueError` when it is built. The message names the
-initial condition and the two options. Known values need no rounding when
-they are whole: `Model.apply_calibration_parameters` writes `{"B": 12.0}`, and
-refuses `{"B": 12.3}` with a message that names the value. The draws of a
-sample are known values too: a `SensitivityAnalysis` of
+inputs, with an `initial_condition` raises `ValueError` when it is built. The
+message names the initial condition and the two options. Known values need no
+rounding when they are whole: `Model.apply_calibration_parameters` writes
+`{"B": 12.0}`, and refuses `{"B": 12.3}` with a message that names the value.
+The draws of a sample are known values too: a `SensitivityAnalysis` of
 `InputSpace.from_sample` writes them. The engine checks every draw when the
 analysis is built, and the message names the set of the draw.
 
@@ -303,8 +303,8 @@ print(0.05 < result.best_parameters["k2"] < 0.2)  # True: near 0.1
 - [ ] The engine is `StochasticEvents` (continuous time) or `StochasticSteps`
       (per-step probabilities), as the rates of the model mean.
 - [ ] The amount of each bin is whole, and the settings name a `rounding` when
-      the amount of a compartment is not, or when a calibration sets an
-      initial condition.
+      the amount of a compartment is not, or when a calibration or a
+      `SensitivityAnalysis` of independent inputs sets an initial condition.
 - [ ] Every run has a seed, or keeps the one commol drew (`results.seed`).
 - [ ] A large total uses `"tau_leaping"` or a deterministic engine.
 - [ ] A calibration sets `replicates`, `replicate_summary` and `seed`.

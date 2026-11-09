@@ -95,6 +95,10 @@ class SensitivityAnalysis:
             replicates=replicates,
             seed=None if seed is None else check_seed(seed),
         )
+        # The structure checks what only the Python definition knows, such as
+        # the unit of the remainder, once the engine has resolved every value
+        # (`ModelStructure.check_calibration_values`), so after the checks of
+        # the replicates and the seed.
         model = simulation.model_definition
         model.structure.check_calibration_values(
             model,
