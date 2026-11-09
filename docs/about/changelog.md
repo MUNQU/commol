@@ -595,6 +595,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the argmin fork. Before, a constrained particle swarm (a profile of a
   prediction) showed only `` `AugmentedLagrangian`: the inner solver failed in
   outer iteration 0 ``, without the reason of the swarm.
+- On a Linux whose SELinux forbids an executable heap (the default of Fedora
+  and RHEL), no formula compiled on the main thread: `add_transition` raised
+  a `ValidationError`, `Invalid expression: ... unable to make memory
+  readable+executable`. The
+  JIT now maps the memory of compiled code instead of taking it from the
+  heap.
 
 ### Documentation
 
