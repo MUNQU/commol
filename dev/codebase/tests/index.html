@@ -4070,6 +4070,14 @@ of this that a program can read: every Python test has an <code>assert</code>, a
 <code>np.testing.assert_*</code>, or a call of a helper of <code>tests/</code> that has one; every Rust test has an <code>assert*!</code>, <code>panic!</code> or
 <code>unreachable!</code>, calls a function of its crate that has one, is
 <code>#[should_panic]</code>, or returns a <code>Result</code>. Review checks the rest.</p>
+<p>A Rust test that must run on the main thread is a file of <code>tests/</code> with its
+own <code>main</code>, declared as a <code>[[test]]</code> with <code>harness = false</code> in the manifest
+of its crate: <code>crates/commol-core/tests/jit_memory.rs</code>, declared in
+<code>crates/commol-core/Cargo.toml</code>. Its
+<code>main</code> checks a result as a <code>#[test]</code> does. Under the harness of libtest, a
+<code>main</code> never runs and the target passes with 0 tests, so
+<code>test_rust_rules.py</code> checks that every file of <code>tests/</code> that defines <code>main</code>
+is declared so.</p>
 <h2 id="duplicates">Duplicates<a class="headerlink" href="#duplicates" title="Permanent link">&para;</a></h2>
 <p>Two tests do not check the same behavior with the same inputs. Candidates
 come from the coverage of each test:</p>

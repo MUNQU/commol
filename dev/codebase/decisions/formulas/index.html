@@ -3301,6 +3301,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#the-jit-maps-the-memory-of-its-code-never-the-heap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The JIT maps the memory of its code, never the heap
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3753,6 +3764,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#the-jit-maps-the-memory-of-its-code-never-the-heap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The JIT maps the memory of its code, never the heap
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3776,7 +3798,7 @@
 <h1 id="formulas">Formulas<a class="headerlink" href="#formulas" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
 <p>How a formula is checked before it reaches the engine, which limits it
-has, and how Python reads it.</p>
+has, how Python reads it, and where the JIT puts its code.</p>
 <h2 id="the-parser-of-the-engine-is-the-only-check-of-a-formula">The parser of the engine is the only check of a formula<a class="headerlink" href="#the-parser-of-the-engine-is-the-only-check-of-a-formula" title="Permanent link">&para;</a></h2>
 <p>Rate expressions (<code>_model/transition.py</code>), formula parameters
 (<code>_model/parameter.py</code>), axis patterns (<code>AxisPattern.combine</code> and
@@ -3984,6 +4006,49 @@ JIT quotes the formula cut after its first 80 characters (<code>quoted</code>,
 <code>crates/commol-core/src/math_expression/error.rs::a_long_formula_is_cut_after_its_first_characters</code>,
 <code>crates/commol-core/src/math_expression/mod.rs::a_formula_that_does_not_compile_is_quoted_cut</code>,
 <code>py-commol/tests/rates/test_formula_rules.py::test_a_formula_gets_the_message_of_the_engine_parser</code>.</p>
+<h2 id="the-jit-maps-the-memory-of-its-code-never-the-heap">The JIT maps the memory of its code, never the heap<a class="headerlink" href="#the-jit-maps-the-memory-of-its-code-never-the-heap" title="Permanent link">&para;</a></h2>
+<p><code>JITCompiler::compile</code> (<code>crates/commol-core/src/math_expression/jit/compiler.rs</code>)
+makes each <code>JITModule</code> with the default memory provider of Cranelift.
+<code>commol-core</code> turns on the feature <code>selinux-fix</code> of <code>cranelift-jit</code>
+(<code>crates/commol-core/Cargo.toml</code>). On Linux and macOS that provider then maps
+the memory of compiled code (<code>mmap</code>) and makes it readable and executable.
+Without the feature, the provider takes that memory from the global allocator
+(<code>SystemMemoryProvider</code> of <code>cranelift-jit</code>). On the
+main thread, the thread of a Python session, glibc serves it from the heap of
+<code>brk</code>. SELinux forbids an executable heap by default on Fedora and RHEL
+(<code>execheap</code>), so there no formula compiled. SELinux allows an executable
+mapping (<code>execmem</code>). On Windows the provider takes the memory from
+<code>VirtualAlloc</code>, with or without the feature.</p>
+<p><strong>Rule:</strong> the JIT keeps the default memory provider of Cranelift, with
+<code>selinux-fix</code> on. A memory provider of commol (<code>JITBuilder::memory_provider</code>)
+maps its memory and never takes it from the heap.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The allocator of Cranelift, as it is by default</td>
+<td>No formula compiles under an SELinux that forbids an executable heap, the default of Fedora and RHEL.</td>
+</tr>
+<tr>
+<td>A memory provider of commol (<code>JITBuilder::memory_provider</code>)</td>
+<td>Code of commol that does what the feature of Cranelift already does.</td>
+</tr>
+<tr>
+<td>A policy that allows an executable heap (<code>setsebool selinuxuser_execheap 1</code>)</td>
+<td>It asks each user to weaken a protection of the whole system.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guard:</strong> <code>crates/commol-core/tests/jit_memory.rs</code> (on the main thread,
+<code>harness = false</code>): a formula compiles, runs, and no part of the <code>[heap]</code> of
+<code>/proc/self/maps</code> is executable.
+<code>py-commol/tests/suite/test_rust_rules.py::test_a_rust_test_with_its_own_main_runs_without_the_harness</code>
+keeps that test running.</p>
 
 
 

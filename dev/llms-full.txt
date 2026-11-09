@@ -38757,6 +38757,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - A particle swarm whose bounds are finite but too far apart, such as `(-1e308, 1e308)`, raised a `PanicException` when it drew its first particles. It now raises a `RuntimeError`, `Optimization failed: ... the bounds are too far apart. ...`, the error of the argmin fork, which checks its own bounds. A bound that is not finite still raises the message that names the parameter.
 - The radius rule of a particle swarm (`radius_tol`) stopped a run at its first iteration, as converged, when the size of the box of its bounds overflowed, such as for `±1e200` in two parameters. The argmin fork now scales the box and the radius before it compares them.
 - The error of a failed optimizer run shows the whole chain of the error of the argmin fork. Before, a constrained particle swarm (a profile of a prediction) showed only `` `AugmentedLagrangian`: the inner solver failed in outer iteration 0 ``, without the reason of the swarm.
+- On a Linux whose SELinux forbids an executable heap (the default of Fedora and RHEL), no formula compiled on the main thread: `add_transition` raised a `ValidationError`, `Invalid expression: ... unable to make memory readable+executable`. The JIT now maps the memory of compiled code instead of taking it from the heap.
 
 ### Documentation
 
