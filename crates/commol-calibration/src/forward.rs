@@ -154,10 +154,6 @@ impl<E: SimulationEngine> ForwardModel<E> {
         self.replicates = replicates;
     }
 
-    pub(crate) fn set_values(&mut self, values: ValueWriter<E>) {
-        self.values = values;
-    }
-
     /// The same model observed at `observed_data` instead: the engine, the
     /// parameters, the values and the replicates stay, the schedule and the
     /// observation operator are those of the new observations.

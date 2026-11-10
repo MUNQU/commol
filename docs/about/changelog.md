@@ -126,6 +126,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The engine checks that a calibration problem leaves no value missing when
+  the problem is built, as it does for a `SensitivityAnalysis`: it writes each
+  value at the point of its bounds nearest 0, with the
+  `initial_condition_remainder`, and refuses a parameter or an initial amount
+  that the model leaves `None` and the problem does not set. The `Calibrator`
+  checks no value of its own: it builds the problem, then checks the unit of
+  the remainder (`ModelStructure.check_calibration_values`). A problem with
+  one fault gets the message it got before. A problem with several can report
+  another one first: the unit of the remainder is now checked after every
+  check of the engine, and the values after the settings of the optimizer and
+  the loss, so a remainder in the wrong unit and an unknown observed output
+  report the output. The warning on constraint positions beyond the
+  observations is no longer logged when the problem does not build. In Rust,
+  `CalibrationProblem::new` takes the remainder after the parameters, in
+  place of `with_initial_condition_remainder`, and `check_model_values` and
+  its binding `commol_rs.calibration.check_model_values` are removed, so
+  every caller of `new` gets the check. See
+  [A run needs every value](../codebase/decisions/model-structure.md#a-run-needs-every-value).
 - **Breaking:** a build logs one `INFO` record, with the number of bins,
   parameters, transitions and outputs; the records of each bin,
   accumulator, stratification, matrix, parameter and transition of a

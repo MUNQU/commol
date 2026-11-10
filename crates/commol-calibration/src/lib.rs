@@ -54,6 +54,7 @@
 //!     engine,
 //!     vec![ObservedDataPoint::new(10.0, "B".to_string(), observed)],
 //!     vec![CalibrationParameter::new("k1".to_string(), 0.0, 1.0)],
+//!     None,
 //!     vec![],
 //!     LossConfig::SumSquaredError,
 //! )
@@ -114,4 +115,4 @@ pub use types::{
     CalibrationResult, CalibrationResultWithHistory, LossConfig, ObservedDataPoint,
     ReplicateSummary, Replicates, check_parameters, crps, first_infinite_bound, weighted_crps,
 };
-pub use values::{ValueSource, check_model_values, configured_engine, plan_model_values};
+pub use values::{ValueSource, configured_engine, plan_model_values};

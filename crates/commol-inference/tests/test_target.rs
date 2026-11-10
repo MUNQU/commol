@@ -23,6 +23,7 @@ fn problem() -> CalibrationProblem<DifferenceEquations> {
         DifferenceEquations::try_from_model(&model).unwrap(),
         vec![ObservedDataPoint::new(2.0, "A".to_string(), 600.0)],
         vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+        None,
         vec![CalibrationConstraint::new(
             "cap".to_string(),
             "0.5 - k".to_string(),
@@ -47,12 +48,13 @@ fn the_discrepancy_is_read_inside_the_support_only() {
 
 #[test]
 fn a_run_that_fails_is_an_error_not_a_point_outside_the_support() {
+    // √(k − 0.5) is not a number below k = 0.5.
     let mut model: Model = serde_json::from_str(
-        r#"{"name":"m","parameters":[{"id":"k","value":0.1},{"id":"z","value":null}],
+        r#"{"name":"m","parameters":[{"id":"k","value":0.6}],
         "engine":{"type":"DifferenceEquations"},
         "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
         "accumulators":[],"stratifications":[],
-        "transitions":[{"id":"ab","source":["A"],"target":["B"],"rate":"k * z"}]},
+        "transitions":[{"id":"ab","source":["A"],"target":["B"],"rate":"sqrt(k - 0.5)"}]},
         "structure":{"kind":"aggregate","bin_amounts":{"A":1000.0,"B":0.0}}}"#,
     )
     .expect("valid model JSON");
@@ -61,6 +63,7 @@ fn a_run_that_fails_is_an_error_not_a_point_outside_the_support() {
         DifferenceEquations::try_from_model(&model).unwrap(),
         vec![ObservedDataPoint::new(2.0, "A".to_string(), 600.0)],
         vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )
@@ -69,7 +72,7 @@ fn a_run_that_fails_is_an_error_not_a_point_outside_the_support() {
     let error = discrepancy_in_support(&problem, &[0.2], &mut Workspace::default()).unwrap_err();
 
     assert!(
-        error.contains("the parameters [\"z\"] have no value"),
+        error.contains("The rate of flow 'ab' at 0 is not a number"),
         "{error}"
     );
 }

@@ -63,6 +63,7 @@ fn problem<E: SimulationEngine>(
         engine,
         observed_data,
         parameters,
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )
@@ -471,9 +472,9 @@ fn a_center_that_cannot_be_run_says_why() {
     let mut infinite = decay("DifferenceEquations", "", &[]);
     infinite.process.transitions[0].source.clear();
     infinite.process.transitions[0].rate = Some("exp(10000 * k)".to_string());
-    let mut without_z = decay("DifferenceEquations", "", &["z"]);
-    without_z.process.transitions[0].rate = Some("k * z".to_string());
-    without_z.parameters[1].value = None;
+    // √(k − 0.5) is not a number at the center k = 0.4.
+    let mut not_a_number = decay("DifferenceEquations", "", &[]);
+    not_a_number.process.transitions[0].rate = Some("sqrt(k - 0.5)".to_string());
     let start = CalibrationParameter::with_type(
         "A".to_string(),
         CalibrationParameterType::InitialCondition,
@@ -482,9 +483,15 @@ fn a_center_that_cannot_be_run_says_why() {
     );
     // A and B keep 1000, so A = 2000 leaves the remainder B at -1000, half of
     // the amount A sets.
-    let beyond_the_remainder = problem(difference(&[]), observed.clone(), vec![start])
-        .with_initial_condition_remainder("B")
-        .unwrap();
+    let beyond_the_remainder = CalibrationProblem::new(
+        difference(&[]),
+        observed.clone(),
+        vec![start],
+        Some("B"),
+        vec![],
+        LossConfig::SumSquaredError,
+    )
+    .unwrap();
 
     let k = || CalibrationParameter::new("k".to_string(), 0.0, 1.0);
     assert_eq!(
@@ -492,8 +499,8 @@ fn a_center_that_cannot_be_run_says_why() {
         SensitivityError::InfeasiblePoint("a value of the run is not finite".to_string())
     );
     assert!(
-        matches!(jacobian(without_z, k(), 0.5), SensitivityError::Failed(message)
-            if message.contains("the parameters [\"z\"] have no value")),
+        matches!(jacobian(not_a_number, k(), 0.4), SensitivityError::Failed(message)
+            if message.contains("The rate of flow 'ab' at 0 is not a number")),
     );
     assert_eq!(
         FiniteDifferences::new(&beyond_the_remainder, Design::Observations)

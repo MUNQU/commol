@@ -138,6 +138,7 @@ fn problem(
             .iter()
             .map(|(id, min, max)| CalibrationParameter::new(id.to_string(), *min, *max))
             .collect(),
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )

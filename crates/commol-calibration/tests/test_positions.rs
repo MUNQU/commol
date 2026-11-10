@@ -31,6 +31,7 @@ fn problem<E: SimulationEngine>(
         engine,
         observed,
         vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+        None,
         constraints,
         LossConfig::SumSquaredError,
     )

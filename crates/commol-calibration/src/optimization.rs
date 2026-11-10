@@ -1148,6 +1148,7 @@ mod tests {
                 crate::CalibrationParameter::new("k1".to_string(), 0.0, 1.0),
                 crate::CalibrationParameter::new("k2".to_string(), 0.0, 1.0),
             ],
+            None,
             vec![],
             crate::LossConfig::SumSquaredError,
         )

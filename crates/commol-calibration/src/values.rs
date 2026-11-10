@@ -78,7 +78,7 @@ impl<E: SimulationEngine> ValueWriter<E> {
     /// Returns a message that names a factor with a bound at or below 0, or
     /// the engine's message when it does not set a parameter or does not
     /// accept a value, or an id or the remainder does not resolve.
-    pub(crate) fn known(
+    fn known(
         engine: &E,
         parameters: &[CalibrationParameter],
         remainder: Option<&str>,
@@ -117,7 +117,7 @@ impl<E: SimulationEngine> ValueWriter<E> {
     /// Returns the message of [`Self::known`], or the engine's message when it
     /// takes only some numbers of a value, such as an engine of whole units
     /// with no rounding and an initial condition.
-    pub(crate) fn varied(
+    fn varied(
         engine: &E,
         parameters: &[CalibrationParameter],
         remainder: Option<&str>,
@@ -137,6 +137,10 @@ impl<E: SimulationEngine> ValueWriter<E> {
     ///
     /// One copy takes every set: each set writes the same values, and
     /// [`SimulationEngine::reset`] keeps the values last written.
+    ///
+    /// It is the one constructor of a writer that other modules reach, so
+    /// `CalibrationProblem::new` and `ForwardModel::unobserved` both check
+    /// that no value is missing.
     ///
     /// # Errors
     ///
@@ -266,10 +270,11 @@ pub(crate) fn configure_engine<E: SimulationEngine>(
 
 /// Check that every factor has positive bounds and the engine sets every
 /// parameter and resolves every value of its model kind and the remainder,
-/// and return the plan it resolves them to: [`check_model_values`] without
-/// its checks that the engine takes every number of a varied value and that
-/// no value is missing, for a query of some of the values, such as the
-/// compartments each initial condition sets. It writes no number.
+/// and return the plan it resolves them to: the checks of the values of
+/// [`crate::CalibrationProblem::new`] without its checks that the engine
+/// takes every number of a varied value and that no value is missing, for a
+/// query of some of the values, such as the compartments each initial
+/// condition sets. It writes no number.
 ///
 /// # Errors
 ///
@@ -282,37 +287,6 @@ pub fn plan_model_values<E: SimulationEngine>(
     remainder: Option<&str>,
 ) -> Result<E::ValuePlan, String> {
     ValueWriter::known(engine, parameters, remainder).map(|writer| writer.plan)
-}
-
-/// Check that every factor has positive bounds, the engine sets every
-/// parameter and resolves every value of its model kind and the remainder,
-/// and the model has every value a run needs once they are written, and
-/// return the plan it resolves them to.
-///
-/// The engine sets and resolves them as the calibration objective does, so
-/// the first check that sees an id gives the engine's message, for example
-/// that the model has no such parameter or that a category needs a binary
-/// stratification. The values are written to a copy of the engine, each at
-/// the point of its bounds nearest 0, and the copy checks that nothing is
-/// left without a value ([`SimulationEngine::check_values`]), so a
-/// calibration that leaves a parameter or an initial amount without a value
-/// is refused before it starts.
-///
-/// # Errors
-///
-/// Returns a message that names a factor with a bound at or below 0, or the
-/// engine's message when it does not set a parameter, a value or the
-/// remainder does not resolve, the kind does not accept a type of value, the
-/// engine does not take every number of a value
-/// ([`SimulationEngine::check_varied_values`]), or a value the calibration
-/// does not write is missing.
-pub fn check_model_values<E: SimulationEngine>(
-    engine: &E,
-    parameters: &[CalibrationParameter],
-    remainder: Option<&str>,
-) -> Result<E::ValuePlan, String> {
-    ValueWriter::checked(engine, parameters, remainder, ValueSource::Varied)
-        .map(|writer| writer.plan)
 }
 
 /// An engine with calibration values applied exactly as the calibration

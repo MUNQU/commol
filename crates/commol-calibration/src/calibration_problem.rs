@@ -20,7 +20,7 @@ use crate::types::{
     CalibrationConstraint, CalibrationParameter, ObservedDataPoint, ReplicateSummary, Replicates,
     check_parameters,
 };
-use crate::values::{ValueWriter, clamp_to_bounds};
+use crate::values::{ValueSource, ValueWriter, clamp_to_bounds};
 
 /// Check what a problem holds before an engine reads it: at least one
 /// observation and one parameter, each parameter and each constraint by its
@@ -79,6 +79,7 @@ pub fn check_contents(
 ///     engine.clone(),
 ///     observed_data.clone(),
 ///     vec![CalibrationParameter::new("k1".to_string(), 0.0, 1.0)],
+///     None,
 ///     vec![],
 ///     LossConfig::SumSquaredError,
 /// )
@@ -90,6 +91,7 @@ pub fn check_contents(
 ///     engine,
 ///     observed_data,
 ///     vec![CalibrationParameter::new("k9".to_string(), 0.0, 1.0)],
+///     None,
 ///     vec![],
 ///     LossConfig::SumSquaredError,
 /// )
@@ -108,11 +110,30 @@ pub struct CalibrationProblem<E: SimulationEngine> {
 impl<E: SimulationEngine> CalibrationProblem<E> {
     /// Create a new calibration problem
     ///
+    /// The values of `parameters` reach the engine as the objective writes
+    /// them, with `remainder` for the initial conditions, each at the point
+    /// of its bounds nearest 0, on a copy of the engine that then checks
+    /// that the model has every value a run needs
+    /// ([`SimulationEngine::check_values`]), as [`ForwardModel::unobserved`]
+    /// does. A value that neither the problem nor the model gives is refused
+    /// here, before any run. The remainder gives a value to every bin it
+    /// covers, a bin left `None` too, which then holds what the values leave
+    /// of the sum: `0` when no initial condition is calibrated
+    /// (<https://github.com/MUNQU/commol/issues/477>).
+    ///
     /// # Arguments
     ///
     /// * `base_engine` - The simulation engine to calibrate (cloned for each evaluation)
     /// * `observed_data` - Vector of observed data points
     /// * `parameters` - Parameters to calibrate with their bounds
+    /// * `remainder` - The id that takes what the calibrated initial
+    ///   conditions leave of the sum the model kind keeps, which the engine
+    ///   resolves. For an aggregate model it is a compartment or bin that
+    ///   takes the sum of the amounts the model states less every other
+    ///   compartment, so the compartments the values and the remainder cover
+    ///   keep their declared sum, and a combination that would leave it
+    ///   negative is infeasible. `None` applies the initial conditions as
+    ///   given.
     /// * `constraints` - Constraints on parameters and/or compartment values
     /// * `discrepancy` - A loss ([`crate::LossConfig`]), or one observation
     ///   model per series label ([`DiscrepancyConfig::Likelihood`])
@@ -121,18 +142,22 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     ///
     /// Returns a message when a stochastic engine
     /// ([`SimulationEngine::is_stochastic`]) comes with observation models,
-    /// what the problem holds breaks a rule of [`check_contents`], a window is outside its rule
-    /// ([`crate::check_window_end`]), a position is one the engine
-    /// rejects, an observation names an unknown output or factor, a factor
-    /// has a bound at or below 0, the engine does not resolve a value of its
-    /// model kind or does not take every number of one
-    /// ([`SimulationEngine::check_varied_values`]), a constraint is invalid,
-    /// or the observation models do not fit the observations and parameters
+    /// what the problem holds breaks a rule of [`check_contents`], a factor
+    /// has a bound at or below 0, the engine does not set a parameter, does
+    /// not resolve a value of its model kind or the remainder (for example
+    /// a remainder that overlaps a calibrated value), or does not take every
+    /// number of a value ([`SimulationEngine::check_varied_values`]), a value
+    /// is missing once they are written ([`SimulationEngine::check_values`]),
+    /// a window is outside its rule ([`crate::check_window_end`]), a
+    /// position is one the engine rejects, an observation names an unknown
+    /// output or factor, a constraint is invalid, or the observation models
+    /// do not fit the observations and parameters
     /// ([`crate::Likelihood::new`]).
     pub fn new(
         base_engine: E,
         observed_data: Vec<ObservedDataPoint>,
         parameters: Vec<CalibrationParameter>,
+        remainder: Option<&str>,
         constraints: Vec<CalibrationConstraint>,
         discrepancy: impl Into<DiscrepancyConfig>,
     ) -> Result<Self, String> {
@@ -146,6 +171,8 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             );
         }
         check_contents(observed_data.len(), &parameters, &constraints)?;
+        let values =
+            ValueWriter::checked(&base_engine, &parameters, remainder, ValueSource::Varied)?;
         check_positions(&base_engine, &observed_data, &constraints)?;
 
         let schedule = schedule_of(&observed_data, constraint_positions(&constraints));
@@ -153,7 +180,6 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         let output_names = base_engine.output_names();
         let observation =
             ObservationOperator::new(&observed_data, &parameters, &output_names, &schedule)?;
-        let values = ValueWriter::varied(&base_engine, &parameters, None)?;
         let feasibility = Feasibility::new(
             &parameters,
             &constraints,
@@ -248,31 +274,6 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             )
         })?;
         self.with_replicates(Some(Replicates::new(count, seed, summary)?))
-    }
-
-    /// Name the id that takes what the calibrated initial conditions leave of
-    /// the sum the model kind keeps; the engine resolves it.
-    ///
-    /// For an aggregate model it is a compartment or bin that takes the sum
-    /// of the amounts the model states less every other compartment, so the
-    /// compartments the values and the remainder cover keep their declared
-    /// sum. Without a remainder, calibrated initial conditions are applied as
-    /// given. With one, a combination that would leave the remainder
-    /// negative is infeasible.
-    ///
-    /// # Errors
-    ///
-    /// Returns the engine's message when the id does not resolve, for example
-    /// when it is not a compartment, bin or bin prefix, or overlaps a
-    /// calibrated bin or compartment.
-    pub fn with_initial_condition_remainder(mut self, remainder: &str) -> Result<Self, String> {
-        let values = ValueWriter::varied(
-            self.forward.base_engine(),
-            self.forward.parameters(),
-            Some(remainder),
-        )?;
-        self.forward.set_values(values);
-        Ok(self)
     }
 
     /// A copy of the problem that compares predictions with other observed

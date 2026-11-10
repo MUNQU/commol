@@ -660,6 +660,7 @@ fn brittle_problem(flat: bool) -> (CalibrationProblem<Brittle>, Priors) {
             .map(|t| ObservedDataPoint::new(f64::from(t), "x".to_string(), 2.0))
             .collect(),
         vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )

@@ -119,6 +119,7 @@ fn quantities_equal_hand_computations() {
         engine,
         vec![windowed],
         k(),
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )

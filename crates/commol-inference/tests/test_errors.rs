@@ -135,6 +135,7 @@ fn problem(formula: Formula, values: &[f64]) -> CalibrationProblem<ClosedForm> {
             .map(|(t, &value)| ObservedDataPoint::new(t as f64, "x".to_string(), value))
             .collect(),
         parameters(),
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )

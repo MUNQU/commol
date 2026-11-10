@@ -340,7 +340,8 @@ impl PyCalibrationProblem {
     /// Raises:
     ///     ValueError: If the JSON is not a problem, a setting is outside
     ///         its rule (the message names its path), the problem is not
-    ///         valid for the engine, it has both or neither of a loss and
+    ///         valid for the engine, the model lacks a value that the problem
+    ///         does not set, it has both or neither of a loss and
     ///         observation models, it has observation models and a
     ///         stochastic engine, or a stochastic engine lacks a setting of
     ///         its replicates

@@ -132,6 +132,7 @@ fn problem(
             .iter()
             .map(|(id, min, max)| CalibrationParameter::new(id.to_string(), *min, *max))
             .collect(),
+        None,
         constraints,
         discrepancy,
     )
@@ -686,6 +687,7 @@ fn a_noise_parameter_is_never_named() {
         base.forward().base_engine().clone(),
         base.observed_data().to_vec(),
         calibrated,
+        None,
         vec![],
         DiscrepancyConfig::Likelihood(vec![(
             "x".to_string(),

@@ -124,6 +124,7 @@ fn capped_problem(observed: Vec<ObservedDataPoint>, cap: f64) -> CalibrationProb
         },
         observed,
         vec![CalibrationParameter::new("c".to_string(), -50.0, 50.0)],
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )

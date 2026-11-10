@@ -9,8 +9,8 @@ use commol_calibration::{
     CalibrationConstraint, CalibrationParameter, CalibrationParameterType, CalibrationProblem,
     EvaluationError, ImprovementStop, LossConfig, MutationApplication, MutationStrategy,
     NelderMeadConfig, ObservedDataPoint, OptimizationConfig, OptimizationObjective,
-    ParticleSwarmConfig, Violation, Workspace, check_model_values, configured_engine, optimize,
-    optimize_from, optimize_with_history,
+    ParticleSwarmConfig, Violation, Workspace, configured_engine, optimize, optimize_from,
+    optimize_with_history,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 
@@ -156,10 +156,18 @@ fn factor(min_bound: f64) -> CalibrationParameter {
 fn problem(
     constraints: Vec<CalibrationConstraint>,
 ) -> Result<CalibrationProblem<StartEngine>, String> {
+    problem_with_remainder(None, constraints)
+}
+
+fn problem_with_remainder(
+    remainder: Option<&str>,
+    constraints: Vec<CalibrationConstraint>,
+) -> Result<CalibrationProblem<StartEngine>, String> {
     CalibrationProblem::new(
         StartEngine::new(),
         vec![ObservedDataPoint::new(1.0, "x".to_string(), 0.5)],
         start_and_k(),
+        remainder,
         constraints,
         LossConfig::SumSquaredError,
     )
@@ -197,10 +205,7 @@ fn the_remainder_reaches_the_engine() {
     .unwrap();
 
     assert_eq!(plan.remainder.as_deref(), Some("rest"));
-    let problem = problem(vec![])
-        .unwrap()
-        .with_initial_condition_remainder("rest")
-        .unwrap();
+    let problem = problem_with_remainder(Some("rest"), vec![]).unwrap();
     let engine = problem.forward().configure(&[1.0, 0.5, 1.0]).unwrap();
     assert_eq!(engine.remainder.as_deref(), Some("rest"));
 }
@@ -212,13 +217,11 @@ fn a_value_the_engine_does_not_resolve_stops_the_problem() {
         CalibrationParameterType::InitialCondition,
     )];
 
-    let error = check_model_values(&StartEngine::new(), &parameters, None).unwrap_err();
-    assert!(error.contains("no value 'other'"), "{error}");
-
     let error = CalibrationProblem::new(
         StartEngine::new(),
         vec![ObservedDataPoint::new(1.0, "x".to_string(), 0.5)],
         parameters,
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )
@@ -231,12 +234,11 @@ fn a_value_the_engine_does_not_resolve_stops_the_problem() {
 fn a_factor_needs_positive_bounds() {
     let message = "Factor parameter 'f' must have positive bounds (got min=0, max=2)";
 
-    let error = check_model_values(&StartEngine::new(), &[factor(0.0)], None).unwrap_err();
-    assert_eq!(error, message);
     let error = CalibrationProblem::new(
         StartEngine::new(),
         vec![ObservedDataPoint::new(1.0, "x".to_string(), 0.5)],
         vec![factor(0.0)],
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )
@@ -341,6 +343,7 @@ fn a_problem_has_observations_and_parameters_of_the_model() {
             StartEngine::new(),
             observed,
             parameters,
+            None,
             vec![],
             LossConfig::SumSquaredError,
         )
@@ -422,8 +425,7 @@ fn an_engine_that_rejects_a_value_or_a_remainder_names_it() {
         "Failed to set parameter 'k': k is not a number"
     );
     assert_eq!(
-        problem
-            .with_initial_condition_remainder("nowhere")
+        problem_with_remainder(Some("nowhere"), vec![])
             .err()
             .unwrap(),
         "this kind has no remainder 'nowhere'"
@@ -437,6 +439,7 @@ fn a_loss_or_a_run_that_is_not_finite_is_infeasible() {
         StartEngine::new(),
         vec![ObservedDataPoint::new(1.0, "x".to_string(), f64::INFINITY)],
         start_and_k(),
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )

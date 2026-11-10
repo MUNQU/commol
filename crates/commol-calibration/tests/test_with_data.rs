@@ -97,6 +97,7 @@ fn problem() -> CalibrationProblem<LineEngine> {
             CalibrationParameter::new("a".to_string(), -10.0, 10.0),
             CalibrationParameter::new("b".to_string(), -10.0, 10.0),
         ],
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )

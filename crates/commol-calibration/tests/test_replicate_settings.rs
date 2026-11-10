@@ -29,6 +29,7 @@ fn problem<E: SimulationEngine>(
         engine,
         vec![ObservedDataPoint::new(1.0, "A".to_string(), 900.0)],
         vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+        None,
         vec![],
         discrepancy,
     )

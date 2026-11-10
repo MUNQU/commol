@@ -141,6 +141,7 @@ fn limited_problem(
             max,
             guess,
         )],
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )

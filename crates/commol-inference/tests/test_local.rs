@@ -168,6 +168,7 @@ fn line_problem() -> CalibrationProblem<Curve> {
             CalibrationParameter::new("b".to_string(), -5.0, 5.0),
             noise("sd", 0.1, 2.0),
         ],
+        None,
         vec![],
         DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Parameter("sd".to_string()))]),
     )
@@ -269,6 +270,7 @@ fn draws_mapped_back_stay_inside_the_bounds() {
         Curve::new(Shape::Line),
         observed("x", &[0.05, -0.02, 0.03]),
         vec![CalibrationParameter::new("a".to_string(), 0.0, 10.0)],
+        None,
         vec![],
         DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.05))]),
     )
@@ -310,6 +312,7 @@ fn mixture_finds_both_modes_in_proportion() {
         Curve::new(Shape::Square),
         observed("x", &values),
         vec![CalibrationParameter::new("a".to_string(), -5.0, 5.0)],
+        None,
         vec![],
         DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(sd))]),
     )
@@ -376,6 +379,7 @@ fn square_on_a_bound() -> (CalibrationProblem<Curve>, Priors) {
         Curve::new(Shape::Square),
         observed("x", &values),
         vec![CalibrationParameter::new("a".to_string(), -5.0, 1.5)],
+        None,
         vec![],
         DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.5))]),
     )
@@ -453,6 +457,7 @@ fn banana_target_gives_a_large_k_hat() {
             CalibrationParameter::new("a".to_string(), -10.0, 10.0),
             CalibrationParameter::new("b".to_string(), -50.0, 10.0),
         ],
+        None,
         vec![],
         DiscrepancyConfig::Likelihood(vec![
             normal("x", Argument::Value(2.0)),
@@ -597,6 +602,7 @@ fn every_scale_maps_the_curvature_by_its_derivative() {
             CalibrationParameter::new("a".to_string(), f64::NEG_INFINITY, f64::INFINITY),
             CalibrationParameter::new("b".to_string(), -10.0, f64::INFINITY),
         ],
+        None,
         vec![],
         DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.5))]),
     )
@@ -646,6 +652,7 @@ fn a_parameter_the_data_do_not_read_has_no_laplace_approximation() {
             CalibrationParameter::new("a".to_string(), -10.0, 10.0),
             CalibrationParameter::new("b".to_string(), -5.0, 5.0),
         ],
+        None,
         vec![],
         DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.5))]),
     )
@@ -675,6 +682,7 @@ fn poisson_line(values: &[f64]) -> CalibrationProblem<Curve> {
         Curve::new(Shape::Line),
         observed("x", values),
         vec![CalibrationParameter::new("a".to_string(), -1.0, 5.0)],
+        None,
         vec![],
         DiscrepancyConfig::Likelihood(vec![("x".to_string(), ObservationModel::Poisson)]),
     )
@@ -733,6 +741,7 @@ fn an_end_whose_curvature_is_singular_gives_no_component() {
         Curve::new(Shape::Square),
         observed("x", &[4.0, 4.2, 3.8]),
         vec![CalibrationParameter::new("a".to_string(), -5.0, 5.0)],
+        None,
         vec![],
         DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.5))]),
     )
@@ -772,6 +781,7 @@ fn a_sandwich_needs_more_blocks_than_parameters_and_reads_the_automatic_length()
             CalibrationParameter::new("a".to_string(), -10.0, 10.0),
             CalibrationParameter::new("b".to_string(), -5.0, 5.0),
         ],
+        None,
         vec![],
         DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.5))]),
     )
@@ -805,6 +815,7 @@ fn a_band_of_replicates_is_refused() {
             CalibrationParameter::new("a".to_string(), -10.0, 10.0),
             CalibrationParameter::new("b".to_string(), -5.0, 5.0),
         ],
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )
@@ -851,6 +862,7 @@ fn a_hessian_of_an_objective_near_the_largest_number_is_not_finite() {
         Curve::new(Shape::Line),
         observed("x", &[1.2e154]),
         vec![CalibrationParameter::new("a".to_string(), -10.0, 10.0)],
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )
@@ -876,6 +888,7 @@ fn a_fit_on_a_bound_above_alone_is_refused() {
             CalibrationParameter::new("a".to_string(), -10.0, 10.0),
             CalibrationParameter::new("b".to_string(), f64::NEG_INFINITY, 0.4),
         ],
+        None,
         vec![],
         DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.5))]),
     )
@@ -900,6 +913,7 @@ fn a_mixture_whose_optima_the_prior_rules_out_is_refused() {
         Curve::new(Shape::Line),
         observed("x", &[-0.4, -0.6, -0.5]),
         vec![CalibrationParameter::new("a".to_string(), -1.0, 5.0)],
+        None,
         vec![],
         DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.5))]),
     )
@@ -996,6 +1010,7 @@ fn a_mixture_sends_each_draw_and_runs_none_once_the_steps_stop() {
         Curve::new(Shape::Square),
         observed("x", &values),
         vec![CalibrationParameter::new("a".to_string(), -5.0, 5.0)],
+        None,
         vec![],
         DiscrepancyConfig::Likelihood(vec![normal("x", Argument::Value(0.5))]),
     )

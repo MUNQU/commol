@@ -115,6 +115,7 @@ fn constant(
         },
         observed(values),
         parameters,
+        None,
         vec![],
         DiscrepancyConfig::Likelihood(vec![("x".to_string(), model)]),
     )
@@ -128,6 +129,7 @@ fn loss_problem() -> CalibrationProblem<Line> {
         },
         observed(&[1.0]),
         vec![CalibrationParameter::new("a".to_string(), -1.0, 1.0)],
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )
@@ -339,6 +341,7 @@ fn a_binomial_of_no_trials_draws_zero() {
         },
         problem_data,
         vec![CalibrationParameter::new("a".to_string(), -1.0, 1.0)],
+        None,
         vec![],
         DiscrepancyConfig::Likelihood(vec![(
             "x".to_string(),
