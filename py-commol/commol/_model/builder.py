@@ -889,9 +889,9 @@ class ModelBuilder:
             one the engine cannot run (a position between two steps for an
             engine that steps only at integers, or a ``"pulse"`` point between
             two steps), a per-compartment override names an unknown
-            compartment, a stochastic engine gets an amount that is not whole,
-            or the origin has a time zone or a step unit that is not of fixed
-            calendar length.
+            compartment, a stochastic engine with no ``rounding`` gets an
+            amount that is not whole, or the origin has a time zone or a step
+            unit that is not of fixed calendar length.
         """
         model: Model[StructureT] = Model(
             name=self._name,

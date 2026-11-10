@@ -2,7 +2,9 @@
 //! units and their start, and impulses that move whole units.
 
 use commol_core::{EngineType, Rounding, SimulationError};
-use commol_model::{CompiledModel, InitialConditionPlan, as_whole, rounded};
+use commol_model::{
+    CompiledModel, InitialConditionPlan, as_whole, nearest_whole, needs_a_rounding, rounded,
+};
 use commol_random::{Generator, sample};
 
 /// The compiled model of a stochastic engine, its generator and its state of
@@ -12,8 +14,9 @@ use commol_random::{Generator, sample};
 /// are written ([`Self::set_initial_condition`]); the first run makes them
 /// whole ([`Self::begin`]), with the rounding of the settings, so a rounding
 /// that draws reads the generator after the values calibration writes. The
-/// rounding makes the compartments of each bin whole and keeps the amount of
-/// the bin, so no unit moves to a bin of another unit.
+/// rounding makes each bin whole on its own, the nearest whole number to its
+/// amount split among its compartments, so no unit moves to a bin of another
+/// unit.
 #[derive(Clone)]
 pub(crate) struct Units {
     pub(crate) model: CompiledModel,
@@ -103,7 +106,10 @@ impl Units {
     /// negative, or the value is not whole and the settings name no rounding.
     pub(crate) fn set_initial_condition(&mut self, index: usize, value: f64) -> Result<(), String> {
         if self.rounding.is_none() && value >= 0.0 && as_whole(value).is_none() {
-            return Err(self.needs_a_rounding(&format!("{value} is not whole")));
+            return Err(needs_a_rounding(
+                self.engine,
+                &format!("{value} is not whole"),
+            ));
         }
         self.model.set_initial_condition(index, value)?;
         if !self.started {
@@ -126,24 +132,15 @@ impl Units {
     /// roundings when the settings name no rounding.
     pub(crate) fn check_varied_values(&self, plan: &InitialConditionPlan) -> Result<(), String> {
         match (self.rounding, plan.ids().next()) {
-            (None, Some(id)) => Err(self.needs_a_rounding(&format!(
-                "a method that varies the initial condition '{id}' can write amounts that \
-                 are not whole"
-            ))),
+            (None, Some(id)) => Err(needs_a_rounding(
+                self.engine,
+                &format!(
+                    "a method that varies the initial condition '{id}' can write amounts \
+                     that are not whole"
+                ),
+            )),
             _ => Ok(()),
         }
-    }
-
-    /// The message of an amount that is not whole and no rounding: the
-    /// engine moves whole units, `reason`, and the roundings to name.
-    fn needs_a_rounding(&self, reason: &str) -> String {
-        format!(
-            "The {} engine moves whole units, and {reason}. Name a rounding in the \
-             settings of the engine: \"{}\" or \"{}\"",
-            self.engine.name(),
-            Rounding::LargestRemainder.name(),
-            Rounding::Random.name(),
-        )
     }
 
     /// Apply the impulses that act at position `t`.
@@ -224,8 +221,9 @@ impl Units {
     }
 }
 
-/// Whole amounts in which the compartments of each bin sum to the rounded
-/// amount of the bin, with `rounding` applied to each bin in turn.
+/// Whole amounts in which the compartments of each bin sum to the nearest
+/// whole number to the amount of the bin, a half up, with `rounding` applied
+/// to each bin in turn.
 pub(crate) fn round_bins(
     amounts: &[f64],
     bins: &[Vec<usize>],
@@ -246,16 +244,16 @@ pub(crate) fn round_bins(
     whole
 }
 
-/// Whole amounts that sum to the rounded sum of `amounts`: each amount
-/// rounded down, and one more unit to each of the largest remainders, the
-/// first compartment first on a tie.
+/// Whole amounts that sum to the nearest whole number to the sum of
+/// `amounts` ([`nearest_whole`]): each amount rounded down, and one more unit
+/// to each of the largest remainders, the first compartment first on a tie.
 pub(crate) fn largest_remainder(amounts: &[f64]) -> Vec<f64> {
     let snapped: Vec<f64> = amounts
         .iter()
         .map(|&amount| as_whole(amount).unwrap_or(amount))
         .collect();
     let mut whole: Vec<f64> = snapped.iter().map(|amount| amount.floor()).collect();
-    let target = snapped.iter().sum::<f64>().round();
+    let target = nearest_whole(snapped.iter().sum());
     let left = (target - whole.iter().sum::<f64>()).max(0.0) as usize;
     let mut order: Vec<usize> = (0..snapped.len()).collect();
     order.sort_by(|&a, &b| {
@@ -268,12 +266,12 @@ pub(crate) fn largest_remainder(amounts: &[f64]) -> Vec<f64> {
     whole
 }
 
-/// Whole amounts drawn from a multinomial of the rounded sum of `amounts`,
-/// each compartment with its share of the sum, so the mean of a draw is
-/// `amounts`.
+/// Whole amounts drawn from a multinomial of the nearest whole number to the
+/// sum of `amounts` ([`nearest_whole`]), each compartment with its share of
+/// the sum, so the mean of a draw is `amounts` when their sum is whole.
 pub(crate) fn random_rounding(amounts: &[f64], generator: &mut Generator) -> Vec<f64> {
     let sum: f64 = amounts.iter().sum();
-    let trials = sum.round() as u64;
+    let trials = nearest_whole(sum) as u64;
     if sum <= 0.0 || trials == 0 {
         return vec![0.0; amounts.len()];
     }
@@ -322,6 +320,19 @@ mod tests {
             let whole = round_bins(&amounts, &bins, Rounding::Random, &mut generator);
             assert_eq!(whole[0] + whole[1], 1.0, "{whole:?}");
             assert_eq!(whole[2] + whole[3], 1.0, "{whole:?}");
+        }
+    }
+
+    #[test]
+    fn a_bin_of_a_half_rounds_up_whatever_its_split() {
+        // The shares of 10.5 sum to 10.499999999999998.
+        let amounts = [10.5 * 0.15, 10.5 * 0.85];
+        assert!(amounts.iter().sum::<f64>() < 10.5);
+        let mut generator = Generator::from_seed(4);
+
+        for rounding in [Rounding::LargestRemainder, Rounding::Random] {
+            let whole = round_bins(&amounts, &[vec![0, 1]], rounding, &mut generator);
+            assert_eq!(whole.iter().sum::<f64>(), 11.0, "{rounding:?}: {whole:?}");
         }
     }
 

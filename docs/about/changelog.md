@@ -144,6 +144,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its binding `commol_rs.calibration.check_model_values` are removed, so
   every caller of `new` gets the check. See
   [A run needs every value](../codebase/decisions/model-structure.md#a-run-needs-every-value).
+- On `StochasticEvents` and `StochasticSteps` with a `rounding`, a bin whose
+  amount is not whole now builds, where `build` raised `ValueError`. Each run
+  starts it at its nearest whole number, a half up whatever its split, so a
+  bin below half a unit starts empty. With no rounding, such an amount is
+  refused as before, with the message that names the two roundings. See
+  [Whole units](../guide/stochastic.md#whole-units).
 - **Breaking:** a build logs one `INFO` record, with the number of bins,
   parameters, transitions and outputs; the records of each bin,
   accumulator, stratification, matrix, parameter and transition of a
@@ -556,6 +562,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `Model.apply_calibration_parameters` wrote a calibrated amount that is not
+  whole, such as `B = 11.85`, onto a model of `StochasticEvents` or
+  `StochasticSteps` with a `rounding`, and the model then did not build: the
+  amount of a bin had to be whole even with a rounding. The model now builds
+  and holds the amount the optimizer found, and a run of it rounds that amount
+  as the calibration did: from 12 units. With `"random"`, a bin of several
+  compartments can still start from other units for the same seed. See
+  [Whole units](../guide/stochastic.md#whole-units).
 - A calibrated initial condition on `StochasticEvents` or `StochasticSteps`
   with no `rounding` built when its bounds were whole, such as `[0, 50]`, and
   then every start failed, because the optimizer writes values that are not

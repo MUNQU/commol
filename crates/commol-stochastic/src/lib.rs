@@ -19,10 +19,10 @@
 //!
 //! [`StochasticEvents`] and [`StochasticSteps`] draw every random number from
 //! one `commol_random::Generator`
-//! seeded by `SimulationEngine::set_seed`, and start from whole units: a bin
-//! whose amount is not whole is an error, and initial amounts that are not
-//! whole need a [`commol_core::Rounding`] in the settings of the engine, which
-//! makes the compartments of each bin whole.
+//! seeded by `SimulationEngine::set_seed`, and start from whole units: initial
+//! amounts that are not whole need a [`commol_core::Rounding`] in the settings
+//! of the engine, which makes each bin its nearest whole number and splits it
+//! into whole amounts of its compartments.
 
 #![warn(missing_docs)]
 

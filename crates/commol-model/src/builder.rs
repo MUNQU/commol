@@ -363,6 +363,26 @@ pub fn as_whole(value: f64) -> Option<f64> {
     ((value - whole).abs() <= WHOLE_TOLERANCE * whole.abs().max(1.0)).then_some(whole)
 }
 
+/// The nearest whole number to `value`, a half up, within the rounding of an
+/// amount times a fraction: a sum of shares of 10.5, such as
+/// `10.499999999999998`, is 11.
+pub fn nearest_whole(value: f64) -> f64 {
+    (value + WHOLE_TOLERANCE * value.abs().max(1.0)).round()
+}
+
+/// The message of an engine of whole units that has no rounding and gets an
+/// amount that is not whole: the engine moves whole units, `reason`, and the
+/// roundings to name in its settings.
+pub fn needs_a_rounding(engine: commol_core::EngineType, reason: &str) -> String {
+    format!(
+        "The {} engine moves whole units, and {reason}. Name a rounding in the \
+         settings of the engine: \"{}\" or \"{}\"",
+        engine.name(),
+        Rounding::LargestRemainder.name(),
+        Rounding::Random.name(),
+    )
+}
+
 /// The first five of `items`, joined, and how many more there are.
 fn first_five(items: &[String]) -> String {
     let shown = items.len().min(5);
@@ -376,44 +396,19 @@ fn first_five(items: &[String]) -> String {
 
 /// Check that a stochastic engine can start the model from whole units.
 ///
-/// A stochastic engine moves whole units, and it makes the compartments of
-/// each bin whole without moving a unit to another bin, so the amount of
-/// every bin must be a whole number. When the amount of a compartment is not,
-/// the settings of the engine must name how to make it whole
-/// ([`commol_core::Rounding`]); there is no default.
+/// A stochastic engine moves whole units. With a rounding in its settings
+/// ([`commol_core::Rounding`]), every amount builds, of a bin as of a
+/// compartment: at the start of each run the rounding makes the amount of
+/// each bin its nearest whole number ([`nearest_whole`]) and splits it into
+/// whole amounts of its compartments, with no unit moved to another bin
+/// (`round_bins` in `commol-stochastic`). With no rounding, every amount must
+/// be whole; there is no default rounding.
 fn check_whole_units(model: &Model, aggregate: &Aggregate) -> Result<(), String> {
     let engine = model.engine.engine_type();
-    if !engine.is_stochastic() {
+    if !engine.is_stochastic() || model.engine.settings().rounding().is_some() {
         return Ok(());
     }
-    let state = initial_state(&model.process, aggregate)?;
-    let fractional_bins: Vec<String> = model
-        .process
-        .bins
-        .iter()
-        .filter_map(|bin| {
-            let amount: f64 = state
-                .iter()
-                .filter(|compartment| compartment.bin == bin.id)
-                .map(|compartment| compartment.amount)
-                .sum();
-            as_whole(amount)
-                .is_none()
-                .then(|| format!("'{}' ({amount})", bin.id))
-        })
-        .collect();
-    if !fractional_bins.is_empty() {
-        return Err(format!(
-            "The {} engine moves whole units, so the amount of each bin must be a whole \
-             number, and the amounts of {} are not whole",
-            engine.name(),
-            first_five(&fractional_bins),
-        ));
-    }
-    if model.engine.settings().rounding().is_some() {
-        return Ok(());
-    }
-    let fractional: Vec<String> = state
+    let fractional: Vec<String> = initial_state(&model.process, aggregate)?
         .into_iter()
         .filter(|compartment| as_whole(compartment.amount).is_none())
         .map(|compartment| format!("'{}' ({})", compartment.name, compartment.amount))
@@ -421,15 +416,12 @@ fn check_whole_units(model: &Model, aggregate: &Aggregate) -> Result<(), String>
     if fractional.is_empty() {
         return Ok(());
     }
-    Err(format!(
-        "The {} engine moves whole units, and the initial amounts of {} are not whole. \
-         Name a rounding in the settings of the engine: \"{}\" (the same whole amounts \
-         in every run, which sum to the amount of each bin) or \"{}\" (each run draws \
-         the amounts of each bin from a multinomial with the fractions of the model)",
-        engine.name(),
-        first_five(&fractional),
-        Rounding::LargestRemainder.name(),
-        Rounding::Random.name(),
+    Err(needs_a_rounding(
+        engine,
+        &format!(
+            "the initial amounts of {} are not whole",
+            first_five(&fractional)
+        ),
     ))
 }
 
@@ -2605,19 +2597,38 @@ mod tests {
     }
 
     #[test]
-    fn a_bin_that_is_not_whole_is_a_build_error_of_a_stochastic_engine() {
+    fn a_bin_that_is_not_whole_is_a_build_error_of_a_stochastic_engine_with_no_rounding() {
         let mut model = make_model(vec![], vec![], vec![]);
         set_bin_amount(&mut model, "B", 10.5);
         model.engine = ModelEngine::new(EngineType::StochasticEvents);
 
         let error = check_model(&model).unwrap_err();
 
-        assert!(
-            error.contains("the amount of each bin must be a whole number"),
-            "{error}"
-        );
         assert!(error.contains("'B' (10.5)"), "{error}");
+        assert!(error.contains("Name a rounding"), "{error}");
         assert!(!error.contains("'A'"), "{error}");
+    }
+
+    #[test]
+    fn a_bin_that_is_not_whole_builds_with_a_rounding() {
+        use commol_core::{EngineSettings, StochasticEventsSettings, StochasticStepsSettings};
+        let mut model = make_model(vec![], vec![], vec![]);
+        set_bin_amount(&mut model, "B", 10.5);
+        for rounding in [Rounding::LargestRemainder, Rounding::Random] {
+            for settings in [
+                EngineSettings::StochasticEvents(StochasticEventsSettings {
+                    rounding: Some(rounding),
+                    ..StochasticEventsSettings::default()
+                }),
+                EngineSettings::StochasticSteps(StochasticStepsSettings {
+                    rounding: Some(rounding),
+                }),
+            ] {
+                model.engine = ModelEngine::with_settings(settings);
+
+                assert_eq!(check_model(&model), Ok(()), "{settings:?}");
+            }
+        }
     }
 
     #[test]

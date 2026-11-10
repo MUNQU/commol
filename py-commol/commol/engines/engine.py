@@ -68,10 +68,11 @@ class ODESolver(BaseModel):
 
 Rounding: TypeAlias = Literal["largest_remainder", "random"]
 """How a stochastic engine makes whole the initial amounts that are not, bin by
-bin: ``"largest_remainder"`` gives the same whole amounts in every run, which
-sum to the amount of each bin; ``"random"`` splits the amount of each bin by a
-multinomial draw with the fractions of the model in each run, so the mean
-start equals the amounts of the model."""
+bin: the amount of each bin becomes its nearest whole number, a half up, split
+among its compartments. ``"largest_remainder"`` gives the same whole amounts in
+every run; ``"random"`` splits the amount of each bin by a multinomial draw with
+the fractions of the model in each run, so the mean start equals the amounts of
+the model when each bin is whole."""
 
 
 class StochasticEventsSettings(BaseModel):

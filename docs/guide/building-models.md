@@ -467,7 +467,7 @@ structure = Aggregate(
 | Every stratification has a fraction for each of its categories, and no other category; a split by category has one split for each category of the stratification it differs by that its compartments have. The engine holds the rule (`check_stratification_fractions` in `crates/commol-model/src/builder.rs`) | `build` |
 | Every fraction is from 0 to 1, and each split sums to 1 within 1e-6. The engine holds the rule (`check_fractions` in `crates/commol-model/src/rules.rs`) | `Aggregate(...)` and each `update_stratification_fractions` |
 | Override names are expanded compartments | `build` |
-| With a stochastic engine, the amount of each bin is a whole number | `build` |
+| With a stochastic engine and no `rounding`, every amount is whole ([Whole units](stochastic.md#whole-units)) | `build` |
 
 The initial amount of a compartment is
 `bin amount × the fraction of each of its categories`, unless an override

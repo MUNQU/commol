@@ -5,7 +5,8 @@
 An `initial_condition` unknown fits how the state starts: the amount of a
 bin in its unit, the split of a category, or the amount of one expanded
 compartment. The Rust engine applies the values in a fixed order, and a
-**remainder** compartment keeps the sum of the amounts the model states.
+**remainder** compartment keeps the sum of the amounts the model states, up to
+the rounding of an engine of whole units ([Whole units](stochastic.md#whole-units)).
 
 ## Quick path
 
@@ -103,7 +104,7 @@ values leave of the amounts the model states:
 | Rule | Detail |
 |---|---|
 | It is not calibrated | It takes the sum of the amounts the model states, less every other compartment. |
-| It keeps the sum of what the values and it cover | A compartment that no value covers keeps its amount, so it does not change the remainder. A bin left `None` for calibration counts as 0, so the remainder states the sum: `A` holds 1000 while `B` is unknown. |
+| It keeps the sum of what the values and it cover | A compartment that no value covers keeps its amount, so it does not change the remainder. A bin left `None` for calibration counts as 0, so the remainder states the sum: `A` holds 1000 while `B` is unknown. On `StochasticEvents` or `StochasticSteps`, each run rounds every bin on its own, so the start can hold up to half a unit more or less per bin that is not whole ([Whole units](stochastic.md#whole-units)). |
 | It has the unit of every amount it gives | The `Calibrator` rejects a calibrated bin, prefix or compartment whose unit is not the unit of the remainder, and names both. A category split has no unit. |
 | It keeps its own split | A bin remainder shares what it takes across its compartments in the proportions of the initial state, or of the stratification fractions when they start at 0. |
 | It must not overlap a calibrated id | Building the problem rejects it otherwise. |
