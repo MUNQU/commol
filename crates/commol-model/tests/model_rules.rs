@@ -1,6 +1,7 @@
 //! The rules of a model that the engine checks when it builds one, whatever
 //! path brings it: unique ids, the categories of a stratification, a process
-//! with bins and transitions, the bin amounts, and the values a run needs.
+//! with bins and transitions, the bin amounts, the values a run needs, and
+//! the names the bins build.
 
 use commol_core::Model;
 use commol_model::CompiledModel;
@@ -198,4 +199,215 @@ fn a_run_needs_every_value() {
 
     compiled.set_initial_condition(b_g1, 5.0).unwrap();
     assert_eq!(compiled.check_values(), Ok(()));
+}
+
+/// The stratification `id` of `categories`.
+fn stratification(id: &str, categories: &[&str]) -> Value {
+    json!({"id": id, "categories": categories})
+}
+
+/// [`model_json`] with the stratifications `stratifications`, each split
+/// evenly, and then `edit`.
+fn stratified(stratifications: &[Value], edit: impl FnOnce(&mut Value)) -> Value {
+    let mut json = model_json();
+    let mut fractions = serde_json::Map::new();
+    for stratification in stratifications {
+        let categories = stratification["categories"].as_array().unwrap();
+        let share = 1.0 / categories.len() as f64;
+        let split = categories
+            .iter()
+            .map(|category| (category.as_str().unwrap().to_string(), json!(share)))
+            .collect();
+        let id = stratification["id"].as_str().unwrap().to_string();
+        fractions.insert(id, Value::Object(split));
+    }
+    json["process"]["stratifications"] = json!(stratifications);
+    json["structure"]["stratification_fractions"] = Value::Object(fractions);
+    edit(&mut json);
+    json
+}
+
+/// Add the bin `id`, of 5.
+fn add_bin(json: &mut Value, id: &str) {
+    let bins = json["process"]["bins"].as_array_mut().unwrap();
+    bins.push(json!({"id": id, "name": id}));
+    json["structure"]["bin_amounts"][id] = json!(5.0);
+}
+
+/// Give the accumulator `n` the id `id`.
+fn rename_accumulator(json: &mut Value, id: &str) {
+    json["process"]["accumulators"][0]["id"] = json!(id);
+    json["process"]["transitions"][0]["accumulators"] = json!([id]);
+}
+
+/// The sentences of the refusal of a model that builds a name twice.
+fn refusal(json: Value) -> String {
+    let message = build(json).err().expect("the model is refused");
+    let opening = "Two things or more build one name, so a rate, an initial condition or a \
+                   result could read one for another: ";
+    message
+        .strip_prefix(opening)
+        .expect("the message of a name built twice")
+        .to_string()
+}
+
+const OWN_NAME: &str = ", so that each has a name of its own.";
+
+#[test]
+fn a_name_of_two_owners_is_refused() {
+    let group = [stratification("group", &["g1", "g2"])];
+    let group_and_type = [
+        stratification("group", &["g1", "g2"]),
+        stratification("type", &["t1", "t2"]),
+    ];
+    let joined = [stratification("group", &["g1_h", "h"])];
+
+    let cases = [
+        (
+            stratified(&group, |json| add_bin(json, "A_g1")),
+            "'A_g1' names the compartment of bin 'A' in 'group:g1' and the bin 'A_g1'. Rename \
+             bin 'A', bin 'A_g1' or category 'group:g1'",
+        ),
+        (
+            stratified(&group_and_type, |json| add_bin(json, "A_g1")),
+            "'A_g1' names the compartments of bin 'A' in 'group:g1' and the bin 'A_g1'. Rename \
+             bin 'A', bin 'A_g1' or category 'group:g1'",
+        ),
+        (
+            stratified(&joined, |json| add_bin(json, "A_g1")),
+            "'A_g1_h' names the compartment of bin 'A' in 'group:g1_h' and the compartment of \
+             bin 'A_g1' in 'group:h'. Rename bin 'A', bin 'A_g1', category 'group:g1_h' or \
+             category 'group:h'",
+        ),
+        (
+            stratified(&group_and_type, |json| add_bin(json, "A_t1")),
+            "'A_t1' names the bin 'A_t1' and the compartments of bin 'A' in 'type:t1'. Rename \
+             bin 'A_t1', bin 'A' or category 'type:t1'",
+        ),
+        (
+            stratified(&group, |json| rename_accumulator(json, "A")),
+            "'A' names the bin 'A' and the accumulator 'A'. Rename bin 'A' or accumulator 'A'",
+        ),
+        (
+            stratified(&group, |json| rename_accumulator(json, "A_g1")),
+            "'A_g1' names the compartment of bin 'A' in 'group:g1' and the accumulator 'A_g1'. \
+             Rename bin 'A', accumulator 'A_g1' or category 'group:g1'",
+        ),
+        (
+            stratified(&group, |json| rename_accumulator(json, "total_g1")),
+            "'total_g1' names the accumulator 'total_g1' and the subgroup total of \
+             'group:g1'. Rename accumulator 'total_g1' or category 'group:g1'",
+        ),
+    ];
+
+    for (json, sentence) in cases {
+        assert_eq!(refusal(json), format!("{sentence}{OWN_NAME}"));
+    }
+}
+
+#[test]
+fn a_name_of_one_owner_from_two_lists_of_category_ids_is_refused() {
+    let only_in_a = json!({"id": "type", "categories": ["b"],
+                           "conditions": [{"stratification": "group", "category": "a"}]});
+    let cases = [
+        (
+            stratification("type", &["b", "c"]),
+            "compartments",
+            "outputs",
+        ),
+        (only_in_a, "compartment", "output"),
+    ];
+
+    for (kind, of, of_outputs) in cases {
+        let json = stratified(&[stratification("group", &["a", "a_b"]), kind], |_| {});
+        let rename = format!(
+            "Rename category 'group:a', category 'type:b' or category 'group:a_b'{OWN_NAME}"
+        );
+        let sentence = |bin: &str| {
+            format!(
+                "'{bin}_a_b' names the compartment of bin '{bin}' in 'group:a', 'type:b' and \
+                 the {of} of bin '{bin}' in 'group:a_b'. {rename}"
+            )
+        };
+        assert_eq!(
+            refusal(json),
+            format!(
+                "{} {} 'n_a_b' names the output of accumulator 'n' in 'group:a', 'type:b' and \
+                 the {of_outputs} of accumulator 'n' in 'group:a_b'. {rename} 'total_a_b' names \
+                 the subgroup total of 'group:a', 'type:b' and the subgroup total of \
+                 'group:a_b'. {rename}",
+                sentence("A"),
+                sentence("B")
+            )
+        );
+    }
+}
+
+#[test]
+fn the_message_gives_only_the_root_of_each_conflict() {
+    let deeper = stratified(
+        &[
+            stratification("group", &["g1_h", "h"]),
+            stratification("type", &["t1", "t2"]),
+        ],
+        |json| add_bin(json, "A_g1"),
+    );
+    let only_in_a = json!({"id": "type", "categories": ["b"],
+                           "conditions": [{"stratification": "group", "category": "a"}]});
+    let under_a_shared_category = stratified(
+        &[
+            stratification("level", &["l1"]),
+            stratification("group", &["a", "a_b"]),
+            only_in_a,
+        ],
+        |_| {},
+    );
+
+    assert_eq!(
+        refusal(deeper),
+        format!(
+            "'A_g1_h' names the compartments of bin 'A' in 'group:g1_h' and the compartments \
+             of bin 'A_g1' in 'group:h'. Rename bin 'A', bin 'A_g1', category 'group:g1_h' or \
+             category 'group:h'{OWN_NAME}"
+        )
+    );
+    let rename =
+        format!("Rename category 'group:a', category 'type:b' or category 'group:a_b'{OWN_NAME}");
+    let partial = |bin: &str| {
+        format!(
+            "'{bin}_a_b' names the compartments of bin '{bin}' in 'group:a', 'type:b' and the \
+             compartments of bin '{bin}' in 'group:a_b'. {rename}"
+        )
+    };
+    assert_eq!(
+        refusal(under_a_shared_category),
+        format!(
+            "{} {} 'n_l1_a_b' names the output of accumulator 'n' in 'level:l1', 'group:a', \
+             'type:b' and the output of accumulator 'n' in 'level:l1', 'group:a_b'. {rename} \
+             'total_a_b' names the subgroup total of 'group:a', 'type:b' and the subgroup \
+             total of 'group:a_b'. {rename}",
+            partial("A"),
+            partial("B")
+        )
+    );
+}
+
+#[test]
+fn a_category_id_that_two_stratifications_share_builds() {
+    let shared = stratified(
+        &[
+            stratification("group", &["c1", "c2"]),
+            stratification("type", &["c1", "c2"]),
+        ],
+        |_| {},
+    );
+
+    assert!(build(shared).is_ok());
+}
+
+#[test]
+fn a_bin_whose_id_starts_with_a_name_of_another_builds() {
+    let group = [stratification("group", &["g1", "g2"])];
+
+    assert!(build(stratified(&group, |json| add_bin(json, "A_g1x"))).is_ok());
 }

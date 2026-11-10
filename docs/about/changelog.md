@@ -232,6 +232,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of these errors is a `ValueError` at `build`, with the message of the
   engine. Migration: catch these errors at `build`, and read the new
   messages.
+- **Breaking:** a model in which two things build one name is now refused
+  at `build`, even when nothing reads that name. A name is a bin or an
+  accumulator, a prefix of its categories, one of its outputs, a bin total, a
+  partial bin total or a subgroup total. These models built before: two bins
+  of one name (a bin `A_g1` next to the compartment `A_g1` of a bin `A`
+  stratified by `group = [g1, g2]`); a bin and a partial total of another (a
+  bin `A_t1` next to `A` stratified by `group` and `type = [t1, t2]`); a bin
+  and an accumulator (both `A`), or an accumulator and a subgroup total; and
+  one bin from two lists of categories (`A_a_b` for `group = [a, a_b]` and
+  `type = [b, c]`, or two compartments `A_a_b` when `type = [b]` applies only
+  in `a`). An initial condition or a remainder
+  `A_g1` set the compartment of `A`, not the bin `A_g1`; a rate that read
+  `A_t1` summed both totals; and the outputs of an accumulator `A` replaced
+  those of the bin `A` in the results; all with no error. The message gives
+  each clash once, at its shortest name, with what it names and the ids to
+  rename: `'A_g1' names the compartment of bin 'A' in 'group:g1' and the bin
+  'A_g1'. Rename bin 'A', bin 'A_g1' or category 'group:g1', so that each has
+  a name of its own.` A bin that a subgroup total names, such as a bin
+  `total_y` with a category `y`, was refused already; it gets this message in
+  place of `Names built from a bin are also subgroup totals`. A category id
+  that two stratifications share still
+  builds ([#475](https://github.com/MUNQU/commol/issues/475)). Migration:
+  rename a bin, an accumulator or a category so that each name names one
+  thing. See
+  [Names the engine sets](../guide/building-models.md#names-the-engine-sets).
 - **Breaking:** a run refuses a parameter or a bin amount without a value
   with the message of the engine, which names each of them: `The model
   cannot run: the parameters ["k1"] and the amounts of the bins ["B"] have no

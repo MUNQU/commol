@@ -26,10 +26,7 @@
 use commol_core::{ModelValue, ModelValueType, ValuePlan};
 
 use crate::engine::CompartmentalEngine;
-use crate::labels::OutputLabels;
-
-/// Separator of a qualified category id, as in `group:g1`.
-pub const CATEGORY_SEPARATOR: char = ':';
+use crate::labels::{CATEGORY_SEPARATOR, OutputLabels};
 
 /// Relative tolerance under which an excess over the sum the remainder keeps
 /// is taken to be zero.
@@ -39,7 +36,8 @@ const EXCESS_TOLERANCE: f64 = 1e-9;
 /// is: an amount of a bin, an amount of a compartment or a split of a
 /// category. An id that names an expanded compartment is a compartment,
 /// because the compartment comes first in the order of resolution
-/// ([`InitialConditionPlan::new`]).
+/// ([`InitialConditionPlan::new`]); as a bin or a bin prefix, such an id
+/// covers that one compartment.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InitialTargetKind {
     /// A bin or a bin prefix. The value is the amount its compartments hold.
@@ -211,6 +209,15 @@ impl InitialConditionPlan {
     /// - a category of a binary stratification, qualified (`group:g1`) or
     ///   bare (`g1`) when one stratification has it ([`resolve_category`],
     ///   among the categories the compartments have).
+    ///
+    /// A name of a compartment, a bin or a bin prefix names one bin and one
+    /// list of its categories, because [`crate::check_model`] refuses a name
+    /// that two things build, as bin `A` in `g1` and a bin `A_g1` build
+    /// `A_g1`. So the order never takes the compartments of one bin for
+    /// those of another: it gives the kind of an id that is a compartment
+    /// and a bin or a prefix of that one compartment. It also puts a bin
+    /// before a bare category of the same id, which then sets the bin with
+    /// no error; the qualified id names the category.
     ///
     /// The remainder, when given, names the compartments that take what the
     /// other compartments leave of the sum of the amounts the model states.
@@ -493,7 +500,9 @@ fn compartment_labels<E: CompartmentalEngine>(engine: &E) -> Vec<OutputLabels> {
 ///
 /// A compartment is covered when the id is its bin (`A`) or its bin followed
 /// by its leading categories (`A_g1`, `A_g1_s2`). The match is built from the
-/// labels, so a bin `A` does not cover the compartments of a bin `A_x`.
+/// labels, so a bin `A` does not cover the compartments of a bin `A_x`, and
+/// the compartments an id covers share one bin and its leading categories
+/// ([`crate::check_model`] refuses a name that two things build).
 fn prefix_indices(id: &str, labels: &[OutputLabels]) -> Option<Vec<usize>> {
     let indices: Vec<usize> = labels
         .iter()

@@ -1,5 +1,7 @@
 """Calibrating initial conditions: which ids name them, and fitting them."""
 
+import re
+
 import pytest
 
 from commol import (
@@ -340,6 +342,30 @@ def test_the_kind_of_each_target_comes_from_the_engine() -> None:
     ]
     assert remainder == []
     assert scored.categories == ["g1"]
+
+
+def test_an_id_of_a_compartment_and_of_another_bin_is_refused() -> None:
+    """``A_g1`` would name the compartment of ``A`` in ``g1`` and the bin
+    ``A_g1``, so the model that has both is refused when it is built."""
+    builder = a_to_b_builder()
+    builder.add_bin(id="A_g1", name="A_g1")
+    builder.add_stratification(id="group", categories=["g1", "g2"])
+    builder.set_structure(
+        Aggregate(
+            bin_amounts={"A": 900, "B": 0, "A_g1": 5},
+            stratification_fractions={"group": {"g1": 0.5, "g2": 0.5}},
+        )
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "'A_g1' names the compartment of bin 'A' in 'group:g1' and the bin "
+            "'A_g1'. Rename bin 'A', bin 'A_g1' or category 'group:g1', so that "
+            "each has a name of its own."
+        ),
+    ):
+        build(builder)
 
 
 def test_a_calibrated_amount_keeps_the_split_by_category() -> None:

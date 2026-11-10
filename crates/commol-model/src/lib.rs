@@ -22,7 +22,8 @@
 //! - `flows` - Planning of the transition flows
 //! - `helpers` - Utility functions for stratification and rate resolution
 //! - `initial_conditions` - Initial conditions that calibration writes
-//! - `labels` - Labels of the outputs and the sums they name
+//! - `labels` - Labels of the outputs and the sums they name, and the check
+//!   that each name a model builds names one thing
 //! - `layout` - Structured index of the compartments
 //! - `matrices` - The variables of a matrix between categories, and the
 //!   matrix sums of a rate written as the sums they are
@@ -73,9 +74,8 @@ pub use builder::{
 pub use engine::{CompartmentalEngine, IntegerStepper, record_steps, rounded};
 pub use flows::{FlowDescription, describe_flows};
 pub use initial_conditions::{
-    CATEGORY_SEPARATOR, InitialConditionPlan, InitialTargetKind, resolve_category,
-    resolve_declared_category,
+    InitialConditionPlan, InitialTargetKind, resolve_category, resolve_declared_category,
 };
-pub use labels::{OutputLabels, output_sums};
+pub use labels::{CATEGORY_SEPARATOR, OutputLabels, output_sums};
 pub use matrices::{MatrixVariable, matrix_variables};
 pub use types::{CompiledModel, FlowChange};
