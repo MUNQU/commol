@@ -718,8 +718,10 @@ impl Default for OdeSolver {
 }
 
 /// How a stochastic engine makes whole the initial amounts of a model that
-/// are not. There is no default: with small amounts the rounding decides
-/// which compartments start with a unit, so it is a choice of the model.
+/// are not, bin by bin: the amount of each bin becomes its nearest whole
+/// number, a half up, split into whole amounts of its compartments. There is
+/// no default: with small amounts the rounding decides which compartments
+/// start with a unit, so it is a choice of the model.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Rounding {
     /// The same whole amounts in every run: in each bin, each amount rounded
@@ -729,7 +731,7 @@ pub enum Rounding {
     LargestRemainder,
     /// A multinomial draw of the amount of each bin with the fractions of
     /// the model in each run, so the mean start equals the amounts of the
-    /// model.
+    /// model when each bin is whole.
     #[serde(rename = "random")]
     Random,
 }

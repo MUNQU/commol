@@ -1,9 +1,10 @@
 """Whole units: a stochastic engine starts from whole amounts.
 
-A total that is not whole is an error. Initial amounts that are not whole
-need a rounding in the settings of the engine, with no default:
+Initial amounts that are not whole, of a bin or of a compartment, need a
+rounding in the settings of the engine, with no default:
 ``"largest_remainder"`` (the same whole amounts in every run) or ``"random"``
-(a multinomial draw per run, whose mean is the amounts of the model).
+(a multinomial draw per run). Either makes each bin its nearest whole number
+and splits it among its compartments.
 A method that varies an initial condition needs a rounding too, and the
 engine checks known values, such as a write-back or the draws of a sample,
 when it writes them.
@@ -69,16 +70,26 @@ class TestWholeUnits:
         assert engine in str(error.value)
         assert "'A_g0' (99.5)" in str(error.value)
 
-    def test_a_bin_that_is_not_whole_names_the_engine_and_the_bin(
-        self, engine: EngineName
+    @pytest.mark.parametrize("rounding", ["largest_remainder", "random"])
+    def test_a_rounding_makes_each_bin_its_nearest_whole_number(
+        self, engine: EngineName, rounding: str
     ) -> None:
-        builder = a_to_b_builder(amounts={"A": 1000.5, "B": 0})
+        # The shares of A sum to 10.499999999999998.
+        builder = a_to_b_builder(
+            amounts={"A": 10.5, "B": 0.4},
+            stratifications={"group": {"g1": 0.15, "g2": 0.85}},
+        )
+        model = build_stochastic(builder, engine, _settings(engine, rounding))
 
-        with pytest.raises(ValueError, match=f"The {engine} engine") as error:
-            build_stochastic(builder, engine, _settings(engine, "random"))
+        starts = Simulation(model).replicates(5, seed=2).run_at([0.0])
 
-        assert "the amount of each bin must be a whole number" in str(error.value)
-        assert "'A' (1000.5)" in str(error.value)
+        # Each bin rounds on its own: a half rounds up whatever its split, and
+        # a bin below half a unit starts empty in every run.
+        bins = [
+            [run[f"{bin_id}_g1"][0] + run[f"{bin_id}_g2"][0] for bin_id in ("A", "B")]
+            for run in starts
+        ]
+        assert bins == [[11.0, 0.0]] * 5
 
     def test_the_largest_remainder_starts_every_run_alike(
         self, engine: EngineName

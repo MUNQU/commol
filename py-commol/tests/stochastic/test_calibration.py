@@ -10,8 +10,10 @@ from typing import Literal
 import pytest
 
 from commol import (
+    Aggregate,
     CalibrationProblem,
     Calibrator,
+    Model,
     NelderMeadConfig,
     ObservedDataPoint,
     Quantile,
@@ -19,7 +21,7 @@ from commol import (
 )
 from commol._fit.result import CalibrationResult
 from commol.engines import StochasticEventsSettings, StochasticStepsSettings
-from commol.engines.engine import EngineName
+from commol.engines.engine import EngineName, Rounding
 from commol.uncertainty import weighted_quantiles
 from tests.support import (
     STOCHASTIC_ENGINES,
@@ -200,16 +202,16 @@ def test_every_initial_condition_that_varies_needs_a_rounding(
     assert str(error.value) == needs_a_rounding("StochasticSteps", entry_id)
 
 
-@pytest.mark.parametrize(
-    ("engine", "settings"),
-    [
-        ("StochasticEvents", StochasticEventsSettings(rounding="largest_remainder")),
-        ("StochasticSteps", StochasticStepsSettings(rounding="largest_remainder")),
-    ],
-)
-def test_a_calibrated_amount_with_a_rounding_is_calibrated(
-    engine: EngineName, settings: StochasticEventsSettings | StochasticStepsSettings
-) -> None:
+def _calibrated_amount(
+    engine: EngineName, rounding: Rounding
+) -> tuple[Model[Aggregate], CalibrationProblem, Calibrator]:
+    """A calibration of the initial amount of bin B in ``[0, 50]`` against
+    12.3 units of B at 0, on `engine` with `rounding`, and its model."""
+    settings = (
+        StochasticEventsSettings(rounding=rounding)
+        if engine == "StochasticEvents"
+        else StochasticStepsSettings(rounding=rounding)
+    )
     model = build_stochastic(a_to_b_builder(), engine, settings)
     problem = CalibrationProblem(
         observed_data=[ObservedDataPoint(at=0.0, output="B", value=12.3)],
@@ -222,9 +224,73 @@ def test_a_calibrated_amount_with_a_rounding_is_calibrated(
         replicate_summary="mean",
         seed=7,
     )
+    return model, problem, Calibrator(Simulation(model), problem)
 
-    result = Calibrator(Simulation(model), problem).run()
+
+@pytest.mark.parametrize("engine", STOCHASTIC_ENGINES)
+def test_a_calibrated_amount_with_a_rounding_is_calibrated(engine: EngineName) -> None:
+    _, _, calibrator = _calibrated_amount(engine, "largest_remainder")
+
+    result = calibrator.run()
 
     # Every run starts from 12 whole units of B, the nearest to 12.3: with no
     # rounding the loss would reach 0.
     assert result.final_loss == pytest.approx((12.0 - 12.3) ** 2, rel=1e-9)
+
+
+@pytest.mark.parametrize("rounding", ["largest_remainder", "random"])
+@pytest.mark.parametrize("engine", STOCHASTIC_ENGINES)
+def test_a_calibrated_amount_is_written_back_onto_a_model_that_builds(
+    engine: EngineName, rounding: Rounding
+) -> None:
+    model, problem, calibrator = _calibrated_amount(engine, rounding)
+    result = calibrator.run()
+    amount = result.best_parameters["B"]
+    (scored,) = calibrator._engine_problem.predict_observations([[amount]])
+
+    model.apply_calibration_parameters(result, problem)
+    starts = Simulation(model).replicates(2, seed=7).run_at([0.0])
+
+    # The model holds the amount the optimizer found, which is not whole, and
+    # every run starts from the units the calibration scored for it.
+    assert amount != round(amount)
+    assert model.structure.bin_amounts["B"] == amount
+    assert [run["B"] for run in starts] == scored == [[12.0], [12.0]]
+
+
+def test_a_stratified_amount_is_written_back_with_its_split() -> None:
+    builder = a_to_b_builder(stratifications={"group": {"g1": 0.3, "g2": 0.7}})
+    settings = StochasticStepsSettings(rounding="largest_remainder")
+    model = build_stochastic(builder, "StochasticSteps", settings)
+    targets = {"A_g1": 296.3, "A_g2": 691.4, "B_g1": 3.7, "B_g2": 8.6}
+    problem = CalibrationProblem(
+        observed_data=[
+            ObservedDataPoint(at=0.0, output=output, value=value)
+            for output, value in targets.items()
+        ],
+        parameters=[
+            bounded("B", 0.0, 50.0, kind="initial_condition", initial_guess=25.0)
+        ],
+        initial_condition_remainder="A",
+        loss_function="sse",
+        optimization_config=NelderMeadConfig(max_iterations=100),
+        replicates=2,
+        replicate_summary="mean",
+        seed=7,
+    )
+    calibrator = Calibrator(Simulation(model), problem)
+    result = calibrator.run()
+    amount = result.best_parameters["B"]
+    (scored,) = calibrator._engine_problem.predict_observations([[amount]])
+
+    model.apply_calibration_parameters(result, problem)
+    starts = Simulation(model).replicates(2, seed=7).run_at([0.0])
+
+    # Each bin holds the amount the engine scored for it and keeps its split,
+    # with no compartment pinned, and every run starts from the units the
+    # calibration scored.
+    assert model.structure.bin_amounts == pytest.approx(
+        {"A": 1000.0 - amount, "B": amount}, rel=1e-12
+    )
+    assert model.structure.compartment_amounts == {}
+    assert [[run[output][0] for output in targets] for run in starts] == scored

@@ -568,21 +568,70 @@ fn a_rounding_error_names_five_amounts_and_counts_the_rest() {
     assert!(six.contains(" and 1 more are not whole"), "{six}");
 }
 
-#[test]
-fn whole_amounts_need_no_rounding_and_each_bin_must_be_whole() {
-    assert!(StochasticEvents::try_from_model(&chain("StochasticEvents", "null")).is_ok());
-    let mut model = chain("StochasticSteps", r#"{"rounding":"random"}"#);
-    let amounts = &mut model
+/// `model` with the amount of `bin` set to `amount`.
+fn with_bin_amount(mut model: Model, bin: &str, amount: f64) -> Model {
+    model
         .aggregate_mut()
         .unwrap()
         .initial_conditions
-        .bin_amounts;
-    let (bin, amount) = amounts.first_mut().unwrap();
-    let bin = bin.clone();
-    *amount = Some(1000.5);
+        .bin_amounts
+        .insert(bin.to_string(), Some(amount));
+    model
+}
+
+#[test]
+fn whole_amounts_need_no_rounding_and_a_bin_that_is_not_whole_needs_one() {
+    assert!(StochasticEvents::try_from_model(&chain("StochasticEvents", "null")).is_ok());
+    let model = with_bin_amount(chain("StochasticSteps", "null"), "A", 1000.5);
     let error = StochasticSteps::try_from_model(&model).err().unwrap();
-    assert!(error.contains("StochasticSteps"), "{error}");
-    assert!(error.contains(&format!("'{bin}' (1000.5)")), "{error}");
+    for part in [
+        "StochasticSteps",
+        "'A' (1000.5)",
+        "largest_remainder",
+        "random",
+    ] {
+        assert!(error.contains(part), "{part} in {error}");
+    }
+}
+
+/// The runs of the ten groups with B = 12.3, from one set of seeds: as the
+/// model declares it, and as calibration writes it.
+fn declared_and_written<E: SimulationEngine + Send + Sync>(
+    engine: &str,
+    settings: &str,
+    build: fn(&Model) -> E,
+) -> [Vec<Vec<Vec<f64>>>; 2] {
+    use commol_core::{ModelValue, ModelValueType};
+    let values = [ModelValue {
+        value_type: ModelValueType::InitialCondition,
+        id: "B".to_string(),
+    }];
+    let declared = build(&with_bin_amount(seeded_groups(engine, settings), "B", 12.3));
+    let mut written = build(&seeded_groups(engine, settings));
+    let plan = written.plan_values(&values, None).unwrap();
+    assert_eq!(written.apply_values(&plan, &[12.3]).unwrap(), 0.0);
+    [&declared, &written].map(|engine| replicates(engine, &[0.0, 5.0], 20))
+}
+
+#[test]
+fn a_bin_that_is_not_whole_starts_as_calibration_writes_it() {
+    for settings in [
+        r#"{"rounding":"largest_remainder"}"#,
+        r#"{"rounding":"random"}"#,
+    ] {
+        for [declared, written] in [
+            declared_and_written("StochasticEvents", settings, events),
+            declared_and_written("StochasticSteps", settings, steps),
+        ] {
+            // The rounding makes B the nearest whole number, 12, and A keeps
+            // its 995 units: a declared amount and a written one start each
+            // run from the same units.
+            assert_eq!(declared, written, "{settings}");
+            for rows in &declared {
+                assert_eq!(rows[0].iter().sum::<f64>(), 1007.0, "{settings}");
+            }
+        }
+    }
 }
 
 #[test]
