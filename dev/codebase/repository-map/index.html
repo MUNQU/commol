@@ -2833,6 +2833,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/names/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Names
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/transitions-and-rates/" class="md-nav__link">
         
   
@@ -3989,7 +4017,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-model/src/labels.rs</code></td>
-<td><code>OutputLabels</code> (bin and categories of an output) and <code>output_sums</code> (bin totals and partial totals).</td>
+<td><code>OutputLabels</code> (bin and categories of an output), <code>output_sums</code> (bin totals and partial totals), <code>CATEGORY_SEPARATOR</code> (of a qualified category id), and <code>check_names</code>, the check that each name a model builds names one thing (<code>Owner</code>, <code>Named</code>).</td>
 <td>Name parsing.</td>
 </tr>
 <tr>
@@ -3999,7 +4027,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-model/src/initial_conditions.rs</code></td>
-<td>How initial-condition values reach a compartmental engine (<code>InitialConditionPlan</code>: resolution, layers, remainder); the <code>plan_values</code> and <code>apply_values</code> of every engine of the aggregate kind use it. The one resolver of a category id, bare or qualified (<code>resolve_category</code>, <code>resolve_declared_category</code>, <code>CATEGORY_SEPARATOR</code>).</td>
+<td>How initial-condition values reach a compartmental engine (<code>InitialConditionPlan</code>: resolution, layers, remainder); the <code>plan_values</code> and <code>apply_values</code> of every engine of the aggregate kind use it. The one resolver of a category id, bare or qualified (<code>resolve_category</code>, <code>resolve_declared_category</code>).</td>
 <td>Parameter values.</td>
 </tr>
 <tr>

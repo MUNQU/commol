@@ -2667,6 +2667,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/names/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Names
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/transitions-and-rates/" class="md-nav__link">
         
   
@@ -5474,6 +5502,31 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   of these errors is a <code>ValueError</code> at <code>build</code>, with the message of the
   engine. Migration: catch these errors at <code>build</code>, and read the new
   messages.</li>
+<li><strong>Breaking:</strong> a model in which two things build one name is now refused
+  at <code>build</code>, even when nothing reads that name. A name is a bin or an
+  accumulator, a prefix of its categories, one of its outputs, a bin total, a
+  partial bin total or a subgroup total. These models built before: two bins
+  of one name (a bin <code>A_g1</code> next to the compartment <code>A_g1</code> of a bin <code>A</code>
+  stratified by <code>group = [g1, g2]</code>); a bin and a partial total of another (a
+  bin <code>A_t1</code> next to <code>A</code> stratified by <code>group</code> and <code>type = [t1, t2]</code>); a bin
+  and an accumulator (both <code>A</code>), or an accumulator and a subgroup total; and
+  one bin from two lists of categories (<code>A_a_b</code> for <code>group = [a, a_b]</code> and
+  <code>type = [b, c]</code>, or two compartments <code>A_a_b</code> when <code>type = [b]</code> applies only
+  in <code>a</code>). An initial condition or a remainder
+  <code>A_g1</code> set the compartment of <code>A</code>, not the bin <code>A_g1</code>; a rate that read
+  <code>A_t1</code> summed both totals; and the outputs of an accumulator <code>A</code> replaced
+  those of the bin <code>A</code> in the results; all with no error. The message gives
+  each clash once, at its shortest name, with what it names and the ids to
+  rename: <code>'A_g1' names the compartment of bin 'A' in 'group:g1' and the bin
+  'A_g1'. Rename bin 'A', bin 'A_g1' or category 'group:g1', so that each has
+  a name of its own.</code> A bin that a subgroup total names, such as a bin
+  <code>total_y</code> with a category <code>y</code>, was refused already; it gets this message in
+  place of <code>Names built from a bin are also subgroup totals</code>. A category id
+  that two stratifications share still
+  builds (<a href="https://github.com/MUNQU/commol/issues/475">#475</a>). Migration:
+  rename a bin, an accumulator or a category so that each name names one
+  thing. See
+  <a href="../../guide/building-models/#names-the-engine-sets">Names the engine sets</a>.</li>
 <li><strong>Breaking:</strong> a run refuses a parameter or a bin amount without a value
   with the message of the engine, which names each of them: <code>The model
   cannot run: the parameters ["k1"] and the amounts of the bins ["B"] have no

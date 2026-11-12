@@ -2683,6 +2683,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../names/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Names
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../transitions-and-rates/" class="md-nav__link">
         
   
@@ -3798,6 +3826,16 @@ characters. A bare category that two stratifications declare is an error
 that names them and the qualified ids. The write-back of a calibration
 (<code>_model/calibration_write_back.py</code>) takes as categories the values the
 engine resolves as category splits (<code>CalibratedInitialState.categories</code>).</p>
+<p>The build refuses a name that two things build
+(<a href="../names/#a-name-names-one-thing">A name names one thing</a>), so the order
+never takes the compartments of one bin for those of another, and a
+remainder (<code>prefix_indices</code>) never covers those of two. The name of a
+compartment is a bin or a prefix only of that one compartment, so
+<code>resolve_target</code>, which meets the compartment first, only sets its kind. The
+order still puts a bin before a bare
+category of the same id, which then sets the bin with no error
+(<a href="https://github.com/MUNQU/commol/issues/476">#476</a>); the qualified id names
+the category.</p>
 <p><strong>Rule:</strong> the engine says the kind of each value (<code>InitialTargetKind</code>: <code>bin</code>,
 <code>compartment</code> or <code>category</code>), together with the compartments it sets
 (<code>InitialConditionPlan::coverage</code>), and Python reads the kind and infers

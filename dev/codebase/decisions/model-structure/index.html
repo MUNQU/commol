@@ -18,7 +18,7 @@
         <link rel="prev" href="../model-kinds/">
       
       
-        <link rel="next" href="../transitions-and-rates/">
+        <link rel="next" href="../names/">
       
       
         
@@ -2802,21 +2802,38 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#the-engine-owns-the-variable-names" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The engine owns the variable names
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../names/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Names
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3858,17 +3875,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#the-engine-owns-the-variable-names" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The engine owns the variable names
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -3891,13 +3897,15 @@
 
 <h1 id="model-structure">Model structure<a class="headerlink" href="#model-structure" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
-<p>How compartments are named, what they hold, and how outputs and variables find them.</p>
+<p>How compartments are named, what they hold, and how outputs find them. The
+names the engine sets, and why each names one thing, are in <a href="../names/">Names</a>.</p>
 <h2 id="compartments-are-labels-with-a-name">Compartments are labels with a name<a class="headerlink" href="#compartments-are-labels-with-a-name" title="Permanent link">&para;</a></h2>
 <p>A compartment is a bin plus one category for each stratification that applies
-to it, in declaration order. Its name, <code>{bin}_{category}_{category}…</code>, is for
-display only. Its identity is its label: <code>OutputLabels</code> in
+to it, in declaration order. Its identity is its label: <code>OutputLabels</code> in
 <code>crates/commol-model/src/labels.rs</code> and <code>CompartmentLayout</code> in
-<code>crates/commol-model/src/layout.rs</code>.</p>
+<code>crates/commol-model/src/layout.rs</code>. Its name, <code>{bin}_{category}_{category}…</code>,
+is what a rate, an initial condition and a result read, and it names that
+label alone (<a href="../names/#a-name-names-one-thing">A name names one thing</a>).</p>
 <p><strong>Rule:</strong> never parse a compartment name or match it by prefix. Bin <code>A</code> and bin
 <code>A_x</code> both produce names that start with <code>A_</code>, and a conditional
 stratification gives some compartments fewer suffixes than others. Use
@@ -4200,34 +4208,6 @@ must be an output name, which stands for itself.</p>
 a prefix), <code>TestTotalSeries::test_an_output_name_stands_for_itself</code> and
 <code>tests/simulation/test_windows.py::test_windowed_totals_take_output_names</code>
 (output names).</p>
-<h2 id="the-engine-owns-the-variable-names">The engine owns the variable names<a class="headerlink" href="#the-engine-owns-the-variable-names" title="Permanent link">&para;</a></h2>
-<p>The engine sets one variable per expanded compartment and per subgroup total
-(<code>total_&lt;categories&gt;</code>, bin totals and partial bin totals).
-The variables of a matrix between categories (<code>&lt;M&gt;_&lt;i&gt;_&lt;j&gt;</code> and
-<code>&lt;M&gt;_radius</code>) are engine variables too: <code>check_matrices</code>
-(<code>crates/commol-model/src/matrices.rs</code>) rejects a parameter, bin,
-accumulator, compartment, subgroup total or engine variable that has the
-id or a variable name of a matrix, and two matrices that give one variable.
-<code>check_model</code> in <code>crates/commol-model/src/builder.rs</code> rejects a parameter
-id that is one of those names, a parameter, bin or accumulator id that is an
-engine variable (<code>ENGINE_VARIABLES</code>: <code>total</code>, <code>step</code>, <code>t</code>, <code>pi</code>, <code>e</code>) or a
-name of the neighbors (<code>neighbors</code>, <code>neighbors_…</code>), a bin
-whose compartments or bin totals read as a <code>total_&lt;categories&gt;</code> name (two sums
-would share one slot), and a <code>total_…</code> variable in a rate or a formula
-parameter that names no subgroup total. <code>Aggregate.check_model</code> calls it at
-<code>build</code>, and <code>CompiledModel::try_from_model</code> calls it again.
-<code>subgroup_total_names</code> lists the names; Python reads them through the binding
-<code>commol_rs.model.subgroup_total_names</code> (<code>engine_state.subgroup_total_names</code>)
-to check rates and give units.</p>
-<p><strong>Rule:</strong> never list these names in Python. Ask the engine.</p>
-<p><strong>Guards:</strong> <code>builder.rs</code> tests
-<code>parameter_id_cannot_be_a_compartment_or_a_subgroup_total</code>,
-<code>subgroup_total_out_of_declaration_order_is_a_build_error</code> and
-<code>subgroup_total_names_follow_the_declaration_order</code>,
-<code>an_engine_variable_is_not_a_parameter_bin_or_accumulator_id</code> and
-<code>a_bin_name_that_reads_as_a_subgroup_total_is_rejected</code>;
-<code>tests/building/test_reserved_names.py</code>;
-<code>tests/rates/test_expressions.py::TestSubgroupTotals::test_every_name_the_engine_provides_is_accepted_in_a_rate</code>.</p>
 
 
 

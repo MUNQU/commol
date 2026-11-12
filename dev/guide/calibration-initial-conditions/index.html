@@ -2820,6 +2820,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/names/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Names
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/transitions-and-rates/" class="md-nav__link">
         
   
@@ -3968,6 +3996,13 @@ compartment. The Rust engine applies the values in a fixed order, and a
 <p>A category that two stratifications share is written with its stratification,
 as in <code>"group:g1"</code> (<a href="../core-concepts/#updating-the-initial-state-after-building">the same rule</a>
 as for the initial state); a bare name is rejected as ambiguous.</p>
+<p>A bin, a bin prefix or a compartment id never covers the compartments of two
+bins: a model in which one name is, say, the compartment <code>A_g1</code> of a bin <code>A</code>
+and also a bin <code>A_g1</code> is rejected when it is built
+(<a href="../building-models/#names-the-engine-sets">Names the engine sets</a>). A bare
+category that is also the id of a bin sets the bin, with no error
+(<a href="https://github.com/MUNQU/commol/issues/476">#476</a>): write the qualified id,
+such as <code>"group:g1"</code>, for the category.</p>
 <p>The engine resolves every id when you create the <code>Calibrator</code>
 (<code>InitialConditionPlan</code> in
 <code>crates/commol-model/src/initial_conditions.rs</code>), so a wrong id fails before

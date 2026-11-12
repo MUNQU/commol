@@ -136,7 +136,19 @@ The engine sets these variables, so `build` rejects a parameter with one of thes
 | A subgroup total                                                                          | `total_g1`, `A_t1` (with two stratifications) |
 | The variables of a [matrix](#matrices-between-categories) `M`: `M_<i>_<j>` and `M_radius` | `M_g1_g2`, `M_radius`                         |
 
-A bin or an accumulator cannot take an id of the first two rows either, because the engine variable would hide it. A bin whose names read as a subgroup total is rejected too: a bin `total_y` stratified by `group = [y, o]` and `type = [y, o]` expands into `total_y_y`, which is also the total of the `y` of both stratifications.
+A bin or an accumulator cannot take an id of the first two rows either, because the engine variable would hide it.
+
+Each name of a model stands for one thing, in rates, initial conditions and results alike: a bin or an accumulator, a prefix of its categories, one of its outputs, a bin total, a partial bin total or a subgroup total. So `build` rejects a model in which one name comes from two bins, from a bin and an accumulator, from a bin and a subgroup total, or from one bin with two lists of categories, even when no rate reads that name (`check_names` in `crates/commol-model/src/labels.rs`):
+
+| Model                                                                       | Name      | It would name                                                               |
+| --------------------------------------------------------------------------- | --------- | --------------------------------------------------------------------------- |
+| Bins `A` and `A_g1`, stratified by `group = [g1, g2]`                       | `A_g1`    | The compartment of `A` in `g1`, and the bin `A_g1`                          |
+| Bins `A` and `A_t1`, stratified by `group = [g1, g2]` and `type = [t1, t2]` | `A_t1`    | The total of `A` in `t1`, and the bin `A_t1`                                |
+| A bin `A` and an accumulator `A`                                            | `A`       | The bin and the accumulator                                                 |
+| A bin `total_y`, stratified by `group = [y, o]` and `type = [y, o]`         | `total_y` | The bin, and the subgroup total of `y`                                      |
+| Bin `A`, stratified by `group = [a, a_b]` and `type = [b, c]`               | `A_a_b`   | The compartment of `A` in `a` and `b`, and the compartments of `A` in `a_b` |
+
+The message gives each clash once, at its shortest name, with the bins, accumulators and categories to rename. A bin whose id only starts with such a name, such as `A_g1x`, builds. So does a category id that two stratifications share, such as `c1` of `group` and of `type`, which the qualified ids `group:c1` and `type:c1` name apart: there, `total_c1` and a partial total `A_c1` read both categories, a known defect ([#475](https://github.com/MUNQU/commol/issues/475)).
 
 A matrix may not take the id of a parameter, a bin, an accumulator, a compartment, a subgroup total or an engine variable, nor may one of its variables, and two matrices may not give one variable nor a variable that is the id of a matrix (`check_matrices` in `crates/commol-model/src/matrices.rs`).
 

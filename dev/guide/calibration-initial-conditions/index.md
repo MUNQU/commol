@@ -76,6 +76,8 @@ Here `B` is calibrated, and `A`, the remainder, takes what `B` leaves of the 100
 
 A category that two stratifications share is written with its stratification, as in `"group:g1"` ([the same rule](https://munqu.github.io/commol/latest/guide/core-concepts/#updating-the-initial-state-after-building) as for the initial state); a bare name is rejected as ambiguous.
 
+A bin, a bin prefix or a compartment id never covers the compartments of two bins: a model in which one name is, say, the compartment `A_g1` of a bin `A` and also a bin `A_g1` is rejected when it is built ([Names the engine sets](https://munqu.github.io/commol/latest/guide/building-models/#names-the-engine-sets)). A bare category that is also the id of a bin sets the bin, with no error ([#476](https://github.com/MUNQU/commol/issues/476)): write the qualified id, such as `"group:g1"`, for the category.
+
 The engine resolves every id when you create the `Calibrator` (`InitialConditionPlan` in `crates/commol-model/src/initial_conditions.rs`), so a wrong id fails before the optimization starts:
 
 | `id`                                                                                                   | Error                                                                                                                                                                                                                                       |

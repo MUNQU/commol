@@ -2023,7 +2023,8 @@ class Aggregate(ModelStructure, InitialConditions):
         stratifications (every stratification and category named, a split by
         category by a stratification declared before it), every id (no
         parameter id is an engine variable, a bin, a compartment or a
-        subgroup total), the neighbors, and every variable a rate or a
+        subgroup total, and no two things build one name), the neighbors,
+        and every variable a rate or a
         formula parameter reads. Then it plans every transition and builds
         the initial state.
 
@@ -2418,7 +2419,7 @@ check_model(model: Model[Self]) -> None
 
 Check the structure against the process and the parameters.
 
-The engine checks the model (`check_model` of `crates/commol-model/src/builder.rs`): unique ids, the categories of each stratification, a bin and a transition, what each transition moves, the conditions of the stratifications and of the stratified rates, the amounts against the bins, the fractions against the stratifications (every stratification and category named, a split by category by a stratification declared before it), every id (no parameter id is an engine variable, a bin, a compartment or a subgroup total), the neighbors, and every variable a rate or a formula parameter reads. Then it plans every transition and builds the initial state.
+The engine checks the model (`check_model` of `crates/commol-model/src/builder.rs`): unique ids, the categories of each stratification, a bin and a transition, what each transition moves, the conditions of the stratifications and of the stratified rates, the amounts against the bins, the fractions against the stratifications (every stratification and category named, a split by category by a stratification declared before it), every id (no parameter id is an engine variable, a bin, a compartment or a subgroup total, and no two things build one name), the neighbors, and every variable a rate or a formula parameter reads. Then it plans every transition and builds the initial state.
 
 Parameters:
 
@@ -2447,7 +2448,8 @@ def check_model(self, model: "Model[Self]") -> None:
     stratifications (every stratification and category named, a split by
     category by a stratification declared before it), every id (no
     parameter id is an engine variable, a bin, a compartment or a
-    subgroup total), the neighbors, and every variable a rate or a
+    subgroup total, and no two things build one name), the neighbors,
+    and every variable a rate or a
     formula parameter reads. Then it plans every transition and builds
     the initial state.
 

@@ -2937,6 +2937,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/names/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Names
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/transitions-and-rates/" class="md-nav__link">
         
   
@@ -4428,10 +4456,57 @@ these ids (<code>Aggregate.check_model</code> and <code>check_model</code> in
 </tbody>
 </table>
 <p>A bin or an accumulator cannot take an id of the first two rows either, because
-the engine variable would hide it. A bin whose names read as a subgroup total is
-rejected too: a bin <code>total_y</code> stratified by <code>group = [y, o]</code> and <code>type = [y, o]</code>
-expands into <code>total_y_y</code>, which is also the total of the <code>y</code> of both
-stratifications.</p>
+the engine variable would hide it.</p>
+<p>Each name of a model stands for one thing, in rates, initial conditions and
+results alike: a bin or an accumulator, a prefix of its categories, one of its
+outputs, a bin total, a partial bin total or a subgroup total. So <code>build</code>
+rejects a model in which one name comes from two bins, from a bin and an
+accumulator, from a bin and a subgroup total, or from one bin with two lists
+of categories, even when no rate reads that name (<code>check_names</code> in
+<code>crates/commol-model/src/labels.rs</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Name</th>
+<th>It would name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bins <code>A</code> and <code>A_g1</code>, stratified by <code>group = [g1, g2]</code></td>
+<td><code>A_g1</code></td>
+<td>The compartment of <code>A</code> in <code>g1</code>, and the bin <code>A_g1</code></td>
+</tr>
+<tr>
+<td>Bins <code>A</code> and <code>A_t1</code>, stratified by <code>group = [g1, g2]</code> and <code>type = [t1, t2]</code></td>
+<td><code>A_t1</code></td>
+<td>The total of <code>A</code> in <code>t1</code>, and the bin <code>A_t1</code></td>
+</tr>
+<tr>
+<td>A bin <code>A</code> and an accumulator <code>A</code></td>
+<td><code>A</code></td>
+<td>The bin and the accumulator</td>
+</tr>
+<tr>
+<td>A bin <code>total_y</code>, stratified by <code>group = [y, o]</code> and <code>type = [y, o]</code></td>
+<td><code>total_y</code></td>
+<td>The bin, and the subgroup total of <code>y</code></td>
+</tr>
+<tr>
+<td>Bin <code>A</code>, stratified by <code>group = [a, a_b]</code> and <code>type = [b, c]</code></td>
+<td><code>A_a_b</code></td>
+<td>The compartment of <code>A</code> in <code>a</code> and <code>b</code>, and the compartments of <code>A</code> in <code>a_b</code></td>
+</tr>
+</tbody>
+</table>
+<p>The message gives each clash once, at its shortest name, with the bins,
+accumulators and categories to rename. A bin whose id only starts with such a
+name, such as <code>A_g1x</code>, builds. So does a category id that two stratifications
+share, such as <code>c1</code> of <code>group</code> and of <code>type</code>, which the qualified ids
+<code>group:c1</code> and <code>type:c1</code> name apart: there, <code>total_c1</code> and a partial total
+<code>A_c1</code> read both categories, a known defect
+(<a href="https://github.com/MUNQU/commol/issues/475">#475</a>).</p>
 <p>A matrix may not take the id of a parameter, a bin, an accumulator, a
 compartment, a subgroup total or an engine variable, nor may one of its
 variables, and two matrices may not give one variable nor a variable that is
