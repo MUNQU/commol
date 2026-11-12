@@ -4069,7 +4069,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/calibration_problem.rs</code></td>
-<td><code>CalibrationProblem</code>: the layers below, built once (<code>new</code>, which refuses observation models with a stochastic engine; <code>with_replicates</code>; <code>with_replicate_settings</code>, the replicates, seed and summary a stochastic engine needs, with the message that names a missing one; <code>with_observation_normalization</code>, <code>with_initial_condition_remainder</code>), a copy with other observed values and weights (<code>with_data</code>), a copy whose runs also report at the positions of other observations (<code>observing</code>), the one evaluation of a point (<code>evaluate</code>), the predictions of one seeded run (<code>predict_once</code>), and the position check that names an observation or constraint (<code>check_positions</code>). It uses only <code>SimulationEngine</code>.</td>
+<td><code>CalibrationProblem</code>: the layers below, built once (<code>new</code>, which takes the initial-condition remainder, refuses observation models with a stochastic engine and a value the model lacks once the values are written; <code>with_replicates</code>; <code>with_replicate_settings</code>, the replicates, seed and summary a stochastic engine needs, with the message that names a missing one; <code>with_observation_normalization</code>), a copy with other observed values and weights (<code>with_data</code>), a copy whose runs also report at the positions of other observations (<code>observing</code>), the one evaluation of a point (<code>evaluate</code>), the predictions of one seeded run (<code>predict_once</code>), and the position check that names an observation or constraint (<code>check_positions</code>). It uses only <code>SimulationEngine</code>.</td>
 <td>Penalties; optimizer setup; anything of one model kind.</td>
 </tr>
 <tr>
@@ -4124,7 +4124,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/values.rs</code></td>
-<td>How calibrated values reach any engine: parameters by id, which the engine checks when a problem is built (<code>set_parameter</code> on a copy), values of the model kind through the engine (<code>ValueWriter</code>, <code>check_model_values</code>, <code>configured_engine</code>); where the numbers of a method come from (<code>ValueSource</code>: varied, through <code>ValueWriter::varied</code>, which asks <code>check_varied_values</code>, or known, through <code>ValueWriter::known</code>); a factor has positive bounds (<code>ValueWriter::known</code>); <code>check_model_values</code> and <code>ForwardModel::unobserved</code> leave no value missing (<code>ValueWriter::checked</code> writes the numbers of the source to a copy of the engine).</td>
+<td>How calibrated values reach any engine: parameters by id, which the engine checks when a problem is built (<code>set_parameter</code> on a copy), values of the model kind through the engine (<code>ValueWriter</code>, <code>configured_engine</code>, <code>plan_model_values</code>); where the numbers of a method come from (<code>ValueSource</code>: varied, through <code>ValueWriter::varied</code>, which asks <code>check_varied_values</code>, or known, through <code>ValueWriter::known</code>); a factor has positive bounds (<code>ValueWriter::known</code>); <code>CalibrationProblem::new</code> and <code>ForwardModel::unobserved</code> leave no value missing (<code>ValueWriter::checked</code>, the one constructor of a writer that other modules reach, writes the numbers of the source to a copy of the engine).</td>
 <td>How a kind resolves its values; a check of parameter ids in Python.</td>
 </tr>
 <tr>
@@ -4525,8 +4525,8 @@ table, and <code>tests/suite/test_architecture.py</code> checks it.</p>
 </tr>
 <tr>
 <td><code>_calibration/calibrator.py</code></td>
-<td><code>Calibrator</code>: the one conversion of a problem to Rust types, <code>run(starts=n)</code>, <code>run_with_history</code>, and the entry points <code>uncertainty</code> and <code>identifiability</code>; <code>check_values</code>, the check of the values a calibration sets.</td>
-<td>Loss or optimizer logic.</td>
+<td><code>Calibrator</code>: the one conversion of a problem to Rust types, which checks the values a calibration sets, then the check of the structure (<code>ModelStructure.check_calibration_values</code>); <code>run(starts=n)</code>, <code>run_with_history</code>, and the entry points <code>uncertainty</code> and <code>identifiability</code>.</td>
+<td>Loss or optimizer logic; a check of the values the engine makes.</td>
 </tr>
 <tr>
 <td><code>_calibration/method.py</code></td>

@@ -3902,7 +3902,7 @@ number.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>CalibrationProblem::new</code>, <code>with_initial_condition_remainder</code>, <code>check_model_values</code></td>
+<td><code>CalibrationProblem::new</code></td>
 <td>Varied</td>
 </tr>
 <tr>
@@ -3919,16 +3919,12 @@ number.</p>
 </tr>
 </tbody>
 </table>
-<p><code>check_model_values</code> and <code>ForwardModel::unobserved</code> then write numbers of
-their source to a copy of the engine and check that no value is missing
-(<code>ValueWriter::checked</code>, before the replicates and the seed of
-<code>ForwardModel::unobserved</code>). A calibration has that check from
-<code>check_model_values</code>, which the <code>Calibrator</code> calls before it builds the
-problem (<code>check_values</code>, <code>py-commol/commol/_calibration/calibrator.py</code>);
-<code>CalibrationProblem::new</code> does not write numbers. A varied source writes the
-point of the bounds of each value nearest 0, which is whole when 0 is within
-the bounds or the bound nearest 0 is whole, so it does not show that every
-number is taken. A known source writes each of its sets, so every draw of a
+<p><code>CalibrationProblem::new</code> and <code>ForwardModel::unobserved</code> then write numbers
+of their source to a copy of the engine and check that no value is missing
+(<a href="../model-structure/#a-run-needs-every-value">A run needs every value</a>).
+A varied source writes the point of the bounds of each value nearest 0,
+which is whole when 0 is within the bounds or the bound nearest 0 is whole,
+so it does not show that every number is taken. A known source writes each of its sets, so every draw of a
 sample is checked when the analysis is built, and the message names its set.</p>
 <table>
 <thead>
@@ -3939,8 +3935,8 @@ sample is checked when the analysis is built, and the message names its set.</p>
 </thead>
 <tbody>
 <tr>
-<td>Check the bounds in <code>check_model_values</code> of <code>commol-calibration</code></td>
-<td>The calibration would hold a rule of the engine, against the golden rule, and the Rust builders that do not call it (<code>CalibrationProblem::new</code>, <code>ForwardModel::unobserved</code>) would not have it.</td>
+<td>Check the bounds in <code>commol-calibration</code></td>
+<td>The calibration would hold a rule of the engine, against the golden rule.</td>
 </tr>
 <tr>
 <td>Refuse when the plan is built (<code>InitialConditionPlan::new</code>)</td>

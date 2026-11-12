@@ -10172,9 +10172,10 @@ class Calibrator:
         ------
         ValueError
             If a parameter, observation, position or constraint does not fit
-            the model, or a setting of the problem is outside its rule; the
-            message names the path of the setting, such as
-            ``optimization_config.inertia_factor``.
+            the model, the model lacks a value that the problem does not set,
+            the remainder is in another unit than an amount it gives, or a
+            setting of the problem is outside its rule; the message names the
+            path of the setting, such as ``optimization_config.inertia_factor``.
         """
         logger.info(
             f"Initializing Calibration for model: '{simulation.model_definition.name}'"
@@ -10190,11 +10191,19 @@ class Calibrator:
             )
         )
 
-        self._validate_calibration_parameters()
-        self._warn_constraint_positions_beyond_observations()
+        # The engine checks the values when it builds the problem
+        # (`CalibrationProblem::new`).
         self._engine_problem: "CalibrationProblemProtocol" = (
             commol_rs.inference.CalibrationProblem(self._engine, engine_json(problem))
         )
+        # The structure checks what only the Python definition knows, such as
+        # the unit of the remainder, once the engine has resolved every value
+        # (`ModelStructure.check_calibration_values`).
+        model = simulation.model_definition
+        model.structure.check_calibration_values(
+            model, self._engine, problem.parameters, problem.initial_condition_remainder
+        )
+        self._warn_constraint_positions_beyond_observations()
         if problem.seed is None:
             logger.info(
                 "No seed set; drew the seed %d, which repeats this calibration.",
@@ -10548,22 +10557,6 @@ class Calibrator:
         """Names of parameters being calibrated."""
         return [param.id for param in self.problem.parameters]
 
-    def _validate_calibration_parameters(self) -> None:
-        """
-        Validate that all calibration parameters exist in the model.
-
-        Raises
-        ------
-        ValueError
-            If a parameter ID doesn't exist in the model or if a bin ID is invalid.
-        """
-        check_values(
-            self.simulation.model_definition,
-            self._engine,
-            self.problem.parameters,
-            self.problem.initial_condition_remainder,
-        )
-
     def _warn_constraint_positions_beyond_observations(self) -> None:
         """Warn when constraints at positions extend beyond observed data."""
         max_observed_position = max(obs.at for obs in self.problem.observed_data)
@@ -10636,9 +10629,9 @@ Parameters:
 
 Raises:
 
-| Type         | Description                                                                                                                                                                                                         |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If a parameter, observation, position or constraint does not fit the model, or a setting of the problem is outside its rule; the message names the path of the setting, such as optimization_config.inertia_factor. |
+| Type         | Description                                                                                                                                                                                                                                                                                                                          |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ValueError` | If a parameter, observation, position or constraint does not fit the model, the model lacks a value that the problem does not set, the remainder is in another unit than an amount it gives, or a setting of the problem is outside its rule; the message names the path of the setting, such as optimization_config.inertia_factor. |
 
 Source code in `commol/_calibration/calibrator.py`
 
@@ -10662,9 +10655,10 @@ def __init__(
     ------
     ValueError
         If a parameter, observation, position or constraint does not fit
-        the model, or a setting of the problem is outside its rule; the
-        message names the path of the setting, such as
-        ``optimization_config.inertia_factor``.
+        the model, the model lacks a value that the problem does not set,
+        the remainder is in another unit than an amount it gives, or a
+        setting of the problem is outside its rule; the message names the
+        path of the setting, such as ``optimization_config.inertia_factor``.
     """
     logger.info(
         f"Initializing Calibration for model: '{simulation.model_definition.name}'"
@@ -10680,11 +10674,19 @@ def __init__(
         )
     )
 
-    self._validate_calibration_parameters()
-    self._warn_constraint_positions_beyond_observations()
+    # The engine checks the values when it builds the problem
+    # (`CalibrationProblem::new`).
     self._engine_problem: "CalibrationProblemProtocol" = (
         commol_rs.inference.CalibrationProblem(self._engine, engine_json(problem))
     )
+    # The structure checks what only the Python definition knows, such as
+    # the unit of the remainder, once the engine has resolved every value
+    # (`ModelStructure.check_calibration_values`).
+    model = simulation.model_definition
+    model.structure.check_calibration_values(
+        model, self._engine, problem.parameters, problem.initial_condition_remainder
+    )
+    self._warn_constraint_positions_beyond_observations()
     if problem.seed is None:
         logger.info(
             "No seed set; drew the seed %d, which repeats this calibration.",
@@ -27422,10 +27424,8 @@ class SensitivityAnalysis:
         self.simulation: Simulation = simulation
         self.inputs: InputSpace = inputs
         self.replicates: int | None = replicates
-        # The engine checks the values: it resolves them, refuses independent
-        # inputs of which it does not take every number, and writes the point
-        # of the bounds nearest 0, or every draw of a sample, to check that it
-        # takes them and that no value is missing.
+        # The engine checks the values when it builds the analysis
+        # (`ForwardModel::unobserved`).
         self._rust: "ForwardAnalysisProtocol" = commol_rs.inference.ForwardAnalysis(
             simulation.engine,
             engine_json(inputs),
@@ -27713,10 +27713,8 @@ def __init__(
     self.simulation: Simulation = simulation
     self.inputs: InputSpace = inputs
     self.replicates: int | None = replicates
-    # The engine checks the values: it resolves them, refuses independent
-    # inputs of which it does not take every number, and writes the point
-    # of the bounds nearest 0, or every draw of a sample, to check that it
-    # takes them and that no value is missing.
+    # The engine checks the values when it builds the analysis
+    # (`ForwardModel::unobserved`).
     self._rust: "ForwardAnalysisProtocol" = commol_rs.inference.ForwardAnalysis(
         simulation.engine,
         engine_json(inputs),
@@ -38725,6 +38723,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+- The engine checks that a calibration problem leaves no value missing when the problem is built, as it does for a `SensitivityAnalysis`: it writes each value at the point of its bounds nearest 0, with the `initial_condition_remainder`, and refuses a parameter or an initial amount that the model leaves `None` and the problem does not set. The `Calibrator` checks no value of its own: it builds the problem, then checks the unit of the remainder (`ModelStructure.check_calibration_values`). A problem with one fault gets the message it got before. A problem with several can report another one first: the unit of the remainder is now checked after every check of the engine, and the values after the settings of the optimizer and the loss, so a remainder in the wrong unit and an unknown observed output report the output. The warning on constraint positions beyond the observations is no longer logged when the problem does not build. In Rust, `CalibrationProblem::new` takes the remainder after the parameters, in place of `with_initial_condition_remainder`, and `check_model_values` and its binding `commol_rs.calibration.check_model_values` are removed, so every caller of `new` gets the check. See [A run needs every value](https://munqu.github.io/commol/latest/codebase/decisions/model-structure/#a-run-needs-every-value).
 - **Breaking:** a build logs one `INFO` record, with the number of bins, parameters, transitions and outputs; the records of each bin, accumulator, stratification, matrix, parameter and transition of a `ModelBuilder` are at `DEBUG`. Set the logger `commol` to `DEBUG` to read them.
 - **Breaking:** with a `sample`, each entry of a report (`Model.applied_parameters`, `ModelStructure.report_sections`) holds its `EntrySpread` under the key `spread`, not `interval`. A report saved as JSON before this change has the key `interval`: read `spread`.
 - **Breaking:** the engine holds the one rule of a fit of a problem: a `CalibrationResult` that lacks a parameter of the problem or has one the problem does not have is refused, with the message `The fit is not a fit of this problem: it lacks ["k1"] and has ["k2"], which the problem does not have`. `Calibrator.point_sample`, `ResidualNoise(fit=...)` and `Collinearity(at=result)` refuse such a fit, and `StartsIdentifiability` refuses such a start (`A start is not a start of this problem: ...`). Before, all of them except `point_sample` accepted an extra parameter.

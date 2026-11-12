@@ -3962,7 +3962,8 @@ writes again at each evaluation, so a value set on it is lost. A calibration
 or any method on <code>ForwardModel</code> sets each parameter on a copy of the engine
 when it is built (<code>ValueWriter::known</code> in <code>crates/commol-calibration/src/values.rs</code>),
 so the engine's message reaches the user before any run, and Python checks no
-parameter id (<code>check_values</code> in <code>_calibration/calibrator.py</code>). <code>ValueWriter::known</code> also
+parameter id: the <code>Calibrator</code> builds the problem
+(<code>commol_rs.inference.CalibrationProblem</code>) and raises its message. <code>ValueWriter::known</code> also
 checks that a factor has positive bounds, the observed outputs and positions
 are checked by <code>CalibrationProblem::new</code> alone, and Python passes each
 message with no prefix.</p>
