@@ -45,6 +45,17 @@ that names them and the qualified ids. The write-back of a calibration
 (`_model/calibration_write_back.py`) takes as categories the values the
 engine resolves as category splits (`CalibratedInitialState.categories`).
 
+The build refuses a name that two things build
+([A name names one thing](names.md#a-name-names-one-thing)), so the order
+never takes the compartments of one bin for those of another, and a
+remainder (`prefix_indices`) never covers those of two. The name of a
+compartment is a bin or a prefix only of that one compartment, so
+`resolve_target`, which meets the compartment first, only sets its kind. The
+order still puts a bin before a bare
+category of the same id, which then sets the bin with no error
+([#476](https://github.com/MUNQU/commol/issues/476)); the qualified id names
+the category.
+
 **Rule:** the engine says the kind of each value (`InitialTargetKind`: `bin`,
 `compartment` or `category`), together with the compartments it sets
 (`InitialConditionPlan::coverage`), and Python reads the kind and infers

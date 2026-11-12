@@ -99,7 +99,8 @@ class Aggregate(ModelStructure, InitialConditions):
         stratifications (every stratification and category named, a split by
         category by a stratification declared before it), every id (no
         parameter id is an engine variable, a bin, a compartment or a
-        subgroup total), the neighbors, and every variable a rate or a
+        subgroup total, and no two things build one name), the neighbors,
+        and every variable a rate or a
         formula parameter reads. Then it plans every transition and builds
         the initial state.
 

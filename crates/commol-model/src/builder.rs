@@ -2,7 +2,7 @@
 
 use crate::flows::{PlannedFlow, check_transition_kinds, plan_transition_flows};
 use crate::helpers::stratification_conditions_met;
-use crate::labels::OutputLabels;
+use crate::labels::{Named, OutputLabels, Owner, check_names};
 use crate::layout::CompartmentLayout;
 use crate::matrices::{check_matrices, matrix_variables, scaled_matrices};
 use crate::types::{
@@ -974,17 +974,8 @@ fn compile_transition_flows(
         .collect()
 }
 
-/// Where the name of a subgroup total comes from.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum TotalSource {
-    /// `total_<categories>`: the compartments of every bin with these categories.
-    Categories,
-    /// A bin total or a partial bin total: the bin id, then some categories.
-    Bin,
-}
-
 /// Every subgroup total of a process, one entry per contributing
-/// compartment: its name, where the name comes from and the compartment index.
+/// compartment: its name, what the name names and the compartment index.
 ///
 /// The entries are:
 /// 1. Subgroup totals over categories (`total_g1`, `total_g1_t1`, ...)
@@ -992,10 +983,10 @@ enum TotalSource {
 /// 3. Partial bin totals (`A_g1` when a second stratification splits it)
 ///
 /// Every entry is built from the compartment labels.
-fn subgroup_total_entries(
-    layout: &CompartmentLayout,
+fn subgroup_total_entries<'a>(
+    layout: &'a CompartmentLayout,
     process: &Process,
-) -> Vec<(String, TotalSource, usize)> {
+) -> Vec<(String, Named<'a>, usize)> {
     let mut entries = Vec::new();
     if process.stratifications.is_empty() {
         return entries;
@@ -1003,39 +994,52 @@ fn subgroup_total_entries(
     let partial_bin_totals = process.stratifications.len() >= 2;
 
     for (compartment_index, label) in layout.labels().iter().enumerate() {
-        let categories: Vec<&str> = label
-            .categories
-            .iter()
-            .map(|(_, category)| category.as_str())
-            .collect();
+        let categories = &label.categories;
         if categories.is_empty() {
             continue;
         }
+        let bin = Owner::Bin(&label.source);
 
-        entries.push((label.source.clone(), TotalSource::Bin, compartment_index));
+        let total = Named {
+            owner: bin,
+            categories: Vec::new(),
+        };
+        entries.push((label.source.clone(), total, compartment_index));
 
         let full_mask: u32 = (1 << categories.len()) - 1;
         for subset_mask in 1..=full_mask {
-            let subset: Vec<&str> = categories
+            let subset: Vec<&(String, String)> = categories
                 .iter()
                 .enumerate()
                 .filter(|(k, _)| (subset_mask >> k) & 1 == 1)
-                .map(|(_, category)| *category)
+                .map(|(_, category)| category)
                 .collect();
-            let combination = subset.join("_");
+            let combination = subset
+                .iter()
+                .map(|(_, category)| category.as_str())
+                .collect::<Vec<_>>()
+                .join("_");
 
+            let over_categories = Named {
+                owner: Owner::Categories,
+                categories: subset.clone(),
+            };
             entries.push((
                 format!("{SUBGROUP_TOTAL_PREFIX}{combination}"),
-                TotalSource::Categories,
+                over_categories,
                 compartment_index,
             ));
 
             // Partial bin total. With one stratification a partial sum would
             // duplicate either the compartment or the bin total.
             if partial_bin_totals && subset_mask != full_mask {
+                let partial = Named {
+                    owner: bin,
+                    categories: subset,
+                };
                 entries.push((
                     format!("{}_{}", label.source, combination),
-                    TotalSource::Bin,
+                    partial,
                     compartment_index,
                 ));
             }
@@ -1139,10 +1143,11 @@ pub fn subgroup_total_names(process: &Process) -> Vec<String> {
 ///   or reads the neighbors and the structure does not say who they are;
 ///   a formula parameter reads the neighbors, which only a transition rate
 ///   has;
-/// - a name built from a bin (a compartment, a bin total or a partial bin
-///   total) is also a `total_<categories>` subgroup total, as for a bin
-///   `total_y` stratified by `group = [y, o]` and `type = [y, o]`: `total_y_y`
-///   would name two sums;
+/// - two owners (bins, accumulators, the `total_<categories>` subgroup
+///   totals), or one owner from two lists of category ids, build one name of
+///   an output, a prefix or a subgroup total, as bin `A` in `g1` and bin
+///   `A_g1` build `A_g1`, or a bin `total_y` and the total of category `y`
+///   build `total_y` (`check_names` in `crates/commol-model/src/labels.rs`);
 /// - a parameter id is one of those names, because the parameter and the
 ///   engine variable would share one slot;
 /// - a transition rate or a formula parameter uses a `total_…` name that is
@@ -1180,7 +1185,17 @@ pub fn check_model(model: &Model) -> Result<(), String> {
     check_whole_units(model, aggregate)?;
     check_positions_of_engine(model)?;
     let layout = CompartmentLayout::new(process);
-    check_bin_names_against_subgroup_totals(&layout, process)?;
+    let accumulators: Vec<OutputLabels> = expand_accumulators(process)
+        .into_iter()
+        .map(|output| OutputLabels {
+            source: output.source,
+            categories: output.categories,
+        })
+        .collect();
+    let totals = subgroup_total_entries(&layout, process)
+        .into_iter()
+        .map(|(name, named, _)| (name, named));
+    check_names(layout.labels(), &accumulators, totals)?;
     let compartments: HashSet<&str> = layout.names().iter().map(String::as_str).collect();
     let subgroup_totals = subgroup_total_name_set(&layout, process);
     let parameter_ids: HashSet<&str> = model.parameters.iter().map(|p| p.id.as_str()).collect();
@@ -1516,41 +1531,6 @@ fn check_engine_variable_ids(model: &Model, process: &Process) -> Result<(), Str
         ));
     }
     Ok(())
-}
-
-/// Reject a compartment, bin total or partial bin total whose name is also a
-/// `total_<categories>` subgroup total.
-fn check_bin_names_against_subgroup_totals(
-    layout: &CompartmentLayout,
-    process: &Process,
-) -> Result<(), String> {
-    let entries = subgroup_total_entries(layout, process);
-    let by_categories: HashSet<&str> = entries
-        .iter()
-        .filter(|(_, source, _)| *source == TotalSource::Categories)
-        .map(|(name, _, _)| name.as_str())
-        .collect();
-    let mut conflicts: Vec<&str> = entries
-        .iter()
-        .filter(|(_, source, _)| *source == TotalSource::Bin)
-        .map(|(name, _, _)| name.as_str())
-        .chain(layout.names().iter().map(String::as_str))
-        .filter(|name| by_categories.contains(name))
-        .collect();
-    if conflicts.is_empty() {
-        return Ok(());
-    }
-    conflicts.sort_unstable();
-    conflicts.dedup();
-    Err(format!(
-        "Names built from a bin are also subgroup totals: {}. Rename the bin \
-         so that its compartments do not read as `{SUBGROUP_TOTAL_PREFIX}<categories>`.",
-        conflicts
-            .iter()
-            .map(|name| format!("'{name}'"))
-            .collect::<Vec<_>>()
-            .join(", ")
-    ))
 }
 
 /// Whether a rate or a formula parameter reads the variable `name`.
@@ -2556,8 +2536,15 @@ mod tests {
         );
         rename_bin(&mut model, "A", "total_y");
 
-        let error = check_model(&model).expect_err("total_y_y names two sums");
-        assert!(error.contains("'total_y_y'"), "{error}");
+        let error = check_model(&model).expect_err("total_y names two sums");
+        assert!(
+            error.ends_with(
+                "'total_y' names the bin 'total_y', the subgroup total of 'group:y' and the \
+                 subgroup total of 'type:y'. Rename bin 'total_y', category 'group:y' or \
+                 category 'type:y', so that each has a name of its own."
+            ),
+            "{error}"
+        );
     }
 
     #[test]

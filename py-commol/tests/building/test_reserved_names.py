@@ -5,7 +5,13 @@ import re
 import pytest
 
 from commol import Aggregate, ModelBuilder, Simulation
-from tests.support import FactoryBuilder, a_to_b_builder, abc_builder, build
+from tests.support import (
+    FactoryBuilder,
+    a_to_b_builder,
+    abc_builder,
+    build,
+    shared_category_builder,
+)
 
 
 def _builder(parameter_id: str, stratifications: int = 1) -> ModelBuilder:
@@ -69,8 +75,71 @@ def test_a_bin_name_that_reads_as_a_subgroup_total_is_rejected() -> None:
         )
     )
 
-    with pytest.raises(ValueError, match="'total_y_y'"):
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "'total_y' names the bin 'total_y', the subgroup total of 'group:y' and "
+            "the subgroup total of 'type:y'."
+        ),
+    ):
         build(builder)
+
+
+@pytest.mark.parametrize(
+    ("bin_id", "accumulator", "sentence"),
+    [
+        pytest.param(
+            "A_t1",
+            None,
+            "'A_t1' names the bin 'A_t1' and the compartments of bin 'A' in 'type:t1'.",
+            id="a partial total",
+        ),
+        pytest.param(
+            None,
+            "A",
+            "'A' names the bin 'A' and the accumulator 'A'.",
+            id="an accumulator of the id of a bin",
+        ),
+        pytest.param(
+            None,
+            "A_g1",
+            "'A_g1' names the compartments of bin 'A' in 'group:g1' and the "
+            "accumulator 'A_g1'.",
+            id="an accumulator of a name of a bin",
+        ),
+    ],
+)
+def test_a_name_of_two_owners_is_refused(
+    bin_id: str | None, accumulator: str | None, sentence: str
+) -> None:
+    """The model is refused even when no rate reads the name."""
+    builder = a_to_b_builder(accumulator=accumulator)
+    amounts = {"A": 900, "B": 0}
+    if bin_id is not None:
+        builder.add_bin(id=bin_id, name=bin_id)
+        amounts[bin_id] = 5
+    builder.add_stratification(id="group", categories=["g1", "g2"])
+    builder.add_stratification(id="type", categories=["t1", "t2"])
+    builder.set_structure(
+        Aggregate(
+            bin_amounts=amounts,
+            stratification_fractions={
+                "group": {"g1": 0.5, "g2": 0.5},
+                "type": {"t1": 0.5, "t2": 0.5},
+            },
+        )
+    )
+
+    with pytest.raises(ValueError, match=re.escape(sentence)):
+        build(builder)
+
+
+def test_a_category_id_that_two_stratifications_share_builds() -> None:
+    """``c1`` of ``group`` and of ``level``: a qualified id names each."""
+    model = build(shared_category_builder())
+
+    names = [c.name for c in model.structure.initial_state(model.process)]
+    assert names == ["A_c1_c1", "A_c1_c2", "A_c2_c1", "A_c2_c2"]
 
 
 def test_every_conflicting_parameter_id_is_reported() -> None:

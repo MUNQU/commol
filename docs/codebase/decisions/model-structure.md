@@ -2,15 +2,17 @@
 
 [Back to Design decisions](../design-decisions.md)
 
-How compartments are named, what they hold, and how outputs and variables find them.
+How compartments are named, what they hold, and how outputs find them. The
+names the engine sets, and why each names one thing, are in [Names](names.md).
 
 ## Compartments are labels with a name
 
 A compartment is a bin plus one category for each stratification that applies
-to it, in declaration order. Its name, `{bin}_{category}_{category}…`, is for
-display only. Its identity is its label: `OutputLabels` in
+to it, in declaration order. Its identity is its label: `OutputLabels` in
 `crates/commol-model/src/labels.rs` and `CompartmentLayout` in
-`crates/commol-model/src/layout.rs`.
+`crates/commol-model/src/layout.rs`. Its name, `{bin}_{category}_{category}…`,
+is what a rate, an initial condition and a result read, and it names that
+label alone ([A name names one thing](names.md#a-name-names-one-thing)).
 
 **Rule:** never parse a compartment name or match it by prefix. Bin `A` and bin
 `A_x` both produce names that start with `A_`, and a conditional
@@ -216,35 +218,3 @@ must be an output name, which stands for itself.
 a prefix), `TestTotalSeries::test_an_output_name_stands_for_itself` and
 `tests/simulation/test_windows.py::test_windowed_totals_take_output_names`
 (output names).
-
-## The engine owns the variable names
-
-The engine sets one variable per expanded compartment and per subgroup total
-(`total_<categories>`, bin totals and partial bin totals).
-The variables of a matrix between categories (`<M>_<i>_<j>` and
-`<M>_radius`) are engine variables too: `check_matrices`
-(`crates/commol-model/src/matrices.rs`) rejects a parameter, bin,
-accumulator, compartment, subgroup total or engine variable that has the
-id or a variable name of a matrix, and two matrices that give one variable.
-`check_model` in `crates/commol-model/src/builder.rs` rejects a parameter
-id that is one of those names, a parameter, bin or accumulator id that is an
-engine variable (`ENGINE_VARIABLES`: `total`, `step`, `t`, `pi`, `e`) or a
-name of the neighbors (`neighbors`, `neighbors_…`), a bin
-whose compartments or bin totals read as a `total_<categories>` name (two sums
-would share one slot), and a `total_…` variable in a rate or a formula
-parameter that names no subgroup total. `Aggregate.check_model` calls it at
-`build`, and `CompiledModel::try_from_model` calls it again.
-`subgroup_total_names` lists the names; Python reads them through the binding
-`commol_rs.model.subgroup_total_names` (`engine_state.subgroup_total_names`)
-to check rates and give units.
-
-**Rule:** never list these names in Python. Ask the engine.
-
-**Guards:** `builder.rs` tests
-`parameter_id_cannot_be_a_compartment_or_a_subgroup_total`,
-`subgroup_total_out_of_declaration_order_is_a_build_error` and
-`subgroup_total_names_follow_the_declaration_order`,
-`an_engine_variable_is_not_a_parameter_bin_or_accumulator_id` and
-`a_bin_name_that_reads_as_a_subgroup_total_is_rejected`;
-`tests/building/test_reserved_names.py`;
-`tests/rates/test_expressions.py::TestSubgroupTotals::test_every_name_the_engine_provides_is_accepted_in_a_rate`.
