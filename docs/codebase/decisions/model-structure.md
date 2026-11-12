@@ -34,8 +34,6 @@ The library names what the compartments hold without assuming individuals:
 **Rule:** use these four terms in code, docs and tests. `AxisPattern` takes a
 `value`, so "amount" means only the value of a compartment.
 
-**Why, against the alternatives:**
-
 | Alternative | Why not |
 |---|---|
 | "population", "head count", `N` | They assume individuals and an epidemiological convention (`N = S + I + R`). A reserved `N` takes a letter that other fields use for a bin, such as a nutrient. |
@@ -61,8 +59,6 @@ bins all start at `0` builds and runs (`initial_state` in
 `crates/commol-model/src/builder.rs`, `InitialConditions._validate_bin_amounts`).
 A structure that states `total`, `bin_fractions` or `compartment_fractions` is
 rejected with the fields to use (`InitialConditions._reject_fractions_of_a_total`).
-
-**Why, against the alternatives:**
 
 | Alternative | Why not |
 |---|---|
@@ -161,40 +157,46 @@ ids of the model (`Model::check_ids`).
 ## A run needs every value
 
 A parameter or a bin amount may be `None`, a value left for calibration, and
-the model builds. A run refuses it: `CompiledModel::check_values` in
-`crates/commol-model/src/system.rs` names every parameter that has no value
-(from the model or from `set_parameter`), every bin left `None` of which no
-compartment has a value, and every other compartment of such a bin that has
-none. The rule is per compartment: a bin of two compartments whose
-calibration writes one of them still has the other at `0`, which no one
-chose. A value reaches a compartment when `set_initial_condition` writes it,
-from a bin, a prefix, a compartment or the remainder. The split of a
-category does not: it shares out the amounts already in each pair
-(`write_target` in `crates/commol-model/src/initial_conditions.rs`), so of
-a bin left `None` it shares out nothing, and the compartments keep no value
-(`keep_unvalued`). Every engine checks it before it runs or steps
-(`record_steps`, `integrate_to`, `run_to` and `step`): it is a required
-method of the trait (`SimulationEngine::check_values`), with one message
-(`check_missing_values` in `commol-core`). The bindings `run`, `run_at`,
-`run_replicates` and `step` check it first to raise `ValueError`, so
-`Simulation.run` holds no check of its own. A calibration is refused when it
-is built: `check_model_values` in `crates/commol-calibration/src/values.rs`
-writes its values to a copy of the engine, each at the point of its bounds
-nearest 0, and checks the copy, so a value the calibration neither sets nor
-finds in the model raises the message of the engine from `Calibrator` and
-from every method that builds the problem, before an optimizer starts. A
-rate that reads a parameter without a value names the parameter, not an
-index (`resolve_slot` in `crates/commol-model/src/rates.rs`).
+the model builds. A run refuses it: `CompiledModel::check_values`
+(`crates/commol-model/src/system.rs`) names every parameter without a value
+(from the model or `set_parameter`), every bin left `None` of which no
+compartment has a value, and every other compartment of such a bin without one.
+A value reaches a compartment when `set_initial_condition` writes it, from a
+bin, a prefix, a compartment or the remainder, not from the split of a
+category, which shares out what each pair holds (`write_target`,
+`keep_unvalued` in `crates/commol-model/src/initial_conditions.rs`). Every
+engine checks it before it runs or steps, with one message
+(`SimulationEngine::check_values`, a required method, and
+`check_missing_values` of `commol-core`); the bindings `run`, `run_at`,
+`run_replicates` and `step` raise it as `ValueError`, so `Simulation.run` holds
+no check of its own. A rate that reads a parameter without a value names it
+(`resolve_slot` in `crates/commol-model/src/rates.rs`).
+
+A method checks its values when it is built: `CalibrationProblem::new` and
+`ForwardModel::unobserved` write the numbers of their source (a varied value at
+the point of its bounds nearest 0), with the remainder they take, to a copy of
+the engine and check the copy (`ValueWriter::checked` in
+`crates/commol-calibration/src/values.rs`, the one constructor of a writer that
+other modules reach). A value that neither the problem nor the model gives is
+refused with the message of the engine. The remainder sets each bin it covers,
+a bin left `None` too ([#477](https://github.com/MUNQU/commol/issues/477)). The
+`Calibrator` and `SensitivityAnalysis` check no value of their own; the
+structure then checks what only Python knows, such as the unit of the remainder
+(`ModelStructure.check_calibration_values`).
 
 | Alternative | Why not |
 |---|---|
 | A bin has a value once any of its compartments has one | The other compartments run at `0`, a value no one gave. |
 | A check only when the calibration runs | The error comes from the optimizer, as a failed start, after the setup. |
+| A check in the `Calibrator`, before it builds the problem | Two routes for one rule (DRY): a Rust caller of `CalibrationProblem::new`, or a binding that builds a problem without that call, gets the error at its first run. |
+| A check in `new` without the remainder, and again in a builder that names it | `new` would refuse a remainder that gives a bin left `None` its value, because it does not know the remainder yet (KISS: one check, where the remainder is known). |
+| Two constructors, `new` and one that takes the remainder | Two paths to one problem, and a shorthand that only tests call (KISS, YAGNI). |
+| The settings (`ProblemSettings::problem`) as the only entry point, with the check there | A Rust caller of `new` skips it, and the port that reads the JSON of Python would hold a rule of the problem it builds (Dependencies point inward; Each boundary is a port). |
+| `check_model_values` kept beside `new` | A second route to the check that `new` makes, with no caller but its own binding (YAGNI, DRY). |
 
 **Guards:**
-`crates/commol-model/tests/model_rules.rs::a_run_needs_every_value`,
-`crates/commol-stochastic/tests/test_values.rs`,
-`crates/commol-calibration/tests/test_infeasible_runs.rs::a_value_that_the_calibration_leaves_missing_is_refused_before_it_runs`,
+`crates/commol-model/tests/model_rules.rs::a_run_needs_every_value`, `crates/commol-stochastic/tests/test_values.rs`,
+`crates/commol-calibration/tests/test_varied_values.rs::a_problem_that_leaves_a_value_missing_is_refused_when_it_is_built`,
 `tests/calibration/test_initial_conditions.py::TestIds::test_a_bin_left_to_calibrate_needs_a_value_in_each_compartment`,
 `tests/calibration/test_problem.py::TestProblemAgainstTheModel::test_a_value_that_the_calibration_leaves_missing_is_refused_at_once`,
 `tests/simulation/test_runs.py::TestResults::test_a_run_with_an_uncalibrated_parameter_is_rejected`,

@@ -135,26 +135,22 @@ number.
 
 | Builder | Source |
 |---|---|
-| `CalibrationProblem::new`, `with_initial_condition_remainder`, `check_model_values` | Varied |
+| `CalibrationProblem::new` | Varied |
 | `ForwardModel::unobserved` | Its argument: `ForwardAnalysis::new` passes varied for independent inputs, and known (every draw) for a sample, which is the design of the analysis |
 | `configured_engine` (the write-back of `Model.apply_calibration_parameters`) | Known (`ValueWriter::known`): the engine checks each number when it writes it (`Units::set_initial_condition`) |
 | `plan_model_values` | Known (`ValueWriter::known`), only to resolve the values: it writes no number |
 
-`check_model_values` and `ForwardModel::unobserved` then write numbers of
-their source to a copy of the engine and check that no value is missing
-(`ValueWriter::checked`, before the replicates and the seed of
-`ForwardModel::unobserved`). A calibration has that check from
-`check_model_values`, which the `Calibrator` calls before it builds the
-problem (`check_values`, `py-commol/commol/_calibration/calibrator.py`);
-`CalibrationProblem::new` does not write numbers. A varied source writes the
-point of the bounds of each value nearest 0, which is whole when 0 is within
-the bounds or the bound nearest 0 is whole, so it does not show that every
-number is taken. A known source writes each of its sets, so every draw of a
+`CalibrationProblem::new` and `ForwardModel::unobserved` then write numbers
+of their source to a copy of the engine and check that no value is missing
+([A run needs every value](model-structure.md#a-run-needs-every-value)).
+A varied source writes the point of the bounds of each value nearest 0,
+which is whole when 0 is within the bounds or the bound nearest 0 is whole,
+so it does not show that every number is taken. A known source writes each of its sets, so every draw of a
 sample is checked when the analysis is built, and the message names its set.
 
 | Alternative | Why not |
 |---|---|
-| Check the bounds in `check_model_values` of `commol-calibration` | The calibration would hold a rule of the engine, against the golden rule, and the Rust builders that do not call it (`CalibrationProblem::new`, `ForwardModel::unobserved`) would not have it. |
+| Check the bounds in `commol-calibration` | The calibration would hold a rule of the engine, against the golden rule. |
 | Refuse when the plan is built (`InitialConditionPlan::new`) | Every plan is built, also for a write of known values, so a whole value written back would need a rounding for a reason that does not apply to it. |
 | Treat every input of an analysis as varied | A sample writes only its draws: a sample of whole amounts would be refused for numbers it never writes. |
 | A default `check_varied_values` that takes every number | A new engine of whole units that forgets it would take every number with no error. |

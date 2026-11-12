@@ -36,6 +36,7 @@ fn problem() -> CalibrationProblem<DifferenceEquations> {
             .map(|t| ObservedDataPoint::new(f64::from(t), "A".to_string(), 500.0))
             .collect(),
         vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )

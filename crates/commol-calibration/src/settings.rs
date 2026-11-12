@@ -710,6 +710,7 @@ impl ProblemSettings {
             engine,
             observed_data(&self.observed_data),
             self.parameters.clone(),
+            self.initial_condition_remainder.as_deref(),
             self.constraints.clone(),
             discrepancy,
         )?;
@@ -717,9 +718,6 @@ impl ProblemSettings {
             problem = problem
                 .with_observation_normalization(self.normalize_observations)?
                 .with_replicate_settings(self.replicates, self.seed, self.replicate_summary)?;
-        }
-        if let Some(remainder) = &self.initial_condition_remainder {
-            problem = problem.with_initial_condition_remainder(remainder)?;
         }
         Ok(problem)
     }

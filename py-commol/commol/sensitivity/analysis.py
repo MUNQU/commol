@@ -84,10 +84,8 @@ class SensitivityAnalysis:
         self.simulation: Simulation = simulation
         self.inputs: InputSpace = inputs
         self.replicates: int | None = replicates
-        # The engine checks the values: it resolves them, refuses independent
-        # inputs of which it does not take every number, and writes the point
-        # of the bounds nearest 0, or every draw of a sample, to check that it
-        # takes them and that no value is missing.
+        # The engine checks the values when it builds the analysis
+        # (`ForwardModel::unobserved`).
         self._rust: "ForwardAnalysisProtocol" = commol_rs.inference.ForwardAnalysis(
             simulation.engine,
             engine_json(inputs),

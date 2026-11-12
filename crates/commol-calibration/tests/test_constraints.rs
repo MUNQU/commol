@@ -124,6 +124,7 @@ fn the_constraint_and_the_rate_read_one_radius() {
         engine_of(rate, None, Some(1.0)),
         observed,
         parameters(),
+        None,
         vec![constraint],
         LossConfig::SumSquaredError,
     )
@@ -204,6 +205,7 @@ fn an_empty_at_is_refused() {
         engine(Some(1.0)),
         vec![ObservedDataPoint::new(1.0, "B".to_string(), 150.0)],
         parameters(),
+        None,
         vec![empty],
         LossConfig::SumSquaredError,
     )

@@ -63,6 +63,7 @@ fn an_unobserved_model_runs_as_the_forward_model_of_a_problem() {
         engine(),
         vec![ObservedDataPoint::new(1.0, "A".to_string(), 0.0)],
         parameters(),
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )

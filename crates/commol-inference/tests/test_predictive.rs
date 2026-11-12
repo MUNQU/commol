@@ -36,6 +36,7 @@ fn problem() -> CalibrationProblem<DifferenceEquations> {
             windowed,
         ],
         vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )
@@ -234,6 +235,7 @@ fn stochastic_problem(replicates: usize) -> CalibrationProblem<commol_stochastic
         commol_stochastic::StochasticSteps::try_from_model(&model).unwrap(),
         vec![ObservedDataPoint::new(5.0, "A".to_string(), 0.0)],
         vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )

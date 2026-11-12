@@ -398,6 +398,7 @@ mod tests {
             DifferenceEquations::try_from_model(&model).unwrap(),
             vec![ObservedDataPoint::new(2.0, "B".to_string(), 190.0)],
             vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+            None,
             vec![],
             LossConfig::SumSquaredError,
         )

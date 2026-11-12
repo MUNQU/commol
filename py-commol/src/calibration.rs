@@ -227,44 +227,6 @@ fn calibrated_initial_state(
     Ok((applied, state, covered, targets))
 }
 
-/// Check that the engine sets every parameter and resolves every value of
-/// its model kind, such as an initial condition, and the remainder, that it
-/// takes every number of a value that calibration varies, and that the model
-/// has every value a run needs once they are written
-///
-/// Args:
-///     engine: The simulation engine
-///     parameters: The JSON of the calibration parameters, in problem order
-///     initial_condition_remainder: The id that takes what the values leave
-///         of the sum the model kind keeps (a compartment or bin of a
-///         compartmental model), if any
-///
-/// Raises:
-///     ValueError: If the engine does not set a parameter (one the model
-///         does not have, or one a formula or a series sets), the kind does
-///         not accept a type of value, or a value or the remainder cannot be
-///         resolved; for example a category of a stratification that is not
-///         binary; if the engine does not take every number of a value that
-///         calibration varies, such as an initial condition on an engine of
-///         whole units with no rounding; or if the model still lacks a value
-///         that the calibration does not set
-#[pyfunction]
-#[pyo3(signature = (engine, parameters, initial_condition_remainder=None))]
-fn check_model_values(
-    engine: PyRef<'_, PyEngine>,
-    parameters: &str,
-    initial_condition_remainder: Option<String>,
-) -> PyResult<()> {
-    let parameters: Vec<CalibrationParameter> = crate::json::read(parameters)?;
-    commol_calibration::check_model_values(
-        &engine.engine(),
-        &parameters,
-        initial_condition_remainder.as_deref(),
-    )
-    .map(|_| ())
-    .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
-}
-
 /// The kind of each initial-condition value and the compartments it sets,
 /// and the compartments of the remainder, as the engine resolves them
 ///
@@ -433,7 +395,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyStartOutcome>()?;
     m.add_class::<PyStarts>()?;
     m.add_function(wrap_pyfunction!(calibrated_initial_state, m)?)?;
-    m.add_function(wrap_pyfunction!(check_model_values, m)?)?;
     m.add_function(wrap_pyfunction!(initial_condition_coverage, m)?)?;
     m.add_function(wrap_pyfunction!(index_at, m)?)?;
     m.add_function(wrap_pyfunction!(window_start, m)?)?;

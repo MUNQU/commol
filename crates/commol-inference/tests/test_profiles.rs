@@ -135,6 +135,7 @@ fn line_problem(values: &[f64]) -> CalibrationProblem<ClosedForm> {
             .iter()
             .map(|(id, min, max)| CalibrationParameter::new(id.to_string(), *min, *max))
             .collect(),
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )
@@ -223,6 +224,7 @@ fn a_problem_observing_more_positions_scores_as_the_problem() {
         base.forward().base_engine().clone(),
         base.observed_data().to_vec(),
         base.parameters().to_vec(),
+        None,
         vec![
             CalibrationConstraint::new("x2".to_string(), "x - 2".to_string())
                 .with_positions(vec![2.0]),
@@ -337,6 +339,7 @@ fn a_problem_of_one_parameter_held_is_scored_once() {
             ObservedDataPoint::new(1.0, "x".to_string(), 3.0),
         ],
         vec![CalibrationParameter::new("a".to_string(), 0.0, 5.0)],
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )
@@ -607,6 +610,7 @@ fn abc_problem() -> CalibrationProblem<commol_difference::DifferenceEquations> {
             CalibrationParameter::new("k1".to_string(), 0.05, 1.0),
             CalibrationParameter::new("k2".to_string(), 0.01, 0.5),
         ],
+        None,
         vec![],
         DiscrepancyConfig::Likelihood(vec![(
             "B".to_string(),
@@ -719,6 +723,7 @@ fn a_tracer_refuses_a_fit_it_cannot_start_from() {
         problem.forward().base_engine().clone(),
         problem.observed_data().to_vec(),
         problem.parameters().to_vec(),
+        None,
         vec![CalibrationConstraint::new(
             "a20".to_string(),
             "a - 20".to_string(),
@@ -921,6 +926,7 @@ fn thresholds_fail_when_every_refit_fails() {
             .iter()
             .map(|(id, min, max)| CalibrationParameter::new(id.to_string(), *min, *max))
             .collect(),
+        None,
         vec![],
         LossConfig::SumSquaredError,
     )

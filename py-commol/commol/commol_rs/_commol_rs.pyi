@@ -168,12 +168,6 @@ class CalibrationModule(Protocol):
         window: float,
         ends: list[float],
     ) -> list[float]: ...
-    def check_model_values(
-        self,
-        engine: EngineProtocol,
-        parameters: str,
-        initial_condition_remainder: str | None = None,
-    ) -> None: ...
     def initial_condition_coverage(
         self,
         engine: EngineProtocol,

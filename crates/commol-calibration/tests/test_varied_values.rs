@@ -1,12 +1,16 @@
 //! A method that varies a value asks the engine whether it takes every
 //! number of it (`SimulationEngine::check_varied_values`); a write of known
-//! values does not, and the engine checks each number it writes.
+//! values does not, and the engine checks each number it writes. Each
+//! builder that varies values writes them at the point of their bounds
+//! nearest 0, with the remainder, to a copy of the engine, which then has
+//! every value a run needs (`SimulationEngine::check_values`).
 
 use commol_calibration::{
     CalibrationParameter, CalibrationParameterType, CalibrationProblem, ForwardModel, LossConfig,
-    ObservedDataPoint, ValueSource, check_model_values, configured_engine, plan_model_values,
+    ObservedDataPoint, ValueSource, configured_engine, plan_model_values,
 };
 use commol_core::Model;
+use commol_difference::DifferenceEquations;
 use commol_stochastic::StochasticSteps;
 
 /// A → B at the rate `k`, in whole units from A = 1000, with no rounding.
@@ -22,8 +26,9 @@ fn whole_only() -> StochasticSteps {
     StochasticSteps::try_from_model(&model).unwrap()
 }
 
-/// The initial amount of B in `[0, 50]`: whole bounds, which the point
-/// nearest 0 of [`check_model_values`] does not catch.
+/// The initial amount of B in `[0, 50]`: whole bounds, so the point of the
+/// bounds nearest 0, which a problem writes to check that no value is
+/// missing, is whole and does not catch it.
 fn amount_of_b() -> Vec<CalibrationParameter> {
     vec![CalibrationParameter::with_type(
         "B".to_string(),
@@ -45,6 +50,7 @@ fn every_method_that_varies_an_amount_needs_a_rounding() {
         whole_only(),
         vec![ObservedDataPoint::new(1.0, "A".to_string(), 900.0)],
         amount_of_b(),
+        None,
         vec![],
         LossConfig::SumSquaredError,
     );
@@ -57,7 +63,6 @@ fn every_method_that_varies_an_amount_needs_a_rounding() {
         Some(7),
     );
 
-    assert_needs_a_rounding(&check_model_values(&whole_only(), &amount_of_b(), None).unwrap_err());
     assert_needs_a_rounding(&problem.err().unwrap());
     assert_needs_a_rounding(&unobserved.err().unwrap());
 }
@@ -110,4 +115,104 @@ fn a_forward_model_of_known_values_checks_every_set_before_any_run() {
         none,
         "There is no parameter set to write: give at least one"
     );
+}
+
+/// A → B at the rate `k * m` in discrete steps, with `k = 0.1` and `m`,
+/// which has no value, from `amounts`, the JSON of the amount of each bin.
+fn decay(amounts: &str, m: &str) -> DifferenceEquations {
+    let json = format!(
+        r#"{{"name":"m","parameters":[{{"id":"k","value":0.1}},{{"id":"m","value":{m}}}],
+        "engine":{{"type":"DifferenceEquations"}},
+        "process":{{"bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}}],
+        "accumulators":[],"stratifications":[],
+        "transitions":[{{"id":"ab","source":["A"],
+        "target":["B"],"rate":"k * m","stratified_rates":null,"per_compartment":null}}]}},
+        "structure":{{"kind":"aggregate","bin_amounts":{amounts}}}}}"#
+    );
+    let model: Model = serde_json::from_str(&json).expect("valid model JSON");
+    DifferenceEquations::try_from_model(&model).unwrap()
+}
+
+/// The message of a builder that varies `parameters` on `engine`, or `None`
+/// when it builds.
+type Build = fn(DifferenceEquations, Vec<CalibrationParameter>, Option<&str>) -> Option<String>;
+
+fn problem_of(
+    engine: DifferenceEquations,
+    parameters: Vec<CalibrationParameter>,
+    remainder: Option<&str>,
+) -> Option<String> {
+    CalibrationProblem::new(
+        engine,
+        vec![ObservedDataPoint::new(1.0, "B".to_string(), 100.0)],
+        parameters,
+        remainder,
+        vec![],
+        LossConfig::SumSquaredError,
+    )
+    .err()
+}
+
+fn analysis_of(
+    engine: DifferenceEquations,
+    parameters: Vec<CalibrationParameter>,
+    remainder: Option<&str>,
+) -> Option<String> {
+    ForwardModel::unobserved(
+        engine,
+        parameters,
+        remainder,
+        ValueSource::Varied,
+        None,
+        None,
+    )
+    .err()
+}
+
+#[test]
+fn a_problem_that_leaves_a_value_missing_is_refused_when_it_is_built() {
+    let k = || vec![CalibrationParameter::new("k".to_string(), 0.0, 3.0)];
+    let k_and_b = || {
+        vec![
+            CalibrationParameter::new("k".to_string(), 0.0, 3.0),
+            CalibrationParameter::with_type(
+                "B".to_string(),
+                CalibrationParameterType::InitialCondition,
+                0.0,
+                1000.0,
+            ),
+        ]
+    };
+    let whole = r#"{"A":1000.0,"B":0.0}"#;
+    // A is left None: only the remainder gives it a value, what B leaves of
+    // the 1000 the model states.
+    let a_left_none = r#"{"A":null,"B":1000.0}"#;
+    let missing = |what: &str| {
+        Some(format!(
+            "The model cannot run: {what} have no value. Give them a value, or calibrate \
+             them and write the calibrated values back"
+        ))
+    };
+
+    for (builder, build) in [
+        ("CalibrationProblem::new", problem_of as Build),
+        ("ForwardModel::unobserved", analysis_of),
+    ] {
+        assert_eq!(
+            build(decay(whole, "null"), k(), None),
+            missing("the parameters [\"m\"]"),
+            "{builder}"
+        );
+        assert_eq!(
+            build(decay(a_left_none, "1.0"), k_and_b(), None),
+            missing("the amounts of the bins [\"A\"]"),
+            "{builder}"
+        );
+        assert_eq!(
+            build(decay(a_left_none, "1.0"), k_and_b(), Some("A")),
+            None,
+            "{builder}"
+        );
+        assert_eq!(build(decay(whole, "1.0"), k(), None), None, "{builder}");
+    }
 }

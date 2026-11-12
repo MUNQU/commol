@@ -129,7 +129,7 @@ fn problem(
     parameters: Vec<CalibrationParameter>,
     config: DiscrepancyConfig,
 ) -> Result<CalibrationProblem<LineEngine>, String> {
-    CalibrationProblem::new(LineEngine::new(), data, parameters, vec![], config)
+    CalibrationProblem::new(LineEngine::new(), data, parameters, None, vec![], config)
 }
 
 fn close(actual: f64, expected: f64) {

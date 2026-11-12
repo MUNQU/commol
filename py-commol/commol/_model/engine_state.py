@@ -224,57 +224,6 @@ def transition_flows(
     ]
 
 
-def check_model_values(
-    engine: "EngineProtocol",
-    parameters: Sequence["CalibrationParameter"],
-    remainder: str | None = None,
-) -> None:
-    """
-    Check the parameters and the values of the model kind that a calibration sets.
-
-    The engine sets each ``parameter`` value as the calibration objective
-    does, so its message names a parameter the model does not have or one
-    that a formula or a series sets. ``factor`` and ``noise`` values belong
-    to no model kind. The engine resolves every other value and the
-    remainder as the calibration objective does (``plan_values`` of the
-    engine of the kind), so its message names the problem: a type of value
-    the kind does not take (the test kind takes none), an unknown id, an
-    ambiguous category, or a category of a stratification that is not
-    binary. Next, the engine checks that it takes every number that a
-    calibration can write for each value (``check_varied_values``), so an
-    initial condition on an engine of whole units with no rounding is
-    refused, whatever its bounds. Last, the engine writes the values to a
-    copy of itself and checks that the model has every value a run needs:
-    a parameter or an initial amount that the model leaves without a value
-    and the calibration does not set is refused here, before the
-    calibration starts.
-
-    Parameters
-    ----------
-    engine : EngineProtocol
-        The engine built from the model the calibration runs on.
-    parameters : Sequence[CalibrationParameter]
-        Calibration parameters, in problem order.
-    remainder : str | None
-        The id that takes what the values leave of the sum the kind keeps,
-        such as a compartment or bin of an aggregate model.
-
-    Raises
-    ------
-    ValueError
-        If the engine does not set a parameter, the kind does not accept a
-        type of value, a value or the remainder cannot be resolved, the
-        engine moves whole units and names no rounding for an initial
-        condition, or a value the calibration does not set is missing; the
-        message of the engine names the parameter or the initial condition.
-    """
-    commol_rs.calibration.check_model_values(
-        engine,
-        engine_json(list(parameters)),
-        initial_condition_remainder=remainder,
-    )
-
-
 InitialTargetKind = Literal["bin", "compartment", "category"]
 """What the id of an initial-condition value names, as the engine resolves it."""
 

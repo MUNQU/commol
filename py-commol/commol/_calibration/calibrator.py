@@ -1,7 +1,6 @@
 """Calibration of a model against observed data."""
 
 import logging
-from collections.abc import Sequence
 from typing import TYPE_CHECKING, TypeVar
 
 from pydantic import BaseModel
@@ -27,9 +26,7 @@ from commol._fit.result import (
     CalibrationResult,
 )
 from commol._fit.starts import fit_result
-from commol._model import engine_state
 from commol._problem.problem import (
-    CalibrationParameter,
     CalibrationProblem,
     ObservedDataPoint,
 )
@@ -71,9 +68,10 @@ class Calibrator:
         ------
         ValueError
             If a parameter, observation, position or constraint does not fit
-            the model, or a setting of the problem is outside its rule; the
-            message names the path of the setting, such as
-            ``optimization_config.inertia_factor``.
+            the model, the model lacks a value that the problem does not set,
+            the remainder is in another unit than an amount it gives, or a
+            setting of the problem is outside its rule; the message names the
+            path of the setting, such as ``optimization_config.inertia_factor``.
         """
         logger.info(
             f"Initializing Calibration for model: '{simulation.model_definition.name}'"
@@ -89,11 +87,19 @@ class Calibrator:
             )
         )
 
-        self._validate_calibration_parameters()
-        self._warn_constraint_positions_beyond_observations()
+        # The engine checks the values when it builds the problem
+        # (`CalibrationProblem::new`).
         self._engine_problem: "CalibrationProblemProtocol" = (
             commol_rs.inference.CalibrationProblem(self._engine, engine_json(problem))
         )
+        # The structure checks what only the Python definition knows, such as
+        # the unit of the remainder, once the engine has resolved every value
+        # (`ModelStructure.check_calibration_values`).
+        model = simulation.model_definition
+        model.structure.check_calibration_values(
+            model, self._engine, problem.parameters, problem.initial_condition_remainder
+        )
+        self._warn_constraint_positions_beyond_observations()
         if problem.seed is None:
             logger.info(
                 "No seed set; drew the seed %d, which repeats this calibration.",
@@ -447,22 +453,6 @@ class Calibrator:
         """Names of parameters being calibrated."""
         return [param.id for param in self.problem.parameters]
 
-    def _validate_calibration_parameters(self) -> None:
-        """
-        Validate that all calibration parameters exist in the model.
-
-        Raises
-        ------
-        ValueError
-            If a parameter ID doesn't exist in the model or if a bin ID is invalid.
-        """
-        check_values(
-            self.simulation.model_definition,
-            self._engine,
-            self.problem.parameters,
-            self.problem.initial_condition_remainder,
-        )
-
     def _warn_constraint_positions_beyond_observations(self) -> None:
         """Warn when constraints at positions extend beyond observed data."""
         max_observed_position = max(obs.at for obs in self.problem.observed_data)
@@ -474,41 +464,3 @@ class Calibrator:
                     constraint.id,
                     max_observed_position,
                 )
-
-
-def check_values(
-    model: "Model",
-    engine: "EngineProtocol",
-    parameters: Sequence[CalibrationParameter],
-    remainder: str | None,
-) -> None:
-    """
-    Check that a model has every value a calibration sets.
-
-    The engine checks that a factor has positive bounds, and each parameter
-    as its ``set_parameter`` does: one the model does not have, or one that
-    a formula or a series sets, is not a value to set. The structure and the
-    engine check the values of the model kind, such as initial conditions,
-    and the remainder, and the engine checks that no value is missing once
-    they are written.
-
-    Parameters
-    ----------
-    model : Model
-        The model the values are set on.
-    engine : EngineProtocol
-        The engine built from it.
-    parameters : Sequence[CalibrationParameter]
-        The values set, with their types and bounds.
-    remainder : str | None
-        The id that takes what the initial conditions leave, if any.
-
-    Raises
-    ------
-    ValueError
-        If a factor has a bound at or below 0, or the engine rejects a
-        parameter or the structure or the engine rejects a value; the message
-        is theirs.
-    """
-    engine_state.check_model_values(engine, parameters, remainder)
-    model.structure.check_calibration_values(model, engine, parameters, remainder)
