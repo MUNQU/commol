@@ -2859,6 +2859,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-calibrated-amount-is-written-back-as-the-optimizer-found-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A calibrated amount is written back as the optimizer found it
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3765,6 +3776,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-calibrated-amount-is-written-back-as-the-optimizer-found-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A calibrated amount is written back as the optimizer found it
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3788,9 +3810,10 @@
 <h1 id="calibrated-initial-conditions">Calibrated initial conditions<a class="headerlink" href="#calibrated-initial-conditions" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
 <p>How calibrated values reach the initial state, which compartment keeps the sum
-the model declares, and what an engine of whole units needs to vary an initial
-condition. How the fractions of the categories compose and how an amount
-overrides them is in <a href="../initial-conditions/">Initial conditions</a>.</p>
+the model declares, what an engine of whole units needs to vary an initial
+condition, and what the write-back of an amount that is not whole holds. How
+the fractions of the categories compose and how an amount overrides them is in
+<a href="../initial-conditions/">Initial conditions</a>.</p>
 <h2 id="calibrated-initial-conditions-are-applied-in-layers">Calibrated initial conditions are applied in layers<a class="headerlink" href="#calibrated-initial-conditions-are-applied-in-layers" title="Permanent link">&para;</a></h2>
 <p><code>InitialConditionPlan</code> in <code>crates/commol-model/src/initial_conditions.rs</code>
 applies calibrated values in a fixed order: bins, category splits, exact
@@ -3874,7 +3897,12 @@ other compartment after the values are written. A compartment that no value
 covers keeps its declared amount and cancels out, so the remainder keeps the
 declared sum of the compartments the values and it cover, and a bin of another
 unit does not enter. A bin left <code>None</code> counts as 0, so the model states the sum
-on the remainder (<code>{"A": 1000, "B": None}</code>). Without a remainder every state is
+on the remainder (<code>{"A": 1000, "B": None}</code>). The plan keeps the sum before an
+engine of whole units rounds each bin at the start of a run, and each bin that
+is not whole can move it by half a unit or less: <code>B</code> 11.3 and <code>C</code> 20.4 with
+the remainder <code>A</code> start from 999 units of 1000
+(<a href="../engines/#whole-units-in-a-stochastic-engine">Whole units in a stochastic engine</a>).
+Without a remainder every state is
 feasible, because the engine rejects a negative amount. With one, a remainder
 below zero is infeasible by its share of the amounts the values set, a number
 with no unit that is never a division by zero.
@@ -4004,6 +4032,59 @@ sample is checked when the analysis is built, and the message names its set.</p>
 <code>tests/stochastic/test_whole_units.py::test_every_draw_of_a_sample_is_checked_when_the_analysis_is_built</code>,
 <code>tests/stochastic/test_whole_units.py::test_a_known_amount_is_written_back_when_it_is_whole</code>,
 <code>tests/stochastic/test_calibration.py::test_a_calibrated_amount_with_a_rounding_is_calibrated</code>.</p>
+<h2 id="a-calibrated-amount-is-written-back-as-the-optimizer-found-it">A calibrated amount is written back as the optimizer found it<a class="headerlink" href="#a-calibrated-amount-is-written-back-as-the-optimizer-found-it" title="Permanent link">&para;</a></h2>
+<p><strong>Rule:</strong> with a rounding, <code>check_model</code> builds every initial amount, whole or
+not, of a bin as of a compartment (<code>check_whole_units</code> in
+<code>crates/commol-model/src/builder.rs</code>), because a run rounds each bin at its
+start (<code>Units::begin</code>) whether the model declares its amount or calibration
+writes it. So <code>Model.apply_calibration_parameters</code> writes the number the
+optimizer found, such as <code>B = 11.853…</code>, the model builds on the same engine,
+and a run of it rounds the amounts the calibration scored by the same rule:
+12 units of <code>B</code>. With no rounding, the engine refuses a known value that is
+not whole when it writes it (<code>Units::set_initial_condition</code>), so the
+write-back refuses <code>{"B": 12.3}</code> and the model never holds an amount it
+cannot build.</p>
+<p>The write-back rebuilds the scored amounts as it does on every engine, within
+<code>_MATCH_TOLERANCE</code> (<code>_model/calibration_write_back.py</code>). For a bin of one
+compartment it writes the amount itself, so a run of one seed is the run the
+calibration scored. In a bin of several compartments the rebuilt amounts can
+differ in their last bits. <code>"largest_remainder"</code> starts from the same units
+unless two remainders tie within those bits. <code>"random"</code> can draw other units:
+<code>multinomial</code> and <code>binomial</code> (<code>crates/commol-random/src/sample.rs</code>) branch on
+the exact value of a share, and a share of <code>0.9999999999999999</code> instead of 1
+makes <code>binomial_inversion</code> draw one more uniform, which shifts the stream of
+the run. A replicate of the written model can then differ along its whole
+path, and the seed of the problem can give a loss other than
+<code>result.final_loss</code> (<a href="https://github.com/MUNQU/commol/issues/474">#474</a>).</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Write back the whole units a run starts from</td>
+<td>KISS: <code>"random"</code> draws them again in each run, so no one state holds them, and the largest remainders of a rounded bin differ from those of the bin: <code>10.4 × (0.35, 0.65)</code> starts from <code>(3, 7)</code>, and <code>10 × (0.35, 0.65)</code> from <code>(4, 6)</code>. The golden rule and DRY: Python would repeat the rounding of the engine, and the model would hold a number the optimizer did not find. It is fragile too: the check it keeps sums the overrides into the bin, so a whole override <code>A_g1 = 4</code> in a bin of 100 split in thirds makes the bin 70.67, and the model is refused.</td>
+</tr>
+<tr>
+<td>Round a calibrated amount when the engine writes it</td>
+<td>S: the engine would round at the write and again at the start of the run. It does not remove the rule of the run: a value that sets only part of a bin, an exact compartment or a prefix, cannot make the bin whole by rounding itself, so <code>A_g1 = 3.7</code> written as 4 in a bin of 100 split in thirds still sums to 70.67.</td>
+</tr>
+<tr>
+<td>Keep refusing a bin that is not whole when the settings name a rounding</td>
+<td>DRY: see <a href="../engines/#whole-units-in-a-stochastic-engine">Whole units in a stochastic engine</a>.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong>
+<code>tests/stochastic/test_calibration.py::test_a_calibrated_amount_is_written_back_onto_a_model_that_builds</code>,
+<code>tests/stochastic/test_calibration.py::test_a_stratified_amount_is_written_back_with_its_split</code>,
+<code>crates/commol-stochastic/tests/oracles.rs::a_bin_that_is_not_whole_starts_as_calibration_writes_it</code>,
+<code>crates/commol-model/src/builder.rs::a_bin_that_is_not_whole_builds_with_a_rounding</code>,
+<code>crates/commol-stochastic/src/units.rs::a_bin_of_a_half_rounds_up_whatever_its_split</code>,
+<code>tests/stochastic/test_whole_units.py::TestWholeUnits::test_a_rounding_makes_each_bin_its_nearest_whole_number</code>.</p>
 
 
 

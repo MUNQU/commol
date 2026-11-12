@@ -5940,9 +5940,9 @@ Each method that adds returns the builder, so the calls chain.</p>
 </span><span id="__span-0-889"><a id="__codelineno-0-889" name="__codelineno-0-889"></a><span class="sd">            one the engine cannot run (a position between two steps for an</span>
 </span><span id="__span-0-890"><a id="__codelineno-0-890" name="__codelineno-0-890"></a><span class="sd">            engine that steps only at integers, or a ``&quot;pulse&quot;`` point between</span>
 </span><span id="__span-0-891"><a id="__codelineno-0-891" name="__codelineno-0-891"></a><span class="sd">            two steps), a per-compartment override names an unknown</span>
-</span><span id="__span-0-892"><a id="__codelineno-0-892" name="__codelineno-0-892"></a><span class="sd">            compartment, a stochastic engine gets an amount that is not whole,</span>
-</span><span id="__span-0-893"><a id="__codelineno-0-893" name="__codelineno-0-893"></a><span class="sd">            or the origin has a time zone or a step unit that is not of fixed</span>
-</span><span id="__span-0-894"><a id="__codelineno-0-894" name="__codelineno-0-894"></a><span class="sd">            calendar length.</span>
+</span><span id="__span-0-892"><a id="__codelineno-0-892" name="__codelineno-0-892"></a><span class="sd">            compartment, a stochastic engine with no ``rounding`` gets an</span>
+</span><span id="__span-0-893"><a id="__codelineno-0-893" name="__codelineno-0-893"></a><span class="sd">            amount that is not whole, or the origin has a time zone or a step</span>
+</span><span id="__span-0-894"><a id="__codelineno-0-894" name="__codelineno-0-894"></a><span class="sd">            unit that is not of fixed calendar length.</span>
 </span><span id="__span-0-895"><a id="__codelineno-0-895" name="__codelineno-0-895"></a><span class="sd">        &quot;&quot;&quot;</span>
 </span><span id="__span-0-896"><a id="__codelineno-0-896" name="__codelineno-0-896"></a>        <span class="n">model</span><span class="p">:</span> <span class="n">Model</span><span class="p">[</span><span class="n">StructureT</span><span class="p">]</span> <span class="o">=</span> <span class="n">Model</span><span class="p">(</span>
 </span><span id="__span-0-897"><a id="__codelineno-0-897" name="__codelineno-0-897"></a>            <span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
@@ -8688,9 +8688,9 @@ settings of that engine, a series point or an impulse position is
 one the engine cannot run (a position between two steps for an
 engine that steps only at integers, or a <code>"pulse"</code> point between
 two steps), a per-compartment override names an unknown
-compartment, a stochastic engine gets an amount that is not whole,
-or the origin has a time zone or a step unit that is not of fixed
-calendar length.</p>
+compartment, a stochastic engine with no <code>rounding</code> gets an
+amount that is not whole, or the origin has a time zone or a step
+unit that is not of fixed calendar length.</p>
               </div>
             </td>
           </tr>
@@ -8818,9 +8818,9 @@ calendar length.</p>
 </span><span id="__span-0-889"><a id="__codelineno-0-889" name="__codelineno-0-889"></a><span class="sd">        one the engine cannot run (a position between two steps for an</span>
 </span><span id="__span-0-890"><a id="__codelineno-0-890" name="__codelineno-0-890"></a><span class="sd">        engine that steps only at integers, or a ``&quot;pulse&quot;`` point between</span>
 </span><span id="__span-0-891"><a id="__codelineno-0-891" name="__codelineno-0-891"></a><span class="sd">        two steps), a per-compartment override names an unknown</span>
-</span><span id="__span-0-892"><a id="__codelineno-0-892" name="__codelineno-0-892"></a><span class="sd">        compartment, a stochastic engine gets an amount that is not whole,</span>
-</span><span id="__span-0-893"><a id="__codelineno-0-893" name="__codelineno-0-893"></a><span class="sd">        or the origin has a time zone or a step unit that is not of fixed</span>
-</span><span id="__span-0-894"><a id="__codelineno-0-894" name="__codelineno-0-894"></a><span class="sd">        calendar length.</span>
+</span><span id="__span-0-892"><a id="__codelineno-0-892" name="__codelineno-0-892"></a><span class="sd">        compartment, a stochastic engine with no ``rounding`` gets an</span>
+</span><span id="__span-0-893"><a id="__codelineno-0-893" name="__codelineno-0-893"></a><span class="sd">        amount that is not whole, or the origin has a time zone or a step</span>
+</span><span id="__span-0-894"><a id="__codelineno-0-894" name="__codelineno-0-894"></a><span class="sd">        unit that is not of fixed calendar length.</span>
 </span><span id="__span-0-895"><a id="__codelineno-0-895" name="__codelineno-0-895"></a><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="__span-0-896"><a id="__codelineno-0-896" name="__codelineno-0-896"></a>    <span class="n">model</span><span class="p">:</span> <span class="n">Model</span><span class="p">[</span><span class="n">StructureT</span><span class="p">]</span> <span class="o">=</span> <span class="n">Model</span><span class="p">(</span>
 </span><span id="__span-0-897"><a id="__codelineno-0-897" name="__codelineno-0-897"></a>        <span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>

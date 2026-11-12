@@ -5393,6 +5393,12 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   its binding <code>commol_rs.calibration.check_model_values</code> are removed, so
   every caller of <code>new</code> gets the check. See
   <a href="../../codebase/decisions/model-structure/#a-run-needs-every-value">A run needs every value</a>.</li>
+<li>On <code>StochasticEvents</code> and <code>StochasticSteps</code> with a <code>rounding</code>, a bin whose
+  amount is not whole now builds, where <code>build</code> raised <code>ValueError</code>. Each run
+  starts it at its nearest whole number, a half up whatever its split, so a
+  bin below half a unit starts empty. With no rounding, such an amount is
+  refused as before, with the message that names the two roundings. See
+  <a href="../../guide/stochastic/#whole-units">Whole units</a>.</li>
 <li><strong>Breaking:</strong> a build logs one <code>INFO</code> record, with the number of bins,
   parameters, transitions and outputs; the records of each bin,
   accumulator, stratification, matrix, parameter and transition of a
@@ -5836,6 +5842,14 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li><code>Model.apply_calibration_parameters</code> wrote a calibrated amount that is not
+  whole, such as <code>B = 11.85</code>, onto a model of <code>StochasticEvents</code> or
+  <code>StochasticSteps</code> with a <code>rounding</code>, and the model then did not build: the
+  amount of a bin had to be whole even with a rounding. The model now builds
+  and holds the amount the optimizer found, and a run of it rounds that amount
+  as the calibration did: from 12 units. With <code>"random"</code>, a bin of several
+  compartments can still start from other units for the same seed. See
+  <a href="../../guide/stochastic/#whole-units">Whole units</a>.</li>
 <li>A calibrated initial condition on <code>StochasticEvents</code> or <code>StochasticSteps</code>
   with no <code>rounding</code> built when its bounds were whole, such as <code>[0, 50]</code>, and
   then every start failed, because the optimizer writes values that are not

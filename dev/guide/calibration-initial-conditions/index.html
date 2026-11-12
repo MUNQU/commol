@@ -3902,7 +3902,8 @@
 <p>An <code>initial_condition</code> unknown fits how the state starts: the amount of a
 bin in its unit, the split of a category, or the amount of one expanded
 compartment. The Rust engine applies the values in a fixed order, and a
-<strong>remainder</strong> compartment keeps the sum of the amounts the model states.</p>
+<strong>remainder</strong> compartment keeps the sum of the amounts the model states, up to
+the rounding of an engine of whole units (<a href="../stochastic/#whole-units">Whole units</a>).</p>
 <h2 id="quick-path">Quick path<a class="headerlink" href="#quick-path" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">Aggregate</span><span class="p">,</span>
@@ -4051,7 +4052,7 @@ values leave of the amounts the model states:</p>
 </tr>
 <tr>
 <td>It keeps the sum of what the values and it cover</td>
-<td>A compartment that no value covers keeps its amount, so it does not change the remainder. A bin left <code>None</code> for calibration counts as 0, so the remainder states the sum: <code>A</code> holds 1000 while <code>B</code> is unknown.</td>
+<td>A compartment that no value covers keeps its amount, so it does not change the remainder. A bin left <code>None</code> for calibration counts as 0, so the remainder states the sum: <code>A</code> holds 1000 while <code>B</code> is unknown. On <code>StochasticEvents</code> or <code>StochasticSteps</code>, each run rounds every bin on its own, so the start can hold up to half a unit more or less per bin that is not whole (<a href="../stochastic/#whole-units">Whole units</a>).</td>
 </tr>
 <tr>
 <td>It has the unit of every amount it gives</td>

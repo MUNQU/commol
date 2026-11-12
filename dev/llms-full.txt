@@ -1190,7 +1190,7 @@ structure = Aggregate(
 | Every stratification has a fraction for each of its categories, and no other category; a split by category has one split for each category of the stratification it differs by that its compartments have. The engine holds the rule (`check_stratification_fractions` in `crates/commol-model/src/builder.rs`) | `build`                                                     |
 | Every fraction is from 0 to 1, and each split sums to 1 within 1e-6. The engine holds the rule (`check_fractions` in `crates/commol-model/src/rules.rs`)                                                                                                                                                        | `Aggregate(...)` and each `update_stratification_fractions` |
 | Override names are expanded compartments                                                                                                                                                                                                                                                                        | `build`                                                     |
-| With a stochastic engine, the amount of each bin is a whole number                                                                                                                                                                                                                                              | `build`                                                     |
+| With a stochastic engine and no `rounding`, every amount is whole ([Whole units](https://munqu.github.io/commol/latest/guide/stochastic/#whole-units))                                                                                                                                                          | `build`                                                     |
 
 The initial amount of a compartment is `bin amount × the fraction of each of its categories`, unless an override names it. `model.structure.initial_state(model.process)` shows the result. To change amounts or fractions on a built model, see [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/#updating-the-initial-state-after-building).
 
@@ -3426,20 +3426,19 @@ print(model.describe().render("markdown").split("### Events")[1].split("\n\n")[1
 
 A stochastic engine moves whole units, so it starts from whole amounts (`check_model` in `crates/commol-model/src/builder.rs`):
 
-| Initial amounts                                                                      | What happens                                                                                             |
-| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| The amount of a bin is not a whole number                                            | `build` raises `ValueError` and names the engine and the bin                                             |
-| Every amount is whole                                                                | Nothing more is needed                                                                                   |
-| The amount of a compartment is not whole (a bin amount times its category fractions) | `build` raises `ValueError`, unless the settings of the engine name a `rounding`; the message lists both |
+| Initial amounts                                                                                  | What happens                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Every amount is whole                                                                            | Nothing more is needed                                                                                                                         |
+| The amount of a bin or of a compartment (a bin amount times its category fractions) is not whole | `build` raises `ValueError`, unless the settings of the engine name a `rounding`; the message names the engine, the amounts and both roundings |
 
 There is no default rounding: with small amounts the rounding decides which compartments start with a unit, so it is a modelling choice. With half a unit in each of ten groups, five groups start with one unit and the others empty.
 
-| `rounding`            | Start of each run                                                                                                                                                   |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"largest_remainder"` | The same whole amounts in every run: in each bin, each amount rounded down, and the units left over to the largest remainders, so they sum to the amount of the bin |
-| `"random"`            | In each run, the amount of each bin split by a multinomial draw with the fractions of the model, so the mean start equals the amounts of the model                  |
+| `rounding`            | Start of each run                                                                                                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"largest_remainder"` | The same whole amounts in every run: in each bin, each amount rounded down, and the units left over to the largest remainders, so they sum to the amount of the bin       |
+| `"random"`            | In each run, the amount of each bin split by a multinomial draw with the fractions of the model, so the mean start equals the amounts of the model when each bin is whole |
 
-Both round each bin on its own: no unit goes from one bin to another, such as from a bin of a concentration to a bin of a count.
+Both round each bin on its own: no unit goes from one bin to another, such as from a bin of a concentration to a bin of a count. The amount of a bin that is not whole becomes its nearest whole number first, a half up, whatever its split: a bin of `10.5` starts each run with 11 units, and one of `10.4` with 10. A bin below half a unit vanishes: a bin of `0.4` starts every run with no unit, with `"random"` too. So the total of the model can change by up to half a unit for each bin that is not whole.
 
 ```python
 from commol.engines import StochasticEventsSettings
@@ -3471,7 +3470,7 @@ print(sum(start[f"B_g{i}"][0] for i in range(10)) + sum(start[f"A_g{i}"][0] for 
 # 1000.0
 ```
 
-Initial conditions that calibration sets go through the same rounding. A method that varies an initial condition, such as an optimizer or a sampler, writes values that are not whole. So it needs a rounding, whatever the bounds. With no rounding, a `Calibrator`, or a `SensitivityAnalysis` of independent inputs, with an `initial_condition` raises `ValueError` when it is built. The message names the initial condition and the two options. Known values need no rounding when they are whole: `Model.apply_calibration_parameters` writes `{"B": 12.0}`, and refuses `{"B": 12.3}` with a message that names the value. The draws of a sample are known values too: a `SensitivityAnalysis` of `InputSpace.from_sample` writes them. The engine checks every draw when the analysis is built, and the message names the set of the draw.
+Initial conditions that calibration sets go through the same rounding. A method that varies an initial condition, such as an optimizer or a sampler, writes values that are not whole. So it needs a rounding, whatever the bounds. With no rounding, a `Calibrator`, or a `SensitivityAnalysis` of independent inputs, with an `initial_condition` raises `ValueError` when it is built. The message names the initial condition and the two options. Known values need no rounding when they are whole: `Model.apply_calibration_parameters` writes `{"B": 12.0}`, and refuses `{"B": 12.3}` with a message that names the value. With a rounding, it writes the amount a calibration found, such as `11.85`, and the model builds. With `"largest_remainder"`, or for a bin of one compartment, each run of it starts as the calibration did, from 12 units. With `"random"`, a bin of several compartments can start from other units for the same seed ([#474](https://github.com/MUNQU/commol/issues/474)). The draws of a sample are known values too: a `SensitivityAnalysis` of `InputSpace.from_sample` writes them. The engine checks every draw when the analysis is built, and the message names the set of the draw.
 
 ## Seeds and replicates
 
@@ -3551,7 +3550,7 @@ print(0.05 < result.best_parameters["k2"] < 0.2)  # True: near 0.1
 ## Checklist
 
 - [ ] The engine is `StochasticEvents` (continuous time) or `StochasticSteps` (per-step probabilities), as the rates of the model mean.
-- [ ] The amount of each bin is whole, and the settings name a `rounding` when the amount of a compartment is not, or when a calibration or a `SensitivityAnalysis` of independent inputs sets an initial condition.
+- [ ] Every initial amount is whole, or the settings name a `rounding`; a calibration or a `SensitivityAnalysis` of independent inputs that sets an initial condition needs one too.
 - [ ] Every run has a seed, or keeps the one commol drew (`results.seed`).
 - [ ] A large total uses `"tau_leaping"` or a deterministic engine.
 - [ ] A calibration sets `replicates`, `replicate_summary` and `seed`.
@@ -3851,7 +3850,7 @@ The result of a run and of replicates (`SimulationResults`, `SimulationReplicate
 
 [Back to Model Calibration](https://munqu.github.io/commol/latest/guide/calibration/index.md)
 
-An `initial_condition` unknown fits how the state starts: the amount of a bin in its unit, the split of a category, or the amount of one expanded compartment. The Rust engine applies the values in a fixed order, and a **remainder** compartment keeps the sum of the amounts the model states.
+An `initial_condition` unknown fits how the state starts: the amount of a bin in its unit, the split of a category, or the amount of one expanded compartment. The Rust engine applies the values in a fixed order, and a **remainder** compartment keeps the sum of the amounts the model states, up to the rounding of an engine of whole units ([Whole units](https://munqu.github.io/commol/latest/guide/stochastic/#whole-units)).
 
 ## Quick path
 
@@ -3940,14 +3939,14 @@ The engine resolves every id when you create the `Calibrator` (`InitialCondition
 
 Without help, calibrated values change the sum of the amounts. Name a compartment or bin in `initial_condition_remainder`, and it takes what the values leave of the amounts the model states:
 
-| Rule                                             | Detail                                                                                                                                                                                                         |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| It is not calibrated                             | It takes the sum of the amounts the model states, less every other compartment.                                                                                                                                |
-| It keeps the sum of what the values and it cover | A compartment that no value covers keeps its amount, so it does not change the remainder. A bin left `None` for calibration counts as 0, so the remainder states the sum: `A` holds 1000 while `B` is unknown. |
-| It has the unit of every amount it gives         | The `Calibrator` rejects a calibrated bin, prefix or compartment whose unit is not the unit of the remainder, and names both. A category split has no unit.                                                    |
-| It keeps its own split                           | A bin remainder shares what it takes across its compartments in the proportions of the initial state, or of the stratification fractions when they start at 0.                                                 |
-| It must not overlap a calibrated id              | Building the problem rejects it otherwise.                                                                                                                                                                     |
-| A value that would make it negative is penalized | The optimizer moves away from it.                                                                                                                                                                              |
+| Rule                                             | Detail                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| It is not calibrated                             | It takes the sum of the amounts the model states, less every other compartment.                                                                                                                                                                                                                                                                                                                                                                                       |
+| It keeps the sum of what the values and it cover | A compartment that no value covers keeps its amount, so it does not change the remainder. A bin left `None` for calibration counts as 0, so the remainder states the sum: `A` holds 1000 while `B` is unknown. On `StochasticEvents` or `StochasticSteps`, each run rounds every bin on its own, so the start can hold up to half a unit more or less per bin that is not whole ([Whole units](https://munqu.github.io/commol/latest/guide/stochastic/#whole-units)). |
+| It has the unit of every amount it gives         | The `Calibrator` rejects a calibrated bin, prefix or compartment whose unit is not the unit of the remainder, and names both. A category split has no unit.                                                                                                                                                                                                                                                                                                           |
+| It keeps its own split                           | A bin remainder shares what it takes across its compartments in the proportions of the initial state, or of the stratification fractions when they start at 0.                                                                                                                                                                                                                                                                                                        |
+| It must not overlap a calibrated id              | Building the problem rejects it otherwise.                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| A value that would make it negative is penalized | The optimizer moves away from it.                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 Without a remainder, values are applied as given, and the other compartments keep their amounts. So a model of a count in `A` and `B` and of a concentration in `C` can fit the amount of `C` alone, or fit `B` with `A` as the remainder.
 
@@ -17255,9 +17254,9 @@ class ModelBuilder:
             one the engine cannot run (a position between two steps for an
             engine that steps only at integers, or a ``"pulse"`` point between
             two steps), a per-compartment override names an unknown
-            compartment, a stochastic engine gets an amount that is not whole,
-            or the origin has a time zone or a step unit that is not of fixed
-            calendar length.
+            compartment, a stochastic engine with no ``rounding`` gets an
+            amount that is not whole, or the origin has a time zone or a step
+            unit that is not of fixed calendar length.
         """
         model: Model[StructureT] = Model(
             name=self._name,
@@ -18233,9 +18232,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If validation fails, the structure does not fit the process (for example a fraction names no bin, or a rate reads neighbors\_<bin> and the structure has no neighbors), the engine is unknown or does not run the kind of the structure, the settings are not settings of that engine, a series point or an impulse position is one the engine cannot run (a position between two steps for an engine that steps only at integers, or a "pulse" point between two steps), a per-compartment override names an unknown compartment, a stochastic engine gets an amount that is not whole, or the origin has a time zone or a step unit that is not of fixed calendar length. |
+| Type         | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If validation fails, the structure does not fit the process (for example a fraction names no bin, or a rate reads neighbors\_<bin> and the structure has no neighbors), the engine is unknown or does not run the kind of the structure, the settings are not settings of that engine, a series point or an impulse position is one the engine cannot run (a position between two steps for an engine that steps only at integers, or a "pulse" point between two steps), a per-compartment override names an unknown compartment, a stochastic engine with no rounding gets an amount that is not whole, or the origin has a time zone or a step unit that is not of fixed calendar length. |
 
 Source code in `commol/_model/builder.py`
 
@@ -18286,9 +18285,9 @@ def build(
         one the engine cannot run (a position between two steps for an
         engine that steps only at integers, or a ``"pulse"`` point between
         two steps), a per-compartment override names an unknown
-        compartment, a stochastic engine gets an amount that is not whole,
-        or the origin has a time zone or a step unit that is not of fixed
-        calendar length.
+        compartment, a stochastic engine with no ``rounding`` gets an
+        amount that is not whole, or the origin has a time zone or a step
+        unit that is not of fixed calendar length.
     """
     model: Model[StructureT] = Model(
         name=self._name,
@@ -38740,6 +38739,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 - The engine checks that a calibration problem leaves no value missing when the problem is built, as it does for a `SensitivityAnalysis`: it writes each value at the point of its bounds nearest 0, with the `initial_condition_remainder`, and refuses a parameter or an initial amount that the model leaves `None` and the problem does not set. The `Calibrator` checks no value of its own: it builds the problem, then checks the unit of the remainder (`ModelStructure.check_calibration_values`). A problem with one fault gets the message it got before. A problem with several can report another one first: the unit of the remainder is now checked after every check of the engine, and the values after the settings of the optimizer and the loss, so a remainder in the wrong unit and an unknown observed output report the output. The warning on constraint positions beyond the observations is no longer logged when the problem does not build. In Rust, `CalibrationProblem::new` takes the remainder after the parameters, in place of `with_initial_condition_remainder`, and `check_model_values` and its binding `commol_rs.calibration.check_model_values` are removed, so every caller of `new` gets the check. See [A run needs every value](https://munqu.github.io/commol/latest/codebase/decisions/model-structure/#a-run-needs-every-value).
+- On `StochasticEvents` and `StochasticSteps` with a `rounding`, a bin whose amount is not whole now builds, where `build` raised `ValueError`. Each run starts it at its nearest whole number, a half up whatever its split, so a bin below half a unit starts empty. With no rounding, such an amount is refused as before, with the message that names the two roundings. See [Whole units](https://munqu.github.io/commol/latest/guide/stochastic/#whole-units).
 - **Breaking:** a build logs one `INFO` record, with the number of bins, parameters, transitions and outputs; the records of each bin, accumulator, stratification, matrix, parameter and transition of a `ModelBuilder` are at `DEBUG`. Set the logger `commol` to `DEBUG` to read them.
 - **Breaking:** with a `sample`, each entry of a report (`Model.applied_parameters`, `ModelStructure.report_sections`) holds its `EntrySpread` under the key `spread`, not `interval`. A report saved as JSON before this change has the key `interval`: read `spread`.
 - **Breaking:** the engine holds the one rule of a fit of a problem: a `CalibrationResult` that lacks a parameter of the problem or has one the problem does not have is refused, with the message `The fit is not a fit of this problem: it lacks ["k1"] and has ["k2"], which the problem does not have`. `Calibrator.point_sample`, `ResidualNoise(fit=...)` and `Collinearity(at=result)` refuse such a fit, and `StartsIdentifiability` refuses such a start (`A start is not a start of this problem: ...`). Before, all of them except `point_sample` accepted an extra parameter.
@@ -38791,6 +38791,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- `Model.apply_calibration_parameters` wrote a calibrated amount that is not whole, such as `B = 11.85`, onto a model of `StochasticEvents` or `StochasticSteps` with a `rounding`, and the model then did not build: the amount of a bin had to be whole even with a rounding. The model now builds and holds the amount the optimizer found, and a run of it rounds that amount as the calibration did: from 12 units. With `"random"`, a bin of several compartments can still start from other units for the same seed. See [Whole units](https://munqu.github.io/commol/latest/guide/stochastic/#whole-units).
 - A calibrated initial condition on `StochasticEvents` or `StochasticSteps` with no `rounding` built when its bounds were whole, such as `[0, 50]`, and then every start failed, because the optimizer writes values that are not whole. A `Calibrator` or a `SensitivityAnalysis` that varies an initial condition on these engines now refuses it when it is built, whatever its bounds, with a message that names the initial condition and the two roundings. `Model.apply_calibration_parameters` writes known values as before, each checked when it is written. A `SensitivityAnalysis` of `InputSpace.from_sample` checks every draw when it is built, not the point of the bounds nearest 0: a sample of whole draws with bounds such as `[0.5, 50]` now builds, and a draw that is not whole is refused there, with the set of the draw, not at the run. See [Whole units](https://munqu.github.io/commol/latest/guide/stochastic/#whole-units).
 - `Collinearity` at a point where a parameter with an infinite bound is 0 scaled its column by an infinite width: an infinite sensitivity and an index below 1, with no error. The magnitude of the parameter there is now 1, as the step of finite differences takes it.
 - A `SampleIdentifiability(reference="prior")` without priors, or `reference="bounds"` with priors, written as JSON measured the sample against the bounds with no error; the engine now refuses it.

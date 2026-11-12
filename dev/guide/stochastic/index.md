@@ -100,20 +100,19 @@ print(model.describe().render("markdown").split("### Events")[1].split("\n\n")[1
 
 A stochastic engine moves whole units, so it starts from whole amounts (`check_model` in `crates/commol-model/src/builder.rs`):
 
-| Initial amounts                                                                      | What happens                                                                                             |
-| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| The amount of a bin is not a whole number                                            | `build` raises `ValueError` and names the engine and the bin                                             |
-| Every amount is whole                                                                | Nothing more is needed                                                                                   |
-| The amount of a compartment is not whole (a bin amount times its category fractions) | `build` raises `ValueError`, unless the settings of the engine name a `rounding`; the message lists both |
+| Initial amounts                                                                                  | What happens                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Every amount is whole                                                                            | Nothing more is needed                                                                                                                         |
+| The amount of a bin or of a compartment (a bin amount times its category fractions) is not whole | `build` raises `ValueError`, unless the settings of the engine name a `rounding`; the message names the engine, the amounts and both roundings |
 
 There is no default rounding: with small amounts the rounding decides which compartments start with a unit, so it is a modelling choice. With half a unit in each of ten groups, five groups start with one unit and the others empty.
 
-| `rounding`            | Start of each run                                                                                                                                                   |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"largest_remainder"` | The same whole amounts in every run: in each bin, each amount rounded down, and the units left over to the largest remainders, so they sum to the amount of the bin |
-| `"random"`            | In each run, the amount of each bin split by a multinomial draw with the fractions of the model, so the mean start equals the amounts of the model                  |
+| `rounding`            | Start of each run                                                                                                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"largest_remainder"` | The same whole amounts in every run: in each bin, each amount rounded down, and the units left over to the largest remainders, so they sum to the amount of the bin       |
+| `"random"`            | In each run, the amount of each bin split by a multinomial draw with the fractions of the model, so the mean start equals the amounts of the model when each bin is whole |
 
-Both round each bin on its own: no unit goes from one bin to another, such as from a bin of a concentration to a bin of a count.
+Both round each bin on its own: no unit goes from one bin to another, such as from a bin of a concentration to a bin of a count. The amount of a bin that is not whole becomes its nearest whole number first, a half up, whatever its split: a bin of `10.5` starts each run with 11 units, and one of `10.4` with 10. A bin below half a unit vanishes: a bin of `0.4` starts every run with no unit, with `"random"` too. So the total of the model can change by up to half a unit for each bin that is not whole.
 
 ```python
 from commol.engines import StochasticEventsSettings
@@ -145,7 +144,7 @@ print(sum(start[f"B_g{i}"][0] for i in range(10)) + sum(start[f"A_g{i}"][0] for 
 # 1000.0
 ```
 
-Initial conditions that calibration sets go through the same rounding. A method that varies an initial condition, such as an optimizer or a sampler, writes values that are not whole. So it needs a rounding, whatever the bounds. With no rounding, a `Calibrator`, or a `SensitivityAnalysis` of independent inputs, with an `initial_condition` raises `ValueError` when it is built. The message names the initial condition and the two options. Known values need no rounding when they are whole: `Model.apply_calibration_parameters` writes `{"B": 12.0}`, and refuses `{"B": 12.3}` with a message that names the value. The draws of a sample are known values too: a `SensitivityAnalysis` of `InputSpace.from_sample` writes them. The engine checks every draw when the analysis is built, and the message names the set of the draw.
+Initial conditions that calibration sets go through the same rounding. A method that varies an initial condition, such as an optimizer or a sampler, writes values that are not whole. So it needs a rounding, whatever the bounds. With no rounding, a `Calibrator`, or a `SensitivityAnalysis` of independent inputs, with an `initial_condition` raises `ValueError` when it is built. The message names the initial condition and the two options. Known values need no rounding when they are whole: `Model.apply_calibration_parameters` writes `{"B": 12.0}`, and refuses `{"B": 12.3}` with a message that names the value. With a rounding, it writes the amount a calibration found, such as `11.85`, and the model builds. With `"largest_remainder"`, or for a bin of one compartment, each run of it starts as the calibration did, from 12 units. With `"random"`, a bin of several compartments can start from other units for the same seed ([#474](https://github.com/MUNQU/commol/issues/474)). The draws of a sample are known values too: a `SensitivityAnalysis` of `InputSpace.from_sample` writes them. The engine checks every draw when the analysis is built, and the message names the set of the draw.
 
 ## Seeds and replicates
 
@@ -225,7 +224,7 @@ print(0.05 < result.best_parameters["k2"] < 0.2)  # True: near 0.1
 ## Checklist
 
 - [ ] The engine is `StochasticEvents` (continuous time) or `StochasticSteps` (per-step probabilities), as the rates of the model mean.
-- [ ] The amount of each bin is whole, and the settings name a `rounding` when the amount of a compartment is not, or when a calibration or a `SensitivityAnalysis` of independent inputs sets an initial condition.
+- [ ] Every initial amount is whole, or the settings name a `rounding`; a calibration or a `SensitivityAnalysis` of independent inputs that sets an initial condition needs one too.
 - [ ] Every run has a seed, or keeps the one commol drew (`results.seed`).
 - [ ] A large total uses `"tau_leaping"` or a deterministic engine.
 - [ ] A calibration sets `replicates`, `replicate_summary` and `seed`.

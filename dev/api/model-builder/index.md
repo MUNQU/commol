@@ -873,9 +873,9 @@ class ModelBuilder:
             one the engine cannot run (a position between two steps for an
             engine that steps only at integers, or a ``"pulse"`` point between
             two steps), a per-compartment override names an unknown
-            compartment, a stochastic engine gets an amount that is not whole,
-            or the origin has a time zone or a step unit that is not of fixed
-            calendar length.
+            compartment, a stochastic engine with no ``rounding`` gets an
+            amount that is not whole, or the origin has a time zone or a step
+            unit that is not of fixed calendar length.
         """
         model: Model[StructureT] = Model(
             name=self._name,
@@ -1851,9 +1851,9 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | If validation fails, the structure does not fit the process (for example a fraction names no bin, or a rate reads neighbors\_<bin> and the structure has no neighbors), the engine is unknown or does not run the kind of the structure, the settings are not settings of that engine, a series point or an impulse position is one the engine cannot run (a position between two steps for an engine that steps only at integers, or a "pulse" point between two steps), a per-compartment override names an unknown compartment, a stochastic engine gets an amount that is not whole, or the origin has a time zone or a step unit that is not of fixed calendar length. |
+| Type         | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If validation fails, the structure does not fit the process (for example a fraction names no bin, or a rate reads neighbors\_<bin> and the structure has no neighbors), the engine is unknown or does not run the kind of the structure, the settings are not settings of that engine, a series point or an impulse position is one the engine cannot run (a position between two steps for an engine that steps only at integers, or a "pulse" point between two steps), a per-compartment override names an unknown compartment, a stochastic engine with no rounding gets an amount that is not whole, or the origin has a time zone or a step unit that is not of fixed calendar length. |
 
 Source code in `commol/_model/builder.py`
 
@@ -1904,9 +1904,9 @@ def build(
         one the engine cannot run (a position between two steps for an
         engine that steps only at integers, or a ``"pulse"`` point between
         two steps), a per-compartment override names an unknown
-        compartment, a stochastic engine gets an amount that is not whole,
-        or the origin has a time zone or a step unit that is not of fixed
-        calendar length.
+        compartment, a stochastic engine with no ``rounding`` gets an
+        amount that is not whole, or the origin has a time zone or a step
+        unit that is not of fixed calendar length.
     """
     model: Model[StructureT] = Model(
         name=self._name,
