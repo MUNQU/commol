@@ -1,5 +1,7 @@
 """Stratifications expand each bin into compartments, fully or under conditions."""
 
+import re
+
 import pytest
 
 from pydantic import ValidationError
@@ -11,10 +13,21 @@ from tests.support import a_to_b_builder, abc_builder, assert_total_conserved, b
 GROUP = {"g1": 0.8, "g2": 0.2}
 STATUS = {"s1": 0.7, "s2": 0.3}
 LEVEL = {"l1": 0.8, "l2": 0.2}
+SHARING_A = {"group": {"a": 0.5, "b": 0.5}, "type": {"a": 0.5, "c": 0.5}}
+"""Two stratifications that share the category id ``a``."""
 
 
 def _compartments(builder: ModelBuilder) -> set[str]:
     return set(Simulation(build(builder)).engine.compartments)
+
+
+def _moved(rate: str) -> float:
+    """What a step of ``rate`` moves from A, of 1000, to B, both split by
+    :data:`SHARING_A`."""
+    results = Simulation(
+        build(a_to_b_builder(rate=rate, stratifications=SHARING_A))
+    ).run(1)
+    return sum(series[-1] for name, series in results.items() if name.startswith("B_"))
 
 
 class TestFullProduct:
@@ -176,3 +189,58 @@ def test_the_order_of_the_stratifications_sets_the_compartments() -> None:
         for bin_id in ("A", "B", "C")
         for suffix in ("s1", "s2_g1", "s2_g2")
     ]
+
+
+@pytest.mark.parametrize(
+    ("rate", "read", "sums"),
+    [
+        pytest.param(
+            "0.0001 * total_a",
+            "'total_a' names the subgroup total of 'group:a' and the subgroup total "
+            "of 'type:a'.",
+            "'group:a' is 'total_a_a + total_a_c'; 'type:a' is 'total_a_a + total_b_a'",
+            id="a subgroup total",
+        ),
+        pytest.param(
+            "0.0001 * A_a",
+            "'A_a' names the compartments of bin 'A' in 'group:a' and the "
+            "compartments of bin 'A' in 'type:a'.",
+            "'group:a' is 'A_a_a + A_a_c'; 'type:a' is 'A_a_a + A_b_a'",
+            id="a partial bin total",
+        ),
+    ],
+)
+def test_a_rate_that_reads_a_name_of_a_shared_category_is_refused(
+    rate: str, read: str, sums: str
+) -> None:
+    """``a`` gives ``total_a`` and ``A_a`` two meanings, the sum in ``group:a``
+    and the sum in ``type:a``, and a rate reads one value. The message gives
+    each meaning as a sum of names of one meaning."""
+    builder = a_to_b_builder(rate=rate, stratifications=SHARING_A)
+    name = read.split(" ", 1)[0]
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            f"transition 't_ab' reads {name}. {read} Rename category 'group:a' or "
+            "category 'type:a', so that each has a name of its own. To keep the "
+            f"ids, read a meaning as a sum of names of one meaning: {sums}."
+        ),
+    ):
+        build(builder)
+
+
+@pytest.mark.parametrize(
+    "rate",
+    [
+        pytest.param("0.0001 * total_c", id="a name of one meaning"),
+        pytest.param("0.0001 * (total_a_a + total_a_c)", id="group a, as two totals"),
+        pytest.param("0.0001 * (total_a_a + total_b_a)", id="type a, as two totals"),
+        pytest.param("0.0001 * (A_a_a + A_a_c)", id="group a of A, as compartments"),
+    ],
+)
+def test_a_rate_reads_a_shared_category_through_names_of_one_meaning(
+    rate: str,
+) -> None:
+    """Each of the 4 compartments of A moves 0.0001 * 500."""
+    assert _moved(rate) == pytest.approx(0.2)

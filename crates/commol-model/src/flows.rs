@@ -15,14 +15,14 @@ use commol_core::{
 
 use crate::builder::{
     accumulator_output_ref, generate_accumulators, missing_neighbors, neighbor_terms,
-    subgroup_total_name_set,
+    subgroup_total_mappings,
 };
 use crate::helpers::{
     category_overrides, get_rate_string_for_compartment, replace_bin_in_rate, target_categories,
 };
 use crate::layout::CompartmentLayout;
 use crate::matrices::{MatrixSums, variables_outside_matrix_sums};
-use crate::types::AccumulatorOutputRef;
+use crate::types::{AccumulatorOutputRef, SubgroupTotalLayout};
 use commol_core::math_expression::jit::ast::Expr;
 use commol_core::math_expression::jit::parser::parse_expression;
 
@@ -181,28 +181,39 @@ fn driving_compartments(
 /// several sources has a proportional rate, when a flow ends
 /// in categories no compartment has, or when a matrix does not fit the
 /// process or a matrix sum cannot be written ([`MatrixSums::resolve`]).
+///
+/// `subgroup_totals` holds the sums a rate reads: the subgroup totals of one
+/// meaning (`build_subgroup_total_mappings` in
+/// `crates/commol-model/src/builder.rs`).
 pub(crate) fn plan_transition_flows(
     process: &Process,
     neighbors: Option<&Neighbors>,
     layout: &CompartmentLayout,
     accumulator_map: &HashMap<AccumulatorOutputRef, usize>,
-    subgroup_total_names: &HashSet<String>,
+    subgroup_totals: &[SubgroupTotalLayout],
 ) -> Result<Vec<PlannedFlow>, String> {
     let stratifications = &process.stratifications;
     let compartment_names: HashSet<&str> = layout.names().iter().map(String::as_str).collect();
+    let subgroup_total_names: HashSet<&str> = subgroup_totals
+        .iter()
+        .map(|total| total.parameter_name.as_str())
+        .collect();
     let is_absolute = |tree: Option<&Expr>, explicit: Option<bool>| {
         explicit.unwrap_or_else(|| {
             tree.map(variables_outside_matrix_sums)
                 .unwrap_or_default()
                 .iter()
-                .any(|v| compartment_names.contains(v.as_str()) || subgroup_total_names.contains(v))
+                .any(|v| {
+                    compartment_names.contains(v.as_str())
+                        || subgroup_total_names.contains(v.as_str())
+                })
         })
     };
     process.check_conditions()?;
     for matrix in &process.matrices {
         matrix.check(process)?;
     }
-    let matrix_sums = MatrixSums::new(process, layout);
+    let matrix_sums = MatrixSums::new(process, layout, subgroup_totals);
     // The tree of each rate, parsed once; None when it does not parse, which
     // the compilation of the rate reports.
     let mut trees: HashMap<String, Option<Expr>> = HashMap::new();
@@ -526,8 +537,8 @@ pub fn describe_flows(
         .enumerate()
         .map(|(idx, output)| (output.output_ref, idx))
         .collect();
-    let names = subgroup_total_name_set(&layout, process);
-    let flows = plan_transition_flows(process, neighbors, &layout, &accumulator_map, &names)?;
+    let totals = subgroup_total_mappings(&layout, process);
+    let flows = plan_transition_flows(process, neighbors, &layout, &accumulator_map, &totals)?;
     let name = |idx: Option<usize>| idx.map(|idx| layout.name(idx).to_string());
     Ok(flows
         .into_iter()
