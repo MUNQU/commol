@@ -143,6 +143,7 @@ print(value_of("A_t1 + 0"))     # 300.0  = 600 x 0.5
 | Suffixes out of declaration order, as in `A_t1_g1` | Error: the variable is not found |
 | `total_…` out of order, as in `total_t1_g1` | `build` fails and lists the valid `total_…` names |
 | A combination that a conditional stratification never creates | `build` fails for `total_…`; `<bin>_…` is not found |
+| A category id that two stratifications share, as `g1` of `group` and of `type`, in `total_g1` or `A_g1` | `build` fails, names both sums and gives each as a sum of names of one meaning, such as `total_g1_g1 + total_g1_g2` for `group:g1` ([Names the engine sets](building-models.md#names-the-engine-sets)) |
 
 ### Matrix sums
 
@@ -161,8 +162,8 @@ of `M`:
 
 | In `e` | Reads in category `j` |
 |---|---|
-| A bin id, such as `B` | The amount of the bin in `j`: the compartment `B_j`, or the sum of the compartments of `B` in `j` when a later stratification splits them |
-| `total` | The total of `j`, `total_j` |
+| A bin id, such as `B` | The amount of the bin in `j`: the compartment `B_j`, or the sum of the compartments of `B` in `j` when a later stratification splits them, written as the partial total `B_j`, or as its compartments when a shared category id gives `B_j` two meanings |
+| `total` | The total of `j`, written as `total_j`, or as its compartments when a shared category id gives `total_j` two meanings |
 | Anything else: a parameter, a compartment, a subgroup total | The same value as outside the sum |
 
 ```python

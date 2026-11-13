@@ -29,6 +29,7 @@ use commol_core::{
 
 use crate::builder::subgroup_totals_by_compartments;
 use crate::layout::CompartmentLayout;
+use crate::types::SubgroupTotalLayout;
 
 /// A variable that a matrix gives the rates and the formula parameters of a
 /// model.
@@ -238,12 +239,17 @@ pub(crate) struct MatrixSums<'a> {
 }
 
 impl<'a> MatrixSums<'a> {
-    /// The matrix sums of `process`, laid out in `layout`.
-    pub(crate) fn new(process: &'a Process, layout: &'a CompartmentLayout) -> Self {
+    /// The matrix sums of `process`, laid out in `layout`, which read the
+    /// subgroup totals of `subgroup_totals`.
+    pub(crate) fn new(
+        process: &'a Process,
+        layout: &'a CompartmentLayout,
+        subgroup_totals: &[SubgroupTotalLayout],
+    ) -> Self {
         let totals = if process.matrices.is_empty() {
             HashMap::new()
         } else {
-            subgroup_totals_by_compartments(layout, process)
+            subgroup_totals_by_compartments(subgroup_totals)
         };
         Self {
             process,
