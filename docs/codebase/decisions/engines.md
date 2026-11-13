@@ -198,7 +198,7 @@ split into whole amounts of its compartments, so a unit never moves to another b
 
 The engine rounds at the start of a run, not when it is built, so a value that
 calibration writes (`InitialConditionPlan`) goes through the same rounding,
-`"random"` draws after the values are written, and the build takes every amount that a run takes ([A calibrated amount is written back as the optimizer found it](calibrated-initial-conditions.md#a-calibrated-amount-is-written-back-as-the-optimizer-found-it)).
+`"random"` draws after the values are written, and the build takes every amount that a run takes ([A calibrated amount is written back as the optimizer found it](calibration-write-back.md#a-calibrated-amount-is-written-back-as-the-optimizer-found-it)).
 With no rounding, a value that is not whole is refused, and a method that varies an initial condition is refused when it is built ([Calibrated initial conditions](calibrated-initial-conditions.md#whole-units-need-a-rounding-to-vary-an-initial-condition)).
 
 | Alternative | Why not |

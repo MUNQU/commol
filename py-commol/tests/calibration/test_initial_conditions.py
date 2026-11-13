@@ -368,6 +368,28 @@ def test_an_id_of_a_compartment_and_of_another_bin_is_refused() -> None:
         build(builder)
 
 
+def test_an_id_of_a_bin_and_of_a_category_is_refused() -> None:
+    """``A`` would name the bin ``A`` and the category ``group:A``, so the
+    plan refuses it; the qualified id it gives names the category alone."""
+    model = build(a_to_b_builder(stratifications={"group": {"A": 0.5, "g2": 0.5}}))
+
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            "Initial-condition id 'A' names the bin 'A' and the category "
+            "'group:A'. Write 'group:A' for the category. A bin has no other id: "
+            "rename bin 'A' or category 'group:A', so that each has an id of its own."
+        ),
+    ):
+        calibrated_initial_state(
+            model, [bounded("A", 0, 1000, kind="initial_condition")], [100]
+        )
+    scored = calibrated_initial_state(
+        model, [bounded("group:A", 0, 1, kind="initial_condition")], [0.2]
+    )
+    assert scored.categories == ["group:A"]
+
+
 def test_a_calibrated_amount_keeps_the_split_by_category() -> None:
     problem = CalibrationProblem(
         observed_data=[ObservedDataPoint(at=1, output="B_g1_t1", value=10.0)],

@@ -46,7 +46,10 @@ build `A_g1`. `check_names` in `crates/commol-model/src/labels.rs`, from
 accumulator, its prefixes and its outputs (`OutputLabels::prefixes`), and
 each bin total, partial bin total and `total_<categories>`
 (`subgroup_total_entries` in `crates/commol-model/src/builder.rs`). The
-owner of a name is a bin, an accumulator, or the totals over categories.
+owner of a name is a bin, an accumulator, or the totals over categories. A
+category id is not one of these names; the plan of initial conditions reads
+it next to them, and refuses an id that is both
+([An initial-condition id names one target](calibrated-initial-conditions.md#an-initial-condition-id-names-one-target)).
 
 **Rule:** the build refuses a name of two owners, such as two bins, a bin
 and an accumulator, or a bin and a total over categories, and a name of one

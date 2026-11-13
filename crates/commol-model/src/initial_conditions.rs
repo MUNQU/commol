@@ -204,10 +204,9 @@ impl InitialConditionPlan {
     /// Resolve the target of every initial-condition value, and the
     /// remainder.
     ///
-    /// An initial-condition id names, in order of precedence:
+    /// An initial-condition id names one of:
     /// - an expanded compartment (`A_g1`);
-    /// - a bin or a bin prefix (`A`, or `A_g1` over a deeper stratification),
-    ///   when it holds no [`CATEGORY_SEPARATOR`];
+    /// - a bin or a bin prefix (`A`, or `A_g1` over a deeper stratification);
     /// - a category of a binary stratification, qualified (`group:g1`) or
     ///   bare (`g1`) when one stratification has it ([`resolve_category`],
     ///   among the categories the compartments have).
@@ -215,11 +214,13 @@ impl InitialConditionPlan {
     /// A name of a compartment, a bin or a bin prefix names one bin and one
     /// list of its categories, because [`crate::check_model`] refuses a name
     /// that two things build, as bin `A` in `g1` and a bin `A_g1` build
-    /// `A_g1`. So the order never takes the compartments of one bin for
-    /// those of another: it gives the kind of an id that is a compartment
-    /// and a bin or a prefix of that one compartment. It also puts a bin
-    /// before a bare category of the same id, which then sets the bin with
-    /// no error; the qualified id names the category.
+    /// `A_g1`. So an id never covers the compartments of two bins, and an id
+    /// that is a compartment and a bin or a prefix of that one compartment
+    /// is a compartment. An id that is a compartment, a bin or a bin prefix
+    /// and also a category, bare or qualified, as a bin `A` and the category
+    /// `group:A`, is refused: the message gives each other id that sets the
+    /// category alone, bare or qualified, and what to rename, because a bin
+    /// has no other id.
     ///
     /// The remainder, when given, names the compartments that take what the
     /// other compartments leave of the sum of the amounts the model states.
@@ -227,7 +228,8 @@ impl InitialConditionPlan {
     /// # Errors
     ///
     /// Returns a message when a value is not an initial condition, when an id
-    /// matches none of these, names a category declared by more than one
+    /// matches none of these, is a compartment, a bin or a bin prefix and
+    /// also a category, names a category declared by more than one
     /// stratification, or names a category of a stratification that is not
     /// binary for some compartment, or when the remainder does not resolve
     /// or keeps no amount the model states.
@@ -241,6 +243,7 @@ impl InitialConditionPlan {
         let state = engine.initial_state();
         let fractions = engine.model().fractions();
         let splits_by = engine.model().splits_by();
+        let stratifications = compartment_categories(&labels);
 
         let targets = values
             .iter()
@@ -252,6 +255,7 @@ impl InitialConditionPlan {
                     &state,
                     fractions,
                     splits_by,
+                    &stratifications,
                 )
                 .map(|target| (value.id.clone(), target)),
             })
@@ -561,23 +565,7 @@ pub fn resolve_category<'a, S: AsRef<str>>(
     id: &str,
     stratifications: &'a [(S, Vec<S>)],
 ) -> Result<Option<(&'a str, &'a str)>, String> {
-    let matches: Vec<(&str, &str)> = stratifications
-        .iter()
-        .flat_map(|(stratification, categories)| {
-            let stratification = stratification.as_ref();
-            categories
-                .iter()
-                .map(AsRef::as_ref)
-                .filter(move |&category| {
-                    category == id
-                        || id
-                            .strip_prefix(stratification)
-                            .and_then(|rest| rest.strip_prefix(CATEGORY_SEPARATOR))
-                            == Some(category)
-                })
-                .map(move |category| (stratification, category))
-        })
-        .collect();
+    let matches = category_matches(id, stratifications);
     match matches.as_slice() {
         [] => Ok(None),
         [found] => Ok(Some(*found)),
@@ -601,6 +589,32 @@ pub fn resolve_category<'a, S: AsRef<str>>(
             ))
         }
     }
+}
+
+/// Every category of `stratifications` that the category id `id` names,
+/// bare or qualified ([`resolve_category`]), as its stratification and its
+/// bare name.
+fn category_matches<'a, S: AsRef<str>>(
+    id: &str,
+    stratifications: &'a [(S, Vec<S>)],
+) -> Vec<(&'a str, &'a str)> {
+    stratifications
+        .iter()
+        .flat_map(|(stratification, categories)| {
+            let stratification = stratification.as_ref();
+            categories
+                .iter()
+                .map(AsRef::as_ref)
+                .filter(move |&category| {
+                    category == id
+                        || id
+                            .strip_prefix(stratification)
+                            .and_then(|rest| rest.strip_prefix(CATEGORY_SEPARATOR))
+                            == Some(category)
+                })
+                .map(move |category| (stratification, category))
+        })
+        .collect()
 }
 
 /// The stratification and the bare name of a category id of the initial
@@ -629,6 +643,16 @@ pub fn resolve_declared_category<'a, S: AsRef<str>>(
     })
 }
 
+/// The target of an initial-condition id: its compartment, its bin or bin
+/// prefix, or its category ([`InitialConditionPlan::new`]), among
+/// `stratifications`, each with the categories the compartments have
+/// ([`compartment_categories`]).
+///
+/// # Errors
+///
+/// Returns a message when the id names nothing, or a compartment, a bin or
+/// a bin prefix and also a category ([`two_meanings`]), or when the category
+/// does not resolve ([`resolve_category`], [`paired_category`]).
 fn resolve_target(
     id: &str,
     compartments: &[String],
@@ -636,18 +660,109 @@ fn resolve_target(
     state: &[f64],
     fractions: &[Vec<f64>],
     splits_by: &[(String, String)],
+    stratifications: &[(&str, Vec<&str>)],
 ) -> Result<InitialConditionTarget, String> {
-    if let Some(index) = compartments.iter().position(|name| name == id) {
-        return Ok(InitialConditionTarget::Exact { index });
+    let Some((kind, indices)) = compartments_named(id, compartments, labels) else {
+        return match resolve_category(id, stratifications)? {
+            Some((stratification, category)) => {
+                paired_category(stratification, category, labels, splits_by)
+            }
+            None => Err(format!(
+                "Invalid bin, compartment or category '{}' for initial condition \
+                 calibration (available compartments: {})",
+                id,
+                compartments.join(", ")
+            )),
+        };
+    };
+    let categories = category_matches(id, stratifications);
+    if !categories.is_empty() {
+        // The ids, other than `id`, that set one of the categories alone.
+        let others: Vec<String> = categories
+            .iter()
+            .filter(|(stratification, category)| {
+                paired_category(stratification, category, labels, splits_by).is_ok()
+            })
+            .flat_map(|&(stratification, category)| {
+                let qualified = format!("{stratification}{CATEGORY_SEPARATOR}{category}");
+                [qualified, category.to_string()]
+                    .into_iter()
+                    .filter(move |other| {
+                        other != id
+                            && category_matches(other, stratifications)
+                                == [(stratification, category)]
+                            && compartments_named(other, compartments, labels).is_none()
+                    })
+            })
+            .collect();
+        let bin = labels[indices[0]].source.as_str();
+        return Err(two_meanings(id, kind, bin, &categories, &others));
     }
-    if !id.contains(CATEGORY_SEPARATOR)
-        && let Some(indices) = prefix_indices(id, labels)
-    {
-        return Ok(InitialConditionTarget::aggregate(
-            indices, state, labels, fractions,
-        ));
+    Ok(match kind {
+        InitialTargetKind::Compartment => InitialConditionTarget::Exact { index: indices[0] },
+        _ => InitialConditionTarget::aggregate(indices, state, labels, fractions),
+    })
+}
+
+/// The kind and the compartments of `id` as an expanded compartment, a bin
+/// or a bin prefix. The compartment comes first, so an id that is also the
+/// bin or a prefix of that one compartment is a compartment.
+fn compartments_named(
+    id: &str,
+    compartments: &[String],
+    labels: &[OutputLabels],
+) -> Option<(InitialTargetKind, Vec<usize>)> {
+    match compartments.iter().position(|name| name == id) {
+        Some(index) => Some((InitialTargetKind::Compartment, vec![index])),
+        None => prefix_indices(id, labels).map(|indices| (InitialTargetKind::Bin, indices)),
     }
-    // Each stratification with the categories its compartments have.
+}
+
+/// The message of an id that is a compartment, a bin or a bin prefix
+/// (`kind`) of the bin `bin`, and also each category of `categories`, as
+/// `(stratification, category)`: what it names, the ids of `others`, which
+/// set a category alone, and what to rename, because a bin has no other id.
+fn two_meanings(
+    id: &str,
+    kind: InitialTargetKind,
+    bin: &str,
+    categories: &[(&str, &str)],
+    others: &[String],
+) -> String {
+    let what = if kind == InitialTargetKind::Bin && bin != id {
+        format!("{} prefix", kind.name())
+    } else {
+        kind.name().to_string()
+    };
+    let qualified: Vec<String> = categories
+        .iter()
+        .map(|(stratification, category)| {
+            format!("'{stratification}{CATEGORY_SEPARATOR}{category}'")
+        })
+        .collect();
+    let (last, rest) = qualified
+        .split_last()
+        .expect("an id of two meanings names a category");
+    let named = if rest.is_empty() {
+        format!("category {last}")
+    } else {
+        format!("categories {} and {last}", rest.join(", "))
+    };
+    let write = if others.is_empty() {
+        String::new()
+    } else {
+        let quoted: Vec<String> = others.iter().map(|other| format!("'{other}'")).collect();
+        format!(" Write {} for the category.", quoted.join(" or "))
+    };
+    format!(
+        "Initial-condition id '{id}' names the {what} '{id}' and the {named}.{write} A {what} \
+         has no other id: rename bin '{bin}' or {named}, so that each has an id of its own."
+    )
+}
+
+/// Each stratification with the categories the compartments of `labels`
+/// have, in the order they come.
+fn compartment_categories(labels: &[OutputLabels]) -> Vec<(&str, Vec<&str>)> {
     let mut stratifications: Vec<(&str, Vec<&str>)> = Vec::new();
     for label in labels {
         for (stratification, category) in &label.categories {
@@ -663,17 +778,7 @@ fn resolve_target(
             }
         }
     }
-    match resolve_category(id, &stratifications)? {
-        Some((stratification, category)) => {
-            paired_category(stratification, category, labels, splits_by)
-        }
-        None => Err(format!(
-            "Invalid bin, compartment or category '{}' for initial condition \
-             calibration (available compartments: {})",
-            id,
-            compartments.join(", ")
-        )),
-    }
+    stratifications
 }
 
 /// Pairs the compartments of a category with those that differ from them
@@ -774,6 +879,24 @@ mod tests {
         (0..count).map(|idx| format!("C{idx}")).collect()
     }
 
+    /// The target of `id` among compartments of `labels` that hold nothing.
+    fn resolved(
+        id: &str,
+        labels: &[OutputLabels],
+        splits_by: &[(String, String)],
+    ) -> Result<InitialConditionTarget, String> {
+        let count = labels.len();
+        resolve_target(
+            id,
+            &names(count),
+            labels,
+            &vec![0.0; count],
+            &vec![Vec::new(); count],
+            splits_by,
+            &compartment_categories(labels),
+        )
+    }
+
     #[test]
     fn binary_category_resolves_to_disjoint_pairs() {
         let labels = labels(&[
@@ -783,15 +906,7 @@ mod tests {
             ("A", &[("group", "c2"), ("type", "t2")]),
         ]);
 
-        let target = resolve_target(
-            "c1",
-            &names(4),
-            &labels,
-            &[0.0; 4],
-            &vec![Vec::new(); 4],
-            &[],
-        )
-        .unwrap();
+        let target = resolved("c1", &labels, &[]).unwrap();
 
         assert_eq!(
             target,
@@ -811,15 +926,7 @@ mod tests {
         ]);
         let splits_by = [("type".to_string(), "group".to_string())];
 
-        let target = resolve_target(
-            "g1",
-            &names(4),
-            &labels,
-            &[0.0; 4],
-            &vec![Vec::new(); 4],
-            &splits_by,
-        )
-        .unwrap();
+        let target = resolved("g1", &labels, &splits_by).unwrap();
 
         assert_eq!(
             target,
@@ -831,15 +938,7 @@ mod tests {
 
     #[test]
     fn category_shared_by_two_stratifications_is_ambiguous() {
-        let error = resolve_target(
-            "c1",
-            &names(4),
-            &shared_category_labels(),
-            &[0.0; 4],
-            &vec![Vec::new(); 4],
-            &[],
-        )
-        .unwrap_err();
+        let error = resolved("c1", &shared_category_labels(), &[]).unwrap_err();
 
         assert!(error.contains("ambiguous"), "{error}");
         assert!(error.contains("'group:c1' or 'type:c1'"), "{error}");
@@ -880,15 +979,7 @@ mod tests {
 
     #[test]
     fn qualified_category_resolves_one_stratification() {
-        let target = resolve_target(
-            "type:c1",
-            &names(4),
-            &shared_category_labels(),
-            &[0.0; 4],
-            &vec![Vec::new(); 4],
-            &[],
-        )
-        .unwrap();
+        let target = resolved("type:c1", &shared_category_labels(), &[]).unwrap();
 
         assert_eq!(
             target,
@@ -906,15 +997,7 @@ mod tests {
             ("A", &[("group", "c2"), ("status", "s2")]),
         ]);
 
-        let target = resolve_target(
-            "s1",
-            &names(3),
-            &labels,
-            &[0.0; 3],
-            &vec![Vec::new(); 3],
-            &[],
-        )
-        .unwrap();
+        let target = resolved("s1", &labels, &[]).unwrap();
 
         assert_eq!(
             target,
@@ -932,15 +1015,7 @@ mod tests {
             ("A", &[("group", "c")]),
         ]);
 
-        let error = resolve_target(
-            "a",
-            &names(3),
-            &labels,
-            &[0.0; 3],
-            &vec![Vec::new(); 3],
-            &[],
-        )
-        .unwrap_err();
+        let error = resolved("a", &labels, &[]).unwrap_err();
 
         assert!(error.contains("binary"), "{error}");
     }

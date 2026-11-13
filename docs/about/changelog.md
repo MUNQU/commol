@@ -281,6 +281,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rename a bin, an accumulator or a category so that each name names one
   thing. See
   [Names the engine sets](../guide/building-models.md#names-the-engine-sets).
+- **Breaking:** an initial-condition id that is a compartment, a bin or a
+  bin prefix and also a category, bare or qualified, is refused wherever the
+  engine resolves it, as when the `Calibrator` is created. With a bin `A`
+  and `group = [A, g2]`, the id `A` set the bin with no error, and a
+  qualified id such as `group:g1` set the category when a bin had that id.
+  The message names both, the other id that sets the category, when there
+  is one, and what to rename: `Initial-condition id 'A' names the bin 'A' and
+  the category 'group:A'. Write 'group:A' for the category. A bin has no
+  other id: rename bin 'A' or category 'group:A', so that each has an id of
+  its own.` The model still builds, and a remainder `A` is still the bin. An
+  id that holds `:` and is no category is now a bin or a bin prefix, so a bin
+  `x:y` of a stratified model, or the prefix `A_0:4` of `age = [0:4, 5:9]`,
+  can be calibrated, as the remainder already took it; it was an unknown id.
+  Migration: write the other id of the category, or rename the bin or the
+  category to calibrate the bin. See
+  [What an id can name](../guide/calibration-initial-conditions.md#what-an-id-can-name).
 - **Breaking:** a run refuses a parameter or a bin amount without a value
   with the message of the engine, which names each of them: `The model
   cannot run: the parameters ["k1"] and the amounts of the bins ["B"] have no
