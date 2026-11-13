@@ -180,11 +180,31 @@ the point of its bounds nearest 0), with the remainder they take, to a copy of
 the engine and check the copy (`ValueWriter::checked` in
 `crates/commol-calibration/src/values.rs`, the one constructor of a writer that
 other modules reach). A value that neither the problem nor the model gives is
-refused with the message of the engine. The remainder sets each bin it covers,
-a bin left `None` too ([#477](https://github.com/MUNQU/commol/issues/477)). The
-`Calibrator` and `SensitivityAnalysis` check no value of their own; the
-structure then checks what only Python knows, such as the unit of the remainder
+refused with the message of the engine. The `Calibrator` and
+`SensitivityAnalysis` check no value of their own; the structure then checks
+what only Python knows, such as the unit of the remainder
 (`ModelStructure.check_calibration_values`).
+
+The remainder gives a value to each compartment it covers, of a bin left `None`
+too: what the values leave of the sum of the amounts the model states for the
+compartments that it and they cover. When the model states none of them
+(`CompiledModel::states_none_of`), that sum is a `0` no one gave, as for
+`{"A": None, "B": 1000}` with only `k` calibrated and the remainder `A`, or with
+a category split alone. The plan refuses it (`with_remainder` in
+`crates/commol-model/src/initial_conditions.rs`) and names the amounts that
+`check_values` would name (`CompiledModel::missing_amounts`). Every builder and
+query of the values resolves the plan, so both builders above,
+`plan_model_values` and `configured_engine` refuse it: the `Calibrator`,
+`SensitivityAnalysis`, and `Model.apply_calibration_parameters`, which would
+write `A = 0` back for a split of `g1` alone.
+
+Its limits: a stated `0` is a sum someone gave, so with `{"A": None, "B": 0}`
+and `B` calibrated the remainder `A` resolves, and every positive `B` is
+infeasible. A compartment override on a bin left `None` counts in `total` but
+not as a stated amount, here as in `check_values`
+([#482](https://github.com/MUNQU/commol/issues/482)). The plan reads the flags
+of the engine when it is built, so a Rust caller that writes an initial
+condition before it builds the plan gives that compartment a value.
 
 | Alternative | Why not |
 |---|---|
@@ -195,10 +215,20 @@ structure then checks what only Python knows, such as the unit of the remainder
 | Two constructors, `new` and one that takes the remainder | Two paths to one problem, and a shorthand that only tests call (KISS, YAGNI). |
 | The settings (`ProblemSettings::problem`) as the only entry point, with the check there | A Rust caller of `new` skips it, and the port that reads the JSON of Python would hold a rule of the problem it builds (Dependencies point inward; Each boundary is a port). |
 | `check_model_values` kept beside `new` | A second route to the check that `new` makes, with no caller but its own binding (YAGNI, DRY). |
+| Any remainder refused when no initial condition is calibrated | It refuses a remainder of a bin with an amount, which gives back that amount, and takes a category split, or a value of a bin left `None`, that leave the remainder at `0` (DRY: a second rule, on what is calibrated, that disagrees with the rule of a value no one gave). |
+| Only a remainder of a bin left `None` refused, when no initial condition is calibrated | It still takes a category split, or a value of a bin left `None`, that leave the remainder at `0` (DRY: the same second rule). |
+| The write of such a remainder gives no value (`keep_unvalued`), so `check_values` names its bins | A query of the plan still gives `0`: the write-back of a split of `g1` alone would write `A = 0` into the model, and the message would say to calibrate a bin that the remainder covers, which it would overlap (DRY: one rule in the plan, which every route resolves). |
+| The check in `ValueWriter::checked` | The calibration would hold a rule of an aggregate model, and the queries of the plan, the write-back among them, would miss it (Dependencies point inward). |
 
 **Guards:**
 `crates/commol-model/tests/model_rules.rs::a_run_needs_every_value`, `crates/commol-stochastic/tests/test_values.rs`,
 `crates/commol-calibration/tests/test_varied_values.rs::a_problem_that_leaves_a_value_missing_is_refused_when_it_is_built`,
+`crates/commol-calibration/tests/test_varied_values.rs::a_remainder_that_would_give_a_value_no_one_gave_is_refused`,
+`crates/commol-model/tests/initial_conditions.rs` (the limits: `a_remainder_that_keeps_only_a_stated_zero_leaves_no_positive_value_feasible`,
+`a_compartment_override_on_a_bin_left_none_is_no_stated_amount`),
+`tests/calibration/test_problem.py::TestProblemAgainstTheModel::test_a_remainder_that_would_give_a_value_no_one_gave_is_refused`,
+`tests/uncertainty/test_sensitivity.py::TestInputs::test_a_remainder_that_would_give_a_value_no_one_gave_is_refused`,
+`tests/calibration/test_problem.py::TestProblemAgainstTheModel::test_a_split_alone_never_writes_back_a_remainder_left_none_at_0`,
 `tests/calibration/test_initial_conditions.py::TestIds::test_a_bin_left_to_calibrate_needs_a_value_in_each_compartment`,
 `tests/calibration/test_problem.py::TestProblemAgainstTheModel::test_a_value_that_the_calibration_leaves_missing_is_refused_at_once`,
 `tests/simulation/test_runs.py::TestResults::test_a_run_with_an_uncalibrated_parameter_is_rejected`,

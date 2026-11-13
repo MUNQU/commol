@@ -674,9 +674,11 @@ class CalibrationProblem(EngineChecked, RangeChecked):
         conditions leave of the amounts the model states (default: None). It
         is not calibrated itself: it takes the sum of the amounts the model
         states, less every other compartment, so that sum does not change.
-        A value that would make it negative is penalized. Without a
-        remainder, calibrated initial conditions are applied as given, and
-        the other compartments keep their amounts.
+        The model states an amount of it or of a calibrated bin or
+        compartment: otherwise that sum is 0, a value no one gave, and the
+        engine refuses the remainder. A value that would make it negative is
+        penalized. Without a remainder, calibrated initial conditions are
+        applied as given, and the other compartments keep their amounts.
     replicates : int | None
         For a stochastic engine: how many replicates each evaluation runs,
         with common random numbers (the same seeds, derived from ``seed``, at

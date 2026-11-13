@@ -15,7 +15,9 @@
 //! amount in the unit of its bin; a category value is a split. The remainder
 //! takes the sum of the amounts the model states less every other
 //! compartment, so a compartment that no value covers, such as a bin of
-//! another unit, keeps its amount and cancels out. Within a layer, values are
+//! another unit, keeps its amount and cancels out. It needs an amount that
+//! the model states for a compartment that it or a value covers: without
+//! one, it would give a value no one gave. Within a layer, values are
 //! written in the order given.
 //!
 //! A bin value, and the remainder, split among their compartments as the
@@ -227,7 +229,8 @@ impl InitialConditionPlan {
     /// Returns a message when a value is not an initial condition, when an id
     /// matches none of these, names a category declared by more than one
     /// stratification, or names a category of a stratification that is not
-    /// binary for some compartment, or when the remainder does not resolve.
+    /// binary for some compartment, or when the remainder does not resolve
+    /// or keeps no amount the model states.
     pub fn new<E: CompartmentalEngine>(
         engine: &E,
         values: &[ModelValue],
@@ -267,11 +270,27 @@ impl InitialConditionPlan {
 
     /// Name the compartments that take what the others leave.
     ///
+    /// The remainder keeps the sum of the amounts the model states for the
+    /// compartments that it and the values cover. When the model states none
+    /// of them ([`crate::CompiledModel::states_none_of`]), as for a remainder
+    /// of a bin left `None` with no value of a bin that has an amount, that
+    /// sum is a `0` that no one gave, so the remainder is refused. An amount
+    /// of `0` that the model states is a sum, so a remainder that keeps only
+    /// that `0` resolves, and every positive value of the others is
+    /// infeasible.
+    ///
+    /// The plan reads which compartments have no value from the engine when
+    /// it is built: a compartment of a bin left `None` that a Rust caller has
+    /// written before ([`CompartmentalEngine::set_initial_condition`]) counts
+    /// as stated, and a compartment override on such a bin does not
+    /// (<https://github.com/MUNQU/commol/issues/482>).
+    ///
     /// # Errors
     ///
     /// Returns a message when the id is not a compartment, bin or bin prefix,
-    /// or when it covers a compartment that a calibrated bin or compartment
-    /// value already sets.
+    /// when it covers a compartment that a bin or compartment value already
+    /// sets, or when the model states no amount of a compartment that it or
+    /// a value covers.
     fn with_remainder<E: CompartmentalEngine>(
         mut self,
         engine: &E,
@@ -295,14 +314,25 @@ impl InitialConditionPlan {
                 .any(|idx| indices.contains(idx))
             {
                 return Err(format!(
-                    "Initial-condition remainder '{}' overlaps the calibrated initial \
-                     condition '{}'",
+                    "Initial-condition remainder '{}' overlaps the initial-condition \
+                     value '{}'",
                     remainder_id, id
                 ));
             }
         }
 
         self.remainder = Some((remainder_id.to_string(), indices));
+        let covered = self.covered_compartments();
+        let model = engine.model();
+        if model.states_none_of(&covered) {
+            return Err(format!(
+                "Initial-condition remainder '{remainder_id}' would give a value no one gave: \
+                 it takes what the initial-condition values leave of the amounts the model \
+                 states for them and for it, and {} have no value. Give one of them an \
+                 amount, or add an initial-condition value of a bin that has one",
+                model.missing_amounts(&covered).join(" and ")
+            ));
+        }
         Ok(self)
     }
 

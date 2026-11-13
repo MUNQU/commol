@@ -91,7 +91,8 @@ parameters. The distributions name each input once, and fit its bounds, when
 you build the input space.
 
 An initial condition is an amount in the unit of its bin, or a category split
-in `[0, 1]`, with `initial_condition_remainder` as in a calibration problem.
+in `[0, 1]`, with `initial_condition_remainder` as in a calibration problem
+([The remainder](../calibration-initial-conditions.md#the-remainder)).
 On `StochasticEvents` or `StochasticSteps`, independent inputs that set an
 initial condition need a `rounding`, and the analysis checks every draw of a
 sample when it is built ([Whole units](../stochastic.md#whole-units)).

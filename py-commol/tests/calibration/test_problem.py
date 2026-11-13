@@ -20,7 +20,14 @@ from commol._data.engine_json import engine_json
 from commol._fit.result import CalibrationResult
 from commol._model.model import Model
 from commol.commol_rs import _commol_rs as commol_rs
-from tests.support import abc_builder, bounded, build, observed
+from tests.support import (
+    a_to_b_builder,
+    abc_builder,
+    bounded,
+    build,
+    initial_condition_problem,
+    observed,
+)
 
 SEED = 42
 
@@ -211,11 +218,13 @@ class TestProblemAgainstTheModel:
         truth: Model,
         parameters: list[CalibrationParameter],
         observed_data: list[ObservedDataPoint] | None = None,
+        remainder: str | None = None,
     ) -> Calibrator:
         problem = CalibrationProblem(
             observed_data=observed_data
             or [ObservedDataPoint(at=0, output="B", value=1.0)],
             parameters=parameters,
+            initial_condition_remainder=remainder,
             loss_function="sse",
             optimization_config=NelderMeadConfig(max_iterations=1),
         )
@@ -272,6 +281,53 @@ class TestProblemAgainstTheModel:
             match=r'^The model cannot run: the parameters \["unused"\] have no value',
         ):
             self._calibrator(model, [bounded("k1")])
+
+    @pytest.mark.parametrize(
+        ("amounts", "parameters", "bins"),
+        [
+            ({"A": None, "B": 1000}, [bounded("k")], r'\["A"\]'),
+            (
+                {"A": None, "B": None},
+                [bounded("k"), bounded("B", 0.0, 1000.0, kind="initial_condition")],
+                r'\["A", "B"\]',
+            ),
+        ],
+        ids=["no initial condition", "an initial condition left None"],
+    )
+    def test_a_remainder_that_would_give_a_value_no_one_gave_is_refused(
+        self,
+        amounts: dict[str, float | None],
+        parameters: list[CalibrationParameter],
+        bins: str,
+    ) -> None:
+        model = build(a_to_b_builder(amounts=amounts))
+
+        with pytest.raises(
+            ValueError,
+            match="^Initial-condition remainder 'A' would give a value no one gave: "
+            f".* the amounts of the bins {bins} have no value",
+        ):
+            self._calibrator(model, parameters, remainder="A")
+
+    def test_a_split_alone_never_writes_back_a_remainder_left_none_at_0(self) -> None:
+        # A split of g1 keeps the 1000 of B, so the remainder A would be 0.
+        model = build(
+            a_to_b_builder(
+                amounts={"A": None, "B": 1000},
+                stratifications={"group": {"g1": 0.5, "g2": 0.5}},
+            )
+        )
+        before = model.model_dump_json()
+
+        with pytest.raises(
+            ValueError,
+            match="^Initial-condition remainder 'A' would give a value no one gave",
+        ):
+            model.apply_calibration_parameters(
+                {"g1": 0.3}, initial_condition_problem("g1", remainder="A")
+            )
+
+        assert model.model_dump_json() == before
 
     def test_a_factor_has_positive_bounds(self, truth: Model) -> None:
         with pytest.raises(ValueError, match="'f' must have positive bounds"):

@@ -63,6 +63,20 @@ class TestInputs:
             [draw[1] for draw in result.sample.values]
         )
 
+    def test_a_remainder_that_would_give_a_value_no_one_gave_is_refused(self) -> None:
+        # Only k varies, so the remainder A would take 1000 less the 1000 of B.
+        model = build(a_to_b_builder(amounts={"A": None, "B": 1000}))
+        inputs = InputSpace.uniform_on_bounds(
+            [bounded("k")], initial_condition_remainder="A"
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="^Initial-condition remainder 'A' would give a value no one gave: "
+            r'.* the amounts of the bins \["A"\] have no value',
+        ):
+            SensitivityAnalysis(Simulation(model), inputs)
+
     def test_a_factor_or_a_noise_parameter_is_not_an_input(self) -> None:
         with pytest.raises(ValueError, match=r"'f' is a factor"):
             InputSpace.uniform_on_bounds([bounded("f", 0.5, 2.0, kind="factor")])
