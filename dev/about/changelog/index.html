@@ -2779,6 +2779,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/calibration-write-back/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibration Write-Back
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/time/" class="md-nav__link">
         
   
@@ -5533,6 +5561,22 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   rename a bin, an accumulator or a category so that each name names one
   thing. See
   <a href="../../guide/building-models/#names-the-engine-sets">Names the engine sets</a>.</li>
+<li><strong>Breaking:</strong> an initial-condition id that is a compartment, a bin or a
+  bin prefix and also a category, bare or qualified, is refused wherever the
+  engine resolves it, as when the <code>Calibrator</code> is created. With a bin <code>A</code>
+  and <code>group = [A, g2]</code>, the id <code>A</code> set the bin with no error, and a
+  qualified id such as <code>group:g1</code> set the category when a bin had that id.
+  The message names both, the other id that sets the category, when there
+  is one, and what to rename: <code>Initial-condition id 'A' names the bin 'A' and
+  the category 'group:A'. Write 'group:A' for the category. A bin has no
+  other id: rename bin 'A' or category 'group:A', so that each has an id of
+  its own.</code> The model still builds, and a remainder <code>A</code> is still the bin. An
+  id that holds <code>:</code> and is no category is now a bin or a bin prefix, so a bin
+  <code>x:y</code> of a stratified model, or the prefix <code>A_0:4</code> of <code>age = [0:4, 5:9]</code>,
+  can be calibrated, as the remainder already took it; it was an unknown id.
+  Migration: write the other id of the category, or rename the bin or the
+  category to calibrate the bin. See
+  <a href="../../guide/calibration-initial-conditions/#what-an-id-can-name">What an id can name</a>.</li>
 <li><strong>Breaking:</strong> a run refuses a parameter or a bin amount without a value
   with the message of the engine, which names each of them: <code>The model
   cannot run: the parameters ["k1"] and the amounts of the bins ["B"] have no

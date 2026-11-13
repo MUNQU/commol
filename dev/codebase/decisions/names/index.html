@@ -2864,6 +2864,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../calibration-write-back/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibration Write-Back
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../time/" class="md-nav__link">
         
   
@@ -3803,7 +3831,10 @@ build <code>A_g1</code>. <code>check_names</code> in <code>crates/commol-model/s
 accumulator, its prefixes and its outputs (<code>OutputLabels::prefixes</code>), and
 each bin total, partial bin total and <code>total_&lt;categories&gt;</code>
 (<code>subgroup_total_entries</code> in <code>crates/commol-model/src/builder.rs</code>). The
-owner of a name is a bin, an accumulator, or the totals over categories.</p>
+owner of a name is a bin, an accumulator, or the totals over categories. A
+category id is not one of these names; the plan of initial conditions reads
+it next to them, and refuses an id that is both
+(<a href="../calibrated-initial-conditions/#an-initial-condition-id-names-one-target">An initial-condition id names one target</a>).</p>
 <p><strong>Rule:</strong> the build refuses a name of two owners, such as two bins, a bin
 and an accumulator, or a bin and a total over categories, and a name of one
 owner from two lists of category ids, such as two compartments <code>A_a_b</code> when

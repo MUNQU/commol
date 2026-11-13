@@ -2932,6 +2932,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/calibration-write-back/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibration Write-Back
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/time/" class="md-nav__link">
         
   
@@ -4000,10 +4028,13 @@ as for the initial state); a bare name is rejected as ambiguous.</p>
 <p>A bin, a bin prefix or a compartment id never covers the compartments of two
 bins: a model in which one name is, say, the compartment <code>A_g1</code> of a bin <code>A</code>
 and also a bin <code>A_g1</code> is rejected when it is built
-(<a href="../building-models/#names-the-engine-sets">Names the engine sets</a>). A bare
-category that is also the id of a bin sets the bin, with no error
-(<a href="https://github.com/MUNQU/commol/issues/476">#476</a>): write the qualified id,
-such as <code>"group:g1"</code>, for the category.</p>
+(<a href="../building-models/#names-the-engine-sets">Names the engine sets</a>).</p>
+<p>An id that is a category and also a compartment, a bin or a bin prefix is
+rejected. With a bin <code>A</code> and a stratification <code>group = [A, g2]</code>, <code>"A"</code> is the
+bin and the category <code>group:A</code>: write <code>"group:A"</code> for the category, and
+rename the bin or the category to calibrate the bin, which has no other id.
+The model itself builds and runs, and <code>"A"</code> as the remainder is the bin,
+because a remainder is never a category.</p>
 <p>The engine resolves every id when you create the <code>Calibrator</code>
 (<code>InitialConditionPlan</code> in
 <code>crates/commol-model/src/initial_conditions.rs</code>), so a wrong id fails before
@@ -4027,6 +4058,10 @@ the optimization starts:</p>
 <tr>
 <td>A category name that two stratifications declare</td>
 <td><code>Category 'c1' is ambiguous</code>, with the stratifications and the qualified names (<code>resolve_category</code>, which <code>Aggregate.resolve_category</code> also asks)</td>
+</tr>
+<tr>
+<td>A bin, a bin prefix or a compartment that is also a category, such as <code>"A"</code> with a bin <code>A</code> and <code>group = [A, g2]</code></td>
+<td><code>Initial-condition id 'A' names the bin 'A' and the category 'group:A'</code>, with the other id of the category when one sets it, and the bin or category to rename</td>
 </tr>
 <tr>
 <td>Any id, on <code>StochasticEvents</code> or <code>StochasticSteps</code> with no <code>rounding</code></td>
@@ -4167,7 +4202,8 @@ its complement the rest, in every split of a stratification whose fractions
   holds that sum in the model.</li>
 <li>[ ] The remainder has the unit of every amount it gives.</li>
 <li>[ ] The remainder is not also calibrated.</li>
-<li>[ ] Category ids name a binary stratification, qualified when the name is shared.</li>
+<li>[ ] Category ids name a binary stratification, qualified when the name is shared
+  or is also a bin, a bin prefix or a compartment.</li>
 </ul>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <table>
@@ -4188,7 +4224,7 @@ its complement the rest, in every split of a stratification whose fractions
 </tr>
 <tr>
 <td>The design behind this page</td>
-<td><a href="../../codebase/decisions/calibrated-initial-conditions/">Calibrated initial conditions</a></td>
+<td><a href="../../codebase/decisions/calibrated-initial-conditions/">Calibrated initial conditions</a>, <a href="../../codebase/decisions/calibration-write-back/">Calibration write-back</a></td>
 </tr>
 </tbody>
 </table>
