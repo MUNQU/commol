@@ -2,11 +2,13 @@
 
 [Back to Design decisions](../design-decisions.md)
 
-How calibrated values reach the initial state, which compartment keeps the sum
-the model declares, what an engine of whole units needs to vary an initial
-condition, and what the write-back of an amount that is not whole holds. How
-the fractions of the categories compose and how an amount overrides them is in
-[Initial conditions](initial-conditions.md).
+How calibrated values reach the initial state, what each id names, which
+compartment keeps the sum the model declares, and what an engine of whole
+units needs to vary an initial condition. How the fractions of the categories
+compose and how an amount overrides them is in
+[Initial conditions](initial-conditions.md), and how a calibrated amount is
+written back onto the model is in
+[Calibration write-back](calibration-write-back.md).
 
 ## Calibrated initial conditions are applied in layers
 
@@ -28,11 +30,14 @@ whose every compartment a value or the remainder sets and the split of every
 calibrated category, and pins as per-compartment overrides every compartment
 that these cannot reproduce.
 
-An id names, in this order: an expanded compartment (`A_g1`), a bin or a bin
-prefix (`A`, or `A_g1` over a deeper stratification) when it holds no `:`,
-or a category of a binary stratification, qualified (`group:g1`) or bare
-(`g1`) when one stratification has it (`InitialConditionPlan::new`). The plan
-matches categories on the labels of the compartments, never on their names.
+An id names an expanded compartment (`A_g1`), a bin or a bin prefix (`A`, or
+`A_g1` over a deeper stratification), or a category of a binary
+stratification, qualified (`group:g1`) or bare (`g1`) when one stratification
+has it (`InitialConditionPlan::new`). The plan refuses a category id that is
+also a compartment, a bin or a bin prefix
+([An initial-condition id names one target](#an-initial-condition-id-names-one-target)).
+The plan matches categories on the labels of the compartments, never on their
+names.
 One function resolves a category id, `resolve_category` in
 `crates/commol-model/src/initial_conditions.rs`, with the one separator
 `CATEGORY_SEPARATOR`: the plan asks it among the categories the compartments
@@ -51,18 +56,14 @@ The build refuses a name that two things build
 never takes the compartments of one bin for those of another, and a
 remainder (`prefix_indices`) never covers those of two. The name of a
 compartment is a bin or a prefix only of that one compartment, so
-`resolve_target`, which meets the compartment first, only sets its kind. The
-order still puts a bin before a bare
-category of the same id, which then sets the bin with no error
-([#476](https://github.com/MUNQU/commol/issues/476)); the qualified id names
-the category.
+`resolve_target`, which meets the compartment first, only sets its kind.
 
 **Rule:** the engine says the kind of each value (`InitialTargetKind`: `bin`,
 `compartment` or `category`), together with the compartments it sets
 (`InitialConditionPlan::coverage`), and Python reads the kind and infers
-nothing from the compartments. The kind is what the id names in the order
-above, so an id that names an expanded compartment is a compartment, also
-when it is the id of a bin with one compartment. The remainder has no kind:
+nothing from the compartments. The kind is what the id names, and the
+compartment comes first, so an id that names an expanded compartment is a
+compartment, also when it is the id of a bin with one compartment. The remainder has no kind:
 it is not a value, and the plan keeps it apart. The binding
 `calibrated_initial_state` returns the state, the covered compartments and
 the kinds from the one plan that writes them, so they agree by construction.
@@ -90,6 +91,46 @@ nothing.
 `crates/commol-model/tests/initial_conditions.rs::the_plan_gives_the_kind_and_the_compartments_of_each_value`,
 `tests/calibration/test_initial_conditions.py::test_the_kind_of_each_target_comes_from_the_engine`,
 `tests/calibration/test_initial_conditions.py::test_a_calibrator_on_a_simulation_that_has_run_splits_a_bin_by_the_initial_state`.
+
+## An initial-condition id names one target
+
+A category has two ids, bare (`g1`) and qualified (`group:g1`); a
+compartment, a bin and a bin prefix have one, their name. `resolve_target` in
+`crates/commol-model/src/initial_conditions.rs` reads an id both ways: as a
+compartment, a bin or a bin prefix (`prefix_indices`, on the labels), and as
+a category among those the compartments have (`category_matches`, which
+`resolve_category` reads too).
+
+**Rule:** the plan refuses an id that is a compartment, a bin or a bin prefix
+and also a category, bare or qualified. The message names both and what to
+rename. For a bin `A` and the category `A` of `group = [A, g2]`:
+`Initial-condition id 'A' names the bin 'A' and the category 'group:A'. Write
+'group:A' for the category. A bin has no other id: rename bin 'A' or category
+'group:A', so that each has an id of its own.` It gives each other id that
+sets the category alone: the qualified id, or the bare one when the id is the
+qualified one, when no other category, compartment, bin or bin prefix has it,
+and only when the category can be a value (`paired_category`), so never
+`group:A` of `group = [A, g2, g3]`. The model builds, because only the plan
+reads the id two ways: a rate reads the bin as `A` and the category as
+`total_A`, a result and an observation read output names, and a remainder
+reads only compartments, bins and bin prefixes. A bare category that two
+stratifications share is refused where it is read too (`resolve_category`). A
+new reader of an id that can be a bin or a category resolves it through the
+same function, `resolve_target` from `InitialConditionPlan::new`, and so
+keeps the rule.
+
+| Alternative | Why not |
+|---|---|
+| The build refuses a category id that is a bin id, next to `check_names` in `crates/commol-model/src/labels.rs` | S, YAGNI, DRY: the build checks the names it builds, and the plan the ids it reads. The plan is the one resolver of an id that can be a bin or a category: `stratification_fractions` keys a category under its stratification, the methods of `Aggregate` that resolve a category id (`resolve_category`) take only categories, and `Model.applied_parameters` (`py-commol/commol/_model/report.py`) reads, by name, ids that the plan has already resolved, a defect of its own ([#481](https://github.com/MUNQU/commol/issues/481)). It would refuse models that run and set the category with its qualified id, and keep a second rule of an ambiguous id away from `resolve_category`. |
+| The bin first, in the order of resolution | One idea, one name: an id sets one of two targets with no error, and the user cannot tell which. |
+| The category first | One idea, one name: the same silence, and the bin has no id left. |
+| A qualified id of a bin, such as `bin:A` | One idea, one name: a second spelling, for a clash that a rename removes, as [A name names one thing](names.md#a-name-names-one-thing) decides for two bins; and `bin:A` is also the qualified id of the category `A` of a stratification `bin`. |
+| A qualified id is a category only, never a bin | One idea, one name: a bin `group:g1` gives its id to the category with no error, and a bin or a bin prefix whose id holds `:`, such as `A_0:4` of `age = [0:4, 5:9]`, cannot be set, while the remainder (`prefix_indices`) takes it. |
+
+**Guards:**
+`crates/commol-model/tests/initial_conditions.rs::an_id_of_a_compartment_bin_or_prefix_and_of_a_category_is_refused`,
+`crates/commol-model/tests/initial_conditions.rs::an_id_that_holds_the_separator_is_a_bin_or_a_prefix`,
+`tests/calibration/test_initial_conditions.py::test_an_id_of_a_bin_and_of_a_category_is_refused`.
 
 ## The remainder keeps the sum the model declares
 
@@ -187,44 +228,3 @@ sample is checked when the analysis is built, and the message names its set.
 `tests/stochastic/test_whole_units.py::test_every_draw_of_a_sample_is_checked_when_the_analysis_is_built`,
 `tests/stochastic/test_whole_units.py::test_a_known_amount_is_written_back_when_it_is_whole`,
 `tests/stochastic/test_calibration.py::test_a_calibrated_amount_with_a_rounding_is_calibrated`.
-
-## A calibrated amount is written back as the optimizer found it
-
-**Rule:** with a rounding, `check_model` builds every initial amount, whole or
-not, of a bin as of a compartment (`check_whole_units` in
-`crates/commol-model/src/builder.rs`), because a run rounds each bin at its
-start (`Units::begin`) whether the model declares its amount or calibration
-writes it. So `Model.apply_calibration_parameters` writes the number the
-optimizer found, such as `B = 11.853…`, the model builds on the same engine,
-and a run of it rounds the amounts the calibration scored by the same rule:
-12 units of `B`. With no rounding, the engine refuses a known value that is
-not whole when it writes it (`Units::set_initial_condition`), so the
-write-back refuses `{"B": 12.3}` and the model never holds an amount it
-cannot build.
-
-The write-back rebuilds the scored amounts as it does on every engine, within
-`_MATCH_TOLERANCE` (`_model/calibration_write_back.py`). For a bin of one
-compartment it writes the amount itself, so a run of one seed is the run the
-calibration scored. In a bin of several compartments the rebuilt amounts can
-differ in their last bits. `"largest_remainder"` starts from the same units
-unless two remainders tie within those bits. `"random"` can draw other units:
-`multinomial` and `binomial` (`crates/commol-random/src/sample.rs`) branch on
-the exact value of a share, and a share of `0.9999999999999999` instead of 1
-makes `binomial_inversion` draw one more uniform, which shifts the stream of
-the run. A replicate of the written model can then differ along its whole
-path, and the seed of the problem can give a loss other than
-`result.final_loss` ([#474](https://github.com/MUNQU/commol/issues/474)).
-
-| Alternative | Why not |
-|---|---|
-| Write back the whole units a run starts from | KISS: `"random"` draws them again in each run, so no one state holds them, and the largest remainders of a rounded bin differ from those of the bin: `10.4 × (0.35, 0.65)` starts from `(3, 7)`, and `10 × (0.35, 0.65)` from `(4, 6)`. The golden rule and DRY: Python would repeat the rounding of the engine, and the model would hold a number the optimizer did not find. It is fragile too: the check it keeps sums the overrides into the bin, so a whole override `A_g1 = 4` in a bin of 100 split in thirds makes the bin 70.67, and the model is refused. |
-| Round a calibrated amount when the engine writes it | S: the engine would round at the write and again at the start of the run. It does not remove the rule of the run: a value that sets only part of a bin, an exact compartment or a prefix, cannot make the bin whole by rounding itself, so `A_g1 = 3.7` written as 4 in a bin of 100 split in thirds still sums to 70.67. |
-| Keep refusing a bin that is not whole when the settings name a rounding | DRY: see [Whole units in a stochastic engine](engines.md#whole-units-in-a-stochastic-engine). |
-
-**Guards:**
-`tests/stochastic/test_calibration.py::test_a_calibrated_amount_is_written_back_onto_a_model_that_builds`,
-`tests/stochastic/test_calibration.py::test_a_stratified_amount_is_written_back_with_its_split`,
-`crates/commol-stochastic/tests/oracles.rs::a_bin_that_is_not_whole_starts_as_calibration_writes_it`,
-`crates/commol-model/src/builder.rs::a_bin_that_is_not_whole_builds_with_a_rounding`,
-`crates/commol-stochastic/src/units.rs::a_bin_of_a_half_rounds_up_whatever_its_split`,
-`tests/stochastic/test_whole_units.py::TestWholeUnits::test_a_rounding_makes_each_bin_its_nearest_whole_number`.

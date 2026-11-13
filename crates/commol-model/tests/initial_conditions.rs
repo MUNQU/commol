@@ -817,3 +817,113 @@ fn a_prefix_that_starts_empty_keeps_its_declared_split() {
 
     assert_close(&state, &[25.0, 75.0, 500.0, 500.0, 0.0, 0.0, 0.0, 0.0]);
 }
+
+/// An engine of [`stratified_model`] with the stratifications `more`, whose
+/// fractions `fractions` follow those of `group` and `type`, each 0.5 / 0.5.
+fn engine_with(more: &str, fractions: &str) -> FrozenEngine {
+    let fractions =
+        format!(r#"{{"group":{{"g1":0.5,"g2":0.5}},"type":{{"t1":0.5,"t2":0.5}}{fractions}}}"#);
+    engine_of(&stratified_model(
+        more,
+        r#"{"A":1000.0,"B":0.0}"#,
+        &fractions,
+    ))
+}
+
+#[test]
+fn an_id_of_a_compartment_bin_or_prefix_and_of_a_category_is_refused() {
+    let kind = |categories: &str| format!(r#",{{"id":"kind","categories":{categories}}}"#);
+    let in_g2 = r#",{"id":"kind","categories":["A_g1_t1","k2"],
+        "conditions":[{"stratification":"group","category":"g2"}]}"#;
+    let own = ", so that each has an id of its own.";
+    let cases = [
+        (
+            engine_with(&kind(r#"["A","k2"]"#), r#","kind":{"A":0.5,"k2":0.5}"#),
+            "A",
+            "Initial-condition id 'A' names the bin 'A' and the category 'kind:A'. Write \
+             'kind:A' for the category. A bin has no other id: rename bin 'A' or category \
+             'kind:A'",
+        ),
+        (
+            engine_with(
+                &kind(r#"["A","k2","k3"]"#),
+                r#","kind":{"A":0.4,"k2":0.3,"k3":0.3}"#,
+            ),
+            "A",
+            "Initial-condition id 'A' names the bin 'A' and the category 'kind:A'. A bin has \
+             no other id: rename bin 'A' or category 'kind:A'",
+        ),
+        (
+            engine_with(
+                &kind(r#"["A_g1","k2"]"#),
+                r#","kind":{"A_g1":0.5,"k2":0.5}"#,
+            ),
+            "A_g1",
+            "Initial-condition id 'A_g1' names the bin prefix 'A_g1' and the category \
+             'kind:A_g1'. Write 'kind:A_g1' for the category. A bin prefix has no other id: \
+             rename bin 'A' or category 'kind:A_g1'",
+        ),
+        (
+            engine_with(in_g2, r#","kind":{"A_g1_t1":0.5,"k2":0.5}"#),
+            "A_g1_t1",
+            "Initial-condition id 'A_g1_t1' names the compartment 'A_g1_t1' and the category \
+             'kind:A_g1_t1'. Write 'kind:A_g1_t1' for the category. A compartment has no \
+             other id: rename bin 'A' or category 'kind:A_g1_t1'",
+        ),
+        (
+            engine_with(
+                &format!(
+                    r#"{},{{"id":"sort","categories":["A","s2"]}}"#,
+                    kind(r#"["A","k2"]"#)
+                ),
+                r#","kind":{"A":0.5,"k2":0.5},"sort":{"A":0.5,"s2":0.5}"#,
+            ),
+            "A",
+            "Initial-condition id 'A' names the bin 'A' and the categories 'kind:A' and \
+             'sort:A'. Write 'kind:A' or 'sort:A' for the category. A bin has no other id: \
+             rename bin 'A' or categories 'kind:A' and 'sort:A'",
+        ),
+        (
+            FrozenEngine::with(
+                &["group:cat0_cat0", "group:cat0_cat1", "B_cat0", "B_cat1"],
+                &[300.0, 200.0, 400.0, 100.0],
+            ),
+            "group:cat0",
+            "Initial-condition id 'group:cat0' names the bin 'group:cat0' and the category \
+             'group:cat0'. Write 'cat0' for the category. A bin has no other id: rename bin \
+             'group:cat0' or category 'group:cat0'",
+        ),
+    ];
+
+    for (engine, id, message) in cases {
+        assert_eq!(
+            written_state(engine, &[id], None, &[0.5]),
+            Err(format!("{message}{own}"))
+        );
+    }
+}
+
+#[test]
+fn an_id_that_holds_the_separator_is_a_bin_or_a_prefix() {
+    let bin = FrozenEngine::with(
+        &["x:y_cat0", "x:y_cat1", "B_cat0", "B_cat1"],
+        &[300.0, 200.0, 400.0, 100.0],
+    );
+    let json = r#"{"name":"m","parameters":[],"engine":{"type":"DifferenceEquations"},
+        "process":{"bins":[{"id":"A","name":"A"},{"id":"B","name":"B"}],
+        "stratifications":[{"id":"age","categories":["0:4","5:9"]},
+        {"id":"group","categories":["g1","g2"]}],
+        "transitions":[{"id":"ab","source":["A"],"target":["B"],"rate":"0.1"}]},
+        "structure":{"kind":"aggregate","bin_amounts":{"A":1000.0,"B":0.0},
+        "stratification_fractions":{"age":{"0:4":0.5,"5:9":0.5},"group":{"g1":0.5,"g2":0.5}}}}"#;
+    let prefix = engine_of(&serde_json::from_str(json).expect("valid model JSON"));
+
+    let bin_state = written_state(bin, &["x:y"], None, &[1000.0]).unwrap();
+    let prefix_state = written_state(prefix, &["A_0:4"], None, &[100.0]).unwrap();
+
+    assert_close(&bin_state, &[600.0, 400.0, 400.0, 100.0]);
+    assert_close(
+        &prefix_state,
+        &[50.0, 50.0, 250.0, 250.0, 0.0, 0.0, 0.0, 0.0],
+    );
+}

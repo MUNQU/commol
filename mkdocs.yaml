@@ -209,6 +209,7 @@ nav:
               - Transitions and Rates: codebase/decisions/transitions-and-rates.md
               - Initial Conditions: codebase/decisions/initial-conditions.md
               - Calibrated Initial Conditions: codebase/decisions/calibrated-initial-conditions.md
+              - Calibration Write-Back: codebase/decisions/calibration-write-back.md
               - Time: codebase/decisions/time.md
               - Engines: codebase/decisions/engines.md
               - Calibration: codebase/decisions/calibration.md

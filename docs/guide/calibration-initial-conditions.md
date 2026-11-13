@@ -86,10 +86,14 @@ as for the initial state); a bare name is rejected as ambiguous.
 A bin, a bin prefix or a compartment id never covers the compartments of two
 bins: a model in which one name is, say, the compartment `A_g1` of a bin `A`
 and also a bin `A_g1` is rejected when it is built
-([Names the engine sets](building-models.md#names-the-engine-sets)). A bare
-category that is also the id of a bin sets the bin, with no error
-([#476](https://github.com/MUNQU/commol/issues/476)): write the qualified id,
-such as `"group:g1"`, for the category.
+([Names the engine sets](building-models.md#names-the-engine-sets)).
+
+An id that is a category and also a compartment, a bin or a bin prefix is
+rejected. With a bin `A` and a stratification `group = [A, g2]`, `"A"` is the
+bin and the category `group:A`: write `"group:A"` for the category, and
+rename the bin or the category to calibrate the bin, which has no other id.
+The model itself builds and runs, and `"A"` as the remainder is the bin,
+because a remainder is never a category.
 
 The engine resolves every id when you create the `Calibrator`
 (`InitialConditionPlan` in
@@ -101,6 +105,7 @@ the optimization starts:
 | Names nothing in the model | `Invalid bin, compartment or category 'X'`, with the compartments |
 | A category of a stratification with three or more categories, such as `"g1"` of `group = [g1, g2, g3]` | `Initial condition category 'group:g1' needs a binary stratification` |
 | A category name that two stratifications declare | `Category 'c1' is ambiguous`, with the stratifications and the qualified names (`resolve_category`, which `Aggregate.resolve_category` also asks) |
+| A bin, a bin prefix or a compartment that is also a category, such as `"A"` with a bin `A` and `group = [A, g2]` | `Initial-condition id 'A' names the bin 'A' and the category 'group:A'`, with the other id of the category when one sets it, and the bin or category to rename |
 | Any id, on `StochasticEvents` or `StochasticSteps` with no `rounding` | `The ... engine moves whole units, and a method that varies the initial condition '<id>' can write amounts that are not whole`, with the two roundings ([Whole units](stochastic.md#whole-units)) |
 
 ## The remainder
@@ -219,7 +224,8 @@ its complement the rest, in every split of a stratification whose fractions
   holds that sum in the model.
 - [ ] The remainder has the unit of every amount it gives.
 - [ ] The remainder is not also calibrated.
-- [ ] Category ids name a binary stratification, qualified when the name is shared.
+- [ ] Category ids name a binary stratification, qualified when the name is shared
+  or is also a bin, a bin prefix or a compartment.
 
 ## Next steps
 
@@ -227,4 +233,4 @@ its complement the rest, in every split of a stratification whose fractions
 |---|---|
 | The rules of initial conditions | [Building Models](building-models.md#the-structure-aggregate) |
 | Reporting fitted initial conditions | [Reports](reports.md) |
-| The design behind this page | [Calibrated initial conditions](../codebase/decisions/calibrated-initial-conditions.md) |
+| The design behind this page | [Calibrated initial conditions](../codebase/decisions/calibrated-initial-conditions.md), [Calibration write-back](../codebase/decisions/calibration-write-back.md) |
