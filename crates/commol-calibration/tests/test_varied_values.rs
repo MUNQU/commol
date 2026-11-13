@@ -3,7 +3,9 @@
 //! values does not, and the engine checks each number it writes. Each
 //! builder that varies values writes them at the point of their bounds
 //! nearest 0, with the remainder, to a copy of the engine, which then has
-//! every value a run needs (`SimulationEngine::check_values`).
+//! every value a run needs (`SimulationEngine::check_values`). Every
+//! builder and query of the values refuses a remainder that keeps no amount
+//! the model states.
 
 use commol_calibration::{
     CalibrationParameter, CalibrationParameterType, CalibrationProblem, ForwardModel, LossConfig,
@@ -214,5 +216,84 @@ fn a_problem_that_leaves_a_value_missing_is_refused_when_it_is_built() {
             "{builder}"
         );
         assert_eq!(build(decay(whole, "1.0"), k(), None), None, "{builder}");
+    }
+}
+
+/// The message of the plan of a query of the values (`plan_model_values`),
+/// or `None` when it resolves them.
+fn plan_of(
+    engine: DifferenceEquations,
+    parameters: Vec<CalibrationParameter>,
+    remainder: Option<&str>,
+) -> Option<String> {
+    plan_model_values(&engine, &parameters, remainder).err()
+}
+
+/// The message of the write-back (`configured_engine`) of the point of the
+/// bounds nearest 0, or `None` when it writes it.
+fn written_of(
+    engine: DifferenceEquations,
+    parameters: Vec<CalibrationParameter>,
+    remainder: Option<&str>,
+) -> Option<String> {
+    let nearest_zero: Vec<f64> = parameters
+        .iter()
+        .map(|parameter| 0.0_f64.max(parameter.min_bound).min(parameter.max_bound))
+        .collect();
+    configured_engine(&engine, &parameters, remainder, &nearest_zero).err()
+}
+
+#[test]
+fn a_remainder_that_would_give_a_value_no_one_gave_is_refused() {
+    let k = || vec![CalibrationParameter::new("k".to_string(), 0.0, 3.0)];
+    let k_and_b = || {
+        vec![
+            CalibrationParameter::new("k".to_string(), 0.0, 3.0),
+            CalibrationParameter::with_type(
+                "B".to_string(),
+                CalibrationParameterType::InitialCondition,
+                0.0,
+                1000.0,
+            ),
+        ]
+    };
+    let refused = |bins: &str| {
+        Some(format!(
+            "Initial-condition remainder 'A' would give a value no one gave: it takes what \
+             the initial-condition values leave of the amounts the model states for them and \
+             for it, and the amounts of the bins {bins} have no value. Give one of them an \
+             amount, or add an initial-condition value of a bin that has one"
+        ))
+    };
+    let a_left_none = || decay(r#"{"A":null,"B":1000.0}"#, "1.0");
+    let both_left_none = || decay(r#"{"A":null,"B":null}"#, "1.0");
+    let a_stated = || decay(r#"{"A":1000.0,"B":0.0}"#, "1.0");
+
+    for (builder, build) in [
+        ("CalibrationProblem::new", problem_of as Build),
+        ("ForwardModel::unobserved", analysis_of),
+        ("plan_model_values", plan_of),
+        ("configured_engine", written_of),
+    ] {
+        // Only k varies, so A would take 1000 less the 1000 of B: 0.
+        assert_eq!(
+            build(a_left_none(), k(), Some("A")),
+            refused("[\"A\"]"),
+            "{builder}"
+        );
+        // B varies, but the model states no amount of A or B: the sum is 0.
+        assert_eq!(
+            build(both_left_none(), k_and_b(), Some("A")),
+            refused("[\"A\", \"B\"]"),
+            "{builder}"
+        );
+        // The model states the amount of A, which A takes back.
+        assert_eq!(build(a_stated(), k(), Some("A")), None, "{builder}");
+        // A takes what B leaves of the 1000 the model states for B.
+        assert_eq!(
+            build(a_left_none(), k_and_b(), Some("A")),
+            None,
+            "{builder}"
+        );
     }
 }

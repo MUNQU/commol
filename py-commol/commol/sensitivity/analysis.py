@@ -74,9 +74,12 @@ class SensitivityAnalysis:
         ValueError
             If an input is not a value of the model, the model lacks a value
             once the point of the bounds nearest 0 or the draws of a sample
-            are written, the engine does not take every number of an
-            independent input (an ``initial_condition`` on an engine of whole
-            units with no rounding), the engine rejects a draw of a sample, the
+            are written, the ``initial_condition_remainder`` of the inputs
+            keeps no amount the model states (a remainder of a bin left
+            ``None`` with no input of a bin that has an amount), the engine
+            does not take every number of an independent input (an
+            ``initial_condition`` on an engine of whole units with no
+            rounding), the engine rejects a draw of a sample, the
             replicates or the seed do not fit the engine, `replicates` is
             below 1 (a negative number included), or the seed is not a whole
             number from 0 to ``2**64 - 1``.

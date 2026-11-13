@@ -117,9 +117,12 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     /// ([`SimulationEngine::check_values`]), as [`ForwardModel::unobserved`]
     /// does. A value that neither the problem nor the model gives is refused
     /// here, before any run. The remainder gives a value to every bin it
-    /// covers, a bin left `None` too, which then holds what the values leave
-    /// of the sum: `0` when no initial condition is calibrated
-    /// (<https://github.com/MUNQU/commol/issues/477>).
+    /// covers, a bin left `None` too: what the values leave of the sum of
+    /// the amounts the model states for what they and the remainder cover.
+    /// The engine refuses a remainder when the model states none of those
+    /// amounts ([`SimulationEngine::plan_values`]), as for a remainder of a
+    /// bin left `None` with no calibrated initial condition: it would give
+    /// `0`, a value no one gave.
     ///
     /// # Arguments
     ///
@@ -145,9 +148,10 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     /// what the problem holds breaks a rule of [`check_contents`], a factor
     /// has a bound at or below 0, the engine does not set a parameter, does
     /// not resolve a value of its model kind or the remainder (for example
-    /// a remainder that overlaps a calibrated value), or does not take every
-    /// number of a value ([`SimulationEngine::check_varied_values`]), a value
-    /// is missing once they are written ([`SimulationEngine::check_values`]),
+    /// a remainder that overlaps a calibrated value or keeps no amount the
+    /// model states), or does not take every number of a value
+    /// ([`SimulationEngine::check_varied_values`]), a value is missing once
+    /// they are written ([`SimulationEngine::check_values`]),
     /// a window is outside its rule ([`crate::check_window_end`]), a
     /// position is one the engine rejects, an observation names an unknown
     /// output or factor, a constraint is invalid, or the observation models

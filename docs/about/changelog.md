@@ -296,8 +296,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Calibrator`, and every uncertainty method that builds the problem, raises
   this `ValueError` when it is built if a value that the calibration does not
   set has none, even when no rate reads it; it was a failed start of the
-  optimizer, or a run at `0`. Migration: give every parameter and bin amount
-  a value, or calibrate it.
+  optimizer, or a run at `0`. An `initial_condition_remainder` no longer
+  gives `0` to a bin left `None` either: it takes what the initial-condition
+  values leave of the amounts the model states for them and for it, so the
+  engine refuses it when the model states none of them. With
+  `{"A": None, "B": 1000}`, only `k` calibrated and the remainder `A`, every
+  run of 0.10.2 started from `{A: 0, B: 1000}`; the same holds for a category
+  split alone, or for values of bins left `None` alone. A `Calibrator` and a
+  `SensitivityAnalysis` raise it when they are built, and
+  `Model.apply_calibration_parameters` when it writes back an initial
+  condition:
+  `Initial-condition remainder 'A' would give a value no one gave: it takes
+  what the initial-condition values leave of the amounts the model states for
+  them and for it, and the amounts of the bins ["A"] have no value. Give one
+  of them an amount, or add an initial-condition value of a bin that has one`.
+  A remainder that overlaps a value says `overlaps the initial-condition value
+  'A_g1'`, not `the calibrated initial condition`. Migration: give every
+  parameter and bin amount a value, or calibrate it; for a remainder of a bin
+  left `None`, calibrate the amount of a bin that has one (`B` above), give
+  the bin of the remainder an amount, or calibrate that bin with no remainder.
+  See [The remainder](../guide/calibration-initial-conditions.md#the-remainder).
 - A qualified category id matches whole ids: `a:b:c` names the category
   `b:c` of `a` or the category `c` of `a:b`, whichever the model declares, so
   a stratification or a category whose id holds `:` resolves. The engine split

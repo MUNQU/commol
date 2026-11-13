@@ -645,6 +645,111 @@ fn a_remainder_of_empty_compartments_splits_by_its_fractions() {
 }
 
 #[test]
+fn a_remainder_keeps_only_an_amount_the_model_states() {
+    // A is left for calibration. A split of `g1` keeps the 1000 of B, so A,
+    // or its prefix `A_g1`, would take 0. B = 300 leaves 700 of it to A, or
+    // to `A_g1`, as `type` splits it there.
+    let model = stratified_model(
+        "",
+        r#"{"A":null,"B":1000.0}"#,
+        &fractions_with(TYPE_BY_GROUP),
+    );
+    let refused = |remainder: &str| {
+        format!(
+            "Initial-condition remainder '{remainder}' would give a value no one gave: it \
+             takes what the initial-condition values leave of the amounts the model states \
+             for them and for it, and the amounts of the bins [\"A\"] have no value. Give \
+             one of them an amount, or add an initial-condition value of a bin that has one"
+        )
+    };
+
+    for remainder in ["A", "A_g1"] {
+        assert_eq!(
+            written_state(engine_of(&model), &["g1"], Some(remainder), &[0.5]),
+            Err(refused(remainder))
+        );
+    }
+    let whole = written_state(engine_of(&model), &["B"], Some("A"), &[300.0]).unwrap();
+    let prefix = written_state(engine_of(&model), &["B"], Some("A_g1"), &[300.0]).unwrap();
+
+    assert_close(&whole[..4], &[70.0, 210.0, 210.0, 210.0]);
+    assert_close(&prefix[..4], &[175.0, 525.0, 0.0, 0.0]);
+}
+
+/// Bins A, B and C, with the bin amounts `amounts`, as JSON.
+fn three_bins(amounts: &str) -> Model {
+    let json = format!(
+        r#"{{"name":"m","parameters":[],"engine":{{"type":"DifferenceEquations"}},
+        "process":{{"bins":[{{"id":"A","name":"A"}},{{"id":"B","name":"B"}},
+        {{"id":"C","name":"C"}}],"stratifications":[],
+        "transitions":[{{"id":"ab","source":["A"],"target":["B"],"rate":"0.1"}}]}},
+        "structure":{{"kind":"aggregate","bin_amounts":{amounts}}}}}"#
+    );
+    serde_json::from_str(&json).expect("valid model JSON")
+}
+
+#[test]
+fn a_remainder_takes_what_the_values_leave_of_the_amount_a_value_states() {
+    // B states 1000, so with B and C the remainder A takes 1000 - B - C; C
+    // alone, left None as A is, states nothing that A could keep.
+    let model = three_bins(r#"{"A":null,"B":1000.0,"C":null}"#);
+
+    let state = written_state(engine_of(&model), &["B", "C"], Some("A"), &[300.0, 200.0]).unwrap();
+    let error = written_state(engine_of(&model), &["C"], Some("A"), &[200.0]).unwrap_err();
+
+    assert_close(&state, &[500.0, 300.0, 200.0]);
+    assert!(
+        error.contains("and the amounts of the bins [\"A\", \"C\"] have no value."),
+        "{error}"
+    );
+}
+
+#[test]
+fn a_remainder_that_keeps_only_a_stated_zero_leaves_no_positive_value_feasible() {
+    // A known limit: B states 0, a sum someone gave, so the remainder A
+    // resolves, and every positive B leaves it below zero.
+    let model = three_bins(r#"{"A":null,"B":0.0,"C":5.0}"#);
+
+    let zero = written_state(engine_of(&model), &["B"], Some("A"), &[0.0]).unwrap();
+    let error = written_state(engine_of(&model), &["B"], Some("A"), &[3.0]).unwrap_err();
+
+    assert_close(&zero, &[0.0, 0.0, 5.0]);
+    assert!(error.contains("'A' keeps by 1.000000 of them"), "{error}");
+}
+
+#[test]
+fn a_compartment_override_on_a_bin_left_none_is_no_stated_amount() {
+    // The rule of #482, as it is: `total` counts the override, while the
+    // remainder, as a run, takes the bin A for one without a value.
+    let mut model = stratified_model(
+        "",
+        r#"{"A":null,"B":1000.0}"#,
+        &fractions_with(TYPE_BY_GROUP),
+    );
+    model
+        .aggregate_mut()
+        .unwrap()
+        .initial_conditions
+        .compartment_amounts
+        .insert("A_g1_t1".to_string(), 500.0);
+    let engine = engine_of(&model);
+
+    let error = written_state(engine.clone(), &[], Some("A"), &[]).unwrap_err();
+
+    assert_eq!(engine.total(), 1500.0);
+    assert!(
+        error.contains("and the amounts of the bins [\"A\"] have no value."),
+        "{error}"
+    );
+    assert!(
+        engine
+            .check_values()
+            .unwrap_err()
+            .contains("the amounts of the bins [\"A\"] have no value"),
+    );
+}
+
+#[test]
 fn a_category_of_the_stratification_a_split_differs_by_keeps_the_split() {
     // g1 = 0.5 of A = 1000 is 500, which `type` splits 0.25 / 0.75; g2 keeps
     // its 0.5 / 0.5.

@@ -69,9 +69,10 @@ class Calibrator:
         ValueError
             If a parameter, observation, position or constraint does not fit
             the model, the model lacks a value that the problem does not set,
-            the remainder is in another unit than an amount it gives, or a
-            setting of the problem is outside its rule; the message names the
-            path of the setting, such as ``optimization_config.inertia_factor``.
+            the remainder keeps no amount the model states or is in another
+            unit than an amount it gives, or a setting of the problem is
+            outside its rule; the message names the path of the setting, such
+            as ``optimization_config.inertia_factor``.
         """
         logger.info(
             f"Initializing Calibration for model: '{simulation.model_definition.name}'"

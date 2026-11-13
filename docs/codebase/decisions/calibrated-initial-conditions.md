@@ -99,10 +99,13 @@ other compartment after the values are written. A compartment that no value
 covers keeps its declared amount and cancels out, so the remainder keeps the
 declared sum of the compartments the values and it cover, and a bin of another
 unit does not enter. A bin left `None` counts as 0, so the model states the sum
-on the remainder (`{"A": 1000, "B": None}`). The plan keeps the sum before an
-engine of whole units rounds each bin at the start of a run, and each bin that
-is not whole can move it by half a unit or less: `B` 11.3 and `C` 20.4 with
-the remainder `A` start from 999 units of 1000
+on the remainder (`{"A": 1000, "B": None}`) or on a calibrated value
+(`{"A": None, "B": 1000}` with `B` calibrated). When it states it on neither,
+the plan refuses the remainder (`with_remainder`): the sum is a `0` no one gave
+([A run needs every value](model-structure.md#a-run-needs-every-value)).
+The plan keeps the sum before an engine of whole units rounds each bin at the
+start of a run, and each bin that is not whole can move it by half a unit or
+less: `B` 11.3 and `C` 20.4 with the remainder `A` start from 999 units of 1000
 ([Whole units in a stochastic engine](engines.md#whole-units-in-a-stochastic-engine)).
 Without a remainder every state is
 feasible, because the engine rejects a negative amount. With one, a remainder
@@ -133,8 +136,9 @@ that sets amounts is checked without a change there.
 `tests/calibration/test_write_back.py::TestWriteBackReadability::test_an_amount_in_the_unit_of_its_bin_is_written_back`,
 `tests/calibration/test_initial_conditions.py::TestRemainderUnits`;
 `crates/commol-model/tests/initial_conditions.rs` (the layers, the remainder
-and the targets of an id, and
-`the_remainder_keeps_the_declared_sum_of_what_it_covers`).
+and the targets of an id, `the_remainder_keeps_the_declared_sum_of_what_it_covers`,
+`a_remainder_keeps_only_an_amount_the_model_states` and
+`a_remainder_takes_what_the_values_leave_of_the_amount_a_value_states`).
 
 ## Whole units need a rounding to vary an initial condition
 
