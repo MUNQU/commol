@@ -4055,6 +4055,10 @@ values leave of the amounts the model states:</p>
 <td>A compartment that no value covers keeps its amount, so it does not change the remainder. A bin left <code>None</code> for calibration counts as 0, so the remainder states the sum: <code>A</code> holds 1000 while <code>B</code> is unknown. On <code>StochasticEvents</code> or <code>StochasticSteps</code>, each run rounds every bin on its own, so the start can hold up to half a unit more or less per bin that is not whole (<a href="../stochastic/#whole-units">Whole units</a>).</td>
 </tr>
 <tr>
+<td>It needs an amount the model states</td>
+<td>The model states the amount of the remainder or of a calibrated bin, prefix or compartment: with <code>{"A": None, "B": 1000}</code>, <code>A</code> takes what a calibrated <code>B</code> leaves of 1000. When the model states none, the sum is 0, a value no one gave, so the <code>Calibrator</code>, a <code>SensitivityAnalysis</code> and <code>apply_calibration_parameters</code> reject the remainder with <code>Initial-condition remainder 'A' would give a value no one gave</code>, which names the amounts. A stated 0 is an amount: with <code>{"A": None, "B": 0}</code>, every positive <code>B</code> leaves <code>A</code> below zero.</td>
+</tr>
+<tr>
 <td>It has the unit of every amount it gives</td>
 <td>The <code>Calibrator</code> rejects a calibrated bin, prefix or compartment whose unit is not the unit of the remainder, and names both. A category split has no unit.</td>
 </tr>

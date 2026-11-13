@@ -5548,8 +5548,26 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>Calibrator</code>, and every uncertainty method that builds the problem, raises
   this <code>ValueError</code> when it is built if a value that the calibration does not
   set has none, even when no rate reads it; it was a failed start of the
-  optimizer, or a run at <code>0</code>. Migration: give every parameter and bin amount
-  a value, or calibrate it.</li>
+  optimizer, or a run at <code>0</code>. An <code>initial_condition_remainder</code> no longer
+  gives <code>0</code> to a bin left <code>None</code> either: it takes what the initial-condition
+  values leave of the amounts the model states for them and for it, so the
+  engine refuses it when the model states none of them. With
+  <code>{"A": None, "B": 1000}</code>, only <code>k</code> calibrated and the remainder <code>A</code>, every
+  run of 0.10.2 started from <code>{A: 0, B: 1000}</code>; the same holds for a category
+  split alone, or for values of bins left <code>None</code> alone. A <code>Calibrator</code> and a
+  <code>SensitivityAnalysis</code> raise it when they are built, and
+  <code>Model.apply_calibration_parameters</code> when it writes back an initial
+  condition:
+  <code>Initial-condition remainder 'A' would give a value no one gave: it takes
+  what the initial-condition values leave of the amounts the model states for
+  them and for it, and the amounts of the bins ["A"] have no value. Give one
+  of them an amount, or add an initial-condition value of a bin that has one</code>.
+  A remainder that overlaps a value says <code>overlaps the initial-condition value
+  'A_g1'</code>, not <code>the calibrated initial condition</code>. Migration: give every
+  parameter and bin amount a value, or calibrate it; for a remainder of a bin
+  left <code>None</code>, calibrate the amount of a bin that has one (<code>B</code> above), give
+  the bin of the remainder an amount, or calibrate that bin with no remainder.
+  See <a href="../../guide/calibration-initial-conditions/#the-remainder">The remainder</a>.</li>
 <li>A qualified category id matches whole ids: <code>a:b:c</code> names the category
   <code>b:c</code> of <code>a</code> or the category <code>c</code> of <code>a:b</code>, whichever the model declares, so
   a stratification or a category whose id holds <code>:</code> resolves. The engine split

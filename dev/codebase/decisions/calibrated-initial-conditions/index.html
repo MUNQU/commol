@@ -3897,10 +3897,13 @@ other compartment after the values are written. A compartment that no value
 covers keeps its declared amount and cancels out, so the remainder keeps the
 declared sum of the compartments the values and it cover, and a bin of another
 unit does not enter. A bin left <code>None</code> counts as 0, so the model states the sum
-on the remainder (<code>{"A": 1000, "B": None}</code>). The plan keeps the sum before an
-engine of whole units rounds each bin at the start of a run, and each bin that
-is not whole can move it by half a unit or less: <code>B</code> 11.3 and <code>C</code> 20.4 with
-the remainder <code>A</code> start from 999 units of 1000
+on the remainder (<code>{"A": 1000, "B": None}</code>) or on a calibrated value
+(<code>{"A": None, "B": 1000}</code> with <code>B</code> calibrated). When it states it on neither,
+the plan refuses the remainder (<code>with_remainder</code>): the sum is a <code>0</code> no one gave
+(<a href="../model-structure/#a-run-needs-every-value">A run needs every value</a>).
+The plan keeps the sum before an engine of whole units rounds each bin at the
+start of a run, and each bin that is not whole can move it by half a unit or
+less: <code>B</code> 11.3 and <code>C</code> 20.4 with the remainder <code>A</code> start from 999 units of 1000
 (<a href="../engines/#whole-units-in-a-stochastic-engine">Whole units in a stochastic engine</a>).
 Without a remainder every state is
 feasible, because the engine rejects a negative amount. With one, a remainder
@@ -3945,8 +3948,9 @@ that sets amounts is checked without a change there.</p>
 <code>tests/calibration/test_write_back.py::TestWriteBackReadability::test_an_amount_in_the_unit_of_its_bin_is_written_back</code>,
 <code>tests/calibration/test_initial_conditions.py::TestRemainderUnits</code>;
 <code>crates/commol-model/tests/initial_conditions.rs</code> (the layers, the remainder
-and the targets of an id, and
-<code>the_remainder_keeps_the_declared_sum_of_what_it_covers</code>).</p>
+and the targets of an id, <code>the_remainder_keeps_the_declared_sum_of_what_it_covers</code>,
+<code>a_remainder_keeps_only_an_amount_the_model_states</code> and
+<code>a_remainder_takes_what_the_values_leave_of_the_amount_a_value_states</code>).</p>
 <h2 id="whole-units-need-a-rounding-to-vary-an-initial-condition">Whole units need a rounding to vary an initial condition<a class="headerlink" href="#whole-units-need-a-rounding-to-vary-an-initial-condition" title="Permanent link">&para;</a></h2>
 <p>A method says where the numbers of its values come from
 (<code>ValueSource</code> of <code>crates/commol-calibration/src/values.rs</code>): it varies them,
