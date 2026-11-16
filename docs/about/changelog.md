@@ -276,10 +276,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a name of its own.` A bin that a subgroup total names, such as a bin
   `total_y` with a category `y`, was refused already; it gets this message in
   place of `Names built from a bin are also subgroup totals`. A category id
-  that two stratifications share still
-  builds ([#475](https://github.com/MUNQU/commol/issues/475)). Migration:
+  that two stratifications share still builds; a rate that reads a name it
+  gives two meanings is refused (see the entry of such a rate). Migration:
   rename a bin, an accumulator or a category so that each name names one
   thing. See
+  [Names the engine sets](../guide/building-models.md#names-the-engine-sets).
+- **Breaking:** a rate, a stratified rate or a formula parameter that reads
+  a name to which a category id that two stratifications share gives two
+  meanings is now refused at `build`. With `group = [a, b]` and
+  `type = [a, c]`, `total_a` is the total of `group:a` and that of `type:a`,
+  and `A_a` is the compartments of `A` in `group:a` and those in `type:a`.
+  Such a rate read the sum of both meanings, with no error, so a compartment
+  in both, such as `A_a_a`, counted twice: with a bin `A` of 1000 split in
+  halves, `total_a` and `A_a` read 1000, while the initial condition `A_a`
+  covers 500. The message names each formula and both meanings, and gives
+  each meaning as a sum of names of one meaning when one is:
+  `A rate or a formula parameter reads a name to which a category id that
+  two stratifications share gives two meanings or more: transition 't_ab'
+  reads 'total_a'. 'total_a' names the subgroup total of 'group:a' and the
+  subgroup total of 'type:a'. Rename category 'group:a' or category
+  'type:a', so that each has a name of its own. To keep the ids, read a
+  meaning as a sum of names of one meaning: 'group:a' is 'total_a_a +
+  total_a_c'; 'type:a' is 'total_a_a + total_b_a'.` Two kinds of rates that
+  ran right are refused too. With two stratifications of disjoint conditions
+  that share an id, such as `type = [x, y]` only in `group:a` and
+  `kind = [x, z]` only in `group:b`, `total_x` summed each compartment once;
+  read it as `total_a_x + total_b_x`, the two sums that the message gives.
+  When `type = [a, c]` splits only `group:b`, `A_a` is the compartment of `A` in
+  `group:a` and the partial total of `type:a`; a rate that read it read the
+  compartment, which no other name is, so the message says that only a
+  rename reads it: rename `a` in `group` or in `type`. The valid names that
+  the message of an unknown subgroup total lists leave out the names of two
+  meanings. A model whose formulas read no such name builds and runs as
+  before. Migration: read the meaning you want as the sum of names of one
+  meaning that the message gives, or rename a category. See
   [Names the engine sets](../guide/building-models.md#names-the-engine-sets).
 - **Breaking:** an initial-condition id that is a compartment, a bin or a
   bin prefix and also a category, bare or qualified, is refused wherever the
@@ -629,6 +659,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as the calibration did: from 12 units. With `"random"`, a bin of several
   compartments can still start from other units for the same seed. See
   [Whole units](../guide/stochastic.md#whole-units).
+- A matrix sum could read a name to which a category id that two
+  stratifications share gives two meanings, and count a compartment twice:
+  with `group = [g1, g2]` and a `type = [g1, t2]` that splits only `g1`,
+  `matrix_sum(M, B / total)` read `B` in `g1` as `B_g1` and the total of
+  `g1` as `total_g1`, which also summed `type:g1`, so `B_g1_g1` and
+  `A_g1_g1` counted twice. It now reads the sum of the compartments of `g1`.
+  See [Matrix sums](../guide/mathematical-expressions.md#matrix-sums).
 - A calibrated initial condition on `StochasticEvents` or `StochasticSteps`
   with no `rounding` built when its bounds were whole, such as `[0, 50]`, and
   then every start failed, because the optimizer writes values that are not

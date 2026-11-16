@@ -170,9 +170,20 @@ The message gives each clash once, at its shortest name, with the bins,
 accumulators and categories to rename. A bin whose id only starts with such a
 name, such as `A_g1x`, builds. So does a category id that two stratifications
 share, such as `c1` of `group` and of `type`, which the qualified ids
-`group:c1` and `type:c1` name apart: there, `total_c1` and a partial total
-`A_c1` read both categories, a known defect
-([#475](https://github.com/MUNQU/commol/issues/475)).
+`group:c1` and `type:c1` name apart in an initial condition. It gives
+`total_c1` and the partial total `A_c1` two meanings, the sum in `group:c1`
+and the sum in `type:c1`, so `build` rejects a rate or a formula parameter
+that reads one of these names, and the message names both meanings. A rate
+reads one meaning as a sum of names of one meaning, which the message gives:
+`total_c1_c1 + total_c1_c2` is the total of `group:c1`, and `A_c1_c1 +
+A_c2_c1` the compartments of `A` in `type:c1`. A compartment can be such a
+name too. When `type = [c1, c2]` splits only `group:c2`, `A_c1` is the
+compartment of `A` in `group:c1` and the compartments of `A` in `type:c1`.
+No other name is that compartment, so the message says that only a rename,
+of `c1` in `group` or in `type`, lets a rate read it. With a matrix sum, such
+a compartment can appear in the rates that `Model.describe` shows, where the
+engine reads the compartment
+([A formula reads a name of one meaning](../codebase/decisions/names.md#a-formula-reads-a-name-of-one-meaning)).
 
 A matrix may not take the id of a parameter, a bin, an accumulator, a
 compartment, a subgroup total or an engine variable, nor may one of its
@@ -671,6 +682,7 @@ call that adds it.
 | The structure follows the rules above | A fraction that names no category of its stratification |
 | Parameter ids are not [names the engine sets](#names-the-engine-sets) | A parameter named `A`, `total` or `A_g1` |
 | Every `total_…` variable names a subgroup total | `total_t1_g1` when `group` is declared before `type` |
+| No rate reads a name of two meanings | `k1 * total_c1` when `group` and `type` both have `c1` ([Names the engine sets](#names-the-engine-sets)) |
 | A rate that reads the neighbors has them | `k1 * neighbors_B` with no `neighbors=` |
 | Every rate expression is in the language of formulas ([Limits of the parser](mathematical-expressions.md#limits-of-the-parser)) | A formula with `__import__('os')` |
 | Every transition can be planned by the engine | See [Transitions](transitions.md#what-building-checks) |

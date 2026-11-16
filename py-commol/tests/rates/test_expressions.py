@@ -95,7 +95,8 @@ class TestSubgroupTotals:
         with pytest.raises(ValueError, match="'total_g2_s1'"):
             build(builder)
 
-    def test_every_name_the_engine_provides_is_accepted_in_a_rate(self) -> None:
+    def test_every_subgroup_total_of_one_meaning_is_accepted_in_a_rate(self) -> None:
+        """No category id is in two stratifications, so each name has one meaning."""
         strata = {
             "stratifications": {
                 "group": {"g1": 0.5, "g2": 0.5},

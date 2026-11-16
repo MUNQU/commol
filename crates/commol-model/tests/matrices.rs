@@ -170,6 +170,34 @@ fn a_set_of_compartments_that_no_subgroup_total_sums_alone_reads_as_their_sum() 
 }
 
 #[test]
+fn a_matrix_sum_never_reads_a_name_that_a_shared_category_gives_two_meanings() {
+    // `type` splits only `g1` and shares its id, so `B_g1` and `total_g1` are
+    // also the sums of `type:g1`, and would count `B_g1_g1` twice.
+    let model = model(
+        "matrix_sum(M, B / total)",
+        r#",{"id":"type","categories":["g1","t2"],
+             "conditions":[{"stratification":"group","category":"g1"}]}"#,
+    );
+    let mut compiled = compile(&model).unwrap();
+    // A_g1_g1, A_g1_t2, A_g2, B_g1_g1, B_g1_t2, B_g2.
+    let state = [100.0, 200.0, 300.0, 50.0, 20.0, 30.0];
+    let mut rates = vec![0.0; 3];
+
+    compiled
+        .transition_rates(0.0, 0.0, &state, &mut rates)
+        .unwrap();
+
+    let in_g1 = "(B_g1_g1 + B_g1_t2) / (A_g1_g1 + A_g1_t2 + B_g1_g1 + B_g1_t2)";
+    assert_eq!(
+        flows(&model)[0].1,
+        format!("M_g1_g1 * ({in_g1}) + M_g1_g2 * (B_g2 / total_g2)")
+    );
+    let (b1, b2) = (70.0 / 370.0, 30.0 / 330.0);
+    let in_g1 = 2.0 * b1 + 1.0 * b2;
+    assert_eq!(rates, [in_g1, in_g1, 1.0 * b1 + 3.0 * b2]);
+}
+
+#[test]
 fn a_term_of_a_zero_entry_is_left_out_and_a_zero_row_keeps_its_first_term() {
     let mut model = model("matrix_sum(M, B)", "");
     model.process.matrices[0].values["g1"]["g2"] = 0.0;

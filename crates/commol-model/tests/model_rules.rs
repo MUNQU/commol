@@ -411,3 +411,184 @@ fn a_bin_whose_id_starts_with_a_name_of_another_builds() {
 
     assert!(build(stratified(&group, |json| add_bin(json, "A_g1x"))).is_ok());
 }
+
+/// The stratifications `group = [a, b]` and `type = [a, c]`, which share the
+/// category id `a`.
+fn sharing_a() -> [Value; 2] {
+    [
+        stratification("group", &["a", "b"]),
+        stratification("type", &["a", "c"]),
+    ]
+}
+
+/// Give the transition `ab` the rate `rate`.
+fn with_rate(json: &mut Value, rate: &str) {
+    json["process"]["transitions"][0]["rate"] = json!(rate);
+}
+
+/// What the refusal of a model whose formula reads a name of two meanings
+/// says after its opening.
+fn read_refusal(json: Value) -> String {
+    let message = build(json).err().expect("the model is refused");
+    let opening = "A rate or a formula parameter reads a name to which a category id that two \
+                   stratifications share gives two meanings or more: ";
+    message
+        .strip_prefix(opening)
+        .expect("the message of a name of two meanings that a formula reads")
+        .to_string()
+}
+
+const RENAME_A: &str = "Rename category 'group:a' or category 'type:a', so that each has a \
+                        name of its own.";
+
+/// How the message reads each meaning of a name with names of one meaning.
+fn reading(sums: &str) -> String {
+    format!(" To keep the ids, read a meaning as a sum of names of one meaning: {sums}.")
+}
+
+#[test]
+fn a_formula_that_reads_a_name_of_a_shared_category_is_refused() {
+    let total_a = format!(
+        "'total_a' names the subgroup total of 'group:a' and the subgroup total of 'type:a'. \
+         {RENAME_A}{}",
+        reading("'group:a' is 'total_a_a + total_a_c'; 'type:a' is 'total_a_a + total_b_a'")
+    );
+    let a_a = format!(
+        "'A_a' names the compartments of bin 'A' in 'group:a' and the compartments of bin 'A' \
+         in 'type:a'. {RENAME_A}{}",
+        reading("'group:a' is 'A_a_a + A_a_c'; 'type:a' is 'A_a_a + A_b_a'")
+    );
+    let with_rate_of = |rate: &str| stratified(&sharing_a(), |json| with_rate(json, rate));
+    let with_formula = stratified(&sharing_a(), |json| {
+        with_rate(json, "k1 * total_a * p");
+        json["parameters"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"id": "p", "value": "total_a / A"}));
+    });
+    let with_stratified_rate = stratified(&sharing_a(), |json| {
+        json["process"]["transitions"][0]["stratified_rates"] = json!([{
+            "conditions": [{"stratification": "group", "category": "b"}],
+            "rate": "k1 * A_a"
+        }]);
+    });
+
+    let cases = [
+        (
+            with_rate_of("k1 * total_a"),
+            format!("transition 'ab' reads 'total_a'. {total_a}"),
+        ),
+        (
+            with_rate_of("k1 * A_a"),
+            format!("transition 'ab' reads 'A_a'. {a_a}"),
+        ),
+        (
+            with_rate_of("k1 * total_a * A_a / A_a_a"),
+            format!("transition 'ab' reads 'A_a' and 'total_a'. {a_a} {total_a}"),
+        ),
+        (
+            with_formula,
+            format!("transition 'ab' reads 'total_a'; parameter 'p' reads 'total_a'. {total_a}"),
+        ),
+        (
+            with_stratified_rate,
+            format!("transition 'ab' reads 'A_a'. {a_a}"),
+        ),
+    ];
+
+    for (json, sentences) in cases {
+        assert_eq!(read_refusal(json), sentences);
+    }
+}
+
+#[test]
+fn a_meaning_that_no_name_of_one_meaning_reads_needs_a_rename() {
+    // `type` splits only `b`, so `A_a` is the compartment of `group:a` and the
+    // compartments of `A` in `type:a`, and no other name is that compartment.
+    let only_in_b = json!({"id": "type", "categories": ["a", "c"],
+                           "conditions": [{"stratification": "group", "category": "b"}]});
+    let json = stratified(&[stratification("group", &["a", "b"]), only_in_b], |json| {
+        with_rate(json, "k1 * A_a / total_a");
+    });
+
+    assert_eq!(
+        read_refusal(json),
+        format!(
+            "transition 'ab' reads 'A_a' and 'total_a'. 'A_a' names the compartment of bin 'A' \
+             in 'group:a' and the compartments of bin 'A' in 'type:a'. {RENAME_A}{} Only a \
+             rename reads 'group:a', which has no other name. 'total_a' names the subgroup \
+             total of 'group:a' and the subgroup total of 'type:a'. {RENAME_A}{} Only a rename \
+             reads 'group:a', which is no sum of names of one meaning.",
+            reading("'type:a' is 'A_b_a'"),
+            reading("'type:a' is 'total_b_a'")
+        )
+    );
+}
+
+#[test]
+fn stratifications_of_disjoint_conditions_that_share_an_id_read_each_meaning_by_a_total() {
+    // `type` splits only `a` and `kind` only `b`: no compartment has both
+    // `x`, and `total_x` is the total of `type:x` and that of `kind:x`.
+    let only_in = |id: &str, categories: [&str; 2], category: &str| {
+        json!({"id": id, "categories": categories,
+               "conditions": [{"stratification": "group", "category": category}]})
+    };
+    let json = stratified(
+        &[
+            stratification("group", &["a", "b"]),
+            only_in("type", ["x", "y"], "a"),
+            only_in("kind", ["x", "z"], "b"),
+        ],
+        |json| with_rate(json, "k1 * total_x"),
+    );
+
+    assert_eq!(
+        read_refusal(json),
+        format!(
+            "transition 'ab' reads 'total_x'. 'total_x' names the subgroup total of 'type:x' \
+             and the subgroup total of 'kind:x'. Rename category 'type:x' or category \
+             'kind:x', so that each has a name of its own.{}",
+            reading("'type:x' is 'total_a_x'; 'kind:x' is 'total_b_x'")
+        )
+    );
+}
+
+#[test]
+fn the_valid_subgroup_totals_leave_out_the_names_of_two_meanings() {
+    let json = stratified(&sharing_a(), |json| with_rate(json, "k1 * total_d"));
+
+    assert_eq!(
+        build(json).err().as_deref(),
+        Some(
+            "Unknown subgroup total(s) 'total_d'. Category suffixes follow the declaration \
+             order of the stratifications. Valid names: total_a_a, total_a_c, total_b, \
+             total_b_a, total_b_c, total_c"
+        )
+    );
+}
+
+#[test]
+fn a_name_of_two_meanings_stays_reserved() {
+    let json = stratified(&sharing_a(), |json| {
+        json["parameters"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"id": "total_a", "value": 1.0}));
+    });
+
+    assert_eq!(
+        build(json).err().as_deref(),
+        Some(
+            "Parameter ids cannot be names the engine provides: 'total_a' (a subgroup total). \
+             Rename the parameter(s)."
+        )
+    );
+}
+
+#[test]
+fn a_shared_category_builds_when_no_formula_reads_a_name_it_gives_two_meanings() {
+    let rate = "k1 * (total_a_a + total_a_c) / total_c * A_b * A_c / (A_a_a + A_a_c) / A";
+    let json = stratified(&sharing_a(), |json| with_rate(json, rate));
+
+    assert!(build(json).is_ok());
+}

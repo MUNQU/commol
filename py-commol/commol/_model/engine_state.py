@@ -389,18 +389,21 @@ def check_model(model: "Model") -> None:
         id is an expanded compartment, a subgroup total or a name of the
         neighbors, a rate or formula parameter is not in the language of
         formulas, uses a ``total_…`` name that is not a subgroup total of the
-        model or reads a variable the model does not define, or a rate reads
-        neighbors the model cannot resolve.
+        model, reads a variable the model does not define or a name to which
+        a category id that two stratifications share gives two meanings, or
+        a rate reads neighbors the model cannot resolve.
     """
     commol_rs.model.check_model(engine_json(model))
 
 
 def subgroup_total_names(process: "Process") -> list[str]:
     """
-    Names of the subgroup totals a rate of a process may read.
+    Names of the subgroup totals of a process.
 
     They are the ``total_<categories>`` names, the bin totals and the partial
-    bin totals, as the engine provides them.
+    bin totals, as the engine provides them. A rate reads each of them, except
+    a name to which a category id that two stratifications share gives two
+    meanings, which the engine refuses in a rate (``check_model``).
 
     Parameters
     ----------

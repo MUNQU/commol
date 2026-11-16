@@ -2,7 +2,7 @@
 
 use crate::flows::{PlannedFlow, check_transition_kinds, plan_transition_flows};
 use crate::helpers::stratification_conditions_met;
-use crate::labels::{Named, OutputLabels, Owner, check_names};
+use crate::labels::{Named, Names, OutputLabels, Owner, check_names};
 use crate::layout::CompartmentLayout;
 use crate::matrices::{check_matrices, matrix_variables, scaled_matrices};
 use crate::types::{
@@ -49,7 +49,7 @@ impl CompiledModel {
     pub fn try_from_model(model: &Model) -> Result<Self, String> {
         let aggregate = model.aggregate()?;
         let process = &model.process;
-        check_model(model)?;
+        let shared = check_aggregate(model)?;
 
         // Generate all compartment and accumulator output combinations
         let layout = CompartmentLayout::new(process);
@@ -175,12 +175,8 @@ impl CompiledModel {
         // Pre-compute the subgroup total mappings for stratifications
         // (must be done before transition flows, as absolute-flow inference
         // needs to know about subgroup total names)
-        let subgroup_total_layout = build_subgroup_total_mappings(&layout, process);
-
-        let subgroup_total_param_names: HashSet<String> = subgroup_total_layout
-            .iter()
-            .map(|m| m.parameter_name.clone())
-            .collect();
+        let subgroup_total_layout =
+            build_subgroup_total_mappings(subgroup_total_entries(&layout, process), &shared);
 
         // Pre-allocate every parameter slot the per-step loop will touch so
         // `set_parameter_str` can update in place and JIT input resolution can
@@ -210,14 +206,16 @@ impl CompiledModel {
             .expect("t parameter slot must be reserved");
 
         let mut subgroup_total_mappings: Vec<SubgroupTotalMapping> = subgroup_total_layout
-            .into_iter()
+            .iter()
             .map(|layout| {
                 let parameter_index = expression_context
                     .parameter_index(&layout.parameter_name)
                     .expect("subgroup total parameter slot must be reserved");
                 SubgroupTotalMapping {
-                    contributing_compartment_indices: layout.contributing_compartment_indices,
-                    parameter_name: layout.parameter_name,
+                    contributing_compartment_indices: layout
+                        .contributing_compartment_indices
+                        .clone(),
+                    parameter_name: layout.parameter_name.clone(),
                     parameter_index,
                 }
             })
@@ -239,7 +237,7 @@ impl CompiledModel {
             aggregate.neighbors.as_ref(),
             &layout,
             &accumulator_map,
-            &subgroup_total_param_names,
+            &subgroup_total_layout,
         )?;
         let schedules = impulse_schedules(process)?;
         let (impulse_plans, flow_plans): (Vec<PlannedFlow>, Vec<PlannedFlow>) = planned_flows
@@ -1041,14 +1039,23 @@ fn subgroup_total_entries<'a>(
 }
 
 /// Build pre-computed subgroup total mappings for stratifications, one per
-/// name of [`subgroup_total_entries`].
+/// name of `entries` ([`subgroup_total_entries`]) that is not in `shared`.
+///
+/// `shared` holds the names to which a category id that two stratifications
+/// share gives two meanings, as `total_c1` when `group` and `type` both have
+/// `c1` ([`Names::shared_names`]). Such a name has no mapping: no formula
+/// reads it ([`Names::check_reads`], from [`check_model`]), so no slot sums
+/// both meanings, and a matrix sum never writes it
+/// ([`subgroup_totals_by_compartments`]).
 fn build_subgroup_total_mappings(
-    layout: &CompartmentLayout,
-    process: &Process,
+    entries: Vec<(String, Named<'_>, usize)>,
+    shared: &HashSet<String>,
 ) -> Vec<SubgroupTotalLayout> {
     let mut totals: HashMap<String, Vec<usize>> = HashMap::new();
-    for (name, _, compartment_index) in subgroup_total_entries(layout, process) {
-        totals.entry(name).or_default().push(compartment_index);
+    for (name, _, compartment_index) in entries {
+        if !shared.contains(&name) {
+            totals.entry(name).or_default().push(compartment_index);
+        }
     }
     totals
         .into_iter()
@@ -1061,49 +1068,64 @@ fn build_subgroup_total_mappings(
         .collect()
 }
 
-/// The subgroup total that sums each set of compartments, by the sorted
-/// indices of the set. When two names sum one set, the first in sorted order
-/// is kept, so the choice does not depend on the order of a map.
-pub(crate) fn subgroup_totals_by_compartments(
+/// The subgroup total mappings of a process that [`check_model`] did not
+/// check, as the description of its flows reads them
+/// ([`build_subgroup_total_mappings`]).
+pub(crate) fn subgroup_total_mappings(
     layout: &CompartmentLayout,
     process: &Process,
+) -> Vec<SubgroupTotalLayout> {
+    let entries = subgroup_total_entries(layout, process);
+    let shared = Names::new(
+        layout.labels(),
+        &[],
+        entries
+            .iter()
+            .map(|(name, named, _)| (name.as_str(), named)),
+    )
+    .shared_names();
+    build_subgroup_total_mappings(entries, &shared)
+}
+
+/// The subgroup total of `mappings` that sums each set of compartments, by
+/// the sorted indices of the set. When two names sum one set, the first in
+/// sorted order is kept, so the choice does not depend on the order of a
+/// map. A name of two meanings has no mapping, so it sums no set
+/// ([`build_subgroup_total_mappings`]).
+pub(crate) fn subgroup_totals_by_compartments(
+    mappings: &[SubgroupTotalLayout],
 ) -> HashMap<Vec<usize>, String> {
-    let mut mappings = build_subgroup_total_mappings(layout, process);
+    let mut mappings: Vec<&SubgroupTotalLayout> = mappings.iter().collect();
     mappings.sort_unstable_by(|a, b| a.parameter_name.cmp(&b.parameter_name));
     let mut totals: HashMap<Vec<usize>, String> = HashMap::new();
     for mapping in mappings {
-        let mut compartments = mapping.contributing_compartment_indices;
+        let mut compartments = mapping.contributing_compartment_indices.clone();
         compartments.sort_unstable();
         compartments.dedup();
-        totals.entry(compartments).or_insert(mapping.parameter_name);
+        totals
+            .entry(compartments)
+            .or_insert_with(|| mapping.parameter_name.clone());
     }
     totals
 }
 
-/// Names of the subgroup totals a rate expression may reference.
-pub(crate) fn subgroup_total_name_set(
-    layout: &CompartmentLayout,
-    process: &Process,
-) -> HashSet<String> {
-    build_subgroup_total_mappings(layout, process)
-        .into_iter()
-        .map(|mapping| mapping.parameter_name)
-        .collect()
-}
-
-/// Names of the subgroup totals a rate expression of a process may read,
-/// sorted.
+/// Names of the subgroup totals of a process, sorted.
 ///
 /// They are the `total_<categories>` names, the bin totals and the partial bin
 /// totals. Category suffixes follow the declaration order of the
 /// stratifications, and a conditional stratification adds its categories only
 /// to the compartments it expands. A process without stratifications has
-/// none.
+/// none. A rate expression may read each of them except a name to which a
+/// category id that two stratifications share gives two meanings, as
+/// `total_c1` when `group` and `type` both have `c1`, which [`check_model`]
+/// refuses in a formula.
 pub fn subgroup_total_names(process: &Process) -> Vec<String> {
-    let mut names: Vec<String> = subgroup_total_name_set(&CompartmentLayout::new(process), process)
+    let mut names: Vec<String> = subgroup_total_entries(&CompartmentLayout::new(process), process)
         .into_iter()
+        .map(|(name, _, _)| name)
         .collect();
     names.sort_unstable();
+    names.dedup();
     names
 }
 
@@ -1142,6 +1164,12 @@ pub fn subgroup_total_names(process: &Process) -> Vec<String> {
 ///   build `total_y` (`check_names` in `crates/commol-model/src/labels.rs`);
 /// - a parameter id is one of those names, because the parameter and the
 ///   engine variable would share one slot;
+/// - a transition rate or a formula parameter reads a name to which a
+///   category id that two stratifications share gives two meanings, as
+///   `total_c1` or `A_c1` when `group` and `type` both have `c1`, because the
+///   name does not say which meaning it reads (`Names::check_reads` in
+///   `crates/commol-model/src/labels.rs`, after the check of the parameter
+///   ids); the model builds when no formula reads such a name;
 /// - a transition rate or a formula parameter uses a `total_…` name that is
 ///   not a subgroup total of the model. Category suffixes follow the
 ///   declaration order of the stratifications, so `total_t1_g1` is not a name
@@ -1161,6 +1189,17 @@ pub fn subgroup_total_names(process: &Process) -> Vec<String> {
 /// Returns a message when the model is not aggregate, or a message that
 /// names each conflict and lists the valid names.
 pub fn check_model(model: &Model) -> Result<(), String> {
+    check_aggregate(model).map(|_| ())
+}
+
+/// [`check_model`], which returns the names to which a category id that two
+/// stratifications share gives two meanings ([`Names::shared_names`]), so
+/// that the compilation gives them no slot without a second search.
+///
+/// # Errors
+///
+/// Returns the messages of [`check_model`].
+fn check_aggregate(model: &Model) -> Result<HashSet<String>, String> {
     let aggregate = model.aggregate()?;
     let process = &model.process;
     model.check_ids()?;
@@ -1184,12 +1223,16 @@ pub fn check_model(model: &Model) -> Result<(), String> {
             categories: output.categories,
         })
         .collect();
-    let totals = subgroup_total_entries(&layout, process)
-        .into_iter()
-        .map(|(name, named, _)| (name, named));
-    check_names(layout.labels(), &accumulators, totals)?;
+    let entries = subgroup_total_entries(&layout, process);
+    let names = check_names(
+        layout.labels(),
+        &accumulators,
+        entries
+            .iter()
+            .map(|(name, named, _)| (name.as_str(), named)),
+    )?;
     let compartments: HashSet<&str> = layout.names().iter().map(String::as_str).collect();
-    let subgroup_totals = subgroup_total_name_set(&layout, process);
+    let subgroup_totals: HashSet<&str> = entries.iter().map(|(name, _, _)| name.as_str()).collect();
     let parameter_ids: HashSet<&str> = model.parameters.iter().map(|p| p.id.as_str()).collect();
 
     let mut reserved: Vec<String> = model
@@ -1216,25 +1259,26 @@ pub fn check_model(model: &Model) -> Result<(), String> {
     }
 
     let formulas = model_formulas(model);
-    let used: HashSet<String> = formulas
-        .iter()
-        .flat_map(|formula| {
-            RateMathExpression::from_string(formula.text.to_string()).get_variables()
-        })
-        .collect();
+    let reads = formula_reads(&formulas);
+    names.check_reads(&reads)?;
+    let shared = names.shared_names();
+
+    let used: HashSet<&String> = reads.iter().flat_map(|(_, variables)| variables).collect();
     let mut unknown: Vec<&String> = used
         .iter()
+        .copied()
         .filter(|name| name.starts_with(SUBGROUP_TOTAL_PREFIX))
-        .filter(|name| !subgroup_totals.contains(*name))
+        .filter(|name| !subgroup_totals.contains(name.as_str()))
         .filter(|name| !compartments.contains(name.as_str()))
         .filter(|name| !parameter_ids.contains(name.as_str()))
         .collect();
     if !unknown.is_empty() {
         unknown.sort();
+        // A name of two meanings is no name a rate reads.
         let mut valid: Vec<&str> = subgroup_totals
             .iter()
-            .map(String::as_str)
-            .filter(|name| name.starts_with(SUBGROUP_TOTAL_PREFIX))
+            .copied()
+            .filter(|name| name.starts_with(SUBGROUP_TOTAL_PREFIX) && !shared.contains(*name))
             .collect();
         valid.sort_unstable();
         let valid = if valid.is_empty() {
@@ -1257,7 +1301,7 @@ pub fn check_model(model: &Model) -> Result<(), String> {
     // also its bin total, and a compartment of no category is its bin.
     let taken: HashMap<&str, &str> = subgroup_totals
         .iter()
-        .map(|name| (name.as_str(), "a subgroup total"))
+        .map(|&name| (name, "a subgroup total"))
         .chain(compartments.iter().map(|&name| (name, "a compartment")))
         .chain(process.bins.iter().map(|bin| (bin.id.as_str(), "a bin")))
         .chain(
@@ -1290,13 +1334,14 @@ pub fn check_model(model: &Model) -> Result<(), String> {
         .iter()
         .copied()
         .chain(compartments.iter().copied())
-        .chain(subgroup_totals.iter().map(String::as_str))
+        .chain(subgroup_totals.iter().copied())
         .chain(process.bins.iter().map(|bin| bin.id.as_str()))
         .chain(matrix_names.iter().map(String::as_str))
         .chain(ENGINE_VARIABLES)
         .chain(std::iter::once(NEIGHBORS))
         .collect();
-    check_formula_variables(model, &formulas, &defined)
+    check_formula_variables(model, &formulas, &defined)?;
+    Ok(shared)
 }
 
 /// A formula of a model: a rate, a stratified rate or the value of a formula
@@ -1344,6 +1389,23 @@ fn model_formulas(model: &Model) -> Vec<ModelFormula<'_>> {
         }
     }
     formulas
+}
+
+/// What `formulas` read: each transition and each formula parameter, as a
+/// message names it (`transition 'ab'`), with the variables its formulas
+/// read. The formulas of one transition are next to each other
+/// ([`model_formulas`]).
+fn formula_reads(formulas: &[ModelFormula<'_>]) -> Vec<(String, Vec<String>)> {
+    let mut reads: Vec<(String, Vec<String>)> = Vec::new();
+    for formula in formulas {
+        let reader = format!("{} '{}'", formula.owner, formula.id);
+        let variables = RateMathExpression::from_string(formula.text.to_string()).get_variables();
+        match reads.last_mut() {
+            Some((last, read)) if *last == reader => read.extend(variables),
+            _ => reads.push((reader, variables)),
+        }
+    }
+    reads
 }
 
 /// Check that every rate and formula parameter of a model is in the
@@ -1947,7 +2009,8 @@ fn resolve_var_slot(
     } else {
         VarSlot::ParameterIndex(expression_context.parameter_index(name).expect(
             "check_model rejects a variable that is not a compartment, an engine variable or a \
-             parameter of the context",
+             parameter of the context, and a name of two meanings, which has no slot \
+             (Names::check_reads)",
         ))
     }
 }

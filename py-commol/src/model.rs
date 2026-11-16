@@ -149,19 +149,22 @@ fn transition_flows(
 ///         or an impulse position is one the engine cannot run, a parameter
 ///         id is an expanded compartment, a subgroup total or a name of the
 ///         neighbors, a rate uses a
-///         `total_…` name that is not a subgroup total of the model, or a
-///         rate reads neighbors the model cannot resolve
+///         `total_…` name that is not a subgroup total of the model or reads
+///         a name to which a category id that two stratifications share gives
+///         two meanings, or a rate reads neighbors the model cannot resolve
 #[pyfunction]
 fn check_model(model: &str) -> PyResult<()> {
     commol_model::check_model(&self::model(model)?)
         .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)
 }
 
-/// Names of the subgroup totals a rate of a process may read, sorted
+/// Names of the subgroup totals of a process, sorted
 ///
 /// This is the authority for those names: the `total_<categories>` names,
 /// the bin totals and the partial bin totals. Category suffixes follow the
-/// declaration order of the stratifications.
+/// declaration order of the stratifications. A rate reads each of them,
+/// except a name to which a category id that two stratifications share
+/// gives two meanings (`check_model` refuses it).
 ///
 /// Args:
 ///     process: The JSON of the process of the model
