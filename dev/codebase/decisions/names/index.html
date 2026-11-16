@@ -2764,6 +2764,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-formula-reads-a-name-of-one-meaning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A formula reads a name of one meaning
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3771,6 +3782,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-formula-reads-a-name-of-one-meaning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A formula reads a name of one meaning
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3822,7 +3844,7 @@ to check rates and give units.</p>
 <code>subgroup_total_names_follow_the_declaration_order</code> and
 <code>an_engine_variable_is_not_a_parameter_bin_or_accumulator_id</code>;
 <code>tests/building/test_reserved_names.py</code>;
-<code>tests/rates/test_expressions.py::TestSubgroupTotals::test_every_name_the_engine_provides_is_accepted_in_a_rate</code>.</p>
+<code>tests/rates/test_expressions.py::TestSubgroupTotals::test_every_subgroup_total_of_one_meaning_is_accepted_in_a_rate</code>.</p>
 <h2 id="a-name-names-one-thing">A name names one thing<a class="headerlink" href="#a-name-names-one-thing" title="Permanent link">&para;</a></h2>
 <p>A name joins ids with <code>_</code>, and ids have no rule on their characters, so two
 things can build one name: bin <code>A</code> in category <code>g1</code> and a bin <code>A_g1</code> both
@@ -3840,11 +3862,11 @@ and an accumulator, or a bin and a total over categories, and a name of one
 owner from two lists of category ids, such as two compartments <code>A_a_b</code> when
 <code>group = [a, a_b]</code> and <code>type = [b]</code> applies only in <code>a</code>. It refuses the model
 even when nothing reads the name. So a name names one thing in a rate, an
-initial condition and a result. The one exception is a category id that two
-stratifications share: one list of ids in two stratifications is one owner's
-name, which <code>total_c1</code> and a partial total <code>A_c1</code> read in both categories
-(<a href="https://github.com/MUNQU/commol/issues/475">#475</a>); an initial condition
-names each with its qualified id.</p>
+initial condition and a result. One owner may build a name from one list of
+ids in two stratifications, when they share a category id: <code>total_c1</code> is
+then the total of <code>group:c1</code> and that of <code>type:c1</code>. Such a model builds, and
+no formula reads that name
+(<a href="#a-formula-reads-a-name-of-one-meaning">A formula reads a name of one meaning</a>).</p>
 <p>The message gives each conflict once, at its root: a conflict is left out
 when, without the last category of each meaning, or without a category that
 every meaning takes, its meanings still conflict at one shorter name
@@ -3884,7 +3906,7 @@ they differ, and every category that not every meaning takes.</p>
 </tr>
 <tr>
 <td>Refuse a category id that two stratifications share</td>
-<td>Leave the code better (15): it is a documented feature, which a qualified id names apart; the double count of its total is a change of its own, <a href="https://github.com/MUNQU/commol/issues/475">#475</a>.</td>
+<td>KISS: it refuses a documented feature in every model, also in one that reads no name of two meanings and runs right; a qualified id names each category apart, and no formula reads a name of two meanings.</td>
 </tr>
 </tbody>
 </table>
@@ -3897,6 +3919,99 @@ they differ, and every category that not every meaning takes.</p>
 <code>tests/building/test_reserved_names.py::test_a_name_of_two_owners_is_refused</code>,
 <code>tests/building/test_reserved_names.py::test_a_category_id_that_two_stratifications_share_builds</code>,
 <code>tests/calibration/test_initial_conditions.py::test_an_id_of_a_compartment_and_of_another_bin_is_refused</code>.</p>
+<h2 id="a-formula-reads-a-name-of-one-meaning">A formula reads a name of one meaning<a class="headerlink" href="#a-formula-reads-a-name-of-one-meaning" title="Permanent link">&para;</a></h2>
+<p>A category id that two stratifications share gives a name a meaning in
+each. With <code>group = [a, b]</code> and <code>type = [a, c]</code>, <code>total_a</code> is the total of
+<code>group:a</code> and the total of <code>type:a</code>, and <code>A_a</code> is the compartments of bin <code>A</code>
+in <code>group:a</code> and those in <code>type:a</code>. A compartment can be such a name: when
+<code>type</code> splits only <code>group:b</code>, <code>A_a</code> is the compartment of <code>group:a</code> and the
+partial total of <code>type:a</code>. <code>Names</code> in <code>crates/commol-model/src/labels.rs</code>,
+which <code>check_names</code> returns, holds the meanings of each name, and <code>shared</code>
+finds these: one owner, one list of ids, two stratifications.</p>
+<p><strong>Rule:</strong> the build refuses a transition rate, a stratified rate or a
+formula parameter that reads a name of two meanings (<code>Names::check_reads</code>,
+from <code>check_model</code>, after the check of the parameter ids). The message names
+each formula and what each name names, with the categories to rename, and
+gives each meaning as a sum of names of one meaning when one is
+(<code>Names::sum_of</code>: each compartment once, its own name when that has one
+meaning). A meaning that no such sum reads, such as that compartment <code>A_a</code>,
+is read only after a rename, and the message says so. A model whose formulas
+read no such name builds and runs. The engine sums no such name either:
+<code>build_subgroup_total_mappings</code> in <code>crates/commol-model/src/builder.rs</code> gives
+it no slot (<code>Names::shared_names</code>, which <code>check_aggregate</code> hands to
+<code>CompiledModel::try_from_model</code>), so a matrix sum writes the sum of the
+compartments in its place (<code>subgroup_totals_by_compartments</code>). The name
+stays reserved: <code>subgroup_total_names</code> lists it, and no parameter takes it.</p>
+<p>A matrix sum still writes a compartment by its name, which the engine reads
+first (<code>resolve_var_slot</code>), also when that name has two meanings: in the
+case above, <code>Model.describe</code> can show <code>B_a / (A_a + B_a)</code> for <code>matrix_sum(M,
+B / total)</code> in <code>a</code>, a rate whose names a user may not write.</p>
+<p>The cost: some models that ran right are refused. A <code>total_x</code> of two
+stratifications with disjoint conditions summed each compartment once, and a
+rate that read that compartment <code>A_a</code> read the compartment. A sum of names
+of one meaning (<code>total_a_x + total_b_x</code>) or a rename reads them.</p>
+<p>An initial condition, an observation, a constraint and a result need no such
+check. They read an output or a prefix of its leading categories
+(<code>prefix_indices</code> in <code>crates/commol-model/src/initial_conditions.rs</code>,
+<code>output_sums</code> in <code>labels.rs</code>), and such a name has one list of categories,
+because the categories before a position decide which stratification is at
+it (<code>expand</code> in <code>builder.rs</code>). There, <code>A_a</code> is <code>group:a</code>, as in
+the results; a total of <code>type:a</code> is not one of their names. An initial
+condition names a category by its qualified id (<code>resolve_category</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Refuse the read when the flows are compiled (<code>resolve_var_slot</code> in <code>builder.rs</code>)</td>
+<td>A model that cannot run as written is refused when it is built (<a href="../../mental-model/#invariants">Invariants</a>), and the compilation comes later, at <code>Simulation</code>. DRY: <code>Names</code> holds the meanings.</td>
+</tr>
+<tr>
+<td>Refuse the read in Python</td>
+<td>The golden rule: the engine holds every rule of a model, so a model in JSON meets it too.</td>
+</tr>
+<tr>
+<td>A qualified form in the grammar, such as <code>total_group:a</code></td>
+<td>KISS, YAGNI: the parser, the JIT, the formula tree, the unit check and the equations of Python would change for a rare model. A sum of names of one meaning reads each meaning (<code>total_a_a + total_a_c</code> for <code>group:a</code>), and a rename gives it a name.</td>
+</tr>
+<tr>
+<td>A function <code>total(group, a)</code></td>
+<td>KISS: the expression language has no text arguments, so its parser, its check and the JIT would change (<a href="../model-structure/#state-amount-total-and-subgroup-total">Model structure</a>).</td>
+</tr>
+<tr>
+<td>Read the first stratification, as a prefix does</td>
+<td>One idea, one name: the rate would hide a choice that its reader cannot see, and an initial condition refuses a bare shared category.</td>
+</tr>
+<tr>
+<td>Keep the slot of such a name, and refuse only the formulas that read it</td>
+<td>DRY: the engine writes rates too. A matrix sum read the slot whose set of compartments it needed, and counted a compartment twice with no error (<code>subgroup_totals_by_compartments</code>).</td>
+</tr>
+<tr>
+<td>Sum each compartment once</td>
+<td>One idea, one name: the union is a third meaning that neither stratification has. A matrix sum that wrote the name would show a rate whose reader cannot tell it.</td>
+</tr>
+<tr>
+<td>Refuse the name in an initial condition, an observation and a constraint too</td>
+<td>KISS: there it has one meaning, the leading one, which the results also give it.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong>
+<code>crates/commol-model/tests/model_rules.rs::a_formula_that_reads_a_name_of_a_shared_category_is_refused</code>,
+<code>crates/commol-model/tests/model_rules.rs::a_meaning_that_no_name_of_one_meaning_reads_needs_a_rename</code>,
+<code>crates/commol-model/tests/model_rules.rs::stratifications_of_disjoint_conditions_that_share_an_id_read_each_meaning_by_a_total</code>,
+<code>crates/commol-model/tests/model_rules.rs::a_shared_category_builds_when_no_formula_reads_a_name_it_gives_two_meanings</code>,
+<code>crates/commol-model/tests/model_rules.rs::a_name_of_two_meanings_stays_reserved</code>,
+<code>crates/commol-model/tests/model_rules.rs::the_valid_subgroup_totals_leave_out_the_names_of_two_meanings</code>,
+<code>crates/commol-model/src/labels.rs::a_compartment_whose_own_name_has_two_meanings_reads_as_another_name_of_it</code>,
+<code>crates/commol-model/src/labels.rs::a_name_that_no_sum_reads_in_any_meaning_is_read_only_after_a_rename</code>,
+<code>crates/commol-model/tests/matrices.rs::a_matrix_sum_never_reads_a_name_that_a_shared_category_gives_two_meanings</code>,
+<code>tests/building/test_stratifications.py::test_a_rate_that_reads_a_name_of_a_shared_category_is_refused</code>,
+<code>tests/building/test_stratifications.py::test_a_rate_reads_a_shared_category_through_names_of_one_meaning</code>.</p>
 
 
 

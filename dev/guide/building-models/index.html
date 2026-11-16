@@ -4532,9 +4532,20 @@ of categories, even when no rate reads that name (<code>check_names</code> in
 accumulators and categories to rename. A bin whose id only starts with such a
 name, such as <code>A_g1x</code>, builds. So does a category id that two stratifications
 share, such as <code>c1</code> of <code>group</code> and of <code>type</code>, which the qualified ids
-<code>group:c1</code> and <code>type:c1</code> name apart: there, <code>total_c1</code> and a partial total
-<code>A_c1</code> read both categories, a known defect
-(<a href="https://github.com/MUNQU/commol/issues/475">#475</a>).</p>
+<code>group:c1</code> and <code>type:c1</code> name apart in an initial condition. It gives
+<code>total_c1</code> and the partial total <code>A_c1</code> two meanings, the sum in <code>group:c1</code>
+and the sum in <code>type:c1</code>, so <code>build</code> rejects a rate or a formula parameter
+that reads one of these names, and the message names both meanings. A rate
+reads one meaning as a sum of names of one meaning, which the message gives:
+<code>total_c1_c1 + total_c1_c2</code> is the total of <code>group:c1</code>, and <code>A_c1_c1 +
+A_c2_c1</code> the compartments of <code>A</code> in <code>type:c1</code>. A compartment can be such a
+name too. When <code>type = [c1, c2]</code> splits only <code>group:c2</code>, <code>A_c1</code> is the
+compartment of <code>A</code> in <code>group:c1</code> and the compartments of <code>A</code> in <code>type:c1</code>.
+No other name is that compartment, so the message says that only a rename,
+of <code>c1</code> in <code>group</code> or in <code>type</code>, lets a rate read it. With a matrix sum, such
+a compartment can appear in the rates that <code>Model.describe</code> shows, where the
+engine reads the compartment
+(<a href="../../codebase/decisions/names/#a-formula-reads-a-name-of-one-meaning">A formula reads a name of one meaning</a>).</p>
 <p>A matrix may not take the id of a parameter, a bin, an accumulator, a
 compartment, a subgroup total or an engine variable, nor may one of its
 variables, and two matrices may not give one variable nor a variable that is
@@ -5295,6 +5306,10 @@ call that adds it.</p>
 <tr>
 <td>Every <code>total_…</code> variable names a subgroup total</td>
 <td><code>total_t1_g1</code> when <code>group</code> is declared before <code>type</code></td>
+</tr>
+<tr>
+<td>No rate reads a name of two meanings</td>
+<td><code>k1 * total_c1</code> when <code>group</code> and <code>type</code> both have <code>c1</code> (<a href="#names-the-engine-sets">Names the engine sets</a>)</td>
 </tr>
 <tr>
 <td>A rate that reads the neighbors has them</td>

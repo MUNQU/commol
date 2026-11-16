@@ -4045,7 +4045,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-model/src/labels.rs</code></td>
-<td><code>OutputLabels</code> (bin and categories of an output), <code>output_sums</code> (bin totals and partial totals), <code>CATEGORY_SEPARATOR</code> (of a qualified category id), and <code>check_names</code>, the check that each name a model builds names one thing (<code>Owner</code>, <code>Named</code>).</td>
+<td><code>OutputLabels</code> (bin and categories of an output), <code>output_sums</code> (bin totals and partial totals), <code>CATEGORY_SEPARATOR</code> (of a qualified category id), and <code>check_names</code>, the check that each name a model builds names one thing, which returns what each name names (<code>Names</code>, of <code>Owner</code> and <code>Named</code>): its check that no formula reads a name to which a shared category id gives two meanings (<code>check_reads</code>, with each meaning as a sum of names of one meaning, <code>sum_of</code>), and those names, which the engine gives no slot (<code>shared_names</code>).</td>
 <td>Name parsing.</td>
 </tr>
 <tr>

@@ -4248,6 +4248,10 @@ stratifications were declared. <code>commol_rs.model.subgroup_total_names</code>
 <td>A combination that a conditional stratification never creates</td>
 <td><code>build</code> fails for <code>total_…</code>; <code>&lt;bin&gt;_…</code> is not found</td>
 </tr>
+<tr>
+<td>A category id that two stratifications share, as <code>g1</code> of <code>group</code> and of <code>type</code>, in <code>total_g1</code> or <code>A_g1</code></td>
+<td><code>build</code> fails, names both sums and gives each as a sum of names of one meaning, such as <code>total_g1_g1 + total_g1_g2</code> for <code>group:g1</code> (<a href="../building-models/#names-the-engine-sets">Names the engine sets</a>)</td>
+</tr>
 </tbody>
 </table>
 <h3 id="matrix-sums">Matrix sums<a class="headerlink" href="#matrix-sums" title="Permanent link">&para;</a></h3>
@@ -4270,11 +4274,11 @@ of <code>M</code>:</p>
 <tbody>
 <tr>
 <td>A bin id, such as <code>B</code></td>
-<td>The amount of the bin in <code>j</code>: the compartment <code>B_j</code>, or the sum of the compartments of <code>B</code> in <code>j</code> when a later stratification splits them</td>
+<td>The amount of the bin in <code>j</code>: the compartment <code>B_j</code>, or the sum of the compartments of <code>B</code> in <code>j</code> when a later stratification splits them, written as the partial total <code>B_j</code>, or as its compartments when a shared category id gives <code>B_j</code> two meanings</td>
 </tr>
 <tr>
 <td><code>total</code></td>
-<td>The total of <code>j</code>, <code>total_j</code></td>
+<td>The total of <code>j</code>, written as <code>total_j</code>, or as its compartments when a shared category id gives <code>total_j</code> two meanings</td>
 </tr>
 <tr>
 <td>Anything else: a parameter, a compartment, a subgroup total</td>
