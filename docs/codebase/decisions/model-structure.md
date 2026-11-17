@@ -163,10 +163,12 @@ the model builds. A run refuses it: `CompiledModel::check_values`
 (`crates/commol-model/src/system.rs`) names every parameter without a value
 (from the model or `set_parameter`), every bin left `None` of which no
 compartment has a value, and every other compartment of such a bin without one.
-A value reaches a compartment when `set_initial_condition` writes it, from a
-bin, a prefix, a compartment or the remainder, not from the split of a
-category, which shares out what each pair holds (`write_target`,
-`keep_unvalued` in `crates/commol-model/src/initial_conditions.rs`). Every
+A compartment has a value when an override names it
+([Initial conditions](initial-conditions.md#a-compartment-amount-overrides-the-expansion)),
+or when `set_initial_condition` writes it, from a bin, a prefix, a compartment
+or the remainder, not from the split of a category, which shares out what each
+pair holds (`write_target`, `keep_unvalued` in
+`crates/commol-model/src/initial_conditions.rs`). Every
 engine checks it before it runs or steps, with one message
 (`SimulationEngine::check_values`, a required method, and
 `check_missing_values` of `commol-core`); the bindings `run`, `run_at`,
@@ -200,11 +202,9 @@ write `A = 0` back for a split of `g1` alone.
 
 Its limits: a stated `0` is a sum someone gave, so with `{"A": None, "B": 0}`
 and `B` calibrated the remainder `A` resolves, and every positive `B` is
-infeasible. A compartment override on a bin left `None` counts in `total` but
-not as a stated amount, here as in `check_values`
-([#482](https://github.com/MUNQU/commol/issues/482)). The plan reads the flags
-of the engine when it is built, so a Rust caller that writes an initial
-condition before it builds the plan gives that compartment a value.
+infeasible. The plan reads the flags of the engine when it is built, so a Rust
+caller that writes an initial condition before it builds the plan gives that
+compartment a value.
 
 | Alternative | Why not |
 |---|---|
@@ -224,8 +224,8 @@ condition before it builds the plan gives that compartment a value.
 `crates/commol-model/tests/model_rules.rs::a_run_needs_every_value`, `crates/commol-stochastic/tests/test_values.rs`,
 `crates/commol-calibration/tests/test_varied_values.rs::a_problem_that_leaves_a_value_missing_is_refused_when_it_is_built`,
 `crates/commol-calibration/tests/test_varied_values.rs::a_remainder_that_would_give_a_value_no_one_gave_is_refused`,
-`crates/commol-model/tests/initial_conditions.rs` (the limits: `a_remainder_that_keeps_only_a_stated_zero_leaves_no_positive_value_feasible`,
-`a_compartment_override_on_a_bin_left_none_is_no_stated_amount`),
+`crates/commol-model/tests/initial_conditions.rs` (`an_override_gives_its_compartment_a_value_on_a_bin_left_none`, and the limit
+`a_remainder_that_keeps_only_a_stated_zero_leaves_no_positive_value_feasible`),
 `tests/calibration/test_problem.py::TestProblemAgainstTheModel::test_a_remainder_that_would_give_a_value_no_one_gave_is_refused`,
 `tests/uncertainty/test_sensitivity.py::TestInputs::test_a_remainder_that_would_give_a_value_no_one_gave_is_refused`,
 `tests/calibration/test_problem.py::TestProblemAgainstTheModel::test_a_split_alone_never_writes_back_a_remainder_left_none_at_0`,

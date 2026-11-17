@@ -89,10 +89,19 @@ pub(crate) enum InitialConditionTarget {
     },
 }
 
+/// The initial amounts of the compartments of an engine, and which of them
+/// hold a 0 that no one stated: the compartments of a bin left `None` that no
+/// override names and no value has reached.
+#[derive(Clone, Copy)]
+struct Start<'a> {
+    amounts: &'a [f64],
+    unvalued: &'a [usize],
+}
+
 /// The share of a value each compartment of `indices` takes: its share of
-/// their amounts in `state`; when they hold nothing, its share of the split
-/// the fractions declare within them; and an even split when that split
-/// gives them nothing either.
+/// their amounts in `start`; when they hold nothing, or when one of them holds
+/// a 0 that no one stated, its share of the split the fractions declare within
+/// them; and an even split when that split gives them nothing either.
 ///
 /// The split within them is the product of the fractions that differ
 /// between them. A fraction they all take scales every share alike, so it
@@ -104,7 +113,7 @@ pub(crate) enum InitialConditionTarget {
 /// the order of the categories of its `labels`.
 fn weights(
     indices: &[usize],
-    state: &[f64],
+    start: Start,
     labels: &[OutputLabels],
     fractions: &[Vec<f64>],
 ) -> Vec<f64> {
@@ -112,9 +121,11 @@ fn weights(
         let total: f64 = of.iter().sum();
         (total > 0.0).then(|| of.iter().map(|value| value / total).collect())
     };
-    let amounts = indices.iter().map(|&idx| state[idx]).collect();
-    if let Some(weights) = normalized(amounts) {
-        return weights;
+    if !indices.iter().any(|idx| start.unvalued.contains(idx)) {
+        let amounts = indices.iter().map(|&idx| start.amounts[idx]).collect();
+        if let Some(weights) = normalized(amounts) {
+            return weights;
+        }
     }
     let of = |idx: usize| {
         labels[idx]
@@ -156,14 +167,14 @@ fn weights(
 impl InitialConditionTarget {
     fn aggregate(
         indices: Vec<usize>,
-        state: &[f64],
+        start: Start,
         labels: &[OutputLabels],
         fractions: &[Vec<f64>],
     ) -> Self {
         let entries = indices
             .iter()
             .copied()
-            .zip(weights(&indices, state, labels, fractions))
+            .zip(weights(&indices, start, labels, fractions))
             .collect();
         Self::Aggregate { entries }
     }
@@ -241,6 +252,7 @@ impl InitialConditionPlan {
         let compartments = engine.compartments();
         let labels = compartment_labels(engine);
         let state = engine.initial_state();
+        let unvalued = engine.model().unvalued_compartments();
         let fractions = engine.model().fractions();
         let splits_by = engine.model().splits_by();
         let stratifications = compartment_categories(&labels);
@@ -252,7 +264,10 @@ impl InitialConditionPlan {
                     &value.id,
                     &compartments,
                     &labels,
-                    &state,
+                    Start {
+                        amounts: &state,
+                        unvalued,
+                    },
                     fractions,
                     splits_by,
                     &stratifications,
@@ -284,10 +299,9 @@ impl InitialConditionPlan {
     /// infeasible.
     ///
     /// The plan reads which compartments have no value from the engine when
-    /// it is built: a compartment of a bin left `None` that a Rust caller has
-    /// written before ([`CompartmentalEngine::set_initial_condition`]) counts
-    /// as stated, and a compartment override on such a bin does not
-    /// (<https://github.com/MUNQU/commol/issues/482>).
+    /// it is built: a compartment of a bin left `None` that an override of
+    /// the model names, or that a Rust caller has written before
+    /// ([`CompartmentalEngine::set_initial_condition`]), counts as stated.
     ///
     /// # Errors
     ///
@@ -451,7 +465,15 @@ impl InitialConditionPlan {
         let remainder = remainder.max(0.0);
 
         let model = engine.model();
-        let weights = weights(indices, &state, model.output_labels(), model.fractions());
+        let weights = weights(
+            indices,
+            Start {
+                amounts: &state,
+                unvalued: model.unvalued_compartments(),
+            },
+            model.output_labels(),
+            model.fractions(),
+        );
         for (&idx, weight) in indices.iter().zip(weights) {
             engine
                 .set_initial_condition(idx, remainder * weight)
@@ -502,7 +524,15 @@ fn write_target<E: CompartmentalEngine>(
             for (category, complement) in pairs {
                 let pair_total: f64 = category.iter().chain(complement).map(|&i| state[i]).sum();
                 for (side, part) in [(category, value), (complement, 1.0 - value)] {
-                    let weights = weights(side, &state, model.output_labels(), model.fractions());
+                    let weights = weights(
+                        side,
+                        Start {
+                            amounts: &state,
+                            unvalued: model.unvalued_compartments(),
+                        },
+                        model.output_labels(),
+                        model.fractions(),
+                    );
                     writes.extend(
                         side.iter()
                             .zip(weights)
@@ -657,7 +687,7 @@ fn resolve_target(
     id: &str,
     compartments: &[String],
     labels: &[OutputLabels],
-    state: &[f64],
+    start: Start,
     fractions: &[Vec<f64>],
     splits_by: &[(String, String)],
     stratifications: &[(&str, Vec<&str>)],
@@ -700,7 +730,7 @@ fn resolve_target(
     }
     Ok(match kind {
         InitialTargetKind::Compartment => InitialConditionTarget::Exact { index: indices[0] },
-        _ => InitialConditionTarget::aggregate(indices, state, labels, fractions),
+        _ => InitialConditionTarget::aggregate(indices, start, labels, fractions),
     })
 }
 
@@ -890,7 +920,10 @@ mod tests {
             id,
             &names(count),
             labels,
-            &vec![0.0; count],
+            Start {
+                amounts: &vec![0.0; count],
+                unvalued: &[],
+            },
             &vec![Vec::new(); count],
             splits_by,
             &compartment_categories(labels),

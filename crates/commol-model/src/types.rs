@@ -431,9 +431,9 @@ pub struct CompiledModel {
     /// [`CompiledModel::set_parameter`] gives it.
     pub(crate) unvalued_parameters: Vec<String>,
     /// The compartments of the bins whose amount the model leaves to
-    /// calibrate that no value has reached since, in engine order:
-    /// [`CompiledModel::set_initial_condition`] removes the compartment it
-    /// writes, and [`CompiledModel::keep_unvalued`] keeps it.
+    /// calibrate that no override names and no value has reached since, in
+    /// engine order: [`CompiledModel::set_initial_condition`] removes the
+    /// compartment it writes, and [`CompiledModel::keep_unvalued`] keeps it.
     pub(crate) unvalued_compartments: Vec<usize>,
 }
 

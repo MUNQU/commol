@@ -338,7 +338,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   value no longer runs as `0`. A bin left `None` needs a value in each of its
   compartments: a calibration of `B_g1` alone leaves `B_g2` without one
   (`the amounts of the compartments ["B_g2"]`), and the split of a category
-  (`g1`, `group:g1`) shares out what the bin holds, so it gives none. A
+  (`g1`, `group:g1`) shares out what the bin holds, so it gives none. An
+  override (`compartment_amounts`) gives its compartment a value, also on a
+  bin left `None`: with `{"A": None, "B": 1000}` and `{"A_g1": 500}`, a run
+  names only `the amounts of the compartments ["A_g2"]`, and a remainder `A`
+  keeps the 500 as an amount the model states. A value or a remainder that
+  also sets a compartment without a value, such as `A` or the remainder `A`
+  there, splits by the fractions, 250 to each half; a value of `A` gave
+  `A_g2` 0 and counted it as stated. A
   `Calibrator`, and every uncertainty method that builds the problem, raises
   this `ValueError` when it is built if a value that the calibration does not
   set has none, even when no rate reads it; it was a failed start of the

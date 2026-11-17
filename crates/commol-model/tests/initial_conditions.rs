@@ -718,9 +718,14 @@ fn a_remainder_that_keeps_only_a_stated_zero_leaves_no_positive_value_feasible()
 }
 
 #[test]
-fn a_compartment_override_on_a_bin_left_none_is_no_stated_amount() {
-    // The rule of #482, as it is: `total` counts the override, while the
-    // remainder, as a run, takes the bin A for one without a value.
+fn an_override_gives_its_compartment_a_value_on_a_bin_left_none() {
+    // A is left None, and `A_g1_t1 = 500` states the amount of that
+    // compartment: `total` counts it, a run names only the other
+    // compartments of A, and the remainder A keeps it. The other
+    // compartments of A hold a 0 no one stated, so the remainder splits the
+    // 500 by the fractions, as for a bin of which nothing is stated:
+    // `g1` 0.4 by `t1` 0.25, and so on. A remainder `A_g2`, of which the
+    // model states no amount, names them as a run does.
     let mut model = stratified_model(
         "",
         r#"{"A":null,"B":1000.0}"#,
@@ -734,19 +739,51 @@ fn a_compartment_override_on_a_bin_left_none_is_no_stated_amount() {
         .insert("A_g1_t1".to_string(), 500.0);
     let engine = engine_of(&model);
 
-    let error = written_state(engine.clone(), &[], Some("A"), &[]).unwrap_err();
+    let kept = written_state(engine.clone(), &[], Some("A"), &[]).unwrap();
+    let refused = written_state(engine.clone(), &[], Some("A_g2"), &[]).unwrap_err();
 
     assert_eq!(engine.total(), 1500.0);
-    assert!(
-        error.contains("and the amounts of the bins [\"A\"] have no value."),
-        "{error}"
+    assert_eq!(
+        engine.check_values(),
+        Err(
+            "The model cannot run: the amounts of the compartments [\"A_g1_t2\", \"A_g2_t1\", \
+             \"A_g2_t2\"] have no value. Give them a value, or calibrate them and write the \
+             calibrated values back"
+                .to_string()
+        )
     );
+    assert_close(&kept[..4], &[50.0, 150.0, 150.0, 150.0]);
     assert!(
-        engine
-            .check_values()
-            .unwrap_err()
-            .contains("the amounts of the bins [\"A\"] have no value"),
+        refused.contains(
+            "and the amounts of the compartments [\"A_g2_t1\", \"A_g2_t2\"] have no value."
+        ),
+        "{refused}"
     );
+}
+
+#[test]
+fn a_value_over_an_override_and_compartments_without_one_splits_by_the_fractions() {
+    // A is left None and `A_g1_t1 = 500` is stated. A value of A, or of the
+    // prefix A_g1, also sets compartments that hold a 0 no one stated, so it
+    // splits by the fractions, not 500 to 0.
+    let mut model = stratified_model(
+        "",
+        r#"{"A":null,"B":1000.0}"#,
+        &fractions_with(TYPE_BY_GROUP),
+    );
+    model
+        .aggregate_mut()
+        .unwrap()
+        .initial_conditions
+        .compartment_amounts
+        .insert("A_g1_t1".to_string(), 500.0);
+    let engine = engine_of(&model);
+
+    let bin = written_state(engine.clone(), &["A"], None, &[800.0]).unwrap();
+    let prefix = written_state(engine, &["A_g1"], None, &[300.0]).unwrap();
+
+    assert_close(&bin[..4], &[80.0, 240.0, 240.0, 240.0]);
+    assert_close(&prefix[..2], &[75.0, 225.0]);
 }
 
 #[test]

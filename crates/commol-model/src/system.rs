@@ -107,8 +107,14 @@ impl CompiledModel {
         Ok(())
     }
 
-    /// Of `indices`, the compartments that no value has reached of a bin
-    /// whose amount the model leaves to calibrate.
+    /// The compartments of a bin whose amount the model leaves to calibrate
+    /// that no override names and no value has reached, in order.
+    pub(crate) fn unvalued_compartments(&self) -> &[usize] {
+        &self.unvalued_compartments
+    }
+
+    /// Of `indices`, the compartments of a bin whose amount the model leaves
+    /// to calibrate that no override names and no value has reached.
     pub(crate) fn unvalued_of(&self, indices: &[usize]) -> Vec<usize> {
         indices
             .iter()
@@ -119,7 +125,7 @@ impl CompiledModel {
 
     /// Whether the model states the amount of none of `indices`: each is a
     /// compartment of a bin whose amount the model leaves to calibrate that
-    /// no value has reached.
+    /// no override names and no value has reached.
     pub(crate) fn states_none_of(&self, indices: &[usize]) -> bool {
         indices
             .iter()
@@ -168,9 +174,10 @@ impl CompiledModel {
 
     /// Check that a run has every value: each parameter has one, from the
     /// model or from [`Self::set_parameter`], and each compartment of a bin
-    /// whose amount the model leaves to calibrate has had a value written to
-    /// it ([`Self::set_initial_condition`]), as a calibration does. Every
-    /// engine of the aggregate kind checks it before it runs.
+    /// whose amount the model leaves to calibrate has one, from an override
+    /// of the model or written to it ([`Self::set_initial_condition`]), as a
+    /// calibration does. Every engine of the aggregate kind checks it before
+    /// it runs.
     ///
     /// # Errors
     ///
