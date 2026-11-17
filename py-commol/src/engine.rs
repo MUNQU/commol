@@ -11,7 +11,7 @@ use commol_core::{
 };
 use commol_difference::DifferenceEquations;
 use commol_differential::DifferentialEquations;
-use commol_model::{CompartmentalEngine, InitialConditionPlan, InitialTargetKind};
+use commol_model::{CompartmentalEngine, InitialConditionPlan, TargetCoverage};
 use commol_stochastic::{StochasticEvents, StochasticSteps};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -166,21 +166,21 @@ macro_rules! compartmental {
     };
 }
 
-/// The name of the kind of each initial-condition value and the compartments
-/// it sets, in the order of the values.
-pub type ValueCoverage = Vec<(&'static str, Vec<usize>)>;
+/// The name of the kind of each initial-condition value, the compartments it
+/// sets and those it writes, in the order of the values.
+pub type ValueCoverage = Vec<(&'static str, Vec<usize>, Vec<usize>)>;
 
 /// The coverage of the values of a plan, with the name of each kind.
-fn named(values: Vec<(InitialTargetKind, Vec<usize>)>) -> ValueCoverage {
+fn named(values: Vec<TargetCoverage>) -> ValueCoverage {
     values
         .into_iter()
-        .map(|(kind, compartments)| (kind.name(), compartments))
+        .map(|value| (value.kind.name(), value.compartments, value.written))
         .collect()
 }
 
 /// The initial state of a compartmental engine, the compartments a plan of
-/// initial conditions covers, and the kind and the compartments of each of
-/// its values.
+/// initial conditions covers, and the kind of each of its values with the
+/// compartments it sets and those it writes.
 ///
 /// # Errors
 ///
@@ -202,8 +202,9 @@ pub fn compartmental_state(
     }
 }
 
-/// The kind and the compartments of each initial-condition value of a plan,
-/// in the order of the values, and the compartments of the remainder.
+/// The kind of each initial-condition value of a plan, with the compartments
+/// it sets and those it writes, in the order of the values, and the
+/// compartments of the remainder.
 ///
 /// # Errors
 ///

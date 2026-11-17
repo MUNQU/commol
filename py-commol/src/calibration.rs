@@ -199,8 +199,9 @@ type CalibratedState = (Vec<f64>, Vec<f64>, Vec<usize>, crate::engine::ValueCove
 ///     compartment, in engine order; the indices of the compartments a
 ///     calibrated bin or compartment value, or the remainder, sets; and, for
 ///     each initial-condition parameter in order, its kind (`bin`,
-///     `compartment` or `category`) and the indices of the compartments it
-///     sets (none for a category split)
+///     `compartment` or `category`), the indices of the compartments it
+///     sets (none for a category split) and those it writes (every
+///     compartment of the pairs of a category split)
 ///
 /// Raises:
 ///     ValueError: If the engine is not compartmental, an initial-condition id
@@ -227,8 +228,9 @@ fn calibrated_initial_state(
     Ok((applied, state, covered, targets))
 }
 
-/// The kind of each initial-condition value and the compartments it sets,
-/// and the compartments of the remainder, as the engine resolves them
+/// The kind of each initial-condition value, the compartments it sets and
+/// those it writes, and the compartments of the remainder, as the engine
+/// resolves them
 ///
 /// Args:
 ///     engine: Engine built from a compartmental model
@@ -239,9 +241,10 @@ fn calibrated_initial_state(
 ///
 /// Returns:
 ///     A `(values, remainder)` tuple: for each parameter, its kind (`bin`,
-///     `compartment` or `category`) and the indices of the compartments it
-///     sets (none for a category split), and the indices of the compartments
-///     of the remainder (none without one)
+///     `compartment` or `category`), the indices of the compartments it sets
+///     (none for a category split) and those it writes (every compartment of
+///     the pairs of a category split), and the indices of the compartments of
+///     the remainder (none without one), which it sets and writes
 ///
 /// Raises:
 ///     ValueError: If the engine is not compartmental, or a value or the

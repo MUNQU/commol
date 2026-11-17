@@ -5,12 +5,14 @@ import pytest
 from pydantic import ValidationError
 
 from commol import Aggregate, CalibrationParameter
+from commol._model.report import CategorySplitEntry
 from commol.description.blocks import Table
 from commol._model.engine_state import calibrated_initial_state
 from commol._model.model import Model
 from tests.support import (
     a_to_b_builder,
     build,
+    initial_condition_problem,
     shared_category_builder,
     stratify,
 )
@@ -21,6 +23,14 @@ TYPE_BY_GROUP = {
     "g1": {"t1": 0.25, "t2": 0.75},
     "g2": {"t1": 0.5, "t2": 0.5},
 }
+
+
+def _split_rows(model: Model) -> dict[str, CategorySplitEntry]:
+    """The ``category_splits`` of the report of a model that no value of its
+    problem has set."""
+    return model.applied_parameters({}, initial_condition_problem("t1"))[
+        "category_splits"
+    ]
 
 
 def _by_group(
@@ -92,7 +102,7 @@ def test_one_split_per_stratification_is_unchanged() -> None:
         ["type", "t1", 0.25, "each bin"],
         ["type", "t2", 0.75, "each bin"],
     ]
-    assert model.applied_parameters({})["category_splits"]["t1"] == {
+    assert _split_rows(model)["t1"] == {
         "group": [],
         "fraction": 0.25,
         "calibrated": False,
@@ -115,7 +125,7 @@ class TestSplitByCategory:
     def test_the_report_gives_a_row_per_category_of_each_split(self) -> None:
         model = _by_group(TYPE_BY_GROUP)
 
-        rows = model.applied_parameters({})["category_splits"]
+        rows = _split_rows(model)
 
         assert rows["t2 of g1"] == {
             "group": ["g1"],
@@ -212,19 +222,14 @@ def test_a_split_by_category_names_the_categories_it_reaches() -> None:
         ["type", "t1", 0.25, "g2"],
         ["type", "t2", 0.75, "g2"],
     ]
-    assert model.applied_parameters({})["category_splits"]["t1 of g2"]["group"] == [
-        "g2"
-    ]
+    assert _split_rows(model)["t1 of g2"]["group"] == ["g2"]
 
 
 def test_one_split_of_a_set_is_of_its_categories() -> None:
     model = _on_g2_g3({"t1": 0.25, "t2": 0.75})
 
     assert _fraction_rows(model)[3] == ["type", "t1", 0.25, "g2|g3"]
-    assert model.applied_parameters({})["category_splits"]["t1"]["group"] == [
-        "g2",
-        "g3",
-    ]
+    assert _split_rows(model)["t1"]["group"] == ["g2", "g3"]
     assert model.structure.subgroup_total(model.process, ["g2", "g3"]) == (
         pytest.approx(800.0)
     )

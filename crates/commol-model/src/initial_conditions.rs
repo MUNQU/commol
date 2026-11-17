@@ -70,6 +70,21 @@ impl InitialTargetKind {
     }
 }
 
+/// What an initial-condition value names and the compartments it reaches,
+/// as the plan resolves them ([`InitialConditionPlan::coverage`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TargetCoverage {
+    /// What the id of the value names.
+    pub kind: InitialTargetKind,
+    /// The compartments whose amount the value sets, in engine order. A
+    /// category split keeps the totals of its pairs, so it sets none.
+    pub compartments: Vec<usize>,
+    /// The compartments the value writes, in engine order: those it sets,
+    /// and for a category split every compartment of its pairs, whose shares
+    /// of their totals the split changes.
+    pub written: Vec<usize>,
+}
+
 /// Compartments an initial-condition value is written to.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum InitialConditionTarget {
@@ -175,6 +190,23 @@ impl InitialConditionTarget {
             Self::Aggregate { entries } => entries.iter().map(|(idx, _)| *idx).collect(),
             Self::Exact { index } => vec![*index],
             Self::PairedCategory { .. } => Vec::new(),
+        }
+    }
+
+    /// Compartments the value writes: those it sets, and every compartment
+    /// of the pairs of a category split.
+    fn written_compartments(&self) -> Vec<usize> {
+        match self {
+            Self::PairedCategory { pairs } => {
+                let mut written: Vec<usize> = pairs
+                    .iter()
+                    .flat_map(|(category, complement)| category.iter().chain(complement))
+                    .copied()
+                    .collect();
+                written.sort_unstable();
+                written
+            }
+            _ => self.covered_compartments(),
         }
     }
 
@@ -364,15 +396,20 @@ impl InitialConditionPlan {
         covered
     }
 
-    /// The kind of each value and the compartments it sets, in the order of
-    /// the values, and the compartments of the remainder (empty without
-    /// one). A category split keeps the pair totals, so it sets none. The
-    /// remainder is not a value, so it has no kind.
-    pub fn coverage(&self) -> (Vec<(InitialTargetKind, Vec<usize>)>, Vec<usize>) {
+    /// The kind of each value, the compartments it sets and those it writes,
+    /// in the order of the values, and the compartments of the remainder
+    /// (empty without one), which it sets and writes. A category split keeps
+    /// the pair totals, so it sets none, and writes both sides of each pair.
+    /// The remainder is not a value, so it has no kind.
+    pub fn coverage(&self) -> (Vec<TargetCoverage>, Vec<usize>) {
         let values = self
             .targets
             .iter()
-            .map(|(_, target)| (target.kind(), target.covered_compartments()))
+            .map(|(_, target)| TargetCoverage {
+                kind: target.kind(),
+                compartments: target.covered_compartments(),
+                written: target.written_compartments(),
+            })
             .collect();
         let remainder = self
             .remainder

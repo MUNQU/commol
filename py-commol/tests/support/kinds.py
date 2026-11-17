@@ -23,6 +23,7 @@ from commol.commol_rs import _commol_rs as commol_rs
 from commol.engines.engine import ModelEngine
 
 if TYPE_CHECKING:
+    from commol import CalibrationProblem
     from commol.uncertainty.sample import ParameterSummary
 
 TEST_ENGINE = "TestEngine"
@@ -133,10 +134,16 @@ class DecayStructure(ModelStructure):
     def report_sections(
         self,
         model: "Model[Self]",  # noqa: ARG002
-        calibrated_ids: set[str],
+        problem: "CalibrationProblem",
+        values: Mapping[str, float],
         parameter_statistics: "Mapping[str, ParameterSummary] | None",
     ) -> ReportSections:
         """A section ``outputs`` with the initial value of each output."""
+        calibrated_ids = {
+            parameter.id
+            for parameter in problem.parameters
+            if parameter.parameter_type == "parameter" and parameter.id in values
+        }
         return {
             "outputs": {
                 output.id: {

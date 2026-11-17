@@ -12,7 +12,11 @@ from commol._model.report_entry import (
     entry_spread,
 )
 from commol._model.structure import ReportSections
-from commol._problem.problem import CalibrationProblem, calibrated_values
+from commol._problem.problem import (
+    CalibrationProblem,
+    calibrated_values,
+    declared_values,
+)
 
 if TYPE_CHECKING:
     from commol._model.model import Model
@@ -39,15 +43,13 @@ class AppliedParametersReport(ReportSections):
 def _parameter_entry(
     entry_id: str,
     value: float,
-    calibrated_ids: set[str],
+    calibrated: bool,
     statistics: Mapping[str, EntrySummary] | None,
 ) -> ParameterEntry:
-    """One reported parameter, with its spread when there is one."""
-    entry: ParameterEntry = {
-        "value": value,
-        "calibrated": entry_id in calibrated_ids,
-    }
-    spread = entry_spread(entry_id, statistics)
+    """One reported parameter, with the spread of its calibrated value when
+    there is one."""
+    entry: ParameterEntry = {"value": value, "calibrated": calibrated}
+    spread = entry_spread(entry_id, statistics) if calibrated else None
     if spread is not None:
         entry["spread"] = spread
     return entry
@@ -68,33 +70,43 @@ def _sample_statistics(
 def applied_parameters_report(
     model: "Model",
     result: CalibrationResult | Mapping[str, float],
-    problem: CalibrationProblem | None,
+    problem: CalibrationProblem,
     sample: SummarizedSample | None,
     confidence_level: float | None,
 ) -> AppliedParametersReport:
     """
     Every parameter of a calibrated model, and the values of its kind.
 
-    The block of `Model.applied_parameters`, which documents it.
+    The block of `Model.applied_parameters`, which documents it. A parameter
+    is calibrated when the problem declares a ``parameter`` of its id and
+    `result` holds its value; the structure reads the values of its kind
+    (`ModelStructure.report_sections`).
     """
-    calibrated = calibrated_values(result)
+    values = calibrated_values(result)
+    calibrated = declared_values(problem, values)
     parameter_statistics = _sample_statistics(sample, confidence_level)
-    calibrated_ids = set(calibrated)
+    parameter_ids = {
+        parameter.id
+        for parameter in calibrated
+        if parameter.parameter_type == "parameter"
+    }
 
     parameters: dict[str, ParameterEntry] = {
         parameter.id: _parameter_entry(
-            parameter.id, parameter.value, calibrated_ids, parameter_statistics
+            parameter.id,
+            parameter.value,
+            parameter.id in parameter_ids,
+            parameter_statistics,
         )
         for parameter in model.parameters
         if isinstance(parameter.value, (int, float))
     }
-    for observation_id in _observation_parameter_ids(problem):
-        if observation_id in calibrated:
-            parameters[observation_id] = _parameter_entry(
-                observation_id,
-                calibrated[observation_id],
-                calibrated_ids,
-                parameter_statistics,
+    # Factor and noise values describe the observations, so the model holds
+    # none of them.
+    for parameter in calibrated:
+        if parameter.parameter_type in ("factor", "noise"):
+            parameters[parameter.id] = _parameter_entry(
+                parameter.id, values[parameter.id], True, parameter_statistics
             )
 
     # `confidence_level` leads the report, so it is written first.
@@ -102,18 +114,6 @@ def applied_parameters_report(
     if confidence_level is not None:
         report = {"confidence_level": confidence_level, "parameters": parameters}
     report.update(
-        model.structure.report_sections(model, calibrated_ids, parameter_statistics)
+        model.structure.report_sections(model, problem, values, parameter_statistics)
     )
     return report
-
-
-def _observation_parameter_ids(problem: CalibrationProblem | None) -> list[str]:
-    """Ids of the problem's factor and noise parameters, which describe the
-    observations, in declaration order."""
-    if problem is None:
-        return []
-    return [
-        parameter.id
-        for parameter in problem.parameters
-        if parameter.parameter_type in ("factor", "noise")
-    ]

@@ -6,12 +6,14 @@ import pytest
 
 from commol import (
     Aggregate,
+    CalibrationParameter,
     CalibrationProblem,
     Model,
     NelderMeadConfig,
     ObservedDataPoint,
 )
 from commol._fit.result import CalibrationResult
+from commol._model.engine_state import build_engine
 from commol.uncertainty import ParameterSample, SampleMethod
 from tests.support import (
     FactoryBuilder,
@@ -42,13 +44,17 @@ def _model(*, conditional: bool = False, a_amount: float | None = 900) -> Model:
     )
 
 
-def _problem(scale: bool = False) -> CalibrationProblem:
-    parameters = [bounded("k1")]
+def _problem(
+    *parameters: CalibrationParameter, scale: bool = False
+) -> CalibrationProblem:
+    """A problem of ``parameters``, ``k1`` by default, and the factor
+    ``reporting_rate`` with ``scale``."""
+    declared = list(parameters) or [bounded("k1")]
     if scale:
-        parameters.append(bounded("reporting_rate", 0.01, 1.0, kind="factor"))
+        declared.append(bounded("reporting_rate", 0.01, 1.0, kind="factor"))
     return CalibrationProblem(
         observed_data=[ObservedDataPoint(at=1, output="A_group1", value=1.0)],
-        parameters=parameters,
+        parameters=declared,
         loss_function="sse",
         optimization_config=NelderMeadConfig(max_iterations=1),
     )
@@ -66,12 +72,12 @@ def _sample(entry_id: str, values: list[float]) -> ParameterSample:
 
 class TestParameters:
     def test_reports_every_numeric_parameter(self) -> None:
-        report = _model().applied_parameters({"k1": 0.3})
+        report = _model().applied_parameters({"k1": 0.3}, _problem())
 
         assert report["parameters"]["k1"] == {"value": 0.3, "calibrated": True}
 
     def test_flags_parameters_the_calibration_did_not_set(self) -> None:
-        report = _model().applied_parameters({"k1": 0.3})
+        report = _model().applied_parameters({"k1": 0.3}, _problem())
 
         assert report["parameters"]["k1"]["calibrated"] is True
         assert "k2" not in report["parameters"]
@@ -79,7 +85,7 @@ class TestParameters:
     def test_formula_parameters_are_omitted(self) -> None:
         model = _model()
 
-        report = model.applied_parameters({})
+        report = model.applied_parameters({}, _problem())
 
         assert "k2" not in report["parameters"]
         assert any(p.id == "k2" for p in model.parameters)
@@ -105,10 +111,19 @@ class TestParameters:
         spread = report["parameters"]["reporting_rate"]["spread"]
         assert spread["mean"] == pytest.approx(0.5)
 
-    def test_scale_parameters_are_absent_without_the_problem(self) -> None:
-        report = _model().applied_parameters({"k1": 0.3, "reporting_rate": 0.5})
+    def test_a_scale_parameter_the_values_lack_is_absent(self) -> None:
+        report = _model().applied_parameters({"k1": 0.3}, _problem(scale=True))
 
         assert "reporting_rate" not in report["parameters"]
+
+    def test_a_value_the_problem_does_not_declare_is_refused(self) -> None:
+        with pytest.raises(ValueError) as error:
+            _model().applied_parameters({"k1": 0.3, "k9": 0.1}, _problem())
+
+        assert str(error.value) == (
+            "Values with no declared parameter type: ['k9']. Declared "
+            "calibration parameters: ['k1']"
+        )
 
 
 class TestInitialAmounts:
@@ -120,7 +135,7 @@ class TestInitialAmounts:
             )
         )
 
-        report = model.applied_parameters({})
+        report = model.applied_parameters({}, _problem())
 
         assert report["initial_amounts"] == {
             "A": {"amount": 990, "unit": "item", "calibrated": False},
@@ -134,7 +149,7 @@ class TestInitialAmounts:
         }
 
     def test_a_bin_reports_its_declared_amount(self) -> None:
-        report = _model().applied_parameters({})
+        report = _model().applied_parameters({}, _problem())
 
         assert report["initial_amounts"]["A"] == {
             "amount": 900,
@@ -143,14 +158,14 @@ class TestInitialAmounts:
         }
 
     def test_an_uncalibrated_amount_reports_none(self) -> None:
-        report = _model(a_amount=None).applied_parameters({})
+        report = _model(a_amount=None).applied_parameters({}, _problem())
 
         assert report["initial_amounts"]["A"]["amount"] is None
 
 
 class TestCategorySplits:
     def test_an_unconditional_category_splits_every_bin(self) -> None:
-        report = _model().applied_parameters({})
+        report = _model().applied_parameters({}, _problem())
 
         assert report["category_splits"]["group1"] == {
             "group": [],
@@ -159,7 +174,7 @@ class TestCategorySplits:
         }
 
     def test_a_conditional_category_reports_its_split_of_its_group(self) -> None:
-        report = _model(conditional=True).applied_parameters({})
+        report = _model(conditional=True).applied_parameters({}, _problem())
 
         assert report["category_splits"]["s1"] == {
             "group": ["group1"],
@@ -183,20 +198,72 @@ class TestCategorySplits:
             )
         )
 
-        report = model.applied_parameters({})["category_splits"]
+        report = model.applied_parameters({}, _problem())["category_splits"]
 
         assert report["d1"]["group"] == ["group1", "s1"]
         assert report["d1"]["fraction"] == 0.5
 
+    def test_a_parameter_with_the_id_of_a_category_marks_no_split(self) -> None:
+        model = build(
+            a_to_b_builder(
+                parameters={"k": 0.1, "g1": 0.3},
+                rate="k * g1",
+                stratifications={"group": {"g1": 0.5, "g2": 0.5}},
+            )
+        )
+
+        report = model.applied_parameters(
+            {"g1": 0.3},
+            _problem(bounded("g1")),
+            sample=_sample("g1", [0.2, 0.4]),
+            confidence_level=0.95,
+        )
+
+        assert report["parameters"]["g1"]["calibrated"] is True
+        assert report["parameters"]["g1"]["spread"]["mean"] == pytest.approx(0.3)
+        assert report["category_splits"]["g1"] == {
+            "group": [],
+            "fraction": 0.5,
+            "calibrated": False,
+        }
+
+    def test_a_split_with_the_id_of_a_parameter_marks_no_parameter(self) -> None:
+        model = build(
+            a_to_b_builder(
+                parameters={"k": 0.1, "g1": 0.3},
+                rate="k * g1",
+                stratifications={"group": {"g1": 0.5, "g2": 0.5}},
+            )
+        )
+        problem = initial_condition_problem("g1")
+
+        model.apply_calibration_parameters({"g1": 0.2}, problem)
+        report = model.applied_parameters(
+            {"g1": 0.2},
+            problem,
+            sample=_sample("g1", [0.1, 0.3]),
+            confidence_level=0.95,
+        )
+
+        assert report["parameters"]["g1"] == {"value": 0.3, "calibrated": False}
+        split = report["category_splits"]["g1"]
+        assert split["fraction"] == pytest.approx(0.2)
+        assert split["calibrated"] is True
+        assert split["spread"]["mean"] == pytest.approx(0.2)
+
     def test_shared_category_rows_are_qualified(self) -> None:
         model = build(shared_category_builder(group=(0.3, 0.7), level=(0.6, 0.4)))
 
-        report = model.applied_parameters({"level:c1": 0.6})
+        report = model.applied_parameters(
+            {"level:c1": 0.6}, initial_condition_problem("level:c1")
+        )
         rows = report["category_splits"]
 
         assert rows["group:c1"]["fraction"] == pytest.approx(0.3)
         assert rows["level:c1"]["fraction"] == pytest.approx(0.6)
+        # The split sets c1 of level and its complement, never group.
         assert rows["level:c1"]["calibrated"] is True
+        assert rows["level:c2"]["calibrated"] is True
         assert rows["group:c1"]["calibrated"] is False
         assert "c1" not in rows
 
@@ -205,7 +272,7 @@ class TestCompartmentOverrides:
     """``override_builder``: A_g1 is set, A_g2 keeps its uniform 500."""
 
     def test_declared_compartment_overrides_are_reported(self) -> None:
-        report = build(override_builder(200)).applied_parameters({})
+        report = build(override_builder(200)).applied_parameters({}, _problem())
 
         assert report["initial_amounts"]["A_g1"] == {
             "amount": 200,
@@ -214,7 +281,7 @@ class TestCompartmentOverrides:
         }
 
     def test_bin_rows_report_the_effective_amount(self) -> None:
-        report = build(override_builder(300)).applied_parameters({})
+        report = build(override_builder(300)).applied_parameters({}, _problem())
 
         assert report["initial_amounts"]["A"]["amount"] == pytest.approx(800.0)
 
@@ -228,7 +295,7 @@ class TestCompartmentOverrides:
             )
         )
 
-        report = model.applied_parameters({})
+        report = model.applied_parameters({}, _problem())
 
         assert report["initial_amounts"]["A"]["amount"] is None
         # The override row still carries its own number.
@@ -273,9 +340,55 @@ class TestCompartmentOverrides:
             {category_id: 0.5}, initial_condition_problem(category_id)
         )
 
+        # The split writes both sides of the pair, and sets the complement.
         assert report["initial_amounts"]["A_g1"]["calibrated"] is True
         assert report["category_splits"]["g1"]["calibrated"] is True
-        assert report["category_splits"]["g2"]["calibrated"] is False
+        assert report["category_splits"]["g2"]["calibrated"] is True
+
+    def test_the_overrides_a_calibrated_prefix_pins_report_calibrated(self) -> None:
+        model = build(
+            a_to_b_builder(
+                stratifications={
+                    "group": {"g1": 0.5, "g2": 0.5},
+                    "test": {"t1": 0.5, "t2": 0.5},
+                }
+            )
+        )
+        problem = initial_condition_problem("A_g1")
+
+        model.apply_calibration_parameters({"A_g1": 200.0}, problem)
+        rows = model.applied_parameters({"A_g1": 200.0}, problem)["initial_amounts"]
+
+        # The prefix sets half of A, so the bin keeps its amount and the
+        # write-back pins the compartments of the prefix.
+        assert rows["A_g1_t1"] == {"amount": 100.0, "unit": None, "calibrated": True}
+        assert rows["A_g1_t2"] == {"amount": 100.0, "unit": None, "calibrated": True}
+        assert rows["A"]["calibrated"] is False
+
+    def test_the_amounts_of_the_remainder_report_calibrated(self) -> None:
+        stratified = build(
+            a_to_b_builder(stratifications={"group": {"g1": 0.5, "g2": 0.5}})
+        )
+        problem = initial_condition_problem("B_g1", remainder="A_g1")
+        unstratified = build(a_to_b_builder())
+        bins = initial_condition_problem("B", remainder="A")
+
+        stratified.apply_calibration_parameters({"B_g1": 10.0}, problem)
+        unstratified.apply_calibration_parameters({"B": 100.0}, bins)
+        rows = stratified.applied_parameters({"B_g1": 10.0}, problem)
+        bin_rows = unstratified.applied_parameters({"B": 100.0}, bins)
+
+        assert rows["initial_amounts"]["A_g1"] == {
+            "amount": 490.0,
+            "unit": None,
+            "calibrated": True,
+        }
+        assert rows["initial_amounts"]["A"]["calibrated"] is False
+        assert bin_rows["initial_amounts"]["A"] == {
+            "amount": 900.0,
+            "unit": None,
+            "calibrated": True,
+        }
 
     def test_diverted_override_order_is_deterministic(self) -> None:
         model = build(override_builder(300))
@@ -290,6 +403,7 @@ class TestSpreads:
     def test_an_entry_of_a_sample_has_a_spread(self) -> None:
         report = _model().applied_parameters(
             {"k1": 0.3},
+            _problem(),
             sample=_sample("k1", [0.8, 1.0, 1.2]),
             confidence_level=0.95,
         )
@@ -312,6 +426,7 @@ class TestSpreads:
     def test_the_spread_is_the_last_key_of_an_entry(self) -> None:
         report = _model().applied_parameters(
             {"k1": 0.3},
+            _problem(),
             sample=_sample("k1", [0.8, 1.0, 1.2]),
             confidence_level=0.95,
         )
@@ -320,7 +435,9 @@ class TestSpreads:
 
     def test_a_sample_needs_a_confidence_level(self) -> None:
         with pytest.raises(ValueError) as error:
-            _model().applied_parameters({"k1": 0.3}, sample=_sample("k1", [0.8, 1.2]))
+            _model().applied_parameters(
+                {"k1": 0.3}, _problem(), sample=_sample("k1", [0.8, 1.2])
+            )
 
         assert str(error.value) == "A report of a sample needs a confidence_level."
 
@@ -328,7 +445,8 @@ class TestSpreads:
         self,
     ) -> None:
         report = _model(conditional=True).applied_parameters(
-            {},
+            {"s1": 0.25},
+            initial_condition_problem("s1"),
             sample=_sample("s1", [0.2, 0.25, 0.3]),
             confidence_level=0.95,
         )
@@ -349,16 +467,22 @@ class TestSpreads:
         )
 
         report = build(override_builder(300)).applied_parameters(
-            {}, sample=sample, confidence_level=0.95
+            {"A": 300, "g1": 0.5, "A_g1": 200},
+            initial_condition_problem("A", "g1", "A_g1"),
+            sample=sample,
+            confidence_level=0.95,
         )
 
         assert report["initial_amounts"]["A"]["spread"]["mean"] == pytest.approx(300)
         assert report["category_splits"]["g1"]["spread"]["mean"] == pytest.approx(0.5)
         assert report["initial_amounts"]["A_g1"]["spread"]["mean"] == pytest.approx(200)
+        # Only the row a value names takes its spread.
+        assert "spread" not in report["category_splits"]["g2"]
 
     def test_entries_without_statistics_have_no_spread(self) -> None:
         report = _model().applied_parameters(
             {"k1": 0.3},
+            _problem(),
             sample=_sample("k1", [0.8, 1.2]),
             confidence_level=0.95,
         )
@@ -367,13 +491,13 @@ class TestSpreads:
         assert "spread" not in report["category_splits"]["group1"]
 
     def test_confidence_level_leads_the_report(self) -> None:
-        report = _model().applied_parameters({}, confidence_level=0.95)
+        report = _model().applied_parameters({}, _problem(), confidence_level=0.95)
 
         assert list(report)[0] == "confidence_level"
         assert report["confidence_level"] == 0.95
 
     def test_no_confidence_level_key_without_one(self) -> None:
-        report = _model().applied_parameters({})
+        report = _model().applied_parameters({}, _problem())
 
         assert "confidence_level" not in report
         assert list(report) == ["parameters", "initial_amounts", "category_splits"]
@@ -390,7 +514,7 @@ class TestResultObjects:
             seed=0,
         )
 
-        report = _model().applied_parameters(result)
+        report = _model().applied_parameters(result, _problem())
 
         # The value is the one the model holds; the result marks it calibrated.
         assert report["parameters"]["k1"] == {"value": 0.3, "calibrated": True}
@@ -427,8 +551,17 @@ class TestReportPerformance:
         )
 
         start = time.perf_counter()
-        report = model.applied_parameters({"g0a": 0.5})
+        build_engine(model)
+        one_build = time.perf_counter() - start
+        start = time.perf_counter()
+        report = model.applied_parameters(
+            {"g0a": 0.5}, initial_condition_problem("g0a")
+        )
         elapsed = time.perf_counter() - start
 
+        # The engine resolves the values once for the whole report, so the
+        # report costs about one build of the engine, whatever the number of
+        # rows and overrides; a bound relative to that build holds on a busy
+        # machine and under the instrumentation of the Rust coverage.
         assert report["category_splits"]["g0a"]["calibrated"] is True
-        assert elapsed < 3.0
+        assert elapsed < 2 * one_build + 0.1

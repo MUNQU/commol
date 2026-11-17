@@ -5,7 +5,9 @@
 use commol_core::{
     Model, ModelValue, ModelValueType, SimulationEngine, SimulationError, ValuePlan,
 };
-use commol_model::{CompartmentalEngine, CompiledModel, InitialTargetKind, OutputLabels};
+use commol_model::{
+    CompartmentalEngine, CompiledModel, InitialTargetKind, OutputLabels, TargetCoverage,
+};
 
 /// A compartmental engine that holds its state and does not move it: one bin
 /// of the compiled model per compartment, or the compartments of a
@@ -393,16 +395,22 @@ fn the_plan_gives_the_kind_and_the_compartments_of_each_value() {
         .unwrap();
 
     // C is a bin and its one compartment, so it is a compartment: the
-    // compartment comes first. The remainder is not a value, so it has no
-    // kind.
+    // compartment comes first. The split of cat1 sets no amount and writes
+    // both sides of each of its pairs, never C. The remainder is not a value,
+    // so it has no kind.
     let (values, remainder) = plan.coverage();
+    let coverage = |kind, compartments: &[usize], written: &[usize]| TargetCoverage {
+        kind,
+        compartments: compartments.to_vec(),
+        written: written.to_vec(),
+    };
     assert_eq!(
         values,
         vec![
-            (InitialTargetKind::Bin, vec![0, 1]),
-            (InitialTargetKind::Compartment, vec![3]),
-            (InitialTargetKind::Category, vec![]),
-            (InitialTargetKind::Compartment, vec![2]),
+            coverage(InitialTargetKind::Bin, &[0, 1], &[0, 1]),
+            coverage(InitialTargetKind::Compartment, &[3], &[3]),
+            coverage(InitialTargetKind::Category, &[], &[0, 1, 3, 4]),
+            coverage(InitialTargetKind::Compartment, &[2], &[2]),
         ]
     );
     assert_eq!(remainder, vec![4]);

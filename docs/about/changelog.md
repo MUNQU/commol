@@ -327,6 +327,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Migration: write the other id of the category, or rename the bin or the
   category to calibrate the bin. See
   [What an id can name](../guide/calibration-initial-conditions.md#what-an-id-can-name).
+- **Breaking:** `Model.applied_parameters(values, problem, ...)` takes the
+  problem the values came from, as `apply_calibration_parameters` does; it
+  was optional. The problem declares the type of each value, which an id
+  does not say, and the report marks a row `calibrated` only through it. A
+  value that the problem does not declare is refused, as
+  `apply_calibration_parameters` refuses it, now with the message `Values
+  with no declared parameter type: ['k9']. Declared calibration parameters:
+  ['k1']`; `apply_calibration_parameters` refuses it with the same message,
+  which began `Cannot apply values with no declared parameter type`. A
+  structure of a new kind takes the problem and the values in
+  `ModelStructure.report_sections(model, problem, values,
+  parameter_statistics)`, in place of the set of calibrated ids. Migration:
+  `model.applied_parameters(result, problem)`. See
+  [The applied parameters of a model](../guide/reports.md#the-applied-parameters-of-a-model).
 - **Breaking:** a run refuses a parameter or a bin amount without a value
   with the message of the engine, which names each of them: `The model
   cannot run: the parameters ["k1"] and the amounts of the bins ["B"] have no
@@ -742,6 +756,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   readable+executable`. The
   JIT now maps the memory of compiled code instead of taking it from the
   heap.
+- `Model.applied_parameters` read what a value set from its id: with a
+  parameter `g1` and a category `g1`, a calibrated parameter marked the
+  split `g1` calibrated and gave it its spread, and a calibrated split
+  marked the parameter. It also left uncalibrated the overrides that the
+  write-back pins for a prefix such as `A_g1`, the amounts of the remainder
+  and the complement of a calibrated split. The engine now resolves the
+  values of the problem: a bin is calibrated when the values and the
+  remainder set every compartment of it, an override when they write its
+  compartment, and each category of the stratification of a calibrated
+  split. A sample gives its spread only to the row a value names. See
+  [The applied parameters of a model](../guide/reports.md#the-applied-parameters-of-a-model).
 
 ### Documentation
 

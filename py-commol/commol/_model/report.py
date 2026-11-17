@@ -1,17 +1,20 @@
 """The ``initial_amounts`` and ``category_splits`` sections of a report."""
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, NotRequired, TypedDict
+from typing import TYPE_CHECKING, NamedTuple, NotRequired, TypedDict
 
 from commol._model.aggregate import split_groups
-from commol._model.engine_state import InitialCompartment
-from commol._model.initial_conditions import CATEGORY_SEPARATOR, split_by
+from commol._model.calibration_write_back import covered_bins
+from commol._model.engine_state import build_engine, initial_condition_coverage
+from commol._model.initial_conditions import split_by
 from commol._model.report_entry import EntrySpread, entry_spread
 
 if TYPE_CHECKING:
     from commol._model.aggregate import Aggregate
+    from commol._model.model import Model
     from commol._model.process import Process
     from commol._model.report_entry import EntrySummary
+    from commol._problem.problem import CalibrationProblem
 
 
 class InitialAmountEntry(TypedDict):
@@ -32,13 +35,98 @@ class CategorySplitEntry(TypedDict):
     spread: NotRequired[EntrySpread]
 
 
+class CalibratedInitialConditions(NamedTuple):
+    """
+    What the calibrated initial conditions of a problem set, as the engine
+    resolves them on the model (`initial_condition_coverage`).
+
+    Attributes
+    ----------
+    ids : frozenset[str]
+        The id of each calibrated initial-condition value.
+    sets : frozenset[str]
+        The compartments whose amount a value or the remainder sets.
+    writes : frozenset[str]
+        The compartments a value or the remainder writes: those they set, and
+        both sides of each pair of a category split.
+    splits : dict[tuple[str, str], str]
+        The id of each value the engine resolves as a category split, by its
+        stratification and its category.
+    """
+
+    ids: frozenset[str]
+    sets: frozenset[str]
+    writes: frozenset[str]
+    splits: dict[tuple[str, str], str]
+
+
+def calibrated_initial_conditions[S: "Aggregate"](
+    model: "Model[S]",
+    problem: "CalibrationProblem",
+    values: Mapping[str, float],
+) -> CalibratedInitialConditions:
+    """
+    What the initial conditions of `problem` that `values` holds set.
+
+    The engine resolves the values and the remainder on `model`: the kind of
+    each value, and the compartments it sets and writes. A value it resolves
+    as a category split names its category through the engine too
+    (`Aggregate.resolve_category`), as the write-back does.
+
+    Parameters
+    ----------
+    model : Model[Aggregate]
+        The model that holds the applied values.
+    problem : CalibrationProblem
+        The problem the values came from, for the type of each value and the
+        remainder.
+    values : Mapping[str, float]
+        Calibrated value per parameter id.
+
+    Returns
+    -------
+    CalibratedInitialConditions
+        Empty when `values` holds no initial condition of `problem`.
+
+    Raises
+    ------
+    ValueError
+        If the engine cannot resolve an initial-condition id or the remainder.
+    """
+    parameters = [
+        parameter
+        for parameter in problem.parameters
+        if parameter.parameter_type == "initial_condition" and parameter.id in values
+    ]
+    if not parameters:
+        return CalibratedInitialConditions(frozenset(), frozenset(), frozenset(), {})
+    coverage, remainder = initial_condition_coverage(
+        build_engine(model), parameters, problem.initial_condition_remainder
+    )
+    sets = set(remainder)
+    writes = set(remainder)
+    splits: dict[tuple[str, str], str] = {}
+    for parameter, target in zip(parameters, coverage, strict=True):
+        sets.update(target.compartments)
+        writes.update(target.written)
+        if target.kind == "category":
+            splits[model.structure.resolve_category(parameter.id)] = parameter.id
+    return CalibratedInitialConditions(
+        frozenset(parameter.id for parameter in parameters),
+        frozenset(sets),
+        frozenset(writes),
+        splits,
+    )
+
+
 def _spread(
     entry: InitialAmountEntry | CategorySplitEntry,
-    entry_id: str,
+    value_id: str | None,
     statistics: "Mapping[str, EntrySummary] | None",
 ) -> None:
-    """Add the spread of an entry, when the sample has one."""
-    spread = entry_spread(entry_id, statistics)
+    """Add the spread of the calibrated value that names an entry, when the
+    sample has one."""
+    spread = None if value_id is None else entry_spread(value_id, statistics)
     if spread is not None:
         entry["spread"] = spread
 
@@ -48,58 +136,19 @@ def _amount_entry(
     amount: float | None,
     unit: str | None,
     calibrated: bool,
+    initial_conditions: CalibratedInitialConditions,
     statistics: "Mapping[str, EntrySummary] | None",
 ) -> InitialAmountEntry:
-    """One reported amount, with its spread when there is one."""
+    """One reported amount, with the spread of the value of its id when
+    there is one."""
     entry: InitialAmountEntry = {
         "amount": amount,
         "unit": unit,
         "calibrated": calibrated,
     }
-    _spread(entry, entry_id, statistics)
+    named = entry_id if entry_id in initial_conditions.ids else None
+    _spread(entry, named, statistics)
     return entry
-
-
-def _category_ids(
-    structure: "Aggregate", stratification: str, category: str
-) -> list[str]:
-    """
-    Ids that name a stratification category, preferred first.
-
-    The qualified id (``group:g1``) always names it. The bare name does too
-    when no other stratification declares a category of that name.
-    """
-    qualified = f"{stratification}{CATEGORY_SEPARATOR}{category}"
-    preferred = structure.category_id(stratification, category)
-    return [qualified] if preferred == qualified else [preferred, qualified]
-
-
-def _override_is_calibrated(
-    process: "Process",
-    structure: "Aggregate",
-    compartment: InitialCompartment,
-    calibrated_ids: set[str],
-) -> bool:
-    """
-    Whether a compartment override row was written back from calibration.
-
-    It was when a calibrated id names the compartment, its bin, or a category
-    of a stratification applied to it: a category value splits the category
-    and its complement, so both sides are written back.
-    """
-    if compartment.name in calibrated_ids or compartment.bin in calibrated_ids:
-        return True
-    categories_by_stratification = {
-        stratification.id: stratification.categories
-        for stratification in process.stratifications
-    }
-    return any(
-        not calibrated_ids.isdisjoint(
-            _category_ids(structure, stratification, category)
-        )
-        for stratification in compartment.categories
-        for category in categories_by_stratification[stratification]
-    )
 
 
 def _unit(process: "Process", bin_id: str) -> str | None:
@@ -111,7 +160,7 @@ def _unit(process: "Process", bin_id: str) -> str | None:
 def initial_amounts_report(
     process: "Process",
     structure: "Aggregate",
-    calibrated_ids: set[str],
+    calibrated: CalibratedInitialConditions,
     parameter_statistics: "Mapping[str, EntrySummary] | None",
 ) -> dict[str, InitialAmountEntry]:
     """
@@ -125,14 +174,16 @@ def initial_amounts_report(
     A bin row reports the amount the engine builds: its declared amount, or
     the sum of its compartments when an override touches one of them. A bin
     whose declared amount is ``None`` keeps the ``None`` that marks it as
-    needing calibration; the override rows still carry their own numbers. An
-    override row is reported ``calibrated`` when its compartment carries a
-    calibrated parameter id, or when a calibrated bin or category parameter id
-    covers it.
+    needing calibration; the override rows still carry their own numbers. A
+    bin row is ``calibrated`` when the calibrated values and the remainder
+    set every compartment of the bin, as the write-back writes its amount
+    (`covered_bins`), and an override row when they write its compartment,
+    a split of a category included (`calibrated`).
     """
     state = structure.initial_state(process)
     by_name = {compartment.name: compartment for compartment in state}
     override_names = set(structure.compartment_amounts)
+    set_bins = covered_bins(state, calibrated.sets)
 
     report: dict[str, InitialAmountEntry] = {}
     for bin_id, declared in structure.bin_amounts.items():
@@ -146,16 +197,17 @@ def initial_amounts_report(
             bin_id,
             amount,
             _unit(process, bin_id),
-            bin_id in calibrated_ids,
+            bin_id in set_bins,
+            calibrated,
             parameter_statistics,
         )
     for name, amount in structure.compartment_amounts.items():
-        compartment = by_name[name]
         report[name] = _amount_entry(
             name,
             amount,
-            _unit(process, compartment.bin),
-            _override_is_calibrated(process, structure, compartment, calibrated_ids),
+            _unit(process, by_name[name].bin),
+            name in calibrated.writes,
+            calibrated,
             parameter_statistics,
         )
     return report
@@ -164,7 +216,7 @@ def initial_amounts_report(
 def category_splits_report(
     process: "Process",
     structure: "Aggregate",
-    calibrated_ids: set[str],
+    calibrated: CalibratedInitialConditions,
     parameter_statistics: "Mapping[str, EntrySummary] | None",
 ) -> dict[str, CategorySplitEntry]:
     """
@@ -180,21 +232,29 @@ def category_splits_report(
     rows do not overwrite each other. A stratification split by the category
     of an earlier one gives a row per split, under ``<category> of
     <category of by>`` (``t1 of g1``), with that category in ``group``.
+
+    Every row of a stratification is ``calibrated`` when a calibrated value
+    is a split of one of its categories (`calibrated`): the value sets its
+    category and the complement, in every split. Only the rows of the
+    category the value names gain its spread.
     """
+    split_stratifications = {stratification for stratification, _ in calibrated.splits}
     report: dict[str, CategorySplitEntry] = {}
     for stratification in structure.stratification_fractions:
         splits = split_groups(structure, process, stratification)
         by = split_by(structure.stratification_fractions[stratification])
         for group, split in splits:
             for category, fraction in split.items():
-                ids = _category_ids(structure, stratification, category)
-                entry_id = next((i for i in ids if i in calibrated_ids), ids[0])
                 entry: CategorySplitEntry = {
                     "group": list(group),
                     "fraction": fraction,
-                    "calibrated": entry_id in calibrated_ids,
+                    "calibrated": stratification in split_stratifications,
                 }
-                _spread(entry, entry_id, parameter_statistics)
-                key = ids[0] if by is None else f"{ids[0]} of {group[-1]}"
-                report[key] = entry
+                _spread(
+                    entry,
+                    calibrated.splits.get((stratification, category)),
+                    parameter_statistics,
+                )
+                key = structure.category_id(stratification, category)
+                report[key if by is None else f"{key} of {group[-1]}"] = entry
     return report

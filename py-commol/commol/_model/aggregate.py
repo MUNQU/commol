@@ -275,20 +275,27 @@ class Aggregate(ModelStructure, InitialConditions):
     def report_sections(
         self,
         model: "Model[Self]",
-        calibrated_ids: set[str],
+        problem: "CalibrationProblem",
+        values: Mapping[str, float],
         parameter_statistics: "Mapping[str, EntrySummary] | None",
     ) -> ReportSections:
         """
         The ``initial_amounts`` and ``category_splits`` sections of a report.
 
-        See `Model.applied_parameters`.
+        The engine resolves the initial conditions of `problem` that `values`
+        holds, and the remainder, on `model` (`initial_condition_coverage`),
+        so each row is calibrated when they set it. See
+        `Model.applied_parameters`.
 
         Parameters
         ----------
         model : Model
             The model that holds the applied values.
-        calibrated_ids : set[str]
-            Ids that calibration set.
+        problem : CalibrationProblem
+            The problem the values came from, for its initial conditions and
+            its remainder.
+        values : Mapping[str, float]
+            Calibrated value per parameter id.
         parameter_statistics : Mapping[str, EntrySummary] | None
             Statistics of each id from a sample, or None without one.
 
@@ -296,15 +303,26 @@ class Aggregate(ModelStructure, InitialConditions):
         -------
         ReportSections
             ``{"initial_amounts": ..., "category_splits": ...}``.
-        """
-        from commol._model.report import category_splits_report, initial_amounts_report
 
+        Raises
+        ------
+        ValueError
+            If the engine cannot resolve an initial-condition id or the
+            remainder.
+        """
+        from commol._model.report import (
+            calibrated_initial_conditions,
+            category_splits_report,
+            initial_amounts_report,
+        )
+
+        calibrated = calibrated_initial_conditions(model, problem, values)
         return {
             "initial_amounts": initial_amounts_report(
-                model.process, self, calibrated_ids, parameter_statistics
+                model.process, self, calibrated, parameter_statistics
             ),
             "category_splits": category_splits_report(
-                model.process, self, calibrated_ids, parameter_statistics
+                model.process, self, calibrated, parameter_statistics
             ),
         }
 
