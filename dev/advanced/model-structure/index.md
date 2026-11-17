@@ -88,7 +88,7 @@ Attributes:
 | -------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bin_amounts`              | \`dict\[str, float | None\]\`                                                                                                                                                                                                                           |
 | `stratification_fractions` | `dict[str, dict]`  | The split of each stratification, by stratification id: a dict[str, float], the fraction of each category, such as {"t1": 0.4, "t2": 0.6}, the split of the amount of every bin the stratification applies to; or a dict\[str, str |
-| `compartment_amounts`      | `dict[str, float]` | Amounts of single expanded compartments, by compartment name, applied after the expansion.                                                                                                                                         |
+| `compartment_amounts`      | `dict[str, float]` | Amounts of single expanded compartments, by compartment name, applied after the expansion. An override states the amount of its compartment also on a bin left None.                                                               |
 
 Source code in `commol/_model/initial_conditions.py`
 
@@ -121,7 +121,8 @@ class InitialConditions(BaseModel):
         conditions select.
     compartment_amounts : dict[str, float]
         Amounts of single expanded compartments, by compartment name, applied
-        after the expansion.
+        after the expansion. An override states the amount of its compartment
+        also on a bin left None.
     """
 
     model_config = ConfigDict(extra="forbid")

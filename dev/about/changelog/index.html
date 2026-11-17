@@ -5618,7 +5618,14 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   value no longer runs as <code>0</code>. A bin left <code>None</code> needs a value in each of its
   compartments: a calibration of <code>B_g1</code> alone leaves <code>B_g2</code> without one
   (<code>the amounts of the compartments ["B_g2"]</code>), and the split of a category
-  (<code>g1</code>, <code>group:g1</code>) shares out what the bin holds, so it gives none. A
+  (<code>g1</code>, <code>group:g1</code>) shares out what the bin holds, so it gives none. An
+  override (<code>compartment_amounts</code>) gives its compartment a value, also on a
+  bin left <code>None</code>: with <code>{"A": None, "B": 1000}</code> and <code>{"A_g1": 500}</code>, a run
+  names only <code>the amounts of the compartments ["A_g2"]</code>, and a remainder <code>A</code>
+  keeps the 500 as an amount the model states. A value or a remainder that
+  also sets a compartment without a value, such as <code>A</code> or the remainder <code>A</code>
+  there, splits by the fractions, 250 to each half; a value of <code>A</code> gave
+  <code>A_g2</code> 0 and counted it as stated. A
   <code>Calibrator</code>, and every uncertainty method that builds the problem, raises
   this <code>ValueError</code> when it is built if a value that the calibration does not
   set has none, even when no rate reads it; it was a failed start of the

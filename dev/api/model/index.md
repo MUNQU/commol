@@ -1945,14 +1945,14 @@ The bins of the process expand over its stratifications into compartments. `bin_
 
 Attributes:
 
-| Name                       | Type                   | Description                                                                                                                                                                                                                                                                                           |
-| -------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `kind`                     | `Literal['aggregate']` | The model kind.                                                                                                                                                                                                                                                                                       |
-| `variant`                  | \`str                  | None\`                                                                                                                                                                                                                                                                                                |
-| `bin_amounts`              | \`dict\[str, float     | None\]\`                                                                                                                                                                                                                                                                                              |
-| `stratification_fractions` | `dict[str, dict]`      | The fraction of each category, by stratification id, a dict[str, float] such as {"group": {"g1": 0.3, "g2": 0.7}}: the split of the amount of every bin it applies to. A stratification may instead split each category of a stratification declared before it by its own fractions, a dict\[str, str |
-| `compartment_amounts`      | `dict[str, float]`     | Amounts of single expanded compartments, such as {"A_g1": 0.0}, applied after the expansion. The names are checked against the engine when the model is built.                                                                                                                                        |
-| `neighbors`                | \`Complete             | Groups                                                                                                                                                                                                                                                                                                |
+| Name                       | Type                   | Description                                                                                                                                                                                                                                                                                                  |
+| -------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `kind`                     | `Literal['aggregate']` | The model kind.                                                                                                                                                                                                                                                                                              |
+| `variant`                  | \`str                  | None\`                                                                                                                                                                                                                                                                                                       |
+| `bin_amounts`              | \`dict\[str, float     | None\]\`                                                                                                                                                                                                                                                                                                     |
+| `stratification_fractions` | `dict[str, dict]`      | The fraction of each category, by stratification id, a dict[str, float] such as {"group": {"g1": 0.3, "g2": 0.7}}: the split of the amount of every bin it applies to. A stratification may instead split each category of a stratification declared before it by its own fractions, a dict\[str, str        |
+| `compartment_amounts`      | `dict[str, float]`     | Amounts of single expanded compartments, such as {"A_g1": 0.0}, applied after the expansion. The names are checked against the engine when the model is built. An override states the amount of its compartment also on a bin left None, so a run needs a value only for the other compartments of that bin. |
+| `neighbors`                | \`Complete             | Groups                                                                                                                                                                                                                                                                                                       |
 
 Source code in `commol/_model/aggregate.py`
 
@@ -1994,7 +1994,9 @@ class Aggregate(ModelStructure, InitialConditions):
     compartment_amounts : dict[str, float]
         Amounts of single expanded compartments, such as ``{"A_g1": 0.0}``,
         applied after the expansion. The names are checked against the engine
-        when the model is built.
+        when the model is built. An override states the amount of its
+        compartment also on a bin left None, so a run needs a value only for
+        the other compartments of that bin.
     neighbors : Complete | Groups | None
         Who the neighbors of a unit are, for the rate variables
         ``neighbors_<bin>`` and ``neighbors``. Required, with no default, when

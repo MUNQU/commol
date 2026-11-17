@@ -4158,10 +4158,12 @@ the model builds. A run refuses it: <code>CompiledModel::check_values</code>
 (<code>crates/commol-model/src/system.rs</code>) names every parameter without a value
 (from the model or <code>set_parameter</code>), every bin left <code>None</code> of which no
 compartment has a value, and every other compartment of such a bin without one.
-A value reaches a compartment when <code>set_initial_condition</code> writes it, from a
-bin, a prefix, a compartment or the remainder, not from the split of a
-category, which shares out what each pair holds (<code>write_target</code>,
-<code>keep_unvalued</code> in <code>crates/commol-model/src/initial_conditions.rs</code>). Every
+A compartment has a value when an override names it
+(<a href="../initial-conditions/#a-compartment-amount-overrides-the-expansion">Initial conditions</a>),
+or when <code>set_initial_condition</code> writes it, from a bin, a prefix, a compartment
+or the remainder, not from the split of a category, which shares out what each
+pair holds (<code>write_target</code>, <code>keep_unvalued</code> in
+<code>crates/commol-model/src/initial_conditions.rs</code>). Every
 engine checks it before it runs or steps, with one message
 (<code>SimulationEngine::check_values</code>, a required method, and
 <code>check_missing_values</code> of <code>commol-core</code>); the bindings <code>run</code>, <code>run_at</code>,
@@ -4192,11 +4194,9 @@ query of the values resolves the plan, so both builders above,
 write <code>A = 0</code> back for a split of <code>g1</code> alone.</p>
 <p>Its limits: a stated <code>0</code> is a sum someone gave, so with <code>{"A": None, "B": 0}</code>
 and <code>B</code> calibrated the remainder <code>A</code> resolves, and every positive <code>B</code> is
-infeasible. A compartment override on a bin left <code>None</code> counts in <code>total</code> but
-not as a stated amount, here as in <code>check_values</code>
-(<a href="https://github.com/MUNQU/commol/issues/482">#482</a>). The plan reads the flags
-of the engine when it is built, so a Rust caller that writes an initial
-condition before it builds the plan gives that compartment a value.</p>
+infeasible. The plan reads the flags of the engine when it is built, so a Rust
+caller that writes an initial condition before it builds the plan gives that
+compartment a value.</p>
 <table>
 <thead>
 <tr>
@@ -4255,8 +4255,8 @@ condition before it builds the plan gives that compartment a value.</p>
 <code>crates/commol-model/tests/model_rules.rs::a_run_needs_every_value</code>, <code>crates/commol-stochastic/tests/test_values.rs</code>,
 <code>crates/commol-calibration/tests/test_varied_values.rs::a_problem_that_leaves_a_value_missing_is_refused_when_it_is_built</code>,
 <code>crates/commol-calibration/tests/test_varied_values.rs::a_remainder_that_would_give_a_value_no_one_gave_is_refused</code>,
-<code>crates/commol-model/tests/initial_conditions.rs</code> (the limits: <code>a_remainder_that_keeps_only_a_stated_zero_leaves_no_positive_value_feasible</code>,
-<code>a_compartment_override_on_a_bin_left_none_is_no_stated_amount</code>),
+<code>crates/commol-model/tests/initial_conditions.rs</code> (<code>an_override_gives_its_compartment_a_value_on_a_bin_left_none</code>, and the limit
+<code>a_remainder_that_keeps_only_a_stated_zero_leaves_no_positive_value_feasible</code>),
 <code>tests/calibration/test_problem.py::TestProblemAgainstTheModel::test_a_remainder_that_would_give_a_value_no_one_gave_is_refused</code>,
 <code>tests/uncertainty/test_sensitivity.py::TestInputs::test_a_remainder_that_would_give_a_value_no_one_gave_is_refused</code>,
 <code>tests/calibration/test_problem.py::TestProblemAgainstTheModel::test_a_split_alone_never_writes_back_a_remainder_left_none_at_0</code>,

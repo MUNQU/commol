@@ -5028,7 +5028,7 @@ of different units.</p>
 <td><code>compartment_amounts</code></td>
 <td><code>dict[str, float]</code></td>
 <td><code>{}</code></td>
-<td>Overrides single expanded compartments with an amount in the unit of their bin.</td>
+<td>Overrides single expanded compartments with an amount in the unit of their bin, also of a bin left <code>None</code>: a run then needs a value only for the compartments of that bin that no override names.</td>
 </tr>
 <tr>
 <td><code>neighbors</code></td>

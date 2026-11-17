@@ -3983,10 +3983,13 @@ keeps the rule.</p>
 other compartment after the values are written. A compartment that no value
 covers keeps its declared amount and cancels out, so the remainder keeps the
 declared sum of the compartments the values and it cover, and a bin of another
-unit does not enter. A bin left <code>None</code> counts as 0, so the model states the sum
-on the remainder (<code>{"A": 1000, "B": None}</code>) or on a calibrated value
-(<code>{"A": None, "B": 1000}</code> with <code>B</code> calibrated). When it states it on neither,
-the plan refuses the remainder (<code>with_remainder</code>): the sum is a <code>0</code> no one gave
+unit does not enter. A compartment of a bin left <code>None</code> counts as 0 unless an
+override names it
+(<a href="../initial-conditions/#a-compartment-amount-overrides-the-expansion">Initial conditions</a>),
+so the model states the sum on the remainder (<code>{"A": 1000, "B": None}</code>) or on a
+calibrated value (<code>{"A": None, "B": 1000}</code> with <code>B</code> calibrated). When it states
+it on neither, the plan refuses the remainder (<code>with_remainder</code>): the sum is a
+<code>0</code> no one gave
 (<a href="../model-structure/#a-run-needs-every-value">A run needs every value</a>).
 The plan keeps the sum before an engine of whole units rounds each bin at the
 start of a run, and each bin that is not whole can move it by half a unit or

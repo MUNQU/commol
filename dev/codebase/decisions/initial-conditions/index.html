@@ -3913,6 +3913,21 @@ before it applies one. <code>Aggregate.check_model</code> and
 <code>Aggregate.update_compartment_amounts</code> (on a copy, so a rejected update
 leaves the structure as it was) ask the engine through
 <code>engine_state.initial_state</code>; Python keeps only the checks of the schema.</p>
+<p><strong>Rule:</strong> an override states the amount of its compartment whatever its bin
+holds, <code>None</code> too. Of a bin left <code>None</code>, the build marks as without a value
+only the compartments that no override names (<code>unvalued_compartments</code>, filled
+in <code>builder.rs</code>), and every reader takes that one record: <code>total</code> counts the
+override, <code>check_values</code> names the other compartments of the bin, the
+remainder keeps the override as an amount the model states (<code>states_none_of</code>),
+and <code>set_initial_condition</code> gives a value as an override does
+(<a href="../model-structure/#a-run-needs-every-value">A run needs every value</a>). With
+<code>{"A": None, "B": 1000}</code> split in halves and <code>{"A_g1": 500}</code>, a run names
+<code>A_g2</code>, and the remainder <code>A</code> keeps 500. A value or a remainder that also
+sets a compartment without a value splits by the fractions, as over a bin of
+which nothing is stated (<code>weights</code> in
+<code>crates/commol-model/src/initial_conditions.rs</code>), not by the initial state,
+where that compartment holds a 0 no one stated: the remainder <code>A</code> gives 250
+to each half.</p>
 <table>
 <thead>
 <tr>
@@ -3929,11 +3944,33 @@ leaves the structure as it was) ask the engine through
 <td>An amount per combination of categories before the expansion</td>
 <td>It repeats the expansion in Python and needs every combination, also those a condition leaves out.</td>
 </tr>
+<tr>
+<td>An override on a bin left <code>None</code> is a build error that names both</td>
+<td>A run needs every value: a known amount of one compartment would need an amount of its bin that no one knows. DRY: the write-back of a calibration of part of such a bin (<code>calibrated_structure</code>, <code>_model/calibration_write_back.py</code>) keeps the bin <code>None</code> and pins the compartments the values set, so it would write a model the build refuses (<code>tests/initial_conditions/test_compartment_amounts.py::TestOverrideOnABinLeftNone::test_a_calibration_of_the_other_compartments_is_written_back</code>).</td>
+</tr>
+<tr>
+<td><code>total</code> counts such an override, and the record of values does not</td>
+<td>The remainder keeps a sum that a run refuses, and the message asks for a value of a bin that holds one in part (DRY: two readings of one number).</td>
+</tr>
+<tr>
+<td>No reader counts such an override</td>
+<td>The model holds a number that only the split of a value reads, and an initial state that no run starts from (YAGNI).</td>
+</tr>
+<tr>
+<td>One override gives its whole bin a value</td>
+<td>The compartments it does not name start at <code>0</code>, which no one stated (A run needs every value).</td>
+</tr>
+<tr>
+<td>A value over such a bin splits by the initial state</td>
+<td>The same <code>0</code>: a value of <code>A</code> or a remainder <code>A</code> gives the compartments without a value nothing, and they then count as stated (A run needs every value).</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Guards:</strong>
 <code>crates/commol-model/src/builder.rs::override_on_truncated_conditional_compartment</code>,
 <code>crates/commol-model/src/builder.rs::unknown_compartment_override_is_a_build_error</code>,
+<code>crates/commol-model/tests/initial_conditions.rs::an_override_gives_its_compartment_a_value_on_a_bin_left_none</code>,
+<code>crates/commol-model/tests/initial_conditions.rs::a_value_over_an_override_and_compartments_without_one_splits_by_the_fractions</code>,
 <code>tests/initial_conditions/test_compartment_amounts.py</code>.</p>
 
 
