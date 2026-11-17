@@ -70,7 +70,9 @@ class Aggregate(ModelStructure, InitialConditions):
     compartment_amounts : dict[str, float]
         Amounts of single expanded compartments, such as ``{"A_g1": 0.0}``,
         applied after the expansion. The names are checked against the engine
-        when the model is built.
+        when the model is built. An override states the amount of its
+        compartment also on a bin left None, so a run needs a value only for
+        the other compartments of that bin.
     neighbors : Complete | Groups | None
         Who the neighbors of a unit are, for the rate variables
         ``neighbors_<bin>`` and ``neighbors``. Required, with no default, when

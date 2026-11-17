@@ -489,7 +489,7 @@ structure = Aggregate(
 |---|---|---|---|
 | `bin_amounts` | `dict[str, float \| None]` | required | The amount of each bin at the start, in the unit of the bin: a count, a mass or a concentration. An amount may be `None` when calibration finds it. |
 | `stratification_fractions` | `dict[str, dict[str, float] \| dict[str, str \| dict[str, float]]]` | `{}` | For each stratification, the fraction in each category: the split of the amount of every bin it applies to. For a conditional stratification, the split of the subgroup it splits. A stratification may instead [split each category of an earlier one](#fractions-that-differ-by-category) by its own fractions. |
-| `compartment_amounts` | `dict[str, float]` | `{}` | Overrides single expanded compartments with an amount in the unit of their bin. |
+| `compartment_amounts` | `dict[str, float]` | `{}` | Overrides single expanded compartments with an amount in the unit of their bin, also of a bin left `None`: a run then needs a value only for the compartments of that bin that no override names. |
 | `neighbors` | `Complete \| Groups \| None` | `None` | Who the [neighbors](#neighbors) of a unit are. Required when a rate reads them. |
 
 | Rule | Checked when |

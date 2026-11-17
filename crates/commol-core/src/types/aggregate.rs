@@ -37,7 +37,8 @@ pub struct InitialConditions {
     #[serde(default)]
     pub stratification_fractions: IndexMap<String, StratificationFractions>,
     /// Amount of single expanded compartments, by compartment name, applied
-    /// after the expansion.
+    /// after the expansion. An override states the amount of its
+    /// compartment, also on a bin whose amount is `None`.
     #[serde(default)]
     pub compartment_amounts: IndexMap<String, f64>,
 }

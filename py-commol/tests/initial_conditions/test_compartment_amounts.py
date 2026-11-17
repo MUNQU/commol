@@ -6,12 +6,14 @@ import pytest
 from pydantic import ValidationError
 
 from commol import Aggregate, Simulation
+from commol._model.engine_state import calibrated_initial_state
 from commol._model.model import Model
 from tests.support import (
     FactoryBuilder,
     a_to_b_builder,
     build,
     conditional_pathway_builder,
+    initial_condition_problem,
     initial_state,
     override_builder,
     run,
@@ -31,6 +33,17 @@ def _overrides(model: Model) -> dict[str, float]:
     return dict(model.structure.compartment_amounts)
 
 
+def _a_left_none_with_a_g1() -> Model:
+    """A left None and B = 1000, split in halves, with the override A_g1 = 500."""
+    return build(
+        a_to_b_builder(
+            amounts={"A": None, "B": 1000},
+            stratifications={"group": {"g1": 0.5, "g2": 0.5}},
+            compartment_amounts={"A_g1": 500},
+        )
+    )
+
+
 class TestBuilderCompartmentAmounts:
     def test_unknown_compartment_is_rejected_by_the_engine_at_build(self) -> None:
         builder = _all_in_g1({"A_missing": 0.0})
@@ -43,16 +56,53 @@ class TestBuilderCompartmentAmounts:
 
         assert initial_state(model)["A_g2"] == 5000
 
-    def test_uncalibrated_bin_amounts_count_as_zero(self) -> None:
-        model = build(
+
+class TestOverrideOnABinLeftNone:
+    def test_an_override_gives_its_compartment_a_value_on_a_bin_left_none(self) -> None:
+        # A_g1 = 500 states that amount of A, left None: a run names only
+        # A_g2, and the remainder A keeps the 500. A_g2 holds a 0 no one
+        # stated, so the remainder splits the 500 by the fractions.
+        model = _a_left_none_with_a_g1()
+
+        kept = calibrated_initial_state(model, [], [], "A").state
+        with pytest.raises(ValueError) as error:
+            Simulation(model).run(1)
+
+        assert kept == {"A_g1": 250, "A_g2": 250, "B_g1": 500, "B_g2": 500}
+        assert str(error.value).startswith(
+            'The model cannot run: the amounts of the compartments ["A_g2"] have no '
+            "value."
+        )
+
+    def test_a_bin_left_none_starts_from_an_override_on_each_compartment(
+        self,
+    ) -> None:
+        results = run(
             a_to_b_builder(
                 rate="k * A",
                 amounts={"A": None, "B": 500},
                 compartment_amounts={"A": 400},
-            )
+            ),
+            1,
         )
 
-        assert initial_state(model) == {"A": 400, "B": 500}
+        assert [results["A"][0], results["B"][0]] == [400, 500]
+
+    def test_a_calibration_of_the_other_compartments_is_written_back(self) -> None:
+        # The override gives A_g1 its value, so a value of A_g2 completes A.
+        model = _a_left_none_with_a_g1()
+
+        model.apply_calibration_parameters(
+            {"A_g2": 200}, initial_condition_problem("A_g2")
+        )
+        results = run(model, 1)
+
+        assert {name: series[0] for name, series in results.items()} == {
+            "A_g1": 500,
+            "A_g2": 200,
+            "B_g1": 500,
+            "B_g2": 500,
+        }
 
 
 class TestOverrideInARun:

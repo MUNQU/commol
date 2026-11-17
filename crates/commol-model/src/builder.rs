@@ -301,8 +301,12 @@ impl CompiledModel {
 
         let num_compartments = compartments.len();
         let bin_amounts = &aggregate.initial_conditions.bin_amounts;
+        let overrides = &aggregate.initial_conditions.compartment_amounts;
+        // An override states the amount of its compartment, also on a bin
+        // left `None`.
         let unvalued_compartments = (0..num_compartments)
             .filter(|&idx| matches!(bin_amounts.get(&output_labels[idx].source), Some(None)))
+            .filter(|&idx| !overrides.contains_key(&compartments[idx]))
             .collect();
         let flow_changes = transition_flows
             .iter()
@@ -665,7 +669,9 @@ pub struct InitialCompartment {
 /// zero.
 ///
 /// After the expansion, `compartment_amounts` overrides replace the amount
-/// of the named compartments.
+/// of the named compartments, also of a bin whose amount is `None`: an
+/// override states the amount of its compartment
+/// ([`CompiledModel::check_values`] reads it as a value).
 ///
 /// # Errors
 ///
