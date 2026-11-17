@@ -156,3 +156,63 @@ fn multinomial_leaves_out_the_units_no_category_takes() {
     let mean = total as f64 / DRAWS as f64;
     assert!((mean - 50.0).abs() < 0.2, "{mean}");
 }
+
+/// Shares that sum to 1 within their rounding: the last category with a
+/// positive share takes the trials left, and the zero shares after it none.
+#[test]
+fn the_last_positive_category_of_a_multinomial_takes_the_trials_left_with_no_draw() {
+    // The second share is one unit in the last place below 0.5, so its
+    // probability among the mass left is 0.9999999999999999, not 1.
+    let mut alone = Generator::from_seed(SEED);
+    let first = binomial(&mut alone, 1_000, 0.5);
+    for shares in [[0.5, 0.5, 0.0], [0.5, 0.5 - f64::EPSILON / 4.0, 0.0]] {
+        let mut generator = Generator::from_seed(SEED);
+        let mut counts = [0; 3];
+
+        multinomial(&mut generator, 1_000, &shares, &mut counts);
+
+        assert_eq!(counts, [first, 1_000 - first, 0], "{shares:?}");
+        assert_eq!(generator.uniform(), alone.clone().uniform(), "{shares:?}");
+    }
+}
+
+#[test]
+fn a_positive_share_after_a_zero_one_takes_every_trial_with_no_draw() {
+    let mut generator = Generator::from_seed(SEED);
+    let mut counts = [0; 2];
+
+    multinomial(&mut generator, 1_000, &[0.0, 1.0], &mut counts);
+
+    assert_eq!(counts, [0, 1_000]);
+    assert_eq!(generator.uniform(), Generator::from_seed(SEED).uniform());
+}
+
+#[test]
+fn shares_below_one_by_more_than_their_rounding_draw_the_last_positive_category() {
+    // 1e-12 is far above the rounding 2 ε of two shares: the shares are
+    // weights, and the last one draws its binomial.
+    let mut alone = Generator::from_seed(SEED);
+    let first = binomial(&mut alone, 1_000, 0.5);
+    let mut generator = Generator::from_seed(SEED);
+    let mut counts = [0; 2];
+
+    multinomial(&mut generator, 1_000, &[0.5, 0.5 - 1e-12], &mut counts);
+
+    assert_eq!(counts[0], first);
+    assert!(counts.iter().sum::<u64>() <= 1_000);
+    alone.uniform();
+    assert_eq!(generator.uniform(), alone.uniform());
+}
+
+#[cfg(debug_assertions)]
+#[test]
+#[should_panic(expected = "probabilities sum to")]
+fn shares_above_one_by_more_than_their_rounding_panic_in_debug_builds() {
+    let mut counts = [0; 2];
+    multinomial(
+        &mut Generator::from_seed(SEED),
+        10,
+        &[0.5, 0.5 + 1e-12],
+        &mut counts,
+    );
+}

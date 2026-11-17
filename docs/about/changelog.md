@@ -126,6 +126,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A multinomial draw gives the last category with a positive share the units
+  left, with no draw, when the shares sum to 1 within rounding: in a bin split
+  by `rounding="random"`, the last compartment, and in `StochasticSteps`, the
+  last flow out of a compartment whose proportional rates sum to 1 within
+  rounding. Before, that category drew a uniform or not by the last bit of the
+  shares, so two shares one bit apart, such as an amount written back by
+  `Model.apply_calibration_parameters`, gave another run of the same seed. The
+  distribution of the draws is the same, but a seeded run of
+  `StochasticEvents` or `StochasticSteps` with `rounding="random"`, or of
+  `StochasticSteps` with such rates, can change from this version. See
+  [Whole units](../guide/stochastic.md#whole-units).
 - The engine checks that a calibration problem leaves no value missing when
   the problem is built, as it does for a `SensitivityAnalysis`: it writes each
   value at the point of its bounds nearest 0, with the

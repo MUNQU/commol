@@ -26,13 +26,18 @@ The write-back rebuilds the scored amounts as it does on every engine, within
 compartment it writes the amount itself, so a run of one seed is the run the
 calibration scored. In a bin of several compartments the rebuilt amounts can
 differ in their last bits. `"largest_remainder"` starts from the same units
-unless two remainders tie within those bits. `"random"` can draw other units:
-`multinomial` and `binomial` (`crates/commol-random/src/sample.rs`) branch on
-the exact value of a share, and a share of `0.9999999999999999` instead of 1
-makes `binomial_inversion` draw one more uniform, which shifts the stream of
-the run. A replicate of the written model can then differ along its whole
-path, and the seed of the problem can give a loss other than
-`result.final_loss` ([#474](https://github.com/MUNQU/commol/issues/474)).
+unless two remainders tie within those bits. `"random"` can draw other units.
+The last category with a positive share draws nothing
+([Stochastic engines and seeds](engines.md#stochastic-engines-and-seeds)),
+but every other conditional share of a bin still meets the branches of
+`binomial` (`crates/commol-random/src/sample.rs`), a share of 0.5 and a mean
+of 10, which an equal split always hits, or draws a count that its last bits
+change. So the draw alone does not make a written-back model run as scored:
+the pins of the write-back
+([#474](https://github.com/MUNQU/commol/issues/474)) do, and where a rebuilt
+amount still differs in its last bits, a replicate of the written model can
+differ along its whole path, and the seed of the problem can give a loss
+other than `result.final_loss`.
 
 | Alternative | Why not |
 |---|---|
