@@ -2865,6 +2865,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-report-marks-what-the-calibration-set-as-the-engine-resolves-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A report marks what the calibration set, as the engine resolves it
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3749,6 +3760,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-report-marks-what-the-calibration-set-as-the-engine-resolves-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A report marks what the calibration set, as the engine resolves it
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3772,8 +3794,9 @@
 <h1 id="calibration-write-back">Calibration write-back<a class="headerlink" href="#calibration-write-back" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
 <p>How <code>Model.apply_calibration_parameters</code> writes the values of a calibration
-back onto a model, and what a run of the model it writes holds. How
-calibrated values reach the initial state during the calibration is in
+back onto a model, what a run of the model it writes holds, and how
+<code>Model.applied_parameters</code> reports what it set. How calibrated values reach
+the initial state during the calibration is in
 <a href="../calibrated-initial-conditions/">Calibrated initial conditions</a>.</p>
 <h2 id="a-calibrated-amount-is-written-back-as-the-optimizer-found-it">A calibrated amount is written back as the optimizer found it<a class="headerlink" href="#a-calibrated-amount-is-written-back-as-the-optimizer-found-it" title="Permanent link">&para;</a></h2>
 <p><strong>Rule:</strong> with a rounding, <code>check_model</code> builds every initial amount, whole or
@@ -3828,6 +3851,82 @@ path, and the seed of the problem can give a loss other than
 <code>crates/commol-model/src/builder.rs::a_bin_that_is_not_whole_builds_with_a_rounding</code>,
 <code>crates/commol-stochastic/src/units.rs::a_bin_of_a_half_rounds_up_whatever_its_split</code>,
 <code>tests/stochastic/test_whole_units.py::TestWholeUnits::test_a_rounding_makes_each_bin_its_nearest_whole_number</code>.</p>
+<h2 id="a-report-marks-what-the-calibration-set-as-the-engine-resolves-it">A report marks what the calibration set, as the engine resolves it<a class="headerlink" href="#a-report-marks-what-the-calibration-set-as-the-engine-resolves-it" title="Permanent link">&para;</a></h2>
+<p><strong>Rule:</strong> <code>Model.applied_parameters(values, problem, ...)</code> takes the problem
+the values came from, as <code>apply_calibration_parameters</code> does, and marks a row
+<code>calibrated</code> only through it. An id does not say what a value set: a
+parameter <code>g1</code> and the category <code>g1</code> of <code>group = [g1, g2]</code> share it, and the
+problem declares which one each value is (<code>parameter_type</code>;
+<code>declared_values</code> in <code>_problem/problem.py</code> refuses an id it does not
+declare). A <code>parameter</code> value marks the parameter of its id. The structure
+reads the values of its kind, from the problem and the values, as
+<code>with_calibrated_values</code> does (<code>ModelStructure.report_sections</code>). For an
+aggregate model, the plan of the write-back resolves the initial conditions
+and the remainder on the model (<code>calibrated_initial_conditions</code> in
+<code>_model/report.py</code>, through the binding <code>initial_condition_coverage</code> and
+<code>InitialConditionPlan::coverage</code>). It reads the labels of the compartments,
+which a write-back does not change, so it gives the written model the
+compartments it gave the calibrated one
+(<code>test_the_overrides_a_calibrated_prefix_pins_report_calibrated</code> reports on
+the written model):</p>
+<table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Calibrated when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A bin</td>
+<td>The values and the remainder set every compartment of it: the bins whose amount the write-back writes (<code>covered_bins</code> in <code>_model/calibration_write_back.py</code>)</td>
+</tr>
+<tr>
+<td>An override</td>
+<td>The values and the remainder write its compartment (<code>TargetCoverage::written</code>): what a value sets, and both sides of each pair of a split. So each compartment the write-back pins: of a prefix such as <code>A_g1</code>, of the remainder, of a split</td>
+</tr>
+<tr>
+<td>A category split</td>
+<td>A value is a split of its stratification: the write-back sets the category and its complement, in every split by category</td>
+</tr>
+</tbody>
+</table>
+<p>Python reads the kind of a value from the engine, never from its id. A
+sample gives its spread to the row a value names, and to no other.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>problem</code> stays optional, and without it the report reads the values by their ids</td>
+<td>The golden rule and DRY: Python resolves an id a second way, and misreads it: the parameter <code>g1</code> marks the split <code>g1</code> and gives it its spread, and the overrides that a prefix <code>A_g1</code> pins are not calibrated. One idea, one name: one call would mean two things, with the problem or without it.</td>
+</tr>
+<tr>
+<td>The engine resolves each id on the model alone, a parameter first</td>
+<td>One idea, one name: an order chooses one of two targets in silence, which the plan refuses for an initial condition (<a href="../calibrated-initial-conditions/#an-initial-condition-id-names-one-target">An initial-condition id names one target</a>). The problem already declares the type, and the report needs its remainder.</td>
+</tr>
+<tr>
+<td>The write-back records in the model what it set</td>
+<td>S and KISS: the model would hold the history of a calibration, save it in its file and keep it after an edit such as <code>update_bin_amounts</code>, and a draw reported on the model would read the record of another set.</td>
+</tr>
+<tr>
+<td>A result carries the types of its values</td>
+<td>DRY and YAGNI: a copy of the problem in each result and draw, and the remainder still needs the problem.</td>
+</tr>
+<tr>
+<td>The complement of a split and the remainder are not calibrated</td>
+<td>One idea, one name: <code>calibrated</code> would mean "a value names it" for a split and "the write-back wrote it" for an override that a prefix pins, which no value names either. Only the spread stays with the row a value names.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong>
+<code>tests/reporting/test_applied_parameters.py</code> (<code>test_a_parameter_with_the_id_of_a_category_marks_no_split</code>, <code>test_a_split_with_the_id_of_a_parameter_marks_no_parameter</code>, <code>test_the_overrides_a_calibrated_prefix_pins_report_calibrated</code>, <code>test_the_amounts_of_the_remainder_report_calibrated</code>, <code>test_an_override_a_calibrated_category_covers_reports_calibrated</code>, <code>test_a_value_the_problem_does_not_declare_is_refused</code>),
+<code>crates/commol-model/tests/initial_conditions.rs::the_plan_gives_the_kind_and_the_compartments_of_each_value</code>,
+<code>tests/calibration/test_initial_conditions.py::test_the_kind_of_each_target_comes_from_the_engine</code>.</p>
 
 
 

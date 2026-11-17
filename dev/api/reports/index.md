@@ -7,27 +7,29 @@ Plain-dictionary reports, each a method of the object whose data it describes. G
 ## applied_parameters
 
 ```python
-applied_parameters(values: CalibrationResult | Mapping[str, float], problem: CalibrationProblem | None = None, sample: SummarizedSample | None = None, confidence_level: float | None = None) -> AppliedParametersReport
+applied_parameters(values: CalibrationResult | Mapping[str, float], problem: CalibrationProblem, sample: SummarizedSample | None = None, confidence_level: float | None = None) -> AppliedParametersReport
 ```
 
 Report every parameter of the model, and the values of its kind.
 
-Call it on the model **after** `apply_calibration_parameters`. Each entry carries the value the model holds and whether calibration set it, so entries the calibration left alone appear alongside the fitted ones. The structure of the model adds the sections of its kind (`ModelStructure.report_sections`); an aggregate model adds `initial_amounts` and `category_splits`.
+Call it on the model **after** `apply_calibration_parameters`, with the same values and problem. Each entry carries the value the model holds and whether calibration set it, so entries the calibration left alone appear alongside the fitted ones. The structure of the model adds the sections of its kind (`ModelStructure.report_sections`); an aggregate model adds `initial_amounts` and `category_splits`.
 
-Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` and `noise` parameters have no place in the model, so they are reported from `problem` when it is given.
+The problem declares the type of each value, so it says what each one set; an id alone does not, since a parameter and a category can share it. A `parameter` value marks the parameter of its id, and the values of the kind of the model are read as the engine resolves them: for an aggregate model, a bin is calibrated when the initial-condition values and the remainder set every compartment of it, an override when they write its compartment, and a category split when a value is a split of its stratification, which also sets the complement.
+
+Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` and `noise` parameters have no place in the model, so they are reported from `problem`.
 
 `initial_amounts` gives each bin and each overridden compartment of an aggregate model its `amount` the engine builds and the `unit` of its bin, so bins of different units are reported side by side; no row is a share of a total. A bin left uncalibrated keeps a `None` amount as its "needs calibration" marker even when overrides touch some of its compartments. `category_splits` gives each category its `fraction` of the group it splits, and that `group`: the categories a conditional stratification is conditioned on, empty when it splits every bin. A stratification whose fractions differ by the category of an earlier one gives a row per split, under the key `t1 of g1`, with that category in its `group`.
 
-With a `sample` each entry gains a `spread` holding the weighted statistics of its draws (`ParameterSample.summary`). Every entry is in the unit it was calibrated in: a parameter in its own, an amount in the unit of its bin, and a category split as a fraction of its group.
+With a `sample` the entry that a calibrated value names gains a `spread` holding the weighted statistics of its draws (`ParameterSample.summary`). Every entry is in the unit it was calibrated in: a parameter in its own, an amount in the unit of its bin, and a category split as a fraction of its group.
 
 Parameters:
 
-| Name               | Type                 | Description | Default                                                                                     |
-| ------------------ | -------------------- | ----------- | ------------------------------------------------------------------------------------------- |
-| `values`           | \`CalibrationResult  | Mapping\`   | The calibration result, or a mapping of parameter id to value such as one draw of a sample. |
-| `problem`          | \`CalibrationProblem | None\`      | The problem the values came from, used to report factor and noise parameters.               |
-| `sample`           | \`ParameterSample    | None\`      | Draws of the parameters, such as the sample of an uncertainty method.                       |
-| `confidence_level` | \`float              | None\`      | Confidence level of the intervals; required with a sample.                                  |
+| Name               | Type                 | Description                                                                                                          | Default                                                                                     |
+| ------------------ | -------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `values`           | \`CalibrationResult  | Mapping\`                                                                                                            | The calibration result, or a mapping of parameter id to value such as one draw of a sample. |
+| `problem`          | `CalibrationProblem` | The problem the values came from, which declares the type of each value and the remainder of the initial conditions. | *required*                                                                                  |
+| `sample`           | \`ParameterSample    | None\`                                                                                                               | Draws of the parameters, such as the sample of an uncertainty method.                       |
+| `confidence_level` | \`float              | None\`                                                                                                               | Confidence level of the intervals; required with a sample.                                  |
 
 Returns:
 
@@ -37,9 +39,10 @@ Returns:
 
 Raises:
 
-| Type         | Description                                      |
-| ------------ | ------------------------------------------------ |
-| `ValueError` | If a sample is given without a confidence level. |
+| Type         | Description                                                                                                                                                               |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If a sample is given without a confidence level, values holds an id that problem does not declare, or the engine cannot resolve an initial-condition id or the remainder. |
+| `TypeError`  | If values is a ParameterSample, which has no single set of parameters.                                                                                                    |
 
 Source code in `commol/_model/model.py`
 
@@ -47,24 +50,33 @@ Source code in `commol/_model/model.py`
 def applied_parameters(
     self,
     values: CalibrationResult | Mapping[str, float],
-    problem: CalibrationProblem | None = None,
+    problem: CalibrationProblem,
     sample: "SummarizedSample | None" = None,
     confidence_level: float | None = None,
 ) -> "AppliedParametersReport":
     """
     Report every parameter of the model, and the values of its kind.
 
-    Call it on the model **after** `apply_calibration_parameters`. Each
-    entry carries the value the model holds and whether calibration set
-    it, so entries the calibration left alone appear alongside the fitted
-    ones. The structure of the model adds the sections of its kind
-    (`ModelStructure.report_sections`); an aggregate model adds
-    ``initial_amounts`` and ``category_splits``.
+    Call it on the model **after** `apply_calibration_parameters`, with
+    the same values and problem. Each entry carries the value the model
+    holds and whether calibration set it, so entries the calibration left
+    alone appear alongside the fitted ones. The structure of the model
+    adds the sections of its kind (`ModelStructure.report_sections`); an
+    aggregate model adds ``initial_amounts`` and ``category_splits``.
+
+    The problem declares the type of each value, so it says what each one
+    set; an id alone does not, since a parameter and a category can share
+    it. A ``parameter`` value marks the parameter of its id, and the
+    values of the kind of the model are read as the engine resolves them:
+    for an aggregate model, a bin is calibrated when the initial-condition
+    values and the remainder set every compartment of it, an override
+    when they write its compartment, and a category split when a value is
+    a split of its stratification, which also sets the complement.
 
     Parameters that are not a single number, such as a formula or a
     series, are omitted: they are inputs rather than fitted values.
     ``factor`` and ``noise`` parameters have no place in the model, so
-    they are reported from `problem` when it is given.
+    they are reported from `problem`.
 
     ``initial_amounts`` gives each bin and each overridden compartment of
     an aggregate model its ``amount`` the engine builds and the ``unit``
@@ -78,19 +90,20 @@ def applied_parameters(
     category of an earlier one gives a row per split, under the key
     ``t1 of g1``, with that category in its ``group``.
 
-    With a `sample` each entry gains a ``spread`` holding the weighted
-    statistics of its draws (`ParameterSample.summary`). Every entry is in
-    the unit it was calibrated in: a parameter in its own, an amount in
-    the unit of its bin, and a category split as a fraction of its group.
+    With a `sample` the entry that a calibrated value names gains a
+    ``spread`` holding the weighted statistics of its draws
+    (`ParameterSample.summary`). Every entry is in the unit it was
+    calibrated in: a parameter in its own, an amount in the unit of its
+    bin, and a category split as a fraction of its group.
 
     Parameters
     ----------
     values : CalibrationResult | Mapping
         The calibration result, or a mapping of parameter id to value such
         as one draw of a sample.
-    problem : CalibrationProblem | None, optional
-        The problem the values came from, used to report factor and noise
-        parameters.
+    problem : CalibrationProblem
+        The problem the values came from, which declares the type of each
+        value and the remainder of the initial conditions.
     sample : ParameterSample | None, optional
         Draws of the parameters, such as the sample of an uncertainty
         method.
@@ -107,7 +120,12 @@ def applied_parameters(
     Raises
     ------
     ValueError
-        If a sample is given without a confidence level.
+        If a sample is given without a confidence level, `values` holds
+        an id that `problem` does not declare, or the engine cannot
+        resolve an initial-condition id or the remainder.
+    TypeError
+        If `values` is a `ParameterSample`, which has no single set of
+        parameters.
     """
     return applied_parameters_report(
         self, values, problem, sample, confidence_level

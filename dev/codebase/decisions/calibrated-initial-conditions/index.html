@@ -3889,11 +3889,12 @@ remainder (<code>prefix_indices</code>) never covers those of two. The name of a
 compartment is a bin or a prefix only of that one compartment, so
 <code>resolve_target</code>, which meets the compartment first, only sets its kind.</p>
 <p><strong>Rule:</strong> the engine says the kind of each value (<code>InitialTargetKind</code>: <code>bin</code>,
-<code>compartment</code> or <code>category</code>), together with the compartments it sets
-(<code>InitialConditionPlan::coverage</code>), and Python reads the kind and infers
-nothing from the compartments. The kind is what the id names, and the
-compartment comes first, so an id that names an expanded compartment is a
-compartment, also when it is the id of a bin with one compartment. The remainder has no kind:
+<code>compartment</code> or <code>category</code>), together with the compartments it sets and
+those it writes (<code>InitialConditionPlan::coverage</code>, <code>TargetCoverage</code>), and
+Python reads the kind and infers nothing from the compartments. The kind is
+what the id names, and the compartment comes first, so an id that names an
+expanded compartment is a compartment, also when it is the id of a bin with
+one compartment. The remainder has no kind:
 it is not a value, and the plan keeps it apart. The binding
 <code>calibrated_initial_state</code> returns the state, the covered compartments and
 the kinds from the one plan that writes them, so they agree by construction.</p>
@@ -3953,7 +3954,7 @@ keeps the rule.</p>
 <tbody>
 <tr>
 <td>The build refuses a category id that is a bin id, next to <code>check_names</code> in <code>crates/commol-model/src/labels.rs</code></td>
-<td>S, YAGNI, DRY: the build checks the names it builds, and the plan the ids it reads. The plan is the one resolver of an id that can be a bin or a category: <code>stratification_fractions</code> keys a category under its stratification, the methods of <code>Aggregate</code> that resolve a category id (<code>resolve_category</code>) take only categories, and <code>Model.applied_parameters</code> (<code>py-commol/commol/_model/report.py</code>) reads, by name, ids that the plan has already resolved, a defect of its own (<a href="https://github.com/MUNQU/commol/issues/481">#481</a>). It would refuse models that run and set the category with its qualified id, and keep a second rule of an ambiguous id away from <code>resolve_category</code>.</td>
+<td>S, YAGNI, DRY: the build checks the names it builds, and the plan the ids it reads. The plan is the one resolver of an id that can be a bin or a category: <code>stratification_fractions</code> keys a category under its stratification, the methods of <code>Aggregate</code> that resolve a category id (<code>resolve_category</code>) take only categories, and <code>Model.applied_parameters</code> reads the ids as the plan resolves them (<a href="../calibration-write-back/#a-report-marks-what-the-calibration-set-as-the-engine-resolves-it">A report marks what the calibration set</a>). It would refuse models that run and set the category with its qualified id, and keep a second rule of an ambiguous id away from <code>resolve_category</code>.</td>
 </tr>
 <tr>
 <td>The bin first, in the order of resolution</td>

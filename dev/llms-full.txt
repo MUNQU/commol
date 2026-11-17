@@ -7167,7 +7167,7 @@ A report turns the data of an object into plain dictionaries, ready for JSON. Ea
 
 | Method                                                    | Reports                                                                                                                                              |
 | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Model.applied_parameters(values, problem=None, …)`       | What the model holds and what calibration set                                                                                                        |
+| `Model.applied_parameters(values, problem, …)`            | What the model holds and what calibration set                                                                                                        |
 | `SimulationResults.report(positions, window, windows, …)` | What a run produced, next to the observations                                                                                                        |
 | `SimulationReplicates.report(confidence_level, …)`        | The same, with each number reduced across the replicates of a stochastic engine                                                                      |
 | `Predictive.report(confidence_level, …)`                  | The same, with each number reduced across the draws of a sample, with their weights                                                                  |
@@ -7247,7 +7247,7 @@ print(sorted(run_report))  # ['accumulators', 'observed', 'series']
 
 ## The applied parameters of a model
 
-`Model.applied_parameters(values, problem=None, sample=None, confidence_level=None)` lists every number the calibrated model holds, and whether calibration set it. The `parameters` section is the same for every kind of model; the structure of the model adds the sections of its kind (`ModelStructure.report_sections`). An aggregate model adds `initial_amounts` and `category_splits`:
+`Model.applied_parameters(values, problem, sample=None, confidence_level=None)` lists every number the calibrated model holds, and whether calibration set it. The `parameters` section is the same for every kind of model; the structure of the model adds the sections of its kind (`ModelStructure.report_sections`). An aggregate model adds `initial_amounts` and `category_splits`:
 
 ```json
 {
@@ -7267,23 +7267,24 @@ print(sorted(run_report))  # ['accumulators', 'observed', 'series']
 }
 ```
 
-| Argument                     | Meaning                                                                                                                                 |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| The model                    | Call the method on the model **after** `apply_calibration_parameters`.                                                                  |
-| `values`                     | A `CalibrationResult`, or an `{id: value}` mapping such as one of `sample.draws()`.                                                     |
-| `problem`                    | Optional. Adds the calibrated `factor` and `noise` parameters, which the model does not hold.                                           |
-| `sample`, `confidence_level` | Optional. A `ParameterSample`: each entry gains its weighted statistics (`ParameterSample.summary`). A sample needs a confidence level. |
+| Argument                     | Meaning                                                                                                                                                                                                                                                                                 |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The model                    | Call the method on the model **after** `apply_calibration_parameters`.                                                                                                                                                                                                                  |
+| `values`                     | A `CalibrationResult`, or an `{id: value}` mapping such as one of `sample.draws()`.                                                                                                                                                                                                     |
+| `problem`                    | The problem the values came from, as for `apply_calibration_parameters`. It declares the type of each value, which an id alone does not say: a parameter `g1` and a category `g1` share it. It also adds the calibrated `factor` and `noise` parameters, which the model does not hold. |
+| `sample`, `confidence_level` | Optional. A `ParameterSample`: the entry each calibrated value names gains its weighted statistics (`ParameterSample.summary`). A sample needs a confidence level.                                                                                                                      |
 
-| Entry                                            | Rule                                                                                                                                                                                                                                                                                                                                       |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Parameters                                       | Only numeric parameters: formulas and series are inputs, not fitted values.                                                                                                                                                                                                                                                                |
-| `initial_amounts`                                | One row per bin and per overridden compartment: the `amount` the engine builds, overrides included, and the `unit` of its bin. No row is a share of a total, so bins of different units sit side by side.                                                                                                                                  |
-| `category_splits`                                | One row per category: its `fraction` of the group it splits. A category has no amount, because it can split bins of different units.                                                                                                                                                                                                       |
-| `group`                                          | The conditioning categories of a conditional stratification, or `[]` when it splits every bin. A stratification whose fractions [differ by category](https://munqu.github.io/commol/latest/guide/building-models/#fractions-that-differ-by-category) adds the category of each split: its rows are under `t1 of g1`, with `g1` in `group`. |
-| An uncalibrated bin (`None` amount)              | `amount` is `null`.                                                                                                                                                                                                                                                                                                                        |
-| A bin with no unit                               | `unit` is `null`.                                                                                                                                                                                                                                                                                                                          |
-| A category name that two stratifications declare | Its row is under the qualified id, such as `group:g1`.                                                                                                                                                                                                                                                                                     |
-| A `sample`                                       | Each entry gains a `spread` block, an `EntrySpread` (`mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max`, `std`, all weighted), and the report starts with `confidence_level`.                                                                                                                                                          |
+| Entry                                            | Rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Parameters                                       | Only numeric parameters: formulas and series are inputs, not fitted values.                                                                                                                                                                                                                                                                                                                                                                                                |
+| `calibrated`                                     | Calibration wrote the number, as the engine resolves the values of the problem: a parameter the problem declares as a `parameter`; a bin when the initial-condition values and the remainder set every compartment of it; an override when they write its compartment, as the pinned compartments of a prefix `A_g1`, the remainder or either side of a calibrated category; and each category of the stratification a calibrated split belongs to, so the complement too. |
+| `initial_amounts`                                | One row per bin and per overridden compartment: the `amount` the engine builds, overrides included, and the `unit` of its bin. No row is a share of a total, so bins of different units sit side by side.                                                                                                                                                                                                                                                                  |
+| `category_splits`                                | One row per category: its `fraction` of the group it splits. A category has no amount, because it can split bins of different units.                                                                                                                                                                                                                                                                                                                                       |
+| `group`                                          | The conditioning categories of a conditional stratification, or `[]` when it splits every bin. A stratification whose fractions [differ by category](https://munqu.github.io/commol/latest/guide/building-models/#fractions-that-differ-by-category) adds the category of each split: its rows are under `t1 of g1`, with `g1` in `group`.                                                                                                                                 |
+| An uncalibrated bin (`None` amount)              | `amount` is `null`.                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| A bin with no unit                               | `unit` is `null`.                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| A category name that two stratifications declare | Its row is under the qualified id, such as `group:g1`.                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| A `sample`                                       | The entry a calibrated value names gains a `spread` block, an `EntrySpread` (`mean`, `median`, `ci_lower`, `ci_upper`, `min`, `max`, `std`, all weighted), and the report starts with `confidence_level`. A row that a value only reaches, such as the complement of a split or the remainder, has none.                                                                                                                                                                   |
 
 The key order of each entry is fixed (`value`, `calibrated`, then `spread`; `amount`, `unit`, `calibrated`, then `spread`; `group`, `fraction`, `calibrated`, then `spread`), so saved JSON files stay comparable. The spread is in the unit of its entry: an amount in the unit of its bin, a split as a fraction of its group.
 
@@ -7337,8 +7338,7 @@ print(list(band_report["series"]["A"]))  # ['mean', 'median', 'ci_lower', 'ci_up
 
 ## Checklist
 
-- [ ] The model reports `applied_parameters` after `apply_calibration_parameters`.
-- [ ] `problem` is passed when there are `factor` or `noise` parameters.
+- [ ] The model reports `applied_parameters` after `apply_calibration_parameters`, with the same values and problem.
 - [ ] `positions`, `window` and `windows` match the observations, and the results hold every position the report reads.
 
 ## Next steps
@@ -18785,18 +18785,10 @@ class Model(BaseModel, Generic[StructureT]):
             parameters.
         """
         values = calibrated_values(result)
-        types = {param.id: param.parameter_type for param in problem.parameters}
-        unknown = sorted(set(values) - set(types))
-        if unknown:
-            raise ValueError(
-                f"Cannot apply values with no declared parameter type: {unknown}. "
-                f"Declared calibration parameters: {sorted(types)}"
-            )
-
         parameters: dict[str, float | None] = {
-            param_id: value
-            for param_id, value in values.items()
-            if types[param_id] == "parameter"
+            param.id: values[param.id]
+            for param in declared_values(problem, values)
+            if param.parameter_type == "parameter"
         }
         # Computed before any mutation, so a rejected value leaves the model
         # unchanged.
@@ -18809,24 +18801,33 @@ class Model(BaseModel, Generic[StructureT]):
     def applied_parameters(
         self,
         values: CalibrationResult | Mapping[str, float],
-        problem: CalibrationProblem | None = None,
+        problem: CalibrationProblem,
         sample: "SummarizedSample | None" = None,
         confidence_level: float | None = None,
     ) -> "AppliedParametersReport":
         """
         Report every parameter of the model, and the values of its kind.
 
-        Call it on the model **after** `apply_calibration_parameters`. Each
-        entry carries the value the model holds and whether calibration set
-        it, so entries the calibration left alone appear alongside the fitted
-        ones. The structure of the model adds the sections of its kind
-        (`ModelStructure.report_sections`); an aggregate model adds
-        ``initial_amounts`` and ``category_splits``.
+        Call it on the model **after** `apply_calibration_parameters`, with
+        the same values and problem. Each entry carries the value the model
+        holds and whether calibration set it, so entries the calibration left
+        alone appear alongside the fitted ones. The structure of the model
+        adds the sections of its kind (`ModelStructure.report_sections`); an
+        aggregate model adds ``initial_amounts`` and ``category_splits``.
+
+        The problem declares the type of each value, so it says what each one
+        set; an id alone does not, since a parameter and a category can share
+        it. A ``parameter`` value marks the parameter of its id, and the
+        values of the kind of the model are read as the engine resolves them:
+        for an aggregate model, a bin is calibrated when the initial-condition
+        values and the remainder set every compartment of it, an override
+        when they write its compartment, and a category split when a value is
+        a split of its stratification, which also sets the complement.
 
         Parameters that are not a single number, such as a formula or a
         series, are omitted: they are inputs rather than fitted values.
         ``factor`` and ``noise`` parameters have no place in the model, so
-        they are reported from `problem` when it is given.
+        they are reported from `problem`.
 
         ``initial_amounts`` gives each bin and each overridden compartment of
         an aggregate model its ``amount`` the engine builds and the ``unit``
@@ -18840,19 +18841,20 @@ class Model(BaseModel, Generic[StructureT]):
         category of an earlier one gives a row per split, under the key
         ``t1 of g1``, with that category in its ``group``.
 
-        With a `sample` each entry gains a ``spread`` holding the weighted
-        statistics of its draws (`ParameterSample.summary`). Every entry is in
-        the unit it was calibrated in: a parameter in its own, an amount in
-        the unit of its bin, and a category split as a fraction of its group.
+        With a `sample` the entry that a calibrated value names gains a
+        ``spread`` holding the weighted statistics of its draws
+        (`ParameterSample.summary`). Every entry is in the unit it was
+        calibrated in: a parameter in its own, an amount in the unit of its
+        bin, and a category split as a fraction of its group.
 
         Parameters
         ----------
         values : CalibrationResult | Mapping
             The calibration result, or a mapping of parameter id to value such
             as one draw of a sample.
-        problem : CalibrationProblem | None, optional
-            The problem the values came from, used to report factor and noise
-            parameters.
+        problem : CalibrationProblem
+            The problem the values came from, which declares the type of each
+            value and the remainder of the initial conditions.
         sample : ParameterSample | None, optional
             Draws of the parameters, such as the sample of an uncertainty
             method.
@@ -18869,7 +18871,12 @@ class Model(BaseModel, Generic[StructureT]):
         Raises
         ------
         ValueError
-            If a sample is given without a confidence level.
+            If a sample is given without a confidence level, `values` holds
+            an id that `problem` does not declare, or the engine cannot
+            resolve an initial-condition id or the remainder.
+        TypeError
+            If `values` is a `ParameterSample`, which has no single set of
+            parameters.
         """
         return applied_parameters_report(
             self, values, problem, sample, confidence_level
@@ -19219,18 +19226,10 @@ def apply_calibration_parameters(
         parameters.
     """
     values = calibrated_values(result)
-    types = {param.id: param.parameter_type for param in problem.parameters}
-    unknown = sorted(set(values) - set(types))
-    if unknown:
-        raise ValueError(
-            f"Cannot apply values with no declared parameter type: {unknown}. "
-            f"Declared calibration parameters: {sorted(types)}"
-        )
-
     parameters: dict[str, float | None] = {
-        param_id: value
-        for param_id, value in values.items()
-        if types[param_id] == "parameter"
+        param.id: values[param.id]
+        for param in declared_values(problem, values)
+        if param.parameter_type == "parameter"
     }
     # Computed before any mutation, so a rejected value leaves the model
     # unchanged.
@@ -19244,27 +19243,29 @@ def apply_calibration_parameters(
 #### applied_parameters
 
 ```python
-applied_parameters(values: CalibrationResult | Mapping[str, float], problem: CalibrationProblem | None = None, sample: SummarizedSample | None = None, confidence_level: float | None = None) -> AppliedParametersReport
+applied_parameters(values: CalibrationResult | Mapping[str, float], problem: CalibrationProblem, sample: SummarizedSample | None = None, confidence_level: float | None = None) -> AppliedParametersReport
 ```
 
 Report every parameter of the model, and the values of its kind.
 
-Call it on the model **after** `apply_calibration_parameters`. Each entry carries the value the model holds and whether calibration set it, so entries the calibration left alone appear alongside the fitted ones. The structure of the model adds the sections of its kind (`ModelStructure.report_sections`); an aggregate model adds `initial_amounts` and `category_splits`.
+Call it on the model **after** `apply_calibration_parameters`, with the same values and problem. Each entry carries the value the model holds and whether calibration set it, so entries the calibration left alone appear alongside the fitted ones. The structure of the model adds the sections of its kind (`ModelStructure.report_sections`); an aggregate model adds `initial_amounts` and `category_splits`.
 
-Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` and `noise` parameters have no place in the model, so they are reported from `problem` when it is given.
+The problem declares the type of each value, so it says what each one set; an id alone does not, since a parameter and a category can share it. A `parameter` value marks the parameter of its id, and the values of the kind of the model are read as the engine resolves them: for an aggregate model, a bin is calibrated when the initial-condition values and the remainder set every compartment of it, an override when they write its compartment, and a category split when a value is a split of its stratification, which also sets the complement.
+
+Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` and `noise` parameters have no place in the model, so they are reported from `problem`.
 
 `initial_amounts` gives each bin and each overridden compartment of an aggregate model its `amount` the engine builds and the `unit` of its bin, so bins of different units are reported side by side; no row is a share of a total. A bin left uncalibrated keeps a `None` amount as its "needs calibration" marker even when overrides touch some of its compartments. `category_splits` gives each category its `fraction` of the group it splits, and that `group`: the categories a conditional stratification is conditioned on, empty when it splits every bin. A stratification whose fractions differ by the category of an earlier one gives a row per split, under the key `t1 of g1`, with that category in its `group`.
 
-With a `sample` each entry gains a `spread` holding the weighted statistics of its draws (`ParameterSample.summary`). Every entry is in the unit it was calibrated in: a parameter in its own, an amount in the unit of its bin, and a category split as a fraction of its group.
+With a `sample` the entry that a calibrated value names gains a `spread` holding the weighted statistics of its draws (`ParameterSample.summary`). Every entry is in the unit it was calibrated in: a parameter in its own, an amount in the unit of its bin, and a category split as a fraction of its group.
 
 Parameters:
 
-| Name               | Type                 | Description | Default                                                                                     |
-| ------------------ | -------------------- | ----------- | ------------------------------------------------------------------------------------------- |
-| `values`           | \`CalibrationResult  | Mapping\`   | The calibration result, or a mapping of parameter id to value such as one draw of a sample. |
-| `problem`          | \`CalibrationProblem | None\`      | The problem the values came from, used to report factor and noise parameters.               |
-| `sample`           | \`ParameterSample    | None\`      | Draws of the parameters, such as the sample of an uncertainty method.                       |
-| `confidence_level` | \`float              | None\`      | Confidence level of the intervals; required with a sample.                                  |
+| Name               | Type                 | Description                                                                                                          | Default                                                                                     |
+| ------------------ | -------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `values`           | \`CalibrationResult  | Mapping\`                                                                                                            | The calibration result, or a mapping of parameter id to value such as one draw of a sample. |
+| `problem`          | `CalibrationProblem` | The problem the values came from, which declares the type of each value and the remainder of the initial conditions. | *required*                                                                                  |
+| `sample`           | \`ParameterSample    | None\`                                                                                                               | Draws of the parameters, such as the sample of an uncertainty method.                       |
+| `confidence_level` | \`float              | None\`                                                                                                               | Confidence level of the intervals; required with a sample.                                  |
 
 Returns:
 
@@ -19274,9 +19275,10 @@ Returns:
 
 Raises:
 
-| Type         | Description                                      |
-| ------------ | ------------------------------------------------ |
-| `ValueError` | If a sample is given without a confidence level. |
+| Type         | Description                                                                                                                                                               |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If a sample is given without a confidence level, values holds an id that problem does not declare, or the engine cannot resolve an initial-condition id or the remainder. |
+| `TypeError`  | If values is a ParameterSample, which has no single set of parameters.                                                                                                    |
 
 Source code in `commol/_model/model.py`
 
@@ -19284,24 +19286,33 @@ Source code in `commol/_model/model.py`
 def applied_parameters(
     self,
     values: CalibrationResult | Mapping[str, float],
-    problem: CalibrationProblem | None = None,
+    problem: CalibrationProblem,
     sample: "SummarizedSample | None" = None,
     confidence_level: float | None = None,
 ) -> "AppliedParametersReport":
     """
     Report every parameter of the model, and the values of its kind.
 
-    Call it on the model **after** `apply_calibration_parameters`. Each
-    entry carries the value the model holds and whether calibration set
-    it, so entries the calibration left alone appear alongside the fitted
-    ones. The structure of the model adds the sections of its kind
-    (`ModelStructure.report_sections`); an aggregate model adds
-    ``initial_amounts`` and ``category_splits``.
+    Call it on the model **after** `apply_calibration_parameters`, with
+    the same values and problem. Each entry carries the value the model
+    holds and whether calibration set it, so entries the calibration left
+    alone appear alongside the fitted ones. The structure of the model
+    adds the sections of its kind (`ModelStructure.report_sections`); an
+    aggregate model adds ``initial_amounts`` and ``category_splits``.
+
+    The problem declares the type of each value, so it says what each one
+    set; an id alone does not, since a parameter and a category can share
+    it. A ``parameter`` value marks the parameter of its id, and the
+    values of the kind of the model are read as the engine resolves them:
+    for an aggregate model, a bin is calibrated when the initial-condition
+    values and the remainder set every compartment of it, an override
+    when they write its compartment, and a category split when a value is
+    a split of its stratification, which also sets the complement.
 
     Parameters that are not a single number, such as a formula or a
     series, are omitted: they are inputs rather than fitted values.
     ``factor`` and ``noise`` parameters have no place in the model, so
-    they are reported from `problem` when it is given.
+    they are reported from `problem`.
 
     ``initial_amounts`` gives each bin and each overridden compartment of
     an aggregate model its ``amount`` the engine builds and the ``unit``
@@ -19315,19 +19326,20 @@ def applied_parameters(
     category of an earlier one gives a row per split, under the key
     ``t1 of g1``, with that category in its ``group``.
 
-    With a `sample` each entry gains a ``spread`` holding the weighted
-    statistics of its draws (`ParameterSample.summary`). Every entry is in
-    the unit it was calibrated in: a parameter in its own, an amount in
-    the unit of its bin, and a category split as a fraction of its group.
+    With a `sample` the entry that a calibrated value names gains a
+    ``spread`` holding the weighted statistics of its draws
+    (`ParameterSample.summary`). Every entry is in the unit it was
+    calibrated in: a parameter in its own, an amount in the unit of its
+    bin, and a category split as a fraction of its group.
 
     Parameters
     ----------
     values : CalibrationResult | Mapping
         The calibration result, or a mapping of parameter id to value such
         as one draw of a sample.
-    problem : CalibrationProblem | None, optional
-        The problem the values came from, used to report factor and noise
-        parameters.
+    problem : CalibrationProblem
+        The problem the values came from, which declares the type of each
+        value and the remainder of the initial conditions.
     sample : ParameterSample | None, optional
         Draws of the parameters, such as the sample of an uncertainty
         method.
@@ -19344,7 +19356,12 @@ def applied_parameters(
     Raises
     ------
     ValueError
-        If a sample is given without a confidence level.
+        If a sample is given without a confidence level, `values` holds
+        an id that `problem` does not declare, or the engine cannot
+        resolve an initial-condition id or the remainder.
+    TypeError
+        If `values` is a `ParameterSample`, which has no single set of
+        parameters.
     """
     return applied_parameters_report(
         self, values, problem, sample, confidence_level
@@ -19958,18 +19975,27 @@ class ModelStructure(BaseModel, ABC):
     def report_sections(
         self,
         model: "Model[Self]",  # noqa: ARG002
-        calibrated_ids: set[str],  # noqa: ARG002
+        problem: "CalibrationProblem",  # noqa: ARG002
+        values: Mapping[str, float],  # noqa: ARG002
         parameter_statistics: "Mapping[str, EntrySummary] | None",  # noqa: ARG002
     ) -> ReportSections:
         """
         Sections of this kind in a report of applied values.
 
+        A row is calibrated when a value of the problem that `values` holds
+        set it, as the engine resolves the values of the kind; the problem
+        declares the type of each value, which its id alone does not say.
+
         Parameters
         ----------
         model : Model
             The model that holds the applied values.
-        calibrated_ids : set[str]
-            Ids that calibration set.
+        problem : CalibrationProblem
+            The problem the values came from, for the types of its
+            parameters.
+        values : Mapping[str, float]
+            Calibrated value per parameter id, each one a parameter of
+            `problem`.
         parameter_statistics : Mapping[str, EntrySummary] | None
             Statistics of each id from a sample, or None without one.
 
@@ -20332,18 +20358,21 @@ def with_calibrated_values(
 #### report_sections
 
 ```python
-report_sections(model: Model[Self], calibrated_ids: set[str], parameter_statistics: Mapping[str, EntrySummary] | None) -> ReportSections
+report_sections(model: Model[Self], problem: CalibrationProblem, values: Mapping[str, float], parameter_statistics: Mapping[str, EntrySummary] | None) -> ReportSections
 ```
 
 Sections of this kind in a report of applied values.
 
+A row is calibrated when a value of the problem that `values` holds set it, as the engine resolves the values of the kind; the problem declares the type of each value, which its id alone does not say.
+
 Parameters:
 
-| Name                   | Type                         | Description                              | Default                                                   |
-| ---------------------- | ---------------------------- | ---------------------------------------- | --------------------------------------------------------- |
-| `model`                | `Model`                      | The model that holds the applied values. | *required*                                                |
-| `calibrated_ids`       | `set[str]`                   | Ids that calibration set.                | *required*                                                |
-| `parameter_statistics` | \`Mapping[str, EntrySummary] | None\`                                   | Statistics of each id from a sample, or None without one. |
+| Name                   | Type                         | Description                                                         | Default                                                   |
+| ---------------------- | ---------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------- |
+| `model`                | `Model`                      | The model that holds the applied values.                            | *required*                                                |
+| `problem`              | `CalibrationProblem`         | The problem the values came from, for the types of its parameters.  | *required*                                                |
+| `values`               | `Mapping[str, float]`        | Calibrated value per parameter id, each one a parameter of problem. | *required*                                                |
+| `parameter_statistics` | \`Mapping[str, EntrySummary] | None\`                                                              | Statistics of each id from a sample, or None without one. |
 
 Returns:
 
@@ -20357,18 +20386,27 @@ Source code in `commol/_model/structure.py`
 def report_sections(
     self,
     model: "Model[Self]",  # noqa: ARG002
-    calibrated_ids: set[str],  # noqa: ARG002
+    problem: "CalibrationProblem",  # noqa: ARG002
+    values: Mapping[str, float],  # noqa: ARG002
     parameter_statistics: "Mapping[str, EntrySummary] | None",  # noqa: ARG002
 ) -> ReportSections:
     """
     Sections of this kind in a report of applied values.
 
+    A row is calibrated when a value of the problem that `values` holds
+    set it, as the engine resolves the values of the kind; the problem
+    declares the type of each value, which its id alone does not say.
+
     Parameters
     ----------
     model : Model
         The model that holds the applied values.
-    calibrated_ids : set[str]
-        Ids that calibration set.
+    problem : CalibrationProblem
+        The problem the values came from, for the types of its
+        parameters.
+    values : Mapping[str, float]
+        Calibrated value per parameter id, each one a parameter of
+        `problem`.
     parameter_statistics : Mapping[str, EntrySummary] | None
         Statistics of each id from a sample, or None without one.
 
@@ -20727,20 +20765,27 @@ class Aggregate(ModelStructure, InitialConditions):
     def report_sections(
         self,
         model: "Model[Self]",
-        calibrated_ids: set[str],
+        problem: "CalibrationProblem",
+        values: Mapping[str, float],
         parameter_statistics: "Mapping[str, EntrySummary] | None",
     ) -> ReportSections:
         """
         The ``initial_amounts`` and ``category_splits`` sections of a report.
 
-        See `Model.applied_parameters`.
+        The engine resolves the initial conditions of `problem` that `values`
+        holds, and the remainder, on `model` (`initial_condition_coverage`),
+        so each row is calibrated when they set it. See
+        `Model.applied_parameters`.
 
         Parameters
         ----------
         model : Model
             The model that holds the applied values.
-        calibrated_ids : set[str]
-            Ids that calibration set.
+        problem : CalibrationProblem
+            The problem the values came from, for its initial conditions and
+            its remainder.
+        values : Mapping[str, float]
+            Calibrated value per parameter id.
         parameter_statistics : Mapping[str, EntrySummary] | None
             Statistics of each id from a sample, or None without one.
 
@@ -20748,15 +20793,26 @@ class Aggregate(ModelStructure, InitialConditions):
         -------
         ReportSections
             ``{"initial_amounts": ..., "category_splits": ...}``.
-        """
-        from commol._model.report import category_splits_report, initial_amounts_report
 
+        Raises
+        ------
+        ValueError
+            If the engine cannot resolve an initial-condition id or the
+            remainder.
+        """
+        from commol._model.report import (
+            calibrated_initial_conditions,
+            category_splits_report,
+            initial_amounts_report,
+        )
+
+        calibrated = calibrated_initial_conditions(model, problem, values)
         return {
             "initial_amounts": initial_amounts_report(
-                model.process, self, calibrated_ids, parameter_statistics
+                model.process, self, calibrated, parameter_statistics
             ),
             "category_splits": category_splits_report(
-                model.process, self, calibrated_ids, parameter_statistics
+                model.process, self, calibrated, parameter_statistics
             ),
         }
 
@@ -21268,20 +21324,21 @@ def with_calibrated_values(
 #### report_sections
 
 ```python
-report_sections(model: Model[Self], calibrated_ids: set[str], parameter_statistics: Mapping[str, EntrySummary] | None) -> ReportSections
+report_sections(model: Model[Self], problem: CalibrationProblem, values: Mapping[str, float], parameter_statistics: Mapping[str, EntrySummary] | None) -> ReportSections
 ```
 
 The `initial_amounts` and `category_splits` sections of a report.
 
-See `Model.applied_parameters`.
+The engine resolves the initial conditions of `problem` that `values` holds, and the remainder, on `model` (`initial_condition_coverage`), so each row is calibrated when they set it. See `Model.applied_parameters`.
 
 Parameters:
 
-| Name                   | Type                         | Description                              | Default                                                   |
-| ---------------------- | ---------------------------- | ---------------------------------------- | --------------------------------------------------------- |
-| `model`                | `Model`                      | The model that holds the applied values. | *required*                                                |
-| `calibrated_ids`       | `set[str]`                   | Ids that calibration set.                | *required*                                                |
-| `parameter_statistics` | \`Mapping[str, EntrySummary] | None\`                                   | Statistics of each id from a sample, or None without one. |
+| Name                   | Type                         | Description                                                                     | Default                                                   |
+| ---------------------- | ---------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `model`                | `Model`                      | The model that holds the applied values.                                        | *required*                                                |
+| `problem`              | `CalibrationProblem`         | The problem the values came from, for its initial conditions and its remainder. | *required*                                                |
+| `values`               | `Mapping[str, float]`        | Calibrated value per parameter id.                                              | *required*                                                |
+| `parameter_statistics` | \`Mapping[str, EntrySummary] | None\`                                                                          | Statistics of each id from a sample, or None without one. |
 
 Returns:
 
@@ -21289,26 +21346,39 @@ Returns:
 | ---------------- | ------------------------------------------------- |
 | `ReportSections` | {"initial_amounts": ..., "category_splits": ...}. |
 
+Raises:
+
+| Type         | Description                                                            |
+| ------------ | ---------------------------------------------------------------------- |
+| `ValueError` | If the engine cannot resolve an initial-condition id or the remainder. |
+
 Source code in `commol/_model/aggregate.py`
 
 ```python
 def report_sections(
     self,
     model: "Model[Self]",
-    calibrated_ids: set[str],
+    problem: "CalibrationProblem",
+    values: Mapping[str, float],
     parameter_statistics: "Mapping[str, EntrySummary] | None",
 ) -> ReportSections:
     """
     The ``initial_amounts`` and ``category_splits`` sections of a report.
 
-    See `Model.applied_parameters`.
+    The engine resolves the initial conditions of `problem` that `values`
+    holds, and the remainder, on `model` (`initial_condition_coverage`),
+    so each row is calibrated when they set it. See
+    `Model.applied_parameters`.
 
     Parameters
     ----------
     model : Model
         The model that holds the applied values.
-    calibrated_ids : set[str]
-        Ids that calibration set.
+    problem : CalibrationProblem
+        The problem the values came from, for its initial conditions and
+        its remainder.
+    values : Mapping[str, float]
+        Calibrated value per parameter id.
     parameter_statistics : Mapping[str, EntrySummary] | None
         Statistics of each id from a sample, or None without one.
 
@@ -21316,15 +21386,26 @@ def report_sections(
     -------
     ReportSections
         ``{"initial_amounts": ..., "category_splits": ...}``.
-    """
-    from commol._model.report import category_splits_report, initial_amounts_report
 
+    Raises
+    ------
+    ValueError
+        If the engine cannot resolve an initial-condition id or the
+        remainder.
+    """
+    from commol._model.report import (
+        calibrated_initial_conditions,
+        category_splits_report,
+        initial_amounts_report,
+    )
+
+    calibrated = calibrated_initial_conditions(model, problem, values)
     return {
         "initial_amounts": initial_amounts_report(
-            model.process, self, calibrated_ids, parameter_statistics
+            model.process, self, calibrated, parameter_statistics
         ),
         "category_splits": category_splits_report(
-            model.process, self, calibrated_ids, parameter_statistics
+            model.process, self, calibrated, parameter_statistics
         ),
     }
 ```
@@ -25720,27 +25801,29 @@ Plain-dictionary reports, each a method of the object whose data it describes. G
 ## applied_parameters
 
 ```python
-applied_parameters(values: CalibrationResult | Mapping[str, float], problem: CalibrationProblem | None = None, sample: SummarizedSample | None = None, confidence_level: float | None = None) -> AppliedParametersReport
+applied_parameters(values: CalibrationResult | Mapping[str, float], problem: CalibrationProblem, sample: SummarizedSample | None = None, confidence_level: float | None = None) -> AppliedParametersReport
 ```
 
 Report every parameter of the model, and the values of its kind.
 
-Call it on the model **after** `apply_calibration_parameters`. Each entry carries the value the model holds and whether calibration set it, so entries the calibration left alone appear alongside the fitted ones. The structure of the model adds the sections of its kind (`ModelStructure.report_sections`); an aggregate model adds `initial_amounts` and `category_splits`.
+Call it on the model **after** `apply_calibration_parameters`, with the same values and problem. Each entry carries the value the model holds and whether calibration set it, so entries the calibration left alone appear alongside the fitted ones. The structure of the model adds the sections of its kind (`ModelStructure.report_sections`); an aggregate model adds `initial_amounts` and `category_splits`.
 
-Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` and `noise` parameters have no place in the model, so they are reported from `problem` when it is given.
+The problem declares the type of each value, so it says what each one set; an id alone does not, since a parameter and a category can share it. A `parameter` value marks the parameter of its id, and the values of the kind of the model are read as the engine resolves them: for an aggregate model, a bin is calibrated when the initial-condition values and the remainder set every compartment of it, an override when they write its compartment, and a category split when a value is a split of its stratification, which also sets the complement.
+
+Parameters that are not a single number, such as a formula or a series, are omitted: they are inputs rather than fitted values. `factor` and `noise` parameters have no place in the model, so they are reported from `problem`.
 
 `initial_amounts` gives each bin and each overridden compartment of an aggregate model its `amount` the engine builds and the `unit` of its bin, so bins of different units are reported side by side; no row is a share of a total. A bin left uncalibrated keeps a `None` amount as its "needs calibration" marker even when overrides touch some of its compartments. `category_splits` gives each category its `fraction` of the group it splits, and that `group`: the categories a conditional stratification is conditioned on, empty when it splits every bin. A stratification whose fractions differ by the category of an earlier one gives a row per split, under the key `t1 of g1`, with that category in its `group`.
 
-With a `sample` each entry gains a `spread` holding the weighted statistics of its draws (`ParameterSample.summary`). Every entry is in the unit it was calibrated in: a parameter in its own, an amount in the unit of its bin, and a category split as a fraction of its group.
+With a `sample` the entry that a calibrated value names gains a `spread` holding the weighted statistics of its draws (`ParameterSample.summary`). Every entry is in the unit it was calibrated in: a parameter in its own, an amount in the unit of its bin, and a category split as a fraction of its group.
 
 Parameters:
 
-| Name               | Type                 | Description | Default                                                                                     |
-| ------------------ | -------------------- | ----------- | ------------------------------------------------------------------------------------------- |
-| `values`           | \`CalibrationResult  | Mapping\`   | The calibration result, or a mapping of parameter id to value such as one draw of a sample. |
-| `problem`          | \`CalibrationProblem | None\`      | The problem the values came from, used to report factor and noise parameters.               |
-| `sample`           | \`ParameterSample    | None\`      | Draws of the parameters, such as the sample of an uncertainty method.                       |
-| `confidence_level` | \`float              | None\`      | Confidence level of the intervals; required with a sample.                                  |
+| Name               | Type                 | Description                                                                                                          | Default                                                                                     |
+| ------------------ | -------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `values`           | \`CalibrationResult  | Mapping\`                                                                                                            | The calibration result, or a mapping of parameter id to value such as one draw of a sample. |
+| `problem`          | `CalibrationProblem` | The problem the values came from, which declares the type of each value and the remainder of the initial conditions. | *required*                                                                                  |
+| `sample`           | \`ParameterSample    | None\`                                                                                                               | Draws of the parameters, such as the sample of an uncertainty method.                       |
+| `confidence_level` | \`float              | None\`                                                                                                               | Confidence level of the intervals; required with a sample.                                  |
 
 Returns:
 
@@ -25750,9 +25833,10 @@ Returns:
 
 Raises:
 
-| Type         | Description                                      |
-| ------------ | ------------------------------------------------ |
-| `ValueError` | If a sample is given without a confidence level. |
+| Type         | Description                                                                                                                                                               |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | If a sample is given without a confidence level, values holds an id that problem does not declare, or the engine cannot resolve an initial-condition id or the remainder. |
+| `TypeError`  | If values is a ParameterSample, which has no single set of parameters.                                                                                                    |
 
 Source code in `commol/_model/model.py`
 
@@ -25760,24 +25844,33 @@ Source code in `commol/_model/model.py`
 def applied_parameters(
     self,
     values: CalibrationResult | Mapping[str, float],
-    problem: CalibrationProblem | None = None,
+    problem: CalibrationProblem,
     sample: "SummarizedSample | None" = None,
     confidence_level: float | None = None,
 ) -> "AppliedParametersReport":
     """
     Report every parameter of the model, and the values of its kind.
 
-    Call it on the model **after** `apply_calibration_parameters`. Each
-    entry carries the value the model holds and whether calibration set
-    it, so entries the calibration left alone appear alongside the fitted
-    ones. The structure of the model adds the sections of its kind
-    (`ModelStructure.report_sections`); an aggregate model adds
-    ``initial_amounts`` and ``category_splits``.
+    Call it on the model **after** `apply_calibration_parameters`, with
+    the same values and problem. Each entry carries the value the model
+    holds and whether calibration set it, so entries the calibration left
+    alone appear alongside the fitted ones. The structure of the model
+    adds the sections of its kind (`ModelStructure.report_sections`); an
+    aggregate model adds ``initial_amounts`` and ``category_splits``.
+
+    The problem declares the type of each value, so it says what each one
+    set; an id alone does not, since a parameter and a category can share
+    it. A ``parameter`` value marks the parameter of its id, and the
+    values of the kind of the model are read as the engine resolves them:
+    for an aggregate model, a bin is calibrated when the initial-condition
+    values and the remainder set every compartment of it, an override
+    when they write its compartment, and a category split when a value is
+    a split of its stratification, which also sets the complement.
 
     Parameters that are not a single number, such as a formula or a
     series, are omitted: they are inputs rather than fitted values.
     ``factor`` and ``noise`` parameters have no place in the model, so
-    they are reported from `problem` when it is given.
+    they are reported from `problem`.
 
     ``initial_amounts`` gives each bin and each overridden compartment of
     an aggregate model its ``amount`` the engine builds and the ``unit``
@@ -25791,19 +25884,20 @@ def applied_parameters(
     category of an earlier one gives a row per split, under the key
     ``t1 of g1``, with that category in its ``group``.
 
-    With a `sample` each entry gains a ``spread`` holding the weighted
-    statistics of its draws (`ParameterSample.summary`). Every entry is in
-    the unit it was calibrated in: a parameter in its own, an amount in
-    the unit of its bin, and a category split as a fraction of its group.
+    With a `sample` the entry that a calibrated value names gains a
+    ``spread`` holding the weighted statistics of its draws
+    (`ParameterSample.summary`). Every entry is in the unit it was
+    calibrated in: a parameter in its own, an amount in the unit of its
+    bin, and a category split as a fraction of its group.
 
     Parameters
     ----------
     values : CalibrationResult | Mapping
         The calibration result, or a mapping of parameter id to value such
         as one draw of a sample.
-    problem : CalibrationProblem | None, optional
-        The problem the values came from, used to report factor and noise
-        parameters.
+    problem : CalibrationProblem
+        The problem the values came from, which declares the type of each
+        value and the remainder of the initial conditions.
     sample : ParameterSample | None, optional
         Draws of the parameters, such as the sample of an uncertainty
         method.
@@ -25820,7 +25914,12 @@ def applied_parameters(
     Raises
     ------
     ValueError
-        If a sample is given without a confidence level.
+        If a sample is given without a confidence level, `values` holds
+        an id that `problem` does not declare, or the engine cannot
+        resolve an initial-condition id or the remainder.
+    TypeError
+        If `values` is a `ParameterSample`, which has no single set of
+        parameters.
     """
     return applied_parameters_report(
         self, values, problem, sample, confidence_level
@@ -38776,6 +38875,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Breaking:** a model in which two things build one name is now refused at `build`, even when nothing reads that name. A name is a bin or an accumulator, a prefix of its categories, one of its outputs, a bin total, a partial bin total or a subgroup total. These models built before: two bins of one name (a bin `A_g1` next to the compartment `A_g1` of a bin `A` stratified by `group = [g1, g2]`); a bin and a partial total of another (a bin `A_t1` next to `A` stratified by `group` and `type = [t1, t2]`); a bin and an accumulator (both `A`), or an accumulator and a subgroup total; and one bin from two lists of categories (`A_a_b` for `group = [a, a_b]` and `type = [b, c]`, or two compartments `A_a_b` when `type = [b]` applies only in `a`). An initial condition or a remainder `A_g1` set the compartment of `A`, not the bin `A_g1`; a rate that read `A_t1` summed both totals; and the outputs of an accumulator `A` replaced those of the bin `A` in the results; all with no error. The message gives each clash once, at its shortest name, with what it names and the ids to rename: `'A_g1' names the compartment of bin 'A' in 'group:g1' and the bin 'A_g1'. Rename bin 'A', bin 'A_g1' or category 'group:g1', so that each has a name of its own.` A bin that a subgroup total names, such as a bin `total_y` with a category `y`, was refused already; it gets this message in place of `Names built from a bin are also subgroup totals`. A category id that two stratifications share still builds; a rate that reads a name it gives two meanings is refused (see the entry of such a rate). Migration: rename a bin, an accumulator or a category so that each name names one thing. See [Names the engine sets](https://munqu.github.io/commol/latest/guide/building-models/#names-the-engine-sets).
 - **Breaking:** a rate, a stratified rate or a formula parameter that reads a name to which a category id that two stratifications share gives two meanings is now refused at `build`. With `group = [a, b]` and `type = [a, c]`, `total_a` is the total of `group:a` and that of `type:a`, and `A_a` is the compartments of `A` in `group:a` and those in `type:a`. Such a rate read the sum of both meanings, with no error, so a compartment in both, such as `A_a_a`, counted twice: with a bin `A` of 1000 split in halves, `total_a` and `A_a` read 1000, while the initial condition `A_a` covers 500. The message names each formula and both meanings, and gives each meaning as a sum of names of one meaning when one is: `A rate or a formula parameter reads a name to which a category id that two stratifications share gives two meanings or more: transition 't_ab' reads 'total_a'. 'total_a' names the subgroup total of 'group:a' and the subgroup total of 'type:a'. Rename category 'group:a' or category 'type:a', so that each has a name of its own. To keep the ids, read a meaning as a sum of names of one meaning: 'group:a' is 'total_a_a + total_a_c'; 'type:a' is 'total_a_a + total_b_a'.` Two kinds of rates that ran right are refused too. With two stratifications of disjoint conditions that share an id, such as `type = [x, y]` only in `group:a` and `kind = [x, z]` only in `group:b`, `total_x` summed each compartment once; read it as `total_a_x + total_b_x`, the two sums that the message gives. When `type = [a, c]` splits only `group:b`, `A_a` is the compartment of `A` in `group:a` and the partial total of `type:a`; a rate that read it read the compartment, which no other name is, so the message says that only a rename reads it: rename `a` in `group` or in `type`. The valid names that the message of an unknown subgroup total lists leave out the names of two meanings. A model whose formulas read no such name builds and runs as before. Migration: read the meaning you want as the sum of names of one meaning that the message gives, or rename a category. See [Names the engine sets](https://munqu.github.io/commol/latest/guide/building-models/#names-the-engine-sets).
 - **Breaking:** an initial-condition id that is a compartment, a bin or a bin prefix and also a category, bare or qualified, is refused wherever the engine resolves it, as when the `Calibrator` is created. With a bin `A` and `group = [A, g2]`, the id `A` set the bin with no error, and a qualified id such as `group:g1` set the category when a bin had that id. The message names both, the other id that sets the category, when there is one, and what to rename: `Initial-condition id 'A' names the bin 'A' and the category 'group:A'. Write 'group:A' for the category. A bin has no other id: rename bin 'A' or category 'group:A', so that each has an id of its own.` The model still builds, and a remainder `A` is still the bin. An id that holds `:` and is no category is now a bin or a bin prefix, so a bin `x:y` of a stratified model, or the prefix `A_0:4` of `age = [0:4, 5:9]`, can be calibrated, as the remainder already took it; it was an unknown id. Migration: write the other id of the category, or rename the bin or the category to calibrate the bin. See [What an id can name](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/#what-an-id-can-name).
+- **Breaking:** `Model.applied_parameters(values, problem, ...)` takes the problem the values came from, as `apply_calibration_parameters` does; it was optional. The problem declares the type of each value, which an id does not say, and the report marks a row `calibrated` only through it. A value that the problem does not declare is refused, as `apply_calibration_parameters` refuses it, now with the message `Values with no declared parameter type: ['k9']. Declared calibration parameters: ['k1']`; `apply_calibration_parameters` refuses it with the same message, which began `Cannot apply values with no declared parameter type`. A structure of a new kind takes the problem and the values in `ModelStructure.report_sections(model, problem, values, parameter_statistics)`, in place of the set of calibrated ids. Migration: `model.applied_parameters(result, problem)`. See [The applied parameters of a model](https://munqu.github.io/commol/latest/guide/reports/#the-applied-parameters-of-a-model).
 - **Breaking:** a run refuses a parameter or a bin amount without a value with the message of the engine, which names each of them: `The model cannot run: the parameters ["k1"] and the amounts of the bins ["B"] have no value. Give them a value, or calibrate them and write the calibrated values back` (`ValueError` from `Simulation.run`, `run_at` and the replicates; the old message was `Cannot run Simulation: ...`). Every engine checks it before it runs, and a rate that reads a parameter without a value names it (`the parameter 'k1' has no value`), not an index. A bin amount without a value no longer runs as `0`. A bin left `None` needs a value in each of its compartments: a calibration of `B_g1` alone leaves `B_g2` without one (`the amounts of the compartments ["B_g2"]`), and the split of a category (`g1`, `group:g1`) shares out what the bin holds, so it gives none. An override (`compartment_amounts`) gives its compartment a value, also on a bin left `None`: with `{"A": None, "B": 1000}` and `{"A_g1": 500}`, a run names only `the amounts of the compartments ["A_g2"]`, and a remainder `A` keeps the 500 as an amount the model states. A value or a remainder that also sets a compartment without a value, such as `A` or the remainder `A` there, splits by the fractions, 250 to each half; a value of `A` gave `A_g2` 0 and counted it as stated. A `Calibrator`, and every uncertainty method that builds the problem, raises this `ValueError` when it is built if a value that the calibration does not set has none, even when no rate reads it; it was a failed start of the optimizer, or a run at `0`. An `initial_condition_remainder` no longer gives `0` to a bin left `None` either: it takes what the initial-condition values leave of the amounts the model states for them and for it, so the engine refuses it when the model states none of them. With `{"A": None, "B": 1000}`, only `k` calibrated and the remainder `A`, every run of 0.10.2 started from `{A: 0, B: 1000}`; the same holds for a category split alone, or for values of bins left `None` alone. A `Calibrator` and a `SensitivityAnalysis` raise it when they are built, and `Model.apply_calibration_parameters` when it writes back an initial condition: `Initial-condition remainder 'A' would give a value no one gave: it takes what the initial-condition values leave of the amounts the model states for them and for it, and the amounts of the bins ["A"] have no value. Give one of them an amount, or add an initial-condition value of a bin that has one`. A remainder that overlaps a value says `overlaps the initial-condition value 'A_g1'`, not `the calibrated initial condition`. Migration: give every parameter and bin amount a value, or calibrate it; for a remainder of a bin left `None`, calibrate the amount of a bin that has one (`B` above), give the bin of the remainder an amount, or calibrate that bin with no remainder. See [The remainder](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/#the-remainder).
 - A qualified category id matches whole ids: `a:b:c` names the category `b:c` of `a` or the category `c` of `a:b`, whichever the model declares, so a stratification or a category whose id holds `:` resolves. The engine split the id at the first `:` and `Aggregate` at the last.
 - A split of no category in `stratification_fractions` (`{"g": {}}`) no longer fails on its sum: `build` gives the message of the engine, such as `Stratification 'g' has no category; give it at least one`.
@@ -38829,6 +38929,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - The radius rule of a particle swarm (`radius_tol`) stopped a run at its first iteration, as converged, when the size of the box of its bounds overflowed, such as for `±1e200` in two parameters. The argmin fork now scales the box and the radius before it compares them.
 - The error of a failed optimizer run shows the whole chain of the error of the argmin fork. Before, a constrained particle swarm (a profile of a prediction) showed only `` `AugmentedLagrangian`: the inner solver failed in outer iteration 0 ``, without the reason of the swarm.
 - On a Linux whose SELinux forbids an executable heap (the default of Fedora and RHEL), no formula compiled on the main thread: `add_transition` raised a `ValidationError`, `Invalid expression: ... unable to make memory readable+executable`. The JIT now maps the memory of compiled code instead of taking it from the heap.
+- `Model.applied_parameters` read what a value set from its id: with a parameter `g1` and a category `g1`, a calibrated parameter marked the split `g1` calibrated and gave it its spread, and a calibrated split marked the parameter. It also left uncalibrated the overrides that the write-back pins for a prefix such as `A_g1`, the amounts of the remainder and the complement of a calibrated split. The engine now resolves the values of the problem: a bin is calibrated when the values and the remainder set every compartment of it, an override when they write its compartment, and each category of the stratification of a calibrated split. A sample gives its spread only to the row a value names. See [The applied parameters of a model](https://munqu.github.io/commol/latest/guide/reports/#the-applied-parameters-of-a-model).
 
 ### Documentation
 

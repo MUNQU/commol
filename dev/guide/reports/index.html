@@ -3914,7 +3914,7 @@ Each report is a method of the object whose data it describes:</p>
 </thead>
 <tbody>
 <tr>
-<td><code>Model.applied_parameters(values, problem=None, …)</code></td>
+<td><code>Model.applied_parameters(values, problem, …)</code></td>
 <td>What the model holds and what calibration set</td>
 </tr>
 <tr>
@@ -4004,7 +4004,7 @@ Each report is a method of the object whose data it describes:</p>
 </span><span id="__span-0-65"><a id="__codelineno-0-65" name="__codelineno-0-65" href="#__codelineno-0-65"></a><span class="nb">print</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">run_report</span><span class="p">))</span>  <span class="c1"># [&#39;accumulators&#39;, &#39;observed&#39;, &#39;series&#39;]</span>
 </span></code></pre></div>
 <h2 id="the-applied-parameters-of-a-model">The applied parameters of a model<a class="headerlink" href="#the-applied-parameters-of-a-model" title="Permanent link">&para;</a></h2>
-<p><code>Model.applied_parameters(values, problem=None, sample=None,
+<p><code>Model.applied_parameters(values, problem, sample=None,
 confidence_level=None)</code> lists every number the calibrated model holds, and
 whether calibration set it. The <code>parameters</code> section is the same for every
 kind of model; the structure of the model adds the sections of its kind
@@ -4044,11 +4044,11 @@ kind of model; the structure of the model adds the sections of its kind
 </tr>
 <tr>
 <td><code>problem</code></td>
-<td>Optional. Adds the calibrated <code>factor</code> and <code>noise</code> parameters, which the model does not hold.</td>
+<td>The problem the values came from, as for <code>apply_calibration_parameters</code>. It declares the type of each value, which an id alone does not say: a parameter <code>g1</code> and a category <code>g1</code> share it. It also adds the calibrated <code>factor</code> and <code>noise</code> parameters, which the model does not hold.</td>
 </tr>
 <tr>
 <td><code>sample</code>, <code>confidence_level</code></td>
-<td>Optional. A <code>ParameterSample</code>: each entry gains its weighted statistics (<code>ParameterSample.summary</code>). A sample needs a confidence level.</td>
+<td>Optional. A <code>ParameterSample</code>: the entry each calibrated value names gains its weighted statistics (<code>ParameterSample.summary</code>). A sample needs a confidence level.</td>
 </tr>
 </tbody>
 </table>
@@ -4063,6 +4063,10 @@ kind of model; the structure of the model adds the sections of its kind
 <tr>
 <td>Parameters</td>
 <td>Only numeric parameters: formulas and series are inputs, not fitted values.</td>
+</tr>
+<tr>
+<td><code>calibrated</code></td>
+<td>Calibration wrote the number, as the engine resolves the values of the problem: a parameter the problem declares as a <code>parameter</code>; a bin when the initial-condition values and the remainder set every compartment of it; an override when they write its compartment, as the pinned compartments of a prefix <code>A_g1</code>, the remainder or either side of a calibrated category; and each category of the stratification a calibrated split belongs to, so the complement too.</td>
 </tr>
 <tr>
 <td><code>initial_amounts</code></td>
@@ -4090,7 +4094,7 @@ kind of model; the structure of the model adds the sections of its kind
 </tr>
 <tr>
 <td>A <code>sample</code></td>
-<td>Each entry gains a <code>spread</code> block, an <code>EntrySpread</code> (<code>mean</code>, <code>median</code>, <code>ci_lower</code>, <code>ci_upper</code>, <code>min</code>, <code>max</code>, <code>std</code>, all weighted), and the report starts with <code>confidence_level</code>.</td>
+<td>The entry a calibrated value names gains a <code>spread</code> block, an <code>EntrySpread</code> (<code>mean</code>, <code>median</code>, <code>ci_lower</code>, <code>ci_upper</code>, <code>min</code>, <code>max</code>, <code>std</code>, all weighted), and the report starts with <code>confidence_level</code>. A row that a value only reaches, such as the complement of a split or the remainder, has none.</td>
 </tr>
 </tbody>
 </table>
@@ -4201,8 +4205,7 @@ evidence of each method that ran, by section name; the sections of
 leave out).</p>
 <h2 id="checklist">Checklist<a class="headerlink" href="#checklist" title="Permanent link">&para;</a></h2>
 <ul>
-<li>[ ] The model reports <code>applied_parameters</code> after <code>apply_calibration_parameters</code>.</li>
-<li>[ ] <code>problem</code> is passed when there are <code>factor</code> or <code>noise</code> parameters.</li>
+<li>[ ] The model reports <code>applied_parameters</code> after <code>apply_calibration_parameters</code>, with the same values and problem.</li>
 <li>[ ] <code>positions</code>, <code>window</code> and <code>windows</code> match the observations, and the results hold every position the report reads.</li>
 </ul>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
