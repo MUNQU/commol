@@ -59,11 +59,12 @@ compartment is a bin or a prefix only of that one compartment, so
 `resolve_target`, which meets the compartment first, only sets its kind.
 
 **Rule:** the engine says the kind of each value (`InitialTargetKind`: `bin`,
-`compartment` or `category`), together with the compartments it sets
-(`InitialConditionPlan::coverage`), and Python reads the kind and infers
-nothing from the compartments. The kind is what the id names, and the
-compartment comes first, so an id that names an expanded compartment is a
-compartment, also when it is the id of a bin with one compartment. The remainder has no kind:
+`compartment` or `category`), together with the compartments it sets and
+those it writes (`InitialConditionPlan::coverage`, `TargetCoverage`), and
+Python reads the kind and infers nothing from the compartments. The kind is
+what the id names, and the compartment comes first, so an id that names an
+expanded compartment is a compartment, also when it is the id of a bin with
+one compartment. The remainder has no kind:
 it is not a value, and the plan keeps it apart. The binding
 `calibrated_initial_state` returns the state, the covered compartments and
 the kinds from the one plan that writes them, so they agree by construction.
@@ -121,7 +122,7 @@ keeps the rule.
 
 | Alternative | Why not |
 |---|---|
-| The build refuses a category id that is a bin id, next to `check_names` in `crates/commol-model/src/labels.rs` | S, YAGNI, DRY: the build checks the names it builds, and the plan the ids it reads. The plan is the one resolver of an id that can be a bin or a category: `stratification_fractions` keys a category under its stratification, the methods of `Aggregate` that resolve a category id (`resolve_category`) take only categories, and `Model.applied_parameters` (`py-commol/commol/_model/report.py`) reads, by name, ids that the plan has already resolved, a defect of its own ([#481](https://github.com/MUNQU/commol/issues/481)). It would refuse models that run and set the category with its qualified id, and keep a second rule of an ambiguous id away from `resolve_category`. |
+| The build refuses a category id that is a bin id, next to `check_names` in `crates/commol-model/src/labels.rs` | S, YAGNI, DRY: the build checks the names it builds, and the plan the ids it reads. The plan is the one resolver of an id that can be a bin or a category: `stratification_fractions` keys a category under its stratification, the methods of `Aggregate` that resolve a category id (`resolve_category`) take only categories, and `Model.applied_parameters` reads the ids as the plan resolves them ([A report marks what the calibration set](calibration-write-back.md#a-report-marks-what-the-calibration-set-as-the-engine-resolves-it)). It would refuse models that run and set the category with its qualified id, and keep a second rule of an ambiguous id away from `resolve_category`. |
 | The bin first, in the order of resolution | One idea, one name: an id sets one of two targets with no error, and the user cannot tell which. |
 | The category first | One idea, one name: the same silence, and the bin has no id left. |
 | A qualified id of a bin, such as `bin:A` | One idea, one name: a second spelling, for a clash that a rename removes, as [A name names one thing](names.md#a-name-names-one-thing) decides for two bins; and `bin:A` is also the qualified id of the category `A` of a stratification `bin`. |

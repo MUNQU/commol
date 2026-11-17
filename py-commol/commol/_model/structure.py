@@ -273,18 +273,27 @@ class ModelStructure(BaseModel, ABC):
     def report_sections(
         self,
         model: "Model[Self]",  # noqa: ARG002
-        calibrated_ids: set[str],  # noqa: ARG002
+        problem: "CalibrationProblem",  # noqa: ARG002
+        values: Mapping[str, float],  # noqa: ARG002
         parameter_statistics: "Mapping[str, EntrySummary] | None",  # noqa: ARG002
     ) -> ReportSections:
         """
         Sections of this kind in a report of applied values.
 
+        A row is calibrated when a value of the problem that `values` holds
+        set it, as the engine resolves the values of the kind; the problem
+        declares the type of each value, which its id alone does not say.
+
         Parameters
         ----------
         model : Model
             The model that holds the applied values.
-        calibrated_ids : set[str]
-            Ids that calibration set.
+        problem : CalibrationProblem
+            The problem the values came from, for the types of its
+            parameters.
+        values : Mapping[str, float]
+            Calibrated value per parameter id, each one a parameter of
+            `problem`.
         parameter_statistics : Mapping[str, EntrySummary] | None
             Statistics of each id from a sample, or None without one.
 

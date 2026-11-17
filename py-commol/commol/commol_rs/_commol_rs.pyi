@@ -173,7 +173,7 @@ class CalibrationModule(Protocol):
         engine: EngineProtocol,
         parameters: str,
         initial_condition_remainder: str | None = None,
-    ) -> tuple[list[tuple[InitialTargetKind, list[int]]], list[int]]: ...
+    ) -> tuple[list[tuple[InitialTargetKind, list[int], list[int]]], list[int]]: ...
     def calibrated_initial_state(
         self,
         engine: EngineProtocol,
@@ -181,7 +181,10 @@ class CalibrationModule(Protocol):
         values: list[float],
         initial_condition_remainder: str | None = None,
     ) -> tuple[
-        list[float], list[float], list[int], list[tuple[InitialTargetKind, list[int]]]
+        list[float],
+        list[float],
+        list[int],
+        list[tuple[InitialTargetKind, list[int], list[int]]],
     ]: ...
 
 class CalibrationProblemProtocol(Protocol):

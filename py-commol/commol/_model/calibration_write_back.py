@@ -1,7 +1,7 @@
 """Write calibrated initial conditions back onto a model definition."""
 
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from typing import TYPE_CHECKING
 
 from commol._model.engine_state import (
@@ -121,9 +121,7 @@ def _declared_update[S: "Aggregate"](
     candidate = model.structure.model_copy(deep=True)
     state = initial_state(model.process, model.structure)
 
-    covered_names = set(covered)
-    partly_covered = {c.bin for c in state if c.name not in covered_names}
-    touched_bins = {c.bin for c in state} - partly_covered
+    touched_bins = covered_bins(state, covered)
     bin_amounts = {
         bin_id: amount
         for bin_id, amount in _bin_amounts(state, scored).items()
@@ -137,6 +135,33 @@ def _declared_update[S: "Aggregate"](
         except ValueError:
             pass
     return candidate
+
+
+def covered_bins(
+    compartments: Sequence[InitialCompartment], covered: Collection[str]
+) -> set[str]:
+    """
+    The bins whose every compartment is in `covered`.
+
+    With the compartments that the calibrated values and the remainder set,
+    these are the bins whose amount the write-back writes; a value that sets
+    only part of a bin leaves its amount and pins its compartments.
+
+    Parameters
+    ----------
+    compartments : Sequence[InitialCompartment]
+        Every compartment of the model, with its bin.
+    covered : Collection[str]
+        The names of the covered compartments.
+
+    Returns
+    -------
+    set[str]
+        The ids of the bins that `covered` covers whole.
+    """
+    names = set(covered)
+    partly_covered = {c.bin for c in compartments if c.name not in names}
+    return {c.bin for c in compartments} - partly_covered
 
 
 def _bin_amounts(

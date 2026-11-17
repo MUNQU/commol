@@ -14,7 +14,12 @@ from commol import (
 from commol._model.process import Process
 from commol._model.structure import ModelStructure, SeriesLabel
 from commol.engines.engine import ModelEngine
-from tests.support import a_to_b_builder, abc_builder, build
+from tests.support import (
+    a_to_b_builder,
+    abc_builder,
+    build,
+    initial_condition_problem,
+)
 from tests.support.kinds import DecayStructure, UnstratifiedVariant, decay_model
 
 
@@ -195,7 +200,9 @@ class TestStructureInterface:
 
         structure = Plain(outputs=[])
 
-        assert structure.report_sections(decay_model(), set(), None) == {}
+        problem = initial_condition_problem("x")
+
+        assert structure.report_sections(decay_model(), problem, {"x": 1.0}, None) == {}
         assert structure.describe(decay_model()) == []
 
     def test_a_kind_describes_itself_through_the_interface(self) -> None:

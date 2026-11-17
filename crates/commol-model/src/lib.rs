@@ -74,7 +74,8 @@ pub use builder::{
 pub use engine::{CompartmentalEngine, IntegerStepper, record_steps, rounded};
 pub use flows::{FlowDescription, describe_flows};
 pub use initial_conditions::{
-    InitialConditionPlan, InitialTargetKind, resolve_category, resolve_declared_category,
+    InitialConditionPlan, InitialTargetKind, TargetCoverage, resolve_category,
+    resolve_declared_category,
 };
 pub use labels::{CATEGORY_SEPARATOR, OutputLabels, output_sums};
 pub use matrices::{MatrixVariable, matrix_variables};

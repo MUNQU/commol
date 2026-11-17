@@ -226,6 +226,7 @@ function reports anything.
 | `Predictive.report` takes no point estimate | Each leaf of an ensemble comes from its members only; the mean of the draws is not a run of the model. |
 | The block of a report lives in the package of its object | A module of every block imports every object it reports, against the order of the layers ([Python models](python-models.md#the-layers-of-the-package)); the block changes with its object. |
 | `Model.applied_parameters` is on the model | Most of the block is data of the model (one row per parameter, the sections of its structure); the values and the problem only add what calibration set. |
+| `Model.applied_parameters` takes the problem | An id does not say what a value set; the problem declares it, and the engine resolves the values of the kind ([A report marks what the calibration set](calibration-write-back.md#a-report-marks-what-the-calibration-set-as-the-engine-resolves-it)). |
 
 - A single run and an ensemble (replicates or a `Predictive`) differ only at
   the leaves (`_ReportLeaf`); a predictive's members carry their weights.

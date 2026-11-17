@@ -19,7 +19,7 @@ from commol._fit.result import CalibrationResult
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.observations.models import _ObservationModel
 
-__all__ = ["calibrated_values"]
+__all__ = ["calibrated_values", "declared_values"]
 
 
 class ObservedDataPoint(EngineChecked, RangeChecked):
@@ -787,3 +787,40 @@ def calibrated_values(
             "of sample.draws() instead."
         )
     return result
+
+
+def declared_values(
+    problem: CalibrationProblem, values: Mapping[str, float]
+) -> list[CalibrationParameter]:
+    """
+    Return the parameters of a problem that a set of values holds.
+
+    The problem declares the type of each value (``parameter_type``), so it
+    says what each value sets: a value is read only through it.
+
+    Parameters
+    ----------
+    problem : CalibrationProblem
+        The problem the values came from.
+    values : Mapping[str, float]
+        A value per parameter id, such as the result of a calibration.
+
+    Returns
+    -------
+    list[CalibrationParameter]
+        Each parameter of `problem` whose id `values` holds, in problem
+        order.
+
+    Raises
+    ------
+    ValueError
+        If `values` holds an id that `problem` does not declare.
+    """
+    declared = [parameter.id for parameter in problem.parameters]
+    unknown = sorted(set(values) - set(declared))
+    if unknown:
+        raise ValueError(
+            f"Values with no declared parameter type: {unknown}. Declared "
+            f"calibration parameters: {sorted(declared)}"
+        )
+    return [parameter for parameter in problem.parameters if parameter.id in values]

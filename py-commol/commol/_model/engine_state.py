@@ -230,7 +230,7 @@ InitialTargetKind = Literal["bin", "compartment", "category"]
 
 class TargetCoverage(NamedTuple):
     """
-    The kind of an initial-condition value and the compartments it sets.
+    The kind of an initial-condition value and the compartments it reaches.
 
     Attributes
     ----------
@@ -241,10 +241,15 @@ class TargetCoverage(NamedTuple):
     compartments : list[str]
         The compartments whose amount the value sets, in engine order; none
         for a category split, which keeps the totals of its pairs.
+    written : list[str]
+        The compartments the value writes, in engine order: those it sets,
+        and for a category split every compartment of its pairs, whose shares
+        of their totals the split changes.
     """
 
     kind: InitialTargetKind
     compartments: list[str]
+    written: list[str]
 
 
 def initial_condition_coverage(
@@ -253,8 +258,8 @@ def initial_condition_coverage(
     remainder: str | None,
 ) -> tuple[list[TargetCoverage], list[str]]:
     """
-    The kind and the compartments of each initial-condition value, and the
-    compartments of the remainder.
+    The kind of each initial-condition value, the compartments it sets and
+    those it writes, and the compartments of the remainder.
 
     Parameters
     ----------
@@ -268,8 +273,9 @@ def initial_condition_coverage(
     Returns
     -------
     tuple[list[TargetCoverage], list[str]]
-        For each parameter, its kind and the compartments it sets, and the
-        compartments of the remainder (none without one).
+        For each parameter, its kind and the compartments it sets and
+        writes, and the compartments of the remainder (none without one),
+        which it sets and writes.
     """
     values, remainder_indices = commol_rs.calibration.initial_condition_coverage(
         engine,
@@ -279,8 +285,12 @@ def initial_condition_coverage(
     names = engine.compartments
     return (
         [
-            TargetCoverage(kind, [names[index] for index in indices])
-            for kind, indices in values
+            TargetCoverage(
+                kind,
+                [names[index] for index in sets],
+                [names[index] for index in written],
+            )
+            for kind, sets, written in values
         ],
         [names[index] for index in remainder_indices],
     )
@@ -361,7 +371,7 @@ def calibrated_initial_state[S: "Aggregate"](
         covered=[engine.compartments[index] for index in covered],
         categories=[
             param.id
-            for param, (kind, _) in zip(parameters, targets, strict=True)
+            for param, (kind, _, _) in zip(parameters, targets, strict=True)
             if kind == "category"
         ],
     )

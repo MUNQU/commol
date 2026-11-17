@@ -336,9 +336,9 @@ def test_the_kind_of_each_target_comes_from_the_engine() -> None:
     scored = calibrated_initial_state(model, parameters, [800, 50, 0.5])
 
     assert coverage == [
-        TargetCoverage("bin", ["A_g1", "A_g2"]),
-        TargetCoverage("compartment", ["B_g1"]),
-        TargetCoverage("category", []),
+        TargetCoverage("bin", ["A_g1", "A_g2"], ["A_g1", "A_g2"]),
+        TargetCoverage("compartment", ["B_g1"], ["B_g1"]),
+        TargetCoverage("category", [], ["A_g1", "A_g2", "B_g1", "B_g2"]),
     ]
     assert remainder == []
     assert scored.categories == ["g1"]
@@ -508,7 +508,7 @@ def test_the_report_gives_the_calibrated_value_of_each_split() -> None:
     problem = initial_condition_problem("t1")
 
     model.apply_calibration_parameters({"t1": 0.2}, problem)
-    rows = model.applied_parameters({"t1": 0.2})["category_splits"]
+    rows = model.applied_parameters({"t1": 0.2}, problem)["category_splits"]
 
     assert rows["t1 of g1"] == {"group": ["g1"], "fraction": 0.2, "calibrated": True}
     assert rows["t2 of g2"]["fraction"] == pytest.approx(0.8)

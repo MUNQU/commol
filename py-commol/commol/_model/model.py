@@ -24,7 +24,11 @@ from commol._model.parameter import Parameter, SeriesValue
 from commol._model.process import Process
 from commol._model.structure import ModelStructure
 from commol._model.units import DEFAULT_STEP_UNIT
-from commol._problem.problem import CalibrationProblem, calibrated_values
+from commol._problem.problem import (
+    CalibrationProblem,
+    calibrated_values,
+    declared_values,
+)
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.engines.engine import ModelEngine
 
@@ -266,18 +270,10 @@ class Model(BaseModel, Generic[StructureT]):
             parameters.
         """
         values = calibrated_values(result)
-        types = {param.id: param.parameter_type for param in problem.parameters}
-        unknown = sorted(set(values) - set(types))
-        if unknown:
-            raise ValueError(
-                f"Cannot apply values with no declared parameter type: {unknown}. "
-                f"Declared calibration parameters: {sorted(types)}"
-            )
-
         parameters: dict[str, float | None] = {
-            param_id: value
-            for param_id, value in values.items()
-            if types[param_id] == "parameter"
+            param.id: values[param.id]
+            for param in declared_values(problem, values)
+            if param.parameter_type == "parameter"
         }
         # Computed before any mutation, so a rejected value leaves the model
         # unchanged.
@@ -290,24 +286,33 @@ class Model(BaseModel, Generic[StructureT]):
     def applied_parameters(
         self,
         values: CalibrationResult | Mapping[str, float],
-        problem: CalibrationProblem | None = None,
+        problem: CalibrationProblem,
         sample: "SummarizedSample | None" = None,
         confidence_level: float | None = None,
     ) -> "AppliedParametersReport":
         """
         Report every parameter of the model, and the values of its kind.
 
-        Call it on the model **after** `apply_calibration_parameters`. Each
-        entry carries the value the model holds and whether calibration set
-        it, so entries the calibration left alone appear alongside the fitted
-        ones. The structure of the model adds the sections of its kind
-        (`ModelStructure.report_sections`); an aggregate model adds
-        ``initial_amounts`` and ``category_splits``.
+        Call it on the model **after** `apply_calibration_parameters`, with
+        the same values and problem. Each entry carries the value the model
+        holds and whether calibration set it, so entries the calibration left
+        alone appear alongside the fitted ones. The structure of the model
+        adds the sections of its kind (`ModelStructure.report_sections`); an
+        aggregate model adds ``initial_amounts`` and ``category_splits``.
+
+        The problem declares the type of each value, so it says what each one
+        set; an id alone does not, since a parameter and a category can share
+        it. A ``parameter`` value marks the parameter of its id, and the
+        values of the kind of the model are read as the engine resolves them:
+        for an aggregate model, a bin is calibrated when the initial-condition
+        values and the remainder set every compartment of it, an override
+        when they write its compartment, and a category split when a value is
+        a split of its stratification, which also sets the complement.
 
         Parameters that are not a single number, such as a formula or a
         series, are omitted: they are inputs rather than fitted values.
         ``factor`` and ``noise`` parameters have no place in the model, so
-        they are reported from `problem` when it is given.
+        they are reported from `problem`.
 
         ``initial_amounts`` gives each bin and each overridden compartment of
         an aggregate model its ``amount`` the engine builds and the ``unit``
@@ -321,19 +326,20 @@ class Model(BaseModel, Generic[StructureT]):
         category of an earlier one gives a row per split, under the key
         ``t1 of g1``, with that category in its ``group``.
 
-        With a `sample` each entry gains a ``spread`` holding the weighted
-        statistics of its draws (`ParameterSample.summary`). Every entry is in
-        the unit it was calibrated in: a parameter in its own, an amount in
-        the unit of its bin, and a category split as a fraction of its group.
+        With a `sample` the entry that a calibrated value names gains a
+        ``spread`` holding the weighted statistics of its draws
+        (`ParameterSample.summary`). Every entry is in the unit it was
+        calibrated in: a parameter in its own, an amount in the unit of its
+        bin, and a category split as a fraction of its group.
 
         Parameters
         ----------
         values : CalibrationResult | Mapping
             The calibration result, or a mapping of parameter id to value such
             as one draw of a sample.
-        problem : CalibrationProblem | None, optional
-            The problem the values came from, used to report factor and noise
-            parameters.
+        problem : CalibrationProblem
+            The problem the values came from, which declares the type of each
+            value and the remainder of the initial conditions.
         sample : ParameterSample | None, optional
             Draws of the parameters, such as the sample of an uncertainty
             method.
@@ -350,7 +356,12 @@ class Model(BaseModel, Generic[StructureT]):
         Raises
         ------
         ValueError
-            If a sample is given without a confidence level.
+            If a sample is given without a confidence level, `values` holds
+            an id that `problem` does not declare, or the engine cannot
+            resolve an initial-condition id or the remainder.
+        TypeError
+            If `values` is a `ParameterSample`, which has no single set of
+            parameters.
         """
         return applied_parameters_report(
             self, values, problem, sample, confidence_level
