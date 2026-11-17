@@ -10,7 +10,7 @@
 //! | [`exponential`] | Inversion |
 //! | [`poisson`] | Multiplication of uniforms below a mean of 10; PTRS above (Hörmann 1993) |
 //! | [`binomial`] | Inversion below a mean of 10; BTRS above (Hörmann 1993) |
-//! | [`multinomial`] | Conditional binomials, category by category |
+//! | [`multinomial`] | Conditional binomials, category by category; the last positive category of probabilities that sum to 1 takes the units left |
 //! | [`normal`] | Box–Muller (1958), one draw from two uniforms |
 //! | [`gamma`] | Marsaglia and Tsang (2000); below a shape of 1, a draw of shape + 1 times `U^(1/shape)` |
 //! | [`index`] | The floor of `n` times a uniform |
@@ -186,12 +186,24 @@ fn binomial_btrs(generator: &mut Generator, trials: u64, probability: f64) -> u6
 ///
 /// The probabilities need not sum to 1: they are weights, and the units that
 /// no category takes are left out. Each category draws a binomial of the
-/// units left, at its probability among the mass left.
+/// units left, at its probability among the mass left. When the
+/// probabilities sum to 1 within `n ε` for `n` categories, no unit is left
+/// out: the last category with a positive probability takes the units left
+/// with no draw, since its probability among the mass left is 1. So the last
+/// bits of the probabilities never decide whether that category draws; the
+/// other categories still branch as [`binomial`] does, at a probability of
+/// 0.5 and at a mean of 10.
+///
+/// The bound `n ε` holds the rounding of shares `a_i / Σ a`, which sum to 1
+/// within about `(n − ½) ε`; weights that leave a mass above it out are
+/// drawn as weights. A caller that refuses weights summing above 1, summed in
+/// this order, never meets the debug check of a sum above `1 + n ε`.
 ///
 /// # Panics
 ///
 /// Panics when `counts` and `probabilities` differ in length, and in debug
-/// builds when a probability is negative or their sum is above 1.
+/// builds when a probability is negative or their sum is above 1 by more
+/// than `n ε`.
 pub fn multinomial(
     generator: &mut Generator,
     trials: u64,
@@ -200,10 +212,23 @@ pub fn multinomial(
 ) {
     assert_eq!(probabilities.len(), counts.len());
     debug_assert!(probabilities.iter().all(|p| *p >= 0.0));
+    let total: f64 = probabilities.iter().sum();
+    let rounding = probabilities.len() as f64 * f64::EPSILON;
+    debug_assert!(total <= 1.0 + rounding, "probabilities sum to {total}");
+    let last = if 1.0 - total <= rounding {
+        probabilities.iter().rposition(|p| *p > 0.0)
+    } else {
+        None
+    };
     let mut left = trials;
     let mut mass = 1.0;
-    for (probability, count) in probabilities.iter().zip(counts.iter_mut()) {
-        *count = if left == 0 || mass <= 0.0 {
+    for (index, (probability, count)) in probabilities.iter().zip(counts.iter_mut()).enumerate() {
+        *count = if left == 0 {
+            0
+        } else if Some(index) == last {
+            left
+        } else if mass <= 0.0 {
+            // coverage: invariant, the category whose share ends the mass takes every trial left
             0
         } else {
             binomial(generator, left, (probability / mass).clamp(0.0, 1.0))

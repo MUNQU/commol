@@ -278,12 +278,6 @@ pub(crate) fn random_rounding(amounts: &[f64], generator: &mut Generator) -> Vec
     let probabilities: Vec<f64> = amounts.iter().map(|amount| amount / sum).collect();
     let mut counts = vec![0u64; amounts.len()];
     sample::multinomial(generator, trials, &probabilities, &mut counts);
-    // The units the rounding of the shares leaves go to the last compartment
-    // that holds any.
-    let drawn: u64 = counts.iter().sum();
-    if let Some(last) = amounts.iter().rposition(|&amount| amount > 0.0) {
-        counts[last] += trials - drawn;
-    }
     counts.into_iter().map(|count| count as f64).collect()
 }
 
@@ -342,6 +336,23 @@ mod tests {
 
         assert_eq!(random_rounding(&[0.2, 0.1], &mut generator), [0.0, 0.0]);
         assert_eq!(random_rounding(&[0.0, 0.0], &mut generator), [0.0, 0.0]);
+    }
+
+    #[test]
+    fn a_random_rounding_of_many_uneven_amounts_assigns_every_unit() {
+        // The shares a_i / Σ a of many uneven amounts sum to 1 only within
+        // their rounding; the last positive compartment takes the units left.
+        let mut amounts: Vec<f64> = (0..997u32)
+            .map(|i| f64::from((i * 7_919) % 101) / 7.0)
+            .collect();
+        amounts.push(0.0);
+        let trials = nearest_whole(amounts.iter().sum());
+        let mut generator = Generator::from_seed(6);
+        for _ in 0..50 {
+            let whole = random_rounding(&amounts, &mut generator);
+            assert_eq!(whole.iter().sum::<f64>(), trials);
+            assert_eq!(whole[997], 0.0);
+        }
     }
 
     #[test]
