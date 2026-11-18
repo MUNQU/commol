@@ -277,15 +277,10 @@ impl PyCalibrationProblem {
                     ResidualBlocks::Stationary => BlockDrawing::Stationary,
                 };
                 let (residuals, scheme) = blocks(*scale, *block_length, drawing)?;
-                Ok((
-                    Box::new(ResidualBootstrap::new(
-                        observed,
-                        residuals,
-                        &scheme,
-                        *residual_blocks,
-                    )),
-                    Some(scheme),
-                ))
+                let resampler =
+                    ResidualBootstrap::new(observed, residuals, &scheme, *residual_blocks)
+                        .map_err(method_error)?;
+                Ok((Box::new(resampler), Some(scheme)))
             }
             ResamplerSpec::Wild {
                 block_length,

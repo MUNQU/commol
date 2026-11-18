@@ -3,7 +3,8 @@
 [Back to Design decisions](../design-decisions.md)
 
 How an observation reads a run: the one operator of the engine, the known
-scale of an observation and the coefficients of a weighted sum of outputs.
+scale of an observation, the coefficients of a weighted sum of outputs and
+the readers that refuse two observations of a series at one position.
 What a weight means and how a calibration runs are on
 [Calibration](calibration.md).
 
@@ -124,3 +125,35 @@ rules of one built in Python.
 `profiles::tracer::tests::the_absolute_error_of_a_prediction_counts_each_output_by_its_coefficient`,
 `sensitivity::finite_differences::tests::observations_with_other_coefficients_are_another_series`,
 `tests/calibration/test_coefficients.py`.
+
+## A reader of positions refuses two observations at one
+
+A label may hold two observations at one position (an increment and a total
+that end there), each with its own window, scale and residual. The loss, the
+likelihood, the scores, the predictive with `NoNoise` or `DistributionNoise`,
+and the block methods of a given `block_length` that weigh blocks or
+multiply residuals in place (the Bayesian and wild bootstraps, the block
+jackknife, the sandwich, the conformal methods other than rolling origins)
+read each observation alone and accept it. A reader that pairs
+the observations of a series by position refuses it, with a message that
+names the series and the position: `ResidualNoise` and `ResidualBootstrap`
+(`SeriesResiduals::new`, one residual per position, and
+`ResidualNoise::check` for the observations it serves), the automatic block
+length (`automatic_block_length`, the residuals as consecutive values) and
+`RollingConformal` (a horizon is a count of observations). They share one
+check, `one_per_position` (`crates/commol-inference/src/resampling/blocks.rs`):
+two observations share a position when their `at` are equal, as
+`distinct_positions` counts the positions of the grid.
+A new reader that pairs a series by position calls it, or reads each
+observation with its own residual.
+
+| Alternative | Why not |
+|---|---|
+| Keep one residual per position | It drops a residual with no message: a total gets the residuals of its increments. |
+| A residual per observation at a position, matched by rank | The second observation of a position has no residual at most positions, so it would draw its own every time and no noise; the two have different scales, so a block mixes them. |
+| Refuse at the calibration | A loss and a likelihood read the two well, and a total beside its increments is valid data. |
+
+**Guards:** `crates/commol-inference/tests/test_resampling.rs::readers_of_a_series_by_position_refuse_two_observations_at_one_position`,
+`crates/commol-inference/tests/test_resampling.rs::residual_noise_refuses_two_held_out_observations_of_a_series_at_one_position`,
+`tests/uncertainty/test_resampling.py::TestResidualBootstraps::test_observations_at_one_position_are_refused`,
+`tests/uncertainty/test_resampling.py::TestResidualNoise::test_held_out_observations_at_one_position_are_refused`.

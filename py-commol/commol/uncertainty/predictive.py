@@ -524,7 +524,8 @@ class Predictive:
         ------
         ValueError
             If an observation names an unknown output or factor, a series the
-            residual noise has no residuals of, or a series with no
+            residual noise has no residuals of or that has two observations at
+            one position for the residual noise, or a series with no
             observation model; `DistributionNoise` comes with a problem that
             has a loss; or the noise is not `NoNoise()` and the source is an
             analysis.

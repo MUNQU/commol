@@ -281,6 +281,7 @@ fn the_median_length_of_white_noise_is_one() {
                 &series,
                 BlockDrawing::Moving,
             )
+            .unwrap()
             .length
         })
         .collect();
@@ -330,7 +331,8 @@ fn automatic_length_grows_with_autocorrelation() {
     );
     let residuals: Vec<f64> = weak.iter().chain(&strong).copied().collect();
 
-    let chosen = automatic_block_length(&observations, &residuals, BlockDrawing::Stationary);
+    let chosen =
+        automatic_block_length(&observations, &residuals, BlockDrawing::Stationary).unwrap();
 
     assert_eq!(chosen.estimates.len(), 2);
     let (x, y) = (&chosen.estimates[0], &chosen.estimates[1]);
@@ -397,7 +399,8 @@ fn a_negative_synthetic_value_is_kept_and_counted() {
         residuals,
         &scheme,
         ResidualBlocks::Moving,
-    );
+    )
+    .unwrap();
 
     let run = bootstrap(&runner, &resampler, 8).unwrap();
 
@@ -416,7 +419,8 @@ fn residual_blocks_are_runs_of_consecutive_residuals() {
 
     for blocks in [ResidualBlocks::Moving, ResidualBlocks::Stationary] {
         let resampler =
-            ResidualBootstrap::new(problem.observed_data(), residuals.clone(), &scheme, blocks);
+            ResidualBootstrap::new(problem.observed_data(), residuals.clone(), &scheme, blocks)
+                .unwrap();
         let Perturbation::Values(synthetic) = resampler.replicate(&mut Generator::from_seed(1))
         else {
             panic!("a residual bootstrap draws values");
@@ -787,6 +791,111 @@ fn residual_noise_rejects_a_series_with_no_residuals() {
     let other = [ObservedDataPoint::new(1.0, "y".to_string(), 0.0)];
     let error = noise.check(&other).unwrap_err();
     assert!(error.contains("series 'y'"), "{error}");
+}
+
+/// The problem of fitting a line to the series `x` at positions 0 to 5,
+/// with a second observation of `x` at 3.
+fn shared_position_problem() -> CalibrationProblem<ClosedForm> {
+    let mut observations: Vec<ObservedDataPoint> = [1.0, 3.0, 2.0, 5.0, 4.0, 6.0]
+        .iter()
+        .enumerate()
+        .map(|(t, &value)| ObservedDataPoint::new(t as f64, "x".to_string(), value))
+        .collect();
+    observations.push(ObservedDataPoint::new(3.0, "x".to_string(), 9.0));
+    CalibrationProblem::new(
+        ClosedForm {
+            formula: line,
+            parameters: HashMap::from([("a".to_string(), 0.0), ("b".to_string(), 0.0)]),
+        },
+        observations,
+        vec![
+            CalibrationParameter::new("a".to_string(), -50.0, 50.0),
+            CalibrationParameter::new("b".to_string(), -10.0, 10.0),
+        ],
+        None,
+        vec![],
+        LossConfig::SumSquaredError,
+    )
+    .unwrap()
+}
+
+#[test]
+fn readers_of_a_series_by_position_refuse_two_observations_at_one_position() {
+    let problem = shared_position_problem();
+    let observed = problem.observed_data();
+    let fit = [1.0, 1.0];
+    let residuals = Residuals::new(&problem, &fit, ResidualScale::Additive).unwrap();
+    let named = |error: String| {
+        assert!(
+            error.contains("the series 'x' has two observations at 3"),
+            "{error}"
+        );
+    };
+
+    named(
+        ResidualNoise::new(observed, &residuals, 1)
+            .unwrap_err()
+            .to_string(),
+    );
+    let scheme = BlockScheme::new(observed, 1).unwrap();
+    named(
+        ResidualBootstrap::new(observed, residuals.clone(), &scheme, ResidualBlocks::Moving)
+            .unwrap_err()
+            .to_string(),
+    );
+    named(
+        automatic_block_length(observed, residuals.residuals(), BlockDrawing::Moving)
+            .unwrap_err()
+            .to_string(),
+    );
+    named(
+        BlockScheme::at_fit(&problem, &fit, None, BlockDrawing::NonOverlapping)
+            .unwrap_err()
+            .to_string(),
+    );
+    let config = config();
+    let runner = ReplicateRunner::new(&problem, &config, &fit, 1, 4).unwrap();
+    let settings =
+        ConformalSettings::new(NonconformityScore::Absolute, Pooling::Series, 0.5).unwrap();
+    named(
+        rolling_conformal(&runner, &[2.0], &[6.0], settings)
+            .unwrap_err()
+            .to_string(),
+    );
+
+    // A block of a given length holds both observations, and the wild
+    // bootstrap multiplies each by the sign of its block: each keeps its own
+    // residual.
+    let given = BlockScheme::at_fit(&problem, &fit, Some(2), BlockDrawing::NonOverlapping).unwrap();
+    assert_eq!(given.blocks()[1], [2, 3, 6]);
+    let wild = WildBootstrap::new(residuals.clone(), &given, Multipliers::Rademacher);
+    let Perturbation::Values(values) = wild.replicate(&mut Generator::from_seed(2)) else {
+        panic!("a wild bootstrap draws values");
+    };
+    let fitted = residuals.fitted();
+    let own = |i: usize| (values[i] - fitted[i]) / residuals.residuals()[i];
+    assert_eq!(own(3).abs(), 1.0);
+    assert_eq!(own(6), own(3));
+}
+
+#[test]
+fn residual_noise_refuses_two_held_out_observations_of_a_series_at_one_position() {
+    let problem = line_problem(&[1.0, 2.0, 3.0]);
+    let residuals = Residuals::new(&problem, &[1.0, 1.0], ResidualScale::Additive).unwrap();
+    let noise = ResidualNoise::new(problem.observed_data(), &residuals, 1).unwrap();
+    let held_out = [
+        ObservedDataPoint::new(4.0, "x".to_string(), 0.0),
+        ObservedDataPoint::new(5.0, "x".to_string(), 0.0),
+        ObservedDataPoint::new(4.0, "x".to_string(), 0.0),
+    ];
+
+    let error = noise.check(&held_out).unwrap_err();
+
+    assert!(
+        error.contains("the series 'x' has two observations at 4"),
+        "{error}"
+    );
+    noise.check(&held_out[..2]).unwrap();
 }
 
 #[test]

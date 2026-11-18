@@ -17,6 +17,7 @@ use crate::conformal::predict::{set_predictions, targets};
 use crate::conformal::quantile::conformal_quantile;
 use crate::conformal::score::{ConformalSettings, scales};
 use crate::error::MethodError;
+use crate::resampling::blocks::one_per_position;
 use crate::resampling::{FitUnit, Perturbation, ReplicateRunner};
 
 fn check<E: SimulationEngine + Send + Sync>(
@@ -31,6 +32,12 @@ fn check<E: SimulationEngine + Send + Sync>(
         .check_rolling()
         .map_err(MethodError::Invalid)?;
     let observed = runner.problem().observed_data();
+    one_per_position(
+        observed,
+        "RollingConformal counts a horizon in observations of a series",
+        "",
+    )
+    .map_err(MethodError::Invalid)?;
     let last = observed
         .iter()
         .map(|obs| obs.at)
@@ -63,9 +70,10 @@ fn check<E: SimulationEngine + Send + Sync>(
 ///
 /// # Errors
 ///
-/// Returns an error when the score is `"spread"`, a position is not after
-/// the data, an origin has no observation before or after it, every fit
-/// fails ([`FitUnit::require`]), or a point cannot be predicted.
+/// Returns an error when the score is `"spread"`, a series has two
+/// observations at one position, a position is not after the data, an
+/// origin has no observation before or after it, every fit fails
+/// ([`FitUnit::require`]), or a point cannot be predicted.
 pub fn rolling_conformal<E>(
     runner: &ReplicateRunner<'_, E>,
     origins: &[f64],

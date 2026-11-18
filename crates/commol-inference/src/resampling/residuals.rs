@@ -9,7 +9,7 @@ use commol_random::Generator;
 use commol_random::sample::index;
 
 use crate::error::MethodError;
-use crate::resampling::blocks::{distinct_positions, position_indices};
+use crate::resampling::blocks::{distinct_positions, one_per_position, position_indices};
 
 /// The scale of the residuals of a fit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -129,7 +129,21 @@ pub(crate) struct SeriesResiduals {
 }
 
 impl SeriesResiduals {
-    pub(crate) fn new(observations: &[ObservedDataPoint], residuals: &[f64]) -> Self {
+    /// The residuals `residuals` of `observations`, by series and position.
+    ///
+    /// # Errors
+    ///
+    /// When a series has two observations at one position, a message that
+    /// names the series and the position ([`one_per_position`]).
+    pub(crate) fn new(
+        observations: &[ObservedDataPoint],
+        residuals: &[f64],
+    ) -> Result<Self, String> {
+        one_per_position(
+            observations,
+            "Residual noise and the residual bootstrap read one residual per position of a series",
+            "",
+        )?;
         let positions = distinct_positions(observations);
         let position_of = position_indices(observations, &positions);
         let series = SeriesIndex::new(observations);
@@ -137,19 +151,17 @@ impl SeriesResiduals {
             .indices()
             .iter()
             .map(|members| {
-                let mut points: Vec<(usize, f64)> = members
+                members
                     .iter()
                     .map(|&i| (position_of[i], residuals[i]))
-                    .collect();
-                points.dedup_by_key(|(position, _)| *position);
-                points
+                    .collect()
             })
             .collect();
-        Self {
+        Ok(Self {
             positions: positions.len(),
             series,
             residuals: by_series,
-        }
+        })
     }
 
     /// The number of distinct positions of the data.
@@ -245,7 +257,7 @@ mod tests {
             ObservedDataPoint::new(1.0, "y".to_string(), 0.0),
             ObservedDataPoint::new(2.0, "y".to_string(), 0.0),
         ];
-        let grid = SeriesResiduals::new(&observations, &[10.0, 13.0, 21.0, 22.0]);
+        let grid = SeriesResiduals::new(&observations, &[10.0, 13.0, 21.0, 22.0]).unwrap();
         let x = grid.series("x").unwrap();
         assert_eq!(
             (0..4).map(|p| grid.at(x, p)).collect::<Vec<_>>(),
@@ -270,7 +282,7 @@ mod tests {
         );
         let mut residuals = vec![20.0, 60.0];
         residuals.extend([0.0; 7]);
-        let grid = SeriesResiduals::new(&observations, &residuals);
+        let grid = SeriesResiduals::new(&observations, &residuals).unwrap();
         let x = grid.series("x").unwrap();
         assert_eq!(
             (2..=6).map(|p| grid.at(x, p)).collect::<Vec<_>>(),

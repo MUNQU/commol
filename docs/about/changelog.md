@@ -705,6 +705,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A series with two observations at one position, such as an increment
+  over 2 steps and a total over 40 steps that both end at 40, is refused by
+  the methods that read one residual per position of a series, with a
+  message that names the series and the position: `ResidualNoise`,
+  `ResidualBootstrap`, `block_length="auto"` of every method, and
+  `RollingConformal`, which counts a horizon in observations. Before, the
+  residual noise and the residual bootstrap gave both observations the
+  residual of one of them, and the automatic block length read them as
+  consecutive positions, with no message. A calibration, the likelihood, the
+  scores, and the Bayesian and wild bootstraps, the block jackknife, the
+  sandwich and the other conformal methods with a `block_length` of a number
+  read each observation with its own residual, and accept such a series. Give one of the two
+  observations a label of its own for the methods that refuse it. See
+  [One position, two observations](../guide/calibration-observations.md#one-position-two-observations).
 - A calibrated value of a bin, and the initial-condition remainder, split by
   the proportions of amounts below the smallest normal `float`, about
   `2.2e-308`, which hold fewer digits the smaller they are: with
