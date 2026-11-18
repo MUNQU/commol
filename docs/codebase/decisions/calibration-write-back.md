@@ -73,7 +73,8 @@ overrides they do not need. A rate that turns on a start value (`if`, a
 comparison, `floor`, `ceil`, `round`, `%`) can then run otherwise:
 `if(B_g1 >= 1.05, 0.2, 0.01)` with `B = 1.5` split `0.7, 0.2, 0.1` scores
 `B_g2 = 1.30` at 5, and the written model, which starts from
-`B_g1 = 1.0499999999999998`, gives 1.11.
+`B_g1 = 1.0499999999999998`, gives 1.11
+([#488](https://github.com/MUNQU/commol/issues/488)).
 
 | Alternative | Why not |
 |---|---|
