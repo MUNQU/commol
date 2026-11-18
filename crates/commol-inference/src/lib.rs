@@ -10,6 +10,7 @@
 //! | [`target`] | [`Target`]: a log density, `−∞` outside the support |
 //! | [`predictive`] | [`Predictive`]: the run of every draw, its bands, and every draw's value of observations |
 //! | [`scores`] | Coverage, interval scores, CRPS and PIT of a predictive |
+//! | [`dependence`] | The dependence of the values of each series: autocorrelations, a robust portmanteau, `τ`, and the factor of the information |
 //! | [`identifiability`] | Structural rank, collinearity, and the identifiability of a sample and of starts |
 //! | [`local`] | Local approximations around a fit: the curvature on the unbounded scale, the Laplace approximation, the delta method, the sandwich and the Laplace mixture |
 //! | [`importance`] | Importance sampling of a target from a proposal on the unbounded scale |
@@ -41,6 +42,7 @@
 
 pub mod batch;
 pub mod conformal;
+pub mod dependence;
 pub mod design;
 pub mod distribution;
 pub mod error;

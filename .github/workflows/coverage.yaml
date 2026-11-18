@@ -58,6 +58,8 @@ jobs:
             tests: tests/uncertainty/test_profiles_coverage.py
           - name: sums of parts
             tests: tests/uncertainty/test_part_sums_coverage.py
+          - name: tests of dependence
+            tests: tests/uncertainty/test_dependence_coverage.py
     defaults:
       run:
         working-directory: ./py-commol

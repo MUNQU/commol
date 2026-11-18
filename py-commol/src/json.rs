@@ -10,7 +10,8 @@
 
 use commol_calibration::{FitRecord, Observation, OptimizerSettings, ProblemSettings};
 use commol_inference::settings::{
-    PriorsSettings, conformal, identifiability, local, profiles, resampling, sensitivity, smc,
+    PriorsSettings, conformal, dependence, identifiability, local, profiles, resampling,
+    sensitivity, smc,
 };
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -95,6 +96,8 @@ objects! {
     "ResidualBootstrap" => resampling::Bootstrap,
     "WildBootstrap" => resampling::Bootstrap,
     "BlockJackknife" => resampling::BlockJackknifeSettings,
+    "AtParameters" => dependence::Reference,
+    "Refitted" => dependence::Reference,
     "NoNoise" => resampling::NoiseSettings,
     "ResidualNoise" => resampling::NoiseSettings,
     "DistributionNoise" => resampling::NoiseSettings,

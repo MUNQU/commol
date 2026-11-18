@@ -12,6 +12,7 @@
 //! | Module | Python classes |
 //! |---|---|
 //! | [`resampling`] | the bootstraps, `BlockJackknife`, the observation noises |
+//! | [`dependence`] | `AtParameters`, `Refitted` |
 //! | [`smc`] | `GibbsPosterior`, `BayesianPosterior`, `ABCSMC`, `ABCRejection`, the calibrations of `η`, the distances |
 //! | [`local`] | `Laplace`, `Sandwich`, `LaplaceMixture`, its targets |
 //! | [`conformal`] | `SplitConformal`, `RollingConformal`, `JackknifePlus`, `EnbPI`, `AdaptiveConformal` |
@@ -23,6 +24,7 @@
 //! `int | "auto"` of a block length.
 
 pub mod conformal;
+pub mod dependence;
 pub mod identifiability;
 pub mod local;
 pub mod profiles;

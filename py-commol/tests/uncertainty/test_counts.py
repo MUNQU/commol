@@ -12,11 +12,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from commol import CalibrationProblem, Simulation
+from commol import CalibrationProblem, ObservedDataPoint, Simulation
 from commol._calibration.calibrator import Calibrator
 from commol._data.engine_json import engine_json
 from commol.commol_rs import _commol_rs as commol_rs
+from commol.dependence import AtParameters
 from commol.distributions import Uniform
+from commol.observations import NoNoise
 from commol.sensitivity import SensitivityAnalysis
 from tests.support import (
     a_to_b_builder,
@@ -67,6 +69,34 @@ def _sample():
     return inference.ParameterSample(["c"], [(0.0, 1.0)], [[0.5]], [0.0], None)
 
 
+def _points() -> str:
+    return engine_json([ObservedDataPoint(at=t, output="B", value=0.0) for t in (1, 2)])
+
+
+def _series_dependence(
+    max_lag: int = 1, replicates: int = 1, seed: int = 1
+) -> Callable[[Bindings], object]:
+    return lambda _: inference.series_dependence(
+        _points(), [0.0, 1.0], max_lag, replicates, 0.9, seed
+    )
+
+
+def _residual_dependence(
+    max_lag: int = 1, randomizations: int = 1
+) -> Callable[[Bindings], object]:
+    return lambda b: inference.residual_dependence(
+        _problem(b),
+        b.calibrator.point_sample(b.calibrator.run())._rust,
+        engine_json(b.calibrator.problem.observed_data),
+        engine_json(NoNoise()),
+        max_lag,
+        randomizations,
+        engine_json(AtParameters(replicates=1)),
+        0.9,
+        logging.getLogger("commol"),
+    )
+
+
 CASES: dict[str, tuple[str, Callable[[Bindings], object]]] = {
     "num_steps of Engine.run": (
         "num_steps",
@@ -101,6 +131,16 @@ CASES: dict[str, tuple[str, Callable[[Bindings], object]]] = {
     "count of Distribution.sample": (
         "count",
         lambda _: _uniform().sample(-1, 1),
+    ),
+    "max_lag of series_dependence": ("max_lag", _series_dependence(max_lag=-1)),
+    "replicates of series_dependence": (
+        "replicates",
+        _series_dependence(replicates=-1),
+    ),
+    "max_lag of residual_dependence": ("max_lag", _residual_dependence(max_lag=-1)),
+    "randomizations of residual_dependence": (
+        "randomizations",
+        _residual_dependence(randomizations=-1),
     ),
 }
 """Each count a binding takes as a number, called with -1."""
@@ -179,6 +219,7 @@ SEEDS: dict[str, Callable[[Bindings], object]] = {
     "ForwardAnalysis": lambda b: inference.ForwardAnalysis(
         b.calibrator.simulation.engine, _inputs(), seed=-1
     ),
+    "series_dependence": _series_dependence(seed=-1),
 }
 """Each binding that takes a seed, called with the seed -1."""
 

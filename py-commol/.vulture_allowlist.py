@@ -14,6 +14,8 @@ SampleAnalysisProtocol
 CalibrationResultProtocol
 ObservationDrawsProtocol
 ObservationBoundsProtocol
+SeriesDependenceProtocol
+SeriesStatisticsProtocol
 AccuracyProtocol
 TighteningProtocol
 BootstrapRunProtocol

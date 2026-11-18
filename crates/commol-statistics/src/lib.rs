@@ -4,6 +4,8 @@
 //! What the model compiler, the calibration and the inference methods use,
 //! and no model: a leaf crate, which depends on no crate of commol.
 //!
+//! - [`dependence`]: the autocovariances of a series with gaps, the robust
+//!   portmanteau and the integrated autocorrelation time of Geyer;
 //! - [`linear_algebra`]: the spectral radius of a square matrix, which the
 //!   model compiler reads;
 //! - [`numeric`]: `log Σ exp`, `x ln y` and `x ln(1 + y)`, the special
@@ -21,6 +23,7 @@
 
 #![warn(missing_docs)]
 
+pub mod dependence;
 pub mod linear_algebra;
 pub mod numeric;
 pub mod special;

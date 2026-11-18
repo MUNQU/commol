@@ -42,6 +42,7 @@ mod calibration;
 mod conformal;
 mod core;
 mod counts;
+mod dependence;
 mod engine;
 mod identifiability;
 mod inference;

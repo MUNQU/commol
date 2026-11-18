@@ -8,10 +8,18 @@ from commol import (
     CalibrationProblem,
     Calibrator,
     NelderMeadConfig,
+    ObservedDataPoint,
     Simulation,
 )
 from commol._data.result_model import ResultModel
 from commol.conformal import ConformalResult, JackknifePlus
+from commol.dependence import (
+    AtParameters,
+    Refitted,
+    SeriesDependence,
+    residual_dependence,
+    series_dependence,
+)
 from commol.distributions import Priors
 from commol.engines import ODESolver
 from commol.identifiability import (
@@ -30,7 +38,7 @@ from commol.local import (
     LaplaceResult,
     Sandwich,
 )
-from commol.observations import NoNoise, NormalObservations
+from commol.observations import DistributionNoise, NoNoise, NormalObservations
 from commol.profiles import ProfileLikelihood, ProfileResult, Threshold
 from commol.quantities import Peak, ValueAt
 from commol.resampling import BayesianBootstrap, BlockJackknife, BootstrapResult
@@ -207,6 +215,50 @@ def _profiled() -> IdentifiabilityReport:
     )
 
 
+def _refitted() -> SeriesDependence:
+    """The dependence of the residuals of the fit of `_normal` against refits."""
+    calibrator = _normal()
+    return residual_dependence(
+        Predictive(calibrator, calibrator.point_sample(calibrator.run()), [1.0]),
+        calibrator.problem.observed_data,
+        DistributionNoise(),
+        max_lag=2,
+        randomizations=2,
+        reference=Refitted(replicates=3),
+        confidence_level=0.9,
+    )
+
+
+def _of_draws() -> SeriesDependence:
+    """The dependence of the residuals of the draws of `_bootstrap`."""
+    return residual_dependence(
+        _predictive(),
+        _flows().problem.observed_data,
+        NoNoise(),
+        max_lag="auto",
+        randomizations=1,
+        reference=AtParameters(replicates=3),
+        confidence_level=0.9,
+    )
+
+
+def _two_series() -> SeriesDependence:
+    """The dependence of the values of two series at positions 1 to 5."""
+    observations = [
+        ObservedDataPoint(at=t, output=output, value=0.0)
+        for output in ("B", "C")
+        for t in range(1, 6)
+    ]
+    return series_dependence(
+        [1.0, 3.0, 2.0, 5.0, 4.0, 2.0, 1.0, 3.0, 1.0, 2.0],
+        observations,
+        max_lag=2,
+        replicates=5,
+        confidence_level=0.9,
+        seed=3,
+    )
+
+
 def _sensitivity[R](method: SensitivityMethod[R]) -> R:
     analysis = SensitivityAnalysis(
         Simulation(build(abc_builder())), abc_rates(), seed=7
@@ -259,6 +311,13 @@ EXAMPLES_OF_RESULTS: dict[str, Callable[[], ResultModel | None]] = {
     "Score": lambda: interval_score(
         _predictive(), flow_observations([9.0, 11.0], windowed=True), NoNoise(), 0.9
     ),
+    # Dependence
+    "SeriesDependence": _refitted,
+    "SeriesStatistics": lambda: _two_series().series[1],
+    "SeriesCorrelation": lambda: _two_series().correlations[0],
+    "ProblemDependence": lambda: _of_draws().problem,
+    "DrawPValues": lambda: _of_draws().series[0].draw_p_values,
+    "DependenceSettings": lambda: _refitted().settings,
     # Resampling
     "BootstrapResult": _bootstrap,
     "ResamplingDiagnostics": lambda: _bootstrap().diagnostics,

@@ -3,6 +3,7 @@
 from collections.abc import Iterable, Mapping, Sequence
 
 from commol import (
+    Aggregate,
     CalibrationParameter,
     CalibrationProblem,
     Calibrator,
@@ -11,6 +12,7 @@ from commol import (
     ParticleSwarmConfig,
     Simulation,
 )
+from commol._model.model import Model
 from commol.engines import ODESolver
 from commol.observations import NegativeBinomialObservations, NormalObservations
 from commol.observations.models import _ObservationModel
@@ -319,6 +321,69 @@ def overdispersed_calibrator(rates: Sequence[str] = ("k1", "k2")) -> Calibrator:
         rate: None if rate in rates else value for rate, value in truth_rates.items()
     }
     model = build(abc_builder(parameters=model_rates))
+    return Calibrator(Simulation(model), problem)
+
+
+def _smooth_rate(parameters: int, length: int) -> str:
+    """``exp(Σ c_k T_k(x))``, ``T_k`` the Chebyshev polynomials and ``x`` the
+    step mapped onto ``[−1, 1]`` over `length` steps."""
+    half = (length - 1) / 2
+    x = f"min(1, max(-1, (step - {half}) / {half}))"
+    terms = ["c0", *(f"c{k} * cos({k} * acos({x}))" for k in range(1, parameters))]
+    return f"exp({' + '.join(terms)}) * A / A"
+
+
+def smooth_model(
+    parameters: int, length: int, values: Sequence[float] | None = None
+) -> Model[Aggregate]:
+    """
+    A flow from A to B (``a_to_b_builder``, 10⁹ in A) at the smooth rate
+    ``exp(Σ c_k T_k(x))`` over `length` steps, of `parameters` coefficients:
+    unknown, or at `values`.
+    """
+    names = [f"c{k}" for k in range(parameters)]
+    known: list[float | None] = (
+        list(values) if values is not None else [None] * parameters
+    )
+    return build(
+        a_to_b_builder(
+            parameters=dict(zip(names, known, strict=True)),
+            rate=_smooth_rate(parameters, length),
+            amounts={"A": 1e9, "B": 0},
+        )
+    )
+
+
+def smooth_calibrator(
+    flows: Sequence[float],
+    start: Sequence[float],
+    *,
+    observation_models: Mapping[str, _ObservationModel] | None = None,
+    seed: int = 1,
+) -> Calibrator:
+    """
+    Fit the coefficients of `smooth_model`, one per value of `start`, their
+    initial guess, to `flows`, each the flow of one step, at positions 1, 2,
+    …: ``c0`` in ``[0, 6]``, the others in ``[−2, 2]``. The fit minimizes the
+    sum of squares, or, with `observation_models` (of ``"B"``), maximizes
+    their likelihood, by Nelder-Mead.
+    """
+    parameters = [
+        bounded("c0", 0.0, 6.0, initial_guess=start[0]),
+        *(
+            bounded(f"c{k}", -2.0, 2.0, initial_guess=value)
+            for k, value in enumerate(start[1:], start=1)
+        ),
+    ]
+    problem = CalibrationProblem(
+        observed_data=flow_observations(flows, windowed=True),
+        parameters=parameters,
+        loss_function=None if observation_models else "sse",
+        observation_models=dict(observation_models) if observation_models else None,
+        optimization_config=NelderMeadConfig(max_iterations=4000, sd_tolerance=1e-10),
+        seed=seed,
+    )
+    model = smooth_model(len(start), len(flows))
     return Calibrator(Simulation(model), problem)
 
 

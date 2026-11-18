@@ -47,7 +47,7 @@ engine; each element of the builder logs at `DEBUG`.
 
 | Method | Step | Event |
 |---|---|---|
-| A bootstrap, a block jackknife, jackknife+, EnbPI, rolling conformal | One fit of the `ReplicateRunner`: a replicate, a block left out, an origin; the binding names it (`StepLog::with_unit`, `FitUnit`) | `RunnerEvent` |
+| A bootstrap, a block jackknife, jackknife+, EnbPI, rolling conformal, the `Refitted` reference of `residual_dependence` | One fit of the `ReplicateRunner`: a replicate, a block left out, an origin, a refit; the binding names it (`StepLog::with_unit`, `FitUnit`) | `RunnerEvent` |
 | A Gibbs or Bayesian posterior, ABC-SMC | One generation of `SmcSampler::advance`, with its level and the last level | `SmcEvent::Generation` |
 | A calibrated `η` by bootstrap coverage | One replicate run, then one round that raises `η`; the generations of a replicate log at `DEBUG` | `SmcEvent` |
 | ABC rejection, a Laplace mixture, a sensitivity method, a predictive | One model run: a draw of the prior, a draw of the importance sampler, a point of `BatchRunner`, a set of `run_sets` | `RunEvent` |
