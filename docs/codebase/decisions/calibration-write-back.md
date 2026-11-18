@@ -87,11 +87,8 @@ more than half of 162). They stay out of `compartment_amounts`, so
 A new calibration of the written model can score other units or amounts,
 because the plan splits a value by the shares of the scored amounts.
 
-A known limit: a bin whose prior amount is subnormal, such as `B = 1e-310`
-split `0.3, 0.7`, makes the plan split a calibrated `B = 1.5` by coarse
-subnormal shares (`weights` of `crates/commol-model/src/initial_conditions.rs`),
-so its compartments lie hundreds of units in the last place from the split,
-and the write-back writes them as overrides.
+A bin whose declared amount is subnormal splits a value by the fractions
+([Amounts below the smallest normal number split by the fractions](calibrated-initial-conditions.md#amounts-below-the-smallest-normal-number-split-by-the-fractions)).
 
 | Alternative | Why not |
 |---|---|

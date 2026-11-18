@@ -56,7 +56,7 @@ pub const SCORED_AMOUNT_ULPS: u64 = 64;
 
 /// The distance of two amounts in units in the last place, with `0.0` and
 /// `-0.0` the same: the count of `f64` values from one to the other.
-fn ulps_between(a: f64, b: f64) -> u64 {
+pub(crate) fn ulps_between(a: f64, b: f64) -> u64 {
     // The bits of a number of either sign, as a point of one ordered line.
     let ordered = |x: f64| {
         let bits = x.to_bits() as i64;

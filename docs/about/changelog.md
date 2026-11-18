@@ -705,6 +705,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A calibrated value of a bin, and the initial-condition remainder, split by
+  the proportions of amounts below the smallest normal `float`, about
+  `2.2e-308`, which hold fewer digits the smaller they are: with
+  `B = 1e-310` split `0.3, 0.7`, `B = 1.5` gave
+  `B_x = 0.44999999999997775`, so `Model.apply_calibration_parameters` wrote
+  both compartments as overrides, and after `update_bin_amounts({"B": 20})`
+  `B` still started from 1.5. Where such amounts hold the split of the
+  fractions up to their rounding, a value now splits by the fractions, so
+  the write-back writes the bin and its split with no override. Amounts
+  further from the fractions, such as an override, keep their proportions.
+  See [What an id can name](../guide/calibration-initial-conditions.md#what-an-id-can-name).
+- After a calibrated category, the initial-condition remainder split
+  compartments that start at 0, as those of a bin left `None`, by the
+  fractions the model declares, not by the calibrated category: with `A`
+  left `None`, `group` split `0.4, 0.6` and `g1 = 0.3` calibrated, the
+  remainder `A` split `0.4, 0.6`, so the write-back, which writes
+  `g1 = 0.3`, overrode both compartments of `A`. It now splits by the
+  fractions with each calibrated category in place of its declared split.
+  See [The remainder](../guide/calibration-initial-conditions.md#the-remainder).
 - `Model.apply_calibration_parameters` wrote a calibrated amount that is not
   whole, such as `B = 11.85`, onto a model of `StochasticEvents` or
   `StochasticSteps` with a `rounding`, and the model then did not build: the

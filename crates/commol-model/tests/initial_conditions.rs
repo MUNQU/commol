@@ -863,6 +863,89 @@ fn a_prefix_that_starts_empty_keeps_its_declared_split() {
     assert_close(&state, &[25.0, 75.0, 500.0, 500.0, 0.0, 0.0, 0.0, 0.0]);
 }
 
+#[test]
+fn amounts_below_the_smallest_normal_number_split_a_value_by_the_fractions() {
+    // A = 1e-310 starts every compartment of A subnormal, and A = 1e-300
+    // with t1 = 1e-30 starts A_g1_t1 and A_g2_t1 at 0 by underflow: too few
+    // bits for their shares. A value of A, the remainder A, and the remainder
+    // A after a calibrated g1 split as the fractions declare, with g1 in, in
+    // every bit as for A left None.
+    let tiny_t1 = r#"{"t1":1e-30,"t2":1.0}"#;
+    for (amount, type_fractions) in [("1e-310", TYPE_BY_GROUP), ("1e-300", tiny_t1)] {
+        let fractions = fractions_with(type_fractions);
+        let amounts = format!(r#"{{"A":{amount},"B":1000.0}}"#);
+        let tiny = engine_of(&stratified_model("", &amounts, &fractions));
+        let none = engine_of(&stratified_model(
+            "",
+            r#"{"A":null,"B":1000.0}"#,
+            &fractions,
+        ));
+        let bin = |engine: &FrozenEngine| {
+            written_state(engine.clone(), &["A"], None, &[2000.0]).unwrap()[..4].to_vec()
+        };
+        let remainder = |engine: &FrozenEngine| {
+            written_state(engine.clone(), &["B"], Some("A"), &[300.0]).unwrap()
+        };
+        let after_a_category = |engine: &FrozenEngine| {
+            written_state(engine.clone(), &["g1", "B"], Some("A"), &[0.43, 600.0]).unwrap()
+        };
+
+        assert_eq!(bin(&tiny), bin(&none), "A = {amount}");
+        assert_eq!(remainder(&tiny), remainder(&none), "A = {amount}");
+        assert_eq!(
+            after_a_category(&tiny),
+            after_a_category(&none),
+            "A = {amount}"
+        );
+    }
+}
+
+#[test]
+fn a_remainder_after_a_calibrated_category_splits_by_the_fractions_it_sets() {
+    // A is left None, so the remainder A, 1000 - 600 = 400, splits by the
+    // fractions: g1 = 0.3 in place of the 0.4 it declares, then `type` as it
+    // splits g1 and g2.
+    let model = stratified_model(
+        "",
+        r#"{"A":null,"B":1000.0}"#,
+        &fractions_with(TYPE_BY_GROUP),
+    );
+
+    let state = written_state(engine_of(&model), &["g1", "B"], Some("A"), &[0.3, 600.0]).unwrap();
+
+    assert_close(&state[..4], &[30.0, 90.0, 140.0, 140.0]);
+}
+
+#[test]
+fn amounts_below_the_smallest_normal_number_keep_the_shares_of_an_override() {
+    // A = 1e-310 builds A_g1_t1 = 1e-311, and the override sets 1e-310, so
+    // A = 1900 keeps the 10:3:3:3 of the state, not the 1:3:3:3 of the
+    // fractions. A = 1e-321 builds A_g1_t1 about 20 units in the last place
+    // above the override 0, further than the rounding of the split: it keeps
+    // its 0.
+    let with_override = |amount: &str, overridden: f64| {
+        let mut model = stratified_model(
+            "",
+            &format!(r#"{{"A":{amount},"B":1000.0}}"#),
+            &fractions_with(TYPE_BY_GROUP),
+        );
+        model
+            .aggregate_mut()
+            .unwrap()
+            .initial_conditions
+            .compartment_amounts
+            .insert("A_g1_t1".to_string(), overridden);
+        written_state(engine_of(&model), &["A"], None, &[1900.0]).unwrap()
+    };
+
+    let tenth = with_override("1e-310", 1e-310);
+    let zero = with_override("1e-321", 0.0);
+
+    assert_close(&tenth[..4], &[1000.0, 300.0, 300.0, 300.0]);
+    assert_eq!(zero[0], 0.0);
+    assert_close(&[zero[1..4].iter().sum()], &[1900.0]);
+}
+
 /// An engine of [`stratified_model`] with the stratifications `more`, whose
 /// fractions `fractions` follow those of `group` and `type`, each 0.5 / 0.5.
 fn engine_with(more: &str, fractions: &str) -> FrozenEngine {
