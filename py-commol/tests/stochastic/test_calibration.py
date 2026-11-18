@@ -5,6 +5,7 @@ Each evaluation runs the same replicates (common random numbers, seeded by
 parameters and Nelder-Mead converges.
 """
 
+from pathlib import Path
 from typing import Literal
 
 import pytest
@@ -20,6 +21,7 @@ from commol import (
     Simulation,
 )
 from commol._fit.result import CalibrationResult
+from commol._model.engine_state import calibrated_initial_state
 from commol.engines import StochasticEventsSettings, StochasticStepsSettings
 from commol.engines.engine import EngineName, Rounding
 from commol.uncertainty import weighted_quantiles
@@ -202,17 +204,21 @@ def test_every_initial_condition_that_varies_needs_a_rounding(
     assert str(error.value) == needs_a_rounding("StochasticSteps", entry_id)
 
 
+def _with_rounding(
+    engine: EngineName, rounding: Rounding
+) -> StochasticEventsSettings | StochasticStepsSettings:
+    """The settings of `engine` that name `rounding`."""
+    if engine == "StochasticEvents":
+        return StochasticEventsSettings(rounding=rounding)
+    return StochasticStepsSettings(rounding=rounding)
+
+
 def _calibrated_amount(
     engine: EngineName, rounding: Rounding
 ) -> tuple[Model[Aggregate], CalibrationProblem, Calibrator]:
     """A calibration of the initial amount of bin B in ``[0, 50]`` against
     12.3 units of B at 0, on `engine` with `rounding`, and its model."""
-    settings = (
-        StochasticEventsSettings(rounding=rounding)
-        if engine == "StochasticEvents"
-        else StochasticStepsSettings(rounding=rounding)
-    )
-    model = build_stochastic(a_to_b_builder(), engine, settings)
+    model = build_stochastic(a_to_b_builder(), engine, _with_rounding(engine, rounding))
     problem = CalibrationProblem(
         observed_data=[ObservedDataPoint(at=0.0, output="B", value=12.3)],
         parameters=[
@@ -282,15 +288,110 @@ def test_a_stratified_amount_is_written_back_with_its_split() -> None:
     result = calibrator.run()
     amount = result.best_parameters["B"]
     (scored,) = calibrator._engine_problem.predict_observations([[amount]])
+    engine_state = calibrated_initial_state(model, problem.parameters, [amount], "A")
 
     model.apply_calibration_parameters(result, problem)
     starts = Simulation(model).replicates(2, seed=7).run_at([0.0])
 
-    # Each bin holds the amount the engine scored for it and keeps its split,
-    # with no compartment pinned, and every run starts from the units the
+    # Each bin holds the amount the engine scored for it and keeps its split.
+    # The rounding can turn on the last bit of an amount, so each compartment
+    # that the bins and the split rebuild only to their last bits is pinned to
+    # the amount the engine scored, and every run starts from the units the
     # calibration scored.
+    pins = model.structure.compartment_amounts
+    declared = model.structure.model_copy(update={"compartment_amounts": {}})
+    rebuilt = {c.name: c.amount for c in declared.initial_state(model.process)}
+    written = {c.name: c.amount for c in model.structure.initial_state(model.process)}
     assert model.structure.bin_amounts == pytest.approx(
         {"A": 1000.0 - amount, "B": amount}, rel=1e-12
     )
-    assert model.structure.compartment_amounts == {}
+    assert written == engine_state.state
+    assert pins == {
+        name: written[name] for name in rebuilt if rebuilt[name] != written[name]
+    }
     assert [[run[output][0] for output in targets] for run in starts] == scored
+
+
+@pytest.mark.parametrize("rounding", ["largest_remainder", "random"])
+@pytest.mark.parametrize("engine", STOCHASTIC_ENGINES)
+def test_a_written_back_model_runs_as_the_calibration_scored_it(
+    engine: EngineName, rounding: Rounding, tmp_path: Path
+) -> None:
+    split = {"g1": 0.7, "g2": 0.2, "g3": 0.1}
+    builder = a_to_b_builder(stratifications={"group": split})
+    model = build_stochastic(builder, engine, _with_rounding(engine, rounding))
+    outputs = [f"{bin_id}_{group}" for bin_id in ("A", "B") for group in split]
+    positions = [0.0, 3.0, 8.0]
+    problem = CalibrationProblem(
+        observed_data=[
+            ObservedDataPoint(at=at, output=output, value=1.0)
+            for at in positions
+            for output in outputs
+        ],
+        parameters=[bounded("B", 0.0, 50.0, kind="initial_condition")],
+        initial_condition_remainder="A",
+        loss_function="sse",
+        optimization_config=NelderMeadConfig(max_iterations=1),
+        replicates=2,
+        replicate_summary="mean",
+        seed=7,
+    )
+    calibrator = Calibrator(Simulation(model), problem)
+    # B = 12 splits into 8.4, 2.4 and 1.2: two remainders tie. For the other
+    # amounts, the bins and the split rebuild the scored shares only to their
+    # last bits, which shifts the draws of "random".
+    for amount in [12.0, *(0.5 + 3.7 * i for i in range(13))]:
+        (scored,) = calibrator._engine_problem.predict_observations([[amount]])
+        written = model.model_copy(deep=True)
+
+        written.apply_calibration_parameters({"B": amount}, problem)
+        written.to_json(tmp_path / "model.json")
+        loaded = Model.from_json(tmp_path / "model.json")
+
+        # Each replicate of the model, and of the model saved and loaded,
+        # starts from the units the calibration scored and follows the same
+        # path.
+        for runnable in (written, loaded):
+            runs = Simulation(runnable).replicates(2, seed=7).run_at(positions)
+            assert [
+                [
+                    run[output][index]
+                    for index in range(len(positions))
+                    for output in outputs
+                ]
+                for run in runs
+            ] == scored, amount
+
+
+def test_successive_write_backs_end_with_the_pins_of_a_fresh_one() -> None:
+    builder = a_to_b_builder(
+        stratifications={"group": {"g1": 0.7, "g2": 0.2, "g3": 0.1}}
+    )
+    settings = StochasticStepsSettings(rounding="random")
+    model = build_stochastic(builder, "StochasticSteps", settings)
+    fresh = model.model_copy(deep=True)
+    problem = CalibrationProblem(
+        observed_data=[ObservedDataPoint(at=0.0, output="B", value=1.0)],
+        parameters=[bounded("B", 0.0, 50.0, kind="initial_condition")],
+        initial_condition_remainder="A",
+        loss_function="sse",
+        optimization_config=NelderMeadConfig(max_iterations=1),
+        replicates=2,
+        replicate_summary="mean",
+        seed=7,
+    )
+
+    model.apply_calibration_parameters({"B": 0.37}, problem)
+    first = dict(model.structure.compartment_amounts)
+    model.apply_calibration_parameters({"B": 1.5}, problem)
+    fresh.apply_calibration_parameters({"B": 1.5}, problem)
+
+    # A write-back drops the pins of the compartments it sets, so none of an
+    # earlier write-back is left: 1.5 split 0.7, 0.2, 0.1 rebuilds only B_g1
+    # other than in its last bit, where 0.37 pinned B_g2 and B_g3.
+    assert set(first) == {"B_g2", "B_g3"}
+    assert model.structure.compartment_amounts == fresh.structure.compartment_amounts
+    assert set(model.structure.compartment_amounts) == {"B_g1"}
+    assert model.structure.initial_state(
+        model.process
+    ) == fresh.structure.initial_state(fresh.process)

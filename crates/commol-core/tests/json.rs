@@ -92,6 +92,34 @@ fn what_is_written_reads_back() {
 }
 
 #[test]
+fn a_number_reads_back_bit_for_bit() {
+    // Seventeen digits, as Python writes a value that calibration found: a
+    // parse that is not correctly rounded reads each of these one unit in
+    // the last place off.
+    for number in [
+        11.543327077049215_f64,
+        29.379030307177974,
+        20.214404692617798,
+        0.029557671750065198,
+    ] {
+        let read: f64 = json::read(&number.to_string()).unwrap();
+        assert_eq!(read.to_bits(), number.to_bits(), "{number}");
+    }
+    let mut bits: u64 = 0x9E37_79B9_7F4A_7C15;
+    for _ in 0..10_000 {
+        bits ^= bits << 13;
+        bits ^= bits >> 7;
+        bits ^= bits << 17;
+        let number = (bits >> 11) as f64 / (1_u64 << 53) as f64 * 1000.0;
+        let text = json::write(&number);
+
+        let read: f64 = json::read(&text).unwrap();
+
+        assert_eq!(read.to_bits(), number.to_bits(), "{text}");
+    }
+}
+
+#[test]
 fn a_rule_names_the_path_of_its_field_through_a_union() {
     assert_eq!(
         error(r#"{"moves": [{"kind": "stay"}, {"kind": "walk", "steps": 0, "scale": 1}]}"#),

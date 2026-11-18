@@ -377,6 +377,12 @@ def calibrated_initial_state[S: "Aggregate"](
     )
 
 
+def is_stochastic(model: "Model") -> bool:
+    """Whether the engine of a model draws random numbers, as the engine's list
+    says."""
+    return commol_rs.engine.EngineType(engine_json(model.engine.type)).is_stochastic
+
+
 def check_model(model: "Model") -> None:
     """
     Check an aggregate model in the engine.

@@ -8,6 +8,7 @@ from commol._model.engine_state import (
     InitialCompartment,
     calibrated_initial_state,
     initial_state,
+    is_stochastic,
 )
 
 if TYPE_CHECKING:
@@ -15,7 +16,11 @@ if TYPE_CHECKING:
     from commol._model.model import Model
     from commol._problem.problem import CalibrationProblem
 
-# Relative tolerance under which a rebuilt amount matches the scored one.
+# Relative tolerance under which a rebuilt amount matches the scored one on a
+# deterministic engine. A stochastic engine makes its start whole by a rounding
+# that can turn on the last bit of an amount (a tie of the largest remainders,
+# a share just below 1 in a draw), so there a rebuilt amount matches only when
+# it is the scored one.
 _MATCH_TOLERANCE = 1e-9
 
 
@@ -33,9 +38,11 @@ def calibrated_structure[S: "Aggregate"](
     the amount the engine gave it, in the unit of the bin, and each
     calibrated category takes the split the engine applied. Every compartment
     whose rebuilt amount still differs from the scored one is then pinned as
-    a per-compartment override. The result therefore rebuilds the scored state
-    exactly, whatever the combination of bin, category and exact-compartment
-    values.
+    a per-compartment override: in any bit on a stochastic engine, whose
+    rounding to whole units can turn on the last bit, and beyond
+    ``_MATCH_TOLERANCE`` on a deterministic engine. The result therefore
+    rebuilds the scored state, bit for bit on a stochastic engine, whatever
+    the combination of bin, category and exact-compartment values.
 
     Parameters
     ----------
@@ -84,14 +91,15 @@ def calibrated_structure[S: "Aggregate"](
     rebuilt = initial_state(process, candidate)
     bin_amounts = _bin_amounts(rebuilt, scored.state)
     target = scored.state
+    tolerance = 0.0 if is_stochastic(model) else _MATCH_TOLERANCE
     pins = {
         compartment.name: max(0.0, target[compartment.name])
         for compartment in rebuilt
         if not math.isclose(
             compartment.amount,
             target[compartment.name],
-            rel_tol=_MATCH_TOLERANCE,
-            abs_tol=_MATCH_TOLERANCE * max(1.0, bin_amounts[compartment.bin]),
+            rel_tol=tolerance,
+            abs_tol=tolerance * max(1.0, bin_amounts[compartment.bin]),
         )
     }
     if pins:
@@ -111,14 +119,23 @@ def _declared_update[S: "Aggregate"](
     ``category_fractions`` holds the applied value of each id that the engine
     resolves as the split of a category.
 
-    Every bin whose every compartment a calibrated value or the remainder
-    sets takes the amount the engine gave it; a bin of which a value sets only
-    some compartments keeps its amount, and the pins that follow cover those
-    compartments. Every calibrated category takes the split the engine
-    applied. A group of category updates that the definition rejects is
-    skipped; the pins that follow cover the compartments it would have set.
+    The overrides of the compartments that a value or the remainder sets are
+    dropped, so the pins that follow are only those of this write-back, not
+    those of an earlier one. Every bin whose every compartment a calibrated
+    value or the remainder sets takes the amount the engine gave it; a bin of
+    which a value sets only some compartments keeps its amount, and the pins
+    that follow cover those compartments. Every calibrated category takes the
+    split the engine applied. A group of category updates that the definition
+    rejects is skipped; the pins that follow cover the compartments it would
+    have set.
     """
+    covered_names = set(covered)
     candidate = model.structure.model_copy(deep=True)
+    candidate.compartment_amounts = {
+        name: amount
+        for name, amount in candidate.compartment_amounts.items()
+        if name not in covered_names
+    }
     state = initial_state(model.process, model.structure)
 
     touched_bins = covered_bins(state, covered)

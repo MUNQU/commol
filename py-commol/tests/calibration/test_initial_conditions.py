@@ -35,6 +35,7 @@ from tests.support import (
     initial_state,
     mixed_units_builder,
     observed,
+    override_builder,
 )
 
 SEED = 42
@@ -512,3 +513,21 @@ def test_the_report_gives_the_calibrated_value_of_each_split() -> None:
 
     assert rows["t1 of g1"] == {"group": ["g1"], "fraction": 0.2, "calibrated": True}
     assert rows["t2 of g2"]["fraction"] == pytest.approx(0.8)
+
+
+def test_a_write_back_drops_the_overrides_of_the_compartments_it_sets() -> None:
+    # The override of A_g1 holds what the split of A gives it.
+    bin_set = build(override_builder(500))
+    other_bin_set = build(override_builder(500))
+
+    bin_set.apply_calibration_parameters({"A": 800}, initial_condition_problem("A"))
+    other_bin_set.apply_calibration_parameters(
+        {"B": 40}, initial_condition_problem("B")
+    )
+
+    # The value of A sets A_g1, so its override goes, also one the user
+    # declared, and the split of 800 rebuilds the scored 400 with no pin;
+    # a value of B leaves the override of A_g1 as it was.
+    assert bin_set.structure.compartment_amounts == {}
+    assert initial_state(bin_set)["A_g1"] == pytest.approx(400.0)
+    assert other_bin_set.structure.compartment_amounts == {"A_g1": 500}

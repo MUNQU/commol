@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from commol.commol_rs._commol_rs import EngineProtocol
 
 from commol._data.engine_json import engine_json
-from commol._model.engine_state import build_engine
+from commol._model.engine_state import build_engine, is_stochastic
 from commol._model.model import Model
 from commol._model.structure import ModelStructure
 from commol._model.outputs import outputs_for, series_names
@@ -101,9 +101,7 @@ class Simulation:
     @property
     def is_stochastic(self) -> bool:
         """Whether the engine of the model draws random numbers."""
-        return commol_rs.engine.EngineType(
-            engine_json(self.model_definition.engine.type)
-        ).is_stochastic
+        return is_stochastic(self.model_definition)
 
     def _seed_run(self, seed: int | None) -> int | None:
         """

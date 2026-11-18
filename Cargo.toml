@@ -32,5 +32,6 @@ nalgebra = { version = "0.35.0", default-features = false, features = ["std"] }
 pyo3 = { version = "0.30.1", features = ["extension-module", "serde"] }
 rayon = "1.11"
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+# `float_roundtrip`: a number of a model reaches the engine bit for bit.
+serde_json = { version = "1.0", features = ["float_roundtrip"] }
 serde_path_to_error = "0.1.20"

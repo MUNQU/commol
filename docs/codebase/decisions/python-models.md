@@ -155,10 +155,11 @@ A number that is not finite crosses as standard JSON text, `"Infinity"`,
 `"-Infinity"` or `"NaN"`, in both directions. Python writes it with the
 serializer of pydantic in the mode `inf_nan_mode="strings"`, the mode that
 the setting `ser_json_inf_nan="strings"` of a model selects, once for every
-class in `engine_json`. The reader is `serde_json`, and its `Value` reads such
-a text as a number only where the type asks for a number (`deserialize_f64`),
-so a label `"NaN"` stays text; a range rule reads the text as its number, so
-an infinite setting gets the message of its rule. The writer of the engine,
+class in `engine_json`. The reader is `serde_json`, which reads a finite
+number bit for bit (`float_roundtrip`), and its `Value` reads such a text as
+a number only where the type asks for a number (`deserialize_f64`), so a
+label `"NaN"` stays text; a range rule reads the text as its number, so an
+infinite setting gets the message of its rule. The writer of the engine,
 `commol_core::json::write`, and the tree of a formula write the same three
 texts, and so does the JSON of every result: `ResultModel` sets
 `ser_json_inf_nan="strings"` for all of them. A value of an enum of the engine
