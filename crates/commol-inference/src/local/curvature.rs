@@ -3,11 +3,13 @@
 //!
 //! Gauss–Newton reads the expected curvature of each observation's term
 //! ([`commol_calibration::CalibrationProblem::term_derivatives`]): over the
-//! arguments of the term, its mean `μ` and the noise arguments of its
-//! observation model, it is `wᵢ` times the Fisher information of the model,
-//! or `2 w n²` for the sum of squares. The chain rule through the Jacobian
-//! `J` of the means and the identity of the noise parameters gives
-//! `H_θ = Σᵢ Aᵢᵀ Cᵢ Aᵢ`, which is `Jᵀ W J` on the model parameters. On the
+//! arguments of the term, the means `μₜ` of its parts and the noise
+//! arguments of its observation model, it is `wᵢ` times the Fisher
+//! information of the model, or `2 w n²` for the sum of squares. The chain
+//! rule through the Jacobian `J` of the means of the parts
+//! ([`crate::sensitivity::PartSensitivities`]) and the identity of the noise
+//! parameters gives `H_θ = Σᵢ Aᵢᵀ Cᵢ Aᵢ`, which is `Jᵀ W J` on the model
+//! parameters. On the
 //! unbounded scale, `H_u = D · H_θ · D`; the curvature of the log Jacobian
 //! is left out. The Hessian takes central differences of the objective
 //! itself, the observed curvature, for a fit with large residuals or a wrong
@@ -63,16 +65,24 @@ impl Curvature {
         let transform = Transform::new(&problem.parameter_bounds());
         check_inside(problem, &transform, fit)?;
         let sensitivities = source.jacobian(fit).map_err(MethodError::Sensitivity)?;
+        let parts = &sensitivities.parts;
         let terms = problem
-            .term_derivatives(fit, &sensitivities.predictions)
+            .term_derivatives(fit, &sensitivities.predictions, &parts.means)
             .map_err(MethodError::Invalid)?;
         let p = fit.len();
         let mut matrix = Matrix::zeros(p, p);
         let mut errors = Matrix::zeros(p, p);
         let mut gradients = Matrix::zeros(terms.len(), p);
+        let rows = |matrix: &Matrix, first: usize, count: usize| -> Vec<Vec<f64>> {
+            (first..first + count)
+                .map(|k| matrix.row(k).iter().copied().collect())
+                .collect()
+        };
+        let mut first = 0;
         for (i, term) in terms.iter().enumerate() {
-            let jacobian: Vec<f64> = sensitivities.jacobian.row(i).iter().copied().collect();
-            let error: Vec<f64> = sensitivities.errors.row(i).iter().copied().collect();
+            let jacobian = rows(&parts.jacobian, first, term.parts);
+            let error = rows(&parts.errors, first, term.parts);
+            first += term.parts;
             add_term(&mut matrix, &mut errors, term, &jacobian, &error);
             for (j, gradient) in term_gradient(term, &jacobian).into_iter().enumerate() {
                 gradients[(i, j)] = gradient;
@@ -275,26 +285,27 @@ fn check_inside<E: SimulationEngine>(
 }
 
 /// Add `Aᵀ C A` of one term to `matrix`, and the first-order error of the
-/// Jacobian row to `errors`. Row 0 of `A` is the Jacobian of the mean; row
-/// `1 + k` is the unit vector of the parameter of noise argument `k`, or 0
-/// for a number.
+/// Jacobian rows to `errors`. Row `t` of `A`, below the number of parts, is
+/// the Jacobian of the mean of part `t`; row `K + k` is the unit vector of
+/// the parameter of noise argument `k`, or 0 for a number.
 fn add_term(
     matrix: &mut Matrix,
     errors: &mut Matrix,
     term: &TermDerivatives,
-    jacobian: &[f64],
-    error: &[f64],
+    jacobian: &[Vec<f64>],
+    error: &[Vec<f64>],
 ) {
-    let size = 1 + term.parameters.len();
-    let p = jacobian.len();
+    let parts = term.parts;
+    let size = parts + term.parameters.len();
+    let p = matrix.ncols();
     let row = |a: usize, j: usize| -> f64 {
-        if a == 0 {
-            jacobian[j]
+        if a < parts {
+            jacobian[a][j]
         } else {
-            f64::from(u8::from(term.parameters[a - 1] == Some(j)))
+            f64::from(u8::from(term.parameters[a - parts] == Some(j)))
         }
     };
-    let row_error = |a: usize, j: usize| if a == 0 { error[j] } else { 0.0 };
+    let row_error = |a: usize, j: usize| if a < parts { error[a][j] } else { 0.0 };
     for a in 0..size {
         for b in 0..size {
             let c = term.curvature[a * size + b];
@@ -317,10 +328,16 @@ fn add_term(
 }
 
 /// `Aᵀ ∇` of one term: the gradient of its arguments through the Jacobian of
-/// the mean and the parameters of its noise arguments.
-fn term_gradient(term: &TermDerivatives, jacobian: &[f64]) -> Vec<f64> {
-    let mut gradient: Vec<f64> = jacobian.iter().map(|j| term.gradient[0] * j).collect();
-    for (parameter, slope) in term.parameters.iter().zip(&term.gradient[1..]) {
+/// the means of its parts and the parameters of its noise arguments.
+fn term_gradient(term: &TermDerivatives, jacobian: &[Vec<f64>]) -> Vec<f64> {
+    let p = jacobian.first().map_or(0, Vec::len);
+    let mut gradient = vec![0.0; p];
+    for (row, slope) in jacobian.iter().zip(&term.gradient) {
+        for (entry, derivative) in gradient.iter_mut().zip(row) {
+            *entry += slope * derivative;
+        }
+    }
+    for (parameter, slope) in term.parameters.iter().zip(&term.gradient[term.parts..]) {
         if let Some(index) = parameter {
             gradient[*index] += slope;
         }

@@ -72,6 +72,14 @@ class ObservedDataPoint(EngineChecked, RangeChecked):
     window : float | None
         Optional window length for a cumulative output: the prediction is the
         output at `at` minus the output at ``at - window``.
+    parts : int
+        The count of equal parts of the window (default: 1). With more than
+        one, `value` is the sum of one independent observation per part,
+        each scattered by the observation model of the series around the
+        mean of its part, and the window splits from its start to `at` into
+        `parts` equal lengths. Needs a `window` and observation models:
+        `PoissonObservations`, `NormalObservations` or
+        `NegativeBinomialObservations` with a ``sum``.
     trials : int | None
         The trials of this observation, for a `BinomialObservations` model
         with no ``trials`` of its own (default: None).
@@ -113,6 +121,13 @@ class ObservedDataPoint(EngineChecked, RangeChecked):
         description=(
             "Optional window length for cumulative-output observations. "
             "When set, prediction is value(at) - value(at - window)."
+        ),
+    )
+    parts: int = Field(
+        default=1,
+        description=(
+            "Count of equal parts of the window; the value is the sum of one "
+            "independent observation per part"
         ),
     )
     trials: int | None = Field(

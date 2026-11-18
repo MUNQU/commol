@@ -33,7 +33,11 @@ arguments are numbers or parameters of type `Noise`, which the value writer
 skips, as it skips factors. What only makes sense for a loss refuses
 observation models: `normalize_observations`, the replicate summaries of a
 stochastic engine (the likelihood of a summary ignores the noise of the
-process), `LossDistance` of ABC and information matching of `η`.
+process), `LossDistance` of ABC and information matching of `η`. A loss
+refuses the fields of an observation model, `parts > 1` and `trials`
+(`check_loss_fields` of `calibration_problem.rs`), with a message that names
+the field and, for a stochastic engine, says that the models need a
+deterministic one: a field with no effect hides a mistake.
 
 | Alternative | Why not |
 |---|---|
@@ -43,7 +47,8 @@ process), `LossDistance` of ABC and information matching of `η`.
 | Densities from a dependency | Their values change with its version; SciPy reference values in a test check ours. |
 
 **Guards:** `crates/commol-calibration/tests/test_likelihood.rs`,
-`tests/uncertainty/test_observation_models.py`.
+`tests/uncertainty/test_observation_models.py`,
+`tests/calibration/test_observations.py::TestParts::test_a_loss_refuses_parts_and_trials`.
 
 ## A `Simulation` follows its model
 

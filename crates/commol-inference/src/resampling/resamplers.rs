@@ -72,13 +72,15 @@ impl Resampler for BayesianBootstrap {
 
 /// The parametric bootstrap: each replicate draws every observed value from
 /// the observation model of its series at the fit, around the fit's
-/// predicted mean and with the fit's noise parameters.
+/// predicted mean, or the means of its parts, and with the fit's noise
+/// parameters ([`DistributionNoise`]).
 #[derive(Debug, Clone)]
 pub struct ParametricResampler {
     noise: DistributionNoise,
     observations: Vec<ObservedDataPoint>,
     fit: Vec<f64>,
     predicted: Vec<f64>,
+    parts: Vec<f64>,
 }
 
 impl ParametricResampler {
@@ -109,6 +111,7 @@ impl ParametricResampler {
             observations: problem.observed_data().to_vec(),
             fit: fit.to_vec(),
             predicted: workspace.predictions,
+            parts: workspace.parts,
         })
     }
 }
@@ -120,6 +123,7 @@ impl Resampler for ParametricResampler {
             &self.observations,
             &self.fit,
             &self.predicted,
+            &self.parts,
             generator,
             &mut values,
         );

@@ -23,6 +23,10 @@ pub struct Workspace {
     /// Predicted observations, replicate after replicate: the prediction of
     /// observation `i` of replicate `r` is at `r × n_observations + i`.
     pub predictions: Vec<f64>,
+    /// The mean of each part of each observation
+    /// ([`ObservationOperator::apply_parts`]), replicate after replicate:
+    /// part `k` of replicate `r` is at `r × n_parts + k`.
+    pub parts: Vec<f64>,
 }
 
 /// Check the parameters of a model with no observations: at least one, each
@@ -156,7 +160,8 @@ impl<E: SimulationEngine> ForwardModel<E> {
 
     /// The same model observed at `observed_data` instead: the engine, the
     /// parameters, the values and the replicates stay, the schedule and the
-    /// observation operator are those of the new observations.
+    /// observation operator, with the parts of the observations, are those
+    /// of the new observations.
     ///
     /// # Errors
     ///
@@ -179,7 +184,8 @@ impl<E: SimulationEngine> ForwardModel<E> {
     }
 
     /// The same model run at `schedule`, sorted and deduplicated, which holds
-    /// every position of `observed_data` and the start of every window; the
+    /// every position of `observed_data`, the start of every window and every
+    /// boundary of a part; the
     /// observation operator reads `observed_data` from those runs.
     ///
     /// # Panics
@@ -390,16 +396,21 @@ impl<E: SimulationEngine> ForwardModel<E> {
     }
 
     /// Write the predicted observations of the rows in `workspace` into
-    /// `workspace.predictions`, replicate after replicate.
+    /// `workspace.predictions` and the means of their parts into
+    /// `workspace.parts`, replicate after replicate.
     pub fn observe(&self, values: &[f64], workspace: &mut Workspace) {
         let n = self.observation.count();
+        let parts = self.observation.part_count();
         workspace.predictions.resize(n * workspace.rows.len(), 0.0);
-        for (rows, out) in workspace
+        workspace.parts.resize(parts * workspace.rows.len(), 0.0);
+        for ((rows, out), part_out) in workspace
             .rows
             .iter()
             .zip(workspace.predictions.chunks_mut(n.max(1)))
+            .zip(workspace.parts.chunks_mut(parts.max(1)))
         {
             self.observation.apply(rows, values, out);
+            self.observation.apply_parts(rows, values, part_out);
         }
     }
 
@@ -437,14 +448,18 @@ impl<E: SimulationEngine> ForwardModel<E> {
 }
 
 /// The positions a run reports at to read `observations`, and `extra`
-/// positions: each position and the start of each window, sorted, once.
+/// positions: each position, the start of each window and each boundary of
+/// its parts ([`ObservedDataPoint::part_boundaries`]), sorted, once.
 pub fn schedule_of(
     observations: &[ObservedDataPoint],
     extra: impl IntoIterator<Item = f64>,
 ) -> Vec<f64> {
     let mut schedule: Vec<f64> = observations
         .iter()
-        .flat_map(|obs| std::iter::once(obs.at).chain(obs.window_start()))
+        .flat_map(|obs| match obs.window_start() {
+            Some(start) => obs.part_boundaries(start),
+            None => vec![obs.at],
+        })
         .chain(extra)
         .collect();
     schedule.sort_by(f64::total_cmp);

@@ -235,7 +235,14 @@ fn moments(problem: &CalibrationProblem<Line>, values: &[f64], mean: f64) -> (f6
     let mut out = [0.0];
     let draws: Vec<f64> = (0..count)
         .map(|_| {
-            noise.observe(observations, values, &[mean], &mut generator, &mut out);
+            noise.observe(
+                observations,
+                values,
+                &[mean],
+                &[mean],
+                &mut generator,
+                &mut out,
+            );
             out[0]
         })
         .collect();
@@ -273,6 +280,7 @@ fn distribution_noise_draws_have_the_moments_of_each_model() {
         (
             ObservationModel::NegativeBinomial {
                 overdispersion: k(),
+                sum: None,
             },
             0.2,
             8.0,
@@ -298,6 +306,7 @@ fn distribution_noise_draws_have_the_moments_of_each_model() {
         (
             ObservationModel::NegativeBinomial {
                 overdispersion: Argument::Value(0.0),
+                sum: None,
             },
             3.5,
             3.5,
@@ -405,6 +414,7 @@ fn the_log_score_of_one_draw_is_the_log_density() {
         &[1.0, 3.0],
         ObservationModel::NegativeBinomial {
             overdispersion: Argument::Parameter("k".to_string()),
+            sum: None,
         },
         &[("k", 0.0, 2.0)],
     );

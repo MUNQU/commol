@@ -85,6 +85,7 @@ plots and the per-series normalization; it defaults to `output`.
 | `scale` | `float` | `1.0` | Above zero and finite. A known number that multiplies the prediction, with the factor; see [Known shares: scales](#known-shares-scales). |
 | `window` | `float \| None` | `None` | Compares with the gain over `(at − window, at]` instead of the value. |
 | `trials` | `int \| None` | `None` | The trials of the observation, for a `BinomialObservations()` model that reads them from each observation. See [Observation Models](uncertainty/observation-models.md). |
+| `parts` | `int` | `1` | At least 1. The count of equal parts of the window that the value sums, each an independent observation; more than 1 needs a `window`. See [Parts of a window](#parts-of-a-window). |
 
 An unknown field, such as a misspelt name, raises `ValidationError` and names
 it.
@@ -273,6 +274,39 @@ method needs one scale per series. With a `block_length` of a number, the
 Bayesian and wild bootstraps, the block jackknife and the sandwich keep both
 in one label, each in the block of its position.
 
+### Parts of a window
+
+A total is often the sum of counts that were measured apart: a weekly report
+adds 7 daily counts, each with its own noise. `parts=K` says so: the window
+splits into `K` equal parts, the boundaries
+`at − window + k · window / K`, and the value is the sum of `K` independent
+observations, one per part. The prediction is still the gain over the window,
+the sum of the means of the parts; the
+[observation model](uncertainty/observation-models.md#sums-of-parts) of the
+series reads the noise of the sum from the mean of each part.
+
+```python
+weekly = [
+    ObservedDataPoint(at=end, output="cum_ab", value=count, window=7, parts=7)
+    for end, count in zip(ends, counts)
+]
+print(weekly[0].parts)  # 7
+```
+
+| Rule | Detail |
+|---|---|
+| Parts need a window | `parts > 1` without `window` raises `ValidationError` that names the observation. |
+| Each boundary is a position of the engine | A `DifferenceEquations` model needs whole steps: a window of 7 splits into 7 parts, not 2. The message names the boundary and the observation. |
+| Observation models only | A problem with `loss_function` refuses `parts > 1`, as it refuses `trials`: both are fields of an observation model, which a loss does not read. |
+| One label mixes any parts | A label may hold totals of 1, 3 and 7 parts, as it holds windows of different lengths. |
+
+The window sets the scale of an observation, not `parts`: a total of 7 steps
+is about 7 times a count of one step, whatever its parts. Give the totals a
+label of their own when a method that reads a series needs one scale per
+series ([One position, two observations](#one-position-two-observations));
+two labels can name the same noise parameter. A total observed next to its own
+parts counts the same data twice: observe either the parts or their total.
+
 ## Positions between integers
 
 An observation is at a position that the engine of the model reports at, as
@@ -329,6 +363,7 @@ Observe expanded outputs by name, such as `B_g1`, or sum them with
 - [ ] Every `factor_id` has a `CalibrationParameter` with `parameter_type="factor"`.
 - [ ] A known share is a `scale`, not a `factor` with narrow bounds.
 - [ ] Windowed observations use a cumulative output and a window that starts at 0 or later.
+- [ ] A total of independent counts has `parts`, and no observation of its parts beside it.
 
 ## Next steps
 

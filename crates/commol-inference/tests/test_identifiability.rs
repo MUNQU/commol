@@ -11,7 +11,8 @@ use commol_inference::identifiability::{
     sample_identifiability, structural_rank,
 };
 use commol_inference::sensitivity::{
-    Design, FiniteDifferences, Matrix, Sensitivities, SensitivityError, SensitivitySource,
+    Design, FiniteDifferences, Matrix, PartSensitivities, Sensitivities, SensitivityError,
+    SensitivitySource,
 };
 use commol_inference::{MethodError, ParameterSample};
 use commol_random::Generator;
@@ -316,9 +317,12 @@ impl SensitivitySource for Fixed {
             -2.0 => Err(SensitivityError::Failed("broken".to_string())),
             index => {
                 let jacobian = self.jacobians[index as usize].clone();
+                let predictions = vec![0.0; jacobian.nrows()];
+                let errors = Matrix::zeros(jacobian.nrows(), jacobian.ncols());
                 Ok(Sensitivities {
-                    predictions: vec![0.0; jacobian.nrows()],
-                    errors: Matrix::zeros(jacobian.nrows(), jacobian.ncols()),
+                    parts: PartSensitivities::one_per_observation(&predictions, &jacobian, &errors),
+                    predictions,
+                    errors,
                     labels: vec!["A".to_string(); jacobian.nrows()],
                     jacobian,
                 })
@@ -417,10 +421,14 @@ impl SensitivitySource for Tolerant {
         if self.accuracy.relative < self.fails_below {
             return Err(SensitivityError::Failed("too stiff".to_string()));
         }
+        let predictions = vec![0.0; 2];
+        let jacobian = Matrix::from_row_slice(2, 2, &[1.0, 0.0, 0.0, 1e-3]);
+        let errors = Matrix::from_element(2, 2, self.accuracy.relative);
         Ok(Sensitivities {
-            predictions: vec![0.0; 2],
-            jacobian: Matrix::from_row_slice(2, 2, &[1.0, 0.0, 0.0, 1e-3]),
-            errors: Matrix::from_element(2, 2, self.accuracy.relative),
+            parts: PartSensitivities::one_per_observation(&predictions, &jacobian, &errors),
+            predictions,
+            jacobian,
+            errors,
             labels: vec!["A".to_string(); 2],
         })
     }
@@ -888,4 +896,43 @@ fn a_measure_over_the_bounds_refuses_an_infinite_bound() {
          the bounds, so they must be finite: parameter 'k' has the bounds [0, inf]. Give \
          reference='prior' with the priors of the sample"
     );
+}
+
+#[test]
+fn the_structural_rank_reads_no_part() {
+    use commol_calibration::{DiscrepancyConfig, ObservationModel};
+    // One total of B over four steps, in four parts: the total reads
+    // A₀ · (1 − (1 − k)⁴), one combination of A₀ and k; the parts would
+    // separate them.
+    let total = ObservedDataPoint {
+        parts: 4,
+        ..ObservedDataPoint::with_window(4.0, "B".to_string(), 300.0, 4.0)
+    };
+    let problem = CalibrationProblem::new(
+        decay("k", &["k"]),
+        vec![total],
+        vec![
+            CalibrationParameter::new("k".to_string(), 0.05, 0.5),
+            CalibrationParameter::with_type(
+                "A".to_string(),
+                CalibrationParameterType::InitialCondition,
+                500.0,
+                1500.0,
+            ),
+        ],
+        None,
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![("B".to_string(), ObservationModel::Poisson)]),
+    )
+    .unwrap();
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+
+    let sensitivities = source.jacobian(&[0.1, 1000.0]).unwrap();
+    assert_eq!(sensitivities.jacobian.nrows(), 1);
+    assert_eq!(sensitivities.parts.jacobian.nrows(), 4);
+    assert_eq!(sensitivities.parts.jacobian.rank(1e-8), 2);
+    let analysis = structural_rank(&source, 5, 7).unwrap();
+    assert_eq!(analysis.generic_rank, 1);
+    let indices = collinearity(&source, &[vec![0.1, 1000.0]], &[1.0], 2, 20.0).unwrap();
+    assert_eq!(indices.pair_gamma[0][1], f64::INFINITY);
 }

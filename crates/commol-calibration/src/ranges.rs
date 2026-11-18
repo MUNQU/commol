@@ -27,6 +27,8 @@ pub const GRID_END: Real = Real::finite("end");
 pub const SCALE: Real = Real::positive("scale");
 /// The trials of a binomial observation.
 pub const TRIALS: Count = Count::at_least("trials", 0);
+/// The count of equal parts of the window of an observation.
+pub const PARTS: Count = Count::at_least("parts", 1);
 
 /// The standard deviation of normal observations.
 pub const SD: Real = Real::positive("sd");

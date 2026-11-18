@@ -198,15 +198,22 @@ impl Discrepancy {
     }
 
     /// The discrepancy of the predictions of one run, one value per
-    /// observation, at the parameter `values`, whatever the summary of the
-    /// replicates: the loss with the weights and the normalization, or the
-    /// negative log-likelihood.
+    /// observation, and of the means of their parts, observation after
+    /// observation ([`crate::Workspace::parts`]), at the parameter `values`,
+    /// whatever the summary of the replicates: the loss of the predictions
+    /// with the weights and the normalization, or the negative
+    /// log-likelihood of the parts.
     ///
     /// # Errors
     ///
-    /// [`Violation::MeanOutsideModel`] when a prediction lies outside the
-    /// means its observation model allows.
-    pub fn of_run(&self, values: &[f64], predictions: &[f64]) -> Result<f64, Violation> {
+    /// [`Violation::MeanOutsideModel`] when the mean of a part lies outside
+    /// the means its observation model allows.
+    pub fn of_run(
+        &self,
+        values: &[f64],
+        predictions: &[f64],
+        parts: &[f64],
+    ) -> Result<f64, Violation> {
         match &self.measure {
             Measure::Loss(loss) => Ok(loss.aggregate(
                 self.observed
@@ -219,19 +226,25 @@ impl Discrepancy {
                     }),
             )),
             Measure::Likelihood(likelihood) => likelihood
-                .log_likelihood(values, predictions)
+                .log_likelihood(values, parts)
                 .map(|log_likelihood| -log_likelihood),
         }
     }
 
     /// The discrepancy of `predictions`, which hold one value per
-    /// observation and replicate, replicate after replicate, at the
-    /// parameter `values`. The predictions are reordered.
+    /// observation and replicate, replicate after replicate, and of the
+    /// means of their `parts`, at the parameter `values`. The predictions
+    /// are reordered.
     ///
     /// # Errors
     ///
     /// As [`Self::of_run`].
-    pub fn of(&self, values: &[f64], predictions: &mut [f64]) -> Result<f64, Violation> {
+    pub fn of(
+        &self,
+        values: &[f64],
+        predictions: &mut [f64],
+        parts: &[f64],
+    ) -> Result<f64, Violation> {
         let n = self.observed.len();
         match (self.summary, &self.measure) {
             (Some(summary), Measure::Loss(loss)) => {
@@ -251,19 +264,20 @@ impl Discrepancy {
                         }),
                 ))
             }
-            _ => self.of_run(values, predictions),
+            _ => self.of_run(values, predictions, parts),
         }
     }
 
     /// The derivatives of each observation's term of the discrepancy of one
-    /// run, at the parameter `values` and the means `predictions`, with
-    /// respect to its arguments ([`TermDerivatives`]).
+    /// run, at the parameter `values`, the means `predictions` and the means
+    /// of their `parts`, with respect to its arguments ([`TermDerivatives`]):
+    /// a loss reads the predictions, observation models the parts.
     ///
     /// | Discrepancy | Gradient | Curvature |
     /// |---|---|---|
     /// | `SumSquaredError` | `−2 w n² r` | `2 w n²` |
     /// | `RootMeanSquaredError` | `−2 w n² r · c` | `2 w n² · c`, `c = 1 / (2 √(W · S))` |
-    /// | Observation models | `−w` times the scores ([`crate::Noise::scores`]) | `w` times the Fisher information ([`crate::Noise::information`]) |
+    /// | Observation models | `−w` times the scores ([`crate::Noise::sum_scores`]) | `w` times the Fisher information ([`crate::Noise::sum_information`]) |
     ///
     /// `r = y − μ` is the residual, `n` the normalization of the observation,
     /// `S = Σ w (n r)²` and
@@ -279,11 +293,12 @@ impl Discrepancy {
         &self,
         values: &[f64],
         predictions: &[f64],
+        parts: &[f64],
     ) -> Result<Vec<TermDerivatives>, TermError> {
         let loss = match &self.measure {
             Measure::Likelihood(likelihood) => {
                 return likelihood
-                    .term_derivatives(values, predictions)
+                    .term_derivatives(values, parts)
                     .map_err(TermError::MeanOutside);
             }
             Measure::Loss(loss) => *loss,
@@ -319,6 +334,7 @@ impl Discrepancy {
             .map(|(((&y, &mean), &weight), &normalization)| {
                 let factor = 2.0 * weight * normalization * normalization * scale;
                 TermDerivatives {
+                    parts: 1,
                     parameters: Vec::new(),
                     gradient: vec![-factor * (y - mean)],
                     curvature: vec![factor],
@@ -448,6 +464,6 @@ mod tests {
             .unwrap();
         // Two replicates: means 3, 5 and 1 against 3, 4 and 0.
         let mut predictions = [2.0, 4.0, 0.0, 4.0, 6.0, 2.0];
-        assert_eq!(discrepancy.of(&[], &mut predictions), Ok(2.0));
+        assert_eq!(discrepancy.of(&[], &mut predictions, &[]), Ok(2.0));
     }
 }

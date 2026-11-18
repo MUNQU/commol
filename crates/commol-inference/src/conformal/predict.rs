@@ -88,7 +88,12 @@ where
     let runs = observe_sets(problem.forward(), sets, points, None)?;
     Ok(runs
         .into_iter()
-        .map(|replicates| replicate_mean(replicates.iter().map(Vec::as_slice), points.len()))
+        .map(|replicates| {
+            replicate_mean(
+                replicates.iter().map(|means| means.predicted.as_slice()),
+                points.len(),
+            )
+        })
         .collect())
 }
 

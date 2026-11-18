@@ -77,6 +77,7 @@ impl ObservationNoise for ResidualNoise {
         observations: &[ObservedDataPoint],
         _values: &[f64],
         predicted: &[f64],
+        _parts: &[f64],
         generator: &mut Generator,
         out: &mut [f64],
     ) {

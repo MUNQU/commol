@@ -19,7 +19,10 @@ use commol_calibration::{
 use commol_core::{Accuracy, AccuracySettings, SimulationEngine};
 use rayon::prelude::*;
 
-use super::{Design, Matrix, Sensitivities, SensitivityError, SensitivitySource, observation_rms};
+use super::{
+    Design, Matrix, PartSensitivities, Sensitivities, SensitivityError, SensitivitySource,
+    observation_rms,
+};
 use commol_calibration::discrepancy::series_rms;
 
 /// Finite differences of the predicted observations of a problem.
@@ -135,14 +138,20 @@ impl<E: SimulationEngine + Send + Sync> FiniteDifferences<E> {
             .collect()
     }
 
+    /// The predicted observations of a run at `values`, then the means of
+    /// their parts.
     fn run(&self, values: &[f64], workspace: &mut Workspace) -> Result<Vec<f64>, EvaluationError> {
-        self.forward
-            .run_observed(values, workspace)
-            .map(<[f64]>::to_vec)
+        self.forward.run_observed(values, workspace)?;
+        Ok(workspace
+            .predictions
+            .iter()
+            .chain(&workspace.parts)
+            .copied()
+            .collect())
     }
 
-    /// The derivative of every observation with respect to parameter `j`,
-    /// and its estimated error.
+    /// The derivative of every observation, then of every part, with
+    /// respect to parameter `j`, and its estimated error.
     fn column(
         &self,
         values: &[f64],
@@ -232,18 +241,30 @@ impl<E: SimulationEngine + Send + Sync> SensitivitySource for FiniteDifferences<
             .par_iter()
             .map(|&j| self.column(values, &center, j, steps[j]))
             .collect::<Result<_, _>>()?;
-        let rows = center.len();
-        let jacobian = Matrix::from_fn(rows, columns.len(), |i, j| columns[j].0[i]);
-        let errors = Matrix::from_fn(rows, columns.len(), |i, j| columns[j].1[i]);
+        let rows = self.observed_data.len();
+        let parts = center.len() - rows;
+        let block = |first: usize, count: usize, errors: bool| {
+            Matrix::from_fn(count, columns.len(), |i, j| {
+                let (derivatives, error) = &columns[j];
+                let column = if errors { error } else { derivatives };
+                column[first + i]
+            })
+        };
         Ok(Sensitivities {
-            predictions: center,
-            jacobian,
-            errors,
+            predictions: center[..rows].to_vec(),
+            jacobian: block(0, rows, false),
+            errors: block(0, rows, true),
             labels: self
                 .observed_data
                 .iter()
                 .map(|obs| obs.label.clone())
                 .collect(),
+            parts: PartSensitivities {
+                counts: self.observed_data.iter().map(|obs| obs.parts).collect(),
+                means: center[rows..].to_vec(),
+                jacobian: block(rows, parts, false),
+                errors: block(rows, parts, true),
+            },
         })
     }
 
@@ -298,7 +319,8 @@ fn reason(violation: &Violation) -> String {
 /// Every series of `observed_data` (its label, outputs, coefficients, factor
 /// and window, with the scale of its first observation) at every unit
 /// position from 0 up to the last observation, and at the positions of the
-/// observations; a series with a window starts once a whole window fits.
+/// observations, each of one part; a series with a window starts once a
+/// whole window fits.
 fn dense_observations(observed_data: &[ObservedDataPoint]) -> Vec<ObservedDataPoint> {
     let last = observed_data.iter().map(|obs| obs.at).fold(0.0, f64::max);
     let mut series: Vec<&ObservedDataPoint> = Vec::new();
@@ -331,6 +353,7 @@ fn dense_observations(observed_data: &[ObservedDataPoint]) -> Vec<ObservedDataPo
                     at,
                     value: 0.0,
                     weight: 1.0,
+                    parts: 1,
                     ..(*obs).clone()
                 })
         })

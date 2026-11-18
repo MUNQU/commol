@@ -3,6 +3,7 @@ output."""
 
 import math
 
+import numpy as np
 import pytest
 from pydantic import ValidationError
 
@@ -16,7 +17,9 @@ from commol import (
     Simulation,
 )
 from commol._model.model import Model
-from commol.observations import NegativeBinomialObservations
+from commol.local import Laplace, Sandwich
+from commol.observations import DistributionNoise, NegativeBinomialObservations
+from commol.uncertainty import ParameterSample, Predictive, SampleMethod
 from tests.support import (
     ENGINE_REL,
     a_to_b_builder,
@@ -24,7 +27,9 @@ from tests.support import (
     bounded,
     build,
     build_ode,
+    build_stochastic,
     observed,
+    sum_calibrator,
 )
 
 SEED = 42
@@ -268,3 +273,188 @@ def test_an_observation_reads_the_model_times_its_scale() -> None:
 def test_a_scale_that_is_not_positive_is_refused(scale: float) -> None:
     with pytest.raises(ValidationError, match="scale is a finite number"):
         ObservedDataPoint(at=1, output="B", value=1.0, scale=scale)
+
+
+def _windows(
+    values: list[float], parts: list[int], *, length: int = 6, label: str = "B"
+) -> list[ObservedDataPoint]:
+    """Observations of B over consecutive windows of `length` ending at
+    `length`, `2 · length`, …, with the `parts` of each."""
+    return [
+        ObservedDataPoint(
+            at=length * (index + 1),
+            output="B",
+            label=label,
+            value=value,
+            window=length,
+            parts=count,
+        )
+        for index, (value, count) in enumerate(zip(values, parts, strict=True))
+    ]
+
+
+class TestParts:
+    def test_parts_need_a_window(self) -> None:
+        with pytest.raises(
+            ValidationError,
+            match=(
+                "Observation 'B' at 10 has parts=2 and no window; parts split "
+                "the window"
+            ),
+        ):
+            ObservedDataPoint(at=10, output="B", value=1.0, parts=2)
+        with pytest.raises(
+            ValidationError, match="parts is a whole number of at least 1"
+        ):
+            ObservedDataPoint(at=10, output="B", value=1.0, window=10, parts=0)
+
+    def test_one_part_is_the_window(self) -> None:
+        # Reference values of a window of one part:
+        # the predictions, log densities, draws and the Laplace fit and
+        # covariance of a negative binomial series.
+        observations = _windows([93, 71, 80, 49, 62, 41, 30, 44], [1] * 8, length=10)
+        model = build(
+            a_to_b_builder(parameters={"k": 0.1}, amounts={"A": 1000, "B": 0})
+        )
+        problem = CalibrationProblem(
+            observed_data=observations,
+            parameters=[
+                bounded("k", 0.001, 0.5),
+                bounded("phi", 0.01, 3.0, kind="noise"),
+            ],
+            observation_models={
+                "B": NegativeBinomialObservations(overdispersion="phi")
+            },
+            optimization_config=NelderMeadConfig(max_iterations=400),
+            seed=3,
+        )
+        calibrator = Calibrator(Simulation(model), problem)
+        engine = calibrator._engine_problem
+        point = [0.01, 0.4]
+
+        assert engine.predict_observations([point]) == [
+            [
+                [
+                    95.61792499119552,
+                    86.47513741157364,
+                    78.20656420895048,
+                    70.72861481859985,
+                    63.96569143214384,
+                    57.84942474677513,
+                    52.317982790554254,
+                    47.31544583639652,
+                ]
+            ]
+        ]
+        assert engine.pointwise_log_likelihood(point) == [
+            -5.040772302400001,
+            -4.818167222686185,
+            -4.892027627621587,
+            -4.554502303962181,
+            -4.642067352360101,
+            -4.36359595393138,
+            -4.241396970789552,
+            -4.311988152637724,
+        ]
+        sample = ParameterSample.equally_weighted(
+            ["k", "phi"],
+            [(0.001, 0.5), (0.01, 3.0)],
+            [point, [0.012, 0.3]],
+            SampleMethod(name="point"),
+        )
+        draws = Predictive(calibrator, sample, [0, 10]).at_observations(
+            observations, DistributionNoise()
+        )
+        assert draws.values == [
+            [97.0, 144.0, 139.0, 76.0, 50.0, 174.0, 33.0, 73.0],
+            [57.0, 65.0, 70.0, 15.0, 140.0, 29.0, 104.0, 12.0],
+        ]
+        result = calibrator.uncertainty(Laplace(draws=10))
+        assert result.fit.best_parameters == {
+            "k": 0.008110949594956205,
+            "phi": 0.023657880499419526,
+        }
+        assert result.covariance == [
+            [0.013258180575577419, 0.0],
+            [0.0, 2.2397584820553185],
+        ]
+
+    def test_a_label_mixes_any_parts(self) -> None:
+        values = [250.0, 130.0, 150.0, 70.0, 95.0]
+        parts = [1, 2, 3, 2, 1]
+        phi = [bounded("phi", 0.01, 3.0, kind="noise")]
+        mixed = sum_calibrator(
+            _windows(values, parts, length=6),
+            {"B": NegativeBinomialObservations(overdispersion="phi", sum="exact")},
+            noise=phi,
+        )
+        # The same observations in two labels: the windows of one part, and
+        # those of several, which share the noise parameter.
+        split = [
+            ObservedDataPoint(
+                **(point.model_dump() | {"label": "B" if point.parts == 1 else "sums"})
+            )
+            for point in _windows(values, parts, length=6)
+        ]
+        two_labels = sum_calibrator(
+            split,
+            {
+                "B": NegativeBinomialObservations(overdispersion="phi"),
+                "sums": NegativeBinomialObservations(overdispersion="phi", sum="exact"),
+            },
+            noise=phi,
+        )
+        point = [0.04, 0.2]
+
+        assert mixed._engine_problem.pointwise_log_likelihood(
+            point
+        ) == two_labels._engine_problem.pointwise_log_likelihood(point)
+        for method in (Laplace(draws=10), Sandwich(block_length=1, draws=10)):
+            one, other = (
+                calibrator.uncertainty(method) for calibrator in (mixed, two_labels)
+            )
+            assert one.fit.best_parameters == other.fit.best_parameters
+            assert np.allclose(one.covariance, other.covariance, rtol=1e-12, atol=0.0)
+
+    def test_a_loss_refuses_parts_and_trials(self) -> None:
+        sums = _windows([10.0], [2], length=4)
+        trials = [ObservedDataPoint(at=4, output="B", value=10.0, trials=20)]
+        for observations, field in ((sums, "parts=2"), (trials, "trials=20")):
+            problem = CalibrationProblem(
+                observed_data=observations,
+                parameters=[bounded("k")],
+                loss_function="sse",
+                optimization_config=NelderMeadConfig(max_iterations=1),
+            )
+            model = build(a_to_b_builder(parameters={"k": None}))
+
+            with pytest.raises(
+                ValueError,
+                match=(
+                    f"Observation 'B' at 4 has {field}, a field of an observation "
+                    "model, which a problem with a loss does not read: it needs "
+                    "observation_models instead of loss_function$"
+                ),
+            ):
+                Calibrator(Simulation(model), problem)
+
+        stochastic = build_stochastic(
+            a_to_b_builder(parameters={"k": None}, amounts={"A": 100, "B": 0})
+        )
+        problem = CalibrationProblem(
+            observed_data=sums,
+            parameters=[bounded("k")],
+            loss_function="sse",
+            optimization_config=NelderMeadConfig(max_iterations=1),
+            replicates=2,
+            replicate_summary="mean",
+            seed=1,
+        )
+        with pytest.raises(
+            ValueError,
+            match=(
+                "it needs observation_models instead of loss_function; observation "
+                "models need a deterministic engine, and this engine is stochastic"
+            ),
+        ):
+            Calibrator(Simulation(stochastic), problem)

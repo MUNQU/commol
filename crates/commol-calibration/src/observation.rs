@@ -219,9 +219,17 @@ pub fn window_increments(
         .collect()
 }
 
-/// How each observation reads a run: the outputs it sums with their
-/// coefficients, the row of its position, the row its window starts at, and
-/// its scale and the factor that multiply it.
+/// How each observation and each part of its window read a run: the outputs
+/// it sums with their coefficients, the rows of the boundaries of its parts,
+/// and its scale and the factor that multiply it.
+///
+/// The mean of a part is the increment of the sum over the part, times the
+/// scale and the factor; the prediction of an observation is the sum of the
+/// means of its parts. An observation without a window has one part, its
+/// level at its position; one with a window and [`ObservedDataPoint::parts`]
+/// `K` has `K` parts ([`ObservedDataPoint::part_boundaries`]), and part `k`
+/// starts at the row where part `k − 1` ends. The parts of a set of
+/// observations are laid out observation after observation.
 ///
 /// The rows are those of a run at the positions of the schedule the operator
 /// was built with ([`ObservationOperator::new`]).
@@ -230,10 +238,12 @@ pub struct ObservationOperator {
     /// Indices of the outputs each observation sums, each with its
     /// coefficient.
     outputs: Vec<Vec<(usize, f64)>>,
-    /// Row of each observation's position.
-    rows: Vec<usize>,
-    /// Row of the start of each observation's window, if it has one.
-    window_rows: Vec<Option<usize>>,
+    /// The rows of each observation: the row of its position without a
+    /// window, or the row of each boundary of its parts, from the start of
+    /// its window to its position.
+    bounds: Vec<Vec<usize>>,
+    /// Number of parts of all the observations.
+    parts: usize,
     /// Index of the factor parameter of each observation, if it has one.
     factors: Vec<Option<usize>>,
     /// The known scale of each observation.
@@ -244,15 +254,17 @@ impl ObservationOperator {
     /// The operator of `observed_data` on a run at `positions`.
     ///
     /// `positions` is sorted, deduplicated, and holds every observation's
-    /// position and the start of every window, each found with the tolerance
-    /// of [`index_at`]. `output_names` are the outputs of a row, in order.
+    /// position, the start of every window and every boundary of a part, each
+    /// found with the tolerance of [`index_at`]. `output_names` are the
+    /// outputs of a row, in order.
     ///
     /// # Errors
     ///
     /// Returns a message when an observation has no outputs, names an
     /// unknown output, has coefficients that break
-    /// [`ObservedDataPoint::check_coefficients`], or its factor is not a
-    /// factor parameter.
+    /// [`ObservedDataPoint::check_coefficients`], has parts and no window
+    /// ([`ObservedDataPoint::check_parts`]), or its factor is not a factor
+    /// parameter.
     pub fn new(
         observed_data: &[ObservedDataPoint],
         parameters: &[CalibrationParameter],
@@ -270,8 +282,9 @@ impl ObservationOperator {
     /// entry per observation and `None` for an observation without a window.
     ///
     /// An observation given by the start of its window reads it here, not at
-    /// `at − window`, which can round away from the start. The `window` of
-    /// each observation is not read. `positions` holds every start.
+    /// `at − window`, which can round away from the start, and its parts
+    /// split the window from that start. The `window` of each observation is
+    /// not read. `positions` holds every start and every boundary.
     ///
     /// # Errors
     ///
@@ -316,6 +329,7 @@ impl ObservationOperator {
                 ));
             }
             obs.check_coefficients()?;
+            obs.check_parts()?;
             let indices = obs
                 .outputs
                 .iter()
@@ -358,10 +372,22 @@ impl ObservationOperator {
             });
         }
 
+        let bounds: Vec<Vec<usize>> = observed_data
+            .iter()
+            .zip(starts)
+            .map(|(obs, start)| match start {
+                None => vec![row_of(obs.at)],
+                Some(start) => obs
+                    .part_boundaries(*start)
+                    .into_iter()
+                    .map(row_of)
+                    .collect(),
+            })
+            .collect();
         Ok(Self {
             outputs,
-            rows: observed_data.iter().map(|obs| row_of(obs.at)).collect(),
-            window_rows: starts.iter().map(|start| start.map(row_of)).collect(),
+            parts: bounds.iter().map(|rows| rows.len().max(2) - 1).sum(),
+            bounds,
             factors,
             scales: observed_data.iter().map(|obs| obs.scale).collect(),
         })
@@ -369,12 +395,18 @@ impl ObservationOperator {
 
     /// Number of observations.
     pub fn count(&self) -> usize {
-        self.rows.len()
+        self.bounds.len()
     }
 
-    /// Write the prediction of each observation into `out`: the sum of its
-    /// outputs, each times its coefficient, or the increment of that sum over
-    /// its window, times its scale and times its factor.
+    /// Number of parts of all the observations.
+    pub fn part_count(&self) -> usize {
+        self.parts
+    }
+
+    /// Write the prediction of each observation into `out`: the sum of the
+    /// means of its parts ([`Self::apply_parts`]). With one part it is the
+    /// sum of its outputs, each times its coefficient, or the increment of
+    /// that sum over its window, times its scale and times its factor.
     ///
     /// `rows` are the rows of a run at the schedule; `parameters` are the
     /// values of the calibration parameters, which hold the factors.
@@ -384,7 +416,37 @@ impl ObservationOperator {
     /// Panics when `out` does not hold one value per observation.
     pub fn apply(&self, rows: &[Vec<f64>], parameters: &[f64], out: &mut [f64]) {
         assert_eq!(out.len(), self.count(), "one prediction per observation");
-        let sum_at = |row: usize, outputs: &[(usize, f64)]| -> f64 {
+        for (index, slot) in out.iter_mut().enumerate() {
+            *slot = self
+                .means_of(index, rows, parameters)
+                .reduce(|sum, mean| sum + mean)
+                .expect("an observation has a part");
+        }
+    }
+
+    /// Write the mean of each part of each observation into `out`,
+    /// observation after observation, as [`Self::apply`] reads them.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `out` does not hold one value per part.
+    pub fn apply_parts(&self, rows: &[Vec<f64>], parameters: &[f64], out: &mut [f64]) {
+        assert_eq!(out.len(), self.part_count(), "one mean per part");
+        let means = (0..self.count()).flat_map(|index| self.means_of(index, rows, parameters));
+        for (slot, mean) in out.iter_mut().zip(means) {
+            *slot = mean;
+        }
+    }
+
+    /// The mean of each part of observation `index`.
+    fn means_of<'a>(
+        &'a self,
+        index: usize,
+        rows: &'a [Vec<f64>],
+        parameters: &'a [f64],
+    ) -> impl Iterator<Item = f64> + 'a {
+        let outputs = &self.outputs[index];
+        let sum_at = move |row: usize| -> f64 {
             rows.get(row)
                 .map(|values| {
                     outputs
@@ -394,19 +456,19 @@ impl ObservationOperator {
                 })
                 .unwrap_or(0.0)
         };
-        for (index, slot) in out.iter_mut().enumerate() {
-            let outputs = &self.outputs[index];
-            let current = sum_at(self.rows[index], outputs);
-            let predicted = match self.window_rows[index] {
-                Some(start) => current - sum_at(start, outputs),
-                None => current,
-            };
+        let multiply = move |predicted: f64| {
             let scaled = predicted * self.scales[index];
-            *slot = match self.factors[index] {
+            match self.factors[index] {
                 Some(factor) => scaled * parameters[factor],
                 None => scaled,
-            };
-        }
+            }
+        };
+        let bounds = &self.bounds[index];
+        let level = (bounds.len() == 1).then(|| multiply(sum_at(bounds[0])));
+        let increments = bounds
+            .windows(2)
+            .map(move |pair| multiply(sum_at(pair[1]) - sum_at(pair[0])));
+        level.into_iter().chain(increments)
     }
 }
 

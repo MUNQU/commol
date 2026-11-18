@@ -65,6 +65,13 @@ pub struct ObservedDataPoint {
     /// When set, the predicted value is `output(at) - output(at - window)`.
     pub window: Option<f64>,
 
+    /// The count of equal parts of the window: the observed value is the sum
+    /// of one independent observation per part, each scattered by the
+    /// observation model of its series around the mean of its part
+    /// ([`Self::part_boundaries`]). 1, the default, reads the window whole;
+    /// more than 1 needs a window ([`crate::ranges::PARTS`]).
+    pub parts: usize,
+
     /// The trials of a binomial observation model that takes them from each
     /// observation; `None` for every other observation.
     pub trials: Option<u64>,
@@ -83,6 +90,7 @@ impl ObservedDataPoint {
             factor_id: None,
             scale: 1.0,
             window: None,
+            parts: 1,
             trials: None,
         }
     }
@@ -120,12 +128,47 @@ impl ObservedDataPoint {
             .map(|window| crate::observation::window_start(self.at, window))
     }
 
+    /// The boundaries of the parts of a window that starts at `start` and
+    /// ends at `at`: `b₀ = start`, `b_K = at` and
+    /// `b_k = start + k · (at − start) / K` between them, `K` the
+    /// [`Self::parts`]. Part `k` covers `(b_{k−1}, b_k]`, so it starts where
+    /// part `k − 1` ends.
+    pub fn part_boundaries(&self, start: f64) -> Vec<f64> {
+        let parts = self.parts.max(1);
+        let length = self.at - start;
+        (0..=parts)
+            .map(|k| match k {
+                0 => start,
+                k if k == parts => self.at,
+                // A count of parts is far below 2^53.
+                k => start + k as f64 * length / parts as f64,
+            })
+            .collect()
+    }
+
     /// The coefficient of each output in the sum: `coefficients`, or 1 for
     /// each output.
     pub fn output_coefficients(&self) -> Vec<f64> {
         self.coefficients
             .clone()
             .unwrap_or_else(|| vec![1.0; self.outputs.len()])
+    }
+
+    /// Check that an observation of more than one part has a window: the
+    /// parts split it.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message that names the observation and the rule.
+    pub fn check_parts(&self) -> Result<(), String> {
+        if self.parts > 1 && self.window.is_none() {
+            return Err(format!(
+                "Observation '{}' at {} has parts={} and no window; parts split the window \
+                 of an observation, so more than one part needs a window",
+                self.label, self.at, self.parts
+            ));
+        }
+        Ok(())
     }
 
     /// Check the coefficients of the outputs: one per output, each a finite
@@ -166,20 +209,22 @@ impl ObservedDataPoint {
         Ok(())
     }
 
-    /// Check the position, the value, the weight, the scale, the window and
-    /// the trials of the observation with their rules ([`crate::ranges`]), as the
-    /// observation of the Python API is checked when it is built.
+    /// Check the position, the value, the weight, the scale, the window, the
+    /// parts and the trials of the observation with their rules
+    /// ([`crate::ranges`]), as the observation of the Python API is checked
+    /// when it is built.
     ///
     /// # Errors
     ///
     /// Returns the message of the first rule that a setting breaks.
     pub fn check_ranges(&self) -> Result<(), String> {
-        use crate::ranges::{AT, SCALE, TRIALS, VALUE, WEIGHT, WINDOW};
+        use crate::ranges::{AT, PARTS, SCALE, TRIALS, VALUE, WEIGHT, WINDOW};
         AT.check(self.at)?;
         VALUE.check(self.value)?;
         WEIGHT.check(self.weight)?;
         SCALE.check(self.scale)?;
         self.window.map_or(Ok(()), |window| WINDOW.check(window))?;
+        PARTS.check(self.parts)?;
         self.trials.map_or(Ok(()), |trials| TRIALS.check(trials))
     }
 }
