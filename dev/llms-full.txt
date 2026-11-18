@@ -3472,7 +3472,7 @@ print(sum(start[f"B_g{i}"][0] for i in range(10)) + sum(start[f"A_g{i}"][0] for 
 # 1000.0
 ```
 
-Initial conditions that calibration sets go through the same rounding. A method that varies an initial condition, such as an optimizer or a sampler, writes values that are not whole. So it needs a rounding, whatever the bounds. With no rounding, a `Calibrator`, or a `SensitivityAnalysis` of independent inputs, with an `initial_condition` raises `ValueError` when it is built. The message names the initial condition and the two options. Known values need no rounding when they are whole: `Model.apply_calibration_parameters` writes `{"B": 12.0}`, and refuses `{"B": 12.3}` with a message that names the value. With a rounding, it writes the amount a calibration found, such as `11.85`, and the model builds. With `"largest_remainder"`, or for a bin of one compartment, each run of it starts as the calibration did, from 12 units. With `"random"`, a bin of several compartments can start from other units for the same seed ([#474](https://github.com/MUNQU/commol/issues/474)). The draws of a sample are known values too: a `SensitivityAnalysis` of `InputSpace.from_sample` writes them. The engine checks every draw when the analysis is built, and the message names the set of the draw.
+Initial conditions that calibration sets go through the same rounding. A method that varies an initial condition, such as an optimizer or a sampler, writes values that are not whole. So it needs a rounding, whatever the bounds. With no rounding, a `Calibrator`, or a `SensitivityAnalysis` of independent inputs, with an `initial_condition` raises `ValueError` when it is built. The message names the initial condition and the two options. Known values need no rounding when they are whole: `Model.apply_calibration_parameters` writes `{"B": 12.0}`, and refuses `{"B": 12.3}` with a message that names the value. With a rounding, it writes the amount a calibration found, such as `11.85`, and the model builds. Each replicate of it, for the seed of the calibration, starts from the units the calibration scored, such as 12 units, and follows the same path, with either rounding. The rounding can turn on the last bit of an amount, so a compartment that the bin and its split rebuild only to their last bits is written as a `compartment_amounts` override, which holds the amount the calibration scored. A later `update_bin_amounts` of the bin leaves such an override as it is ([#483](https://github.com/MUNQU/commol/issues/483)), and a new calibration of the written model can score other units with `"random"`, because it splits a value by the amounts of the overrides. The draws of a sample are known values too: a `SensitivityAnalysis` of `InputSpace.from_sample` writes them. The engine checks every draw when the analysis is built, and the message names the set of the draw.
 
 ## Seeds and replicates
 
@@ -4028,7 +4028,7 @@ print({c.name: round(c.amount, 1) for c in composite.structure.initial_state(com
 1. Each bin whose every compartment a value or the remainder sets gets the amount the engine gave it, in the unit of the bin, and each category gets the split the engine applied, so the definition stays readable.
 1. Every compartment whose amount still differs from the scored one is pinned as a `compartment_amounts` override.
 
-So an expanded-compartment id always becomes an override, and so does a bin or category value that overlaps an existing override. A bin of which a value sets only some compartments keeps its amount. Reloading the saved model gives the scored state exactly. A calibrated category split is written with `update_stratification_fractions`: the named category gets the value and its complement the rest, in every split of a stratification whose fractions [differ by category](https://munqu.github.io/commol/latest/guide/building-models/#fractions-that-differ-by-category).
+So an expanded-compartment id always becomes an override, and so does a bin or category value that overlaps an existing override. A bin of which a value sets only some compartments keeps its amount. Reloading the saved model gives the scored state bit for bit on a stochastic engine, and within a relative `1e-9` on a deterministic engine, where a rate that turns on a start value, such as `if(B_g1 >= 1.05, 0.2, 0.01)`, can then run otherwise. A calibrated category split is written with `update_stratification_fractions`: the named category gets the value and its complement the rest, in every split of a stratification whose fractions [differ by category](https://munqu.github.io/commol/latest/guide/building-models/#fractions-that-differ-by-category).
 
 ## Checklist
 
@@ -20736,7 +20736,12 @@ class Aggregate(ModelStructure, InitialConditions):
         the bin, and category values the splits. Every compartment those do
         not reproduce, such as an exact compartment value or a value that
         overlaps a per-compartment override, is written as a per-compartment
-        override.
+        override; the overrides of the compartments the values set, of an
+        earlier write-back or declared, are dropped first, so none is kept
+        that this state does not need. On a stochastic engine, whose start can turn on
+        the last bit of an amount, a compartment those reproduce only to its
+        last bits is an override too, so the written state is the scored one
+        bit for bit.
 
         Parameters
         ----------
@@ -21255,7 +21260,7 @@ with_calibrated_values(model: Model[Self], problem: CalibrationProblem, values: 
 
 The structure with calibrated initial conditions written back.
 
-The written structure rebuilds the initial state the engine scored. Bin values update the amounts they declare, in the unit of the bin, and category values the splits. Every compartment those do not reproduce, such as an exact compartment value or a value that overlaps a per-compartment override, is written as a per-compartment override.
+The written structure rebuilds the initial state the engine scored. Bin values update the amounts they declare, in the unit of the bin, and category values the splits. Every compartment those do not reproduce, such as an exact compartment value or a value that overlaps a per-compartment override, is written as a per-compartment override; the overrides of the compartments the values set, of an earlier write-back or declared, are dropped first, so none is kept that this state does not need. On a stochastic engine, whose start can turn on the last bit of an amount, a compartment those reproduce only to its last bits is an override too, so the written state is the scored one bit for bit.
 
 Parameters:
 
@@ -21294,7 +21299,12 @@ def with_calibrated_values(
     the bin, and category values the splits. Every compartment those do
     not reproduce, such as an exact compartment value or a value that
     overlaps a per-compartment override, is written as a per-compartment
-    override.
+    override; the overrides of the compartments the values set, of an
+    earlier write-back or declared, are dropped first, so none is kept
+    that this state does not need. On a stochastic engine, whose start can turn on
+    the last bit of an amount, a compartment those reproduce only to its
+    last bits is an override too, so the written state is the scored one
+    bit for bit.
 
     Parameters
     ----------
@@ -29929,9 +29939,7 @@ class Simulation:
     @property
     def is_stochastic(self) -> bool:
         """Whether the engine of the model draws random numbers."""
-        return commol_rs.engine.EngineType(
-            engine_json(self.model_definition.engine.type)
-        ).is_stochastic
+        return is_stochastic(self.model_definition)
 
     def _seed_run(self, seed: int | None) -> int | None:
         """
@@ -38915,8 +38923,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
-- `Model.apply_calibration_parameters` wrote a calibrated amount that is not whole, such as `B = 11.85`, onto a model of `StochasticEvents` or `StochasticSteps` with a `rounding`, and the model then did not build: the amount of a bin had to be whole even with a rounding. The model now builds and holds the amount the optimizer found, and a run of it rounds that amount as the calibration did: from 12 units. With `"random"`, a bin of several compartments can still start from other units for the same seed. See [Whole units](https://munqu.github.io/commol/latest/guide/stochastic/#whole-units).
+- `Model.apply_calibration_parameters` wrote a calibrated amount that is not whole, such as `B = 11.85`, onto a model of `StochasticEvents` or `StochasticSteps` with a `rounding`, and the model then did not build: the amount of a bin had to be whole even with a rounding. The model now builds and holds the amount the optimizer found, and a run of it rounds that amount as the calibration did: from 12 units. See [Whole units](https://munqu.github.io/commol/latest/guide/stochastic/#whole-units).
 - A matrix sum could read a name to which a category id that two stratifications share gives two meanings, and count a compartment twice: with `group = [g1, g2]` and a `type = [g1, t2]` that splits only `g1`, `matrix_sum(M, B / total)` read `B` in `g1` as `B_g1` and the total of `g1` as `total_g1`, which also summed `type:g1`, so `B_g1_g1` and `A_g1_g1` counted twice. It now reads the sum of the compartments of `g1`. See [Matrix sums](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#matrix-sums).
+- A model that `Model.apply_calibration_parameters` wrote back onto `StochasticEvents` or `StochasticSteps` could start, for the seed of the calibration, from other units than the calibration scored and then run another path, so its loss could differ from `result.final_loss`: with `"random"` in a bin of several compartments, and with `"largest_remainder"` when two remainders tie, such as `B = 12` split `0.7, 0.2, 0.1`. The write-back rebuilt the scored amounts within a relative `1e-9`, and the rounding can turn on the last bit. On these engines it now writes each compartment that the bins and the splits do not rebuild bit for bit as a `compartment_amounts` override of the amount the calibration scored, so each replicate starts and runs as the calibration scored it, also after `to_json` and `from_json`. On every engine, a write-back first drops the overrides of the compartments its values and its remainder set, also those the user declared, so it leaves no override, of an earlier write-back or not, that its own state does not need. A deterministic engine still rebuilds within a relative `1e-9`. See [Whole units](https://munqu.github.io/commol/latest/guide/stochastic/#whole-units).
+- The engine read about one number of 17 significant digits in 10, such as a value a calibration found, one unit in the last place off from the number the model holds. It now reads every number bit for bit. A run of a model that holds such a number can change in its last bits, and a seeded run of a stochastic engine with `"random"` whose amounts or splits hold such a number can follow another path.
 - A calibrated initial condition on `StochasticEvents` or `StochasticSteps` with no `rounding` built when its bounds were whole, such as `[0, 50]`, and then every start failed, because the optimizer writes values that are not whole. A `Calibrator` or a `SensitivityAnalysis` that varies an initial condition on these engines now refuses it when it is built, whatever its bounds, with a message that names the initial condition and the two roundings. `Model.apply_calibration_parameters` writes known values as before, each checked when it is written. A `SensitivityAnalysis` of `InputSpace.from_sample` checks every draw when it is built, not the point of the bounds nearest 0: a sample of whole draws with bounds such as `[0.5, 50]` now builds, and a draw that is not whole is refused there, with the set of the draw, not at the run. See [Whole units](https://munqu.github.io/commol/latest/guide/stochastic/#whole-units).
 - `Collinearity` at a point where a parameter with an infinite bound is 0 scaled its column by an infinite width: an infinite sensitivity and an index below 1, with no error. The magnitude of the parameter there is now 1, as the step of finite differences takes it.
 - A `SampleIdentifiability(reference="prior")` without priors, or `reference="bounds"` with priors, written as JSON measured the sample against the bounds with no error; the engine now refuses it.

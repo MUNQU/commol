@@ -2210,7 +2210,12 @@ class Aggregate(ModelStructure, InitialConditions):
         the bin, and category values the splits. Every compartment those do
         not reproduce, such as an exact compartment value or a value that
         overlaps a per-compartment override, is written as a per-compartment
-        override.
+        override; the overrides of the compartments the values set, of an
+        earlier write-back or declared, are dropped first, so none is kept
+        that this state does not need. On a stochastic engine, whose start can turn on
+        the last bit of an amount, a compartment those reproduce only to its
+        last bits is an override too, so the written state is the scored one
+        bit for bit.
 
         Parameters
         ----------
@@ -2729,7 +2734,7 @@ with_calibrated_values(model: Model[Self], problem: CalibrationProblem, values: 
 
 The structure with calibrated initial conditions written back.
 
-The written structure rebuilds the initial state the engine scored. Bin values update the amounts they declare, in the unit of the bin, and category values the splits. Every compartment those do not reproduce, such as an exact compartment value or a value that overlaps a per-compartment override, is written as a per-compartment override.
+The written structure rebuilds the initial state the engine scored. Bin values update the amounts they declare, in the unit of the bin, and category values the splits. Every compartment those do not reproduce, such as an exact compartment value or a value that overlaps a per-compartment override, is written as a per-compartment override; the overrides of the compartments the values set, of an earlier write-back or declared, are dropped first, so none is kept that this state does not need. On a stochastic engine, whose start can turn on the last bit of an amount, a compartment those reproduce only to its last bits is an override too, so the written state is the scored one bit for bit.
 
 Parameters:
 
@@ -2768,7 +2773,12 @@ def with_calibrated_values(
     the bin, and category values the splits. Every compartment those do
     not reproduce, such as an exact compartment value or a value that
     overlaps a per-compartment override, is written as a per-compartment
-    override.
+    override; the overrides of the compartments the values set, of an
+    earlier write-back or declared, are dropped first, so none is kept
+    that this state does not need. On a stochastic engine, whose start can turn on
+    the last bit of an amount, a compartment those reproduce only to its
+    last bits is an override too, so the written state is the scored one
+    bit for bit.
 
     Parameters
     ----------

@@ -4165,10 +4165,11 @@ a number greater than 0, got -1</code>).</p>
 <code>"-Infinity"</code> or <code>"NaN"</code>, in both directions. Python writes it with the
 serializer of pydantic in the mode <code>inf_nan_mode="strings"</code>, the mode that
 the setting <code>ser_json_inf_nan="strings"</code> of a model selects, once for every
-class in <code>engine_json</code>. The reader is <code>serde_json</code>, and its <code>Value</code> reads such
-a text as a number only where the type asks for a number (<code>deserialize_f64</code>),
-so a label <code>"NaN"</code> stays text; a range rule reads the text as its number, so
-an infinite setting gets the message of its rule. The writer of the engine,
+class in <code>engine_json</code>. The reader is <code>serde_json</code>, which reads a finite
+number bit for bit (<code>float_roundtrip</code>), and its <code>Value</code> reads such a text as
+a number only where the type asks for a number (<code>deserialize_f64</code>), so a
+label <code>"NaN"</code> stays text; a range rule reads the text as its number, so an
+infinite setting gets the message of its rule. The writer of the engine,
 <code>commol_core::json::write</code>, and the tree of a formula write the same three
 texts, and so does the JSON of every result: <code>ResultModel</code> sets
 <code>ser_json_inf_nan="strings"</code> for all of them. A value of an enum of the engine

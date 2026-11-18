@@ -178,7 +178,7 @@ print({c.name: round(c.amount, 1) for c in composite.structure.initial_state(com
 1. Each bin whose every compartment a value or the remainder sets gets the amount the engine gave it, in the unit of the bin, and each category gets the split the engine applied, so the definition stays readable.
 1. Every compartment whose amount still differs from the scored one is pinned as a `compartment_amounts` override.
 
-So an expanded-compartment id always becomes an override, and so does a bin or category value that overlaps an existing override. A bin of which a value sets only some compartments keeps its amount. Reloading the saved model gives the scored state exactly. A calibrated category split is written with `update_stratification_fractions`: the named category gets the value and its complement the rest, in every split of a stratification whose fractions [differ by category](https://munqu.github.io/commol/latest/guide/building-models/#fractions-that-differ-by-category).
+So an expanded-compartment id always becomes an override, and so does a bin or category value that overlaps an existing override. A bin of which a value sets only some compartments keeps its amount. Reloading the saved model gives the scored state bit for bit on a stochastic engine, and within a relative `1e-9` on a deterministic engine, where a rate that turns on a start value, such as `if(B_g1 >= 1.05, 0.2, 0.01)`, can then run otherwise. A calibrated category split is written with `update_stratification_fractions`: the named category gets the value and its complement the rest, in every split of a stratification whose fractions [differ by category](https://munqu.github.io/commol/latest/guide/building-models/#fractions-that-differ-by-category).
 
 ## Checklist
 

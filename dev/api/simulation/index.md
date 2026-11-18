@@ -68,9 +68,7 @@ class Simulation:
     @property
     def is_stochastic(self) -> bool:
         """Whether the engine of the model draws random numbers."""
-        return commol_rs.engine.EngineType(
-            engine_json(self.model_definition.engine.type)
-        ).is_stochastic
+        return is_stochastic(self.model_definition)
 
     def _seed_run(self, seed: int | None) -> int | None:
         """

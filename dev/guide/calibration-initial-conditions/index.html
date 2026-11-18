@@ -4190,7 +4190,10 @@ state the optimizer scored:</p>
 <p>So an expanded-compartment id always becomes an override, and so does a bin or
 category value that overlaps an existing override. A bin of which a value sets
 only some compartments keeps its amount. Reloading the saved model
-gives the scored state exactly. A calibrated category split is written
+gives the scored state bit for bit on a stochastic engine, and within a
+relative <code>1e-9</code> on a deterministic engine, where a rate that turns on a start
+value, such as <code>if(B_g1 &gt;= 1.05, 0.2, 0.01)</code>, can then run otherwise. A
+calibrated category split is written
 with <code>update_stratification_fractions</code>: the named category gets the value and
 its complement the rest, in every split of a stratification whose fractions
 <a href="../building-models/#fractions-that-differ-by-category">differ by category</a>.</p>
