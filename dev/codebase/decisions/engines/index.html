@@ -3910,8 +3910,8 @@ adds kinds to an entry or new entries, not a second meaning of the type; see
 <a href="../model-kinds/#one-interface-for-every-model-kind">One interface for every model kind</a>.</p>
 <p>The builder takes the structure, the engine and its settings where it chooses
 them, <code>build(structure, engine, settings=None)</code>, so one builder builds a model
-for each structure and engine with its own settings. Settings of one engine given to another raise an error
-from the engine that names both.</p>
+for each structure and engine with its own settings. Settings of one engine
+given to another raise an error from the engine that names both.</p>
 <p><strong>Guards:</strong> <code>crates/commol-core/src/types/engine.rs</code> (tests),
 <code>py-commol/src/engine.rs::every_entry_builds_its_engine_and_runs</code>,
 <code>tests/building/test_engine.py</code>.</p>
@@ -4014,15 +4014,14 @@ other error. The forward model turns an infeasible run into a
 <code>Violation::InfeasibleRun</code> and a failed one into <code>EvaluationError::Failed</code>
 (<code>forward.rs</code>); the optimization objective gives a violation a penalty and
 records nothing in the history; a failed run still stops the calibration, so a
-rate that cannot be evaluated does not hide behind a poor fit. An optimizer
-that explores the bounds of a rate would otherwise stop on the first infeasible
+rate that cannot be evaluated does not hide behind a poor fit. An optimizer that
+explores the bounds of a rate would otherwise stop on the first infeasible
 point, though the fit lies elsewhere. A prediction of an infeasible draw raises
-<code>InfeasibleStateError</code> (<code>prediction_error</code> in <code>py-commol/src/inference.rs</code>)
-with the message of the run, which <code>Violation::InfeasibleRun</code> carries
+<code>InfeasibleStateError</code> (<code>prediction_error</code> in <code>py-commol/src/inference.rs</code>) with
+the message of the run, which <code>Violation::InfeasibleRun</code> carries
 (<code>tests/uncertainty/test_predictive.py::TestBands::test_an_infeasible_draw_of_a_predictive_names_the_compartment_and_step</code>).
-Python receives <code>InfeasibleStateError</code>, a
-<code>ValueError</code> (<code>simulation_error</code> in <code>py-commol/src/engine.rs</code>); a failed run
-stays a <code>RuntimeError</code>.</p>
+Python receives <code>InfeasibleStateError</code>, a <code>ValueError</code> (<code>simulation_error</code> in
+<code>py-commol/src/engine.rs</code>); a failed run stays a <code>RuntimeError</code>.</p>
 <p>The differential engine is not checked: a solver may step below zero by its
 tolerance, and a model whose exact solution goes negative is a modelling choice
 there.</p>
@@ -4057,7 +4056,7 @@ from a reported position, and draws the flow of an event when it happens.</p>
 </tr>
 <tr>
 <td>Samplers</td>
-<td>Exponential, Poisson, binomial and multinomial, and the normal, gamma and index of the inference methods, written in <code>commol-random/src/sample.rs</code>, not taken from <code>rand_distr</code>, whose values may change in a minor version. A test holds the first values of each for a fixed seed (<code>crates/commol-random/tests/test_samplers.rs</code>).</td>
+<td>Exponential, Poisson, binomial and multinomial, and the normal, gamma and index of the inference methods, written in <code>commol-random/src/sample.rs</code>, not taken from <code>rand_distr</code>, whose values may change in a minor version. A test holds the first values of each for a fixed seed (<code>crates/commol-random/tests/test_samplers.rs</code>). <code>multinomial</code> draws a conditional binomial per category, and when the shares sum to 1 within <code>n ε</code> for <code>n</code> categories, the last category with a positive share takes the units left, with no draw: its share of the mass left is 1, and in floating point it comes out as <code>1.0</code> or <code>0.9999999999999999</code> by the last bits of the shares, where <code>binomial</code> returns with no draw or draws a uniform, so one bit would shift the stream of the whole run. The bound holds the rounding of the shares <code>a_i / Σ a</code> of <code>random_rounding</code> (<code>crates/commol-stochastic/src/units.rs</code>), which sum to 1 within about <code>(n − ½) ε</code>; <code>StochasticSteps::step</code> refuses rates that sum above 1, summed in the same order, so the debug check of a sum above <code>1 + n ε</code> never fires there. Shares that sum below 1 by more are weights, and the units no category takes stay, as in <code>StochasticSteps</code>. The draws keep their distribution (<code>multinomial_draws_split_every_unit</code>); <code>the_last_positive_category_of_a_multinomial_takes_the_trials_left_with_no_draw</code>, <code>shares_below_one_by_more_than_their_rounding_draw_the_last_positive_category</code> and <code>a_random_rounding_of_many_uneven_amounts_assigns_every_unit</code> (<code>crates/commol-stochastic/src/units.rs</code>) guard the bound.</td>
 </tr>
 <tr>
 <td>Replicates</td>
@@ -4118,6 +4117,14 @@ version may change a run, and the changelog says so.</p>
 <tr>
 <td>The mean as the default summary</td>
 <td>What to fit is a modelling choice; the mean of runs where half go extinct describes no run.</td>
+</tr>
+<tr>
+<td>Each caller of <code>multinomial</code> gives the units left to its last category, or <code>binomial</code> reads a share within <code>ε</code> of 1 as 1</td>
+<td>DRY: each caller would repeat the rule, and the draw would still take a uniform first. S: <code>binomial</code> takes any share, and only the multinomial knows that the share of its last category is 1.</td>
+</tr>
+<tr>
+<td>The last positive category always takes the rest</td>
+<td>It breaks the weights that <code>StochasticSteps</code> relies on: the units no flow takes stay (<code>multinomial_leaves_out_the_units_no_category_takes</code>).</td>
 </tr>
 </tbody>
 </table>
@@ -4195,10 +4202,9 @@ With no rounding, a value that is not whole is refused, and a method that varies
 </tbody>
 </table>
 <p>A per-step probability of <code>StochasticSteps</code> outside <code>[0, 1]</code>, or proportional
-rates out of one compartment that sum to more than 1, are an error that names
-the compartment, the step and the flows (<code>SimulationError::Infeasible</code>), not a
-clamp: a binomial draw has no meaning outside <code>[0, 1]</code>, and a clamp would change
-the model without notice.</p>
+rates out of one compartment that sum above 1, stop the step with an error that
+names the compartment, the step and the flows (<code>SimulationError::Infeasible</code>): a
+binomial draw has no meaning there, and a clamp would change the model unseen.</p>
 <p><strong>Guards:</strong> <code>crates/commol-stochastic/tests/oracles.rs</code>
 (<code>amounts_that_are_not_whole_need_a_rounding</code>,
 <code>whole_amounts_need_no_rounding_and_a_bin_that_is_not_whole_needs_one</code>, <code>a_bin_that_is_not_whole_starts_as_calibration_writes_it</code>,
@@ -4206,7 +4212,7 @@ the model without notice.</p>
 <code>a_random_rounding_starts_on_average_from_the_amounts_of_the_model</code>,
 <code>calibrated_initial_conditions_go_through_the_rounding</code>,
 <code>a_negative_rate_or_probabilities_above_one_fail_at_their_step</code>),
-<code>crates/commol-stochastic/src/units.rs</code> (<code>each_bin_keeps_its_amount_when_rounded</code>, <code>a_bin_of_a_half_rounds_up_whatever_its_split</code>),
+<code>crates/commol-stochastic/src/units.rs</code> (<code>each_bin_keeps_its_amount_when_rounded</code>, <code>a_bin_of_a_half_rounds_up_whatever_its_split</code>, <code>a_random_rounding_of_many_uneven_amounts_assigns_every_unit</code>),
 <code>builder.rs</code> (<code>a_bin_that_is_not_whole_is_a_build_error_of_a_stochastic_engine_with_no_rounding</code>, <code>a_bin_that_is_not_whole_builds_with_a_rounding</code>),
 <code>tests/stochastic/test_whole_units.py</code>.</p>
 <h2 id="the-solver-is-diffsol">The solver is <code>diffsol</code><a class="headerlink" href="#the-solver-is-diffsol" title="Permanent link">&para;</a></h2>
