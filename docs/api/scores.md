@@ -15,6 +15,8 @@ Guide: [Uncertainty](../guide/uncertainty/index.md).
 
 ::: commol.scores.pit
 
+::: commol.scores.quantile_residuals
+
 ::: commol.scores.log_score
 
 ::: commol.scores.Score

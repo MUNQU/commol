@@ -113,8 +113,11 @@ replicates of a stream (`Stream::replicate`); no method draws from the seed
 itself. The starts of a calibration draw from two streams of the same
 registry (`Stream::StartPoints`, `Stream::StartSeeds`). No method has a seed of its own, so one seed repeats a calibration
 and every method on it. A score reads the seed its draws keep,
-`ObservationDraws.seed` (`crates/commol-inference/src/predictive.rs`):
-`scores::pit` randomizes ties from a stream of it. Every method that fits the
+`ObservationDraws.seed` (`crates/commol-inference/src/predictive.rs`) or
+`ObservationBounds.seed` (`scores.rs`): the place `v` of each observed value
+within its mass `p(y)` comes from `Stream::PitTies` of it, one per
+observation, and the PIT and the quantile residuals read the same `v`, so
+`quantile_residuals` is `Φ⁻¹` of `pit`. Every method that fits the
 data takes `starts`, at least 1 with the default 1, and fits with
 `Calibrator.run(starts)`: the bootstraps, the jackknife, the conformal
 methods, the profiles, `Laplace`, `Sandwich`, `LaplaceMixture`,

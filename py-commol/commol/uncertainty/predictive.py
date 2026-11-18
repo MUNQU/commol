@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from commol._simulation.reports import SimulationReport
     from commol._simulation.simulation import Simulation
     from commol.commol_rs._commol_rs import (
+        ObservationBoundsProtocol,
         ObservationDrawsProtocol,
         PredictiveProtocol,
     )
@@ -51,6 +52,19 @@ class PredictiveSource(Protocol):
         noise: _ObservationNoise,
     ) -> "ObservationDrawsProtocol":
         """Every draw's value of `observed_data` with `noise`."""
+        ...
+
+    def _observation_bounds(
+        self,
+        sample: ParameterSample,
+        observed_data: list[ObservedDataPoint],
+        noise: _ObservationNoise,
+    ) -> "ObservationBoundsProtocol":
+        """
+        The tails of each observed value of `observed_data` under every draw
+        of `sample`, with `noise`: of the observation models for
+        `DistributionNoise`, of the draws of the noise otherwise.
+        """
         ...
 
     def _check_observations(self, observed_data: list[ObservedDataPoint]) -> None:

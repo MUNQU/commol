@@ -152,6 +152,7 @@ PAGES = {
         "interval_score",
         "log_score",
         "pit",
+        "quantile_residuals",
         "weighted_interval_score",
     },
 }

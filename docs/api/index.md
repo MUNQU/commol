@@ -47,7 +47,7 @@ A choice among names is a string, such as `loss_function="sse"`.
 | [`commol.quantities`](quantities.md) | `Level`, `Increments`, `ValueAt`, `Gain`, `Peak`, `PeakPosition`, `Trajectory`, `Ratio`, `quantity_schedule` |
 | [`commol.observations`](observations.md) | `NormalObservations`, `LogNormalObservations`, `StudentTObservations`, `PoissonObservations`, `NegativeBinomialObservations`, `BinomialObservations`, `NoNoise`, `ResidualNoise`, `DistributionNoise` |
 | [`commol.uncertainty`](uncertainty.md) | `ParameterSample`, `SampleMethod`, `Predictive`, `Scenarios`, `weighted_quantiles`, `member_statistics`; the results `ParameterSummary`, `PredictiveBand`, `SeriesBand`, `ObservationDraws`, `ScenarioSummary` and the figures of a predictive, `PredictivePlot` |
-| [`commol.scores`](scores.md) | `coverage`, `interval_score`, `weighted_interval_score`, `crps`, `pit`, `log_score`; the result `Score` |
+| [`commol.scores`](scores.md) | `coverage`, `interval_score`, `weighted_interval_score`, `crps`, `pit`, `quantile_residuals`, `log_score`; the result `Score` |
 | [`commol.resampling`](resampling.md) | `BayesianBootstrap`, `ResidualBootstrap`, `WildBootstrap`, `BlockJackknife`, `ParametricBootstrap`; the results `BootstrapResult`, `JackknifeResult`, `ResamplingDiagnostics`, `BoundError` |
 | [`commol.profiles`](profiles.md) | `ProfileLikelihood`, `PredictionProfile`, `PredictionSpec`, `Threshold`; the results `ProfileResult`, `Profile`, `ProfileInterval`, `ProfileStructure` |
 | [`commol.local`](local.md) | `Laplace`, `Sandwich`, `LaplaceMixture`, `LikelihoodTarget`, `GibbsTarget`; the results `LaplaceResult`, `SandwichResult`, `ImportanceResult`, `MixtureComponent`, `DeltaBand` |

@@ -1,20 +1,132 @@
 //! The special functions of the distributions: the normal distribution
 //! function and its inverse, and the regularized incomplete gamma and beta
-//! functions.
+//! functions, each accurate in its own tail.
+//!
+//! The factor `xᵃ e⁻ˣ / Γ(a)` of the incomplete gamma and
+//! `xᵃ (1 − x)ᵇ / B(a, b)` of the incomplete beta are read from Stirling's
+//! series once a shape reaches 10 (Temme 1979; Didonato and
+//! Morris 1992), so no term of their logarithm is larger than the logarithm
+//! itself.
 //!
 //! Every elementary function comes from `libm`, a port of musl's, so a value
 //! is the same on every platform.
 
 use std::f64::consts::{PI, SQRT_2};
 
-use commol_statistics::numeric::{ln_beta, ln_gamma};
+use crate::numeric::{ln_beta, ln_gamma};
 
 /// Relative accuracy the series and continued fractions stop at.
 const ACCURACY: f64 = 1e-16;
-/// Terms of a series or continued fraction before it stops.
+/// Terms of a series or continued fraction before it stops, at the least.
 const MAX_TERMS: usize = 10_000;
+/// Terms of the gamma series per `√a`: near `x = a` it needs about `8 √a`
+/// of them, the continued fraction fewer.
+const TERMS_PER_ROOT: f64 = 16.0;
+
+/// The terms the series and the continued fraction of the incomplete gamma
+/// of shape `a` may take before they stop.
+fn gamma_terms(a: f64) -> usize {
+    MAX_TERMS.max((TERMS_PER_ROOT * a.sqrt()) as usize)
+}
 /// The smallest denominator of the modified Lentz method.
 const TINY: f64 = 1e-300;
+
+/// From this shape on, the factor of an incomplete gamma or beta function
+/// reads Stirling's series of `ln Γ`, whose terms after the last kept one are
+/// below `1e-16` there.
+const LARGE_SHAPE: f64 = 10.0;
+
+/// `δ(x) = ln Γ(x) − ((x − ½) ln x − x + ½ ln 2π)`, Stirling's correction,
+/// for `x ≥ LARGE_SHAPE`.
+fn stirling_correction(x: f64) -> f64 {
+    let inverse = 1.0 / (x * x);
+    (1.0 / 12.0
+        - inverse
+            * (1.0 / 360.0
+                - inverse
+                    * (1.0 / 1260.0
+                        - inverse
+                            * (1.0 / 1680.0
+                                - inverse
+                                    * (1.0 / 1188.0
+                                        - inverse * (691.0 / 360_360.0 - inverse / 156.0))))))
+        / x
+}
+
+/// Below this `|t|`, `t − ln(1 + t)` is read from its series.
+const SMALL_ARGUMENT: f64 = 0.1;
+
+/// `t − ln(1 + t)` for `t > −1`, accurate near 0, where it is about `t²/2`.
+fn log1p_gap(t: f64) -> f64 {
+    if t.abs() < SMALL_ARGUMENT {
+        // Σ_{k≥2} (−1)ᵏ tᵏ / k, to the precision of `f64`.
+        let mut power = t * t;
+        let mut sum = 0.0;
+        let mut k = 2.0;
+        loop {
+            let term = power / k;
+            sum += term;
+            if term.abs() <= 1e-17 * sum.abs() {
+                return sum;
+            }
+            power *= -t;
+            k += 1.0;
+        }
+    } else {
+        t - libm::log1p(t)
+    }
+}
+
+/// `ln Γ(a) − ln Γ(a + b)` for `a ≥ LARGE_SHAPE`, from Stirling's series:
+/// `−(a − ½) ln(1 + b/a) − b ln(a + b) + b + δ(a) − δ(a + b)`.
+fn ln_gamma_ratio(a: f64, b: f64) -> f64 {
+    -(a - 0.5) * libm::log1p(b / a) - b * libm::log(a + b) + b + stirling_correction(a)
+        - stirling_correction(a + b)
+}
+
+/// `ln x` given `x` and `y = 1 − x`: `ln(1 − y)` where `x` is near 1.
+fn ln_of(x: f64, y: f64) -> f64 {
+    if x > 0.5 {
+        libm::log1p(-y)
+    } else {
+        libm::log(x)
+    }
+}
+
+/// `xᵃ e⁻ˣ / Γ(a)`, the factor of the incomplete gamma function, for
+/// `a > 0` and `x > 0`: `x` times the Poisson probability of `a − 1` at
+/// the mean `x`.
+pub fn gamma_factor(a: f64, x: f64) -> f64 {
+    if a < LARGE_SHAPE {
+        libm::exp(a * libm::log(x) - x - ln_gamma(a))
+    } else {
+        // (x/a)ᵃ e^{a − x} √(a/2π) e^{−δ(a)}.
+        let t = (x - a) / a;
+        libm::exp(-a * log1p_gap(t) + 0.5 * libm::log(a / (2.0 * PI)) - stirling_correction(a))
+    }
+}
+
+/// `xᵃ yᵇ / B(a, b)` with `y = 1 − x`, the factor of the incomplete beta
+/// function, for `a, b > 0` and `x, y` in `(0, 1)`: the probabilities of the
+/// binomial and the negative binomial are such factors.
+pub fn beta_factor(a: f64, b: f64, x: f64, y: f64) -> f64 {
+    let exponent = match (a >= LARGE_SHAPE, b >= LARGE_SHAPE) {
+        (true, true) => {
+            // λ = (a + b) x − a = b x − a y; a ln((a + b) x / a) = a ln(1 + λ/a).
+            let lambda = b * x - a * y;
+            let total = a + b;
+            -a * log1p_gap(lambda / a) - b * log1p_gap(-lambda / b)
+                + 0.5 * libm::log(a * b / (total * 2.0 * PI))
+                - stirling_correction(a)
+                - stirling_correction(b)
+                + stirling_correction(total)
+        }
+        (true, false) => a * ln_of(x, y) + b * ln_of(y, x) - ln_gamma(b) - ln_gamma_ratio(a, b),
+        (false, true) => a * ln_of(x, y) + b * ln_of(y, x) - ln_gamma(a) - ln_gamma_ratio(b, a),
+        (false, false) => a * ln_of(x, y) + b * ln_of(y, x) - ln_beta(a, b),
+    };
+    libm::exp(exponent)
+}
 
 /// `x`, or `TINY` when `x` is nearer 0: the guard of a denominator of the
 /// modified Lentz method.
@@ -23,7 +135,7 @@ fn away_from_zero(x: f64) -> f64 {
 }
 
 /// The standard normal density `φ(z)`; 0 at `±∞`.
-pub(crate) fn normal_density(z: f64) -> f64 {
+pub fn normal_density(z: f64) -> f64 {
     if z.is_infinite() {
         0.0
     } else {
@@ -32,19 +144,19 @@ pub(crate) fn normal_density(z: f64) -> f64 {
 }
 
 /// The standard normal distribution function `Φ(z)`.
-pub(crate) fn normal_cdf(z: f64) -> f64 {
+pub fn normal_cdf(z: f64) -> f64 {
     0.5 * libm::erfc(-z / SQRT_2)
 }
 
 /// The standard normal survival function `1 − Φ(z)`, accurate in the upper
 /// tail.
-pub(crate) fn normal_sf(z: f64) -> f64 {
+pub fn normal_sf(z: f64) -> f64 {
     0.5 * libm::erfc(z / SQRT_2)
 }
 
 /// The standard normal quantile `Φ⁻¹(p)`: Acklam's rational approximation,
 /// refined by one step of Halley's method on `erfc`.
-pub(crate) fn normal_quantile(p: f64) -> f64 {
+pub fn normal_quantile(p: f64) -> f64 {
     if p <= 0.0 {
         return f64::NEG_INFINITY;
     }
@@ -109,7 +221,7 @@ pub(crate) fn normal_quantile(p: f64) -> f64 {
 
 /// The standard normal quantile of the upper tail: the `z` with
 /// `1 − Φ(z) = q`.
-pub(crate) fn normal_quantile_sf(q: f64) -> f64 {
+pub fn normal_quantile_sf(q: f64) -> f64 {
     -normal_quantile(q)
 }
 
@@ -119,7 +231,7 @@ const BISECTION_STEPS: usize = 200;
 /// The quantile of the Student t with `df > 0` degrees of freedom at
 /// `p` in `(0, 1)`, by bisection on its upper tail
 /// `1 − F(t) = ½ I_{ν/(ν+t²)}(ν/2, ½)` for `t ≥ 0`, and symmetry.
-pub(crate) fn student_t_quantile(p: f64, df: f64) -> f64 {
+pub fn student_t_quantile(p: f64, df: f64) -> f64 {
     if p < 0.5 {
         return -student_t_quantile(1.0 - p, df);
     }
@@ -146,7 +258,7 @@ pub(crate) fn student_t_quantile(p: f64, df: f64) -> f64 {
 }
 
 /// The regularized lower incomplete gamma function `P(a, x)`, `a > 0`.
-pub(crate) fn gamma_p(a: f64, x: f64) -> f64 {
+pub fn gamma_p(a: f64, x: f64) -> f64 {
     if x <= 0.0 {
         0.0
     } else if x.is_infinite() {
@@ -160,7 +272,7 @@ pub(crate) fn gamma_p(a: f64, x: f64) -> f64 {
 
 /// The regularized upper incomplete gamma function `Q(a, x) = 1 − P(a, x)`,
 /// accurate where `P` is near 1.
-pub(crate) fn gamma_q(a: f64, x: f64) -> f64 {
+pub fn gamma_q(a: f64, x: f64) -> f64 {
     if x <= 0.0 {
         1.0
     } else if x.is_infinite() {
@@ -177,7 +289,7 @@ fn gamma_series(a: f64, x: f64) -> f64 {
     let mut term = 1.0 / a;
     let mut sum = term;
     let mut denominator = a;
-    for _ in 0..MAX_TERMS {
+    for _ in 0..gamma_terms(a) {
         denominator += 1.0;
         term *= x / denominator;
         sum += term;
@@ -185,7 +297,7 @@ fn gamma_series(a: f64, x: f64) -> f64 {
             break;
         }
     }
-    sum * libm::exp(-x + a * libm::log(x) - ln_gamma(a))
+    sum * gamma_factor(a, x)
 }
 
 /// `Q(a, x)` by its continued fraction (modified Lentz), for `x ≥ a + 1`.
@@ -194,7 +306,7 @@ fn gamma_continued_fraction(a: f64, x: f64) -> f64 {
     let mut c = 1.0 / TINY;
     let mut d = 1.0 / b;
     let mut h = d;
-    for i in 1..MAX_TERMS {
+    for i in 1..gamma_terms(a) {
         let an = -(i as f64) * (i as f64 - a);
         b += 2.0;
         d = an * d + b;
@@ -208,22 +320,34 @@ fn gamma_continued_fraction(a: f64, x: f64) -> f64 {
             break;
         }
     }
-    libm::exp(-x + a * libm::log(x) - ln_gamma(a)) * h
+    gamma_factor(a, x) * h
 }
 
 /// The regularized incomplete beta function `I_x(a, b)`, `a, b > 0`.
-pub(crate) fn beta_i(a: f64, b: f64, x: f64) -> f64 {
+pub fn beta_i(a: f64, b: f64, x: f64) -> f64 {
+    beta_tails(a, b, x, 1.0 - x).0
+}
+
+/// The two tails of the regularized incomplete beta function,
+/// `(I_x(a, b), I_y(b, a))` with `y = 1 − x`, which they sum to 1, for
+/// `a, b > 0`: given both `x` and `y`, so that each tail keeps its relative
+/// accuracy where the other is near 1. The continued fraction reads the
+/// side of `x` below `(a + 1)/(a + b + 2)`, where it converges, and the
+/// other tail is its complement.
+pub fn beta_tails(a: f64, b: f64, x: f64, y: f64) -> (f64, f64) {
     if x <= 0.0 {
-        return 0.0;
+        return (0.0, 1.0);
     }
-    if x >= 1.0 {
-        return 1.0;
+    if y <= 0.0 {
+        return (1.0, 0.0);
     }
-    let front = libm::exp(a * libm::log(x) + b * libm::log1p(-x) - ln_beta(a, b));
+    let front = beta_factor(a, b, x, y);
     if x < (a + 1.0) / (a + b + 2.0) {
-        front * beta_continued_fraction(a, b, x) / a
+        let lower = front * beta_continued_fraction(a, b, x) / a;
+        (lower, 1.0 - lower)
     } else {
-        1.0 - front * beta_continued_fraction(b, a, 1.0 - x) / b
+        let upper = front * beta_continued_fraction(b, a, y) / b;
+        (1.0 - upper, upper)
     }
 }
 
@@ -232,7 +356,7 @@ pub(crate) fn beta_i(a: f64, b: f64, x: f64) -> f64 {
 /// of Student's t with `nu` degrees of freedom. Bisection on its
 /// distribution function `I_{x/(x+ν)}(1/2, ν/2)`, to the precision of
 /// `f64`.
-pub(crate) fn f_one_quantile(nu: f64, level: f64) -> f64 {
+pub fn f_one_quantile(nu: f64, level: f64) -> f64 {
     let cdf = |x: f64| beta_i(0.5, nu / 2.0, x / (x + nu));
     let mut hi = 1.0;
     while cdf(hi) < level {
@@ -363,6 +487,36 @@ mod tests {
             assert!(close(gamma_q(k, x), q, 1e-13), "{k} {x}");
             assert!(close(gamma_p(k, x), 1.0 - q, 1e-13), "{k} {x}");
         }
+    }
+
+    #[test]
+    fn stirling_reads_join_the_direct_ones_at_the_large_shape() {
+        // Below and above LARGE_SHAPE, the two forms of each factor agree.
+        for (a, x) in [(10.0, 3.0), (10.0, 10.0), (10.0, 25.0)] {
+            let direct = libm::exp(a * libm::log(x) - x - ln_gamma(a));
+            assert!(close(gamma_factor(a, x), direct, 1e-14), "{a} {x}");
+        }
+        for (a, b, x) in [(10.0, 12.0, 0.4), (10.0, 3.0, 0.8), (2.0, 10.0, 0.1)] {
+            let direct = libm::exp(a * libm::log(x) + b * libm::log1p(-x) - ln_beta(a, b));
+            assert!(
+                close(beta_factor(a, b, x, 1.0 - x), direct, 1e-14),
+                "{a} {b} {x}"
+            );
+        }
+        // The series joins the direct form at its edge, and tends to t²/2.
+        for t in [-0.099_999, 0.099_999] {
+            assert!(close(log1p_gap(t), t - libm::log1p(t), 1e-13), "{t}");
+        }
+        let t = 1e-9;
+        assert!(close(log1p_gap(t), t * t / 2.0 - t * t * t / 3.0, 1e-15));
+    }
+
+    #[test]
+    fn the_beta_tails_sum_to_one_and_meet_their_ends() {
+        let (lower, upper) = beta_tails(3.0, 4.0, 0.2, 0.8);
+        assert!(close(lower + upper, 1.0, 1e-15));
+        assert_eq!(beta_tails(3.0, 4.0, 0.0, 1.0), (0.0, 1.0));
+        assert_eq!(beta_tails(3.0, 4.0, 1.0, 0.0), (1.0, 0.0));
     }
 
     #[test]

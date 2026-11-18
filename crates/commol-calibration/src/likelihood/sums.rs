@@ -10,6 +10,9 @@
 //! | `NegativeBinomial`, [`Sum::Exact`] | the distribution of the sum (`Recursion`) |
 //! | `NegativeBinomial`, [`Sum::Moments`] | `NB(M, φ · Σμₜ²/M²)`, the mean and the variance of the sum; the share `Σμₜ²/M²` is 1 when `M = 0` |
 //!
+//! The tails of a sum are those of the same reading: of the model of the
+//! total, or the cumulative sums of the recursion.
+//!
 //! The other models read no sum, and [`crate::Likelihood`] refuses their
 //! parts. One part is the observation of its window, which [`Noise`] reads
 //! alone, so every function here gives what [`Noise`] gives for one part.
@@ -21,7 +24,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::density::{NEGLIGIBLE, Noise, dispersion_bracket};
+use super::density::{NEGLIGIBLE, Noise, Tails, dispersion_bracket};
 
 /// How a negative binomial reads the sum of the parts of a window:
 /// `"exact"` or `"moments"` in the Python API.
@@ -87,6 +90,23 @@ impl Noise {
                 recursion.extend_to(last);
                 recursion.log_probability(last)
             }
+        }
+    }
+
+    /// The tails of the sum `y` of parts of means `parts`, each of which
+    /// [`Noise::mean_outside`] allows: those of the model of the total, or
+    /// for [`Sum::Exact`] the sums of the recursion below and above `y`.
+    ///
+    /// # Panics
+    ///
+    /// As [`Self::sum_log_density`].
+    pub fn sum_tails(&self, y: f64, parts: &[f64]) -> Tails {
+        if let [mean] = parts {
+            return self.tails(y, *mean);
+        }
+        match self.reading(parts) {
+            Reading::Total { noise, mean, .. } => noise.tails(y, mean),
+            Reading::Exact { overdispersion } => exact_tails(parts, overdispersion, y),
         }
     }
 
@@ -231,10 +251,51 @@ impl Noise {
     }
 }
 
+/// The smallest `P(Y > y)` of a sum read as the complement of the counts up
+/// to `y`: it keeps the relative accuracy of `f64` to about `1e-14`, and
+/// spares the sum above for all but the upper tail.
+const COMPLEMENT_TAIL: f64 = 0.01;
+
 /// The count `y`, a whole number of at least 0, as an index.
 fn count(y: f64) -> usize {
     // An observed count is a whole number of at least 0.
     y as usize
+}
+
+/// The tails at the count `y` of a sum of negative binomials of
+/// overdispersion `phi` and means `parts`: `P(Y < y)` sums the recursion up
+/// to `y`; `P(Y > y)` is its complement while that is at least
+/// [`COMPLEMENT_TAIL`], and otherwise the sum of the counts above `y` until
+/// a term is negligible, so it keeps its relative accuracy in the upper
+/// tail. The sum above costs `O(n²)` in the last count `n` it reaches,
+/// which a heavy tail (`φ μ` large) puts far beyond `y`.
+fn exact_tails(parts: &[f64], phi: f64, y: f64) -> Tails {
+    let last = count(y);
+    let mut recursion = Recursion::new(parts, phi, y, false);
+    recursion.extend_to(last);
+    let probability = |recursion: &Recursion, n: usize| libm::exp(recursion.log_probability(n));
+    let below = (0..last).fold(0.0, |sum, n| sum + probability(&recursion, n));
+    let at = probability(&recursion, last);
+    let complement = (1.0 - below) - at;
+    if complement >= COMPLEMENT_TAIL {
+        return Tails {
+            below,
+            at,
+            above: complement,
+        };
+    }
+    let mean: f64 = parts.iter().sum();
+    let mut above = 0.0;
+    let mut n = last;
+    loop {
+        n += 1;
+        recursion.extend_to(n);
+        let term = probability(&recursion, n);
+        above += term;
+        if n as f64 > mean && term <= NEGLIGIBLE * above {
+            return Tails { below, at, above };
+        }
+    }
 }
 
 /// The exact information of a sum of negative binomials of overdispersion

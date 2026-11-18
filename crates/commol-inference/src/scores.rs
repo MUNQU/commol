@@ -1,20 +1,29 @@
 //! Scores of a predictive against observations: empirical coverage, the
 //! interval score, the weighted interval score, the CRPS of a weighted
-//! sample, PIT values, and the log score of observation models.
+//! sample, PIT values, quantile residuals, and the log score of observation
+//! models.
 //!
-//! Every score but the log score takes the draws of a predictive at a set of
-//! observations ([`ObservationDraws`]) and the observed values; the log score
-//! reads the density of the observation models at each draw's predicted
-//! mean. Each returns one value per observation; [`by_series`] averages them
-//! per series. Which observations to score, for example the ones held out of
-//! a calibration, is the caller's choice.
+//! Coverage, the interval scores and the CRPS take the draws of a
+//! predictive at a set of observations ([`ObservationDraws`]) and the
+//! observed values; the log score reads the density of the observation
+//! models at each draw's predicted mean. The PIT and the quantile residuals
+//! read [`ObservationBounds`]: the tails of each draw at each observed
+//! value, from the distribution functions of the observation models
+//! ([`observation_bounds`]) or from the draws ([`ObservationBounds::of_draws`]).
+//! Each returns one value per observation; [`by_series`] averages them per
+//! series. Which observations to score, for example the ones held out of a
+//! calibration, is the caller's choice.
 
 use commol_calibration::likelihood::parts_of;
-use commol_calibration::{CalibrationProblem, ObservedDataPoint, SeriesIndex, weighted_crps};
+use commol_calibration::{
+    CalibrationProblem, ObservedDataPoint, SeriesIndex, Tails, weighted_crps,
+};
 use commol_core::{CONFIDENCE_LEVEL, SimulationEngine};
 use commol_random::Generator;
 use commol_statistics::numeric::log_sum_exp;
+use commol_statistics::special::{normal_quantile, normal_quantile_sf};
 use commol_statistics::statistics;
+use rayon::prelude::*;
 
 use crate::predictive::{
     DistributionNoise, ObservationDraws, ObservationNoise, PredictiveError, check_names,
@@ -149,35 +158,161 @@ pub fn crps(draws: &ObservationDraws, observed: &[f64]) -> Result<Vec<f64>, Stri
         .collect())
 }
 
-/// The probability integral transform of each observation: `F(y)` of the
-/// weighted draws, randomized between `F(y⁻)` and `F(y)` where draws tie
-/// with `y` (so a discrete predictive gives uniform values too), with the
-/// generator seeded with the stream [`Stream::PitTies`] of the seed of the
-/// draws. The same draws give the same values. Calibrated predictions give
-/// uniform values.
+/// The tails of every draw of a sample at a set of observed values, with the
+/// weights of the draws: the one primitive of the PIT, the quantile
+/// residuals and every reader of the distribution of an observation under
+/// each draw, which adds its own uniform numbers.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ObservationBounds {
+    /// `[draw][observation]`: `P(Y < y)`, `p(y)` and `P(Y > y)` under the
+    /// draw, its replicates mixed with equal shares.
+    pub tails: Vec<Vec<Tails>>,
+    /// The weight of every draw.
+    pub weights: Vec<f64>,
+    /// The seed of the draws; the place `v` of each observed value within
+    /// its mass ([`Self::places`]) comes from the stream
+    /// [`Stream::PitTies`] of it.
+    pub seed: u64,
+}
+
+impl ObservationBounds {
+    /// The bounds of `draws` at the values `observed`: each draw is a mass
+    /// at its value, so its tails are 0 or 1.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when the shapes differ or there is no draw.
+    pub fn of_draws(draws: &ObservationDraws, observed: &[f64]) -> Result<Self, String> {
+        check(draws, observed)?;
+        let tails = draws
+            .values
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .zip(observed)
+                    .map(|(&x, &y)| Tails::point_mass(y, x))
+                    .collect()
+            })
+            .collect();
+        Ok(Self {
+            tails,
+            weights: draws.weights.clone(),
+            seed: draws.seed,
+        })
+    }
+
+    /// The tails of the predictive at each observed value: those of the
+    /// mixture of the draws, `Σ_d w_d T_d / Σ_d w_d`.
+    pub fn mixture(&self) -> Vec<Tails> {
+        let total: f64 = self.weights.iter().sum();
+        let count = self.tails.first().map_or(0, Vec::len);
+        (0..count)
+            .map(|i| {
+                let mut mixed = Tails::default();
+                for (row, &w) in self.tails.iter().zip(&self.weights) {
+                    mixed.add_weighted(w / total, row[i]);
+                }
+                mixed
+            })
+            .collect()
+    }
+
+    /// The place `v` of each observed value within the mass `p(y)` that the
+    /// predictive gives it: one uniform number per observation, in order,
+    /// from the stream [`Stream::PitTies`] of the seed. The PIT and the
+    /// quantile residuals read the same places.
+    pub fn places(&self) -> Vec<f64> {
+        let count = self.tails.first().map_or(0, Vec::len);
+        let mut generator = Generator::from_seed(Stream::PitTies.seed(self.seed));
+        (0..count).map(|_| generator.uniform()).collect()
+    }
+
+    /// The randomized probability integral transform of each observation,
+    /// `F(y⁻) + v · p(y)` of the mixture with the places `v` of
+    /// [`Self::places`]: uniform for data the predictive did not see, also
+    /// for a discrete model, and `F(y)` whatever the seed for a model with
+    /// no atoms.
+    pub fn pit(&self) -> Vec<f64> {
+        self.mixture()
+            .iter()
+            .zip(self.places())
+            .map(|(tails, v)| tails.pit(v))
+            .collect()
+    }
+
+    /// The randomized quantile residual of each observation (Dunn and Smyth
+    /// 1996): `Φ⁻¹(u)` of the PIT `u` of [`Self::pit`], read from the
+    /// nearer tail, `Φ⁻¹(u)` up to `½` and `−Φ⁻¹(1 − u)` above, with
+    /// `1 − u = P(Y > y) + (1 − v) · p(y)`, so a residual far in the upper
+    /// tail stays finite. Standard normal for data the predictive did not
+    /// see.
+    pub fn quantile_residuals(&self) -> Vec<f64> {
+        self.mixture()
+            .iter()
+            .zip(self.places())
+            .map(|(tails, v)| {
+                let u = tails.pit(v);
+                if u <= 0.5 {
+                    normal_quantile(u)
+                } else {
+                    normal_quantile_sf(tails.above + (1.0 - v) * tails.at)
+                }
+            })
+            .collect()
+    }
+}
+
+/// The tails of the observed value of each of `observations` under every
+/// draw of `sample`, from the distribution functions of the observation
+/// models of `noise` ([`commol_calibration::Likelihood::tails`]) at each
+/// draw's predicted means and noise parameters, each mean the nearest the
+/// model allows. A replicate of a draw is seeded from `seed` as in
+/// [`crate::Predictive::new`], and the tails of a draw mix its replicates
+/// with equal shares; the bounds keep `seed`. The models run once for every
+/// reader of the bounds.
 ///
 /// # Errors
 ///
-/// Returns a message when the shapes differ.
-pub fn pit(draws: &ObservationDraws, observed: &[f64]) -> Result<Vec<f64>, String> {
-    check(draws, observed)?;
-    let total: f64 = draws.weights.iter().sum();
-    let mut generator = Generator::from_seed(Stream::PitTies.seed(draws.seed));
-    Ok(observed
-        .iter()
-        .enumerate()
-        .map(|(i, &y)| {
-            let (mut below, mut at) = (0.0, 0.0);
-            for (row, w) in draws.values.iter().zip(&draws.weights) {
-                if row[i] < y {
-                    below += w;
-                } else if row[i] == y {
-                    at += w;
+/// Returns an error, before any run, when the sample's parameters are not
+/// the problem's, an observation names a series with no model, or an
+/// observed value is outside the support of its model; and when an
+/// observation names an unknown output or factor, or a draw has no run.
+pub fn observation_bounds<E>(
+    problem: &CalibrationProblem<E>,
+    sample: &ParameterSample,
+    observations: &[ObservedDataPoint],
+    noise: &DistributionNoise,
+    seed: u64,
+) -> Result<ObservationBounds, PredictiveError>
+where
+    E: SimulationEngine + Send + Sync,
+{
+    check_names(problem.forward(), sample)?;
+    let likelihood = noise.likelihood();
+    let terms = likelihood
+        .check_values(observations)
+        .map_err(PredictiveError::Mismatch)?;
+    let runs = observe_sets(problem.forward(), sample.values(), observations, Some(seed))?;
+    let tails = runs
+        .par_iter()
+        .zip(sample.values())
+        .map(|(replicates, values)| {
+            let share = 1.0 / replicates.len() as f64;
+            let mut mixed = vec![Tails::default(); observations.len()];
+            for means in replicates {
+                let tails = likelihood.tails_of(observations, &terms, values, &means.parts);
+                for (sum, tails) in mixed.iter_mut().zip(tails) {
+                    sum.add_weighted(share, tails);
                 }
             }
-            (below + generator.uniform() * at) / total
+            mixed
         })
-        .collect())
+        .collect();
+    Ok(ObservationBounds {
+        tails,
+        weights: sample.weights().to_vec(),
+        seed,
+    })
 }
 
 /// The log score of each of `observations`: the log density of its
@@ -322,10 +457,11 @@ mod tests {
             weights: vec![2.0; 4],
             seed: 5,
         };
-        let value = pit(&draws, &[1.0]).unwrap()[0];
+        let pit = |y: f64| ObservationBounds::of_draws(&draws, &[y]).unwrap().pit()[0];
+        let value = pit(1.0);
         assert!(value > 0.25 && value < 0.75, "{value}");
-        assert_eq!(pit(&draws, &[3.0]).unwrap(), vec![1.0]);
-        assert_eq!(pit(&draws, &[0.5]).unwrap(), vec![0.25]);
+        assert_eq!(pit(3.0), 1.0);
+        assert_eq!(pit(0.5), 0.25);
     }
 
     #[test]

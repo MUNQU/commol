@@ -263,8 +263,15 @@ problem with `observation_models`, and serves the series they name, at any
 position.
 
 `scores.log_score(predictive, observations, DistributionNoise())` scores the
-observed values by the densities of these models
-([Scores](index.md#scores)).
+observed values by the densities of these models, and
+`scores.pit(predictive, observations, DistributionNoise())` and
+`scores.quantile_residuals(predictive, observations, DistributionNoise())` by
+their distribution functions, exactly: `F(y⁻) + v · p(y)` of the mixture of the
+models over the draws, also for a sample of one point
+([Quantile residuals](index.md#quantile-residuals)). The distribution function
+of an observation of several parts is that of the reading of its model
+([Sums of parts](#sums-of-parts)): the recursion of `"exact"`, the matched
+negative binomial of `"moments"`, `Poisson(M)` and `N(M, K · sd²)`.
 
 ## Checklist
 

@@ -1,8 +1,10 @@
 """Scores of a predictive against observations.
 
 Every score is computed in Rust, per observation and per series: from each
-draw's value of the observations (`Predictive.at_observations`), or, for the
-log score, from the density of the observation models at each draw's
+draw's value of the observations (`Predictive.at_observations`); for the PIT
+and the quantile residuals, from the tails of each draw at each observed value,
+which the distribution functions of the observation models give exactly; for
+the log score, from the density of the observation models at each draw's
 prediction. Which observations to score, for example the ones held out of the
 calibration, and the observation noise are arguments with no default: a band
 of the model (`NoNoise`) compared with data covers less than its level.
@@ -195,11 +197,17 @@ def pit(
     """
     The probability integral transform of each observation.
 
-    ``F(y)`` of the weighted draws, randomized between ``F(y⁻)`` and ``F(y)``
-    where draws tie with ``y``, so a discrete predictive gives uniform values
-    too. The ties take their random numbers from the seed of the source of
-    the predictive (``Calibrator.seed`` or ``SensitivityAnalysis.seed``), the
-    seed of the draws, so the same draws give the same values.
+    ``F(y⁻) + v · p(y)`` of the predictive: the mixture over the draws of the
+    distribution of an observation, with ``v`` uniform in ``[0, 1]``, so a
+    discrete predictive gives uniform values too. With `DistributionNoise`
+    the distribution of each draw is its observation model, read exactly:
+    a sample of one point gives its PIT, and a model with no atoms gives
+    ``F(y)`` whatever the seed. With the other noises it is the mass at the
+    draw's value, so ``F`` is that of the weighted draws and ``p(y)`` the
+    weight of the draws that tie with ``y``. The values ``v`` come from the
+    seed of the source of the predictive (``Calibrator.seed`` or
+    ``SensitivityAnalysis.seed``), so the same predictive gives the same
+    values; `quantile_residuals` reads the same ``v``.
 
     Parameters
     ----------
@@ -208,15 +216,81 @@ def pit(
     observations : Sequence[ObservedDataPoint]
         The observations to score.
     noise : NoNoise | ResidualNoise | DistributionNoise
-        The observation noise of the draws (`Predictive.at_observations`).
+        The observation noise of the predictive.
 
     Returns
     -------
     Score
         Values in ``[0, 1]``; calibrated predictions give uniform values.
+
+    Raises
+    ------
+    ValueError
+        As `Predictive.at_observations`, and if an observed value is outside
+        the support of its observation model with `DistributionNoise`.
     """
-    draws = predictive.at_observations(observations, noise)
-    return _score(draws, draws._draws.pit(draws.observed))
+    bounds = predictive.source._observation_bounds(
+        predictive.sample, list(observations), noise
+    )
+    return _score_of(observations, bounds.pit())
+
+
+def quantile_residuals(
+    predictive: Predictive,
+    observations: Sequence[ObservedDataPoint],
+    noise: DistributionNoise,
+) -> Score:
+    """
+    The randomized quantile residual of each observation (Dunn and Smyth 1996).
+
+    ``Φ⁻¹(u)`` of the PIT ``u`` of `pit`, with the same ``v``, read from the
+    nearer tail: ``−Φ⁻¹(P(Y > y) + (1 − v) · p(y))`` above ``u = ½``, so a
+    value far in the upper tail has a finite residual. Standard normal for
+    data the predictive did not see; in the data a predictive was fitted to,
+    the residuals shrink.
+
+    Parameters
+    ----------
+    predictive : Predictive
+        The predictive, of a problem with ``observation_models``.
+    observations : Sequence[ObservedDataPoint]
+        The observations to score.
+    noise : DistributionNoise
+        The observation models of the problem.
+
+    Returns
+    -------
+    Score
+        The quantile residual of each observation.
+
+    Raises
+    ------
+    TypeError
+        If `noise` is not `DistributionNoise`.
+    ValueError
+        If the problem has a loss, an observation names an unknown output or
+        factor or a series with no observation model, an observed value is
+        outside the support of its model, or the predictive is of a
+        sensitivity analysis, which has no observation models.
+    InfeasibleStateError
+        If a draw leaves the values its model allows, as `Predictive.at_observations`.
+
+    References
+    ----------
+    Dunn, P. K., & Smyth, G. K. (1996). Randomized quantile residuals.
+    Journal of Computational and Graphical Statistics, 5(3), 236–244.
+    https://doi.org/10.1080/10618600.1996.10474708
+    """
+    if not isinstance(noise, DistributionNoise):
+        raise TypeError(
+            f"Quantile residuals need the distribution functions of the "
+            f"observation models, so they take DistributionNoise(); "
+            f"{type(noise).__name__} has none."
+        )
+    bounds = predictive.source._observation_bounds(
+        predictive.sample, list(observations), noise
+    )
+    return _score_of(observations, bounds.quantile_residuals())
 
 
 def log_score(

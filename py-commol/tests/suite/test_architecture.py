@@ -82,6 +82,7 @@ HANDLES = {
     "ParameterSample": "a sample of parameter values, which methods read",
     "Predictive": "the predictive of a sample, which draws",
     "ObservationDraws": "draws of observations, which scores read",
+    "ObservationBounds": "the tails of observations, which scores read",
     "Distribution": "a distribution, which gives densities and draws",
     "ForwardAnalysis": "the inputs of a sensitivity analysis, which run",
     "Parallelism": "the threads of this context, which every parallel method reads",

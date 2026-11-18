@@ -21,7 +21,7 @@ use nalgebra::DMatrix;
 
 use super::check_numbers;
 use crate::error::MethodError;
-use crate::special::beta_i;
+use commol_statistics::special::beta_i;
 
 /// The PRCC of every input for every quantity.
 #[derive(Debug, Clone, PartialEq)]

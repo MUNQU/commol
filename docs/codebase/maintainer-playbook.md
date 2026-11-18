@@ -110,9 +110,9 @@ changing it ([Design decisions](decisions/uncertainty.md#methods-plug-into-one-e
       from a stream of the problem's seed: a new `Stream` of
       `crates/commol-random/src/streams.rs`, with a number of its own, and
       `Stream::replicate` for each draw or replicate; never the seed itself.
-      It takes its numerical helpers and log densities from
-      `commol_statistics::numeric` and its quantiles and weighted statistics
-      from `commol_statistics::statistics`, and writes no copy of them.
+      It takes its helpers from `commol_statistics` (`numeric`, `special`,
+      `statistics`) and the tails of an observation from `ObservationBounds`
+      (`scores.rs`), and writes no copy of them.
 - [ ] A method that samples a posterior is a `TemperedTarget` on
       `SmcSampler` (`crates/commol-inference/src/smc/`), not a sampler of its
       own, and its configuration takes required `priors` (`WithPriors`)

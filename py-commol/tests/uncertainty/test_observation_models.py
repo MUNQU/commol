@@ -462,8 +462,9 @@ class TestPrediction:
         calibrator = flow_calibrator(
             values, windowed=True, observation_models={"B": PoissonObservations()}
         )
+        # The PIT of one point is exact: no draws of the noise.
         sample = ParameterSample.equally_weighted(
-            ["c"], [(0.0, 50.0)], [[FLOW]] * 300, SampleMethod(name="truth")
+            ["c"], [(0.0, 50.0)], [[FLOW]], SampleMethod(name="truth")
         )
         predictive = Predictive(calibrator, sample, [0, 1])
         observations = flow_observations(values, windowed=True)

@@ -7,6 +7,7 @@ from commol.scores.rules import (
     interval_score,
     log_score,
     pit,
+    quantile_residuals,
     weighted_interval_score,
 )
 from commol.scores.rules import Score
@@ -18,6 +19,7 @@ __all__ = [
     "interval_score",
     "log_score",
     "pit",
+    "quantile_residuals",
     "weighted_interval_score",
     # Results
     "Score",

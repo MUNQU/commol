@@ -185,7 +185,7 @@ Every reader of observations of a sample (`Predictive.at_observations`, every
 function of `commol.scores`) takes the noise with no default: `NoNoise()` gives
 a band of the model, `ResidualNoise(...)` and `DistributionNoise()` (the
 observation models of the problem) a prediction interval. The log score needs
-a density, so it takes only `DistributionNoise`; the parametric bootstrap
+a density and quantile residuals a distribution function, so they take only `DistributionNoise`; the parametric bootstrap
 (`ParametricResampler`) draws its data sets with the same draws. The Rust port
 `ObservationNoise` (`crates/commol-inference/src/predictive.rs`) sees one
 draw's whole vector of observations with the draw's parameter values and the
@@ -202,7 +202,8 @@ draw a sum as it reads it. `ResidualNoise` serves only series the fit has residu
 
 **Guards:** `crates/commol-inference/tests/test_resampling.rs::residual_noise_rejects_a_series_with_no_residuals`,
 `tests/uncertainty/test_resampling.py::TestResidualNoise`,
-`crates/commol-inference/tests/test_likelihood_target.rs`, `tests/uncertainty/test_scores.py::TestLogScore`.
+`crates/commol-inference/tests/test_likelihood_target.rs`, `tests/uncertainty/test_scores.py::TestLogScore`,
+`tests/uncertainty/test_scores.py::TestQuantileResiduals::test_they_need_distribution_noise`.
 
 ## Conformal variants share one score and one quantile
 

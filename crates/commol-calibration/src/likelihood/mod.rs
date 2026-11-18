@@ -10,15 +10,15 @@
 //!
 //! | Module | Holds |
 //! |---|---|
-//! | [`density`] | [`Noise`]: a model with numbers for its noise, and its log density |
-//! | [`sums`] | [`Sum`]: the density of a sum of parts, its scores and its information |
+//! | [`density`] | [`Noise`]: a model with numbers for its noise, its log density and its [`Tails`] |
+//! | [`sums`] | [`Sum`]: the density of a sum of parts, its tails, its scores and its information |
 
 pub mod density;
 pub mod sums;
 
 use std::collections::HashMap;
 
-pub use density::{Center, Noise, log_location};
+pub use density::{Center, Noise, Tails, log_location};
 pub use sums::Sum;
 
 use commol_core::Real;
@@ -337,10 +337,7 @@ impl Likelihood {
     ///
     /// As [`Self::new`], for the observations.
     pub fn with_data(&self, observed_data: &[ObservedDataPoint]) -> Result<Self, String> {
-        let terms = self.terms(observed_data)?;
-        for (obs, &term) in observed_data.iter().zip(&terms) {
-            self.check_value(obs, term)?;
-        }
+        let terms = self.check_values(observed_data)?;
         Ok(Self {
             terms,
             observed: observed_data.iter().map(|obs| obs.value).collect(),
@@ -546,6 +543,62 @@ impl Likelihood {
                         .map(|entry| weight * entry)
                         .collect(),
                 })
+            })
+            .collect()
+    }
+
+    /// The term of each of `observations`, which need not be the problem's,
+    /// once its observed value lies in the support of its model.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::terms`], and a message that names the observation when
+    /// its value is outside the support of its model, as [`Self::new`]
+    /// says it.
+    pub fn check_values(&self, observations: &[ObservedDataPoint]) -> Result<Vec<Term>, String> {
+        let terms = self.terms(observations)?;
+        for (obs, &term) in observations.iter().zip(&terms) {
+            self.check_value(obs, term)?;
+        }
+        Ok(terms)
+    }
+
+    /// The tails of the observed value of each of `observations` at the
+    /// parameter `values` and the means of the parts `parts`, observation
+    /// after observation ([`Noise::sum_tails`]), each part at the nearest
+    /// mean its model allows ([`Noise::nearest_mean`]).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::check_values`].
+    pub fn tails(
+        &self,
+        observations: &[ObservedDataPoint],
+        values: &[f64],
+        parts: &[f64],
+    ) -> Result<Vec<Tails>, String> {
+        let terms = self.check_values(observations)?;
+        Ok(self.tails_of(observations, &terms, values, parts))
+    }
+
+    /// As [`Self::tails`], with the `terms` that [`Self::check_values`]
+    /// gave for `observations`, so a reader of many draws checks once.
+    pub fn tails_of(
+        &self,
+        observations: &[ObservedDataPoint],
+        terms: &[Term],
+        values: &[f64],
+        parts: &[f64],
+    ) -> Vec<Tails> {
+        observations
+            .iter()
+            .zip(terms)
+            .zip(parts_of(terms, parts))
+            .map(|((obs, &term), means)| {
+                let noise = self.noise(term, values);
+                let nearest: Vec<f64> =
+                    means.iter().map(|&mean| noise.nearest_mean(mean)).collect();
+                noise.sum_tails(obs.value, &nearest)
             })
             .collect()
     }

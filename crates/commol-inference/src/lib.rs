@@ -61,7 +61,6 @@ pub mod scores;
 pub mod sensitivity;
 pub mod settings;
 pub mod smc;
-mod special;
 pub mod target;
 pub mod transform;
 
