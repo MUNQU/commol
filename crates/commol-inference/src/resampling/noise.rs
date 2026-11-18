@@ -5,7 +5,9 @@ use commol_random::Generator;
 
 use crate::error::MethodError;
 use crate::predictive::ObservationNoise;
-use crate::resampling::blocks::{check_length, distinct_positions, position_indices};
+use crate::resampling::blocks::{
+    check_length, distinct_positions, one_per_position, position_indices,
+};
 use crate::resampling::residuals::{
     ResidualBlocks, ResidualScale, Residuals, SeriesResiduals, source_positions,
 };
@@ -17,7 +19,8 @@ use crate::resampling::residuals::{
 /// The positions of the observations it serves need not be those of the
 /// fit: the residual of a series at a drawn position is the one at the
 /// nearest position where the series has one. It serves only series the fit
-/// has residuals of.
+/// has residuals of, each with one observation per position: a position of
+/// a series draws one residual.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResidualNoise {
     scale: ResidualScale,
@@ -32,7 +35,8 @@ impl ResidualNoise {
     /// # Errors
     ///
     /// [`MethodError::Invalid`] when `length` is 0 or larger than the number
-    /// of distinct positions of `observations`.
+    /// of distinct positions of `observations`, or when a series has two
+    /// observations at one position.
     pub fn new(
         observations: &[ObservedDataPoint],
         residuals: &Residuals,
@@ -43,7 +47,8 @@ impl ResidualNoise {
         Ok(Self {
             scale: residuals.scale(),
             length,
-            grid: SeriesResiduals::new(observations, residuals.residuals()),
+            grid: SeriesResiduals::new(observations, residuals.residuals())
+                .map_err(MethodError::Invalid)?,
         })
     }
 }
@@ -59,7 +64,11 @@ impl ObservationNoise for ResidualNoise {
                  residual noise cannot add any",
                 obs.label, obs.at, obs.label
             )),
-            None => Ok(()),
+            None => one_per_position(
+                observations,
+                "Residual noise draws one residual per position of a series",
+                "",
+            ),
         }
     }
 

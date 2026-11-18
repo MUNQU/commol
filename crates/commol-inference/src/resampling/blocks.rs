@@ -64,7 +64,7 @@ impl BlockScheme {
     ///
     /// # Errors
     ///
-    /// As [`Self::new`].
+    /// As [`Self::new`], and, for `None`, as [`automatic_block_length`].
     pub fn resolve(
         observations: &[ObservedDataPoint],
         residuals: &[f64],
@@ -74,7 +74,7 @@ impl BlockScheme {
         match requested {
             Some(length) => Self::new(observations, length),
             None => {
-                let automatic = automatic_block_length(observations, residuals, drawing);
+                let automatic = automatic_block_length(observations, residuals, drawing)?;
                 let mut scheme = Self::new(observations, automatic.length)?;
                 scheme.estimates = Some(automatic.estimates);
                 Ok(scheme)
@@ -87,7 +87,8 @@ impl BlockScheme {
     ///
     /// # Errors
     ///
-    /// As [`Residuals::new`] when the fit has no run, and as [`Self::new`].
+    /// As [`Residuals::new`] when the fit has no run, and as
+    /// [`Self::resolve`].
     pub fn at_fit<E: SimulationEngine>(
         problem: &CalibrationProblem<E>,
         fit: &[f64],
@@ -169,6 +170,35 @@ pub fn position_indices(observations: &[ObservedDataPoint], positions: &[f64]) -
                 .expect("every position is listed")
         })
         .collect()
+}
+
+/// Refuse a series of `observations` with two observations at one position,
+/// for a reader that reads one value per position of a series: `reader`
+/// says what it reads, and `instead` what else the user can do.
+///
+/// A label may hold two observations at one position (an increment and a
+/// total that end there), each read by the loss with its own window. A
+/// reader that pairs a series by position cannot tell them apart: it would
+/// keep one value of the two, or read them as consecutive positions.
+pub(crate) fn one_per_position(
+    observations: &[ObservedDataPoint],
+    reader: &str,
+    instead: &str,
+) -> Result<(), String> {
+    let series = SeriesIndex::new(observations);
+    for (label, members) in series.labels().iter().zip(series.indices()) {
+        if let Some(pair) = members
+            .windows(2)
+            .find(|pair| observations[pair[0]].at == observations[pair[1]].at)
+        {
+            return Err(format!(
+                "{reader}, and the series '{label}' has two observations at {}. Give one of \
+                 them a label of its own{instead}",
+                observations[pair[0]].at
+            ));
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn check_length(length: usize, positions: usize) -> Result<(), String> {
@@ -277,11 +307,23 @@ pub struct AutomaticLength {
 /// The automatic block length of `residuals`, one per observation: the
 /// [`automatic_length`] of each series (its observations in position order),
 /// and the largest of them.
+///
+/// # Errors
+///
+/// [`MethodError::Invalid`], which names the series and the position, when
+/// a series has two observations at one position: the estimate reads one
+/// residual per position.
 pub fn automatic_block_length(
     observations: &[ObservedDataPoint],
     residuals: &[f64],
     drawing: BlockDrawing,
-) -> AutomaticLength {
+) -> Result<AutomaticLength, MethodError> {
+    one_per_position(
+        observations,
+        "block_length=\"auto\" reads one residual per position of a series",
+        ", or a block_length of a number of positions",
+    )
+    .map_err(MethodError::Invalid)?;
     let series = SeriesIndex::new(observations);
     let estimates: Estimates = series
         .labels()
@@ -294,10 +336,10 @@ pub fn automatic_block_length(
         .collect();
     let positions = distinct_positions(observations).len();
     let largest = estimates.iter().map(|(_, b)| *b).fold(1.0, f64::max);
-    AutomaticLength {
+    Ok(AutomaticLength {
         length: (largest.round() as usize).clamp(1, positions),
         estimates,
-    }
+    })
 }
 
 #[cfg(test)]

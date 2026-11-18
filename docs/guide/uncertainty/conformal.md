@@ -198,7 +198,10 @@ or before it (one refit per origin, from the fit of every observation) and
 scores the later ones. The intervals are around the fit of every observation,
 at `positions`, which must all be after the data; the `k`-th position is
 horizon `k`, so give positions spaced as the observations. A horizon with fewer
-than `1/α − 1` origins that reach it has an unbounded interval.
+than `1/α − 1` origins that reach it has an unbounded interval. A series with
+two observations at one position has no single count of horizons, so
+`RollingConformal` refuses it
+([One position, two observations](../calibration-observations.md#one-position-two-observations)).
 
 ```python
 from commol.conformal import RollingConformal

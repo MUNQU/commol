@@ -16,7 +16,14 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from commol import Calibrator, NelderMeadConfig, ObservedDataPoint, ParticleSwarmConfig
+from commol import (
+    CalibrationProblem,
+    Calibrator,
+    NelderMeadConfig,
+    ObservedDataPoint,
+    ParticleSwarmConfig,
+    Simulation,
+)
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.conformal import JackknifePlus, RollingConformal
 from commol.conformal.results import ConformalResult
@@ -34,7 +41,14 @@ from commol.resampling.results import BootstrapResult, JackknifeResult
 from commol.smc import BootstrapCoverageEta, GibbsPosterior
 from commol.smc.results import GibbsResult
 from commol.uncertainty import Predictive
-from tests.support import flow_calibrator, flow_observations, line_calibrator
+from tests.support import (
+    a_to_b_builder,
+    bounded,
+    build,
+    flow_calibrator,
+    flow_observations,
+    line_calibrator,
+)
 
 
 def _noisy(count: int, seed: int, level: float = 10.0) -> list[float]:
@@ -194,6 +208,37 @@ class TestResidualBootstraps:
             assert first.sample != other.sample
             assert first.sample.method.settings["seed"] == 8
 
+    def test_observations_at_one_position_are_refused(self) -> None:
+        # The total over 12 steps and the flow of the 12th step share the
+        # series and the position: their residuals have different scales,
+        # and a reader of one residual per position would drop one of them.
+        calibrator = _total_beside_its_steps()
+        shared = r"the series 'B' has two observations at 12\. Give one of them"
+        fit = calibrator.run()
+        noise = ResidualNoise(fit=fit, block_length=1, residual_scale="additive")
+        result = calibrator.uncertainty(BayesianBootstrap(replicates=3, block_length=2))
+        predictive = Predictive(calibrator, result.sample, [12.0])
+
+        with pytest.raises(ValueError, match=shared):
+            predictive.at_observations(flow_observations([0.0], windowed=True), noise)
+        with pytest.raises(ValueError, match=shared):
+            calibrator.uncertainty(
+                ResidualBootstrap(
+                    replicates=3,
+                    block_length=1,
+                    residual_scale="additive",
+                    scheme="moving",
+                )
+            )
+        with pytest.raises(ValueError, match=shared + r".*or a block_length"):
+            calibrator.uncertainty(BayesianBootstrap(replicates=3, block_length="auto"))
+        # Blocks of a given length keep both observations: the wild bootstrap
+        # multiplies each residual in place.
+        wild = calibrator.uncertainty(
+            WildBootstrap(replicates=3, block_length=2, multipliers="rademacher")
+        )
+        assert len(wild.sample) + len(wild.failed) == 3
+
 
 class TestBlockJackknife:
     def test_jackknife_of_a_mean_is_the_classical_standard_error(self) -> None:
@@ -228,6 +273,32 @@ class TestBlockJackknife:
             calibrator.uncertainty(BlockJackknife(block_length=4))
 
 
+def _total_beside_its_steps() -> Calibrator:
+    """
+    The flow ``c`` of ``flow_calibrator``, observed as the flow of each of
+    the steps 1 to 12 and as their total, in the same series ``B`` and at
+    the same position, 12, as the last step.
+    """
+    model = build(
+        a_to_b_builder(
+            parameters={"c": None}, rate="c * A / A", amounts={"A": 1e6, "B": 0}
+        )
+    )
+    values = _noisy(12, 3)
+    observations = [
+        *flow_observations(values, windowed=True),
+        ObservedDataPoint(at=12, output="B", value=sum(values) + 30.0, window=12),
+    ]
+    problem = CalibrationProblem(
+        observed_data=observations,
+        parameters=[bounded("c", 0.0, 50.0, initial_guess=25.0)],
+        loss_function="sse",
+        optimization_config=NelderMeadConfig(max_iterations=1000, sd_tolerance=1e-14),
+        seed=1,
+    )
+    return Calibrator(Simulation(model), problem)
+
+
 class TestResidualNoise:
     def test_residual_noise_needs_residuals_of_the_series(self) -> None:
         calibrator = flow_calibrator(_noisy(10, 1), windowed=True)
@@ -239,6 +310,21 @@ class TestResidualNoise:
             predictive.at_observations(
                 [ObservedDataPoint(at=1, output="A", value=0.0)], noise
             )
+
+    def test_held_out_observations_at_one_position_are_refused(self) -> None:
+        calibrator = flow_calibrator(_noisy(10, 1), windowed=True)
+        result = calibrator.uncertainty(BayesianBootstrap(replicates=3, block_length=1))
+        predictive = Predictive(calibrator, result.sample, [11.0])
+        noise = ResidualNoise(fit=result.fit, block_length=1, residual_scale="additive")
+        held_out = [
+            *flow_observations([10.0], windowed=True, start=11),
+            ObservedDataPoint(at=11, output="B", value=100.0, window=11),
+        ]
+
+        shared = "the series 'B' has two observations at 11"
+        with pytest.raises(ValueError, match=shared):
+            predictive.at_observations(held_out, noise)
+        assert len(predictive.at_observations(held_out, NoNoise()).values[0]) == 2
 
     def test_residual_noise_widens_the_band_of_held_out_observations(self) -> None:
         values = _noisy(30, 4)

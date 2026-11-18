@@ -250,6 +250,29 @@ calibration, so a report shows exactly what the loss compared. See
 `window` reads its output at `at`; `SimulationResults.sample` reads a run
 there in the same way ([Values at positions](simulations.md#values-at-positions)).
 
+### One position, two observations
+
+A label may hold two observations at one position: an increment over 2 steps
+and a total over 40 steps that both end at 40. Each is its own observation,
+with its own window and its own residual, so the loss, the likelihood, the
+scores and the predictive with `NoNoise()` or `DistributionNoise()` read both.
+
+A few methods read a series as one value per position, and they refuse such a
+label with a message that names it and the position
+(`one_per_position` in `crates/commol-inference/src/resampling/blocks.rs`):
+
+| Method | What it reads per position |
+|---|---|
+| `ResidualNoise`, `ResidualBootstrap` | One residual of the series, drawn for every observation there |
+| `block_length="auto"` of any method | The residuals of the series as consecutive values |
+| `RollingConformal` | One observation per horizon |
+
+The two observations also have different scales: a total over 40 steps is
+about 20 times an increment over 2. Give one of them a label of its own when a
+method needs one scale per series. With a `block_length` of a number, the
+Bayesian and wild bootstraps, the block jackknife and the sandwich keep both
+in one label, each in the block of its position.
+
 ## Positions between integers
 
 An observation is at a position that the engine of the model reports at, as

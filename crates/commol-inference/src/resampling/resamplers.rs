@@ -143,25 +143,31 @@ pub struct ResidualBootstrap {
 impl ResidualBootstrap {
     /// The bootstrap of the residuals of `observations`, with the positions
     /// of `scheme` and blocks of mean `scheme.length()`.
+    ///
+    /// # Errors
+    ///
+    /// [`MethodError::Invalid`], which names the series and the position,
+    /// when a series has two observations at one position.
     pub fn new(
         observations: &[ObservedDataPoint],
         residuals: Residuals,
         scheme: &BlockScheme,
         blocks: ResidualBlocks,
-    ) -> Self {
-        let grid = SeriesResiduals::new(observations, residuals.residuals());
+    ) -> Result<Self, MethodError> {
+        let grid = SeriesResiduals::new(observations, residuals.residuals())
+            .map_err(MethodError::Invalid)?;
         let series_of = observations
             .iter()
             .map(|obs| grid.series(&obs.label).expect("every series has residuals"))
             .collect();
-        Self {
+        Ok(Self {
             residuals,
             grid,
             series_of,
             position_of: scheme.position_of().to_vec(),
             length: scheme.length(),
             blocks,
-        }
+        })
     }
 }
 
