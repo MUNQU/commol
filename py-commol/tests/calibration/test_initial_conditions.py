@@ -541,3 +541,53 @@ def test_a_write_back_drops_the_overrides_of_the_compartments_it_sets() -> None:
     assert bin_set.structure.compartment_amounts == {}
     assert initial_state(bin_set)["A_g1"] == pytest.approx(400.0)
     assert other_bin_set.structure.compartment_amounts == {"A_g1": 500}
+
+
+@pytest.mark.parametrize(
+    ("amount", "split"),
+    [
+        (1e-310, {"x": 0.3, "y": 0.7}),
+        (1e-305, {"x": 1e-9, "y": 1 - 1e-9}),
+        (1e-300, {"x": 1e-30, "y": 1.0}),
+    ],
+    ids=["subnormal-bin", "subnormal-compartment", "zero-by-underflow"],
+)
+def test_a_bin_of_a_subnormal_amount_splits_a_value_by_its_fractions(
+    amount: float, split: dict[str, float]
+) -> None:
+    # B_x starts below the smallest normal number, too few bits for its share
+    # of B, so B = 1.5 splits as the fractions declare: the bin and its split
+    # rebuild it with no override, and an update of the bin takes effect.
+    model = build(
+        a_to_b_builder(amounts={"A": 1000, "B": amount}, stratifications={"s": split})
+    )
+    declared = build(
+        a_to_b_builder(amounts={"A": 1000, "B": 20.0}, stratifications={"s": split})
+    )
+
+    model.apply_calibration_parameters({"B": 1.5}, initial_condition_problem("B"))
+    model.structure.update_bin_amounts({"B": 20.0})
+
+    assert initial_state(model) == initial_state(declared)
+
+
+def test_a_subnormal_remainder_takes_the_split_of_a_calibrated_category() -> None:
+    # g1 = 0.43 splits A = 1e-310 into amounts too small for their shares, so
+    # the remainder A, 1000 - 600 = 400, splits as the fractions with g1 in
+    # declare: the bin and the written split rebuild it with no override, and
+    # an update of A takes effect.
+    model = build(
+        a_to_b_builder(
+            amounts={"A": 1e-310, "B": 1000},
+            stratifications={"group": {"g1": 0.4, "g2": 0.6}},
+        )
+    )
+    problem = initial_condition_problem("g1", "B", remainder="A")
+
+    model.apply_calibration_parameters({"g1": 0.43, "B": 600.0}, problem)
+    model.structure.update_bin_amounts({"A": 40.0})
+
+    state = initial_state(model)
+    assert (state["A_g1"], state["A_g2"]) == pytest.approx(
+        (40.0 * 0.43, 40.0 * 0.57), rel=1e-12
+    )

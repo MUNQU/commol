@@ -23,7 +23,10 @@
 //! A bin value, and the remainder, split among their compartments as the
 //! initial state does; compartments that hold nothing, such as those of a bin
 //! whose amount is left for calibration, split as the stratification
-//! fractions declare within them ([`crate::CompiledModel::fractions`]).
+//! fractions declare within them ([`crate::CompiledModel::fractions`]), each
+//! calibrated category written before them in place of its declared split,
+//! and so do compartments whose amounts round that split below the smallest
+//! normal number, where they hold too few bits for their shares.
 
 use commol_core::{ModelValue, ModelValueType, ValuePlan};
 
@@ -89,17 +92,18 @@ pub struct TargetCoverage {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum InitialConditionTarget {
     /// A bin or a bin prefix. The value is the amount the covered
-    /// compartments hold, shared by weights taken from the initial state, or
-    /// from the fractions when the compartments hold nothing ([`weights`]).
+    /// compartments hold, shared by weights taken from the initial state or
+    /// from the fractions, as [`weights`] decides.
     Aggregate { entries: Vec<(usize, f64)> },
     /// One expanded compartment. The value is its amount.
     Exact { index: usize },
-    /// A category of a binary stratification. The value splits each
-    /// `(category, complement)` pair of groups of compartments: one
-    /// compartment each, or, when a later stratification is split by this one,
-    /// every compartment of that stratification, which keeps its split within
-    /// its side ([`weights`]).
+    /// A category of the binary stratification `stratification`. The value
+    /// splits each `(category, complement)` pair of groups of compartments:
+    /// one compartment each, or, when a later stratification is split by this
+    /// one, every compartment of that stratification, which keeps its split
+    /// within its side ([`weights`]).
     PairedCategory {
+        stratification: String,
         pairs: Vec<(Vec<usize>, Vec<usize>)>,
     },
 }
@@ -116,32 +120,128 @@ struct Start<'a> {
 /// The share of a value each compartment of `indices` takes: its share of
 /// their amounts in `start`; when they hold nothing, or when one of them holds
 /// a 0 that no one stated, its share of the split the fractions declare within
-/// them; and an even split when that split gives them nothing either.
+/// them ([`split_of_fractions`]); and an even split when that split gives them
+/// nothing either.
 ///
-/// The split within them is the product of the fractions that differ
-/// between them. A fraction they all take scales every share alike, so it
-/// leaves the split as it is, or, when it is 0, empties every share: a side
-/// of a category, or a bin prefix, whose own fraction is 0 still takes the
-/// split of the stratifications within it.
+/// When the fractions give a share to a compartment whose amount lies below
+/// the smallest normal number, and every amount is the split of the
+/// fractions up to its rounding ([`rounds_the_split`]), they take the split
+/// of the fractions instead: a share of the amounts is only as precise as the
+/// amounts, and such an amount holds fewer bits the smaller it is, down to
+/// none at 0. `B = 1e-310` split `0.3, 0.7` starts `B_x` from a number of 43
+/// bits, so its share of `B` lies hundreds of units in the last place from
+/// 0.3. Amounts further from that split than its rounding, such as an
+/// override, keep their shares of the amounts.
 ///
 /// `fractions` holds the fraction of each category of each compartment, in
-/// the order of the categories of its `labels`.
+/// the order of the categories of its `labels`, as the calibrated categories
+/// written so far set them ([`split_category`]).
 fn weights(
     indices: &[usize],
     start: Start,
     labels: &[OutputLabels],
     fractions: &[Vec<f64>],
 ) -> Vec<f64> {
-    let normalized = |of: Vec<f64>| {
-        let total: f64 = of.iter().sum();
-        (total > 0.0).then(|| of.iter().map(|value| value / total).collect())
+    let of_fractions = || split_of_fractions(indices, labels, fractions);
+    let declared =
+        || of_fractions().unwrap_or_else(|| vec![1.0 / indices.len() as f64; indices.len()]);
+    if indices.iter().any(|idx| start.unvalued.contains(idx)) {
+        return declared();
+    }
+    let amounts: Vec<f64> = indices.iter().map(|&idx| start.amounts[idx]).collect();
+    let Some(shares) = normalized(&amounts) else {
+        return declared();
     };
-    if !indices.iter().any(|idx| start.unvalued.contains(idx)) {
-        let amounts = indices.iter().map(|&idx| start.amounts[idx]).collect();
-        if let Some(weights) = normalized(amounts) {
-            return weights;
+    if amounts.iter().all(|amount| amount.is_normal()) {
+        return shares;
+    }
+    let roundings = indices
+        .iter()
+        .map(|&idx| labels[idx].categories.len())
+        .max()
+        .unwrap_or(0)
+        + indices.len();
+    match of_fractions() {
+        Some(split) if rounds_the_split(&amounts, &split, roundings) => split,
+        _ => shares,
+    }
+}
+
+/// Each of `of` over their sum, or `None` when the sum is not above 0.
+fn normalized(of: &[f64]) -> Option<Vec<f64>> {
+    let total: f64 = of.iter().sum();
+    (total > 0.0).then(|| of.iter().map(|value| value / total).collect())
+}
+
+/// Whether `amounts` are the split `split` of their sum, rounded below the
+/// smallest normal number: the split gives a share to a compartment whose
+/// amount is subnormal or 0, and every amount lies within `2 * roundings`
+/// units in the last place of its share of the sum.
+///
+/// `roundings` is the count of compartments and of fractions of one of them,
+/// `n + k`. An amount and its share of the sum each pass through fewer than
+/// `2 (n + k)` roundings (the product of `k` fractions, a sum of `n` amounts
+/// or shares, a division, a product), each of at most half a unit in the
+/// last place, absolute below the smallest normal number. An amount that
+/// departs from the split by more is not its rounding.
+fn rounds_the_split(amounts: &[f64], split: &[f64], roundings: usize) -> bool {
+    let total: f64 = amounts.iter().sum();
+    let bound = 2 * roundings as u64;
+    let pairs = || amounts.iter().zip(split);
+    pairs().any(|(amount, &share)| share > 0.0 && !amount.is_normal())
+        && pairs()
+            .all(|(&amount, &share)| crate::rules::ulps_between(share * total, amount) <= bound)
+}
+
+/// Write the calibrated split `value` of a category of `stratification` into
+/// `fractions`, as the split writes the amounts: in each pair, the category
+/// takes `value` of what the fractions of the two categories give the pair,
+/// and its complement the rest. A pair whose compartments have no fraction of
+/// `stratification` in `labels` keeps its fractions.
+fn split_category(
+    fractions: &mut [Vec<f64>],
+    labels: &[OutputLabels],
+    stratification: &str,
+    pairs: &[(Vec<usize>, Vec<usize>)],
+    value: f64,
+) {
+    let position = |idx: usize| {
+        labels[idx]
+            .categories
+            .iter()
+            .position(|(id, _)| id == stratification)
+    };
+    for (category, complement) in pairs {
+        let fraction = |idx: usize| position(idx).map(|at| fractions[idx][at]);
+        let (Some(of_category), Some(of_complement)) =
+            (fraction(category[0]), fraction(complement[0]))
+        else {
+            continue;
+        };
+        let pair = of_category + of_complement;
+        for (side, part) in [(category, value), (complement, 1.0 - value)] {
+            for &idx in side {
+                if let Some(at) = position(idx) {
+                    fractions[idx][at] = part * pair;
+                }
+            }
         }
     }
+}
+
+/// The split the fractions declare within the compartments of `indices`, or
+/// `None` when it gives them nothing.
+///
+/// The split within them is the product of the fractions that differ
+/// between them. A fraction they all take scales every share alike, so it
+/// leaves the split as it is, or, when it is 0, empties every share: a side
+/// of a category, or a bin prefix, whose own fraction is 0 still takes the
+/// split of the stratifications within it.
+fn split_of_fractions(
+    indices: &[usize],
+    labels: &[OutputLabels],
+    fractions: &[Vec<f64>],
+) -> Option<Vec<f64>> {
     let of = |idx: usize| {
         labels[idx]
             .categories
@@ -167,7 +267,7 @@ fn weights(
         of(idx).for_each(|(id, value)| differ(id, value, first));
         of(first).for_each(|(id, value)| differ(id, value, idx));
     }
-    let split = indices
+    let split: Vec<f64> = indices
         .iter()
         .map(|&idx| {
             of(idx)
@@ -176,7 +276,7 @@ fn weights(
                 .product()
         })
         .collect();
-    normalized(split).unwrap_or_else(|| vec![1.0 / indices.len() as f64; indices.len()])
+    normalized(&split)
 }
 
 impl InitialConditionTarget {
@@ -208,7 +308,7 @@ impl InitialConditionTarget {
     /// of the pairs of a category split.
     fn written_compartments(&self) -> Vec<usize> {
         match self {
-            Self::PairedCategory { pairs } => {
+            Self::PairedCategory { pairs, .. } => {
                 let mut written: Vec<usize> = pairs
                     .iter()
                     .flat_map(|(category, complement)| category.iter().chain(complement))
@@ -463,12 +563,24 @@ impl InitialConditionPlan {
                 values.len()
             ));
         }
+        // The fractions as the calibrated categories written so far set them,
+        // once one is written.
+        let mut fractions: Option<Vec<Vec<f64>>> = None;
         for layer in 0..3 {
             for ((id, target), value) in self.targets.iter().zip(values) {
-                if target.kind().layer() == layer {
-                    write_target(engine, target, *value).map_err(|e| {
-                        format!("Failed to set initial condition for '{}': {}", id, e)
-                    })?;
+                if target.kind().layer() != layer {
+                    continue;
+                }
+                write_target(engine, target, *value, fractions.as_deref())
+                    .map_err(|e| format!("Failed to set initial condition for '{}': {}", id, e))?;
+                if let InitialConditionTarget::PairedCategory {
+                    stratification,
+                    pairs,
+                } = target
+                {
+                    let model = engine.model();
+                    let set = fractions.get_or_insert_with(|| model.fractions().to_vec());
+                    split_category(set, model.output_labels(), stratification, pairs, *value);
                 }
             }
         }
@@ -509,7 +621,7 @@ impl InitialConditionPlan {
                 unvalued: model.unvalued_compartments(),
             },
             model.output_labels(),
-            model.fractions(),
+            fractions.as_deref().unwrap_or(model.fractions()),
         );
         for (&idx, weight) in indices.iter().zip(weights) {
             engine
@@ -540,10 +652,14 @@ fn feasible_or(excess: f64) -> f64 {
     }
 }
 
+/// Write one value into an engine. A category splits each side of a pair by
+/// [`weights`], with `fractions` as the calibrated categories written before
+/// it set them, or the fractions of the model when none is.
 fn write_target<E: CompartmentalEngine>(
     engine: &mut E,
     target: &InitialConditionTarget,
     value: f64,
+    fractions: Option<&[Vec<f64>]>,
 ) -> Result<(), String> {
     match target {
         InitialConditionTarget::Aggregate { entries } => {
@@ -554,9 +670,10 @@ fn write_target<E: CompartmentalEngine>(
         InitialConditionTarget::Exact { index } => {
             engine.set_initial_condition(*index, value)?;
         }
-        InitialConditionTarget::PairedCategory { pairs } => {
+        InitialConditionTarget::PairedCategory { pairs, .. } => {
             let state = engine.initial_state();
             let model = engine.model();
+            let fractions = fractions.unwrap_or(model.fractions());
             let mut writes = Vec::new();
             for (category, complement) in pairs {
                 let pair_total: f64 = category.iter().chain(complement).map(|&i| state[i]).sum();
@@ -568,7 +685,7 @@ fn write_target<E: CompartmentalEngine>(
                             unvalued: model.unvalued_compartments(),
                         },
                         model.output_labels(),
-                        model.fractions(),
+                        fractions,
                     );
                     writes.extend(
                         side.iter()
@@ -913,7 +1030,10 @@ fn paired_category(
         paired.extend(&side);
         pairs.push((side, complement));
     }
-    Ok(InitialConditionTarget::PairedCategory { pairs })
+    Ok(InitialConditionTarget::PairedCategory {
+        stratification: stratification.to_string(),
+        pairs,
+    })
 }
 
 #[cfg(test)]
@@ -981,7 +1101,8 @@ mod tests {
         assert_eq!(
             target,
             InitialConditionTarget::PairedCategory {
-                pairs: vec![(vec![0], vec![2]), (vec![1], vec![3])]
+                stratification: "group".to_string(),
+                pairs: vec![(vec![0], vec![2]), (vec![1], vec![3])],
             }
         );
     }
@@ -1001,7 +1122,8 @@ mod tests {
         assert_eq!(
             target,
             InitialConditionTarget::PairedCategory {
-                pairs: vec![(vec![0, 1], vec![2, 3])]
+                stratification: "group".to_string(),
+                pairs: vec![(vec![0, 1], vec![2, 3])],
             }
         );
     }
@@ -1054,7 +1176,8 @@ mod tests {
         assert_eq!(
             target,
             InitialConditionTarget::PairedCategory {
-                pairs: vec![(vec![0], vec![1]), (vec![2], vec![3])]
+                stratification: "type".to_string(),
+                pairs: vec![(vec![0], vec![1]), (vec![2], vec![3])],
             }
         );
     }
@@ -1072,7 +1195,8 @@ mod tests {
         assert_eq!(
             target,
             InitialConditionTarget::PairedCategory {
-                pairs: vec![(vec![1], vec![2])]
+                stratification: "status".to_string(),
+                pairs: vec![(vec![1], vec![2])],
             }
         );
     }
@@ -1102,5 +1226,59 @@ mod tests {
         assert_eq!(prefix_indices("A_g1", &labels), Some(vec![0]));
         assert_eq!(prefix_indices("A_x", &labels), Some(vec![2]));
         assert_eq!(prefix_indices("B", &labels), None);
+    }
+
+    #[test]
+    fn a_split_of_many_compartments_below_the_smallest_normal_number_holds_its_rounding() {
+        // Two stratifications of 100 categories split a bin of 1e-300 into
+        // 10 000 compartments, and the last category of `s0` takes 1e-25, so
+        // 100 of them start below the smallest normal number. Their amounts
+        // round as far as 90 units in the last place from their shares of the
+        // sum, within the rounding of a split of 10 000 compartments, so they
+        // take the split of the fractions.
+        let mut seed: u64 = 30u64.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            (seed >> 11) as f64 / (1u64 << 53) as f64
+        };
+        let mut splits: Vec<Vec<f64>> = (0..2)
+            .map(|_| {
+                let weights: Vec<f64> = (0..100).map(|_| next()).collect();
+                let sum: f64 = weights.iter().sum();
+                weights.iter().map(|weight| weight / sum).collect()
+            })
+            .collect();
+        splits[0][99] = 1e-25;
+        splits[0][0] += 1.0 - splits[0].iter().sum::<f64>();
+        let labels: Vec<OutputLabels> = (0..10_000)
+            .map(|i| OutputLabels {
+                source: "B".to_string(),
+                categories: vec![
+                    ("s0".to_string(), format!("s0c{}", i / 100)),
+                    ("s1".to_string(), format!("s1c{}", i % 100)),
+                ],
+            })
+            .collect();
+        let fractions: Vec<Vec<f64>> = (0..10_000)
+            .map(|i| vec![splits[0][i / 100], splits[1][i % 100]])
+            .collect();
+        let amounts: Vec<f64> = fractions
+            .iter()
+            .map(|of| of.iter().fold(1e-300, |amount, fraction| amount * fraction))
+            .collect();
+        let indices: Vec<usize> = (0..10_000).collect();
+        let start = Start {
+            amounts: &amounts,
+            unvalued: &[],
+        };
+
+        let shares = weights(&indices, start, &labels, &fractions);
+
+        assert_eq!(
+            shares,
+            split_of_fractions(&indices, &labels, &fractions).unwrap()
+        );
     }
 }

@@ -2,13 +2,14 @@
 
 [Back to Design decisions](../design-decisions.md)
 
-How calibrated values reach the initial state, what each id names, which
-compartment keeps the sum the model declares, and what an engine of whole
-units needs to vary an initial condition. How the fractions of the categories
-compose and how an amount overrides them is in
-[Initial conditions](initial-conditions.md), and how a calibrated amount is
+How calibrated values reach the initial state, what each id names and which
+compartment keeps the sum the model declares. How the fractions of the
+categories compose and how an amount overrides them is in
+[Initial conditions](initial-conditions.md), how a calibrated amount is
 written back onto the model is in
-[Calibration write-back](calibration-write-back.md).
+[Calibration write-back](calibration-write-back.md), and what an engine of
+whole units needs to vary an initial condition is in
+[Calibration](calibration.md#whole-units-need-a-rounding-to-vary-an-initial-condition).
 
 ## Calibrated initial conditions are applied in layers
 
@@ -80,12 +81,15 @@ of a run. Compartments that start with nothing, such as those of a bin left
 `None`, or a side of a category whose fraction is 0, split a value as the
 fractions declare it within them: the product of the fractions that differ
 between them (`CompiledModel::fractions`, `weights` in
-`crates/commol-model/src/initial_conditions.rs`). A fraction they all take
+`crates/commol-model/src/initial_conditions.rs`), with each calibrated
+category written before them in place of its declared split
+(`split_category`), as the write-back writes it. A fraction they all take
 scales every share alike, and when it is 0 it would empty them all, so it
 does not count. They split evenly only when that product gives them
 nothing.
 
 **Guards:**
+`crates/commol-model/tests/initial_conditions.rs::a_remainder_after_a_calibrated_category_splits_by_the_fractions_it_sets`,
 `crates/commol-model/tests/initial_conditions.rs::a_bin_and_the_remainder_keep_the_split_of_the_initial_state_after_a_run`,
 `crates/commol-model/tests/initial_conditions.rs::a_bin_left_for_calibration_splits_a_value_by_its_fractions`,
 `crates/commol-model/tests/initial_conditions.rs::a_prefix_that_starts_empty_keeps_its_declared_split`,
@@ -95,6 +99,46 @@ nothing.
 `crates/commol-model/tests/initial_conditions.rs::the_plan_gives_the_kind_and_the_compartments_of_each_value`,
 `tests/calibration/test_initial_conditions.py::test_the_kind_of_each_target_comes_from_the_engine`,
 `tests/calibration/test_initial_conditions.py::test_a_calibrator_on_a_simulation_that_has_run_splits_a_bin_by_the_initial_state`.
+
+## Amounts below the smallest normal number split by the fractions
+
+**Rule:** when the fractions give a share to a compartment whose amount is
+subnormal or 0, and every amount lies within the rounding of its share of
+their sum by that split, the compartments take the split of the fractions,
+each calibrated category in its place, as compartments that hold nothing do
+(`weights` and `rounds_the_split`). The rounding is `2(n + k)` units in the
+last place for `n` compartments of `k` fractions each: an amount and its
+share each pass through fewer than `2(n + k)` roundings of at most half a
+unit, absolute below the smallest normal number. Amounts further from that
+split, such as an override, keep their shares of the amounts.
+
+A share of the amounts is only as precise as the amounts, and an amount
+below the smallest normal number (`f64::MIN_POSITIVE`, about `2.2e-308`)
+holds fewer bits the smaller it is, down to none at 0. `B = 1e-310` split
+`0.3, 0.7` starts `B_x` from a number of 43 bits, so a value `B = 1.5` split
+by the state gives `B_x = 0.44999999999997775`, about 400 units in the last
+place from what the bin and its split build, and the write-back would
+override both compartments. Split by the fractions, a value over such
+amounts splits as over normal amounts, and the bins and the splits rebuild it
+to its last bits. A split of 10 000 compartments rounds up to 90 units.
+
+| Alternative | Why not |
+|---|---|
+| The split of the fractions whenever an amount is subnormal | L: a value would no longer split as the initial state does where the amounts depart from the fractions, so a bin would ignore an override of one of its compartments. |
+| The split of the fractions when the sum of the amounts is subnormal | The invariant "What the user saves, the engine reloads": it misses a subnormal compartment beside normal ones, as `B = 1e-305` split `1e-9, 1 - 1e-9`, and an amount that underflows to 0, as `B = 1e-300` split `1e-30, 1`: both would still write an override. |
+| The split of the fractions whenever the amounts round it, at any magnitude | S and KISS: it changes the last bits of the calibration of every stratified model on every engine, where the shares of normal amounts lose only the last bits that the scored amounts of the write-back correct. |
+| The fractions as the model declares them after a calibrated category | The invariant "What the user saves, the engine reloads": the write-back writes the category into the fractions, which then do not rebuild the remainder. With `g1 = 0.43` over `A = 1e-310`, or `g1 = 0.3` over `A` left `None`, the remainder `A` would write overrides. |
+| The bound of a scored amount, 64 units in the last place | It bounds another rounding, a build against a scored amount. Below the smallest normal number, 64 units are an absolute `3.2e-322`, wider than the rounding there, so a bin of `1e-321` would take an override `B_x = 0` for the split; and a split of 10 000 compartments rounds further than 64. |
+| An exact match of the amounts to the split | The sum and each share round, so the amounts hold the split only up to their rounding. |
+| The shares of the amounts scaled up by a power of two | The bits are lost when the build rounds the amount, not in the division: a scaled amount keeps its 43 bits. |
+| Rebuild the state at a scale where every amount is normal (each bin and override times `2^k`) | KISS and S: the plan reads the state of the engine, which holds what earlier layers and a Rust caller wrote, not only what the model builds, so it would need a second state to rebuild. |
+
+**Guards:**
+`crates/commol-model/tests/initial_conditions.rs::amounts_below_the_smallest_normal_number_split_a_value_by_the_fractions`,
+`crates/commol-model/tests/initial_conditions.rs::amounts_below_the_smallest_normal_number_keep_the_shares_of_an_override`,
+`crates/commol-model/src/initial_conditions.rs::a_split_of_many_compartments_below_the_smallest_normal_number_holds_its_rounding`,
+`tests/calibration/test_initial_conditions.py::test_a_bin_of_a_subnormal_amount_splits_a_value_by_its_fractions`,
+`tests/calibration/test_initial_conditions.py::test_a_subnormal_remainder_takes_the_split_of_a_calibrated_category`.
 
 ## An initial-condition id names one target
 
@@ -187,51 +231,3 @@ that sets amounts is checked without a change there.
 and the targets of an id, `the_remainder_keeps_the_declared_sum_of_what_it_covers`,
 `a_remainder_keeps_only_an_amount_the_model_states` and
 `a_remainder_takes_what_the_values_leave_of_the_amount_a_value_states`).
-
-## Whole units need a rounding to vary an initial condition
-
-A method says where the numbers of its values come from
-(`ValueSource` of `crates/commol-calibration/src/values.rs`): it varies them,
-such as an optimizer or a sampler, or it writes numbers it knows, such as the
-draws of a sample. A varied source builds its writer with `ValueWriter::varied`:
-it asks the engine whether it takes every number of the values of the plan
-(`SimulationEngine::check_varied_values`, a required method that takes the
-plan, so the values are resolved first and a new engine states its answer).
-`StochasticEvents` and `StochasticSteps` answer through `Units`: with no
-`rounding`, they refuse an initial condition, whatever its bounds, and the
-message names it and the two roundings. The deterministic engines take every
-number.
-
-| Builder | Source |
-|---|---|
-| `CalibrationProblem::new` | Varied |
-| `ForwardModel::unobserved` | Its argument: `ForwardAnalysis::new` passes varied for independent inputs, and known (every draw) for a sample, which is the design of the analysis |
-| `configured_engine` (the write-back of `Model.apply_calibration_parameters`) | Known (`ValueWriter::known`): the engine checks each number when it writes it (`Units::set_initial_condition`) |
-| `plan_model_values` | Known (`ValueWriter::known`), only to resolve the values: it writes no number |
-
-`CalibrationProblem::new` and `ForwardModel::unobserved` then write numbers
-of their source to a copy of the engine and check that no value is missing
-([A run needs every value](model-structure.md#a-run-needs-every-value)).
-A varied source writes the point of the bounds of each value nearest 0,
-which is whole when 0 is within the bounds or the bound nearest 0 is whole,
-so it does not show that every number is taken. A known source writes each of its sets, so every draw of a
-sample is checked when the analysis is built, and the message names its set.
-
-| Alternative | Why not |
-|---|---|
-| Check the bounds in `commol-calibration` | The calibration would hold a rule of the engine, against the golden rule. |
-| Refuse when the plan is built (`InitialConditionPlan::new`) | Every plan is built, also for a write of known values, so a whole value written back would need a rounding for a reason that does not apply to it. |
-| Treat every input of an analysis as varied | A sample writes only its draws: a sample of whole amounts would be refused for numbers it never writes. |
-| A default `check_varied_values` that takes every number | A new engine of whole units that forgets it would take every number with no error. |
-| Refuse only when a bound is not whole | Bounds `[0, 50]` pass, and every start fails on the first value that is not whole. |
-
-**Guards:**
-`crates/commol-calibration/tests/test_varied_values.rs`,
-`crates/commol-stochastic/tests/oracles.rs` (`calibrated_initial_conditions_go_through_the_rounding`),
-`tests/stochastic/test_calibration.py::test_a_calibrated_amount_needs_a_rounding`,
-`tests/stochastic/test_calibration.py::test_every_initial_condition_that_varies_needs_a_rounding`,
-`tests/stochastic/test_whole_units.py::test_an_analysis_that_varies_an_amount_needs_a_rounding`,
-`tests/stochastic/test_whole_units.py::test_an_analysis_of_a_sample_writes_its_draws_as_known_amounts`,
-`tests/stochastic/test_whole_units.py::test_every_draw_of_a_sample_is_checked_when_the_analysis_is_built`,
-`tests/stochastic/test_whole_units.py::test_a_known_amount_is_written_back_when_it_is_whole`,
-`tests/stochastic/test_calibration.py::test_a_calibrated_amount_with_a_rounding_is_calibrated`.

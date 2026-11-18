@@ -74,7 +74,7 @@ Here `B` is calibrated, and `A`, the remainder, takes what `B` leaves of the
 
 | `id` | Example | The value is |
 |---|---|---|
-| A bin | `"B"` | The amount of the bin, in its unit. Its compartments share it in the proportions of the initial state, also when the `Simulation` has run; compartments that start at 0, as those of a bin left `None`, share it as the stratification fractions split them, [split by category](building-models.md#fractions-that-differ-by-category) included. A prefix such as `"A_g1"` whose fraction is 0 still takes the split of the later stratifications. |
+| A bin | `"B"` | The amount of the bin, in its unit. Its compartments share it in the proportions of the initial state, also when the `Simulation` has run; compartments that start at 0, as those of a bin left `None`, share it as the stratification fractions split them, [split by category](building-models.md#fractions-that-differ-by-category) included. So do compartments that start below about `2.2e-308`, the smallest normal `float`, as those of `B = 1e-310`, whose amounts are too small to hold their proportions, unless an override sets them apart from the fractions. A prefix such as `"A_g1"` whose fraction is 0 still takes the split of the later stratifications. |
 | A bin prefix (a bin and some categories) | `"B_g1"` | The amount in those compartments, shared in the same way. Compartments are matched by label, so `B_g1` never covers a bin `B_g1x`. |
 | An expanded compartment | `"B_g1_t2"` | The amount of that compartment alone, in the unit of its bin. |
 | A category of a **binary** stratification | `"g1"` or `"group:g1"` | The split: every `(g1, g2)` pair of compartments keeps its total and gives `g1` this fraction. When a later stratification is split by `group`, directly or through another, each side keeps that split, also a side that starts at 0. |
@@ -120,7 +120,7 @@ values leave of the amounts the model states:
 | It keeps the sum of what the values and it cover | A compartment that no value covers keeps its amount, so it does not change the remainder. A bin left `None` for calibration counts as 0, except a compartment an override names, so the remainder states the sum: `A` holds 1000 while `B` is unknown. On `StochasticEvents` or `StochasticSteps`, each run rounds every bin on its own, so the start can hold up to half a unit more or less per bin that is not whole ([Whole units](stochastic.md#whole-units)). |
 | It needs an amount the model states | The model states the amount of the remainder or of a calibrated bin, prefix or compartment, in a bin amount or an override: with `{"A": None, "B": 1000}`, `A` takes what a calibrated `B` leaves of 1000. When the model states none, the sum is 0, a value no one gave, so the `Calibrator`, a `SensitivityAnalysis` and `apply_calibration_parameters` reject the remainder with `Initial-condition remainder 'A' would give a value no one gave`, which names the amounts. A stated 0 is an amount: with `{"A": None, "B": 0}`, every positive `B` leaves `A` below zero. |
 | It has the unit of every amount it gives | The `Calibrator` rejects a calibrated bin, prefix or compartment whose unit is not the unit of the remainder, and names both. A category split has no unit. |
-| It keeps its own split | A bin remainder shares what it takes across its compartments in the proportions of the initial state, or of the stratification fractions when they start at 0. |
+| It keeps its own split | A bin remainder shares what it takes across its compartments in the proportions of the initial state, or of the stratification fractions when they start at 0 or below about `2.2e-308`, as [a bin](#what-an-id-can-name) does. The fractions then take each calibrated category in place of its declared split. |
 | It must not overlap a calibrated id | Building the problem rejects it otherwise. |
 | A value that would make it negative is penalized | The optimizer moves away from it. |
 
@@ -264,4 +264,4 @@ its complement the rest, in every split of a stratification whose fractions
 |---|---|
 | The rules of initial conditions | [Building Models](building-models.md#the-structure-aggregate) |
 | Reporting fitted initial conditions | [Reports](reports.md) |
-| The design behind this page | [Calibrated initial conditions](../codebase/decisions/calibrated-initial-conditions.md), [Calibration write-back](../codebase/decisions/calibration-write-back.md) |
+| The design behind this page | [Calibrated initial conditions](../codebase/decisions/calibrated-initial-conditions.md), [Calibration write-back](../codebase/decisions/calibration-write-back.md), [Whole units need a rounding to vary an initial condition](../codebase/decisions/calibration.md#whole-units-need-a-rounding-to-vary-an-initial-condition) |
