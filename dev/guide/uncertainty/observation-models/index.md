@@ -116,14 +116,17 @@ A count observed on a known share of the model output, such as a sample of a kno
 
 A noise argument is a number, or the id of a calibration parameter of type `"noise"`. A noise parameter is fitted, sampled and reported with the others, and never reaches the engine; `Model.apply_calibration_parameters` skips it, as it skips a factor. Its bounds must lie in the domain of the argument: above 0 for `sd`, `sigma`, `scale` and `df`, at least 0 for `overdispersion`. No prediction reads a noise parameter, so `StructuralRank` and `Collinearity` leave it out ([Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#noise-parameters)).
 
-| Rule                                                                                                        | Error                                                |
-| ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| A problem has `loss_function` or `observation_models`, exactly one, with no default                         | `ValueError` from `CalibrationProblem`               |
-| Every observed series has a model, and every model names an observed series                                 | `ValueError` from `Calibrator` that names the series |
-| Every noise parameter is an argument of a model                                                             | `ValueError` that names the parameter                |
-| Counts are whole numbers, at least 0; a binomial count is at most its trials; a log-normal value is above 0 | `ValueError` that names the observation              |
-| A stochastic engine needs a loss                                                                            | `ValueError` from `Calibrator`                       |
-| `normalize_observations` needs a loss: the models set the scale of each series                              | `ValueError` from `CalibrationProblem`               |
+| Rule                                                                                                              | Error                                                                   |
+| ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| A problem has `loss_function` or `observation_models`, exactly one, with no default                               | `ValueError` from `CalibrationProblem`                                  |
+| Every observed series has a model, and every model names an observed series                                       | `ValueError` from `Calibrator` that names the series                    |
+| Every noise parameter is an argument of a model                                                                   | `ValueError` that names the parameter                                   |
+| Counts are whole numbers, at least 0; a binomial count is at most its trials; a log-normal value is above 0       | `ValueError` that names the observation                                 |
+| A stochastic engine needs a loss                                                                                  | `ValueError` from `Calibrator`                                          |
+| `parts > 1` and `trials` need observation models: a problem with a loss refuses them                              | `ValueError` from `Calibrator` that names the observation and the field |
+| A negative binomial series with an observation of `parts > 1` needs `sum`, and a series without one refuses `sum` | `ValueError` that names the series                                      |
+| Only Poisson, normal and negative binomial models read a sum of parts                                             | `ValueError` that names the observation and its series                  |
+| `normalize_observations` needs a loss: the models set the scale of each series                                    | `ValueError` from `CalibrationProblem`                                  |
 
 `Likelihood::new` in `crates/commol-calibration/src/likelihood/mod.rs` checks the models and values; `CalibrationProblem._validate_loss_or_models` checks the first and the last rules.
 
@@ -134,6 +137,46 @@ A stochastic engine is refused because the likelihood of a stochastic model inte
 The log-likelihood is `Σᵢ wᵢ · log p(yᵢ | μᵢ)`, where `μᵢ` is the prediction and `wᵢ` the observation weight. The weight raises the density of the observation to its power: an observation of weight 2 counts twice, as in every loss. The log densities are written in commol (`Noise::log_density` in `crates/commol-calibration/src/likelihood/density.rs`), and `crates/commol-calibration/tests/test_likelihood.rs` checks them against reference values of SciPy.
 
 A prediction outside the means a model allows, such as a negative count or a binomial mean above its trials, leaves the point outside the support: the optimizer gets a penalty, and a sampler a density of 0.
+
+## Sums of parts
+
+An observation with [`parts=K`](https://munqu.github.io/commol/latest/guide/calibration-observations/#parts-of-a-window) is the sum of `K` independent observations, one per part of its window, with the means `μ₁, …, μ_K` of the parts and their sum `M`. Its model reads the sum:
+
+| Model                                                         | The sum                                                                                         |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `PoissonObservations()`                                       | `Poisson(M)`, exactly                                                                           |
+| `NormalObservations(sd)`                                      | `N(M, K · sd²)`, exactly                                                                        |
+| `NegativeBinomialObservations(overdispersion, sum="exact")`   | The convolution of the parts, by a recursion; at `φ = 0` it is `Poisson(M)`                     |
+| `NegativeBinomialObservations(overdispersion, sum="moments")` | `NB(M, φ · Σμₜ²/M²)`, the negative binomial of the mean and the variance `M + φΣμₜ²` of the sum |
+| Log-normal, Student t, binomial                               | Refused: their sums have no closed form                                                         |
+
+A negative binomial series with parts says how it reads them: `sum` has no default. `"moments"` is exact for equal parts and cheap; it drifts from the sum when the parts differ and the totals are large, with `φ ≳ 0.5`, and with few effective parts, `(Σμₜ)²/Σμₜ² ≲ 5`, and there it biases the fit of `φ`. `"exact"` costs about `K · y + y²` operations per evaluation of a total `y`, and its information is a sum over every count of non-negligible mass, which reaches far above `M` for a large `φ`: at totals in the thousands it is the cost of the fit.
+
+```python
+weekly = Simulation(decay_model(0.05)).run(num_steps=40)
+size = 1 / 0.1
+steps = [
+    float(rng.negative_binomial(size, size / (size + weekly["B"][t] - weekly["B"][t - 1])))
+    for t in range(1, 41)
+]
+totals = [
+    ObservedDataPoint(at=end, output="B", value=sum(steps[end - 5 : end]), window=5, parts=5)
+    for end in range(5, 41, 5)
+]
+sums = CalibrationProblem(
+    observed_data=totals,
+    parameters=problem.parameters,
+    observation_models={
+        "B": NegativeBinomialObservations(overdispersion="phi", sum="exact")
+    },
+    optimization_config=NelderMeadConfig(max_iterations=2000),
+    seed=42,
+)
+fit = Calibrator(Simulation(decay_model(None)), sums).run()
+print(round(fit.best_parameters["k1"], 2))  # 0.05
+```
+
+The gradient and the curvature of a sum are those of the density its reading uses, so the sandwich and the Laplace approximation read the same likelihood as the fit. `DistributionNoise()` and `ParametricBootstrap` draw a sum as its model reads it: each part, summed, for `"exact"`, a Poisson or a normal; the matched negative binomial for `"moments"`.
 
 ## Maximum likelihood against the posterior
 

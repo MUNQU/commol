@@ -4203,10 +4203,10 @@ observation models of the problem) a prediction interval. The log score needs
 a density, so it takes only <code>DistributionNoise</code>; the parametric bootstrap
 (<code>ParametricResampler</code>) draws its data sets with the same draws. The Rust port
 <code>ObservationNoise</code> (<code>crates/commol-inference/src/predictive.rs</code>) sees one
-draw's whole vector of observations with the draw's parameter values, so a
-noise can draw blocks of residuals across observations, and a noise model can
-read calibrated noise parameters. <code>ResidualNoise</code> serves only series the fit
-has residuals of.</p>
+draw's whole vector of observations with the draw's parameter values and the
+means of their parts, so a noise can draw blocks of residuals across
+observations, and a noise model can read calibrated noise parameters and
+draw a sum as it reads it. <code>ResidualNoise</code> serves only series the fit has residuals of.</p>
 <table>
 <thead>
 <tr>
@@ -4235,8 +4235,7 @@ has residuals of.</p>
 </table>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_resampling.rs::residual_noise_rejects_a_series_with_no_residuals</code>,
 <code>tests/uncertainty/test_resampling.py::TestResidualNoise</code>,
-<code>crates/commol-inference/tests/test_likelihood_target.rs</code>,
-<code>tests/uncertainty/test_scores.py::TestLogScore</code>.</p>
+<code>crates/commol-inference/tests/test_likelihood_target.rs</code>, <code>tests/uncertainty/test_scores.py::TestLogScore</code>.</p>
 <h2 id="conformal-variants-share-one-score-and-one-quantile">Conformal variants share one score and one quantile<a class="headerlink" href="#conformal-variants-share-one-score-and-one-quantile" title="Permanent link">&para;</a></h2>
 <p>A conformal variant only chooses which predictions and which held-out values
 feed a <code>NonconformityScore</code>; the score, its scale and the quantile

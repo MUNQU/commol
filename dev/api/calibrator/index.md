@@ -1227,19 +1227,20 @@ An observation compares one output, or the sum of several outputs, with an obser
 
 Attributes:
 
-| Name           | Type          | Description                                                                                                                                                                                                                                                                                                      |
-| -------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `at`           | `float`       | Position of the observation on the axis. The engine decides which positions its model type accepts: a DifferentialEquations model any non-negative position, a DifferenceEquations model only an integer step.                                                                                                   |
-| `output`       | \`str         | None\`                                                                                                                                                                                                                                                                                                           |
-| `outputs`      | \`list[str]   | None\`                                                                                                                                                                                                                                                                                                           |
-| `coefficients` | \`list[float] | None\`                                                                                                                                                                                                                                                                                                           |
-| `label`        | `str`         | Name of the observed series, used by reports, plots and the per-series normalization. Defaults to output.                                                                                                                                                                                                        |
-| `value`        | `float`       | Observed value                                                                                                                                                                                                                                                                                                   |
-| `weight`       | `float`       | How much this observation counts in the loss (default: 1.0). Every loss multiplies the squared or absolute residual by it: sse is Σ w·r², rmse is √(Σ w·r² / Σ w), mae is Σ w·                                                                                                                                   |
-| `factor_id`    | \`str         | None\`                                                                                                                                                                                                                                                                                                           |
-| `scale`        | `float`       | A known positive number that multiplies the model output, with the factor if there is one, before comparison (default: 1.0): the known share of the model output that the observation sees, such as the share of the units that report. A count model then reads the observed count with the mean scale · model. |
-| `window`       | \`float       | None\`                                                                                                                                                                                                                                                                                                           |
-| `trials`       | \`int         | None\`                                                                                                                                                                                                                                                                                                           |
+| Name           | Type          | Description                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `at`           | `float`       | Position of the observation on the axis. The engine decides which positions its model type accepts: a DifferentialEquations model any non-negative position, a DifferenceEquations model only an integer step.                                                                                                                                                                                                        |
+| `output`       | \`str         | None\`                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `outputs`      | \`list[str]   | None\`                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `coefficients` | \`list[float] | None\`                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `label`        | `str`         | Name of the observed series, used by reports, plots and the per-series normalization. Defaults to output.                                                                                                                                                                                                                                                                                                             |
+| `value`        | `float`       | Observed value                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `weight`       | `float`       | How much this observation counts in the loss (default: 1.0). Every loss multiplies the squared or absolute residual by it: sse is Σ w·r², rmse is √(Σ w·r² / Σ w), mae is Σ w·                                                                                                                                                                                                                                        |
+| `factor_id`    | \`str         | None\`                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `scale`        | `float`       | A known positive number that multiplies the model output, with the factor if there is one, before comparison (default: 1.0): the known share of the model output that the observation sees, such as the share of the units that report. A count model then reads the observed count with the mean scale · model.                                                                                                      |
+| `window`       | \`float       | None\`                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `parts`        | `int`         | The count of equal parts of the window (default: 1). With more than one, value is the sum of one independent observation per part, each scattered by the observation model of the series around the mean of its part, and the window splits from its start to at into parts equal lengths. Needs a window and observation models: PoissonObservations, NormalObservations or NegativeBinomialObservations with a sum. |
+| `trials`       | \`int         | None\`                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 Source code in `commol/_problem/problem.py`
 
@@ -1294,6 +1295,14 @@ class ObservedDataPoint(EngineChecked, RangeChecked):
     window : float | None
         Optional window length for a cumulative output: the prediction is the
         output at `at` minus the output at ``at - window``.
+    parts : int
+        The count of equal parts of the window (default: 1). With more than
+        one, `value` is the sum of one independent observation per part,
+        each scattered by the observation model of the series around the
+        mean of its part, and the window splits from its start to `at` into
+        `parts` equal lengths. Needs a `window` and observation models:
+        `PoissonObservations`, `NormalObservations` or
+        `NegativeBinomialObservations` with a ``sum``.
     trials : int | None
         The trials of this observation, for a `BinomialObservations` model
         with no ``trials`` of its own (default: None).
@@ -1335,6 +1344,13 @@ class ObservedDataPoint(EngineChecked, RangeChecked):
         description=(
             "Optional window length for cumulative-output observations. "
             "When set, prediction is value(at) - value(at - window)."
+        ),
+    )
+    parts: int = Field(
+        default=1,
+        description=(
+            "Count of equal parts of the window; the value is the sum of one "
+            "independent observation per part"
         ),
     )
     trials: int | None = Field(

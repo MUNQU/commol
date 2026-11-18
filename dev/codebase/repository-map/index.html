@@ -4130,7 +4130,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/forward.rs</code></td>
-<td><code>ForwardModel</code>: every clone, reset, write of values and run of the engine (<code>run_schedule</code>, <code>run_observed</code>, <code>run_at</code>), one run per replicate of a stochastic engine, or one run seeded by its caller (<code>run_once</code>); the same model on other observations (<code>with_observations</code>, which checks their positions), or with none (<code>unobserved</code>, which asks a stochastic engine for replicates and a seed); <code>Workspace</code>; the one schedule of a set of observations (<code>schedule_of</code>: each position and window start, sorted, once) and the one mean over replicates (<code>replicate_mean</code>).</td>
+<td><code>ForwardModel</code>: every clone, reset, write of values and run of the engine (<code>run_schedule</code>, <code>run_observed</code>, <code>run_at</code>), one run per replicate of a stochastic engine, or one run seeded by its caller (<code>run_once</code>); the same model on other observations (<code>with_observations</code>, which checks their positions), or with none (<code>unobserved</code>, which asks a stochastic engine for replicates and a seed); <code>Workspace</code> (the predictions and the means of the parts); the one schedule of a set of observations (<code>schedule_of</code>: each position, window start and boundary of a part, sorted, once) and the one mean over replicates (<code>replicate_mean</code>).</td>
 <td>Loss, penalties, history; a second schedule or mean over replicates.</td>
 </tr>
 <tr>
@@ -4140,7 +4140,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/observation.rs</code></td>
-<td><code>ObservationOperator</code>: one prediction per observation from the rows of a run (rows, sums of outputs, windows, scales, factors); <code>index_at</code>, the row of a position within the tolerance of the axis; the arithmetic of every window: <code>window_start</code> and <code>check_window_end</code>, the window of an observation; <code>window_increments</code>, which <code>windowed_totals</code> also reads; the grid of windows that results, figures and reports read (<code>window_bounds</code>, <code>window_index</code>, <code>window_ends</code>, <code>windows_in</code>).</td>
+<td><code>ObservationOperator</code>: one prediction per observation from the rows of a run (rows, sums of outputs, windows, scales, factors), and the mean of each part of its window from the rows of every boundary (<code>apply_parts</code>); <code>index_at</code>, the row of a position within the tolerance of the axis; the arithmetic of every window: <code>window_start</code> and <code>check_window_end</code>, the window of an observation; <code>window_increments</code>, which <code>windowed_totals</code> also reads; the grid of windows that results, figures and reports read (<code>window_bounds</code>, <code>window_index</code>, <code>window_ends</code>, <code>windows_in</code>).</td>
 <td>Comparison with data.</td>
 </tr>
 <tr>
@@ -4155,7 +4155,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/likelihood/</code></td>
-<td>The observation models: <code>ObservationModel</code> and <code>Argument</code> (<code>likelihood/mod.rs</code>), <code>Likelihood</code> (the model and trials of each observation, the checks of models, noise parameters and observed values, the pointwise log-likelihood), <code>Noise</code> (<code>density.rs</code>: a model with numbers for its noise, its log density, the means it allows, its scores and Fisher information), <code>TermDerivatives</code> (the gradient and the expected curvature of each observation's term, also of a loss through <code>Discrepancy::term_derivatives</code>).</td>
+<td>The observation models: <code>ObservationModel</code> and <code>Argument</code> (<code>likelihood/mod.rs</code>), <code>Likelihood</code> (the model and trials of each observation, the checks of models, noise parameters and observed values, the pointwise log-likelihood), <code>Noise</code> (<code>density.rs</code>: a model with numbers for its noise, its log density, the means it allows, its scores and Fisher information), the readings of a sum of parts (<code>sums.rs</code>: <code>Sum</code>, the exact recursion and the moments, their densities, scores and information), <code>TermDerivatives</code> (the gradient and the expected curvature of each observation's term, also of a loss through <code>Discrepancy::term_derivatives</code>).</td>
 <td>Draws; running engines.</td>
 </tr>
 <tr>
@@ -4210,7 +4210,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/predictive.rs</code></td>
-<td><code>Predictive</code> (the run of every draw, its bands), <code>observation_draws</code> through <code>ForwardModel::with_observations</code>, the <code>ObservationNoise</code> port (one draw's whole vector), <code>NoNoise</code>, and <code>DistributionNoise</code> with the draw of each observation model; <code>Band</code>, the one layout of a band (<code>[position][output]</code>, also of the delta method) and its one reducer (<code>Band::of</code>, on <code>statistics::summary</code>); <code>share_among_replicates</code>, the one share of the weight of a draw among its replicates.</td>
+<td><code>Predictive</code> (the run of every draw, its bands), <code>observation_draws</code> through <code>ForwardModel::with_observations</code>, the <code>ObservationNoise</code> port (one draw's whole vector, with the means of the parts, <code>ObservedMeans</code>), <code>NoNoise</code>, and <code>DistributionNoise</code> with the draw of each observation model and of a sum of parts (<code>draw_sum</code>); <code>Band</code>, the one layout of a band (<code>[position][output]</code>, also of the delta method) and its one reducer (<code>Band::of</code>, on <code>statistics::summary</code>); <code>share_among_replicates</code>, the one share of the weight of a draw among its replicates.</td>
 <td>Noise models of one method; a second band reducer or layout.</td>
 </tr>
 <tr>
@@ -4235,7 +4235,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/sensitivity/</code></td>
-<td><code>SensitivitySource</code>, the port of derivatives of the predicted observations; <code>FiniteDifferences</code> on the design of the observations or a dense one; the scaled sensitivities and <code>observation_rms</code>, the root mean square of each observed series, which divides them.</td>
+<td><code>SensitivitySource</code>, the port of derivatives of the predicted observations; <code>FiniteDifferences</code> on the design of the observations or a dense one; <code>PartSensitivities</code>, the block of the derivatives of the means of the parts; the scaled sensitivities and <code>observation_rms</code>, the root mean square of each observed series, which divides them.</td>
 <td>Ranks, verdicts.</td>
 </tr>
 <tr>
@@ -4813,8 +4813,8 @@ results.</p>
 </tr>
 <tr>
 <td>Add or change an observation model or the likelihood</td>
-<td><code>crates/commol-calibration/src/likelihood/</code> (<code>likelihood/mod.rs</code>, <code>density.rs</code>)</td>
-<td><code>crates/commol-inference/src/predictive.rs</code> (<code>draw_observation</code>), <code>py-commol/commol/observations/models.py</code>, <code>docs/guide/uncertainty/observation-models.md</code></td>
+<td><code>crates/commol-calibration/src/likelihood/</code> (<code>likelihood/mod.rs</code>, <code>density.rs</code>, <code>sums.rs</code>)</td>
+<td><code>crates/commol-inference/src/predictive.rs</code> (<code>draw_observation</code>, <code>draw_sum</code>), <code>py-commol/commol/observations/models.py</code>, <code>docs/guide/uncertainty/observation-models.md</code></td>
 </tr>
 <tr>
 <td>Add an uncertainty method</td>

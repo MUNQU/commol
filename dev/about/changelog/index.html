@@ -5289,6 +5289,22 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
+<p><code>ObservedDataPoint(parts=K)</code>: a value that is the sum of <code>K</code> independent
+  observations over equal parts of its window, such as a weekly total of
+  daily counts; <code>parts=1</code> by default, and more than 1 needs a <code>window</code>. The
+  prediction is the sum of the means of the parts, and the observation model
+  of the series reads the sum: <code>PoissonObservations</code> as <code>Poisson(M)</code>,
+  <code>NormalObservations</code> as <code>N(M, K · sd²)</code>, and
+  <code>NegativeBinomialObservations(sum="exact" | "moments")</code> as the exact
+  convolution of the parts or the negative binomial of its mean and
+  variance. A negative binomial series with parts needs <code>sum</code>, and one
+  without parts refuses it; the other models refuse parts. The draws of
+  <code>DistributionNoise()</code> and <code>ParametricBootstrap</code>, the log score, the
+  gradients and the expected information read the sum as its model does. See
+  <a href="../../guide/calibration-observations/#parts-of-a-window">Parts of a window</a>
+  and <a href="../../guide/uncertainty/observation-models/#sums-of-parts">Sums of parts</a>.</p>
+</li>
+<li>
 <p><code>Aggregate.scored_amounts</code>, a <code>dict[str, ScoredAmount]</code>: the scored
   amounts that <code>Model.apply_calibration_parameters</code> writes for the
   compartments that the bins and the fractions build only to their last
@@ -5463,6 +5479,13 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   bin below half a unit starts empty. With no rounding, such an amount is
   refused as before, with the message that names the two roundings. See
   <a href="../../guide/stochastic/#whole-units">Whole units</a>.</li>
+<li><strong>Breaking:</strong> a problem with a <code>loss_function</code> refuses an observation with
+  <code>trials</code> or with <code>parts</code> above 1, fields of an observation model that a loss
+  does not read, with a message that names the observation and the field and
+  says that it needs <code>observation_models</code>. Before, a loss ignored <code>trials</code>.
+  Drop <code>trials</code> from the observations of a loss, or fit them with a
+  <code>BinomialObservations()</code> model. See
+  <a href="../../guide/uncertainty/observation-models/#noise-parameters">Noise parameters</a>.</li>
 <li><strong>Breaking:</strong> a build logs one <code>INFO</code> record, with the number of bins,
   parameters, transitions and outputs; the records of each bin,
   accumulator, stratification, matrix, parameter and transition of a
@@ -5991,7 +6014,14 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
-<li>A series with two observations at one position, such as an increment
+<li>
+<p>The curvature of a <code>NegativeBinomialObservations</code> of <code>overdispersion</code> 0,
+  which the Laplace approximation, the sandwich and the noise floor of a
+  profile read, is the limit of the Poisson, <code>μ²/2</code> for <code>φ</code>. Before, it ran
+  with no end.</p>
+</li>
+<li>
+<p>A series with two observations at one position, such as an increment
   over 2 steps and a total over 40 steps that both end at 40, is refused by
   the methods that read one residual per position of a series, with a
   message that names the series and the position: <code>ResidualNoise</code>,
@@ -6004,7 +6034,8 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   sandwich and the other conformal methods with a <code>block_length</code> of a number
   read each observation with its own residual, and accept such a series. Give one of the two
   observations a label of its own for the methods that refuse it. See
-  <a href="../../guide/calibration-observations/#one-position-two-observations">One position, two observations</a>.</li>
+  <a href="../../guide/calibration-observations/#one-position-two-observations">One position, two observations</a>.</p>
+</li>
 <li><code>InformationMatchingEta</code> gave an <code>η</code> far too large, so a posterior far
   too narrow, with few blocks per parameter: with 10 parameters, 35
   positions, noise of sd 1 and <code>loss_function="sse"</code>, <code>block_length=3</code> gave

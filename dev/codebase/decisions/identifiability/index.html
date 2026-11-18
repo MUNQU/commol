@@ -3851,7 +3851,12 @@ carries an estimated error, from the steps <code>h</code> and <code>2h</code> an
 the runs; the structural rank counts a singular value only above the norm of
 that error (Weyl's inequality). The scaled sensitivities
 <code>S_ij = J_ij · |θ_j| / s_i</code> do not depend on units. A stochastic engine is
-refused: its runs change in jumps with the parameters.</p>
+refused: its runs change in jumps with the parameters. The derivatives of the
+means of the parts of each observation
+(<a href="../observations/#the-parts-of-a-window-are-observations-of-every-reader">parts of a window</a>)
+come from the same runs, in a block of their own (<code>Sensitivities.parts</code>):
+the curvature and the noise floor of a profile read it, the structural rank
+and the collinearity read the observations.</p>
 <table>
 <thead>
 <tr>

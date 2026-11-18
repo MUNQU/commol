@@ -3994,7 +3994,11 @@ arguments are numbers or parameters of type <code>Noise</code>, which the value 
 skips, as it skips factors. What only makes sense for a loss refuses
 observation models: <code>normalize_observations</code>, the replicate summaries of a
 stochastic engine (the likelihood of a summary ignores the noise of the
-process), <code>LossDistance</code> of ABC and information matching of <code>η</code>.</p>
+process), <code>LossDistance</code> of ABC and information matching of <code>η</code>. A loss
+refuses the fields of an observation model, <code>parts &gt; 1</code> and <code>trials</code>
+(<code>check_loss_fields</code> of <code>calibration_problem.rs</code>), with a message that names
+the field and, for a stochastic engine, says that the models need a
+deterministic one: a field with no effect hides a mistake.</p>
 <table>
 <thead>
 <tr>
@@ -4022,7 +4026,8 @@ process), <code>LossDistance</code> of ABC and information matching of <code>η<
 </tbody>
 </table>
 <p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_likelihood.rs</code>,
-<code>tests/uncertainty/test_observation_models.py</code>.</p>
+<code>tests/uncertainty/test_observation_models.py</code>,
+<code>tests/calibration/test_observations.py::TestParts::test_a_loss_refuses_parts_and_trials</code>.</p>
 <h2 id="a-simulation-follows-its-model">A <code>Simulation</code> follows its model<a class="headerlink" href="#a-simulation-follows-its-model" title="Permanent link">&para;</a></h2>
 <p><code>Simulation</code> keeps the JSON its engine was built from. <code>run</code>, <code>engine</code> and
 <code>simulation_outputs</code> compare it with <code>model_dump_json()</code> and rebuild the engine

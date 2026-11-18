@@ -3000,6 +3000,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-parts-of-a-window-are-observations-of-every-reader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The parts of a window are observations of every reader
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-model-reads-the-sum-of-the-parts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A model reads the sum of the parts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-reader-of-positions-refuses-two-observations-at-one" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3805,6 +3827,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-parts-of-a-window-are-observations-of-every-reader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The parts of a window are observations of every reader
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-model-reads-the-sum-of-the-parts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A model reads the sum of the parts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-reader-of-positions-refuses-two-observations-at-one" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3838,8 +3882,9 @@
 <h1 id="observations">Observations<a class="headerlink" href="#observations" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
 <p>How an observation reads a run: the one operator of the engine, the known
-scale of an observation, the coefficients of a weighted sum of outputs and
-the readers that refuse two observations of a series at one position.
+scale of an observation, the coefficients of a weighted sum of outputs, the
+parts of a window and the readers that refuse two observations of a series at
+one position.
 What a weight means and how a calibration runs are on
 <a href="../calibration/">Calibration</a>.</p>
 <h2 id="one-observation-operator">One observation operator<a class="headerlink" href="#one-observation-operator" title="Permanent link">&para;</a></h2>
@@ -3948,6 +3993,88 @@ rules of one built in Python.</p>
 <code>profiles::tracer::tests::the_absolute_error_of_a_prediction_counts_each_output_by_its_coefficient</code>,
 <code>sensitivity::finite_differences::tests::observations_with_other_coefficients_are_another_series</code>,
 <code>tests/calibration/test_coefficients.py</code>.</p>
+<h2 id="the-parts-of-a-window-are-observations-of-every-reader">The parts of a window are observations of every reader<a class="headerlink" href="#the-parts-of-a-window-are-observations-of-every-reader" title="Permanent link">&para;</a></h2>
+<p>An observation with <code>parts=K</code> (<code>ObservedDataPoint.parts</code>, 1 by default, the
+rule <code>PARTS</code> of <code>crates/commol-calibration/src/ranges.rs</code>) is the sum of <code>K</code> independent observations over
+equal parts of its window, with the boundaries
+<code>b_k = start + k · (at − start) / K</code> (<code>ObservedDataPoint::part_boundaries</code>),
+<code>b₀</code> the start of the window and <code>b_K</code> its end, so the parts share their
+boundary rows. The operator keeps the rows of every boundary
+(<code>ObservationOperator::apply_parts</code>) and gives the mean of each part, times
+the coefficients, the scale and the factor; its prediction is their sum, so an
+observation of one part is its window read whole. The operator is built wherever an operator is
+(<code>ForwardModel::new</code>, <code>with_observations</code>, <code>on_schedule</code>,
+<code>CalibrationProblem::observing</code>), so the <code>Workspace</code> holds the part means of
+the problem's observations and of held-out ones, <code>ObservationNoise::observe</code>
+gets them, and <code>Sensitivities.parts</code> holds their derivatives as a block of
+its own, from the same runs, which the structural rank and the collinearity
+do not read. <code>check_positions</code> refuses an interior boundary the engine does
+not accept, naming it.</p>
+<p><strong>Rule:</strong> a count of equal parts, a field of the observation with one
+spelling: in commol <code>period</code> is a length (<code>decisions/time.md</code>), and the window
+changes by observation, as <code>window</code> and <code>trials</code> do. A label may mix any
+parts, as it mixes windows: the window sets the scale of an observation, not
+<code>parts</code>. A problem with a loss refuses <code>parts &gt; 1</code>
+(<a href="../calibration/#a-problem-has-a-loss-or-observation-models">Calibration</a>).</p>
+<p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_parts.rs</code>,
+<code>crates/commol-inference/tests/test_identifiability.rs::the_structural_rank_reads_no_part</code>,
+<code>tests/calibration/test_observations.py::TestParts</code>,
+<code>tests/uncertainty/test_scores.py::TestLogScore::test_a_held_out_sum_reads_its_parts</code>,
+<code>tests/uncertainty/test_profiles.py::TestPredictionProfiles::test_a_profile_of_a_sum_reads_its_parts</code>.</p>
+<h2 id="a-model-reads-the-sum-of-the-parts">A model reads the sum of the parts<a class="headerlink" href="#a-model-reads-the-sum-of-the-parts" title="Permanent link">&para;</a></h2>
+<p><code>Noise::sum_log_density</code>, <code>sum_scores</code> and <code>sum_information</code>
+(<code>crates/commol-calibration/src/likelihood/sums.rs</code>) read a term from the
+means of its parts; with one part they are the functions of one mean. A
+Poisson reads <code>Poisson(M)</code> and a normal <code>N(M, K · sd²)</code>, both exact. A
+negative binomial series with parts needs <code>sum</code> (<code>Sum::Exact</code> or
+<code>Sum::Moments</code>), and one without parts refuses it (<code>Likelihood::new</code>).
+<code>"exact"</code> is the recursion of Panjer over the parts, in <code>O(K · y + y²)</code>, with
+<code>log p(0)</code> kept apart and the terms scaled down past <code>1e150</code>; <code>"moments"</code> is
+<code>NB(M, φ · Σμₜ²/M²)</code>. Every other model refuses parts. The draws read the sum
+as the density does (<code>draw_sum</code> of <code>predictive.rs</code>): each part, summed, or
+the matched negative binomial for <code>"moments"</code>.</p>
+<p><strong>Rule:</strong> a term of several parts reads the density of their sum, and its
+draws, scores and information read that same density; a model with no closed
+form for the sum refuses parts.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Moments only</td>
+<td>They drift by up to 56 % of an interval with few effective parts, and bias <code>φ</code>.</td>
+</tr>
+<tr>
+<td>Exact only</td>
+<td>1.3·10⁹ operations per evaluation at a total of 50 000.</td>
+</tr>
+<tr>
+<td>A default <code>sum</code>, or a switch by the size of the total</td>
+<td>A judgment hidden in the library.</td>
+</tr>
+<tr>
+<td>Approximate sums of the log-normal and the Student t</td>
+<td>No caller (<a href="https://github.com/MUNQU/commol/issues/498#issuecomment-6983148460">L8</a>).</td>
+</tr>
+<tr>
+<td>The Poisson below a small <code>φ</code></td>
+<td>A jump in the likelihood at the threshold; the recursion, with <code>log1p(φμ)/(φμ)</code> and no division by <code>φ</code>, reaches the Poisson at <code>φ = 0</code> within 6e-14 (<a href="https://github.com/MUNQU/commol/issues/498#issuecomment-6983149187">L9</a>).</td>
+</tr>
+<tr>
+<td>Truncating the recursion where <code>q_max^j &lt; 1e-17</code></td>
+<td>It saves 10–100× at small <code>φ</code> and costs up to 7.6e-3 in <code>log p</code> far in the upper tail; only with a declared tolerance and a test of that tail (<a href="https://github.com/MUNQU/commol/issues/498#issuecomment-6983149799">L10</a>).</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_parts.rs::the_exact_sum_is_the_convolution_of_its_parts</code>,
+<code>crates/commol-calibration/tests/test_parts.rs::the_moments_of_a_sum</code>,
+<code>crates/commol-inference/tests/test_predictive.rs::draws_of_a_sum_have_the_variance_of_their_parts</code>,
+<code>tests/uncertainty/test_observation_sums.py::TestSums</code>,
+<code>tests/uncertainty/test_part_sums_coverage.py::TestPartSums</code>.</p>
 <h2 id="a-reader-of-positions-refuses-two-observations-at-one">A reader of positions refuses two observations at one<a class="headerlink" href="#a-reader-of-positions-refuses-two-observations-at-one" title="Permanent link">&para;</a></h2>
 <p>A label may hold two observations at one position (an increment and a total
 that end there), each with its own window, scale and residual. The loss, the

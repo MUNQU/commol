@@ -4010,7 +4010,14 @@ gives each observation's gradient and expected curvature over its arguments:
 <code>−2 w n² r</code> and <code>2 w n²</code> for the sum of squares, the same times
 <code>c = 1 / (2 √(W · S))</code> for the root mean squared error (its derivative per
 unit of <code>S</code>), <code>−w</code> times <code>Noise::scores</code> and <code>w</code> times <code>Noise::information</code>
-for an observation model. The mean absolute error is refused: its sandwich
+for an observation model. A term of several parts reads the density of its
+reading (<code>sum_scores</code> and <code>sum_information</code> of <code>likelihood/sums.rs</code>): its
+scores over the mean of each part, which the curvature chains with the block
+of the parts, and its expected information; for <code>"exact"</code> both come from the
+recursion and from its derivative in <code>φ</code>, the information summed over the
+counts from 0 until the terms above the mean are negligible, with the recursion tilted towards <code>M</code> plus 10 standard deviations. The information of the moments
+under <code>"exact"</code> is off by up to −15 %/+27 % and gives <code>η</code> of 0.90–0.96 for a
+correct model. The mean absolute error is refused: its sandwich
 needs a density of the residuals at 0 and a bandwidth. The sandwich,
 information matching and later gradient methods read them.</p>
 <table>
@@ -4031,7 +4038,10 @@ information matching and later gradient methods read them.</p>
 </tr>
 </tbody>
 </table>
-<p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_likelihood.rs::scores_equal_the_differences_of_the_terms</code>.</p>
+<p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_likelihood.rs::scores_equal_the_differences_of_the_terms</code>,
+<code>crates/commol-inference/tests/test_local.rs::the_gradient_of_a_sum_is_that_of_its_density</code>,
+<code>crates/commol-inference/tests/test_local.rs::the_information_of_a_sum_is_that_of_its_density</code>,
+<code>tests/uncertainty/test_local.py::TestInformationMatching::test_a_correct_model_with_sums_gives_one</code>.</p>
 <h2 id="the-sandwich-sums-scores-over-blocks">The sandwich sums scores over blocks<a class="headerlink" href="#the-sandwich-sums-scores-over-blocks" title="Permanent link">&para;</a></h2>
 <p><code>sandwich</code> (<code>local/sandwich.rs</code>) gives <code>H⁻¹ B H⁻¹</code> with
 <code>B = G/(G − 1) · Σ_b s_b s_bᵀ</code> over the non-overlapping blocks of

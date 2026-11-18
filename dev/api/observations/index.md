@@ -144,11 +144,14 @@ Negative binomial counts of mean `μ`, the prediction, and variance `μ + φμ²
 
 `φ = 0` is the Poisson, so bounds `[0, …]` of a noise parameter hold it. The dispersion `k` (`size` in R) is `1/φ`. Every observed value must be a whole number, at least 0.
 
+An observation of several parts (`ObservedDataPoint.parts`) is the sum of one independent negative binomial per part, each with this `φ`, and a series with such an observation says how its model reads that sum: `sum="exact"` reads its exact distribution, at a cost of about `K·y + y²` operations for `K` parts and a total `y`; `sum="moments"` reads a negative binomial with the mean and the variance of the sum, `NB(M, φ · Σμₜ²/M²)`, fast but off when a total spreads over few effective parts with a large `φ`. A series without such an observation has no `sum`.
+
 Attributes:
 
-| Name             | Type    | Description |
-| ---------------- | ------- | ----------- |
-| `overdispersion` | \`float | str\`       |
+| Name             | Type               | Description |
+| ---------------- | ------------------ | ----------- |
+| `overdispersion` | \`float            | str\`       |
+| `sum`            | \`{exact, moments} | None\`      |
 
 Source code in `commol/observations/models.py`
 
@@ -162,14 +165,31 @@ class NegativeBinomialObservations(_ObservationModel, RangeChecked):
     it. The dispersion ``k`` (``size`` in R) is ``1/φ``.
     Every observed value must be a whole number, at least 0.
 
+    An observation of several parts (``ObservedDataPoint.parts``) is the sum
+    of one independent negative binomial per part, each with this ``φ``, and
+    a series with such an observation says how its model reads that sum:
+    ``sum="exact"`` reads its exact distribution, at a cost of about
+    ``K·y + y²`` operations for ``K`` parts and a total ``y``;
+    ``sum="moments"`` reads a negative binomial with the mean and the
+    variance of the sum, ``NB(M, φ · Σμₜ²/M²)``, fast but off when a total
+    spreads over few effective parts with a large ``φ``. A series without
+    such an observation has no ``sum``.
+
     Attributes
     ----------
     overdispersion : float | str
         ``φ``, at least 0, or the id of a noise parameter.
+    sum : {"exact", "moments"} | None
+        How the model reads the sum of the parts of a window: required for a
+        series with an observation of more than one part, refused otherwise
+        (default: None).
     """
 
     kind: Literal["negative_binomial"] = "negative_binomial"
     overdispersion: float | str = Field(description="The overdispersion φ.")
+    sum: Literal["exact", "moments"] | None = Field(
+        default=None, description="How the model reads a sum of parts."
+    )
 ```
 
 ## BinomialObservations

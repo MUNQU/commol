@@ -4137,6 +4137,7 @@ Each observation compares the model output named in `output` with `value` at the
 | `scale`        | `float`               | `1.0`           | Above zero and finite. A known number that multiplies the prediction, with the factor; see [Known shares: scales](#known-shares-scales).                                                                                  |
 | `window`       | `float \| None`       | `None`          | Compares with the gain over `(at − window, at]` instead of the value.                                                                                                                                                     |
 | `trials`       | `int \| None`         | `None`          | The trials of the observation, for a `BinomialObservations()` model that reads them from each observation. See [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md). |
+| `parts`        | `int`                 | `1`             | At least 1. The count of equal parts of the window that the value sums, each an independent observation; more than 1 needs a `window`. See [Parts of a window](#parts-of-a-window).                                       |
 
 An unknown field, such as a misspelt name, raises `ValidationError` and names it.
 
@@ -4294,6 +4295,27 @@ A few methods read a series as one value per position, and they refuse such a la
 
 The two observations also have different scales: a total over 40 steps is about 20 times an increment over 2. Give one of them a label of its own when a method needs one scale per series. With a `block_length` of a number, the Bayesian and wild bootstraps, the block jackknife and the sandwich keep both in one label, each in the block of its position.
 
+### Parts of a window
+
+A total is often the sum of counts that were measured apart: a weekly report adds 7 daily counts, each with its own noise. `parts=K` says so: the window splits into `K` equal parts, the boundaries `at − window + k · window / K`, and the value is the sum of `K` independent observations, one per part. The prediction is still the gain over the window, the sum of the means of the parts; the [observation model](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#sums-of-parts) of the series reads the noise of the sum from the mean of each part.
+
+```python
+weekly = [
+    ObservedDataPoint(at=end, output="cum_ab", value=count, window=7, parts=7)
+    for end, count in zip(ends, counts)
+]
+print(weekly[0].parts)  # 7
+```
+
+| Rule                                      | Detail                                                                                                                                           |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Parts need a window                       | `parts > 1` without `window` raises `ValidationError` that names the observation.                                                                |
+| Each boundary is a position of the engine | A `DifferenceEquations` model needs whole steps: a window of 7 splits into 7 parts, not 2. The message names the boundary and the observation.   |
+| Observation models only                   | A problem with `loss_function` refuses `parts > 1`, as it refuses `trials`: both are fields of an observation model, which a loss does not read. |
+| One label mixes any parts                 | A label may hold totals of 1, 3 and 7 parts, as it holds windows of different lengths.                                                           |
+
+The window sets the scale of an observation, not `parts`: a total of 7 steps is about 7 times a count of one step, whatever its parts. Give the totals a label of their own when a method that reads a series needs one scale per series ([One position, two observations](#one-position-two-observations)); two labels can name the same noise parameter. A total observed next to its own parts counts the same data twice: observe either the parts or their total.
+
 ## Positions between integers
 
 An observation is at a position that the engine of the model reports at, as for [`Simulation.run_at`](https://munqu.github.io/commol/latest/guide/simulations/#simulation): a model in continuous time (`DifferentialEquations`, `StochasticEvents`) at any position, such as `2.5`, with windows of any length; a model of whole steps (`DifferenceEquations`, `StochasticSteps`) at integer steps only. The calibration reads the engine at those positions (`SimulationEngine::run_at_positions_into_buffer`), and the engine checks each one (`SimulationEngine::check_position`): `Calibrator` raises `ValueError` for a position the engine does not accept, and the engine's message names the observation, or the constraint, that holds it (`check_positions` in `crates/commol-calibration/src/calibration_problem.rs`).
@@ -4339,6 +4361,7 @@ Observe expanded outputs by name, such as `B_g1`, or sum them with `outputs`. `S
 - [ ] Every `factor_id` has a `CalibrationParameter` with `parameter_type="factor"`.
 - [ ] A known share is a `scale`, not a `factor` with narrow bounds.
 - [ ] Windowed observations use a cumulative output and a window that starts at 0 or later.
+- [ ] A total of independent counts has `parts`, and no observation of its parts beside it.
 
 ## Next steps
 
@@ -5271,14 +5294,17 @@ A count observed on a known share of the model output, such as a sample of a kno
 
 A noise argument is a number, or the id of a calibration parameter of type `"noise"`. A noise parameter is fitted, sampled and reported with the others, and never reaches the engine; `Model.apply_calibration_parameters` skips it, as it skips a factor. Its bounds must lie in the domain of the argument: above 0 for `sd`, `sigma`, `scale` and `df`, at least 0 for `overdispersion`. No prediction reads a noise parameter, so `StructuralRank` and `Collinearity` leave it out ([Identifiability](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#noise-parameters)).
 
-| Rule                                                                                                        | Error                                                |
-| ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| A problem has `loss_function` or `observation_models`, exactly one, with no default                         | `ValueError` from `CalibrationProblem`               |
-| Every observed series has a model, and every model names an observed series                                 | `ValueError` from `Calibrator` that names the series |
-| Every noise parameter is an argument of a model                                                             | `ValueError` that names the parameter                |
-| Counts are whole numbers, at least 0; a binomial count is at most its trials; a log-normal value is above 0 | `ValueError` that names the observation              |
-| A stochastic engine needs a loss                                                                            | `ValueError` from `Calibrator`                       |
-| `normalize_observations` needs a loss: the models set the scale of each series                              | `ValueError` from `CalibrationProblem`               |
+| Rule                                                                                                              | Error                                                                   |
+| ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| A problem has `loss_function` or `observation_models`, exactly one, with no default                               | `ValueError` from `CalibrationProblem`                                  |
+| Every observed series has a model, and every model names an observed series                                       | `ValueError` from `Calibrator` that names the series                    |
+| Every noise parameter is an argument of a model                                                                   | `ValueError` that names the parameter                                   |
+| Counts are whole numbers, at least 0; a binomial count is at most its trials; a log-normal value is above 0       | `ValueError` that names the observation                                 |
+| A stochastic engine needs a loss                                                                                  | `ValueError` from `Calibrator`                                          |
+| `parts > 1` and `trials` need observation models: a problem with a loss refuses them                              | `ValueError` from `Calibrator` that names the observation and the field |
+| A negative binomial series with an observation of `parts > 1` needs `sum`, and a series without one refuses `sum` | `ValueError` that names the series                                      |
+| Only Poisson, normal and negative binomial models read a sum of parts                                             | `ValueError` that names the observation and its series                  |
+| `normalize_observations` needs a loss: the models set the scale of each series                                    | `ValueError` from `CalibrationProblem`                                  |
 
 `Likelihood::new` in `crates/commol-calibration/src/likelihood/mod.rs` checks the models and values; `CalibrationProblem._validate_loss_or_models` checks the first and the last rules.
 
@@ -5289,6 +5315,46 @@ A stochastic engine is refused because the likelihood of a stochastic model inte
 The log-likelihood is `Σᵢ wᵢ · log p(yᵢ | μᵢ)`, where `μᵢ` is the prediction and `wᵢ` the observation weight. The weight raises the density of the observation to its power: an observation of weight 2 counts twice, as in every loss. The log densities are written in commol (`Noise::log_density` in `crates/commol-calibration/src/likelihood/density.rs`), and `crates/commol-calibration/tests/test_likelihood.rs` checks them against reference values of SciPy.
 
 A prediction outside the means a model allows, such as a negative count or a binomial mean above its trials, leaves the point outside the support: the optimizer gets a penalty, and a sampler a density of 0.
+
+## Sums of parts
+
+An observation with [`parts=K`](https://munqu.github.io/commol/latest/guide/calibration-observations/#parts-of-a-window) is the sum of `K` independent observations, one per part of its window, with the means `μ₁, …, μ_K` of the parts and their sum `M`. Its model reads the sum:
+
+| Model                                                         | The sum                                                                                         |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `PoissonObservations()`                                       | `Poisson(M)`, exactly                                                                           |
+| `NormalObservations(sd)`                                      | `N(M, K · sd²)`, exactly                                                                        |
+| `NegativeBinomialObservations(overdispersion, sum="exact")`   | The convolution of the parts, by a recursion; at `φ = 0` it is `Poisson(M)`                     |
+| `NegativeBinomialObservations(overdispersion, sum="moments")` | `NB(M, φ · Σμₜ²/M²)`, the negative binomial of the mean and the variance `M + φΣμₜ²` of the sum |
+| Log-normal, Student t, binomial                               | Refused: their sums have no closed form                                                         |
+
+A negative binomial series with parts says how it reads them: `sum` has no default. `"moments"` is exact for equal parts and cheap; it drifts from the sum when the parts differ and the totals are large, with `φ ≳ 0.5`, and with few effective parts, `(Σμₜ)²/Σμₜ² ≲ 5`, and there it biases the fit of `φ`. `"exact"` costs about `K · y + y²` operations per evaluation of a total `y`, and its information is a sum over every count of non-negligible mass, which reaches far above `M` for a large `φ`: at totals in the thousands it is the cost of the fit.
+
+```python
+weekly = Simulation(decay_model(0.05)).run(num_steps=40)
+size = 1 / 0.1
+steps = [
+    float(rng.negative_binomial(size, size / (size + weekly["B"][t] - weekly["B"][t - 1])))
+    for t in range(1, 41)
+]
+totals = [
+    ObservedDataPoint(at=end, output="B", value=sum(steps[end - 5 : end]), window=5, parts=5)
+    for end in range(5, 41, 5)
+]
+sums = CalibrationProblem(
+    observed_data=totals,
+    parameters=problem.parameters,
+    observation_models={
+        "B": NegativeBinomialObservations(overdispersion="phi", sum="exact")
+    },
+    optimization_config=NelderMeadConfig(max_iterations=2000),
+    seed=42,
+)
+fit = Calibrator(Simulation(decay_model(None)), sums).run()
+print(round(fit.best_parameters["k1"], 2))  # 0.05
+```
+
+The gradient and the curvature of a sum are those of the density its reading uses, so the sandwich and the Laplace approximation read the same likelihood as the fit. `DistributionNoise()` and `ParametricBootstrap` draw a sum as its model reads it: each part, summed, for `"exact"`, a Poisson or a normal; the matched negative binomial for `"moments"`.
 
 ## Maximum likelihood against the posterior
 
@@ -11403,19 +11469,20 @@ An observation compares one output, or the sum of several outputs, with an obser
 
 Attributes:
 
-| Name           | Type          | Description                                                                                                                                                                                                                                                                                                      |
-| -------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `at`           | `float`       | Position of the observation on the axis. The engine decides which positions its model type accepts: a DifferentialEquations model any non-negative position, a DifferenceEquations model only an integer step.                                                                                                   |
-| `output`       | \`str         | None\`                                                                                                                                                                                                                                                                                                           |
-| `outputs`      | \`list[str]   | None\`                                                                                                                                                                                                                                                                                                           |
-| `coefficients` | \`list[float] | None\`                                                                                                                                                                                                                                                                                                           |
-| `label`        | `str`         | Name of the observed series, used by reports, plots and the per-series normalization. Defaults to output.                                                                                                                                                                                                        |
-| `value`        | `float`       | Observed value                                                                                                                                                                                                                                                                                                   |
-| `weight`       | `float`       | How much this observation counts in the loss (default: 1.0). Every loss multiplies the squared or absolute residual by it: sse is Σ w·r², rmse is √(Σ w·r² / Σ w), mae is Σ w·                                                                                                                                   |
-| `factor_id`    | \`str         | None\`                                                                                                                                                                                                                                                                                                           |
-| `scale`        | `float`       | A known positive number that multiplies the model output, with the factor if there is one, before comparison (default: 1.0): the known share of the model output that the observation sees, such as the share of the units that report. A count model then reads the observed count with the mean scale · model. |
-| `window`       | \`float       | None\`                                                                                                                                                                                                                                                                                                           |
-| `trials`       | \`int         | None\`                                                                                                                                                                                                                                                                                                           |
+| Name           | Type          | Description                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `at`           | `float`       | Position of the observation on the axis. The engine decides which positions its model type accepts: a DifferentialEquations model any non-negative position, a DifferenceEquations model only an integer step.                                                                                                                                                                                                        |
+| `output`       | \`str         | None\`                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `outputs`      | \`list[str]   | None\`                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `coefficients` | \`list[float] | None\`                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `label`        | `str`         | Name of the observed series, used by reports, plots and the per-series normalization. Defaults to output.                                                                                                                                                                                                                                                                                                             |
+| `value`        | `float`       | Observed value                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `weight`       | `float`       | How much this observation counts in the loss (default: 1.0). Every loss multiplies the squared or absolute residual by it: sse is Σ w·r², rmse is √(Σ w·r² / Σ w), mae is Σ w·                                                                                                                                                                                                                                        |
+| `factor_id`    | \`str         | None\`                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `scale`        | `float`       | A known positive number that multiplies the model output, with the factor if there is one, before comparison (default: 1.0): the known share of the model output that the observation sees, such as the share of the units that report. A count model then reads the observed count with the mean scale · model.                                                                                                      |
+| `window`       | \`float       | None\`                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `parts`        | `int`         | The count of equal parts of the window (default: 1). With more than one, value is the sum of one independent observation per part, each scattered by the observation model of the series around the mean of its part, and the window splits from its start to at into parts equal lengths. Needs a window and observation models: PoissonObservations, NormalObservations or NegativeBinomialObservations with a sum. |
+| `trials`       | \`int         | None\`                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 Source code in `commol/_problem/problem.py`
 
@@ -11470,6 +11537,14 @@ class ObservedDataPoint(EngineChecked, RangeChecked):
     window : float | None
         Optional window length for a cumulative output: the prediction is the
         output at `at` minus the output at ``at - window``.
+    parts : int
+        The count of equal parts of the window (default: 1). With more than
+        one, `value` is the sum of one independent observation per part,
+        each scattered by the observation model of the series around the
+        mean of its part, and the window splits from its start to `at` into
+        `parts` equal lengths. Needs a `window` and observation models:
+        `PoissonObservations`, `NormalObservations` or
+        `NegativeBinomialObservations` with a ``sum``.
     trials : int | None
         The trials of this observation, for a `BinomialObservations` model
         with no ``trials`` of its own (default: None).
@@ -11511,6 +11586,13 @@ class ObservedDataPoint(EngineChecked, RangeChecked):
         description=(
             "Optional window length for cumulative-output observations. "
             "When set, prediction is value(at) - value(at - window)."
+        ),
+    )
+    parts: int = Field(
+        default=1,
+        description=(
+            "Count of equal parts of the window; the value is the sum of one "
+            "independent observation per part"
         ),
     )
     trials: int | None = Field(
@@ -22985,11 +23067,14 @@ Negative binomial counts of mean `μ`, the prediction, and variance `μ + φμ²
 
 `φ = 0` is the Poisson, so bounds `[0, …]` of a noise parameter hold it. The dispersion `k` (`size` in R) is `1/φ`. Every observed value must be a whole number, at least 0.
 
+An observation of several parts (`ObservedDataPoint.parts`) is the sum of one independent negative binomial per part, each with this `φ`, and a series with such an observation says how its model reads that sum: `sum="exact"` reads its exact distribution, at a cost of about `K·y + y²` operations for `K` parts and a total `y`; `sum="moments"` reads a negative binomial with the mean and the variance of the sum, `NB(M, φ · Σμₜ²/M²)`, fast but off when a total spreads over few effective parts with a large `φ`. A series without such an observation has no `sum`.
+
 Attributes:
 
-| Name             | Type    | Description |
-| ---------------- | ------- | ----------- |
-| `overdispersion` | \`float | str\`       |
+| Name             | Type               | Description |
+| ---------------- | ------------------ | ----------- |
+| `overdispersion` | \`float            | str\`       |
+| `sum`            | \`{exact, moments} | None\`      |
 
 Source code in `commol/observations/models.py`
 
@@ -23003,14 +23088,31 @@ class NegativeBinomialObservations(_ObservationModel, RangeChecked):
     it. The dispersion ``k`` (``size`` in R) is ``1/φ``.
     Every observed value must be a whole number, at least 0.
 
+    An observation of several parts (``ObservedDataPoint.parts``) is the sum
+    of one independent negative binomial per part, each with this ``φ``, and
+    a series with such an observation says how its model reads that sum:
+    ``sum="exact"`` reads its exact distribution, at a cost of about
+    ``K·y + y²`` operations for ``K`` parts and a total ``y``;
+    ``sum="moments"`` reads a negative binomial with the mean and the
+    variance of the sum, ``NB(M, φ · Σμₜ²/M²)``, fast but off when a total
+    spreads over few effective parts with a large ``φ``. A series without
+    such an observation has no ``sum``.
+
     Attributes
     ----------
     overdispersion : float | str
         ``φ``, at least 0, or the id of a noise parameter.
+    sum : {"exact", "moments"} | None
+        How the model reads the sum of the parts of a window: required for a
+        series with an observation of more than one part, refused otherwise
+        (default: None).
     """
 
     kind: Literal["negative_binomial"] = "negative_binomial"
     overdispersion: float | str = Field(description="The overdispersion φ.")
+    sum: Literal["exact", "moments"] | None = Field(
+        default=None, description="How the model reads a sum of parts."
+    )
 ```
 
 ## BinomialObservations
@@ -39001,6 +39103,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- `ObservedDataPoint(parts=K)`: a value that is the sum of `K` independent observations over equal parts of its window, such as a weekly total of daily counts; `parts=1` by default, and more than 1 needs a `window`. The prediction is the sum of the means of the parts, and the observation model of the series reads the sum: `PoissonObservations` as `Poisson(M)`, `NormalObservations` as `N(M, K · sd²)`, and `NegativeBinomialObservations(sum="exact" | "moments")` as the exact convolution of the parts or the negative binomial of its mean and variance. A negative binomial series with parts needs `sum`, and one without parts refuses it; the other models refuse parts. The draws of `DistributionNoise()` and `ParametricBootstrap`, the log score, the gradients and the expected information read the sum as its model does. See [Parts of a window](https://munqu.github.io/commol/latest/guide/calibration-observations/#parts-of-a-window) and [Sums of parts](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#sums-of-parts).
 - `Aggregate.scored_amounts`, a `dict[str, ScoredAmount]`: the scored amounts that `Model.apply_calibration_parameters` writes for the compartments that the bins and the fractions build only to their last bits, each with the amount they `built` and the amount the calibration `scored`, at most 64 units in the last place apart. The build applies a scored amount last, while its compartment still builds `built`, has no `compartment_amounts` entry and is not of a bin left `None`, and ignores it otherwise, so an edit of the model takes effect, whatever its path. `compartment_amounts` holds only what the user declares, a value a calibration sets for an exact compartment among them, which an update of its bin keeps as before. `describe()` says in one line how many compartments start from a scored amount. A file with a non-empty `scored_amounts` needs this release or later; a model with none writes no field. See [Writing back](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/#writing-back).
 - Ctrl-C stops a method that logs its steps: it starts no new step, waits for the steps already running, and raises `KeyboardInterrupt`, whatever the level of the logger. See [Stop a long method](https://munqu.github.io/commol/latest/getting-started/quickstart/#stop-a-long-method).
 - More long methods log their steps at `INFO`, on the logger of their module: each block of a block jackknife (`commol.resampling`); each fit of jackknife+, EnbPI and rolling conformal (`commol.conformal`); each generation of a Gibbs posterior, a Bayesian posterior and ABC-SMC, with its level, and each replicate and round of a calibrated `η` (`commol.smc`); and the model runs of ABC rejection (`commol.smc`), a Laplace mixture (`commol.local`), each sensitivity method (`commol.sensitivity`) and a predictive, at each 1 % of the runs. See [Log messages](https://munqu.github.io/commol/latest/getting-started/quickstart/#log-messages).
@@ -39022,6 +39125,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `InitialCompartment`, the entry of `Aggregate.initial_state`, has a fifth field, `scored`: whether a scored amount (`scored_amounts`) set the amount of the compartment. Code that unpacks an entry into four names, such as `name, bin, categories, amount = entry`, now raises `ValueError`; read the fields by name. See [Writing back](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/#writing-back).
 - The engine checks that a calibration problem leaves no value missing when the problem is built, as it does for a `SensitivityAnalysis`: it writes each value at the point of its bounds nearest 0, with the `initial_condition_remainder`, and refuses a parameter or an initial amount that the model leaves `None` and the problem does not set. The `Calibrator` checks no value of its own: it builds the problem, then checks the unit of the remainder (`ModelStructure.check_calibration_values`). A problem with one fault gets the message it got before. A problem with several can report another one first: the unit of the remainder is now checked after every check of the engine, and the values after the settings of the optimizer and the loss, so a remainder in the wrong unit and an unknown observed output report the output. The warning on constraint positions beyond the observations is no longer logged when the problem does not build. In Rust, `CalibrationProblem::new` takes the remainder after the parameters, in place of `with_initial_condition_remainder`, and `check_model_values` and its binding `commol_rs.calibration.check_model_values` are removed, so every caller of `new` gets the check. See [A run needs every value](https://munqu.github.io/commol/latest/codebase/decisions/model-structure/#a-run-needs-every-value).
 - On `StochasticEvents` and `StochasticSteps` with a `rounding`, a bin whose amount is not whole now builds, where `build` raised `ValueError`. Each run starts it at its nearest whole number, a half up whatever its split, so a bin below half a unit starts empty. With no rounding, such an amount is refused as before, with the message that names the two roundings. See [Whole units](https://munqu.github.io/commol/latest/guide/stochastic/#whole-units).
+- **Breaking:** a problem with a `loss_function` refuses an observation with `trials` or with `parts` above 1, fields of an observation model that a loss does not read, with a message that names the observation and the field and says that it needs `observation_models`. Before, a loss ignored `trials`. Drop `trials` from the observations of a loss, or fit them with a `BinomialObservations()` model. See [Noise parameters](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#noise-parameters).
 - **Breaking:** a build logs one `INFO` record, with the number of bins, parameters, transitions and outputs; the records of each bin, accumulator, stratification, matrix, parameter and transition of a `ModelBuilder` are at `DEBUG`. Set the logger `commol` to `DEBUG` to read them.
 - **Breaking:** with a `sample`, each entry of a report (`Model.applied_parameters`, `ModelStructure.report_sections`) holds its `EntrySpread` under the key `spread`, not `interval`. A report saved as JSON before this change has the key `interval`: read `spread`.
 - **Breaking:** the engine holds the one rule of a fit of a problem: a `CalibrationResult` that lacks a parameter of the problem or has one the problem does not have is refused, with the message `The fit is not a fit of this problem: it lacks ["k1"] and has ["k2"], which the problem does not have`. `Calibrator.point_sample`, `ResidualNoise(fit=...)` and `Collinearity(at=result)` refuse such a fit, and `StartsIdentifiability` refuses such a start (`A start is not a start of this problem: ...`). Before, all of them except `point_sample` accepted an extra parameter.
@@ -39076,6 +39180,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- The curvature of a `NegativeBinomialObservations` of `overdispersion` 0, which the Laplace approximation, the sandwich and the noise floor of a profile read, is the limit of the Poisson, `μ²/2` for `φ`. Before, it ran with no end.
 - A series with two observations at one position, such as an increment over 2 steps and a total over 40 steps that both end at 40, is refused by the methods that read one residual per position of a series, with a message that names the series and the position: `ResidualNoise`, `ResidualBootstrap`, `block_length="auto"` of every method, and `RollingConformal`, which counts a horizon in observations. Before, the residual noise and the residual bootstrap gave both observations the residual of one of them, and the automatic block length read them as consecutive positions, with no message. A calibration, the likelihood, the scores, and the Bayesian and wild bootstraps, the block jackknife, the sandwich and the other conformal methods with a `block_length` of a number read each observation with its own residual, and accept such a series. Give one of the two observations a label of its own for the methods that refuse it. See [One position, two observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#one-position-two-observations).
 - `InformationMatchingEta` gave an `η` far too large, so a posterior far too narrow, with few blocks per parameter: with 10 parameters, 35 positions, noise of sd 1 and `loss_function="sse"`, `block_length=3` gave `η = 8.0` and `block_length=1` gave `0.77` where `1/(2σ²) = 0.5`, since `tr(J I⁻¹ J) / tr(J)` inverts the estimate of `I`. It now gives `η = p / tr(J⁻¹ I)`, which reads `I` only through a trace: 0.51, 0.47 and, with 5 blocks of 7, 0.52. It takes two blocks or more, also fewer than the parameters, where a `ValueError` asked for more blocks than parameters, and raises a `ValueError` when every block score is 0 because the scores of each parameter fall inside one block. See [What `η` means](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means).
 - A calibrated value of a bin, and the initial-condition remainder, split by the proportions of amounts below the smallest normal `float`, about `2.2e-308`, which hold fewer digits the smaller they are: with `B = 1e-310` split `0.3, 0.7`, `B = 1.5` gave `B_x = 0.44999999999997775`, so `Model.apply_calibration_parameters` wrote both compartments as overrides, and after `update_bin_amounts({"B": 20})` `B` still started from 1.5. Where such amounts hold the split of the fractions up to their rounding, a value now splits by the fractions, so the write-back writes the bin and its split with no override. Amounts further from the fractions, such as an override, keep their proportions. See [What an id can name](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/#what-an-id-can-name).
