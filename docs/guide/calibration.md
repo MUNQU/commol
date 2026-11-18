@@ -149,7 +149,7 @@ refuses an infinite bound, with a message that names the parameter (see
 [Optimizers](calibration-optimizers.md#nelder-mead)). So do the methods that
 read the bounds as a box: `StructuralRank`, which draws its points inside
 them, and `SampleIdentifiability(reference="bounds")`, which measures the
-contraction against the uniform distribution on them; give it
+sample against the uniform distribution on them; give it
 `reference="prior"`. A NaN bound is always refused.
 
 ## Losses

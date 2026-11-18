@@ -7,8 +7,9 @@ the data determine:
   design of the observations or a dense one. Structural: what any data from
   that design can determine.
 - `Collinearity`: Brun's indices at a fit or over a sample. Practical.
-- `SampleIdentifiability`: the contraction, correlations and modes of a
-  sample. Practical.
+- `SampleIdentifiability`: what a sample learned against its reference:
+  contraction, correlations, modes, bounds that set a side, overlap and
+  directions. Practical.
 - `StartsIdentifiability`: starts of equal loss that end apart. Practical.
 - `ProfileIdentifiability`: the shape of each profile of a
   `ProfileLikelihood`. Structural when a profile is flat, practical
@@ -125,24 +126,56 @@ class SampleIdentifiability(
     IdentifiabilityMethod[IdentifiabilityReport], EngineChecked, RangeChecked
 ):
     """
-    Practical identifiability from any parameter sample: how much it contracts
-    each parameter, which parameters move together, and which marginals have
-    several modes.
+    Practical identifiability from any parameter sample: what it learned
+    about each parameter against its reference (the bounds or the priors).
+
+    A parameter is ``poorly_determined`` when its contraction is below
+    `contraction_threshold`, its correlation with another is above
+    `correlation_threshold`, or its marginal has several modes. The section
+    also gives the mass of each parameter in the outer `bound_share` of its
+    reference at each side, the bounds that set a side of a marginal
+    (``at_bound``, which does not set the verdict), the overlap of each
+    marginal with its reference and the directions of the parameters, with
+    the count of directions among the ``determined`` parameters that
+    contract less than `contraction_threshold`. Equal draws are merged, each
+    with the summed weight of its copies. The bootstrap of that count draws
+    from the seed of the calibrator, ``Calibrator.seed``.
 
     Attributes
     ----------
     sample : ParameterSample
         The sample, such as the draws of an uncertainty method.
     reference : {"bounds", "prior"}
-        The distribution the contraction compares with: ``"bounds"``, the
+        The distribution the sample is measured against: ``"bounds"``, the
         uniform distribution on the bounds, or ``"prior"``, the prior of each
         parameter in `priors`, such as the priors the sample was drawn with.
     correlation_threshold : float
         The absolute correlation above which a pair is listed and its
         parameters are poorly determined, strictly between 0 and 1. No
         default: it is a modelling judgment.
+    contraction_threshold : float
+        The contraction ``1 − Var(sample) / Var(reference)`` below which a
+        parameter is poorly determined, strictly between 0 and 1; also the
+        contraction below which a direction counts as a hidden ridge. No
+        default: it is a modelling judgment.
+    bound_share : float
+        The share ``ε`` of the reference at each side, strictly between 0
+        and 0.5: the section gives the mass of the sample where the
+        distribution function of the reference is below ``ε`` and above
+        ``1 − ε``. No default: it is a modelling judgment.
+    log_parameters : list[str]
+        The parameters whose shape measures (contraction, correlation,
+        modes, density at a bound, directions) read ``ln θ``; each has a
+        lower bound of at least 0 and every draw above 0. Default: none.
     priors : Priors | dict[str, distribution] | None
         The prior of each parameter, with ``reference="prior"`` only.
+
+    Raises
+    ------
+    ValueError
+        When the analysis runs, if `log_parameters` names a parameter the
+        sample does not hold, one with a lower bound below 0, or one with a
+        draw at 0.
     """
 
     _runner = staticmethod(run_sample_identifiability)
@@ -152,6 +185,9 @@ class SampleIdentifiability(
     sample: ParameterSample
     reference: SampleReference
     correlation_threshold: float
+    contraction_threshold: float
+    bound_share: float
+    log_parameters: list[str] = Field(default_factory=list)
     priors: Priors | None = None
 
     @model_validator(mode="before")

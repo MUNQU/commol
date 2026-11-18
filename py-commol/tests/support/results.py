@@ -194,6 +194,8 @@ def _correlated() -> IdentifiabilityReport:
             reference="prior",
             priors=PRIORS,
             correlation_threshold=0.9,
+            contraction_threshold=0.5,
+            bound_share=0.05,
         )
     )
 
@@ -304,6 +306,7 @@ EXAMPLES_OF_RESULTS: dict[str, Callable[[], ResultModel | None]] = {
     "SubsetIndex": lambda: _collinearity().collinearity[0].best_by_size[0],
     "SampleSection": lambda: _correlated().sample[0],
     "CorrelatedPair": lambda: _correlated().sample[0].correlated_pairs[0],
+    "Direction": lambda: _correlated().sample[0].directions[0],
     "StartsSection": lambda: _starts().starts[0],
     "ProfileSection": lambda: _profiled().profile[0],
     # Sensitivity

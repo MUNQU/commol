@@ -37,6 +37,7 @@ from tests.support import (
     overdispersed_calibrator,
     rare_flow_calibrator,
 )
+from tests.support.results import EXAMPLES_OF_RESULTS
 
 
 def _report(
@@ -215,6 +216,41 @@ class TestReport:
         }
         assert sections["structural"][0]["left_out"] == left_out
         assert sections["collinearity"][0]["left_out"] == left_out
+
+    def test_a_sample_section_reports_its_fields_in_order(self) -> None:
+        section = EXAMPLES_OF_RESULTS["SampleSection"]()
+        assert isinstance(section, SampleSection)
+        names = list(section.contraction)
+        report = IdentifiabilityReport(
+            parameters=names,
+            verdicts={name: ParameterVerdicts() for name in names},
+            sample=[section],
+        )
+
+        (data,) = report.report()["sections"]["sample"]
+
+        assert list(data) == [
+            "reference",
+            "correlation_threshold",
+            "contraction_threshold",
+            "bound_share",
+            "log_parameters",
+            "effective_size",
+            "contraction",
+            "correlation",
+            "correlated_pairs",
+            "modes",
+            "mass_below",
+            "mass_above",
+            "at_bound",
+            "overlap",
+            "bins",
+            "directions",
+            "hidden_ridges",
+            "draws_per_parameter",
+            "warnings",
+        ]
+        assert list(data["directions"][0]) == ["contraction", "loadings", "scales"]
 
     def test_reports_of_other_parameters_do_not_merge(self) -> None:
         other = IdentifiabilityReport(

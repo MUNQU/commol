@@ -43,6 +43,8 @@ they return, its parts, and the types of its plain-dictionary report
 
 ::: commol.identifiability.CorrelatedPair
 
+::: commol.identifiability.Direction
+
 ::: commol.identifiability.StartsSection
 
 ::: commol.identifiability.ProfileSection
@@ -79,6 +81,8 @@ they return, its parts, and the types of its plain-dictionary report
 ::: commol.identifiability.SampleSectionData
 
 ::: commol.identifiability.CorrelatedPairData
+
+::: commol.identifiability.DirectionData
 
 ::: commol.identifiability.StartsSectionData
 

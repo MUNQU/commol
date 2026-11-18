@@ -128,7 +128,7 @@ leave out the [noise parameters](#noise-parameters).
 |---|---|---|---|
 | `StructuralRank(points, design)` | The problem only | The rank of the sensitivities, the non-identifiable parameters and the identifiable combinations | Deterministic |
 | `Collinearity(at, max_subset_size, threshold)` | A fit (`CalibrationResult`) or a sample | Which subsets of parameters can be fitted together; `threshold` from 5 to 20 | Deterministic |
-| `SampleIdentifiability(sample, reference, correlation_threshold, priors)` | Any `ParameterSample` | How much the sample contracts each parameter against its bounds or its prior, which pairs move together, which marginals have several modes; `correlation_threshold` from 0.8 to 0.95 | Any |
+| `SampleIdentifiability(sample, reference, correlation_threshold, contraction_threshold, bound_share, log_parameters, priors)` | Any `ParameterSample` | What the sample learned about each parameter against its bounds or its prior: contraction, correlated pairs, modes, mass at each side, bounds that set a side, overlap and the directions of the parameters; `correlation_threshold` from 0.8 to 0.95 | Any |
 | `StartsIdentifiability(result, parameter_tolerance, loss_tolerance)` | A result of `Calibrator.run(starts=n)` with two or more converged starts | Which parameters differ between starts of equal loss | Any |
 | `ProfileIdentifiability(result)` | A `ProfileResult` of the parameters of the problem, in problem order | The verdict of the shape of each profile ([Profile Likelihood](profiles.md#verdicts-and-the-identifiability-report)); it runs no model | Any |
 
@@ -266,7 +266,10 @@ print(rank.verdicts["phi"].structural.verdict)  # None
 ### A sample
 
 `SampleIdentifiability` reads any sample, such as the draws of an uncertainty
-method. Here the sample is the ends of the starts.
+method, and says what it learned about each parameter against its
+**reference**: `"bounds"`, the uniform distribution on the bounds, or
+`"prior"` with `priors`, the prior of each parameter. Here the sample is the
+ends of the starts.
 
 ```python
 names = calibrator.parameter_names
@@ -277,25 +280,44 @@ sample = ParameterSample.equally_weighted(
     SampleMethod(name="starts"),
 )
 from_sample = calibrator.identifiability(
-    SampleIdentifiability(sample=sample, reference="bounds", correlation_threshold=0.9)
+    SampleIdentifiability(
+        sample=sample,
+        reference="bounds",
+        correlation_threshold=0.9,
+        contraction_threshold=0.5,
+        bound_share=0.05,
+    )
 )
 pair = from_sample.sample[0].correlated_pairs[0]
 print(pair.first, pair.second, round(pair.correlation, 1))  # k1 alpha -1.0
 ```
 
-| Field | Meaning |
-|---|---|
-| `contraction` | `1 − Var(sample) / Var(reference)`: near 0 when the sample spreads over the bounds, near 1 when it sits on one value |
-| `correlated_pairs` | The pairs whose absolute correlation is above `correlation_threshold` |
-| `modes` | The modes of each marginal: the maxima of a kernel density above a tenth of the highest |
+Three settings have no default, as every threshold of this page:
+`correlation_threshold` (from 0.8 to 0.95 in the literature),
+`contraction_threshold`, strictly between 0 and 1, and `bound_share`, the
+share `ε` of the reference at each side, strictly between 0 and 0.5.
+Draws that are equal in every parameter, as after a resampling, count once,
+with the sum of their weights: the section reads the Kish size of the
+distinct draws (`effective_size`).
 
-The `reference` of the contraction is `"bounds"`, the uniform distribution on
-the bounds, or `"prior"` with `priors`, the prior of each parameter: the
-sample of a [Gibbs posterior or ABC](smc.md) contracts its priors by how much
-the data inform each parameter, and a sample drawn from the priors themselves
-has a contraction near 0. `"prior"` without `priors`, or `"bounds"` with
-them, raises a `ValueError`: the engine never measures against a reference you
-did not choose.
+| Field | Meaning | Read it against the reference |
+|---|---|---|
+| `contraction` | `1 − Var(sample) / Var(reference)`, with the variance of the weighted draws | Near 0: the sample spreads as the reference, the data add nothing. Near 1: it sits on one value. Below 0: it spreads more than the reference |
+| `correlation`, `correlated_pairs` | The weighted correlations, and the pairs above `correlation_threshold` | A pair that moves together is fitted only together |
+| `modes` | The modes of each marginal, in parameter units | Two modes are two sets of values that fit |
+| `mass_below`, `mass_above` | The weight of the draws where the distribution function of the reference is below `ε`, and above `1 − ε` | A sample of its reference has `ε` at each side; more says the sample leans to that side |
+| `at_bound` | The sides whose finite bound sets that side of the marginal | See below |
+| `overlap`, `bins` | `Σ_b min(w_b, 1/B)` over `B = ⌈2 n_eff^{1/3}⌉` bins of equal reference mass (Rice's rule) | 1 for a sample of its reference, `1/B` for a sample in one bin |
+| `directions` | The eigenvectors of the covariance with each parameter divided by the standard deviation of its reference (`Direction`): a `contraction`, the `loadings` and the `scales` | A direction of contraction near 0 is a combination the data do not inform |
+| `hidden_ridges`, `draws_per_parameter`, `warnings` | How many directions among the `determined` parameters contract less than `contraction_threshold`, and `n_eff / p` | A ridge that no pair shows |
+
+A parameter is `poorly_determined` when its contraction is below
+`contraction_threshold`, it is in a correlated pair, or its marginal has two
+or more modes. The count of hidden ridges corrects the contraction of each
+direction by a Bayesian bootstrap whose weights are drawn from the seed of
+the calibrator (`Calibrator.seed`), so `problem.seed` repeats it.
+`"prior"` without `priors`, or `"bounds"` with them, raises a `ValueError`:
+the engine never measures against a reference you did not choose.
 
 ```python
 from commol.distributions import Priors, Uniform
@@ -306,14 +328,109 @@ against_priors = calibrator.identifiability(
         reference="prior",
         priors=Priors(distributions={name: Uniform() for name in names}),
         correlation_threshold=0.9,
+        contraction_threshold=0.5,
+        bound_share=0.05,
     )
 )
 section = against_priors.sample[0]
 print(section.reference, section.contraction == from_sample.sample[0].contraction)  # prior True
 ```
 
-A parameter is `poorly_determined` when it is in a correlated pair or its
-marginal has two or more modes.
+#### What the contraction measures
+
+Against an informative prior, the contraction measures what the data add to
+the prior: the sample of a [Gibbs posterior or ABC](smc.md) contracts its
+prior by how much the data inform each parameter, and a sample drawn from the
+prior has a contraction near 0. Data as informative as the prior give 0.5,
+so a parameter that collinearity calls `determined` may fall below a
+`contraction_threshold` of 0.5, and a merge of the two reports reads
+`conflicting`. A `GibbsPosterior` on the observation models of the problem
+with `eta=k` is data cloning (Lele, Nadeem and Schmuland 2010): its
+posterior is that of `k` copies of the data, so what still contracts as `k`
+grows is what the likelihood determines, and what stays is what the prior
+does. With a loss in place of observation models, `eta=k` is a tempering of
+the loss, not cloning.
+
+#### The overlap
+
+An overlap of 0.35 is a guideline of latent-class and capture–recapture
+models with uniform priors on probabilities (Garrett and Zeger 2000;
+Gimenez, Morgan and Brooks 2009): below it, the data inform the parameter.
+For a normal marginal on a uniform reference it is about a contraction of
+0.93. The estimate has a floor of `1/B`, and it sits low for a flat sample,
+whose bins scatter around `1/B`: a sample of its reference has an overlap
+above 0.85 at `n_eff = 500` and about 0.82 at 30.
+
+#### A bound that sets a side
+
+`at_bound` names a side when the density of the sample at a finite bound is
+at the top of its mode and above the density of the reference there,
+smoothed by the same kernel, by more than three standard errors. commol
+cannot tell a natural bound, such as a rate of 0, from one you chose: either
+way the bound, not the data, sets that side, and the interval of the
+parameter ends there. `at_bound` does not set the verdict: its reason, such
+as "Sample: the lower bound, not the data, sets one side; 79 % of its mass is
+in the bottom 5 % of its reference.", stays when the parameter is
+`determined`. A sample of a prior that piles at its bound, such as
+`Beta(a=5, b=1)`, is not `at_bound`.
+
+#### The scale of each parameter
+
+The contraction, the correlations, the modes, the density at a bound and the
+directions read each parameter as it is, or `ln θ` for the parameters of
+`log_parameters`. A product held fixed is a line on the log scale, and a
+heavy-tailed prior such as `LogNormal(mu=0, sigma=2)` gives a meaningless
+contraction on the natural scale. A parameter of `log_parameters` has a lower
+bound of at least 0 and every draw above 0; a bound of 0 is no bound of
+`ln θ`. The masses and the overlap read the distribution function of the
+reference, which no scale changes.
+
+```python
+import random
+
+rng = random.Random(1)
+rows = []
+for _ in range(2000):
+    # k1 · alpha held near 0.3, and k2 piled at its lower bound 0.
+    k1 = 0.3 * 2.5 ** rng.uniform(-1.0, 1.0)
+    rows.append([k1, 0.3 / k1 * (1 + 0.01 * rng.gauss(0, 1)), abs(rng.gauss(0, 0.005))])
+draws = ParameterSample.equally_weighted(
+    names, [(0.1, 3.0), (0.1, 3.0), (0.0, 0.5)], rows, SampleMethod(name="given")
+)
+logged = calibrator.identifiability(
+    SampleIdentifiability(
+        sample=draws,
+        reference="bounds",
+        correlation_threshold=0.99,
+        contraction_threshold=0.5,
+        bound_share=0.05,
+        log_parameters=["k1", "alpha"],
+    )
+).sample[0]
+ridge = logged.directions[-1]
+print(round(ridge.contraction, 3), {n: round(v, 2) for n, v in ridge.loadings.items()})
+# 1.0 {'k1': 0.71, 'alpha': 0.71, 'k2': 0.02}
+print(logged.at_bound["k2"])  # ['lower']
+```
+
+#### Limits of a sample
+
+- **Few draws lose weak modes.** A mode counts when its dip is deeper than
+  three standard errors of the density; a weak mode needs many draws to pass.
+  Each dip is tested on its own, so a flat marginal of many draws shows a
+  false second mode in about 2 % of samples of 20 000 draws (0.5 % at 2000).
+- **The effective size.** The weights of the distinct draws, which set the
+  standard errors, and their Kish size do not see correlated draws, such as
+  the particles of a short chain: they can overstate the size, and the
+  standard errors are then too small. A sample whose weight sits on one
+  draw has a contraction near 1: read `effective_size` before the verdict.
+- **Hidden ridges.** Below `n_eff ≈ 30·p` the count of hidden ridges
+  over-counts: the eigenvalues of a sample covariance spread with the
+  dimension, and the bootstrap correction does not remove all of it.
+- **A covariance is linear.** The directions and the correlations see a
+  straight ridge; a curved or multimodal posterior, such as a product on the
+  natural scale or two sets of values, hides behind a contraction that looks
+  high. Read the modes and the figures of the sample with them.
 
 ### Starts
 

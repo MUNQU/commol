@@ -26,7 +26,15 @@ StructuralDesign = Literal["observations", "dense"]
 
 
 SampleReference = Literal["bounds", "prior"]
-"""What the contraction of a sample is measured against."""
+"""What a sample is measured against."""
+
+
+ParameterScale = Literal["natural", "log"]
+"""The scale a shape measure of a sample reads a parameter on."""
+
+
+BoundSideName = Literal["lower", "upper"]
+"""A side of the bounds of a parameter."""
 
 
 ProfileThresholdName = Literal["chi_square", "beale", "bootstrap_calibrated"]
@@ -336,35 +344,113 @@ class CorrelatedPair(_FrozenResult):
     correlation: float
 
 
+class Direction(_FrozenResult):
+    """
+    A direction of the parameters of a sample: an eigenvector of the
+    covariance of the sample, each parameter on its scale divided by the
+    standard deviation of its reference.
+
+    Attributes
+    ----------
+    contraction : float
+        ``1 − λ``, with ``λ`` the eigenvalue: near 0 when the sample spreads
+        along the direction as its reference does, below 0 when it spreads
+        more.
+    loadings : dict[str, float]
+        The loading of each parameter; the largest in absolute value is
+        positive. The direction moves ``θ / sd`` of each parameter, or
+        ``ln θ / sd`` on the log scale, by its loading.
+    scales : dict[str, ParameterScale]
+        The scale of each parameter: ``"natural"``, or ``"log"`` for the
+        parameters of ``log_parameters``.
+    """
+
+    contraction: float
+    loadings: dict[str, float]
+    scales: dict[str, ParameterScale]
+
+
 class SampleSection(_FrozenResult):
     """
-    The evidence of `SampleIdentifiability`.
+    The evidence of `SampleIdentifiability`: what the sample learned about
+    each parameter against its reference.
 
     Attributes
     ----------
     reference : {"bounds", "prior"}
-        The distribution the contraction compares with: ``"bounds"``, the
+        The distribution the sample is measured against: ``"bounds"``, the
         uniform distribution on the bounds, or ``"prior"``, the prior of each
         parameter.
     correlation_threshold : float
         The absolute correlation above which a pair is listed.
+    contraction_threshold : float
+        The contraction below which a parameter is poorly determined.
+    bound_share : float
+        The share of the reference at each side in which `mass_below` and
+        `mass_above` are measured.
+    log_parameters : list[str]
+        The parameters whose shape measures read ``ln θ``.
+    effective_size : float
+        Kish's effective size of the distinct draws, each with the summed
+        weight of its copies.
     contraction : dict[str, float]
-        ``1 − Var(sample) / Var(reference)`` of each parameter: near 0 when
-        the sample spreads as the reference, near 1 when it sits on a value.
+        ``1 − Var(sample) / Var(reference)`` of each parameter, on its scale:
+        near 0 when the sample spreads as the reference, near 1 when it sits
+        on a value.
     correlation : dict[str, dict[str, float]]
-        The weighted correlation matrix.
+        The weighted correlation matrix, on the scale of each parameter.
     correlated_pairs : list[CorrelatedPair]
         The pairs above the threshold.
     modes : dict[str, list[float]]
-        The modes of the marginal of each parameter.
+        The modes of the marginal of each parameter, in parameter units.
+    mass_below : dict[str, float]
+        The weight of the draws where the distribution function of the
+        reference is below `bound_share`.
+    mass_above : dict[str, float]
+        The weight of the draws where it is above ``1 − bound_share``.
+    at_bound : dict[str, list[BoundSideName]]
+        The sides whose finite bound, not the data, sets that side of the
+        marginal of each parameter. It does not set the verdict.
+    overlap : dict[str, float]
+        ``Σ_b min(w_b, 1/B)`` of each parameter over `bins` bins of equal
+        reference mass: 1 when the sample spreads as its reference, ``1/B``
+        when it sits in one bin.
+    bins : int
+        The number of bins ``B = ⌈2 n_eff^{1/3}⌉`` of the overlap.
+    directions : list[Direction]
+        The directions of the parameters, from the least contracted; empty
+        when the sample has at most as many distinct draws as parameters.
+    hidden_ridges : int | None
+        How many directions among the parameters called ``determined`` have
+        a contraction, corrected by a Bayesian bootstrap, below
+        `contraction_threshold`: a ridge that no pair shows. None without
+        directions.
+    draws_per_parameter : float
+        The effective size per parameter, ``n_eff / p``; below about 30 the
+        count of hidden ridges over-counts.
+    warnings : list[str]
+        What the section warns of: hidden ridges, or no directions.
     """
 
     reference: SampleReference
     correlation_threshold: float
+    contraction_threshold: float
+    bound_share: float
+    log_parameters: list[str]
+    effective_size: float
     contraction: dict[str, float]
     correlation: dict[str, dict[str, float]]
     correlated_pairs: list[CorrelatedPair]
     modes: dict[str, list[float]]
+    mass_below: dict[str, float]
+    mass_above: dict[str, float]
+    at_bound: dict[str, list[BoundSideName]]
+    overlap: dict[str, float]
+    bins: int
+    directions: list[Direction]
+    hidden_ridges: int | None
+    draws_per_parameter: float
+    warnings: list[str]
 
 
 class StartsSection(_FrozenResult):

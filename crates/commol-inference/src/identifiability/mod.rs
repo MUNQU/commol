@@ -4,7 +4,7 @@
 //! |---|---|
 //! | [`structural`] | The numerical rank of the scaled sensitivities at random points, and the combinations a rank deficit leaves |
 //! | [`collinearity`](mod@collinearity) | Brun's sensitivity measures and collinearity indices |
-//! | [`sample`] | The contraction, correlations and modes of a parameter sample |
+//! | [`sample`] | What a parameter sample learned against its reference: contraction, correlations, modes, masses at each side, bounds that set a side, overlap and directions |
 //! | [`starts`] | The parameters that differ between starts of equal loss |
 //!
 //! Every analysis reads derivatives only through a
@@ -18,7 +18,7 @@ pub mod structural;
 pub use collinearity::{
     Collinearity, CollinearityVerdict, Subset, collinearity, collinearity_index,
 };
-pub use sample::{Reference, SampleIdentifiability, SampleVerdict, sample_identifiability};
+pub use sample::{Direction, SampleIdentifiability, SampleVerdict, sample_identifiability};
 pub use starts::{StartsIdentifiability, starts_identifiability};
 pub use structural::{
     Combination, PointRank, StructuralAnalysis, StructuralVerdict, Tightening, TighterRank,

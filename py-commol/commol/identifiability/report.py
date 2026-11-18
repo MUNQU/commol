@@ -7,7 +7,9 @@ from commol.profiles.results import ProfileVerdictName
 
 if TYPE_CHECKING:
     from commol.identifiability.results import (
+        BoundSideName,
         IdentifiabilityReport,
+        ParameterScale,
         ProfileThresholdName,
         SampleReference,
         StructuralDesign,
@@ -118,15 +120,36 @@ class CorrelatedPairData(TypedDict):
     correlation: float
 
 
+class DirectionData(TypedDict):
+    """`Direction` as plain data."""
+
+    contraction: float
+    loadings: dict[str, float]
+    scales: dict[str, "ParameterScale"]
+
+
 class SampleSectionData(TypedDict):
     """`SampleSection` as plain data."""
 
     reference: "SampleReference"
     correlation_threshold: float
+    contraction_threshold: float
+    bound_share: float
+    log_parameters: list[str]
+    effective_size: float
     contraction: dict[str, float]
     correlation: dict[str, dict[str, float]]
     correlated_pairs: list[CorrelatedPairData]
     modes: dict[str, list[float]]
+    mass_below: dict[str, float]
+    mass_above: dict[str, float]
+    at_bound: dict[str, list["BoundSideName"]]
+    overlap: dict[str, float]
+    bins: int
+    directions: list[DirectionData]
+    hidden_ridges: int | None
+    draws_per_parameter: float
+    warnings: list[str]
 
 
 class StartsSectionData(TypedDict):
