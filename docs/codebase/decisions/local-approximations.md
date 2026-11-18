@@ -96,7 +96,9 @@ information matching and later gradient methods read them.
 fit sum to zero and `B` would have rank below `p`. `block_length` has no
 default; `"auto"` is the length of non-overlapping blocks of the residuals.
 Information matching (`smc/gibbs.rs`) reads the same `H` as `J` and the same
-`B` as `I`, so it takes a likelihood and holds under dependence.
+`B` as `I`, so it takes a likelihood and holds under dependence; it reads `B`
+only through a trace, so it needs two blocks, not more than `p`
+([below](#information-matching-reads-the-meat-through-a-trace)).
 
 | Alternative | Why not |
 |---|---|
@@ -108,6 +110,31 @@ Information matching (`smc/gibbs.rs`) reads the same `H` as `J` and the same
 **Guards:** `tests/uncertainty/test_local.py::TestSandwich`,
 `tests/uncertainty/test_coverage.py::TestSandwich`,
 `tests/uncertainty/test_local.py::TestInformationMatching`.
+
+## Information matching reads the meat through a trace
+
+`information_matching_eta` (`smc/gibbs.rs`) gives `η = p / tr(J⁻¹ I)`, the
+magnitude adjustment of a composite likelihood (Pauli, Racugno and Ventura
+2011; Ribatet, Cooley and Davison 2012), with `J` the Gauss–Newton `H` and
+`I` the meat `B`, both on the unbounded scale, where the trace has the value
+it has on the scale of the parameters. It equals `tr(J I⁻¹ J) / tr(J)` when
+`I = J/η`. It refuses one block, whose score of a fit is zero, a trace of 0,
+when every score is 0, and a trace below `10⁻¹⁰` times that of one block per
+observation, when each parameter's scores fall inside one block. With `G`
+blocks the trace reads at most `p(G − 1)` degrees of freedom, fewer when the
+blocks share the curvature unevenly, and its reciprocal is skewed upward
+when they are few.
+
+| Alternative | Why not |
+|---|---|
+| `tr(J I⁻¹ J) / tr(J)` (Holmes and Walker 2017; Lyddon, Holmes and Walker 2019) | It inverts `I`: the inverse of an estimate from `G` block scores of `p` parameters, `G − 1` degrees of freedom after the fit, has the mean `(G − 1)/(G − p − 2)` times `I⁻¹`, none for `G ≤ p + 2`, so 12 blocks for 10 parameters give an `η` about 16 times too large, and `G ≤ p` has no inverse at all. |
+| Correct the inverse by `(G − p − 2)/(G − 1)` | It still needs `G > p + 2`, so blocks short enough for that are too short for the dependence. |
+| A leverage correction of each block (CR2) | It needs the curvature of each block; kept for when a coverage study of uneven blocks needs it, as for the sandwich. |
+
+**Guards:** `crates/commol-inference/tests/test_smc.rs::information_matching_gives_eta_near_its_value_with_few_blocks_per_parameter`,
+`crates/commol-inference/tests/test_smc.rs::information_matching_needs_two_blocks_and_scores_that_are_not_all_0`,
+`tests/uncertainty/test_local.py::TestInformationMatching`,
+`tests/uncertainty/test_coverage.py::TestInformationMatching`.
 
 ## The Laplace approximation needs observation models
 

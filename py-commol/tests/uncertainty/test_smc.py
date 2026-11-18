@@ -223,7 +223,7 @@ class TestGibbsPosterior:
             _binomial(300, loss_function="sse").uncertainty(method)
 
     def test_information_matching_needs_a_parameter_the_data_read(self) -> None:
-        # No output reads d: its loss terms have no variance.
+        # No output reads d: the curvature of the objective is singular.
         model = build(
             a_to_b_builder(
                 parameters={"c": None, "d": None},

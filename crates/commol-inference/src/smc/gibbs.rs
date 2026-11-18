@@ -10,7 +10,6 @@ use commol_calibration::{CalibrationProblem, LossConfig, Workspace};
 use commol_core::{CONFIDENCE_LEVEL, SimulationEngine, Steps};
 use commol_random::Generator;
 use commol_statistics::statistics::{interval_levels, normalized_weights, quantiles};
-use nalgebra::DMatrix;
 
 use super::TemperedTarget;
 use super::kernel::Kernel;
@@ -144,23 +143,29 @@ pub(crate) fn reached_the_posterior(run: SmcRun, posterior: &str) -> Result<SmcR
     }
 }
 
-/// `η` by information matching (Holmes and Walker 2017; Lyddon, Holmes and
-/// Walker 2019): `η = tr(J I⁻¹ J) / tr(J)` at the fit `θ̂`, on the scale of
-/// the parameters. `J` is the Gauss–Newton [`crate::local::Curvature`] of the objective,
-/// and `I` the meat of the sandwich ([`block_meat`]): the outer products of
-/// the gradients of the terms summed over blocks of `block_length`
-/// positions, or of the automatic length for `None`, so `I` holds under
-/// dependence inside blocks. The terms are those of the sum of squares or of
-/// `−log L`; with a correct observation model `I ≈ J` and `η ≈ 1`. The
-/// outcome keeps the block length and, with the automatic length, the
-/// estimate of each series ([`BlockScheme::estimates`]).
+/// `η` by information matching: `η = p / tr(J⁻¹ I)` at the fit `θ̂`, the
+/// magnitude adjustment of a composite likelihood (Pauli, Racugno and Ventura
+/// 2011; Ribatet, Cooley and Davison 2012), for `p` parameters. `J` is the
+/// Gauss–Newton [`crate::local::Curvature`] of the objective, and `I` the
+/// meat of the sandwich ([`block_meat`]): the outer products of the
+/// gradients of the terms summed over blocks of `block_length` positions, or
+/// of the automatic length for `None`, so `I` holds under dependence inside
+/// blocks. The terms are those of the sum of squares or of `−log L`; with a
+/// correct observation model `I ≈ J` and `η ≈ 1`. `I` enters only through a
+/// trace, so `η` needs no inverse of `I`, takes fewer blocks than
+/// parameters, and is the same on every scale of the parameters. With
+/// `I = J/η` it equals `tr(J I⁻¹ J) / tr(J)` (Holmes and Walker 2017;
+/// Lyddon, Holmes and Walker 2019). The outcome keeps the block length and,
+/// with the automatic length, the estimate of each series
+/// ([`BlockScheme::estimates`]).
 ///
 /// # Errors
 ///
 /// [`MethodError::Invalid`] when the loss is not the sum of squares, the
-/// engine is stochastic, the fit is on a bound, or the blocks are not more
-/// than the parameters; [`MethodError::Failed`] when the derivatives fail at
-/// the fit or `I` is singular.
+/// engine is stochastic, the fit is on a bound, the blocks are fewer than
+/// two, or every block score is 0 while the scores of the terms are not;
+/// [`MethodError::Failed`] when the derivatives fail at the fit, `J` is
+/// singular or every score is 0.
 pub fn information_matching_eta<E>(
     problem: &CalibrationProblem<E>,
     fit: &[f64],
@@ -191,26 +196,45 @@ where
     }
     let curvature = curvature_at(problem, fit, CurvatureKind::GaussNewton)?;
     let blocks = blocks_at(problem, &curvature, block_length)?;
-    let meat = block_meat(&curvature, &blocks)?;
-    // Back to the scale of the parameters: `X_θ = D⁻¹ X_u D⁻¹`.
-    let derivatives = curvature.derivatives();
-    let d = fit.len();
-    let natural = |m: &DMatrix<f64>| {
-        DMatrix::from_fn(d, d, |j, k| m[(j, k)] / (derivatives[j] * derivatives[k]))
-    };
-    let information = natural(curvature.matrix());
-    let variance = natural(&meat);
-    let inverse = variance.try_inverse().ok_or_else(|| {
+    if blocks.count() < 2 {
+        return Err(MethodError::Invalid(format!(
+            "block_length {} makes 1 block; information matching needs at least two, \
+             since the scores of a fit sum to zero. Use shorter blocks",
+            blocks.length()
+        )));
+    }
+    let meat = block_meat(&curvature, &blocks);
+    // On the unbounded scale: `tr(J⁻¹ I)` is the same on every scale.
+    let inverse = curvature.matrix().clone().try_inverse().ok_or_else(|| {
         MethodError::Failed(
-            "The variance of the scores of the terms at the fit is singular: information \
-             matching needs every parameter read by the data and scores that are not all 0"
+            "The curvature of the objective at the fit is singular: information matching \
+             needs every parameter read by the data"
                 .to_string(),
         )
     })?;
-    // With `I` positive definite, some gradient is not 0, so `tr(J) > 0`
-    // and `η > 0`.
+    // `J` is positive definite and `I` positive semi-definite, so the trace
+    // is 0 only when every block score is; `tr(J⁻¹ Σᵢ gᵢ gᵢᵀ)`, the trace of
+    // one block per observation, is its scale.
+    let gradients = curvature.gradients();
+    let independent = (gradients * &inverse).component_mul(gradients).sum();
+    if independent.is_nan() || independent <= 0.0 {
+        return Err(MethodError::Failed(
+            "The scores of the terms at the fit are all 0: the fit runs through every \
+             observation, so information matching has no variance of the scores to read"
+                .to_string(),
+        ));
+    }
+    let trace = (inverse * meat).trace();
+    if trace.is_nan() || trace <= 1e-10 * independent {
+        return Err(MethodError::Invalid(format!(
+            "block_length {} makes block scores that are all 0: the scores of each \
+             parameter fall inside one block, where they sum to zero at the fit. Use \
+             shorter blocks",
+            blocks.length()
+        )));
+    }
     Ok(InformationCalibration {
-        eta: (&information * inverse * &information).trace() / information.trace(),
+        eta: fit.len() as f64 / trace,
         block_length: blocks.length(),
         estimates: blocks.estimates().map(<[_]>::to_vec),
     })

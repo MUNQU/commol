@@ -719,6 +719,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   read each observation with its own residual, and accept such a series. Give one of the two
   observations a label of its own for the methods that refuse it. See
   [One position, two observations](../guide/calibration-observations.md#one-position-two-observations).
+- `InformationMatchingEta` gave an `η` far too large, so a posterior far
+  too narrow, with few blocks per parameter: with 10 parameters, 35
+  positions, noise of sd 1 and `loss_function="sse"`, `block_length=3` gave
+  `η = 8.0` and `block_length=1` gave `0.77` where `1/(2σ²) = 0.5`, since
+  `tr(J I⁻¹ J) / tr(J)` inverts the estimate of `I`. It now gives
+  `η = p / tr(J⁻¹ I)`, which reads `I` only through a trace: 0.51, 0.47 and,
+  with 5 blocks of 7, 0.52. It takes two blocks or more, also fewer than the
+  parameters, where a `ValueError` asked for more blocks than parameters,
+  and raises a `ValueError` when every block score is 0 because the scores
+  of each parameter fall inside one block.
+  See [What `η` means](../guide/uncertainty/smc.md#what-means).
 - A calibrated value of a bin, and the initial-condition remainder, split by
   the proportions of amounts below the smallest normal `float`, about
   `2.2e-308`, which hold fewer digits the smaller they are: with

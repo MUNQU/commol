@@ -50,6 +50,7 @@ from tests.support import (
     bounded,
     build,
     build_ode,
+    fan_calibrator,
     flow_calibrator,
     flow_observations,
     two_wells_calibrator,
@@ -506,3 +507,15 @@ class TestInformationMatching:
 
         assert result.fit is not None
         assert result.eta == pytest.approx(1.0, rel=6 * math.sqrt(2 / count))
+
+    def test_few_blocks_per_parameter_give_eta_near_its_value(self) -> None:
+        # 10 constant flows at 35 positions with noise of sd 1: the sum of
+        # squares has η = 1/(2σ²) = 0.5. Blocks of 3 and 7 positions make 12
+        # and 5 blocks for 10 parameters.
+        rng = np.random.default_rng(4)
+        calibrator = fan_calibrator((5.0 + rng.normal(size=(10, 35))).tolist())
+
+        for block_length in (3, 7):
+            result = calibrator.uncertainty(_matching(block_length))
+
+            assert result.eta == pytest.approx(0.5, rel=0.1), block_length
