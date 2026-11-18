@@ -2887,6 +2887,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-scored-amount-of-the-write-back-lives-in-its-own-field" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A scored amount of the write-back lives in its own field
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3793,6 +3804,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-scored-amount-of-the-write-back-lives-in-its-own-field" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A scored amount of the write-back lives in its own field
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3865,37 +3887,53 @@ calibration scored
 <code>crates/commol-stochastic/src/units.rs::a_bin_of_a_half_rounds_up_whatever_its_split</code>,
 <code>tests/stochastic/test_whole_units.py::TestWholeUnits::test_a_rounding_makes_each_bin_its_nearest_whole_number</code>.</p>
 <h2 id="a-written-back-model-runs-as-the-calibration-scored-it">A written-back model runs as the calibration scored it<a class="headerlink" href="#a-written-back-model-runs-as-the-calibration-scored-it" title="Permanent link">&para;</a></h2>
-<p><strong>Rule:</strong> on a stochastic engine, the write-back rebuilds the scored initial
-state bit for bit, because its rounding to whole units can turn on the last
-bit of an amount: <code>"largest_remainder"</code> breaks a tie of remainders by their
-last bits (<code>B = 12</code> split <code>0.7, 0.2, 0.1</code> gives the remainders 0.4, 0.4 and
-0.2), and <code>binomial</code> (<code>crates/commol-random/src/sample.rs</code>) branches at a
-conditional share of 0.5 and at a mean of 10, which an equal split always
-hits, or draws a count that the last bits of its share change, which shifts
-the stream of the run; only the last category with a positive share draws
-nothing (<a href="../engines/#stochastic-engines-and-seeds">Stochastic engines and seeds</a>).
-<code>calibrated_structure</code> (<code>_model/calibration_write_back.py</code>)
-drops the overrides of the compartments that the values and the remainder
-set, so no pin of an earlier write-back nor an override the user declared
-there is left, writes the bins and the splits, and, when the engine is
-stochastic (<code>is_stochastic</code>, <code>_model/engine_state.py</code>), pins each
-compartment that they rebuild other than in every bit to the scored amount.
-The engine reads a pin as Python writes it (<code>float_roundtrip</code> of <code>serde_json</code>,
+<p><strong>Rule:</strong> on every engine, the write-back rebuilds the scored initial state
+bit for bit, sign included, because a run can turn on the last bit of a start
+amount. On a stochastic engine, its rounding to whole units does:
+<code>"largest_remainder"</code> breaks a tie of remainders by their last bits
+(<code>B = 12</code> split <code>0.7, 0.2, 0.1</code> gives the remainders 0.4, 0.4 and 0.2), and
+<code>binomial</code> (<code>crates/commol-random/src/sample.rs</code>) branches at a conditional
+share of 0.5 and at a mean of 10, which an equal split always hits, or draws
+a count that the last bits of its share change, which shifts the stream of
+the run; only the last category with a positive share draws nothing
+(<a href="../engines/#stochastic-engines-and-seeds">Stochastic engines and seeds</a>).
+On any engine, a rate that steps on a start value (<code>if</code>, a comparison,
+<code>floor</code>, <code>ceil</code>, <code>round</code>, <code>%</code>, <code>1 / x</code>) does: <code>if(B_g1 &gt;= 1.05, 0.2, 0.01)</code>
+with <code>B = 1.5</code> split <code>0.7, 0.2, 0.1</code> scores <code>B_g1 = 1.05</code> and <code>B_g2 = 1.30</code>
+at 5, and the bin and its split rebuild <code>B_g1 = 1.0499999999999998</code>, which
+gives 1.11; a bin of <code>B = -0.0</code> rebuilds <code>0.0</code>, which <code>==</code> takes for <code>-0.0</code>
+and <code>1 / B_g1</code> does not. <code>calibrated_structure</code>
+(<code>_model/calibration_write_back.py</code>) drops the overrides of the compartments
+that the values and the remainder set and the scored amounts of an earlier
+write-back, writes the bins and the splits, and writes each compartment the
+result starts other than in every bit, as the engine sorts it (<code>write_back</code>
+of <code>crates/commol-model/src/builder.rs</code>, through <code>engine_state.write_back</code>;
+Python only applies the result): a scored amount when its expansion lies
+within the last bits of the scored amount, it has no override and its bin
+has an amount
+(<a href="#a-scored-amount-of-the-write-back-lives-in-its-own-field">A scored amount of the write-back lives in its own field</a>),
+and an override otherwise, such as a value of an exact compartment, which the
+bins and the splits do not hold, or a compartment the user overrides, whose
+override the scored amount replaces. The engine reads both as Python writes
+them (<code>float_roundtrip</code> of <code>serde_json</code>,
 <a href="../python-models/#a-data-object-crosses-as-the-json-of-its-dump">A data object crosses as the JSON of its dump</a>).
-A replicate of the written model, saved and loaded or not, then starts for
-the seed of the problem from the units the calibration scored and follows the
-same path, so a run of it gives <code>result.final_loss</code>.</p>
-<p>A new calibration of the written model can score other units, because the
-plan splits a value by the pinned shares, and a later <code>update_bin_amounts</code>
-keeps the pins (<a href="https://github.com/MUNQU/commol/issues/483">#483</a>).</p>
-<p>A deterministic engine keeps the contract of <code>_MATCH_TOLERANCE</code>, a relative
-<code>1e-9</code>: pins of the last bits would give most calibrated stratified models
-overrides they do not need. A rate that turns on a start value (<code>if</code>, a
-comparison, <code>floor</code>, <code>ceil</code>, <code>round</code>, <code>%</code>) can then run otherwise:
-<code>if(B_g1 &gt;= 1.05, 0.2, 0.01)</code> with <code>B = 1.5</code> split <code>0.7, 0.2, 0.1</code> scores
-<code>B_g2 = 1.30</code> at 5, and the written model, which starts from
-<code>B_g1 = 1.0499999999999998</code>, gives 1.11
-(<a href="https://github.com/MUNQU/commol/issues/488">#488</a>).</p>
+The written model, saved and loaded or not, then starts from the state the
+calibration scored and gives the outputs it scored, for the seed of the
+problem on a stochastic engine, so a run of it gives <code>result.final_loss</code>.</p>
+<p>The cost is the scored amounts: the bins and the splits rebuild some
+compartments of most splits only to their last bits, and a remainder bin
+almost all of them, so a calibrated stratified model can hold a scored amount
+for most of its compartments
+(<code>tests/initial_conditions/test_scored_amounts.py::test_a_write_back_of_four_stratifications_writes_no_override</code>:
+more than half of 162). They stay out of <code>compartment_amounts</code>, so
+<code>describe()</code> gives them one line, and <code>Model.applied_parameters</code> no row.</p>
+<p>A new calibration of the written model can score other units or amounts,
+because the plan splits a value by the shares of the scored amounts.</p>
+<p>A known limit: a bin whose prior amount is subnormal, such as <code>B = 1e-310</code>
+split <code>0.3, 0.7</code>, makes the plan split a calibrated <code>B = 1.5</code> by coarse
+subnormal shares (<code>weights</code> of <code>crates/commol-model/src/initial_conditions.rs</code>),
+so its compartments lie hundreds of units in the last place from the split,
+and the write-back writes them as overrides.</p>
 <table>
 <thead>
 <tr>
@@ -3913,8 +3951,16 @@ comparison, <code>floor</code>, <code>ceil</code>, <code>round</code>, <code>%</
 <td>O and KISS: it covers one rounding, and it moves the edge without removing it: two remainders as far apart as the tolerance still split on their last bits.</td>
 </tr>
 <tr>
-<td>Pin in any bit on every engine</td>
-<td>The invariant "What the user saves, the engine reloads" reads both ways: most calibrated stratified models of a deterministic engine would save overrides of their last bits, which hide the amount of a bin and its split from the user who reads the model, for the few rates that turn on a start value.</td>
+<td>Rebuild within a relative <code>1e-9</code> on a deterministic engine</td>
+<td>The invariant "What the user saves, the engine reloads": a rate that steps on a start value runs otherwise, as above, and a model with no step runs off in its last bits, so its loss is <code>result.final_loss</code> only approximately. Two rules for one idea, against one comparison on every engine.</td>
+</tr>
+<tr>
+<td>Correct only when a formula of the model steps, as the tree of the engine (<code>engine_state.formula_tree</code>) says</td>
+<td>O and DRY: a list of the nodes that step (<code>Conditional</code>, a comparison of a <code>Chain</code>, <code>%</code>, <code>floor</code>, …) would copy a property of the language of the engine, and each new function would need a case. A step on any state at any time, not only on a start value, can flip on a last bit, so every formula of the model must be walked. A model with no step still runs off in its last bits.</td>
+</tr>
+<tr>
+<td>Write a bin amount, a few units in the last place off, that rebuilds every compartment bit for bit</td>
+<td>KISS: a search over the build of the engine, with no amount to find in general: one amount must round to the scored compartment for every product of fractions of its bin, each of which bounds it to its own interval, a split bounds every bin at once, and a remainder is the total less the others. Where the intervals do not meet, the scored amounts stay.</td>
 </tr>
 <tr>
 <td>Make the plan split a value as the build does, so the bins and splits rebuild every bit</td>
@@ -3922,21 +3968,20 @@ comparison, <code>floor</code>, <code>ceil</code>, <code>round</code>, <code>%</
 </tr>
 <tr>
 <td>The default parse of <code>serde_json</code></td>
-<td>The invariant "What the user saves, the engine reloads": it reads some numbers of 17 digits, such as a value a calibration found (those of <code>a_number_reads_back_bit_for_bit</code>), one unit in the last place off, so a pin would not hold the scored amount. The correct parse costs more per number, but the engine parses a model once when it builds it, not in each run.</td>
+<td>The invariant "What the user saves, the engine reloads": it reads some numbers of 17 digits, such as a value a calibration found (those of <code>a_number_reads_back_bit_for_bit</code>), one unit in the last place off, so a scored amount would not hold what the calibration scored. The correct parse costs more per number, but the engine parses a model, a problem and its data once when it builds them, not in each run or evaluation: the profiles of <code>k1</code> and <code>k2</code> in <code>docs/guide/uncertainty/profiles.md</code> make the same 1096 and 1190 evaluations with either parse, in the same time. The parse moves the last bit of some numbers it reads, and with them the path of an optimizer: on the ridge of that page, where some refits never reach their <code>sd_tolerance</code> and run to <code>max_iterations</code>, the profile of <code>k1</code> made 80 764 evaluations with it against 65 174 without, which is why the page caps those refits at 1000 iterations.</td>
 </tr>
 </tbody>
 </table>
 <p><strong>Guards:</strong>
 <code>tests/stochastic/test_calibration.py::test_a_written_back_model_runs_as_the_calibration_scored_it</code>,
+<code>tests/calibration/test_write_back_runs.py::test_a_deterministic_write_back_runs_as_the_calibration_scored_it</code>,
+<code>tests/calibration/test_write_back_runs.py::test_a_write_back_keeps_the_sign_of_a_scored_zero</code>,
 <code>tests/stochastic/test_calibration.py::test_a_stratified_amount_is_written_back_with_its_split</code>,
-<code>tests/stochastic/test_calibration.py::test_successive_write_backs_end_with_the_pins_of_a_fresh_one</code>,
+<code>tests/stochastic/test_calibration.py::test_successive_write_backs_end_with_the_scored_amounts_of_a_fresh_one</code>,
 <code>tests/calibration/test_initial_conditions.py::test_a_write_back_drops_the_overrides_of_the_compartments_it_sets</code>,
-<code>crates/commol-core/tests/json.rs::a_number_reads_back_bit_for_bit</code>;
-on a deterministic engine,
-<code>tests/calibration/test_write_back.py::TestApplyCalibrationParameters::test_applied_model_reproduces_the_loss_the_optimizer_scored</code>
-and
-<code>tests/calibration/test_initial_conditions.py::test_the_write_back_of_a_split_by_category_rebuilds_the_scored_state</code>
-(no pin).</p>
+<code>tests/calibration/test_initial_conditions.py::test_the_write_back_of_a_split_by_category_rebuilds_the_scored_state</code>,
+<code>tests/calibration/test_write_back.py::TestApplyCalibrationParameters::test_applied_model_reproduces_the_loss_the_optimizer_scored</code>,
+<code>crates/commol-core/tests/json.rs::a_number_reads_back_bit_for_bit</code>.</p>
 <h2 id="a-report-marks-what-the-calibration-set-as-the-engine-resolves-it">A report marks what the calibration set, as the engine resolves it<a class="headerlink" href="#a-report-marks-what-the-calibration-set-as-the-engine-resolves-it" title="Permanent link">&para;</a></h2>
 <p><strong>Rule:</strong> <code>Model.applied_parameters(values, problem, ...)</code> takes the problem
 the values came from, as <code>apply_calibration_parameters</code> does, and marks a row
@@ -3969,7 +4014,7 @@ the written model):</p>
 </tr>
 <tr>
 <td>An override</td>
-<td>The values and the remainder write its compartment (<code>TargetCoverage::written</code>): what a value sets, and both sides of each pair of a split. So each compartment the write-back pins: of a prefix such as <code>A_g1</code>, of the remainder, of a split</td>
+<td>The values and the remainder write its compartment (<code>TargetCoverage::written</code>): what a value sets, and both sides of each pair of a split. So each compartment the write-back overrides: of a prefix such as <code>A_g1</code>, of the remainder, of a split</td>
 </tr>
 <tr>
 <td>A category split</td>
@@ -3989,7 +4034,7 @@ sample gives its spread to the row a value names, and to no other.</p>
 <tbody>
 <tr>
 <td><code>problem</code> stays optional, and without it the report reads the values by their ids</td>
-<td>The golden rule and DRY: Python resolves an id a second way, and misreads it: the parameter <code>g1</code> marks the split <code>g1</code> and gives it its spread, and the overrides that a prefix <code>A_g1</code> pins are not calibrated. One idea, one name: one call would mean two things, with the problem or without it.</td>
+<td>The golden rule and DRY: Python resolves an id a second way, and misreads it: the parameter <code>g1</code> marks the split <code>g1</code> and gives it its spread, and the overrides that a prefix <code>A_g1</code> writes are not calibrated. One idea, one name: one call would mean two things, with the problem or without it.</td>
 </tr>
 <tr>
 <td>The engine resolves each id on the model alone, a parameter first</td>
@@ -4005,7 +4050,7 @@ sample gives its spread to the row a value names, and to no other.</p>
 </tr>
 <tr>
 <td>The complement of a split and the remainder are not calibrated</td>
-<td>One idea, one name: <code>calibrated</code> would mean "a value names it" for a split and "the write-back wrote it" for an override that a prefix pins, which no value names either. Only the spread stays with the row a value names.</td>
+<td>One idea, one name: <code>calibrated</code> would mean "a value names it" for a split and "the write-back wrote it" for an override that a prefix writes, which no value names either. Only the spread stays with the row a value names.</td>
 </tr>
 </tbody>
 </table>
@@ -4013,6 +4058,84 @@ sample gives its spread to the row a value names, and to no other.</p>
 <code>tests/reporting/test_applied_parameters.py</code> (<code>test_a_parameter_with_the_id_of_a_category_marks_no_split</code>, <code>test_a_split_with_the_id_of_a_parameter_marks_no_parameter</code>, <code>test_the_overrides_a_calibrated_prefix_pins_report_calibrated</code>, <code>test_the_amounts_of_the_remainder_report_calibrated</code>, <code>test_an_override_a_calibrated_category_covers_reports_calibrated</code>, <code>test_a_value_the_problem_does_not_declare_is_refused</code>),
 <code>crates/commol-model/tests/initial_conditions.rs::the_plan_gives_the_kind_and_the_compartments_of_each_value</code>,
 <code>tests/calibration/test_initial_conditions.py::test_the_kind_of_each_target_comes_from_the_engine</code>.</p>
+<h2 id="a-scored-amount-of-the-write-back-lives-in-its-own-field">A scored amount of the write-back lives in its own field<a class="headerlink" href="#a-scored-amount-of-the-write-back-lives-in-its-own-field" title="Permanent link">&para;</a></h2>
+<p><strong>Rule:</strong> <code>scored_amounts</code> (<code>InitialConditions</code> of
+<code>crates/commol-core/src/types/aggregate.rs</code>, <code>ScoredAmount</code> in Python) holds,
+by compartment, the amount a calibration scored and the amount the bins and
+the fractions <code>built</code> for it when it was written back. The engine checks each
+entry with <code>check_scored_amount</code> (<code>crates/commol-model/src/rules.rs</code>): two
+initial amounts at most <code>SCORED_AMOUNT_ULPS</code>, 64, units in the last place
+apart, <code>0.0</code> and <code>-0.0</code> the same: the bins and the fractions rebuild a
+scored amount to a few of them, each fraction rounding once, and a value a
+calibration sets lies further away. The engine also decides which
+compartment takes one (<code>write_back</code>), so Python repeats no rule of it.
+<code>initial_state</code> (<code>builder.rs</code>) applies a scored amount last, after
+<code>compartment_amounts</code>, while it is current: the compartment expands to
+<code>built</code> in every bit, has no <code>compartment_amounts</code> entry and is not of a bin
+left <code>None</code> (<code>takes_a_scored_amount</code>, which <code>write_back</code> shares), so a
+scored amount never gives a value to an unvalued bin. Any other entry is
+stale and ignored, so an edit that changes the compartment, by an <code>update_*</code>
+method, a direct assignment, <code>model_copy</code> or a file, drops its scored
+amount, and an override wins on every path. <code>update_compartment_amounts</code>
+drops the entry it makes stale, to keep the field tidy. A stale entry is
+cleared by a new write-back or by <code>scored_amounts = {}</code>.</p>
+<p>One idea, one name: <code>compartment_amounts</code> is a declaration of the user,
+which every edit keeps, also a value a calibration set for an exact
+compartment; <code>scored_amounts</code> is a record of the write-back, valid while the
+model builds what it recorded, and no method of the user sets it. An
+override that names no compartment is a build error, because the user wrote
+a name the model does not have; a stale scored amount is ignored silently,
+because it is valid data whose condition no longer holds. An edit that
+rebuilds the same bits keeps a scored amount, which moves the amount by its
+last bits only.</p>
+<p>A file with a scored amount does not load in a commol older than the field
+(<code>extra="forbid"</code>); a model with none writes no field
+(<code>skip_serializing_if</code>, <code>exclude_if</code>), so it still does. A declared
+override, a calibrated exact-compartment value among them, survives an
+update of its bin
+(<a href="../initial-conditions/#a-compartment-amount-overrides-the-expansion">A compartment amount overrides the expansion</a>).</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The scored amounts in <code>compartment_amounts</code></td>
+<td>One idea, one name: <code>describe()</code>, <code>applied_parameters</code> and the user could not tell a scored amount from a declaration, and every edit kept a scored amount that froze the compartment at its old amount (<a href="https://github.com/MUNQU/commol/issues/483">#483</a>): <code>update_bin_amounts({"B": 100})</code> left B at 31.05.</td>
+</tr>
+<tr>
+<td>Invalidate a scored amount in each <code>update_*</code> method</td>
+<td>Decide in the core, act at the edge: Python would need the process to map a bin or a stratification to the names of its compartments, which only the engine knows, and it would miss a direct assignment, <code>model_copy</code> and a file.</td>
+</tr>
+<tr>
+<td>One fingerprint of the whole state for all the scored amounts</td>
+<td>KISS and S: all or nothing, any edit drops every scored amount, also of the bins it does not touch, and a hash is opaque in the JSON a user reads.</td>
+</tr>
+<tr>
+<td>A value of an exact compartment as a scored amount too</td>
+<td>The invariant "What the user saves, the engine reloads": a coincidence of <code>built</code> would bring a value-sized amount back after an edit: <code>A_g1 = 700</code> in a bin of 600 split <code>0.5, 0.5</code> holds while the split is 0.5, and a bin edited to 0 or <code>None</code> would keep it.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong>
+<code>crates/commol-model/src/builder.rs::a_scored_amount_replaces_the_amount_its_compartment_still_builds</code>,
+<code>crates/commol-model/src/builder.rs::a_scored_amount_is_stale_once_its_compartment_builds_another_amount</code>,
+<code>crates/commol-model/src/builder.rs::an_override_wins_over_a_scored_amount_of_its_compartment</code>,
+<code>crates/commol-model/src/builder.rs::a_scored_amount_never_gives_a_value_to_a_bin_left_none</code>,
+<code>crates/commol-model/src/builder.rs::a_scored_amount_far_from_its_built_amount_is_refused</code>,
+<code>crates/commol-model/src/builder.rs::a_write_back_corrects_the_last_bits_of_an_expansion_and_overrides_the_rest</code>,
+<code>crates/commol-model/src/builder.rs::a_write_back_overrides_a_compartment_of_a_bin_left_none</code>,
+<code>crates/commol-model/tests/value_rules.rs::a_value_inside_its_rule_is_accepted</code>,
+<code>crates/commol-core/src/types/aggregate.rs::scored_amounts_read_and_write_back_bit_for_bit</code>,
+<code>tests/calibration/test_write_back_runs.py::test_a_compartment_the_user_overrides_starts_as_the_calibration_scored_it</code>,
+<code>tests/initial_conditions/test_scored_amounts.py</code> (no report row, an edit
+that rebuilds the same bits, a new split, a bin left <code>None</code>, an override by assignment and by
+the method, an update of a bin, the round trip, the refusal, a stochastic run
+after a new split, four stratifications with no override),
+<code>tests/description/test_description.py::TestSections::test_the_initial_state_says_how_many_compartments_start_from_a_scored_amount</code>.</p>
 
 
 

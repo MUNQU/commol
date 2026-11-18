@@ -5288,10 +5288,29 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Ctrl-C stops a method that logs its steps: it starts no new step, waits
+<li>
+<p><code>Aggregate.scored_amounts</code>, a <code>dict[str, ScoredAmount]</code>: the scored
+  amounts that <code>Model.apply_calibration_parameters</code> writes for the
+  compartments that the bins and the fractions build only to their last
+  bits, each with the amount they <code>built</code> and the amount the calibration
+  <code>scored</code>, at most 64 units in the last place apart. The build applies a
+  scored amount last, while its compartment still builds <code>built</code>, has no
+  <code>compartment_amounts</code> entry and is not of a bin left <code>None</code>, and ignores it
+  otherwise, so an edit of the model takes effect, whatever its path.
+  <code>compartment_amounts</code> holds only what the user declares, a value a
+  calibration sets for an exact compartment among them, which an update of
+  its bin keeps as before. <code>describe()</code> says in one line how many
+  compartments start from a scored amount. A file with a non-empty
+  <code>scored_amounts</code> needs this release or later; a model with none writes no
+  field. See
+  <a href="../../guide/calibration-initial-conditions/#writing-back">Writing back</a>.</p>
+</li>
+<li>
+<p>Ctrl-C stops a method that logs its steps: it starts no new step, waits
   for the steps already running, and raises <code>KeyboardInterrupt</code>, whatever
   the level of the logger. See
-  <a href="../../getting-started/quickstart/#stop-a-long-method">Stop a long method</a>.</li>
+  <a href="../../getting-started/quickstart/#stop-a-long-method">Stop a long method</a>.</p>
+</li>
 <li>More long methods log their steps at <code>INFO</code>, on the logger of their
   module: each block of a block jackknife (<code>commol.resampling</code>); each fit
   of jackknife+, EnbPI and rolling conformal (<code>commol.conformal</code>); each
@@ -5414,6 +5433,12 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>StochasticEvents</code> or <code>StochasticSteps</code> with <code>rounding="random"</code>, or of
   <code>StochasticSteps</code> with such rates, can change from this version. See
   <a href="../../guide/stochastic/#whole-units">Whole units</a>.</li>
+<li><code>InitialCompartment</code>, the entry of <code>Aggregate.initial_state</code>, has a fifth
+  field, <code>scored</code>: whether a scored amount (<code>scored_amounts</code>) set the amount
+  of the compartment. Code that unpacks an entry into four names, such as
+  <code>name, bin, categories, amount = entry</code>, now raises <code>ValueError</code>; read the
+  fields by name. See
+  <a href="../../guide/calibration-initial-conditions/#writing-back">Writing back</a>.</li>
 <li>The engine checks that a calibration problem leaves no value missing when
   the problem is built, as it does for a <code>SensitivityAnalysis</code>: it writes each
   value at the point of its bounds nearest 0, with the
@@ -5980,22 +6005,30 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>g1</code> as <code>total_g1</code>, which also summed <code>type:g1</code>, so <code>B_g1_g1</code> and
   <code>A_g1_g1</code> counted twice. It now reads the sum of the compartments of <code>g1</code>.
   See <a href="../../guide/mathematical-expressions/#matrix-sums">Matrix sums</a>.</li>
-<li>A model that <code>Model.apply_calibration_parameters</code> wrote back onto
-  <code>StochasticEvents</code> or <code>StochasticSteps</code> could start, for the seed of the
-  calibration, from other units than the calibration scored and then run
-  another path, so its loss could differ from <code>result.final_loss</code>: with
-  <code>"random"</code> in a bin of several compartments, and with <code>"largest_remainder"</code>
-  when two remainders tie, such as <code>B = 12</code> split <code>0.7, 0.2, 0.1</code>. The
-  write-back rebuilt the scored amounts within a relative <code>1e-9</code>, and the
-  rounding can turn on the last bit. On these engines it now writes each
-  compartment that the bins and the splits do not rebuild bit for bit as a
-  <code>compartment_amounts</code> override of the amount the calibration scored, so
-  each replicate starts and runs as the calibration scored it, also after
-  <code>to_json</code> and <code>from_json</code>. On every engine, a write-back first drops the
+<li>A model that <code>Model.apply_calibration_parameters</code> wrote back could start
+  from other amounts than the calibration scored, in their last bits, and
+  then run otherwise. On <code>StochasticEvents</code> and <code>StochasticSteps</code>, the
+  rounding can turn on the last bit: with <code>"random"</code> in a bin of several
+  compartments, and with <code>"largest_remainder"</code> when two remainders tie, such
+  as <code>B = 12</code> split <code>0.7, 0.2, 0.1</code>, a replicate started, for the seed of the
+  calibration, from other units, so its loss could differ from
+  <code>result.final_loss</code>. On <code>DifferenceEquations</code> and <code>DifferentialEquations</code>,
+  a rate that steps on a start value ran otherwise: with
+  <code>if(B_g1 &gt;= 1.05, 0.2, 0.01)</code> and <code>B = 1.5</code> split <code>0.7, 0.2, 0.1</code>, the
+  calibration scored <code>B_g2 = 1.30</code> at 5 and the written model gave 1.11. The
+  write-back rebuilt the scored amounts within a relative <code>1e-9</code>. It now
+  writes each compartment that the bins and the splits do not rebuild bit
+  for bit, also one that differs only in its sign, as <code>-0.0</code> from <code>0.0</code>: as
+  a scored amount (<code>scored_amounts</code>) when they build it to its last bits,
+  and as a <code>compartment_amounts</code> override otherwise, such as a value of an
+  exact compartment or a compartment the user overrides. So the written
+  model, also after <code>to_json</code> and <code>from_json</code>, starts from the scored state
+  and gives the scored outputs, on every engine. A write-back first drops the
   overrides of the compartments its values and its remainder set, also those
-  the user declared, so it leaves no override, of an earlier write-back or
-  not, that its own state does not need. A deterministic engine still rebuilds within a relative <code>1e-9</code>. See
-  <a href="../../guide/stochastic/#whole-units">Whole units</a>.</li>
+  the user declared, and the scored amounts of an earlier one, and it no
+  longer leaves last-bit overrides that a later <code>update_bin_amounts</code> keeps
+  (<a href="https://github.com/MUNQU/commol/issues/483">#483</a>). See
+  <a href="../../guide/calibration-initial-conditions/#writing-back">Writing back</a>.</li>
 <li>The engine read about one number of 17 significant digits in 10, such as a
   value a calibration found, one unit in the last place off from the number
   the model holds. It now reads every number bit for bit. A run of a model

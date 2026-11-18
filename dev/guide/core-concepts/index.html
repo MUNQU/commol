@@ -4545,6 +4545,13 @@ the expansion of the process before they are stored.</p>
 <p>A category name that two stratifications declare must be qualified with its
 stratification, as in <code>{"group:g1": 0.5}</code>. Calibration writes its results back
 through these same methods.</p>
+<p>An override is your declaration, and an update of its bin keeps it: with
+<code>B = 12</code> split in halves and <code>B_g1 = 8.4</code> declared, <code>update_bin_amounts({"B":
+20})</code> starts <code>B_g1</code> at 8.4 and <code>B_g2</code> at 10, so the bin sums to 20 only where
+no override holds. To restart the bin from its amount, remove its overrides
+from <code>compartment_amounts</code>. The scored amounts a calibration write-back records
+(<code>scored_amounts</code>) stop applying by themselves; see
+<a href="../calibration-initial-conditions/#writing-back">Writing back</a>.</p>
 <h2 id="several-sources-or-targets">Several sources or targets<a class="headerlink" href="#several-sources-or-targets" title="Permanent link">&para;</a></h2>
 <p>A transition can have several sources or several targets. It then moves
 <strong>one</strong> flow, which each source loses and each target gains, so its rate must

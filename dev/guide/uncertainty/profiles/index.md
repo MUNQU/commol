@@ -202,7 +202,7 @@ A profile is flat for one of two reasons: other parameters compensate the parame
 
 A reset whose evaluation fails counts as infeasible. The ends of the box only rule out `non_identifiable`. A parameter is named in the reason when resetting it alone, where it moves most along the profile, raises the objective of that point above `T`; the parameters not named are then reset together, and a rise above the floor says that the list may be incomplete. Noise parameters of observation models are never named. `combinations` stays empty for a profile: it holds the algebraic combinations of the structural rank. Every reason says that the verdict holds with the other parameters at their fitted values. `Profile.refit_error` is the distance of a refit at the fit from `f̂`, a diagnostic of the optimizer, with a note when it is above `ε`.
 
-What the settings give: with Nelder-Mead at its default `sd_tolerance` (`1e-6`), the resets prove a parameter with no effect `non_identifiable` on a difference model and on an ODE model at the default solver tolerances. A ridge needs its profile flat within `ε`: on an ODE model at the default tolerances `ν` is near `1e-4` and the profiles of the ridge below read `in_combination`; on a difference model `ν` is near `1e-13`, a refit lands about `1e-6` from its minimum, and the profile reads practically non-identifiable. Its `in_combination` needs an `sd_tolerance` near `ν`, as the example below uses.
+What the settings give: with Nelder-Mead at its default `sd_tolerance` (`1e-6`), the resets prove a parameter with no effect `non_identifiable` on a difference model and on an ODE model at the default solver tolerances. A ridge needs its profile flat within `ε`: on an ODE model at the default tolerances `ν` is near `1e-4` and the profiles of the ridge below read `in_combination`; on a difference model `ν` is near `1e-13`, a refit lands about `1e-6` from its minimum, and the profile reads practically non-identifiable. Its `in_combination` needs an `sd_tolerance` near `ν`, as the example below uses. Some refits on the ridge never reach a tolerance that tight and run to `max_iterations`, so that limit sets the time of the profile: the example keeps it at 1000, where the verdict already holds.
 
 `ProfileIdentifiability(result=profiles)` (`commol.identifiability`), run through `Calibrator.identifiability`, turns the verdicts into an [identifiability report](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#the-report) with a `profile` section, which `merge` joins with the other methods. A rate that reads `k1 * s` cannot tell `k1` from `s`: their profiles are flat on the ridge `k1 · s = constant`, resetting `s` breaks it, and the profile of `k1` reads `in_combination`, compensated by `s`, as the structural rank does. The two still disagree in some cases, and the merged verdict is then `conflicting`:
 
@@ -240,7 +240,7 @@ product_problem = CalibrationProblem(
         CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
     ],
     observation_models={"B": NormalObservations(sd=10.0)},
-    optimization_config=NelderMeadConfig(max_iterations=4000, sd_tolerance=1e-15),
+    optimization_config=NelderMeadConfig(max_iterations=1000, sd_tolerance=1e-15),
     seed=42,
 )
 product = Calibrator(Simulation(product_model(None, None, None)), product_problem)

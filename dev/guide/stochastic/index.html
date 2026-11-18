@@ -4228,14 +4228,11 @@ rounding when they are whole: <code>Model.apply_calibration_parameters</code> wr
 With a rounding, it writes the amount a calibration found, such as <code>11.85</code>,
 and the model builds. Each replicate of it, for the seed of the calibration,
 starts from the units the calibration scored, such as 12 units, and follows
-the same path, with either rounding. The rounding can turn on the last bit
-of an amount, so a compartment that the bin and its split rebuild only to
-their last bits is written as a <code>compartment_amounts</code> override, which holds
-the amount the calibration scored. A later <code>update_bin_amounts</code> of the bin
-leaves such an override as it is
-(<a href="https://github.com/MUNQU/commol/issues/483">#483</a>), and a new calibration of
-the written model can score other units with <code>"random"</code>, because it splits a
-value by the amounts of the overrides.
+the same path, with either rounding: the write-back gives a scored amount to
+each compartment the bin and its split rebuild only to their last bits, as
+<a href="../calibration-initial-conditions/#writing-back">Writing back</a> says. A new
+calibration of the written model can score other units with <code>"random"</code>,
+because it splits a value by the scored amounts.
 The draws of a sample are known values too: a <code>SensitivityAnalysis</code> of
 <code>InputSpace.from_sample</code> writes them. The engine checks every draw when the
 analysis is built, and the message names the set of the draw.</p>

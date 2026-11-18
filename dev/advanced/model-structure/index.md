@@ -84,11 +84,12 @@ Every amount is in the unit of its bin, so bins of different units, such as a co
 
 Attributes:
 
-| Name                       | Type               | Description                                                                                                                                                                                                                        |
-| -------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bin_amounts`              | \`dict\[str, float | None\]\`                                                                                                                                                                                                                           |
-| `stratification_fractions` | `dict[str, dict]`  | The split of each stratification, by stratification id: a dict[str, float], the fraction of each category, such as {"t1": 0.4, "t2": 0.6}, the split of the amount of every bin the stratification applies to; or a dict\[str, str |
-| `compartment_amounts`      | `dict[str, float]` | Amounts of single expanded compartments, by compartment name, applied after the expansion. An override states the amount of its compartment also on a bin left None.                                                               |
+| Name                       | Type                      | Description                                                                                                                                                                                                                        |
+| -------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bin_amounts`              | \`dict\[str, float        | None\]\`                                                                                                                                                                                                                           |
+| `stratification_fractions` | `dict[str, dict]`         | The split of each stratification, by stratification id: a dict[str, float], the fraction of each category, such as {"t1": 0.4, "t2": 0.6}, the split of the amount of every bin the stratification applies to; or a dict\[str, str |
+| `compartment_amounts`      | `dict[str, float]`        | Amounts of single expanded compartments, by compartment name, applied after the expansion. An override states the amount of its compartment also on a bin left None.                                                               |
+| `scored_amounts`           | `dict[str, ScoredAmount]` | The amounts a calibration scored that the bins and the fractions rebuild only to their last bits, by compartment name, written by Model.apply_calibration_parameters; applied last, while current.                                 |
 
 Source code in `commol/_model/initial_conditions.py`
 
@@ -123,6 +124,10 @@ class InitialConditions(BaseModel):
         Amounts of single expanded compartments, by compartment name, applied
         after the expansion. An override states the amount of its compartment
         also on a bin left None.
+    scored_amounts : dict[str, ScoredAmount]
+        The amounts a calibration scored that the bins and the fractions
+        rebuild only to their last bits, by compartment name, written by
+        `Model.apply_calibration_parameters`; applied last, while current.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -145,6 +150,14 @@ class InitialConditions(BaseModel):
         default_factory=dict,
         description=(
             "Amounts of single expanded compartments, applied after the expansion."
+        ),
+    )
+    scored_amounts: dict[str, ScoredAmount] = Field(
+        default_factory=dict,
+        exclude_if=lambda amounts: not amounts,
+        description=(
+            "The amounts a calibration scored that the bins and fractions "
+            "rebuild only to their last bits, applied last while current."
         ),
     )
 
@@ -194,6 +207,17 @@ class InitialConditions(BaseModel):
     def _validate_compartment_amounts(cls, value: dict[str, float]) -> dict[str, float]:
         """Check every compartment amount with the rule of the engine."""
         commol_rs.model.check_compartment_amounts(list(value.items()))
+        return value
+
+    @field_validator("scored_amounts")
+    @classmethod
+    def _validate_scored_amounts(
+        cls, value: dict[str, ScoredAmount]
+    ) -> dict[str, ScoredAmount]:
+        """Check every scored amount with the rule of the engine."""
+        commol_rs.model.check_scored_amounts(
+            [(name, amount.built, amount.scored) for name, amount in value.items()]
+        )
         return value
 
     def resolve_category(self, category: str) -> tuple[str, str]:
@@ -346,7 +370,9 @@ class InitialConditions(BaseModel):
         Upsert per-compartment overrides by expanded compartment name.
 
         A compartment already present in ``compartment_amounts`` has its
-        amount replaced; a new one is appended. Compartment names depend on
+        amount replaced; a new one is appended. A scored amount of the
+        compartment, which the override makes stale, is dropped. Compartment
+        names depend on
         the expansion of the process, so
         :meth:`~commol._model.aggregate.Aggregate.update_compartment_amounts`
         validates them against the engine, not here.
@@ -359,6 +385,13 @@ class InitialConditions(BaseModel):
         """
         commol_rs.model.check_compartment_amounts(list(amounts.items()))
         self.compartment_amounts.update(amounts)
+        # An override wins over a scored amount of its compartment, so the
+        # scored amount is dropped as stale.
+        self.scored_amounts = {
+            name: amount
+            for name, amount in self.scored_amounts.items()
+            if name not in amounts
+        }
 
     def update_bin_amounts(self, amounts: Mapping[str, float | None]) -> None:
         """
@@ -367,6 +400,16 @@ class InitialConditions(BaseModel):
         Every amount is checked before any bin changes, so a rejected call
         leaves the initial conditions unchanged. The bins of one unit keep no
         sum: to move an amount between bins, update every bin involved.
+
+        The expansion of each bin takes its new amount. A
+        ``compartment_amounts`` override of a compartment of the bin is a
+        declaration of the user and stays, also a value a calibration set by
+        an exact compartment id or a prefix, so the bin then sums to the new
+        amount only where no override holds: with ``B = 12`` split in halves
+        and ``B_g1 = 8.4`` declared, ``{"B": 20}`` starts ``B_g1`` at 8.4 and
+        ``B_g2`` at 10. To restart the bin from its amount, remove those
+        overrides. The scored amounts of a calibration write-back
+        (``scored_amounts``) of the bin stop applying by themselves.
 
         Parameters
         ----------
@@ -644,6 +687,8 @@ Update bin amounts by bin ID.
 
 Every amount is checked before any bin changes, so a rejected call leaves the initial conditions unchanged. The bins of one unit keep no sum: to move an amount between bins, update every bin involved.
 
+The expansion of each bin takes its new amount. A `compartment_amounts` override of a compartment of the bin is a declaration of the user and stays, also a value a calibration set by an exact compartment id or a prefix, so the bin then sums to the new amount only where no override holds: with `B = 12` split in halves and `B_g1 = 8.4` declared, `{"B": 20}` starts `B_g1` at 8.4 and `B_g2` at 10. To restart the bin from its amount, remove those overrides. The scored amounts of a calibration write-back (`scored_amounts`) of the bin stop applying by themselves.
+
 Parameters:
 
 | Name      | Type                  | Description | Default                                                                                                          |
@@ -666,6 +711,16 @@ def update_bin_amounts(self, amounts: Mapping[str, float | None]) -> None:
     Every amount is checked before any bin changes, so a rejected call
     leaves the initial conditions unchanged. The bins of one unit keep no
     sum: to move an amount between bins, update every bin involved.
+
+    The expansion of each bin takes its new amount. A
+    ``compartment_amounts`` override of a compartment of the bin is a
+    declaration of the user and stays, also a value a calibration set by
+    an exact compartment id or a prefix, so the bin then sums to the new
+    amount only where no override holds: with ``B = 12`` split in halves
+    and ``B_g1 = 8.4`` declared, ``{"B": 20}`` starts ``B_g1`` at 8.4 and
+    ``B_g2`` at 10. To restart the bin from its amount, remove those
+    overrides. The scored amounts of a calibration write-back
+    (``scored_amounts``) of the bin stop applying by themselves.
 
     Parameters
     ----------

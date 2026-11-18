@@ -5031,6 +5031,12 @@ of different units.</p>
 <td>Overrides single expanded compartments with an amount in the unit of their bin, also of a bin left <code>None</code>: a run then needs a value only for the compartments of that bin that no override names.</td>
 </tr>
 <tr>
+<td><code>scored_amounts</code></td>
+<td><code>dict[str, ScoredAmount]</code></td>
+<td><code>{}</code></td>
+<td>The scored amounts a calibration write-back records for compartments the bins and fractions build only to their last bits; see <a href="../calibration-initial-conditions/#writing-back">Writing back</a>. You do not write them.</td>
+</tr>
+<tr>
 <td><code>neighbors</code></td>
 <td><code>Complete \| Groups \| None</code></td>
 <td><code>None</code></td>
@@ -5047,7 +5053,7 @@ of different units.</p>
 </thead>
 <tbody>
 <tr>
-<td>Every amount is finite and not negative; <code>0</code> is an amount. The engine holds the rule (<code>check_bin_amount</code> and <code>check_compartment_amount</code> in <code>crates/commol-model/src/rules.rs</code>)</td>
+<td>Every amount is finite and not negative; <code>0</code> is an amount. The engine holds the rule (<code>check_bin_amount</code> and <code>check_compartment_amount</code> in <code>crates/commol-model/src/rules.rs</code>); a scored amount also lies at most 64 units in the last place from the amount it corrects (<code>check_scored_amount</code>)</td>
 <td><code>Aggregate(...)</code> and each update of an amount</td>
 </tr>
 <tr>

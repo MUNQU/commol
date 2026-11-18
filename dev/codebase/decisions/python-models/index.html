@@ -4110,8 +4110,8 @@ and <code>tests/suite/test_architecture.py::test_the_check_names_an_import_upwar
 <h2 id="a-value-of-a-model-has-its-rule-in-the-engine">A value of a model has its rule in the engine<a class="headerlink" href="#a-value-of-a-model-has-its-rule-in-the-engine" title="Permanent link">&para;</a></h2>
 <p>An initial amount, the fractions of a stratification, an impulse and the
 points of a series have their rule once, in <code>crates/commol-model/src/rules.rs</code>
-(<code>check_bin_amount</code>, <code>check_compartment_amount</code>, <code>check_fractions</code>,
-<code>check_impulse</code>, <code>check_series</code>). The model
+(<code>check_bin_amount</code>, <code>check_compartment_amount</code>, <code>check_scored_amount</code>,
+<code>check_fractions</code>, <code>check_impulse</code>, <code>check_series</code>). The model
 compiler calls them when it compiles a model, <code>set_initial_condition</code> when a
 calibration writes an amount, and the Python object of the value when it is
 built: the validators of <code>InitialConditions</code>, <code>Transition</code> and <code>SeriesValue</code>

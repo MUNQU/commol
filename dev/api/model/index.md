@@ -2,7 +2,7 @@
 
 [Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
 
-The validated model that `ModelBuilder.build` returns: a header, the process written once, the structure that lays it out (`Aggregate`, with its neighbors `Complete` and `Groups`), the entries of `Aggregate.initial_state()`, the `SeriesValue` of a series parameter, the parts of the process, and `UnitConsistencyError`, the error of `Model.check_unit_consistency`. Guide: [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md), [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#the-structure-aggregate), [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md), [Units](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md). The tree of types is in [Model Structure](https://munqu.github.io/commol/latest/advanced/model-structure/index.md). `Model.describe` returns a `ModelDescription` of the [`commol.description`](https://munqu.github.io/commol/latest/api/description/index.md) module.
+The validated model that `ModelBuilder.build` returns: a header, the process written once, the structure that lays it out (`Aggregate`, with its neighbors `Complete` and `Groups`), the entries of `Aggregate.initial_state()` and of `Aggregate.scored_amounts`, the `SeriesValue` of a series parameter, the parts of the process, and `UnitConsistencyError`, the error of `Model.check_unit_consistency`. Guide: [Core Concepts](https://munqu.github.io/commol/latest/guide/core-concepts/index.md), [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#the-structure-aggregate), [Describing a Model](https://munqu.github.io/commol/latest/guide/describing-models/index.md), [Units](https://munqu.github.io/commol/latest/guide/units-and-equations/index.md). The tree of types is in [Model Structure](https://munqu.github.io/commol/latest/advanced/model-structure/index.md). `Model.describe` returns a `ModelDescription` of the [`commol.description`](https://munqu.github.io/commol/latest/api/description/index.md) module.
 
 ## Model
 
@@ -1983,14 +1983,15 @@ The bins of the process expand over its stratifications into compartments. `bin_
 
 Attributes:
 
-| Name                       | Type                   | Description                                                                                                                                                                                                                                                                                                  |
-| -------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `kind`                     | `Literal['aggregate']` | The model kind.                                                                                                                                                                                                                                                                                              |
-| `variant`                  | \`str                  | None\`                                                                                                                                                                                                                                                                                                       |
-| `bin_amounts`              | \`dict\[str, float     | None\]\`                                                                                                                                                                                                                                                                                                     |
-| `stratification_fractions` | `dict[str, dict]`      | The fraction of each category, by stratification id, a dict[str, float] such as {"group": {"g1": 0.3, "g2": 0.7}}: the split of the amount of every bin it applies to. A stratification may instead split each category of a stratification declared before it by its own fractions, a dict\[str, str        |
-| `compartment_amounts`      | `dict[str, float]`     | Amounts of single expanded compartments, such as {"A_g1": 0.0}, applied after the expansion. The names are checked against the engine when the model is built. An override states the amount of its compartment also on a bin left None, so a run needs a value only for the other compartments of that bin. |
-| `neighbors`                | \`Complete             | Groups                                                                                                                                                                                                                                                                                                       |
+| Name                       | Type                      | Description                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kind`                     | `Literal['aggregate']`    | The model kind.                                                                                                                                                                                                                                                                                                                                                        |
+| `variant`                  | \`str                     | None\`                                                                                                                                                                                                                                                                                                                                                                 |
+| `bin_amounts`              | \`dict\[str, float        | None\]\`                                                                                                                                                                                                                                                                                                                                                               |
+| `stratification_fractions` | `dict[str, dict]`         | The fraction of each category, by stratification id, a dict[str, float] such as {"group": {"g1": 0.3, "g2": 0.7}}: the split of the amount of every bin it applies to. A stratification may instead split each category of a stratification declared before it by its own fractions, a dict\[str, str                                                                  |
+| `compartment_amounts`      | `dict[str, float]`        | Amounts of single expanded compartments, such as {"A_g1": 0.0}, applied after the expansion. The names are checked against the engine when the model is built. An override states the amount of its compartment also on a bin left None, so a run needs a value only for the other compartments of that bin.                                                           |
+| `scored_amounts`           | `dict[str, ScoredAmount]` | The amounts a calibration scored that the bins and the fractions rebuild only to their last bits, by compartment name. Model.apply_calibration_parameters writes them; the build applies each one last, while its compartment still expands to the amount it was built from, has no compartment_amounts entry and is not of a bin left None, and ignores it otherwise. |
+| `neighbors`                | \`Complete                | Groups                                                                                                                                                                                                                                                                                                                                                                 |
 
 Source code in `commol/_model/aggregate.py`
 
@@ -2035,6 +2036,13 @@ class Aggregate(ModelStructure, InitialConditions):
         when the model is built. An override states the amount of its
         compartment also on a bin left None, so a run needs a value only for
         the other compartments of that bin.
+    scored_amounts : dict[str, ScoredAmount]
+        The amounts a calibration scored that the bins and the fractions
+        rebuild only to their last bits, by compartment name.
+        `Model.apply_calibration_parameters` writes them; the build applies
+        each one last, while its compartment still expands to the amount it
+        was built from, has no ``compartment_amounts`` entry and is not of a
+        bin left None, and ignores it otherwise.
     neighbors : Complete | Groups | None
         Who the neighbors of a unit are, for the rate variables
         ``neighbors_<bin>`` and ``neighbors``. Required, with no default, when
@@ -2210,12 +2218,12 @@ class Aggregate(ModelStructure, InitialConditions):
         the bin, and category values the splits. Every compartment those do
         not reproduce, such as an exact compartment value or a value that
         overlaps a per-compartment override, is written as a per-compartment
-        override; the overrides of the compartments the values set, of an
-        earlier write-back or declared, are dropped first, so none is kept
-        that this state does not need. On a stochastic engine, whose start can turn on
-        the last bit of an amount, a compartment those reproduce only to its
-        last bits is an override too, so the written state is the scored one
-        bit for bit.
+        override; the overrides of the compartments the values set, declared
+        or not, and the scored amounts of an earlier write-back are dropped
+        first, so none is kept that this state does not need. A run can turn
+        on the last bit of a start amount, so a compartment those reproduce
+        only to its last bits gets a scored amount, on every engine, and the
+        written state is the scored one bit for bit.
 
         Parameters
         ----------
@@ -2338,9 +2346,10 @@ class Aggregate(ModelStructure, InitialConditions):
         Upsert per-compartment initial condition overrides.
 
         A compartment already declared has its amount replaced; a new one is
-        appended. The engine validates the result against the expansion of
-        the process before it is stored, so a rejected call leaves the
-        structure unchanged.
+        appended, and a scored amount of the compartment is dropped. The
+        engine validates the result against the expansion of the process
+        before it is stored, so a rejected call leaves the structure
+        unchanged.
 
         Parameters
         ----------
@@ -2360,6 +2369,7 @@ class Aggregate(ModelStructure, InitialConditions):
         candidate._upsert_compartment_amounts(amounts)
         engine_state.initial_state(process, candidate)
         self.compartment_amounts = candidate.compartment_amounts
+        self.scored_amounts = candidate.scored_amounts
 
     def initial_state(self, process: Process) -> list[InitialCompartment]:
         """
@@ -2734,7 +2744,7 @@ with_calibrated_values(model: Model[Self], problem: CalibrationProblem, values: 
 
 The structure with calibrated initial conditions written back.
 
-The written structure rebuilds the initial state the engine scored. Bin values update the amounts they declare, in the unit of the bin, and category values the splits. Every compartment those do not reproduce, such as an exact compartment value or a value that overlaps a per-compartment override, is written as a per-compartment override; the overrides of the compartments the values set, of an earlier write-back or declared, are dropped first, so none is kept that this state does not need. On a stochastic engine, whose start can turn on the last bit of an amount, a compartment those reproduce only to its last bits is an override too, so the written state is the scored one bit for bit.
+The written structure rebuilds the initial state the engine scored. Bin values update the amounts they declare, in the unit of the bin, and category values the splits. Every compartment those do not reproduce, such as an exact compartment value or a value that overlaps a per-compartment override, is written as a per-compartment override; the overrides of the compartments the values set, declared or not, and the scored amounts of an earlier write-back are dropped first, so none is kept that this state does not need. A run can turn on the last bit of a start amount, so a compartment those reproduce only to its last bits gets a scored amount, on every engine, and the written state is the scored one bit for bit.
 
 Parameters:
 
@@ -2773,12 +2783,12 @@ def with_calibrated_values(
     the bin, and category values the splits. Every compartment those do
     not reproduce, such as an exact compartment value or a value that
     overlaps a per-compartment override, is written as a per-compartment
-    override; the overrides of the compartments the values set, of an
-    earlier write-back or declared, are dropped first, so none is kept
-    that this state does not need. On a stochastic engine, whose start can turn on
-    the last bit of an amount, a compartment those reproduce only to its
-    last bits is an override too, so the written state is the scored one
-    bit for bit.
+    override; the overrides of the compartments the values set, declared
+    or not, and the scored amounts of an earlier write-back are dropped
+    first, so none is kept that this state does not need. A run can turn
+    on the last bit of a start amount, so a compartment those reproduce
+    only to its last bits gets a scored amount, on every engine, and the
+    written state is the scored one bit for bit.
 
     Parameters
     ----------
@@ -2972,7 +2982,7 @@ update_compartment_amounts(process: Process, amounts: Mapping[str, float]) -> No
 
 Upsert per-compartment initial condition overrides.
 
-A compartment already declared has its amount replaced; a new one is appended. The engine validates the result against the expansion of the process before it is stored, so a rejected call leaves the structure unchanged.
+A compartment already declared has its amount replaced; a new one is appended, and a scored amount of the compartment is dropped. The engine validates the result against the expansion of the process before it is stored, so a rejected call leaves the structure unchanged.
 
 Parameters:
 
@@ -2997,9 +3007,10 @@ def update_compartment_amounts(
     Upsert per-compartment initial condition overrides.
 
     A compartment already declared has its amount replaced; a new one is
-    appended. The engine validates the result against the expansion of
-    the process before it is stored, so a rejected call leaves the
-    structure unchanged.
+    appended, and a scored amount of the compartment is dropped. The
+    engine validates the result against the expansion of the process
+    before it is stored, so a rejected call leaves the structure
+    unchanged.
 
     Parameters
     ----------
@@ -3019,6 +3030,7 @@ def update_compartment_amounts(
     candidate._upsert_compartment_amounts(amounts)
     engine_state.initial_state(process, candidate)
     self.compartment_amounts = candidate.compartment_amounts
+    self.scored_amounts = candidate.scored_amounts
 ```
 
 #### initial_state
@@ -3389,6 +3401,52 @@ def __init__(
     )
 ```
 
+## ScoredAmount
+
+Bases: `BaseModel`
+
+The amount a calibration scored for one compartment, and the amount the model built for it when the calibration was written back.
+
+`Model.apply_calibration_parameters` writes one into `scored_amounts` for each compartment that the bins and the fractions rebuild only to its last bits, so the written model starts from the state the calibration scored, bit for bit. The build applies `scored` only while the compartment still expands to `built` in every bit, has no `compartment_amounts` entry and is not of a bin left None; after an edit that changes it, the entry is stale and the build ignores it.
+
+Attributes:
+
+| Name     | Type    | Description                                                                       |
+| -------- | ------- | --------------------------------------------------------------------------------- |
+| `built`  | `float` | The amount the bins and the fractions built for the compartment.                  |
+| `scored` | `float` | The amount the calibration scored, at most 64 units in the last place from built. |
+
+Source code in `commol/_model/initial_conditions.py`
+
+```python
+class ScoredAmount(BaseModel):
+    """
+    The amount a calibration scored for one compartment, and the amount the
+    model built for it when the calibration was written back.
+
+    `Model.apply_calibration_parameters` writes one into
+    ``scored_amounts`` for each compartment that the bins and the fractions
+    rebuild only to its last bits, so the written model starts from the
+    state the calibration scored, bit for bit. The build applies ``scored``
+    only while the compartment still expands to ``built`` in every bit, has
+    no ``compartment_amounts`` entry and is not of a bin left None; after
+    an edit that changes it, the entry is stale and the build ignores it.
+
+    Attributes
+    ----------
+    built : float
+        The amount the bins and the fractions built for the compartment.
+    scored : float
+        The amount the calibration scored, at most 64 units in the last
+        place from ``built``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    built: float = Field(..., description="The amount the bins and fractions built.")
+    scored: float = Field(..., description="The amount the calibration scored.")
+```
+
 ## InitialCompartment
 
 Bases: `NamedTuple`
@@ -3402,7 +3460,8 @@ Attributes:
 | `name`       | `str`            | Expanded compartment name, for example A_g1.                                                                                                            |
 | `bin`        | `str`            | Bin the compartment expands from.                                                                                                                       |
 | `categories` | `dict[str, str]` | Category applied to the compartment, keyed by stratification id. A conditional stratification whose conditions the compartment does not meet is absent. |
-| `amount`     | `float`          | Initial amount, including per-compartment overrides.                                                                                                    |
+| `amount`     | `float`          | Initial amount, including per-compartment overrides and the scored amounts that are current.                                                            |
+| `scored`     | `bool`           | Whether a current scored amount set the amount.                                                                                                         |
 
 Source code in `commol/_model/engine_state.py`
 
@@ -3422,13 +3481,17 @@ class InitialCompartment(NamedTuple):
         conditional stratification whose conditions the compartment does not
         meet is absent.
     amount : float
-        Initial amount, including per-compartment overrides.
+        Initial amount, including per-compartment overrides and the scored
+        amounts that are current.
+    scored : bool
+        Whether a current scored amount set the amount.
     """
 
     name: str
     bin: str
     categories: dict[str, str]
     amount: float
+    scored: bool = False
 ```
 
 ## SeriesLabel

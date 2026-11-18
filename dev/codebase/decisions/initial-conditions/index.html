@@ -3928,6 +3928,14 @@ which nothing is stated (<code>weights</code> in
 <code>crates/commol-model/src/initial_conditions.rs</code>), not by the initial state,
 where that compartment holds a 0 no one stated: the remainder <code>A</code> gives 250
 to each half.</p>
+<p>An override is a declaration of the user, so it survives an update of its
+bin: <code>update_bin_amounts</code> (<code>_model/initial_conditions.py</code>) changes the
+amount the expansion takes and nothing else, and a bin of <code>B = 12</code> split in
+halves with <code>B_g1 = 8.4</code> declared starts <code>B_g1</code> at 8.4 and <code>B_g2</code> at 10 after
+<code>{"B": 20}</code>. A value a calibration set by an exact compartment id or a
+prefix is an override too. The scored amounts of a write-back are not
+overrides: they stop applying once their compartment builds another amount
+(<a href="../calibration-write-back/#a-scored-amount-of-the-write-back-lives-in-its-own-field">A scored amount of the write-back lives in its own field</a>).</p>
 <table>
 <thead>
 <tr>
@@ -3946,7 +3954,7 @@ to each half.</p>
 </tr>
 <tr>
 <td>An override on a bin left <code>None</code> is a build error that names both</td>
-<td>A run needs every value: a known amount of one compartment would need an amount of its bin that no one knows. DRY: the write-back of a calibration of part of such a bin (<code>calibrated_structure</code>, <code>_model/calibration_write_back.py</code>) keeps the bin <code>None</code> and pins the compartments the values set, so it would write a model the build refuses (<code>tests/initial_conditions/test_compartment_amounts.py::TestOverrideOnABinLeftNone::test_a_calibration_of_the_other_compartments_is_written_back</code>).</td>
+<td>A run needs every value: a known amount of one compartment would need an amount of its bin that no one knows. DRY: the write-back of a calibration of part of such a bin (<code>calibrated_structure</code>, <code>_model/calibration_write_back.py</code>) keeps the bin <code>None</code> and overrides the compartments the values set, so it would write a model the build refuses (<code>tests/initial_conditions/test_compartment_amounts.py::TestOverrideOnABinLeftNone::test_a_calibration_of_the_other_compartments_is_written_back</code>).</td>
 </tr>
 <tr>
 <td><code>total</code> counts such an override, and the record of values does not</td>
@@ -3964,6 +3972,14 @@ to each half.</p>
 <td>A value over such a bin splits by the initial state</td>
 <td>The same <code>0</code>: a value of <code>A</code> or a remainder <code>A</code> gives the compartments without a value nothing, and they then count as stated (A run needs every value).</td>
 </tr>
+<tr>
+<td><code>update_bin_amounts</code> drops the overrides of its bin</td>
+<td>One idea, one name, and a breaking change: an override is a declaration of the user, and the update would destroy it. It needs the process to map the bin to its compartments. The scored amounts of a write-back, the reason for it (<a href="https://github.com/MUNQU/commol/issues/483">#483</a>), no longer need it: <code>scored_amounts</code> drops them by itself.</td>
+</tr>
+<tr>
+<td><code>update_bin_amounts</code> refuses a bin with an override</td>
+<td>KISS: it forces a redeclaration of the overrides before every scenario of the bin.</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Guards:</strong>
@@ -3971,7 +3987,8 @@ to each half.</p>
 <code>crates/commol-model/src/builder.rs::unknown_compartment_override_is_a_build_error</code>,
 <code>crates/commol-model/tests/initial_conditions.rs::an_override_gives_its_compartment_a_value_on_a_bin_left_none</code>,
 <code>crates/commol-model/tests/initial_conditions.rs::a_value_over_an_override_and_compartments_without_one_splits_by_the_fractions</code>,
-<code>tests/initial_conditions/test_compartment_amounts.py</code>.</p>
+<code>tests/initial_conditions/test_compartment_amounts.py</code>,
+<code>tests/initial_conditions/test_scored_amounts.py::test_an_update_of_a_bin_keeps_its_overrides_and_drops_its_scored_amounts</code>.</p>
 
 
 
