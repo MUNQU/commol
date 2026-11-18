@@ -212,6 +212,49 @@ class SensitivityAnalysis:
         _check_no_noise(noise)
         return self._rust.observation_bounds(sample._rust, engine_json(observed_data))
 
+    def _residual_dependence(
+        self,
+        sample: ParameterSample,  # noqa: ARG002
+        observed_data: list[ObservedDataPoint],  # noqa: ARG002
+        noise: _ObservationNoise,  # noqa: ARG002
+        max_lag: int | Literal["auto"],  # noqa: ARG002
+        randomizations: int,  # noqa: ARG002
+        reference: str,  # noqa: ARG002
+        confidence_level: float,  # noqa: ARG002
+    ) -> "SeriesDependenceProtocol":
+        """
+        Refuse a dependence analysis of residuals: an analysis has no data.
+
+        Parameters
+        ----------
+        sample : ParameterSample
+            The draws.
+        observed_data : list[ObservedDataPoint]
+            The observations.
+        noise : NoNoise | ResidualNoise | DistributionNoise
+            The residuals.
+        max_lag : int | "auto"
+            The largest lag.
+        randomizations : int
+            The randomizations.
+        reference : str
+            The JSON of the reference.
+        confidence_level : float
+            The level of the band.
+
+        Raises
+        ------
+        ValueError
+            Always: the residuals of a fit and their reference need a
+            calibration problem.
+        """
+        raise ValueError(
+            "A dependence analysis of residuals reads the residuals of a fit "
+            "against a reference of its calibration problem, and a sensitivity "
+            "analysis has no data. Read the residuals of a Calibrator, or give "
+            "any values to series_dependence."
+        )
+
     def _check_observations(self, observed_data: list[ObservedDataPoint]) -> None:
         """
         Check `observed_data` against the analysis in Rust, with no run.

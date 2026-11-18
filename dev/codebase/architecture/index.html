@@ -1377,6 +1377,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/uncertainty/dependence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/uncertainty/conformal/" class="md-nav__link">
         
   
@@ -2096,6 +2124,34 @@
     
   
     commol.scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dependence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.dependence
   
 
     
@@ -3242,6 +3298,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/dependence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/results/" class="md-nav__link">
         
   
@@ -3990,12 +4074,12 @@ the statistics that the base, the compiler, calibration and inference use.</p>
 <tr>
 <td>Statistics</td>
 <td><code>commol-statistics</code></td>
-<td>One copy of each numerical helper (<code>log Σ exp</code>, <code>x ln y</code>, the special functions of the gamma family, the normal distribution function and its quantile, the incomplete gamma and beta functions), of the log densities of the normal, the log-normal and the Student t, of the weighted statistics: the one quantile of commol, the weighted summary of a column, the covariance and the effective size, and the spectral radius of a matrix. It depends on no crate of commol.</td>
+<td>One copy of each numerical helper (<code>log Σ exp</code>, <code>x ln y</code>, the special functions of the gamma family, the normal distribution function and its quantile, the incomplete gamma and beta functions), of the log densities of the normal, the log-normal and the Student t, of the weighted statistics: the one quantile of commol, the weighted summary of a column, the covariance and the effective size, the estimators of the dependence of a series (the autocovariance with gaps, the robust portmanteau and the integrated time of Geyer), and the spectral radius of a matrix. It depends on no crate of commol.</td>
 </tr>
 <tr>
 <td>Inference</td>
 <td><code>commol-inference</code></td>
-<td>What every uncertainty method returns or reads: the weighted parameter sample, the predictive of a sample, its observation noise and its scores; the resampling methods, which fit copies of the problem with other data (<code>CalibrationProblem::with_data</code>); the conformal prediction intervals; the port of sensitivities and the identifiability analyses; the distributions and priors, and the sequential Monte Carlo sampler with its targets (Gibbs posterior, ABC, the posterior of observation models); the noise, the parametric bootstrap, the log score, the exact PIT and the quantile residuals of observation models; the input spaces, designs, quantities of interest and estimators of global sensitivity, which run on a forward model with no observations; the profile likelihood of parameters and predictions and its thresholds. It depends on calibration, never the reverse.</td>
+<td>What every uncertainty method returns or reads: the weighted parameter sample, the predictive of a sample, its observation noise and its scores; the resampling methods, which fit copies of the problem with other data (<code>CalibrationProblem::with_data</code>); the conformal prediction intervals; the port of sensitivities and the identifiability analyses; the distributions and priors, and the sequential Monte Carlo sampler with its targets (Gibbs posterior, ABC, the posterior of observation models); the noise, the parametric bootstrap, the log score, the exact PIT and the quantile residuals of observation models; the dependence of the values and residuals of each series against its references; the input spaces, designs, quantities of interest and estimators of global sensitivity, which run on a forward model with no observations; the profile likelihood of parameters and predictions and its thresholds. It depends on calibration, never the reverse.</td>
 </tr>
 </tbody>
 </table>
@@ -4015,7 +4099,7 @@ to the extension at the bottom, and every import points down
 (<a href="../decisions/python-models/#the-layers-of-the-package">The layers of the package</a>).</p>
 <pre class="mermaid"><code>flowchart TB
     ROOT["commol (the root)"]
-    MET["method families&lt;br/&gt;scores, resampling, profiles, local, smc,&lt;br/&gt;conformal, identifiability, sensitivity"]
+    MET["method families&lt;br/&gt;scores, dependence, resampling, profiles, local, smc,&lt;br/&gt;conformal, identifiability, sensitivity"]
     CAL["_calibration&lt;br/&gt;Calibrator, InferenceMethod, CalibrationPort"]
     UNC["uncertainty&lt;br/&gt;ParameterSample, Predictive"]
     SIM["_simulation&lt;br/&gt;Simulation, results, reports, panels"]

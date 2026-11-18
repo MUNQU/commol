@@ -34,6 +34,7 @@ Commol is a Python library, with a Rust engine, to build, simulate and calibrate
 - [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md): Priors, the sequential Monte Carlo sampler, the Gibbs posterior and its scale eta, ABC and its distances, and the diagnostics
 - [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/index.md): The curvature and the unbounded scale, the Laplace approximation and the delta method, the sandwich, the Laplace mixture and PSIS
 - [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md): Profile likelihood of parameters and predictions, how to read a profile, the chi-square, Beale and bootstrap thresholds, the adaptive step, verdicts, the report and plots
+- [Dependence](https://munqu.github.io/commol/latest/guide/uncertainty/dependence/index.md): The dependence of the values and residuals of each series, the robust portmanteau, the integrated autocorrelation time and its bias, the information factor of the problem, the references AtParameters and Refitted, and the methods that read dependence
 - [Conformal](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md): Conformal prediction intervals, the guarantee, scores and pooling, split, rolling origins, jackknife+ and CV+, EnbPI, adaptive conformal, plots and reports
 - [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md): Forward questions with no data, input spaces, quantities of interest, propagation, PRCC, Morris screening, Sobol indices, polynomial chaos and their plots
 - [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md): The applied parameters of a model, and the reports of a run, of replicates, of a predictive and of an identifiability analysis
@@ -47,6 +48,7 @@ Commol is a Python library, with a Rust engine, to build, simulate and calibrate
 - [AxisUnits](https://munqu.github.io/commol/latest/api/axis-units/index.md)
 - [Calibration](https://munqu.github.io/commol/latest/api/calibrator/index.md)
 - [commol.conformal](https://munqu.github.io/commol/latest/api/conformal/index.md)
+- [commol.dependence](https://munqu.github.io/commol/latest/api/dependence/index.md)
 - [commol.description](https://munqu.github.io/commol/latest/api/description/index.md)
 - [commol.distributions](https://munqu.github.io/commol/latest/api/distributions/index.md)
 - [commol.engines](https://munqu.github.io/commol/latest/api/engines/index.md)

@@ -1377,6 +1377,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/uncertainty/dependence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/uncertainty/conformal/" class="md-nav__link">
         
   
@@ -2096,6 +2124,34 @@
     
   
     commol.scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dependence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.dependence
   
 
     
@@ -3281,6 +3337,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../decisions/dependence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../decisions/results/" class="md-nav__link">
         
   
@@ -4034,6 +4118,11 @@
 <td>A second copy of a special function.</td>
 </tr>
 <tr>
+<td><code>crates/commol-statistics/src/dependence.rs</code></td>
+<td>The estimators of the dependence of one series on its grid, one copy of each: <code>autocovariance</code> at a lag over the pairs that exist (amplitude-modulated), <code>robust_portmanteau</code> (<code>Q̃</code> of Dalla, Giraitis and Phillips 2022) and <code>initial_monotone_time</code> (<code>τ</code> by Geyer's initial monotone sequence, with its cut lag and the reason it is undefined).</td>
+<td>Series of observations; a second estimator of <code>τ</code>.</td>
+</tr>
+<tr>
 <td><code>crates/commol-statistics/src/linear_algebra.rs</code></td>
 <td>The linear algebra of commol: <code>spectral_radius</code>, the largest modulus of the eigenvalues of a square matrix, from the real Schur decomposition of <code>nalgebra</code>, which the model compiler reads for each matrix between categories.</td>
 <td>A second eigenvalue routine.</td>
@@ -4229,6 +4318,11 @@
 <td>Changes to the problem other than through <code>with_data</code>.</td>
 </tr>
 <tr>
+<td><code>crates/commol-inference/src/dependence/</code></td>
+<td>The dependence analyses: <code>grid.rs</code> (the grid of each series, which reads <code>one_per_position</code> of <code>resampling/blocks.rs</code>, and the positions the series share), <code>sets.rs</code> (the statistics of one set of values, of the problem, and their weighted summary over sets), <code>law.rs</code> (the tests and bands: <code>χ²</code>, Monte Carlo p-values, the band of <code>τ</code>, the spread of the p-values of draws, and the result), <code>of_values.rs</code> (<code>series_dependence</code>, the wild sets), <code>of_residuals.rs</code> (<code>residual_dependence</code>: the quantile and additive residuals, the references <code>AtParameters</code> and <code>Refitted</code> and <code>SignFlips</code>). <code>settings/dependence.rs</code> holds the references.</td>
+<td>The estimators (<code>commol-statistics</code>).</td>
+</tr>
+<tr>
 <td><code>crates/commol-inference/src/conformal/</code></td>
 <td>Conformal prediction intervals: <code>score.rs</code> (<code>NonconformityScore</code>, <code>Pooling</code>, <code>ConformalSettings</code>, the scale of a score), <code>quantile.rs</code> (the conformal quantile, the order statistics of jackknife+), <code>intervals.rs</code> (<code>PredictionIntervals</code>, <code>ConformalRun</code>), <code>predict.rs</code> (predictions and spread at any observations, the target points), and one file per variant: <code>split.rs</code>, <code>rolling.rs</code>, <code>jackknife_plus.rs</code> (with <code>cv_plus_bound</code>), <code>enbpi.rs</code>, <code>adaptive.rs</code> (<code>AdaptiveLevel</code>).</td>
 <td>A second quantile or score of one variant.</td>
@@ -4368,6 +4462,11 @@
 <tr>
 <td><code>py-commol/src/local.rs</code></td>
 <td><code>commol_rs.inference</code>: the runners of the local approximations (<code>laplace</code>, <code>sandwich</code>, <code>laplace_mixture</code>, each with the JSON of its method, which fit the problem first; <code>delta_band</code>) and <code>LocalRun</code>, <code>MixtureRun</code>.</td>
+<td>Logic beyond type conversion.</td>
+</tr>
+<tr>
+<td><code>py-commol/src/dependence.rs</code></td>
+<td><code>commol_rs.inference</code>: <code>series_dependence</code> and <code>residual_dependence</code>, with the JSON of the observations, the noise and the reference; <code>SeriesDependence</code>, <code>SeriesStatistics</code>.</td>
 <td>Logic beyond type conversion.</td>
 </tr>
 <tr>
@@ -4657,6 +4756,11 @@ results.</p>
 <td>Quantile formulas.</td>
 </tr>
 <tr>
+<td><code>dependence/</code></td>
+<td><code>series_dependence</code> and <code>residual_dependence</code> (<code>dependence/analysis.py</code>), the references <code>AtParameters</code> and <code>Refitted</code> (<code>dependence/references.py</code>), and <code>SeriesDependence</code> with its parts (<code>dependence/results.py</code>).</td>
+<td>The statistics (the engine's).</td>
+</tr>
+<tr>
 <td><code>resampling/</code>, <code>profiles/</code>, <code>local/</code>, <code>smc/</code>, <code>conformal/</code>, <code>identifiability/</code></td>
 <td>The settings and results of each family of methods (in its methods and results modules: the resampling methods; <code>ProfileLikelihood</code>, <code>PredictionProfile</code>, <code>PredictionSpec</code>, <code>Threshold</code>, <code>ProfileResult</code>; <code>Laplace</code>, <code>Sandwich</code>, <code>LaplaceMixture</code>, its targets, <code>LaplaceResult</code>, <code>SandwichResult</code>, <code>DeltaBand</code> with <code>LocalResult.delta_band</code>, <code>ImportanceResult</code>; <code>GibbsPosterior</code>, <code>BayesianPosterior</code>, the eta calibrations, <code>ABCSMC</code>, <code>ABCRejection</code>, the distances, <code>SMCResult</code>, <code>GibbsResult</code>; the conformal methods and <code>ConformalResult</code>; the identifiability methods, <code>ProfileIdentifiability</code> among them, <code>IdentifiabilityReport</code> and its block (<code>identifiability/report.py</code>)), their runners (in its runners module), which send each method whole to the engine and build its result, and the figure of a profile (<code>profiles/plots.py</code>).</td>
 <td>A check of a type in a runner; the computation of a method (the engine's).</td>
@@ -4862,9 +4966,9 @@ results.</p>
 <td><code>crates/commol-calibration/src/likelihood/density.rs</code> (<code>information</code>, <code>scores</code>), <code>discrepancy.rs</code> (<code>term_derivatives</code>), <code>py-commol/src/local.rs</code>, <code>py-commol/commol/local/methods.py</code>, <code>local/runners.py</code>, <code>docs/guide/uncertainty/local.md</code></td>
 </tr>
 <tr>
-<td>Change the parameter sample, the predictive, the scenarios, the scores or the quantile</td>
-<td><code>crates/commol-inference/src/sample.rs</code>, <code>predictive.rs</code>, <code>scores.rs</code>; <code>crates/commol-statistics/src/statistics.rs</code> (the one quantile, also of the replicates of a calibration)</td>
-<td><code>py-commol/commol/uncertainty/sample.py</code>, <code>uncertainty/predictive.py</code>, <code>uncertainty/scenarios.py</code>, <code>scores/rules.py</code>, <code>docs/guide/uncertainty/index.md</code></td>
+<td>Change the parameter sample, the predictive, the scenarios, the scores, the dependence analyses or the quantile</td>
+<td><code>crates/commol-inference/src/sample.rs</code>, <code>predictive.rs</code>, <code>scores.rs</code>, <code>dependence/</code>; <code>crates/commol-statistics/src/statistics.rs</code> (the one quantile, also of the replicates of a calibration), <code>commol-statistics/src/dependence.rs</code> (the estimators of dependence)</td>
+<td><code>py-commol/commol/uncertainty/sample.py</code>, <code>uncertainty/predictive.py</code>, <code>uncertainty/scenarios.py</code>, <code>scores/rules.py</code>, <code>py-commol/commol/dependence/</code>, <code>docs/guide/uncertainty/index.md</code>, <code>uncertainty/dependence.md</code></td>
 </tr>
 <tr>
 <td>Change the Python API</td>

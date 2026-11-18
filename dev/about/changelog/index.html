@@ -1373,6 +1373,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/uncertainty/dependence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/uncertainty/conformal/" class="md-nav__link">
         
   
@@ -2092,6 +2120,34 @@
     
   
     commol.scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dependence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.dependence
   
 
     
@@ -3095,6 +3151,34 @@
     
   
     Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../codebase/decisions/dependence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependence
   
 
     
@@ -5288,6 +5372,24 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
+<li>
+<p><code>commol.dependence</code>: whether the values of each series are independent,
+  and how strongly they depend. <code>series_dependence(values, observations,
+  max_lag, replicates, confidence_level, seed)</code> reads any values, one per
+  observation; <code>residual_dependence(predictive, observations, noise,
+  max_lag, randomizations, reference, confidence_level)</code> reads the quantile
+  residuals (<code>DistributionNoise()</code>) or the additive residuals (<code>NoNoise()</code>)
+  of a predictive. Each series, read on the grid of its smallest spacing
+  with each lag over its pairs, has its autocorrelations, the robust
+  portmanteau <code>Q̃</code> of Dalla, Giraitis and Phillips (2022) with its p-value,
+  and the integrated autocorrelation time <code>τ</code> by Geyer's initial monotone
+  sequence with its band; the series together have their correlations and
+  the factor by which the dependence multiplies the information. The
+  required <code>reference</code> is <code>AtParameters(replicates)</code>, for held-out data, or
+  <code>Refitted(replicates, starts=1)</code>, which refits data drawn at the fit and
+  holds for the data of the fit. The result is <code>SeriesDependence</code>. See
+  <a href="../../guide/uncertainty/dependence/">Dependence</a>.</p>
+</li>
 <li>
 <p><code>commol.scores.quantile_residuals(predictive, observations, DistributionNoise())</code>:
   the randomized quantile residuals of Dunn and Smyth (1996), <code>Φ⁻¹</code> of the

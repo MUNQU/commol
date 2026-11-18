@@ -4982,6 +4982,7 @@ A **band of the model** is the spread of the model's output across the draws of 
 | `PolynomialChaos`                            | A polynomial surrogate of an output and its Sobol indices, in few runs                                                                                 | No                                                                              | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/#polynomial-chaos)                              |
 | `ProfileLikelihood`                          | The interval of each parameter and whether the data determine it, from refits with the parameter held                                                  | No: `Threshold.chi_square` needs one, `beale` and `bootstrap_calibrated` do not | [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md)                                            |
 | `PredictionProfile`                          | The interval of a prediction: the values the data do not reject                                                                                        | No, as `ProfileLikelihood`                                                      | [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#prediction-profiles)                                |
+| `residual_dependence`, `series_dependence`   | Whether the residuals or values of each series are independent, and how many times the observations count their information                            | No: quantile residuals need one, additive residuals do not                      | [Dependence](https://munqu.github.io/commol/latest/guide/uncertainty/dependence/index.md)                                                  |
 
 ## The parameter sample
 
@@ -5132,7 +5133,7 @@ The functions of `commol.scores` compare a predictive with observations, and ret
 
 `quantile_residuals` gives the randomized quantile residuals of Dunn and Smyth (1996): `Φ⁻¹(u)`, with `u` the PIT of `pit`. They are the residuals of count data too, where a Pearson residual of a mean near 0 has no bound. Above `u = ½` a residual reads the upper tail, `−Φ⁻¹(P(Y > y) + (1 − v) · p(y))`, so a value 9 standard deviations above its mean has the residual 9, where `Φ⁻¹(u)` of a PIT that rounds to 1 would be infinite.
 
-The residuals are standard normal for data the predictive did not see, such as held-out observations, and for data drawn at the parameters the predictive reads. In the data a predictive was fitted to they shrink: in a linear normal model of `n` observations and `p` parameters, their variance is about `1 − p/n` at a fit and about `(n − p)/(n + p)` with the draws of a posterior, 0.72 and 0.56 at `n = 35`, `p = 10`. An in-sample check reads them at the fit, `Calibrator.point_sample(fit)`, or at one draw of a sample, `sample.resample(1, seed)`, which is standard normal only when the sample is an exact posterior.
+The residuals are standard normal for data the predictive did not see, such as held-out observations, and for data drawn at the parameters the predictive reads. In the data a predictive was fitted to they shrink: in a linear normal model of `n` observations and `p` parameters, their variance is about `1 − p/n` at a fit and about `(n − p)/(n + p)` with the draws of a posterior, 0.72 and 0.56 at `n = 35`, `p = 10`. An in-sample check reads them at the fit, `Calibrator.point_sample(fit)`, or at one draw of a sample, `sample.resample(1, seed)`, which is standard normal only when the sample is an exact posterior. The dependence of the residuals, along each series and between series, is `commol.dependence.residual_dependence` ([Dependence](https://munqu.github.io/commol/latest/guide/uncertainty/dependence/index.md)).
 
 ```python
 from commol.observations import DistributionNoise, NormalObservations
@@ -5202,6 +5203,7 @@ print(first == second, len({first, second}))  # True 1
 | The curvature at the fit: Laplace, the sandwich and the Laplace mixture          | [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/index.md)               |
 | Intervals and verdicts from profiles of the likelihood or the loss               | [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/index.md)              |
 | Prediction intervals with a coverage guarantee                                   | [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/index.md) |
+| Whether the residuals of each series are independent                             | [Dependence](https://munqu.github.io/commol/latest/guide/uncertainty/dependence/index.md)                    |
 | How the inputs move the outputs, with no data                                    | [Sensitivity Analysis](https://munqu.github.io/commol/latest/guide/uncertainty/sensitivity/index.md)         |
 | Several starts of an optimizer                                                   | [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts)             |
 | Reports of a predictive                                                          | [Reports](https://munqu.github.io/commol/latest/guide/reports/index.md)                                      |
@@ -6728,6 +6730,257 @@ figure = result.plot()
 | Observation models and the likelihood                 | [Observation Models](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/index.md) |
 | The parameter sample, the predictive and its scores   | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)                           |
 
+# Dependence
+
+[Back to Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)
+
+Many methods of commol read each observation as one independent piece of information: a likelihood sums the terms of its observations, `block_length=1` resamples them one by one, and a Laplace approximation reads the curvature of their sum. When the noise of neighbouring positions moves together, or two series share a shock, the data hold less information than their count says, and those intervals are too narrow. This page shows how to measure that dependence, in the residuals of a fit or in any values, and what to do with the answer. It is for anyone who reads intervals from data along an axis.
+
+The analyses run in Rust (`crates/commol-inference/src/dependence/`, with the estimators in `crates/commol-statistics/src/dependence.rs`) and live in `commol.dependence`.
+
+## Quick path
+
+The residuals of a constant flow fitted to data whose noise is an AR(1) of 0.6: the test rejects independence, and `τ` says the data count each observation about 2.6 times.
+
+```python
+import numpy as np
+
+from commol import (
+    Aggregate,
+    CalibrationParameter,
+    CalibrationProblem,
+    Calibrator,
+    ModelBuilder,
+    NelderMeadConfig,
+    ObservedDataPoint,
+    Simulation,
+)
+from commol.dependence import Refitted, residual_dependence, series_dependence
+from commol.observations import NoNoise
+from commol.uncertainty import Predictive
+
+
+def flow_model():
+    """A constant flow c from A to B each step."""
+    return (
+        ModelBuilder(name="Flow")
+        .add_bin(id="A", name="A")
+        .add_bin(id="B", name="B")
+        .add_parameter(id="c", value=None)
+        .add_transition(id="t_ab", source=["A"], target=["B"], rate="c * A / A")
+        .build(Aggregate(bin_amounts={"A": 1e6, "B": 0}), engine="DifferenceEquations")
+    )
+
+
+# The flow of each of 60 steps: 10 plus an AR(1) noise of 0.6.
+rng = np.random.default_rng(1)
+noise = np.zeros(60)
+for t in range(1, 60):
+    noise[t] = 0.6 * noise[t - 1] + rng.normal()
+problem = CalibrationProblem(
+    observed_data=[
+        ObservedDataPoint(at=step, output="B", value=float(10 + value), window=1)
+        for step, value in enumerate(noise, start=1)
+    ],
+    parameters=[
+        CalibrationParameter(id="c", parameter_type="parameter", min_bound=0.0, max_bound=30.0)
+    ],
+    loss_function="sse",
+    optimization_config=NelderMeadConfig(max_iterations=500),
+    seed=3,
+)
+calibrator = Calibrator(Simulation(flow_model()), problem)
+fit = calibrator.run()
+
+# The residuals of the fit, against refits of data built from the fit and
+# its residuals with signs ±1.
+at_fit = Predictive(calibrator, calibrator.point_sample(fit), positions=[1])
+result = residual_dependence(
+    at_fit,
+    problem.observed_data,
+    NoNoise(),
+    max_lag="auto",
+    randomizations=1,
+    reference=Refitted(replicates=99),
+    confidence_level=0.9,
+)
+(series,) = result.series
+print(series.max_lag)  # 10
+print([round(r, 2) for r in series.correlations[:3]])  # [0.52, 0.17, 0.1]
+print(series.p_value)  # 0.02
+print(round(series.tau, 2), [round(b, 2) for b in series.tau_band])  # 2.58 [0.38, 1.97]
+```
+
+## The statistics of a series
+
+A series is the values of one label in position order. Its statistics read them on the grid of its smallest spacing: positions 7, 14, 21 and 35 are a series of step 7 with a gap at 28, and lag 1 is 7 positions. Each lag reads the pairs of values that exist at its distance (the amplitude-modulated estimator of Parzen 1963 and Stoffer and Toloi 1992), so a gap costs pairs, never pairs values at different distances. `pairs` gives the pairs of each lag.
+
+| Statistic      | What it says                                                                                                                                                                                                                                                                                    |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `correlations` | The autocorrelation at lags `1 … max_lag`; `None` at a lag with no pair                                                                                                                                                                                                                         |
+| `portmanteau`  | The robust portmanteau `Q̃ = Σ_k (Σ e_t e_{t−k})² / Σ e_t² e_{t−k}²` of the values centered per series, the diagonal form of the statistic of Dalla, Giraitis and Phillips (2022): `χ²` of `degrees_of_freedom` lags under independence, also when the size of the noise varies along the series |
+| `p_value`      | The p-value of `Q̃` under the reference                                                                                                                                                                                                                                                          |
+| `tau`          | The integrated autocorrelation time `τ = 1 + 2 Σ r(k)`, by the initial monotone sequence of Geyer (1992): how many times the series counts each value                                                                                                                                           |
+| `tau_band`     | The central interval of `τ` at `confidence_level` under independence, with one draw; `None` when no replicate has a `τ`, as for a constant series                                                                                                                                               |
+| `cut_lag`      | The largest lag in the sum of `τ`: the sequence `Γ_k = r(2k) + r(2k+1)`, made monotone, stops at its first `Γ_k ≤ 0` or at the first lag with no pair; over several sets, the largest of theirs                                                                                                 |
+
+`max_lag` has no default: an integer, in steps of the grid of each series, or `"auto"`, `min(10, n/5)` for a series of `n` values, at least 1. `τ` does not read it: its sum stops where the sequence of Geyer stops.
+
+A series has no statistics, with the `reason`, when two of its observations share one position (give one of them a label of its own), a position is off its grid, such as 0, 2, 3 and 4.5, or its grid has more than 10 points per value, as when one position lies close to another. A lag with a single pair adds 1 to `Q̃` whatever the values, so a `max_lag` near the length of a short series makes the test conservative. `τ` is undefined, with the `tau_reason`, for fewer than 4 values, constant values, or an estimate not above 0, which comes from a negative correlation at the first lags; an undefined `τ` reads as below its band.
+
+## The series together
+
+Two series can share a shock at the same position, which no series shows alone. Over the series standardized by their own spread, `z`, the `problem` of the result gives:
+
+| Statistic            | What it says                                                                                                                                          |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `variance_factor`    | `Var(Σz) / ΣVar(z)`, `Σz` summed at each position of any series: 1 for series independent of each other                                               |
+| `tau`                | `τ` of `Σz`: the dependence of the shared shock along the positions                                                                                   |
+| `information_factor` | Their product, `LRV(Σz) / ΣVar(z)`: how many times the observations count their information; 1 for independent observations, 2 when each counts twice |
+| `p_value`            | The test of the information factor against the reference                                                                                              |
+
+`correlations` gives the correlation at lag 0 of every two series, over the positions they share.
+
+## Any values
+
+`series_dependence(values, observations, max_lag, replicates, confidence_level, seed)` reads one finite value per observation: a residual of held-out data, a score, any number. `Q̃` is read against `χ²`, and the band of `τ` and the test of the factor come from `replicates` sets of the values centered per series with independent signs ±1 (a wild band), from the `seed`. A band from independent normal series would leave 12 to 39 % of heteroscedastic values outside it; the wild band keeps the size of each value. In a study of 1000 sets of 35 independent values whose spread grows 30 times along the series, `Q̃` at `max_lag=7` rejects at 5 % in 5.1 % of them, and an AR(1) of 0.5 on 100 positions in 98 %.
+
+Two series with a shared AR(1) shock of 0.7: each series alone is near independent, and the factor of the problem says the observations count about twice.
+
+```python
+rng = np.random.default_rng(2)
+shock = np.zeros(50)
+for t in range(1, 50):
+    shock[t] = 0.7 * shock[t - 1] + rng.normal()
+values = [*(shock + rng.normal(size=50)), *(shock + rng.normal(size=50))]
+observations = [
+    ObservedDataPoint(at=t, output=output, value=0.0)
+    for output in ("north", "south")
+    for t in range(1, 51)
+]
+together = series_dependence(
+    values, observations, max_lag=5, replicates=199, confidence_level=0.9, seed=7
+)
+print([round(s.tau, 2) for s in together.series])  # [1.34, 1.2]
+print(round(together.correlations[0].correlation, 2))  # 0.54
+print(round(together.problem.information_factor, 2), together.problem.p_value)  # 2.1 0.035
+```
+
+`values` is one set: a list of lists raises a `TypeError` that points to `residual_dependence`, which reads the residuals of several draws or randomizations with a valid law.
+
+## The residuals of a predictive
+
+`residual_dependence(predictive, observations, noise, max_lag, randomizations, reference, confidence_level)` reads the residuals of a predictive of a `Calibrator`. Every random number comes from the seed of the calibrator, so the same predictive gives the same result.
+
+| `noise`               | Residuals                                                                                                                                                                                                                                                                                            | `randomizations`                  |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `DistributionNoise()` | The [quantile residuals](https://munqu.github.io/commol/latest/guide/uncertainty/#quantile-residuals) of the observation models of each draw. A count model randomizes them, so the statistics are averaged over the randomizations, common to every draw: the result does not depend on one of them | At least 1; more for small counts |
+| `NoNoise()`           | The additive residuals `y − ŷ` of a loss or a stochastic engine, `ŷ` the prediction the loss scores                                                                                                                                                                                                  | 1                                 |
+| `ResidualNoise(...)`  | A `TypeError`: it adds the residuals of a fit as noise                                                                                                                                                                                                                                               | —                                 |
+
+With one draw, such as `Calibrator.point_sample(fit)`, the result has its tests. With many, it gives the statistics averaged with the weights of the draws (`τ` as the ratio of the mean long-run variance to the mean variance), and, for `Q̃` and the factor, `draw_p_values` in place of `p_value` and `tau_band`: the median and the weighted share at or below `1 − confidence_level` of the p-values of the draws. That is no test: a p-value of one draw holds its level only under an exact posterior and moves with the seed. Test the fit with `Calibrator.point_sample(fit)`.
+
+## The reference
+
+`reference` has no default, since what holds depends on the data the residuals come from.
+
+| Reference                        | What it draws                                                                                                                                                                                                                                                               | Use it for                                     |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `AtParameters(replicates)`       | With `DistributionNoise()`, `replicates` data sets from the observation models at the predictions of the draw, with no refit and no run of the model; with `NoNoise()`, `Q̃` against `χ²` and the wild band                                                                  | Held-out data, or data drawn at the parameters |
+| `Refitted(replicates, starts=1)` | `replicates` data sets drawn from the observation models at the fit (`DistributionNoise()`), or the fit plus its residuals with signs ±1 (`NoNoise()`), each fitted again by the optimizer of the problem from `starts` starts; the p-value is `(1 + #{Q_b ≥ Q}) / (B + 1)` | The data of the fit                            |
+
+A fit leaves its residuals correlated with each other, the more so the more parameters it has, and `Refitted` holds that in its law. In a study of 400 data sets of independent Poisson counts at 35 positions, fitted by a smooth flow of 3 or 10 parameters with a Poisson model or with the sum of squares, `Refitted(replicates=39)` rejects at 5 % in 4.8 to 5.2 % of them with 3 parameters and 6.5 to 7.2 % with 10; `AtParameters` in 7.5 to 8.5 % and 24 to 26 %. `Refitted` needs a sample of one point and the observations of the problem, and a `ValueError` says so otherwise. Its refits run in parallel, log a record of each, and the result gives `failed` and `not_converged`.
+
+The power is that of a short series. Normal AR(1) noise of 0.5 at 100 positions, fitted with 3 parameters, is rejected in 86 % of data sets; at 35 positions with 10 parameters, in about 7 to 15 %. Not rejecting a short series is no evidence of independence: read `τ` and the autocorrelations, and the bias table below.
+
+## The bias of `τ`
+
+`τ` of a short series is biased: the median, the 10–90 % range and the share undefined of 500 series of each kind, true `τ` in brackets, the fits by least squares on Chebyshev polynomials.
+
+| Series (true `τ`)                                 | 20 positions           | 35                     | 100                    | 1000                   |
+| ------------------------------------------------- | ---------------------- | ---------------------- | ---------------------- | ---------------------- |
+| Independent (1)                                   | 0.98 (0.46–1.67), 0 %  | 0.98 (0.56–1.57), 0 %  | 1.04 (0.76–1.45), 0 %  | 1.03 (0.93–1.18), 0 %  |
+| AR(1) of 0.5 (3)                                  | 1.95 (1.16–3.56), 0 %  | 2.30 (1.52–4.14), 0 %  | 2.70 (1.86–4.13), 0 %  | 3.01 (2.57–3.83), 0 %  |
+| AR(1) of 0.8 (9)                                  | 3.26 (1.64–5.62), 0 %  | 4.30 (2.47–8.14), 0 %  | 6.33 (4.06–11.18), 0 % | 8.70 (6.96–12.05), 0 % |
+| AR(1) of 0.5 plus as much white noise (2)         | 1.46 (0.82–2.64), 0 %  | 1.58 (1.00–2.99), 0 %  | 1.74 (1.23–2.73), 0 %  | 2.00 (1.72–2.41), 0 %  |
+| AR(1) of −0.5 (1/3)                               | 0.42 (0.12–0.89), 20 % | 0.34 (0.09–0.78), 11 % | 0.31 (0.11–0.60), 4 %  | 0.33 (0.25–0.43), 0 %  |
+| AR(2) of 1 and −0.5, oscillating (5/3)            | 2.25 (1.87–3.26), 0 %  | 2.32 (2.04–3.26), 0 %  | 2.33 (2.18–2.91), 0 %  | 2.34 (2.30–2.54), 0 %  |
+| Residuals of a fit of 3 to independent noise (1)  | 0.70 (0.25–1.25), 2 %  | 0.83 (0.44–1.27), 0 %  | 0.98 (0.71–1.28), 0 %  | 1.02 (0.92–1.16), 0 %  |
+| Residuals of a fit of 10 to independent noise (1) | 0.24 (0.05–0.54), 29 % | 0.40 (0.13–0.77), 4 %  | 0.78 (0.56–1.04), 0 %  | 0.99 (0.90–1.10), 0 %  |
+| Residuals of a fit of 10 to an AR(1) of 0.5 (3)   | 0.32 (0.07–0.66), 19 % | 0.88 (0.43–1.33), 0 %  | 1.67 (1.39–2.11), 0 %  | 2.72 (2.40–3.23), 0 %  |
+
+- **`τ` measures the initial positive stretch of the correlation.** An oscillating correlation, as the AR(2), stops the sequence at its first negative pair, so `τ` tends to `1 + 2 r(1)`, 7/3, above the 5/3 of the process. A cycle at a long lag, such as a weekly pattern in daily data, does not reach `τ` at all: the autocorrelations and `Q̃` with `max_lag` at least that lag show it.
+- **A fit absorbs dependence.** Its residuals are less dependent than its noise, the more so with many parameters and few positions: the band of `Refitted` reads them against refits that absorbed the same.
+
+## What dependence means
+
+One realization cannot tell noise that depends on its neighbours, such as the noise of the dynamics, from a model that misses a feature of the data: both leave runs of residuals of one sign. A dependent series says that the observations count less than their number, or that the model misses something; a better model or a method that holds for dependent noise answers it, and the guide pages below say which.
+
+Several series give several tests, one per series, so some reject by chance. Holm's correction keeps the chance of any false rejection at the level: sort the `m` p-values, multiply the `i`-th smallest by `m − i + 1`, and keep each at least the one before.
+
+```python
+def holm(p_values: dict[str, float]) -> dict[str, float]:
+    """The p-values of Holm's correction."""
+    ordered = sorted(p_values.items(), key=lambda item: item[1])
+    adjusted, running = {}, 0.0
+    for i, (label, p) in enumerate(ordered):
+        running = max(running, min(1.0, (len(ordered) - i) * p))
+        adjusted[label] = running
+    return adjusted
+
+
+print(holm({s.label: s.p_value for s in together.series}))  # {'south': 1.0, 'north': 1.0}
+```
+
+## The methods that read dependence
+
+| Method                                           | How it reads dependence                                                                                                                                                    |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The bootstraps and the jackknife                 | `block_length`: dependence inside a block is kept ([Blocks and their length](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#blocks-and-their-length)) |
+| `Sandwich`                                       | Scores summed over blocks ([Sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich))                                                            |
+| `InformationMatchingEta`, `BootstrapCoverageEta` | The scale `η` of a Gibbs posterior from blocks of scores or of data ([What `η` means](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means))            |
+| `EnbPI`                                          | Prediction intervals of a series with dependent errors ([EnbPI](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#enbpi))                                 |
+| `Laplace`, `BayesianPosterior`, `block_length=1` | Each observation independent: an information factor above 1 says their intervals are too narrow                                                                            |
+
+## Errors
+
+| Situation                                                                                    | What happens                                                    |
+| -------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `values` is a list of lists                                                                  | `TypeError` that points to `residual_dependence`                |
+| `values` is not one finite value per observation                                             | `ValueError`                                                    |
+| `max_lag`, `replicates` or `randomizations` below 1, or `max_lag` a text other than `"auto"` | `ValueError` that names the rule                                |
+| `ResidualNoise(...)`                                                                         | `TypeError`                                                     |
+| `NoNoise()` with more than one randomization                                                 | `ValueError`                                                    |
+| `DistributionNoise()` with a loss, or an observed value outside the support of its model     | `ValueError`                                                    |
+| `Refitted` with a sample of many draws, or observations other than the problem's             | `ValueError` that points to `point_sample` or to `AtParameters` |
+| A predictive of a `SensitivityAnalysis`                                                      | `ValueError`: an analysis has no data                           |
+| Every refit fails                                                                            | `RuntimeError`                                                  |
+
+## Checklist
+
+- [ ] You test the residuals of a fit with `Refitted` and those of held-out data with `AtParameters`.
+- [ ] A test of many draws reads `Calibrator.point_sample(fit)`.
+- [ ] Several series are corrected for several tests.
+- [ ] A short series that does not reject is read with `τ` and its bias, not as independent.
+
+## Next steps
+
+| To learn                                                | Read                                                                                                      |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Quantile residuals and the other scores of a predictive | [Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/#scores)                            |
+| Methods for dependent noise: blocks                     | [Resampling](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#blocks-and-their-length) |
+| A covariance that holds for dependent noise             | [Local Approximations](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich)           |
+| The scale of a Gibbs posterior                          | [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#gibbs-posterior)    |
+
+## References
+
+- Dalla, V., Giraitis, L., & Phillips, P. C. B. (2022). Robust tests for white noise and cross-correlation. *Econometric Theory*, 38(5), 913–941.
+- Dunn, P. K., & Smyth, G. K. (1996). Randomized quantile residuals. *Journal of Computational and Graphical Statistics*, 5(3), 236–244.
+- Geyer, C. J. (1992). Practical Markov chain Monte Carlo. *Statistical Science*, 7(4), 473–483.
+- Holm, S. (1979). A simple sequentially rejective multiple test procedure. *Scandinavian Journal of Statistics*, 6(2), 65–70.
+- Parzen, E. (1963). On spectral analysis with missing observations and amplitude modulation. *Sankhyā A*, 25, 383–392.
+- Stoffer, D. S., & Toloi, C. M. C. (1992). A note on the Ljung–Box–Pierce portmanteau statistic with missing data. *Statistics & Probability Letters*, 13(5), 391–396.
+
 # Conformal Prediction Intervals
 
 [Back to Uncertainty](https://munqu.github.io/commol/latest/guide/uncertainty/index.md)
@@ -7567,18 +7820,19 @@ A number below 1, or `levels` other than `"all"` and `"outer"`, raises `ValueErr
 
 ## What runs in parallel
 
-| Method                                                          | What runs in parallel                          |
-| --------------------------------------------------------------- | ---------------------------------------------- |
-| `Calibrator.run(starts=n)`                                      | The starts                                     |
-| A particle swarm (`ParticleSwarmConfig`)                        | The particles of an iteration                  |
-| The bootstraps, the block jackknife                             | The replicates                                 |
-| `Predictive`, `Scenarios`, scores                               | The draws of the sample                        |
-| `GibbsPosterior`, `BayesianPosterior`, `ABCSMC`, `ABCRejection` | The particles or the draws                     |
-| `ProfileLikelihood`, `PredictionProfile`                        | Each side of each quantity                     |
-| The conformal methods                                           | The fits of their folds or blocks              |
-| The sensitivity methods                                         | The runs of the design                         |
-| The local approximations, the identifiability methods           | The runs of the finite differences, the points |
-| `Simulation.replicates(count)`                                  | The replicates of a stochastic engine          |
+| Method                                                          | What runs in parallel                                                             |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `Calibrator.run(starts=n)`                                      | The starts                                                                        |
+| A particle swarm (`ParticleSwarmConfig`)                        | The particles of an iteration                                                     |
+| The bootstraps, the block jackknife                             | The replicates                                                                    |
+| `Predictive`, `Scenarios`, scores                               | The draws of the sample                                                           |
+| `GibbsPosterior`, `BayesianPosterior`, `ABCSMC`, `ABCRejection` | The particles or the draws                                                        |
+| `ProfileLikelihood`, `PredictionProfile`                        | Each side of each quantity                                                        |
+| The conformal methods                                           | The fits of their folds or blocks                                                 |
+| The sensitivity methods                                         | The runs of the design                                                            |
+| The local approximations, the identifiability methods           | The runs of the finite differences, the points                                    |
+| `Simulation.replicates(count)`                                  | The replicates of a stochastic engine                                             |
+| `residual_dependence`, `series_dependence`                      | The draws of the sample, the data sets and refits of the reference, the wild sets |
 
 One run of a model is never split: each thread runs whole runs.
 
@@ -8220,6 +8474,7 @@ The package root `commol` holds the main flow: build a model, choose its structu
 | [`commol.observations`](https://munqu.github.io/commol/latest/api/observations/index.md)       | `NormalObservations`, `LogNormalObservations`, `StudentTObservations`, `PoissonObservations`, `NegativeBinomialObservations`, `BinomialObservations`, `NoNoise`, `ResidualNoise`, `DistributionNoise`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | [`commol.uncertainty`](https://munqu.github.io/commol/latest/api/uncertainty/index.md)         | `ParameterSample`, `SampleMethod`, `Predictive`, `Scenarios`, `weighted_quantiles`, `member_statistics`; the results `ParameterSummary`, `PredictiveBand`, `SeriesBand`, `ObservationDraws`, `ScenarioSummary` and the figures of a predictive, `PredictivePlot`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | [`commol.scores`](https://munqu.github.io/commol/latest/api/scores/index.md)                   | `coverage`, `interval_score`, `weighted_interval_score`, `crps`, `pit`, `quantile_residuals`, `log_score`; the result `Score`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| [`commol.dependence`](https://munqu.github.io/commol/latest/api/dependence/index.md)           | `series_dependence`, `residual_dependence`, `AtParameters`, `Refitted`; the result `SeriesDependence` and its parts `SeriesStatistics`, `SeriesCorrelation`, `ProblemDependence`, `DrawPValues`, `DependenceSettings`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | [`commol.resampling`](https://munqu.github.io/commol/latest/api/resampling/index.md)           | `BayesianBootstrap`, `ResidualBootstrap`, `WildBootstrap`, `BlockJackknife`, `ParametricBootstrap`; the results `BootstrapResult`, `JackknifeResult`, `ResamplingDiagnostics`, `BoundError`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | [`commol.profiles`](https://munqu.github.io/commol/latest/api/profiles/index.md)               | `ProfileLikelihood`, `PredictionProfile`, `PredictionSpec`, `Threshold`; the results `ProfileResult`, `Profile`, `ProfileInterval`, `ProfileStructure`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | [`commol.local`](https://munqu.github.io/commol/latest/api/local/index.md)                     | `Laplace`, `Sandwich`, `LaplaceMixture`, `LikelihoodTarget`, `GibbsTarget`; the results `LaplaceResult`, `SandwichResult`, `ImportanceResult`, `MixtureComponent`, `DeltaBand`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
@@ -10554,6 +10809,57 @@ class Calibrator:
         """
         return self._engine_problem.observation_bounds(
             sample._rust, engine_json(observed_data), engine_json(noise)
+        )
+
+    def _residual_dependence(
+        self,
+        sample: ParameterSample,
+        observed_data: list[ObservedDataPoint],
+        noise: _ObservationNoise,
+        max_lag: int | Literal["auto"],
+        randomizations: int,
+        reference: str,
+        confidence_level: float,
+    ) -> "SeriesDependenceProtocol":
+        """
+        The dependence of the residuals of `sample` at `observed_data`, for
+        `commol.dependence.residual_dependence`.
+
+        Parameters
+        ----------
+        sample : ParameterSample
+            The draws, in the problem's order.
+        observed_data : list[ObservedDataPoint]
+            The observations.
+        noise : NoNoise | ResidualNoise | DistributionNoise
+            The residuals: `DistributionNoise` reads the quantile residuals,
+            `NoNoise` the additive ones.
+        max_lag : int | "auto"
+            The largest lag.
+        randomizations : int
+            The randomizations of the quantile residuals.
+        reference : str
+            The JSON of `AtParameters` or `Refitted`.
+        confidence_level : float
+            The level of the band of ``τ``.
+
+        Returns
+        -------
+        SeriesDependenceProtocol
+            The analysis, computed in Rust from the calibrator's seed; the
+            refits of `Refitted` log a record of each to the logger
+            ``commol.dependence``.
+        """
+        return commol_rs.inference.residual_dependence(
+            self._engine_problem,
+            sample._rust,
+            engine_json(observed_data),
+            engine_json(noise),
+            max_lag,
+            randomizations,
+            reference,
+            confidence_level,
+            logging.getLogger("commol.dependence"),
         )
 
     def _check_observations(self, observed_data: list[ObservedDataPoint]) -> None:
@@ -13071,6 +13377,769 @@ class SeriesIntervals(ResultModel):
     prediction: list[float]
     lower: list[float]
     upper: list[float]
+```
+
+# Dependence API
+
+[Back to API Reference](https://munqu.github.io/commol/latest/api/index.md)
+
+The module `commol.dependence`: the dependence of the values of each series, of any values and of the residuals of a predictive, with the references of its tests and its result. Guide: [Dependence](https://munqu.github.io/commol/latest/guide/uncertainty/dependence/index.md).
+
+## series_dependence
+
+```python
+series_dependence(values: Sequence[float], observations: Sequence[ObservedDataPoint], max_lag: int | Literal['auto'], replicates: int, confidence_level: float, seed: int) -> SeriesDependence
+```
+
+The dependence of one value per observation, series by series.
+
+The values of each label, in position order, are read on the grid of the smallest spacing of the series, and each lag over the pairs of values that exist at that distance (Parzen 1963; Stoffer and Toloi 1992). For each series: the autocorrelation up to `max_lag`; the robust portmanteau `Q̃ = Σ_k (Σ e_t e_{t−k})² / Σ e_t² e_{t−k}²` of the values centered per series (Dalla, Giraitis and Phillips 2022), which holds under heteroscedasticity, with its p-value against `χ²(h)`; and the integrated autocorrelation time `τ` by the initial monotone sequence of Geyer (1992), with its band under independence from `replicates` sets of the centered values with signs ±1 (a wild band). For the series together: their correlations at lag 0, and over the standardized series `z` the factors `Var(Σz) / ΣVar(z)` and `τ` of `Σz`, whose product `LRV(Σz) / ΣVar(z)` is the factor by which the dependence multiplies the information, with its p-value against the wild sets.
+
+Parameters:
+
+| Name               | Type                          | Description                                                                                                                            | Default                                                                                                               |
+| ------------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `values`           | `Sequence[float]`             | One finite value per observation, in the order of observations: a quantile residual of held-out data, an additive residual, any score. | *required*                                                                                                            |
+| `observations`     | `Sequence[ObservedDataPoint]` | The observations the values belong to.                                                                                                 | *required*                                                                                                            |
+| `max_lag`          | \`int                         | auto\`                                                                                                                                 | The largest lag, in steps of the grid of each series; "auto" is min(10, n / 5), at least 1, for a series of n values. |
+| `replicates`       | `int`                         | The wild sets of the band and of the test of the factor, at least 1.                                                                   | *required*                                                                                                            |
+| `confidence_level` | `float`                       | The level of the band of τ.                                                                                                            | *required*                                                                                                            |
+| `seed`             | `int`                         | The seed of the signs, such as Calibrator.seed.                                                                                        | *required*                                                                                                            |
+
+Returns:
+
+| Type               | Description                    |
+| ------------------ | ------------------------------ |
+| `SeriesDependence` | The statistics, with one draw. |
+
+Raises:
+
+| Type         | Description                                                                           |
+| ------------ | ------------------------------------------------------------------------------------- |
+| `TypeError`  | If values holds lists: one set of values only.                                        |
+| `ValueError` | If a setting is outside its range, or values is not one finite value per observation. |
+
+References
+
+Dalla, V., Giraitis, L., & Phillips, P. C. B. (2022). Robust tests for white noise and cross-correlation. Econometric Theory, 38(5), 913–941.
+
+Geyer, C. J. (1992). Practical Markov chain Monte Carlo. Statistical Science, 7(4), 473–483.
+
+Source code in `commol/dependence/analysis.py`
+
+```python
+def series_dependence(
+    values: Sequence[float],
+    observations: Sequence[ObservedDataPoint],
+    max_lag: int | Literal["auto"],
+    replicates: int,
+    confidence_level: float,
+    seed: int,
+) -> SeriesDependence:
+    """
+    The dependence of one value per observation, series by series.
+
+    The values of each label, in position order, are read on the grid of the
+    smallest spacing of the series, and each lag over the pairs of values
+    that exist at that distance (Parzen 1963; Stoffer and Toloi 1992). For
+    each series: the autocorrelation up to `max_lag`; the robust portmanteau
+    ``Q̃ = Σ_k (Σ e_t e_{t−k})² / Σ e_t² e_{t−k}²`` of the values centered
+    per series (Dalla, Giraitis and Phillips 2022), which holds under
+    heteroscedasticity, with its p-value against ``χ²(h)``; and the
+    integrated autocorrelation time ``τ`` by the initial monotone sequence
+    of Geyer (1992), with its band under independence from `replicates`
+    sets of the centered values with signs ±1 (a wild band). For the series
+    together: their correlations at lag 0, and over the standardized series
+    ``z`` the factors ``Var(Σz) / ΣVar(z)`` and ``τ`` of ``Σz``, whose product
+    ``LRV(Σz) / ΣVar(z)`` is the factor by which the dependence multiplies the
+    information, with its p-value against the wild sets.
+
+    Parameters
+    ----------
+    values : Sequence[float]
+        One finite value per observation, in the order of `observations`: a
+        quantile residual of held-out data, an additive residual, any score.
+    observations : Sequence[ObservedDataPoint]
+        The observations the values belong to.
+    max_lag : int | "auto"
+        The largest lag, in steps of the grid of each series; ``"auto"`` is
+        ``min(10, n / 5)``, at least 1, for a series of ``n`` values.
+    replicates : int
+        The wild sets of the band and of the test of the factor, at least 1.
+    confidence_level : float
+        The level of the band of ``τ``.
+    seed : int
+        The seed of the signs, such as ``Calibrator.seed``.
+
+    Returns
+    -------
+    SeriesDependence
+        The statistics, with one draw.
+
+    Raises
+    ------
+    TypeError
+        If `values` holds lists: one set of values only.
+    ValueError
+        If a setting is outside its range, or `values` is not one finite
+        value per observation.
+
+    References
+    ----------
+    Dalla, V., Giraitis, L., & Phillips, P. C. B. (2022). Robust tests for
+    white noise and cross-correlation. Econometric Theory, 38(5), 913–941.
+
+    Geyer, C. J. (1992). Practical Markov chain Monte Carlo. Statistical
+    Science, 7(4), 473–483.
+    """
+    if any(isinstance(value, Sequence) for value in values):
+        raise TypeError(
+            "series_dependence reads one set of values, one per observation; for "
+            "the residuals of several draws or randomizations, use "
+            "residual_dependence"
+        )
+    raw = commol_rs.inference.series_dependence(
+        engine_json(list(observations)),
+        list(values),
+        max_lag,
+        replicates,
+        confidence_level,
+        seed,
+    )
+    settings = DependenceSettings(
+        max_lag=max_lag,
+        confidence_level=confidence_level,
+        seed=seed,
+        replicates=replicates,
+    )
+    return SeriesDependence._of(raw, settings)
+```
+
+## residual_dependence
+
+```python
+residual_dependence(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: _ObservationNoise, max_lag: int | Literal['auto'], randomizations: int, reference: AtParameters | Refitted, confidence_level: float) -> SeriesDependence
+```
+
+The dependence of the residuals of a predictive, series by series.
+
+With `DistributionNoise`, the residuals of each draw are its randomized quantile residuals (Dunn and Smyth 1996), standard normal and independent for independent data under the right model; a count model randomizes them, so the statistics are averaged over `randomizations` randomizations, common to every draw, and the result does not depend on one of them. With `NoNoise`, for a loss or a stochastic engine, they are the additive residuals `y − ŷ`, `ŷ` the prediction the loss scores, and `randomizations` is 1. The statistics are those of `series_dependence`, averaged over the randomizations and, with their weights, over the draws (`τ` as the ratio of the mean long-run variance to the mean variance).
+
+With one draw, the tests and the band of `τ` come from `reference`: `Refitted` holds at a fit, `AtParameters` at the parameters the data were drawn from. With many draws, the result gives the weighted statistics, and the median and the weighted share below the level of the p-values of the draws, with no test of its own: test a fit with `Calibrator.point_sample(fit)`. Every random number comes from the seed of the source of the predictive, so the same predictive gives the same result.
+
+Parameters:
+
+| Name               | Type                          | Description                                                                                          | Default                                                                                                               |
+| ------------------ | ----------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `predictive`       | `Predictive`                  | The predictive of a Calibrator.                                                                      | *required*                                                                                                            |
+| `observations`     | `Sequence[ObservedDataPoint]` | The observations whose residuals are read: the problem's, for Refitted, or held-out data.            | *required*                                                                                                            |
+| `noise`            | \`NoNoise                     | DistributionNoise\`                                                                                  | DistributionNoise() for the quantile residuals of observation models, NoNoise() for the additive residuals of a loss. |
+| `max_lag`          | \`int                         | auto\`                                                                                               | The largest lag, as in series_dependence.                                                                             |
+| `randomizations`   | `int`                         | The randomizations of the quantile residuals, at least 1; 1 with NoNoise.                            | *required*                                                                                                            |
+| `reference`        | \`AtParameters                | Refitted\`                                                                                           | The reference of the tests and the band of τ.                                                                         |
+| `confidence_level` | `float`                       | The level of the band of τ; a p-value of a draw is below the level at or below 1 − confidence_level. | *required*                                                                                                            |
+
+Returns:
+
+| Type               | Description                                                                  |
+| ------------------ | ---------------------------------------------------------------------------- |
+| `SeriesDependence` | The statistics and their tests, with failed and not_converged of the refits. |
+
+Raises:
+
+| Type                   | Description                                                                                                                                                                                                                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TypeError`            | If noise is ResidualNoise.                                                                                                                                                                                                                                                                        |
+| `ValueError`           | If a setting is outside its range, the predictive is of a sensitivity analysis, quantile residuals have a loss or an observed value outside the support of its model, additive residuals have more than one randomization, or Refitted reads many draws or observations other than the problem's. |
+| `RuntimeError`         | If every refit fails.                                                                                                                                                                                                                                                                             |
+| `InfeasibleStateError` | If a draw leaves the values its model allows.                                                                                                                                                                                                                                                     |
+
+References
+
+Dunn, P. K., & Smyth, G. K. (1996). Randomized quantile residuals. Journal of Computational and Graphical Statistics, 5(3), 236–244.
+
+Source code in `commol/dependence/analysis.py`
+
+```python
+def residual_dependence(
+    predictive: Predictive,
+    observations: Sequence[ObservedDataPoint],
+    noise: _ObservationNoise,
+    max_lag: int | Literal["auto"],
+    randomizations: int,
+    reference: AtParameters | Refitted,
+    confidence_level: float,
+) -> SeriesDependence:
+    """
+    The dependence of the residuals of a predictive, series by series.
+
+    With `DistributionNoise`, the residuals of each draw are its randomized
+    quantile residuals (Dunn and Smyth 1996), standard normal and
+    independent for independent data under the right model; a count model
+    randomizes them, so the statistics are averaged over `randomizations`
+    randomizations, common to every draw, and the result does not depend on
+    one of them. With `NoNoise`, for a loss or a stochastic engine, they are
+    the additive residuals ``y − ŷ``, ``ŷ`` the prediction the loss scores,
+    and `randomizations` is 1. The statistics are those of
+    `series_dependence`, averaged over the randomizations and, with their
+    weights, over the draws (``τ`` as the ratio of the mean long-run variance
+    to the mean variance).
+
+    With one draw, the tests and the band of ``τ`` come from `reference`:
+    `Refitted` holds at a fit, `AtParameters` at the parameters the data
+    were drawn from. With many draws, the result gives the weighted
+    statistics, and the median and the weighted share below the level of
+    the p-values of the draws, with no test of its own: test a fit with
+    ``Calibrator.point_sample(fit)``. Every random number comes from the seed
+    of the source of the predictive, so the same predictive gives the same
+    result.
+
+    Parameters
+    ----------
+    predictive : Predictive
+        The predictive of a `Calibrator`.
+    observations : Sequence[ObservedDataPoint]
+        The observations whose residuals are read: the problem's, for
+        `Refitted`, or held-out data.
+    noise : NoNoise | DistributionNoise
+        `DistributionNoise()` for the quantile residuals of observation
+        models, `NoNoise()` for the additive residuals of a loss.
+    max_lag : int | "auto"
+        The largest lag, as in `series_dependence`.
+    randomizations : int
+        The randomizations of the quantile residuals, at least 1; 1 with
+        `NoNoise`.
+    reference : AtParameters | Refitted
+        The reference of the tests and the band of ``τ``.
+    confidence_level : float
+        The level of the band of ``τ``; a p-value of a draw is below the
+        level at or below ``1 − confidence_level``.
+
+    Returns
+    -------
+    SeriesDependence
+        The statistics and their tests, with ``failed`` and ``not_converged``
+        of the refits.
+
+    Raises
+    ------
+    TypeError
+        If `noise` is `ResidualNoise`.
+    ValueError
+        If a setting is outside its range, the predictive is of a
+        sensitivity analysis, quantile residuals have a loss or an observed
+        value outside the support of its model, additive residuals have more
+        than one randomization, or `Refitted` reads many draws or
+        observations other than the problem's.
+    RuntimeError
+        If every refit fails.
+    InfeasibleStateError
+        If a draw leaves the values its model allows.
+
+    References
+    ----------
+    Dunn, P. K., & Smyth, G. K. (1996). Randomized quantile residuals.
+    Journal of Computational and Graphical Statistics, 5(3), 236–244.
+    """
+    raw = predictive.source._residual_dependence(
+        predictive.sample,
+        list(observations),
+        noise,
+        max_lag,
+        randomizations,
+        engine_json(reference),
+        confidence_level,
+    )
+    for entry in raw.failed:
+        logger.warning(entry)
+    settings = DependenceSettings(
+        max_lag=max_lag,
+        confidence_level=confidence_level,
+        seed=predictive.source.seed,
+        noise=noise if isinstance(noise, (NoNoise, DistributionNoise)) else None,
+        randomizations=randomizations,
+        reference=reference,
+    )
+    return SeriesDependence._of(raw, settings)
+```
+
+## AtParameters
+
+Bases: `RangeChecked`
+
+A reference at the parameters of each draw, with no refit.
+
+With `DistributionNoise`, `replicates` data sets drawn from the observation models at the predictions of the draw give the law of the integrated statistics: the p-values of `Q̃` and of the information factor, and the band of `τ`. No model runs again. With `NoNoise`, `Q̃` is read against `χ²(h)` and the band comes from `replicates` sets of the residuals with signs ±1. A fit leaves its residuals correlated with each other, the more so the more parameters it has, so with the data of the fit this reference rejects more often than its level (8 % at 5 % with 3 parameters and 24 to 26 % with 10, at 35 positions); `Refitted` holds there. It is the reference of held-out data.
+
+Attributes:
+
+| Name         | Type            | Description                                 |
+| ------------ | --------------- | ------------------------------------------- |
+| `kind`       | `at_parameters` | The reference, which the engine reads.      |
+| `replicates` | `int`           | The data sets of the reference, at least 1. |
+
+Source code in `commol/dependence/references.py`
+
+```python
+class AtParameters(RangeChecked):
+    """
+    A reference at the parameters of each draw, with no refit.
+
+    With `DistributionNoise`, `replicates` data sets drawn from the
+    observation models at the predictions of the draw give the law of the
+    integrated statistics: the p-values of ``Q̃`` and of the information
+    factor, and the band of ``τ``. No model runs again. With `NoNoise`,
+    ``Q̃`` is read against ``χ²(h)`` and the band comes from `replicates`
+    sets of the residuals with signs ±1. A fit leaves its residuals
+    correlated with each other, the more so the more parameters it has, so
+    with the data of the fit this reference rejects more often than its
+    level (8 % at 5 % with 3 parameters and 24 to 26 % with 10, at 35
+    positions); `Refitted` holds there. It is the reference of held-out data.
+
+    Attributes
+    ----------
+    kind : "at_parameters"
+        The reference, which the engine reads.
+    replicates : int
+        The data sets of the reference, at least 1.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["at_parameters"] = Field(
+        default="at_parameters", description="The reference."
+    )
+    replicates: int = Field(description="The data sets of the reference.")
+```
+
+## Refitted
+
+Bases: `RangeChecked`
+
+A reference of data sets drawn at the fit and fitted again.
+
+Each of `replicates` data sets is drawn from the observation models at the fit (`DistributionNoise`), or is the fit plus its residuals with signs ±1 (`NoNoise`), and is fitted again by the optimizer of the problem from `starts` starts. The statistics of the residuals of the refits are the law of the statistics of the fit, so the test holds at a fit whatever its number of parameters: the p-value of `Q̃` and of the information factor is `(1 + #{Q_b ≥ Q}) / (B + 1)`. It needs the sample of one point and the observations of the problem; the refits run in parallel and log a record of each.
+
+Attributes:
+
+| Name         | Type       | Description                                                                                |
+| ------------ | ---------- | ------------------------------------------------------------------------------------------ |
+| `kind`       | `refitted` | The reference, which the engine reads.                                                     |
+| `replicates` | `int`      | The refits, at least 1.                                                                    |
+| `starts`     | `int`      | Starts of each refit (default 1): the fit, then rows of a Latin hypercube over the bounds. |
+
+Source code in `commol/dependence/references.py`
+
+```python
+class Refitted(RangeChecked):
+    """
+    A reference of data sets drawn at the fit and fitted again.
+
+    Each of `replicates` data sets is drawn from the observation models at
+    the fit (`DistributionNoise`), or is the fit plus its residuals with
+    signs ±1 (`NoNoise`), and is fitted again by the optimizer of the
+    problem from `starts` starts. The statistics of the residuals of the
+    refits are the law of the statistics of the fit, so the test holds at a
+    fit whatever its number of parameters: the p-value of ``Q̃`` and of the
+    information factor is ``(1 + #{Q_b ≥ Q}) / (B + 1)``. It needs the sample
+    of one point and the observations of the problem; the refits run in
+    parallel and log a record of each.
+
+    Attributes
+    ----------
+    kind : "refitted"
+        The reference, which the engine reads.
+    replicates : int
+        The refits, at least 1.
+    starts : int
+        Starts of each refit (default 1): the fit, then rows of a Latin
+        hypercube over the bounds.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["refitted"] = Field(default="refitted", description="The reference.")
+    replicates: int = Field(description="The refits.")
+    starts: int = Field(default=1, description="Starts per refit.")
+```
+
+## SeriesDependence
+
+Bases: `ResultModel`
+
+Whether the values of each series are dependent, and how strongly.
+
+Attributes:
+
+| Name            | Type                      | Description                                                                                                                                  |
+| --------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `series`        | `list[SeriesStatistics]`  | Each series, in order of first appearance of its label.                                                                                      |
+| `correlations`  | `list[SeriesCorrelation]` | Each pair of series with statistics.                                                                                                         |
+| `problem`       | `ProblemDependence`       | The series together.                                                                                                                         |
+| `settings`      | `DependenceSettings`      | The settings of the analysis.                                                                                                                |
+| `draws`         | `int`                     | The draws of the sample; 1 for values. With many, the statistics are the weighted means of the draws, and the result has no test of its own. |
+| `failed`        | `list[str]`               | Each refit of a Refitted reference that failed (also logged).                                                                                |
+| `not_converged` | `int`                     | The refits kept although their optimizer did not converge.                                                                                   |
+
+Source code in `commol/dependence/results.py`
+
+```python
+class SeriesDependence(ResultModel):
+    """
+    Whether the values of each series are dependent, and how strongly.
+
+    Attributes
+    ----------
+    series : list[SeriesStatistics]
+        Each series, in order of first appearance of its label.
+    correlations : list[SeriesCorrelation]
+        Each pair of series with statistics.
+    problem : ProblemDependence
+        The series together.
+    settings : DependenceSettings
+        The settings of the analysis.
+    draws : int
+        The draws of the sample; 1 for values. With many, the statistics are
+        the weighted means of the draws, and the result has no test of its
+        own.
+    failed : list[str]
+        Each refit of a `Refitted` reference that failed (also logged).
+    not_converged : int
+        The refits kept although their optimizer did not converge.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    series: list[SeriesStatistics]
+    correlations: list[SeriesCorrelation]
+    problem: ProblemDependence
+    settings: DependenceSettings
+    draws: int
+    failed: list[str]
+    not_converged: int
+
+    @classmethod
+    def _of(
+        cls, raw: "SeriesDependenceProtocol", settings: DependenceSettings
+    ) -> "SeriesDependence":
+        return cls(
+            series=[SeriesStatistics._of(series) for series in raw.series],
+            correlations=[
+                SeriesCorrelation(first=first, second=second, correlation=value)
+                for first, second, value in raw.correlations
+            ],
+            problem=ProblemDependence(
+                variance_factor=raw.variance_factor,
+                tau=raw.tau,
+                tau_reason=raw.tau_reason,
+                information_factor=raw.information_factor,
+                p_value=raw.p_value,
+                draw_p_values=_draw_p_values(raw.draw_p_values),
+            ),
+            settings=settings,
+            draws=raw.draws,
+            failed=raw.failed,
+            not_converged=raw.not_converged,
+        )
+```
+
+## SeriesStatistics
+
+Bases: `ResultModel`
+
+The dependence of the values of one series.
+
+The series reads its values in position order, on the grid of its smallest spacing; each lag pairs the values that exist at that distance.
+
+Attributes:
+
+| Name                 | Type                  | Description                            |
+| -------------------- | --------------------- | -------------------------------------- |
+| `label`              | `str`                 | The label of the series.               |
+| `values`             | `int`                 | The values it reads.                   |
+| `reason`             | \`str                 | None\`                                 |
+| `max_lag`            | `int`                 | The largest lag, in steps of the grid. |
+| `correlations`       | \`list\[float         | None\]\`                               |
+| `pairs`              | `list[int]`           | The pairs of values each lag reads.    |
+| `portmanteau`        | \`float               | None\`                                 |
+| `degrees_of_freedom` | `int`                 | The lags in the sum of Q̃.              |
+| `p_value`            | \`float               | None\`                                 |
+| `draw_p_values`      | \`DrawPValues         | None\`                                 |
+| `tau`                | \`float               | None\`                                 |
+| `tau_reason`         | \`str                 | None\`                                 |
+| `tau_band`           | \`tuple[float, float] | None\`                                 |
+| `cut_lag`            | \`int                 | None\`                                 |
+
+Source code in `commol/dependence/results.py`
+
+```python
+class SeriesStatistics(ResultModel):
+    """
+    The dependence of the values of one series.
+
+    The series reads its values in position order, on the
+    grid of its smallest spacing; each lag pairs the values that exist at
+    that distance.
+
+    Attributes
+    ----------
+    label : str
+        The label of the series.
+    values : int
+        The values it reads.
+    reason : str | None
+        Why it has no statistics: two observations at one position, a
+        position off its grid, or a grid of more than 10 points per value.
+    max_lag : int
+        The largest lag, in steps of the grid.
+    correlations : list[float | None]
+        The autocorrelation at lags ``1 … max_lag``, each over its pairs;
+        None at a lag with no pair.
+    pairs : list[int]
+        The pairs of values each lag reads.
+    portmanteau : float | None
+        The robust portmanteau ``Q̃`` (Dalla, Giraitis and Phillips 2022).
+    degrees_of_freedom : int
+        The lags in the sum of ``Q̃``.
+    p_value : float | None
+        The p-value of ``Q̃`` under the reference, with one draw.
+    draw_p_values : DrawPValues | None
+        The spread of the p-values of the draws, with many.
+    tau : float | None
+        The integrated autocorrelation time, by the initial monotone
+        sequence of Geyer (1992).
+    tau_reason : str | None
+        Why ``τ`` is undefined: fewer than 4 values, constant values, or an
+        estimate not above 0, which reads as below its band.
+    tau_band : tuple[float, float] | None
+        The central interval of ``τ`` under independence at the confidence
+        level, with one draw; ``-inf`` where the replicates have no ``τ``,
+        and None when none has one.
+    cut_lag : int | None
+        The largest lag in the sum of ``τ``; over several sets, the largest
+        of theirs.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    label: str
+    values: int
+    reason: str | None
+    max_lag: int
+    correlations: list[float | None]
+    pairs: list[int]
+    portmanteau: float | None
+    degrees_of_freedom: int
+    p_value: float | None
+    draw_p_values: DrawPValues | None
+    tau: float | None
+    tau_reason: str | None
+    tau_band: tuple[float, float] | None
+    cut_lag: int | None
+
+    @classmethod
+    def _of(cls, raw: "SeriesStatisticsProtocol") -> "SeriesStatistics":
+        return cls(
+            label=raw.label,
+            values=raw.values,
+            reason=raw.reason,
+            max_lag=raw.max_lag,
+            correlations=raw.correlations,
+            pairs=raw.pairs,
+            portmanteau=raw.portmanteau,
+            degrees_of_freedom=raw.degrees_of_freedom,
+            p_value=raw.p_value,
+            draw_p_values=_draw_p_values(raw.draw_p_values),
+            tau=raw.tau,
+            tau_reason=raw.tau_reason,
+            tau_band=raw.tau_band,
+            cut_lag=raw.cut_lag,
+        )
+```
+
+## SeriesCorrelation
+
+Bases: `ResultModel`
+
+The correlation at lag 0 of two series, over the positions they share.
+
+Attributes:
+
+| Name          | Type    | Description                     |
+| ------------- | ------- | ------------------------------- |
+| `first`       | `str`   | The label of the first series.  |
+| `second`      | `str`   | The label of the second series. |
+| `correlation` | \`float | None\`                          |
+
+Source code in `commol/dependence/results.py`
+
+```python
+class SeriesCorrelation(ResultModel):
+    """
+    The correlation at lag 0 of two series, over the positions they share.
+
+    Attributes
+    ----------
+    first : str
+        The label of the first series.
+    second : str
+        The label of the second series.
+    correlation : float | None
+        None with fewer than two shared positions or a constant series.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    first: str
+    second: str
+    correlation: float | None
+```
+
+## ProblemDependence
+
+Bases: `ResultModel`
+
+The dependence of the series together, over the standardized series `z`: how many times the observations count their information.
+
+Attributes:
+
+| Name                 | Type          | Description |
+| -------------------- | ------------- | ----------- |
+| `variance_factor`    | \`float       | None\`      |
+| `tau`                | \`float       | None\`      |
+| `tau_reason`         | \`str         | None\`      |
+| `information_factor` | \`float       | None\`      |
+| `p_value`            | \`float       | None\`      |
+| `draw_p_values`      | \`DrawPValues | None\`      |
+
+Source code in `commol/dependence/results.py`
+
+```python
+class ProblemDependence(ResultModel):
+    """
+    The dependence of the series together, over the standardized series
+    ``z``: how many times the observations count their information.
+
+    Attributes
+    ----------
+    variance_factor : float | None
+        ``Var(Σz) / ΣVar(z)``, ``Σz`` summed at each position of any
+        series: the dependence across series at one position.
+    tau : float | None
+        ``τ`` of ``Σz``: the dependence of the sum along the positions.
+    tau_reason : str | None
+        Why ``τ`` of ``Σz`` is undefined.
+    information_factor : float | None
+        Their product, ``LRV(Σz) / ΣVar(z)``: 1 for independent
+        observations, 2 when each counts its information twice.
+    p_value : float | None
+        The p-value of the information factor under the reference, with one
+        draw.
+    draw_p_values : DrawPValues | None
+        The spread of the p-values of the draws, with many.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    variance_factor: float | None
+    tau: float | None
+    tau_reason: str | None
+    information_factor: float | None
+    p_value: float | None
+    draw_p_values: DrawPValues | None
+```
+
+## DrawPValues
+
+Bases: `ResultModel`
+
+The spread of the p-values of the draws of a sample, each against its own reference: no test of the sample.
+
+Attributes:
+
+| Name          | Type    | Description                                          |
+| ------------- | ------- | ---------------------------------------------------- |
+| `median`      | `float` | The weighted median.                                 |
+| `share_below` | `float` | The weighted share at or below 1 − confidence_level. |
+
+Source code in `commol/dependence/results.py`
+
+```python
+class DrawPValues(ResultModel):
+    """
+    The spread of the p-values of the draws of a sample, each against its
+    own reference: no test of the sample.
+
+    Attributes
+    ----------
+    median : float
+        The weighted median.
+    share_below : float
+        The weighted share at or below ``1 − confidence_level``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    median: float = Field(description="The weighted median.")
+    share_below: float = Field(description="The weighted share below the level.")
+```
+
+## DependenceSettings
+
+Bases: `ResultModel`
+
+The settings of a dependence analysis.
+
+Attributes:
+
+| Name               | Type           | Description                     |
+| ------------------ | -------------- | ------------------------------- |
+| `max_lag`          | \`int          | auto\`                          |
+| `confidence_level` | `float`        | The level of the band of τ.     |
+| `seed`             | `int`          | The seed of its random numbers. |
+| `replicates`       | \`int          | None\`                          |
+| `noise`            | \`NoNoise      | DistributionNoise               |
+| `randomizations`   | \`int          | None\`                          |
+| `reference`        | \`AtParameters | Refitted                        |
+
+Source code in `commol/dependence/results.py`
+
+```python
+class DependenceSettings(ResultModel):
+    """
+    The settings of a dependence analysis.
+
+    Attributes
+    ----------
+    max_lag : int | "auto"
+        The largest lag of each series.
+    confidence_level : float
+        The level of the band of ``τ``.
+    seed : int
+        The seed of its random numbers.
+    replicates : int | None
+        The wild sets of `series_dependence`.
+    noise : NoNoise | DistributionNoise | None
+        The residuals of `residual_dependence`.
+    randomizations : int | None
+        The randomizations of `residual_dependence`.
+    reference : AtParameters | Refitted | None
+        The reference of `residual_dependence`.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    max_lag: int | Literal["auto"]
+    confidence_level: float
+    seed: int
+    replicates: int | None = None
+    noise: NoNoise | DistributionNoise | None = Field(
+        default=None, discriminator="kind"
+    )
+    randomizations: int | None = None
+    reference: AtParameters | Refitted | None = Field(
+        default=None, discriminator="kind"
+    )
 ```
 
 # Description API
@@ -28323,6 +29392,49 @@ class SensitivityAnalysis:
         _check_no_noise(noise)
         return self._rust.observation_bounds(sample._rust, engine_json(observed_data))
 
+    def _residual_dependence(
+        self,
+        sample: ParameterSample,  # noqa: ARG002
+        observed_data: list[ObservedDataPoint],  # noqa: ARG002
+        noise: _ObservationNoise,  # noqa: ARG002
+        max_lag: int | Literal["auto"],  # noqa: ARG002
+        randomizations: int,  # noqa: ARG002
+        reference: str,  # noqa: ARG002
+        confidence_level: float,  # noqa: ARG002
+    ) -> "SeriesDependenceProtocol":
+        """
+        Refuse a dependence analysis of residuals: an analysis has no data.
+
+        Parameters
+        ----------
+        sample : ParameterSample
+            The draws.
+        observed_data : list[ObservedDataPoint]
+            The observations.
+        noise : NoNoise | ResidualNoise | DistributionNoise
+            The residuals.
+        max_lag : int | "auto"
+            The largest lag.
+        randomizations : int
+            The randomizations.
+        reference : str
+            The JSON of the reference.
+        confidence_level : float
+            The level of the band.
+
+        Raises
+        ------
+        ValueError
+            Always: the residuals of a fit and their reference need a
+            calibration problem.
+        """
+        raise ValueError(
+            "A dependence analysis of residuals reads the residuals of a fit "
+            "against a reference of its calibration problem, and a sensitivity "
+            "analysis has no data. Read the residuals of a Calibrator, or give "
+            "any values to series_dependence."
+        )
+
     def _check_observations(self, observed_data: list[ObservedDataPoint]) -> None:
         """
         Check `observed_data` against the analysis in Rust, with no run.
@@ -39555,6 +40667,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- `commol.dependence`: whether the values of each series are independent, and how strongly they depend. `series_dependence(values, observations, max_lag, replicates, confidence_level, seed)` reads any values, one per observation; `residual_dependence(predictive, observations, noise, max_lag, randomizations, reference, confidence_level)` reads the quantile residuals (`DistributionNoise()`) or the additive residuals (`NoNoise()`) of a predictive. Each series, read on the grid of its smallest spacing with each lag over its pairs, has its autocorrelations, the robust portmanteau `Q̃` of Dalla, Giraitis and Phillips (2022) with its p-value, and the integrated autocorrelation time `τ` by Geyer's initial monotone sequence with its band; the series together have their correlations and the factor by which the dependence multiplies the information. The required `reference` is `AtParameters(replicates)`, for held-out data, or `Refitted(replicates, starts=1)`, which refits data drawn at the fit and holds for the data of the fit. The result is `SeriesDependence`. See [Dependence](https://munqu.github.io/commol/latest/guide/uncertainty/dependence/index.md).
 - `commol.scores.quantile_residuals(predictive, observations, DistributionNoise())`: the randomized quantile residuals of Dunn and Smyth (1996), `Φ⁻¹` of the PIT of the mixture of the observation models over the draws, read from the nearer tail, so a value far in the upper tail has a finite residual. They are standard normal for data the predictive did not see; another noise raises a `TypeError`. The engine gives both tails of every observation model, sums of parts included, from special functions now in `commol-statistics`. See [Quantile residuals](https://munqu.github.io/commol/latest/guide/uncertainty/#quantile-residuals).
 - `ObservedDataPoint(parts=K)`: a value that is the sum of `K` independent observations over equal parts of its window, such as a weekly total of daily counts; `parts=1` by default, and more than 1 needs a `window`. The prediction is the sum of the means of the parts, and the observation model of the series reads the sum: `PoissonObservations` as `Poisson(M)`, `NormalObservations` as `N(M, K · sd²)`, and `NegativeBinomialObservations(sum="exact" | "moments")` as the exact convolution of the parts or the negative binomial of its mean and variance. A negative binomial series with parts needs `sum`, and one without parts refuses it; the other models refuse parts. The draws of `DistributionNoise()` and `ParametricBootstrap`, the log score, the gradients and the expected information read the sum as its model does. See [Parts of a window](https://munqu.github.io/commol/latest/guide/calibration-observations/#parts-of-a-window) and [Sums of parts](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#sums-of-parts).
 - `Aggregate.scored_amounts`, a `dict[str, ScoredAmount]`: the scored amounts that `Model.apply_calibration_parameters` writes for the compartments that the bins and the fractions build only to their last bits, each with the amount they `built` and the amount the calibration `scored`, at most 64 units in the last place apart. The build applies a scored amount last, while its compartment still builds `built`, has no `compartment_amounts` entry and is not of a bin left `None`, and ignores it otherwise, so an edit of the model takes effect, whatever its path. `compartment_amounts` holds only what the user declares, a value a calibration sets for an exact compartment among them, which an update of its bin keeps as before. `describe()` says in one line how many compartments start from a scored amount. A file with a non-empty `scored_amounts` needs this release or later; a model with none writes no field. See [Writing back](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/#writing-back).

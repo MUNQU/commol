@@ -1377,6 +1377,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/dependence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../guide/uncertainty/conformal/" class="md-nav__link">
         
   
@@ -2096,6 +2124,34 @@
     
   
     commol.scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/dependence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.dependence
   
 
     
@@ -3244,6 +3300,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../dependence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../results/" class="md-nav__link">
         
   
@@ -4088,7 +4172,10 @@ names the series and the position: <code>ResidualNoise</code> and <code>Residual
 (<code>SeriesResiduals::new</code>, one residual per position, and
 <code>ResidualNoise::check</code> for the observations it serves), the automatic block
 length (<code>automatic_block_length</code>, the residuals as consecutive values) and
-<code>RollingConformal</code> (a horizon is a count of observations). They share one
+<code>RollingConformal</code> (a horizon is a count of observations). The dependence
+analyses (<code>crates/commol-inference/src/dependence/grid.rs</code>) pair a series
+by position too, and give such a series no statistics, with the message,
+since the other series of the problem still have theirs. They share one
 check, <code>one_per_position</code> (<code>crates/commol-inference/src/resampling/blocks.rs</code>):
 two observations share a position when their <code>at</code> are equal, as
 <code>distinct_positions</code> counts the positions of the grid.

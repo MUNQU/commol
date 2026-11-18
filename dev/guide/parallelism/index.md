@@ -29,18 +29,19 @@ A number below 1, or `levels` other than `"all"` and `"outer"`, raises `ValueErr
 
 ## What runs in parallel
 
-| Method                                                          | What runs in parallel                          |
-| --------------------------------------------------------------- | ---------------------------------------------- |
-| `Calibrator.run(starts=n)`                                      | The starts                                     |
-| A particle swarm (`ParticleSwarmConfig`)                        | The particles of an iteration                  |
-| The bootstraps, the block jackknife                             | The replicates                                 |
-| `Predictive`, `Scenarios`, scores                               | The draws of the sample                        |
-| `GibbsPosterior`, `BayesianPosterior`, `ABCSMC`, `ABCRejection` | The particles or the draws                     |
-| `ProfileLikelihood`, `PredictionProfile`                        | Each side of each quantity                     |
-| The conformal methods                                           | The fits of their folds or blocks              |
-| The sensitivity methods                                         | The runs of the design                         |
-| The local approximations, the identifiability methods           | The runs of the finite differences, the points |
-| `Simulation.replicates(count)`                                  | The replicates of a stochastic engine          |
+| Method                                                          | What runs in parallel                                                             |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `Calibrator.run(starts=n)`                                      | The starts                                                                        |
+| A particle swarm (`ParticleSwarmConfig`)                        | The particles of an iteration                                                     |
+| The bootstraps, the block jackknife                             | The replicates                                                                    |
+| `Predictive`, `Scenarios`, scores                               | The draws of the sample                                                           |
+| `GibbsPosterior`, `BayesianPosterior`, `ABCSMC`, `ABCRejection` | The particles or the draws                                                        |
+| `ProfileLikelihood`, `PredictionProfile`                        | Each side of each quantity                                                        |
+| The conformal methods                                           | The fits of their folds or blocks                                                 |
+| The sensitivity methods                                         | The runs of the design                                                            |
+| The local approximations, the identifiability methods           | The runs of the finite differences, the points                                    |
+| `Simulation.replicates(count)`                                  | The replicates of a stochastic engine                                             |
+| `residual_dependence`, `series_dependence`                      | The draws of the sample, the data sets and refits of the reference, the wild sets |
 
 One run of a model is never split: each thread runs whole runs.
 

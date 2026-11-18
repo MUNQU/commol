@@ -1604,6 +1604,34 @@
   
   
     <li class="md-nav__item">
+      <a href="dependence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="conformal/" class="md-nav__link">
         
   
@@ -2323,6 +2351,34 @@
     
   
     commol.scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dependence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.dependence
   
 
     
@@ -3326,6 +3382,34 @@
     
   
     Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../codebase/decisions/dependence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependence
   
 
     
@@ -4401,6 +4485,12 @@ coverage guarantee, from the scores of observations the fit did not use.</p>
 <td>No, as <code>ProfileLikelihood</code></td>
 <td><a href="profiles/#prediction-profiles">Profile Likelihood</a></td>
 </tr>
+<tr>
+<td><code>residual_dependence</code>, <code>series_dependence</code></td>
+<td>Whether the residuals or values of each series are independent, and how many times the observations count their information</td>
+<td>No: quantile residuals need one, additive residuals do not</td>
+<td><a href="dependence/">Dependence</a></td>
+</tr>
 </tbody>
 </table>
 <h2 id="the-parameter-sample">The parameter sample<a class="headerlink" href="#the-parameter-sample" title="Permanent link">&para;</a></h2>
@@ -4763,7 +4853,9 @@ is about <code>1 − p/n</code> at a fit and about <code>(n − p)/(n + p)</code
 posterior, 0.72 and 0.56 at <code>n = 35</code>, <code>p = 10</code>. An in-sample check reads them
 at the fit, <code>Calibrator.point_sample(fit)</code>, or at one draw of a sample,
 <code>sample.resample(1, seed)</code>, which is standard normal only when the sample is
-an exact posterior.</p>
+an exact posterior. The dependence of the residuals, along each series and
+between series, is <code>commol.dependence.residual_dependence</code>
+(<a href="dependence/">Dependence</a>).</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol.observations</span><span class="w"> </span><span class="kn">import</span> <span class="n">DistributionNoise</span><span class="p">,</span> <span class="n">NormalObservations</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">normal_problem</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
@@ -4871,6 +4963,10 @@ hashes, so they can be keys of a <code>dict</code> or members of a <code>set</co
 <tr>
 <td>Prediction intervals with a coverage guarantee</td>
 <td><a href="conformal/">Conformal Prediction Intervals</a></td>
+</tr>
+<tr>
+<td>Whether the residuals of each series are independent</td>
+<td><a href="dependence/">Dependence</a></td>
 </tr>
 <tr>
 <td>How the inputs move the outputs, with no data</td>

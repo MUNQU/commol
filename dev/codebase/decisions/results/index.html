@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://munqu.github.io/commol/dev/codebase/decisions/results/">
       
       
-        <link rel="prev" href="../profiles/">
+        <link rel="prev" href="../dependence/">
       
       
         <link rel="next" href="../files/">
@@ -1377,6 +1377,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../guide/uncertainty/dependence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../guide/uncertainty/conformal/" class="md-nav__link">
         
   
@@ -2096,6 +2124,34 @@
     
   
     commol.scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/dependence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    commol.dependence
   
 
     
@@ -3128,6 +3184,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../dependence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -4066,7 +4150,9 @@ seed comes from.</p>
 </tbody>
 </table>
 <p><strong>Rule:</strong> a new method takes no seed and reads the seed of its source; a new
-method that fits the data takes <code>starts</code> with the default 1.</p>
+method that fits the data takes <code>starts</code> with the default 1. A function with
+no source, as <code>series_dependence</code> of any values, takes the seed, such as
+<code>Calibrator.seed</code>.</p>
 <p><strong>Guards:</strong> <code>tests/uncertainty/test_identifiability.py::TestStructuralRank::test_structural_rank_takes_the_seed_of_the_calibrator</code>,
 <code>crates/commol-random/tests/test_seeds.rs::a_seed_that_is_set_is_kept_and_one_that_is_not_is_drawn</code>,
 <code>tests/model_kinds/test_stochastic.py</code> (<code>test_a_run_without_a_seed_keeps_the_seed_it_drew</code>, <code>test_replicates_without_a_seed_keep_the_seed_they_drew</code>),
