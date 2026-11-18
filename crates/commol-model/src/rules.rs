@@ -48,6 +48,53 @@ pub fn check_compartment_amount(compartment: &str, amount: f64) -> Result<(), St
         .map_err(|error| format!("Compartment '{compartment}': {error}"))
 }
 
+/// How many units in the last place a scored amount may lie from the amount
+/// it corrects ([`check_scored_amount`]): the bins and the fractions of a
+/// write-back rebuild a scored amount to a few of them, and a value a
+/// calibration sets is a declared amount, never a scored amount.
+pub const SCORED_AMOUNT_ULPS: u64 = 64;
+
+/// The distance of two amounts in units in the last place, with `0.0` and
+/// `-0.0` the same: the count of `f64` values from one to the other.
+fn ulps_between(a: f64, b: f64) -> u64 {
+    // The bits of a number of either sign, as a point of one ordered line.
+    let ordered = |x: f64| {
+        let bits = x.to_bits() as i64;
+        if bits < 0 { i64::MIN - bits } else { bits }
+    };
+    ordered(a).abs_diff(ordered(b))
+}
+
+/// Whether `scored` corrects `built`: both are initial amounts, and
+/// `scored` lies within [`SCORED_AMOUNT_ULPS`] of `built`.
+pub fn corrects(built: f64, scored: f64) -> bool {
+    INITIAL_AMOUNT.check(built).is_ok()
+        && INITIAL_AMOUNT.check(scored).is_ok()
+        && ulps_between(built, scored) <= SCORED_AMOUNT_ULPS
+}
+
+/// Check the scored amount of the compartment `compartment`: an initial
+/// amount that corrects the last bits of the amount `built` its bin and
+/// fractions build ([`corrects`]).
+///
+/// # Errors
+///
+/// Returns the message of [`INITIAL_AMOUNT`] after the compartment, or a
+/// message that names the two amounts when they lie further apart.
+pub fn check_scored_amount(compartment: &str, built: f64, scored: f64) -> Result<(), String> {
+    check_compartment_amount(compartment, built)?;
+    check_compartment_amount(compartment, scored)?;
+    if corrects(built, scored) {
+        Ok(())
+    } else {
+        Err(format!(
+            "Compartment '{compartment}': a scored amount corrects the last bits of the \
+             amount its bin and fractions build, at most {SCORED_AMOUNT_ULPS} units in the \
+             last place from it; got {scored:?} for {built:?}"
+        ))
+    }
+}
+
 /// Check the fractions of the stratification `stratification`: in each
 /// split, each fraction of [`FRACTION`], and a sum of 1 within
 /// [`FRACTION_SUM_TOLERANCE`]. A split by category is checked category by

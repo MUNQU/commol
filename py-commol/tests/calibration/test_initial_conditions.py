@@ -483,12 +483,16 @@ def test_a_category_of_the_stratification_a_split_differs_by_keeps_it() -> None:
 
 
 @pytest.mark.parametrize(
-    ("values", "remainder"),
-    [({"A": 800.0}, "B"), ({"t1": 0.2}, None), ({"g1": 0.5}, None)],
+    ("values", "remainder", "scored_ids"),
+    [
+        ({"A": 800.0}, "B", ["B_g1_t2"]),
+        ({"t1": 0.2}, None, []),
+        ({"g1": 0.5}, None, []),
+    ],
     ids=["bin", "category", "category-it-differs-by"],
 )
 def test_the_write_back_of_a_split_by_category_rebuilds_the_scored_state(
-    values: dict[str, float], remainder: str | None
+    values: dict[str, float], remainder: str | None, scored_ids: list[str]
 ) -> None:
     model = _split_by_group(1000.0)
     problem = initial_condition_problem(*values, remainder=remainder)
@@ -499,8 +503,14 @@ def test_the_write_back_of_a_split_by_category_rebuilds_the_scored_state(
 
     model.apply_calibration_parameters(values, problem)
 
-    assert initial_state(model) == pytest.approx(scored)
+    # The remainder B of 200 split by the fractions rebuilds B_g1_t2 only to
+    # its last bits, so it starts from the scored 60.00000000000001, a scored
+    # amount, not an override.
+    assert initial_state(model) == scored
     assert model.structure.compartment_amounts == {}
+    assert {
+        name: amount.scored for name, amount in model.structure.scored_amounts.items()
+    } == {name: scored[name] for name in scored_ids}
     assert model.structure.stratification_fractions["type"]["by"] == "group"
 
 
@@ -526,7 +536,7 @@ def test_a_write_back_drops_the_overrides_of_the_compartments_it_sets() -> None:
     )
 
     # The value of A sets A_g1, so its override goes, also one the user
-    # declared, and the split of 800 rebuilds the scored 400 with no pin;
+    # declared, and the split of 800 rebuilds the scored 400 with no override;
     # a value of B leaves the override of A_g1 as it was.
     assert bin_set.structure.compartment_amounts == {}
     assert initial_state(bin_set)["A_g1"] == pytest.approx(400.0)

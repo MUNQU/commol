@@ -12,7 +12,7 @@ from commol.description.blocks import (
     Text,
 )
 from commol._model.model import Model
-from tests.support import abc_builder, build, build_ode
+from tests.support import abc_builder, build, build_ode, initial_condition_problem
 from tests.support.kinds import DecayStructure, decay_model
 
 DEFAULT_KEYS = [
@@ -141,6 +141,28 @@ class TestSections:
         ]
         assert rows[0][:4] == ["k1", None, None, True]
         assert rows[1][:4] == ["k2", 0.1, None, False]
+
+    def test_the_initial_state_says_how_many_compartments_start_from_a_scored_amount(
+        self,
+    ) -> None:
+        model = build(abc_builder(stratifications={"group": {"g1": 0.7, "g2": 0.3}}))
+        model.apply_calibration_parameters(
+            {"B": 1.5}, initial_condition_problem("B", remainder="A")
+        )
+
+        blocks = model.describe().section("initialization").blocks
+        tables = [block for block in blocks if isinstance(block, Table)]
+        (line,) = [block.text for block in blocks if isinstance(block, Text)]
+
+        # The bins and the split rebuild one compartment only to its last bits;
+        # the line gives its scored amount, and no table lists it.
+        ((_, amount),) = model.structure.scored_amounts.items()
+        difference = abs(amount.scored - amount.built)
+        assert line.startswith(
+            "1 compartment(s) start from a scored amount (scored_amounts)"
+        )
+        assert line.endswith(f"largest difference {difference:.3g}.")
+        assert "Compartment overrides" not in [table.heading for table in tables]
 
     def test_the_neighbors_of_groups_give_their_weights(self) -> None:
         builder = abc_builder(

@@ -27,7 +27,7 @@ A choice among names is a string, such as `loss_function="sse"`.
 | Page | Names |
 |---|---|
 | [ModelBuilder](model-builder.md) | `ModelBuilder`, `StratificationCondition`, `StratifiedRate` |
-| [Model](model.md) | `Model`, `Aggregate`, `Complete`, `Groups`, `SeriesValue`, `UnitConsistencyError`; the results `Process`, `InitialCompartment`, `SeriesLabel`, `ReportSections`; the parts `Bin`, `Accumulator`, `Stratification`, `CategoryMatrix`, `Parameter`, `Transition` |
+| [Model](model.md) | `Model`, `Aggregate`, `Complete`, `Groups`, `ScoredAmount`, `SeriesValue`, `UnitConsistencyError`; the results `Process`, `InitialCompartment`, `SeriesLabel`, `ReportSections`; the parts `Bin`, `Accumulator`, `Stratification`, `CategoryMatrix`, `Parameter`, `Transition` |
 | [AxisPattern](axis-patterns.md) | `AxisPattern` |
 | [AxisUnits](axis-units.md) | `AxisUnits` |
 | [Simulation](simulation.md) | `Simulation`, `InfeasibleStateError`; the results `SimulationResults`, `ReplicateRuns`, `SimulationReplicates` and their figures `ResultsPlot`, `ReplicatesPlot` |

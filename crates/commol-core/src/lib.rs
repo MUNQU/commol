@@ -65,7 +65,7 @@ pub use types::{
     Accumulator, Aggregate, AggregateVariant, Bin, CategoryMatrix, DynamicsForm, EngineSettings,
     EngineType, EventMethod, FRACTIONS_BY, InitialConditions, Model, ModelEngine, ModelKind,
     ModelStructure, ModelValueType, NEIGHBORS, NEIGHBORS_PREFIX, Neighbors, OdeMethod, OdeSolver,
-    Parameter, ParameterValue, Process, RateKeeps, RateMeaning, Rounding, SeriesMode,
+    Parameter, ParameterValue, Process, RateKeeps, RateMeaning, Rounding, ScoredAmount, SeriesMode,
     StochasticEventsSettings, StochasticStepsSettings, Stratification, StratificationCondition,
     StratificationFractions, StratifiedRate, Transition,
 };

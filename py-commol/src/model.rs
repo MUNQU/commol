@@ -16,19 +16,21 @@ use pyo3::prelude::*;
 ///     structure: The JSON of the aggregate structure
 ///
 /// Returns:
-///     One `(name, bin, categories, amount)` tuple per expanded compartment,
-///     in engine order. `categories` holds the `(stratification, category)`
-///     pairs applied to the compartment, in declaration order.
+///     One `(name, bin, categories, amount, scored)` tuple per expanded
+///     compartment, in engine order. `categories` holds the
+///     `(stratification, category)` pairs applied to the compartment, in
+///     declaration order, and `scored` says whether a current scored amount
+///     set the amount.
 ///
 /// Raises:
-///     ValueError: If a bin amount or an override is not finite or is
-///         negative, or an override names an unknown compartment
+///     ValueError: If a bin amount, an override or a scored amount breaks its
+///         rule, or an override names an unknown compartment
 #[pyfunction]
 #[allow(clippy::type_complexity)]
 fn initial_state(
     process: &str,
     structure: &str,
-) -> PyResult<Vec<(String, String, Vec<(String, String)>, f64)>> {
+) -> PyResult<Vec<(String, String, Vec<(String, String)>, f64, bool)>> {
     let state = commol_model::initial_state(&self::process(process)?, &aggregate(structure)?)
         .map_err(PyErr::new::<pyo3::exceptions::PyValueError, _>)?;
     Ok(state
@@ -39,6 +41,7 @@ fn initial_state(
                 compartment.bin,
                 compartment.categories,
                 compartment.amount,
+                compartment.scored,
             )
         })
         .collect())
@@ -249,6 +252,64 @@ fn check_compartment_amounts(amounts: Vec<(String, f64)>) -> PyResult<()> {
         .map_err(value_error)
 }
 
+/// Check each scored amount, as `(compartment, built, scored)`: an initial
+/// amount within `SCORED_AMOUNT_ULPS` units in the last place of the amount
+/// it corrects
+///
+/// Raises:
+///     ValueError: With the message of the rule of the first scored amount
+///         outside it, which names its compartment
+#[pyfunction]
+fn check_scored_amounts(amounts: Vec<(String, f64, f64)>) -> PyResult<()> {
+    amounts
+        .iter()
+        .try_for_each(|(compartment, built, scored)| {
+            commol_model::rules::check_scored_amount(compartment, *built, *scored)
+        })
+        .map_err(value_error)
+}
+
+/// What a calibration write-back writes for each compartment that a
+/// structure starts other than in the scored state, in any bit
+///
+/// Args:
+///     process: The JSON of the process of the model
+///     structure: The JSON of the aggregate structure, whose scored amounts
+///         the write-back replaces
+///     scored: The amount the calibration scored, by compartment
+///
+/// Returns:
+///     The scored amounts, as `(compartment, built, scored)`, of the
+///     compartments whose expansion lies within the last bits of the scored
+///     amount, have no override and whose bin has an amount; and the
+///     overrides, as `(compartment, amount)`, of the others
+///
+/// Raises:
+///     ValueError: With the message of the engine, if the structure does not
+///         build or the scored state lacks a compartment
+#[pyfunction]
+#[allow(clippy::type_complexity)]
+fn write_back(
+    process: &str,
+    structure: &str,
+    scored: Vec<(String, f64)>,
+) -> PyResult<(Vec<(String, f64, f64)>, Vec<(String, f64)>)> {
+    let written = commol_model::write_back(
+        &self::process(process)?,
+        &aggregate(structure)?,
+        &scored.into_iter().collect(),
+    )
+    .map_err(value_error)?;
+    Ok((
+        written
+            .scored_amounts
+            .into_iter()
+            .map(|(name, amount)| (name, amount.built, amount.scored))
+            .collect(),
+        written.compartment_amounts,
+    ))
+}
+
 /// Check the fractions of each stratification, the JSON of
 /// `stratification_fractions`: in each split, each fraction from 0 to 1, and
 /// a sum of 1 within 1e-6
@@ -321,6 +382,8 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(matrix_variables, m)?)?;
     m.add_function(wrap_pyfunction!(check_bin_amounts, m)?)?;
     m.add_function(wrap_pyfunction!(check_compartment_amounts, m)?)?;
+    m.add_function(wrap_pyfunction!(check_scored_amounts, m)?)?;
+    m.add_function(wrap_pyfunction!(write_back, m)?)?;
     m.add_function(wrap_pyfunction!(check_fractions, m)?)?;
     m.add_function(wrap_pyfunction!(check_impulse, m)?)?;
     m.add_function(wrap_pyfunction!(check_series, m)?)?;

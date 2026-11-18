@@ -236,6 +236,22 @@ def _initialization[S: "Aggregate"](model: "Model[S]") -> list[_Block]:
             ],
         )
     )
+    scored = [compartment for compartment in state if compartment.scored]
+    if scored:
+        largest = max(
+            abs(compartment.amount - structure.scored_amounts[compartment.name].built)
+            for compartment in scored
+        )
+        blocks.append(
+            Text(
+                text=(
+                    f"{len(scored)} compartment(s) start from a scored "
+                    "amount (scored_amounts): the amount a calibration scored, "
+                    "which the bins and the fractions build only to their last "
+                    f"bits; largest difference {largest:.3g}."
+                )
+            )
+        )
     return blocks
 
 

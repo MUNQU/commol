@@ -73,6 +73,13 @@ class Aggregate(ModelStructure, InitialConditions):
         when the model is built. An override states the amount of its
         compartment also on a bin left None, so a run needs a value only for
         the other compartments of that bin.
+    scored_amounts : dict[str, ScoredAmount]
+        The amounts a calibration scored that the bins and the fractions
+        rebuild only to their last bits, by compartment name.
+        `Model.apply_calibration_parameters` writes them; the build applies
+        each one last, while its compartment still expands to the amount it
+        was built from, has no ``compartment_amounts`` entry and is not of a
+        bin left None, and ignores it otherwise.
     neighbors : Complete | Groups | None
         Who the neighbors of a unit are, for the rate variables
         ``neighbors_<bin>`` and ``neighbors``. Required, with no default, when
@@ -248,12 +255,12 @@ class Aggregate(ModelStructure, InitialConditions):
         the bin, and category values the splits. Every compartment those do
         not reproduce, such as an exact compartment value or a value that
         overlaps a per-compartment override, is written as a per-compartment
-        override; the overrides of the compartments the values set, of an
-        earlier write-back or declared, are dropped first, so none is kept
-        that this state does not need. On a stochastic engine, whose start can turn on
-        the last bit of an amount, a compartment those reproduce only to its
-        last bits is an override too, so the written state is the scored one
-        bit for bit.
+        override; the overrides of the compartments the values set, declared
+        or not, and the scored amounts of an earlier write-back are dropped
+        first, so none is kept that this state does not need. A run can turn
+        on the last bit of a start amount, so a compartment those reproduce
+        only to its last bits gets a scored amount, on every engine, and the
+        written state is the scored one bit for bit.
 
         Parameters
         ----------
@@ -376,9 +383,10 @@ class Aggregate(ModelStructure, InitialConditions):
         Upsert per-compartment initial condition overrides.
 
         A compartment already declared has its amount replaced; a new one is
-        appended. The engine validates the result against the expansion of
-        the process before it is stored, so a rejected call leaves the
-        structure unchanged.
+        appended, and a scored amount of the compartment is dropped. The
+        engine validates the result against the expansion of the process
+        before it is stored, so a rejected call leaves the structure
+        unchanged.
 
         Parameters
         ----------
@@ -398,6 +406,7 @@ class Aggregate(ModelStructure, InitialConditions):
         candidate._upsert_compartment_amounts(amounts)
         engine_state.initial_state(process, candidate)
         self.compartment_amounts = candidate.compartment_amounts
+        self.scored_amounts = candidate.scored_amounts
 
     def initial_state(self, process: Process) -> list[InitialCompartment]:
         """

@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Aggregate.scored_amounts`, a `dict[str, ScoredAmount]`: the scored
+  amounts that `Model.apply_calibration_parameters` writes for the
+  compartments that the bins and the fractions build only to their last
+  bits, each with the amount they `built` and the amount the calibration
+  `scored`, at most 64 units in the last place apart. The build applies a
+  scored amount last, while its compartment still builds `built`, has no
+  `compartment_amounts` entry and is not of a bin left `None`, and ignores it
+  otherwise, so an edit of the model takes effect, whatever its path.
+  `compartment_amounts` holds only what the user declares, a value a
+  calibration sets for an exact compartment among them, which an update of
+  its bin keeps as before. `describe()` says in one line how many
+  compartments start from a scored amount. A file with a non-empty
+  `scored_amounts` needs this release or later; a model with none writes no
+  field. See
+  [Writing back](../guide/calibration-initial-conditions.md#writing-back).
+
 - Ctrl-C stops a method that logs its steps: it starts no new step, waits
   for the steps already running, and raises `KeyboardInterrupt`, whatever
   the level of the logger. See
@@ -137,6 +153,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `StochasticEvents` or `StochasticSteps` with `rounding="random"`, or of
   `StochasticSteps` with such rates, can change from this version. See
   [Whole units](../guide/stochastic.md#whole-units).
+- `InitialCompartment`, the entry of `Aggregate.initial_state`, has a fifth
+  field, `scored`: whether a scored amount (`scored_amounts`) set the amount
+  of the compartment. Code that unpacks an entry into four names, such as
+  `name, bin, categories, amount = entry`, now raises `ValueError`; read the
+  fields by name. See
+  [Writing back](../guide/calibration-initial-conditions.md#writing-back).
 - The engine checks that a calibration problem leaves no value missing when
   the problem is built, as it does for a `SensitivityAnalysis`: it writes each
   value at the point of its bounds nearest 0, with the
@@ -697,22 +719,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `g1` as `total_g1`, which also summed `type:g1`, so `B_g1_g1` and
   `A_g1_g1` counted twice. It now reads the sum of the compartments of `g1`.
   See [Matrix sums](../guide/mathematical-expressions.md#matrix-sums).
-- A model that `Model.apply_calibration_parameters` wrote back onto
-  `StochasticEvents` or `StochasticSteps` could start, for the seed of the
-  calibration, from other units than the calibration scored and then run
-  another path, so its loss could differ from `result.final_loss`: with
-  `"random"` in a bin of several compartments, and with `"largest_remainder"`
-  when two remainders tie, such as `B = 12` split `0.7, 0.2, 0.1`. The
-  write-back rebuilt the scored amounts within a relative `1e-9`, and the
-  rounding can turn on the last bit. On these engines it now writes each
-  compartment that the bins and the splits do not rebuild bit for bit as a
-  `compartment_amounts` override of the amount the calibration scored, so
-  each replicate starts and runs as the calibration scored it, also after
-  `to_json` and `from_json`. On every engine, a write-back first drops the
+- A model that `Model.apply_calibration_parameters` wrote back could start
+  from other amounts than the calibration scored, in their last bits, and
+  then run otherwise. On `StochasticEvents` and `StochasticSteps`, the
+  rounding can turn on the last bit: with `"random"` in a bin of several
+  compartments, and with `"largest_remainder"` when two remainders tie, such
+  as `B = 12` split `0.7, 0.2, 0.1`, a replicate started, for the seed of the
+  calibration, from other units, so its loss could differ from
+  `result.final_loss`. On `DifferenceEquations` and `DifferentialEquations`,
+  a rate that steps on a start value ran otherwise: with
+  `if(B_g1 >= 1.05, 0.2, 0.01)` and `B = 1.5` split `0.7, 0.2, 0.1`, the
+  calibration scored `B_g2 = 1.30` at 5 and the written model gave 1.11. The
+  write-back rebuilt the scored amounts within a relative `1e-9`. It now
+  writes each compartment that the bins and the splits do not rebuild bit
+  for bit, also one that differs only in its sign, as `-0.0` from `0.0`: as
+  a scored amount (`scored_amounts`) when they build it to its last bits,
+  and as a `compartment_amounts` override otherwise, such as a value of an
+  exact compartment or a compartment the user overrides. So the written
+  model, also after `to_json` and `from_json`, starts from the scored state
+  and gives the scored outputs, on every engine. A write-back first drops the
   overrides of the compartments its values and its remainder set, also those
-  the user declared, so it leaves no override, of an earlier write-back or
-  not, that its own state does not need. A deterministic engine still rebuilds within a relative `1e-9`. See
-  [Whole units](../guide/stochastic.md#whole-units).
+  the user declared, and the scored amounts of an earlier one, and it no
+  longer leaves last-bit overrides that a later `update_bin_amounts` keeps
+  ([#483](https://github.com/MUNQU/commol/issues/483)). See
+  [Writing back](../guide/calibration-initial-conditions.md#writing-back).
 - The engine read about one number of 17 significant digits in 10, such as a
   value a calibration found, one unit in the last place off from the number
   the model holds. It now reads every number bit for bit. A run of a model

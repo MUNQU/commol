@@ -112,19 +112,31 @@ which nothing is stated (`weights` in
 where that compartment holds a 0 no one stated: the remainder `A` gives 250
 to each half.
 
+An override is a declaration of the user, so it survives an update of its
+bin: `update_bin_amounts` (`_model/initial_conditions.py`) changes the
+amount the expansion takes and nothing else, and a bin of `B = 12` split in
+halves with `B_g1 = 8.4` declared starts `B_g1` at 8.4 and `B_g2` at 10 after
+`{"B": 20}`. A value a calibration set by an exact compartment id or a
+prefix is an override too. The scored amounts of a write-back are not
+overrides: they stop applying once their compartment builds another amount
+([A scored amount of the write-back lives in its own field](calibration-write-back.md#a-scored-amount-of-the-write-back-lives-in-its-own-field)).
+
 | Alternative | Why not |
 |---|---|
 | A fraction of a total | A model has no total: bins of different units start without a sum over them. |
 | An amount per combination of categories before the expansion | It repeats the expansion in Python and needs every combination, also those a condition leaves out. |
-| An override on a bin left `None` is a build error that names both | A run needs every value: a known amount of one compartment would need an amount of its bin that no one knows. DRY: the write-back of a calibration of part of such a bin (`calibrated_structure`, `_model/calibration_write_back.py`) keeps the bin `None` and pins the compartments the values set, so it would write a model the build refuses (`tests/initial_conditions/test_compartment_amounts.py::TestOverrideOnABinLeftNone::test_a_calibration_of_the_other_compartments_is_written_back`). |
+| An override on a bin left `None` is a build error that names both | A run needs every value: a known amount of one compartment would need an amount of its bin that no one knows. DRY: the write-back of a calibration of part of such a bin (`calibrated_structure`, `_model/calibration_write_back.py`) keeps the bin `None` and overrides the compartments the values set, so it would write a model the build refuses (`tests/initial_conditions/test_compartment_amounts.py::TestOverrideOnABinLeftNone::test_a_calibration_of_the_other_compartments_is_written_back`). |
 | `total` counts such an override, and the record of values does not | The remainder keeps a sum that a run refuses, and the message asks for a value of a bin that holds one in part (DRY: two readings of one number). |
 | No reader counts such an override | The model holds a number that only the split of a value reads, and an initial state that no run starts from (YAGNI). |
 | One override gives its whole bin a value | The compartments it does not name start at `0`, which no one stated (A run needs every value). |
 | A value over such a bin splits by the initial state | The same `0`: a value of `A` or a remainder `A` gives the compartments without a value nothing, and they then count as stated (A run needs every value). |
+| `update_bin_amounts` drops the overrides of its bin | One idea, one name, and a breaking change: an override is a declaration of the user, and the update would destroy it. It needs the process to map the bin to its compartments. The scored amounts of a write-back, the reason for it ([#483](https://github.com/MUNQU/commol/issues/483)), no longer need it: `scored_amounts` drops them by itself. |
+| `update_bin_amounts` refuses a bin with an override | KISS: it forces a redeclaration of the overrides before every scenario of the bin. |
 
 **Guards:**
 `crates/commol-model/src/builder.rs::override_on_truncated_conditional_compartment`,
 `crates/commol-model/src/builder.rs::unknown_compartment_override_is_a_build_error`,
 `crates/commol-model/tests/initial_conditions.rs::an_override_gives_its_compartment_a_value_on_a_bin_left_none`,
 `crates/commol-model/tests/initial_conditions.rs::a_value_over_an_override_and_compartments_without_one_splits_by_the_fractions`,
-`tests/initial_conditions/test_compartment_amounts.py`.
+`tests/initial_conditions/test_compartment_amounts.py`,
+`tests/initial_conditions/test_scored_amounts.py::test_an_update_of_a_bin_keeps_its_overrides_and_drops_its_scored_amounts`.

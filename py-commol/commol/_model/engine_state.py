@@ -6,7 +6,7 @@ overrides apply, and how calibrated values reach the initial state.
 This module only asks the engine; it does not reproduce any of those rules.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from functools import lru_cache
 from typing import TYPE_CHECKING, Literal, NamedTuple
 
@@ -37,13 +37,17 @@ class InitialCompartment(NamedTuple):
         conditional stratification whose conditions the compartment does not
         meet is absent.
     amount : float
-        Initial amount, including per-compartment overrides.
+        Initial amount, including per-compartment overrides and the scored
+        amounts that are current.
+    scored : bool
+        Whether a current scored amount set the amount.
     """
 
     name: str
     bin: str
     categories: dict[str, str]
     amount: float
+    scored: bool = False
 
 
 class ExpandedOutput(NamedTuple):
@@ -114,8 +118,8 @@ def initial_state(
         expansion.
     """
     return [
-        InitialCompartment(name, bin_id, dict(categories), amount)
-        for name, bin_id, categories, amount in commol_rs.model.initial_state(
+        InitialCompartment(name, bin_id, dict(categories), amount, scored)
+        for name, bin_id, categories, amount, scored in commol_rs.model.initial_state(
             engine_json(process), engine_json(structure)
         )
     ]
@@ -293,6 +297,46 @@ def initial_condition_coverage(
             for kind, sets, written in values
         ],
         [names[index] for index in remainder_indices],
+    )
+
+
+class WrittenBack(NamedTuple):
+    """
+    What a calibration write-back writes, as the engine sorts it.
+
+    Attributes
+    ----------
+    scored_amounts : dict[str, tuple[float, float]]
+        The ``(built, scored)`` amounts of each compartment that takes a
+        scored amount: its expansion lies within the last bits of the scored
+        amount, it has no override and its bin has an amount.
+    compartment_amounts : dict[str, float]
+        The scored amount of every other compartment that starts otherwise,
+        as an override.
+    """
+
+    scored_amounts: dict[str, tuple[float, float]]
+    compartment_amounts: dict[str, float]
+
+
+def write_back(
+    process: "Process", structure: "Aggregate", scored: Mapping[str, float]
+) -> WrittenBack:
+    """
+    Sort each compartment that `structure` starts other than in `scored`, in
+    any bit, into a scored amount or an override, with the rule of the
+    engine (`write_back` of `crates/commol-model/src/builder.rs`).
+
+    Raises
+    ------
+    ValueError
+        If the structure does not build, with the message of the engine.
+    """
+    amounts, overrides = commol_rs.model.write_back(
+        engine_json(process), engine_json(structure), list(scored.items())
+    )
+    return WrittenBack(
+        {name: (built, amount) for name, built, amount in amounts}, dict(overrides)
     )
 
 

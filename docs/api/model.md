@@ -4,7 +4,8 @@
 
 The validated model that `ModelBuilder.build` returns: a header, the process
 written once, the structure that lays it out (`Aggregate`, with its neighbors
-`Complete` and `Groups`), the entries of `Aggregate.initial_state()`, the
+`Complete` and `Groups`), the entries of `Aggregate.initial_state()` and of
+`Aggregate.scored_amounts`, the
 `SeriesValue` of a series parameter, the parts of the process, and
 `UnitConsistencyError`, the error of `Model.check_unit_consistency`.
 Guide: [Core Concepts](../guide/core-concepts.md),
@@ -25,6 +26,8 @@ Guide: [Core Concepts](../guide/core-concepts.md),
 ::: commol.Complete
 
 ::: commol.Groups
+
+::: commol.ScoredAmount
 
 ::: commol.InitialCompartment
 

@@ -205,16 +205,44 @@ state the optimizer scored:
 1. Each bin whose every compartment a value or the remainder sets gets the
    amount the engine gave it, in the unit of the bin, and each category gets
    the split the engine applied, so the definition stays readable.
-2. Every compartment whose amount still differs from the scored one is
-   pinned as a `compartment_amounts` override.
+2. Every compartment whose amount still differs from the scored one in any
+   bit is written: as a scored amount (`scored_amounts`) when the bins and the
+   splits build it only to its last bits, and as a `compartment_amounts`
+   override otherwise.
 
 So an expanded-compartment id always becomes an override, and so does a bin or
 category value that overlaps an existing override. A bin of which a value sets
-only some compartments keeps its amount. Reloading the saved model
-gives the scored state bit for bit on a stochastic engine, and within a
-relative `1e-9` on a deterministic engine, where a rate that turns on a start
-value, such as `if(B_g1 >= 1.05, 0.2, 0.01)`, can then run otherwise. A
-calibrated category split is written
+only some compartments keeps its amount. Step 2 compares every bit, sign
+included, on every engine, because a run can turn on the last bit of an
+amount: a rounding to whole units does, and so does a rate that steps on a
+start value, such as `if(B_g1 >= 1.05, 0.2, 0.01)`. So the model, saved and
+reloaded or not, starts from the scored state bit for bit and gives the
+outputs the calibration scored.
+
+Most compartments of a calibrated stratified model can start from a scored
+amount:
+
+```text
+{'B_g1': ScoredAmount(built=1.0499999999999998, scored=1.05), ...}
+```
+
+Each scored amount records the amount the bins and the splits `built` and the
+amount the calibration `scored`, at most 64 units in the last place apart.
+The build applies it while the compartment still builds `built`, has no
+`compartment_amounts` entry and is not of a bin left `None`. An edit that
+changes the compartment, such as `update_bin_amounts`,
+`update_stratification_fractions`, `update_compartment_amounts` or an
+assignment, makes it stale, and the build ignores it, so the edit takes
+effect. An override is different: an exact-compartment value the write-back
+wrote is a declaration, and a later `update_bin_amounts` of its bin keeps it,
+as it keeps every override
+([Updating the initial state after building](core-concepts.md#updating-the-initial-state-after-building)).
+A new write-back replaces the scored amounts, and
+`model.structure.scored_amounts = {}` clears them. `describe()` says in one
+line how many compartments start from a scored amount, and `applied_parameters` lists
+none of them. A file with scored amounts needs this release or later; a model
+with none writes no field. A calibrated category
+split is written
 with `update_stratification_fractions`: the named category gets the value and
 its complement the rest, in every split of a stratification whose fractions
 [differ by category](building-models.md#fractions-that-differ-by-category).

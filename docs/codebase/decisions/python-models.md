@@ -111,8 +111,8 @@ and `tests/suite/test_architecture.py::test_the_check_names_an_import_upward`.
 
 An initial amount, the fractions of a stratification, an impulse and the
 points of a series have their rule once, in `crates/commol-model/src/rules.rs`
-(`check_bin_amount`, `check_compartment_amount`, `check_fractions`,
-`check_impulse`, `check_series`). The model
+(`check_bin_amount`, `check_compartment_amount`, `check_scored_amount`,
+`check_fractions`, `check_impulse`, `check_series`). The model
 compiler calls them when it compiles a model, `set_initial_condition` when a
 calibration writes an amount, and the Python object of the value when it is
 built: the validators of `InitialConditions`, `Transition` and `SeriesValue`

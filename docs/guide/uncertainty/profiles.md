@@ -302,7 +302,9 @@ tolerances `ν` is near `1e-4` and the profiles of the ridge below read
 `in_combination`; on a difference model `ν` is near `1e-13`, a refit lands
 about `1e-6` from its minimum, and the profile reads practically
 non-identifiable. Its `in_combination` needs an `sd_tolerance` near `ν`, as
-the example below uses.
+the example below uses. Some refits on the ridge never reach a tolerance that
+tight and run to `max_iterations`, so that limit sets the time of the
+profile: the example keeps it at 1000, where the verdict already holds.
 
 `ProfileIdentifiability(result=profiles)` (`commol.identifiability`), run
 through `Calibrator.identifiability`, turns the verdicts into an
@@ -353,7 +355,7 @@ product_problem = CalibrationProblem(
         CalibrationParameter(id="k2", parameter_type="parameter", min_bound=0.0, max_bound=1.0),
     ],
     observation_models={"B": NormalObservations(sd=10.0)},
-    optimization_config=NelderMeadConfig(max_iterations=4000, sd_tolerance=1e-15),
+    optimization_config=NelderMeadConfig(max_iterations=1000, sd_tolerance=1e-15),
     seed=42,
 )
 product = Calibrator(Simulation(product_model(None, None, None)), product_problem)

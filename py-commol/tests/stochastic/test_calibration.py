@@ -295,19 +295,24 @@ def test_a_stratified_amount_is_written_back_with_its_split() -> None:
 
     # Each bin holds the amount the engine scored for it and keeps its split.
     # The rounding can turn on the last bit of an amount, so each compartment
-    # that the bins and the split rebuild only to their last bits is pinned to
-    # the amount the engine scored, and every run starts from the units the
-    # calibration scored.
-    pins = model.structure.compartment_amounts
-    declared = model.structure.model_copy(update={"compartment_amounts": {}})
+    # that the bins and the split rebuild only to their last bits gets the
+    # amount the engine scored as a scored amount, never an override, and
+    # every run starts from the units the calibration scored.
+    scored_amounts = model.structure.scored_amounts
+    declared = model.structure.model_copy(update={"scored_amounts": {}})
     rebuilt = {c.name: c.amount for c in declared.initial_state(model.process)}
     written = {c.name: c.amount for c in model.structure.initial_state(model.process)}
     assert model.structure.bin_amounts == pytest.approx(
         {"A": 1000.0 - amount, "B": amount}, rel=1e-12
     )
     assert written == engine_state.state
-    assert pins == {
-        name: written[name] for name in rebuilt if rebuilt[name] != written[name]
+    assert model.structure.compartment_amounts == {}
+    assert {
+        name: (entry.built, entry.scored) for name, entry in scored_amounts.items()
+    } == {
+        name: (rebuilt[name], written[name])
+        for name in rebuilt
+        if rebuilt[name] != written[name]
     }
     assert [[run[output][0] for output in targets] for run in starts] == scored
 
@@ -363,7 +368,7 @@ def test_a_written_back_model_runs_as_the_calibration_scored_it(
             ] == scored, amount
 
 
-def test_successive_write_backs_end_with_the_pins_of_a_fresh_one() -> None:
+def test_successive_write_backs_end_with_the_scored_amounts_of_a_fresh_one() -> None:
     builder = a_to_b_builder(
         stratifications={"group": {"g1": 0.7, "g2": 0.2, "g3": 0.1}}
     )
@@ -382,16 +387,17 @@ def test_successive_write_backs_end_with_the_pins_of_a_fresh_one() -> None:
     )
 
     model.apply_calibration_parameters({"B": 0.37}, problem)
-    first = dict(model.structure.compartment_amounts)
+    first = dict(model.structure.scored_amounts)
     model.apply_calibration_parameters({"B": 1.5}, problem)
     fresh.apply_calibration_parameters({"B": 1.5}, problem)
 
-    # A write-back drops the pins of the compartments it sets, so none of an
-    # earlier write-back is left: 1.5 split 0.7, 0.2, 0.1 rebuilds only B_g1
-    # other than in its last bit, where 0.37 pinned B_g2 and B_g3.
+    # A write-back replaces the scored amounts of an earlier one: 1.5 split
+    # 0.7, 0.2, 0.1 rebuilds only B_g1 other than in its last bit, where 0.37
+    # rebuilt B_g2 and B_g3 so.
     assert set(first) == {"B_g2", "B_g3"}
-    assert model.structure.compartment_amounts == fresh.structure.compartment_amounts
-    assert set(model.structure.compartment_amounts) == {"B_g1"}
+    assert model.structure.scored_amounts == fresh.structure.scored_amounts
+    assert set(model.structure.scored_amounts) == {"B_g1"}
+    assert model.structure.compartment_amounts == {}
     assert model.structure.initial_state(
         model.process
     ) == fresh.structure.initial_state(fresh.process)

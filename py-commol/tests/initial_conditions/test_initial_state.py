@@ -104,7 +104,5 @@ class TestInitialState:
             model.process.model_dump_json(), model.structure.model_dump_json()
         )
 
-        assert state[0] == ("A_g1", "A", [("group", "g1")], 450.0)
-        assert [name for name, _, _, _ in state] == Simulation(
-            model
-        ).engine.compartments
+        assert state[0] == ("A_g1", "A", [("group", "g1")], 450.0, False)
+        assert [name for name, *_ in state] == Simulation(model).engine.compartments

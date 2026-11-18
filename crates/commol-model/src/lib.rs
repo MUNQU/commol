@@ -68,8 +68,9 @@ mod system;
 mod types;
 
 pub use builder::{
-    ExpandedOutput, InitialCompartment, as_whole, check_model, expand_accumulators,
+    ExpandedOutput, InitialCompartment, WrittenBack, as_whole, check_model, expand_accumulators,
     expand_compartments, initial_state, nearest_whole, needs_a_rounding, subgroup_total_names,
+    write_back,
 };
 pub use engine::{CompartmentalEngine, IntegerStepper, record_steps, rounded};
 pub use flows::{FlowDescription, describe_flows};
