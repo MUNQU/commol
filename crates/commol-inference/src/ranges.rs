@@ -58,6 +58,11 @@ pub const MAX_SUBSET_SIZE: Count = Count::at_least("max_subset_size", 2);
 pub const THRESHOLD: Real = Real::new("threshold", Bound::Open(1.0), Bound::Closed(f64::INFINITY));
 /// The absolute correlation above which a pair of a sample is listed.
 pub const CORRELATION_THRESHOLD: Real = Real::share("correlation_threshold");
+/// The contraction of a sample below which a parameter is poorly determined.
+pub const CONTRACTION_THRESHOLD: Real = Real::share("contraction_threshold");
+/// The share of its reference at each side in which the mass of a sample is
+/// measured.
+pub const BOUND_SHARE: Real = Real::new("bound_share", Bound::Open(0.0), Bound::Open(0.5));
 /// The spread of the ends of the starts, as a share of the bound width,
 /// above which a parameter is flagged.
 pub const PARAMETER_TOLERANCE: Real = Real::non_negative_or_infinite("parameter_tolerance");

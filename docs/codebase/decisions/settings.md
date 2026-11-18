@@ -15,7 +15,7 @@ value that breaks one: `ProblemSettings::check` and
 the `check` arm of `checked!`. A rule that reads an engine handle, such as
 the sample of an input space, is checked by the method of the settings that
 receives it (`InputSpaceSettings::inputs`,
-`SampleIdentifiabilitySettings::reference_priors`,
+`SampleIdentifiabilitySettings::reference_priors` and `log_scales`,
 `SplitConformalSettings::check_predictor`). A binding converts types and
 calls them; it holds no default and no fallback. A missing required field,
 such as `priors` or `eta`, gets a message that names the field and the fix,
@@ -41,6 +41,6 @@ the parameters a scenario may set come from the engine too.
 **Guards:** `crates/commol-calibration/tests/test_json.rs`,
 `crates/commol-calibration/tests/test_constraints.rs::an_empty_at_is_refused`,
 `crates/commol-inference/tests/test_quantities.rs::a_repeated_label_is_refused`,
-`tests/uncertainty/test_identifiability.py::test_the_reference_matches_the_priors`,
+`tests/uncertainty/test_identifiability_sample.py::test_the_reference_matches_the_priors`,
 `tests/uncertainty/test_sensitivity.py::test_the_input_space_is_given_once`,
 `tests/uncertainty/test_smc.py::test_the_priors_are_required`.

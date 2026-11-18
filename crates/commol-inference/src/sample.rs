@@ -252,6 +252,45 @@ impl ParameterSample {
         ))
     }
 
+    /// The sample of the distinct draws of positive weight, each with the
+    /// sum of the weights of its copies, in the lexicographic order of the
+    /// draws; it has no groups, since copies may come from several. The
+    /// order reads `−0.0` as `0.0`, so equal draws sit together.
+    pub fn distinct(&self) -> ParameterSample {
+        let mut order: Vec<usize> = (0..self.len()).filter(|&i| self.weights[i] > 0.0).collect();
+        let row_order = |a: &usize, b: &usize| {
+            self.values[*a]
+                .iter()
+                .zip(&self.values[*b])
+                .map(|(x, y)| (x + 0.0).total_cmp(&(y + 0.0)))
+                .find(|ordering| ordering.is_ne())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        };
+        order.sort_by(row_order);
+        let mut values: Vec<Vec<f64>> = Vec::with_capacity(order.len());
+        let mut weights: Vec<f64> = Vec::with_capacity(order.len());
+        for i in order {
+            match values.last() {
+                Some(last) if *last == self.values[i] => {
+                    *weights.last_mut().expect("a weight per row") += self.weights[i];
+                }
+                _ => {
+                    values.push(self.values[i].clone());
+                    weights.push(self.weights[i]);
+                }
+            }
+        }
+        let log_weights: Vec<f64> = weights.iter().map(|w| w.ln()).collect();
+        ParameterSample::new(
+            self.names.clone(),
+            self.bounds.clone(),
+            values,
+            &log_weights,
+            None,
+        )
+        .expect("the distinct draws of a sample are a sample")
+    }
+
     /// Kish's effective sample size of the weights.
     pub fn effective_size(&self) -> f64 {
         statistics::effective_size(&self.weights)
@@ -282,6 +321,46 @@ impl ParameterSample {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_distinct_draws_merge_copies_and_drop_zero_weights_and_groups() {
+        let sample = ParameterSample::new(
+            vec!["a".to_string(), "b".to_string()],
+            vec![(0.0, 10.0), (0.0, 10.0)],
+            vec![
+                vec![2.0, 1.0],
+                vec![1.0, 5.0],
+                vec![2.0, 1.0],
+                vec![1.0, 3.0],
+                vec![-0.0, 0.2],
+                vec![0.0, 0.1],
+                vec![0.0, 0.2],
+            ],
+            &[0.0, 2f64.ln(), 3f64.ln(), f64::NEG_INFINITY, 0.0, 0.0, 0.0],
+            Some(vec![0, 0, 1, 1, 2, 2, 2]),
+        )
+        .unwrap();
+
+        let distinct = sample.distinct();
+
+        // −0.0 and 0.0 are one value.
+        assert_eq!(
+            distinct.values(),
+            [
+                vec![0.0, 0.1],
+                vec![0.0, 0.2],
+                vec![1.0, 5.0],
+                vec![2.0, 1.0]
+            ]
+        );
+        let weights = distinct.weights();
+        for (w, expected) in weights.iter().zip([1.0, 2.0, 2.0, 4.0]) {
+            assert!((w - expected / 9.0).abs() < 1e-12, "{weights:?}");
+        }
+        assert_eq!(distinct.groups(), None);
+        assert_eq!(distinct.names(), sample.names());
+        assert_eq!(distinct.bounds(), sample.bounds());
+    }
 
     #[test]
     fn a_sample_gives_its_standard_deviations_and_refuses_a_scenario_of_its_parameters() {

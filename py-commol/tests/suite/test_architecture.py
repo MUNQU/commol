@@ -106,6 +106,7 @@ RESULTS = {
     "CollinearityVerdict",
     "CollinearityAnalysis",
     "SampleVerdict",
+    "Direction",
     "SampleAnalysis",
     "StartsAnalysis",
     "Profile",

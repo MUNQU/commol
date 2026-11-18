@@ -1,5 +1,6 @@
-"""Identifiability: the structural rank, collinearity, a sample and the
-starts. The report that joins them is in ``test_identifiability_report.py``."""
+"""Identifiability: the structural rank, collinearity and the starts. A sample
+is in ``test_identifiability_sample.py``, and the report that joins them in
+``test_identifiability_report.py``."""
 
 import pytest
 from pydantic import ValidationError
@@ -13,10 +14,8 @@ from commol import (
     Simulation,
 )
 from commol._fit.result import CalibrationResult, StartSummary
-from commol.distributions import Beta, Gamma, Normal, Priors
 from commol.identifiability import (
     Collinearity,
-    SampleIdentifiability,
     StartsIdentifiability,
     StructuralRank,
 )
@@ -353,138 +352,7 @@ def _result(ends: list[dict[str, float]], losses: list[float]) -> CalibrationRes
     )
 
 
-class TestPractical:
-    def test_a_sample_reports_contraction_correlation_and_modes(
-        self, product: Calibrator
-    ) -> None:
-        # k1 spreads over its bounds; s and k2 follow it on lines.
-        k1 = [0.1 + 0.5 * (i + 0.5) / 100 for i in range(100)]
-        sample = ParameterSample.equally_weighted(
-            ["k1", "s", "k2"],
-            [(0.1, 0.6), (0.5, 2.0), (0.02, 0.3)],
-            [[k, 2.1 - 2.0 * k, 0.05 + 0.1 * k] for k in k1],
-            SampleMethod(name="given"),
-        )
-        report = product.identifiability(
-            SampleIdentifiability(
-                sample=sample, reference="bounds", correlation_threshold=0.9
-            )
-        )
-
-        section = report.sample[0]
-        assert section.contraction["k1"] == pytest.approx(0.0, abs=0.05)
-        assert section.correlation["k1"]["s"] == pytest.approx(-1.0)
-        assert [(p.first, p.second) for p in section.correlated_pairs] == [
-            ("k1", "s"),
-            ("k1", "k2"),
-            ("s", "k2"),
-        ]
-        verdict = report.verdicts["k1"].practical
-        assert verdict is not None
-        assert verdict.verdict == "poorly_determined"
-
-    def test_a_sample_gives_the_reason_of_each_verdict(
-        self, product: Calibrator
-    ) -> None:
-        # k1 and s lie on a line; k2 has two clusters, apart from both.
-        k1 = [0.1 + 0.5 * (i + 0.5) / 100 for i in range(100)]
-        k2 = [0.05 + 0.2 * (i % 2) + 0.01 * ((i * 37) % 11) / 11 for i in range(100)]
-        lines = ParameterSample.equally_weighted(
-            ["k1", "s", "k2"],
-            [(0.1, 0.6), (0.5, 2.0), (0.02, 0.3)],
-            [[k, 2.1 - 2.0 * k, c] for k, c in zip(k1, k2, strict=True)],
-            SampleMethod(name="given"),
-        )
-        near = ParameterSample.equally_weighted(
-            ["k1", "s", "k2"],
-            [(0.1, 0.6), (0.5, 2.0), (0.02, 0.3)],
-            [[0.3 + 0.001 * ((i * 13) % 7), 1.0, 0.1] for i in range(50)],
-            SampleMethod(name="given"),
-        )
-
-        def reasons(sample: ParameterSample) -> dict[str, tuple[str, list[str]]]:
-            report = product.identifiability(
-                SampleIdentifiability(
-                    sample=sample, reference="bounds", correlation_threshold=0.9
-                )
-            )
-            return {
-                name: (verdict.practical.verdict, verdict.practical.reasons)
-                for name, verdict in report.verdicts.items()
-                if verdict.practical is not None
-            }
-
-        assert reasons(lines) == {
-            "k1": ("poorly_determined", ["Sample: correlation -1.000 with s."]),
-            "s": ("poorly_determined", ["Sample: correlation -1.000 with k1."]),
-            "k2": ("poorly_determined", ["Sample: its marginal has 2 modes."]),
-        }
-        assert reasons(near)["k1"] == (
-            "determined",
-            ["Sample: contraction 1.00, no strong pair."],
-        )
-
-    def test_contraction_against_the_prior_of_a_prior_sample_is_zero(
-        self, product: Calibrator
-    ) -> None:
-        bounds = [(0.1, 0.6), (0.5, 2.0), (0.02, 0.3)]
-        priors = Priors(
-            distributions={
-                "k1": Beta(a=2.0, b=5.0),
-                "s": Normal(mean=1.0, sd=0.2),
-                "k2": Gamma(shape=4.0, rate=40.0),
-            }
-        )
-        columns = [
-            priors.distributions[name].sample(4000, bound, seed=index)
-            for index, (name, bound) in enumerate(zip(["k1", "s", "k2"], bounds))
-        ]
-        sample = ParameterSample.equally_weighted(
-            ["k1", "s", "k2"],
-            bounds,
-            [list(row) for row in zip(*columns, strict=True)],
-            SampleMethod(name="prior"),
-        )
-
-        against_prior = product.identifiability(
-            SampleIdentifiability(
-                sample=sample,
-                reference="prior",
-                priors=priors,
-                correlation_threshold=0.9,
-            )
-        ).sample[0]
-        against_bounds = product.identifiability(
-            SampleIdentifiability(
-                sample=sample, reference="bounds", correlation_threshold=0.9
-            )
-        ).sample[0]
-
-        assert against_prior.reference == "prior"
-        for name in ["k1", "s", "k2"]:
-            assert against_prior.contraction[name] == pytest.approx(0.0, abs=0.1)
-            # The priors are narrower than their bounds.
-            assert against_bounds.contraction[name] > 0.3
-
-    def test_a_sample_of_other_parameters_is_rejected(
-        self, product: Calibrator
-    ) -> None:
-        sample = ParameterSample.equally_weighted(
-            ["k1", "s"], [(0.1, 0.6), (0.5, 2.0)], [[0.3, 1.0]], SampleMethod(name="g")
-        )
-
-        with pytest.raises(ValueError) as error:
-            product.identifiability(
-                SampleIdentifiability(
-                    sample=sample, reference="bounds", correlation_threshold=0.9
-                )
-            )
-
-        assert str(error.value) == (
-            "The sample's parameters ['k1', 's'] are not the problem's "
-            "['k1', 's', 'k2']."
-        )
-
+class TestStarts:
     def test_starts_with_equal_losses_flag_the_parameters_that_differ(
         self, product: Calibrator
     ) -> None:
@@ -584,17 +452,3 @@ def test_the_starts_of_a_polished_fit_are_its_polished_ends(
     # The swarm alone converges at no start, so the method has none to read.
     with pytest.raises(ValueError, match="at least two that converged, got 0"):
         calibrators[1].identifiability(StartsIdentifiability(result=alone, **method))
-
-
-def test_the_reference_matches_the_priors() -> None:
-    # The engine reads the JSON of the method: no priors with "prior", and
-    # priors only with "prior".
-    given = SampleMethod(name="g")
-    sample = ParameterSample.equally_weighted(["k1"], [(0, 1)], [[0.5]], given)
-    method = {"sample": sample, "correlation_threshold": 0.9}
-    with pytest.raises(ValidationError, match="reference='prior' needs priors"):
-        SampleIdentifiability(**method, reference="prior")
-    with pytest.raises(ValidationError, match="priors are read only with"):
-        SampleIdentifiability(
-            **method, reference="bounds", priors=Priors.uniform_on_bounds()
-        )

@@ -267,7 +267,13 @@ EXAMPLES: dict[str, Callable[[], BaseModel]] = {
     "StructuralRank": lambda: StructuralRank(points=3, design="dense"),
     "Collinearity": lambda: Collinearity(at=FIT, max_subset_size=2, threshold=20.0),
     "SampleIdentifiability": lambda: SampleIdentifiability(
-        sample=SAMPLE, reference="prior", priors=PRIORS, correlation_threshold=0.9
+        sample=SAMPLE,
+        reference="prior",
+        priors=PRIORS,
+        correlation_threshold=0.9,
+        contraction_threshold=0.5,
+        bound_share=0.05,
+        log_parameters=["c"],
     ),
     "StartsIdentifiability": lambda: StartsIdentifiability(
         result=FIT, parameter_tolerance=0.1, loss_tolerance=0.1

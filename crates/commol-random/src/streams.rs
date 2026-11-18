@@ -94,6 +94,8 @@ streams! {
     PosteriorReplicate = 20, "a tempered posterior", "the one replicate of a stochastic model at every point";
     StartPoints = 21, "the starts of a calibration", "the Latin hypercube of the start points";
     StartSeeds = 22, "the starts of a calibration", "the seed of the particle swarm of each start";
+    SampleDirections = 23, "the identifiability of a sample",
+        "the Bayesian-bootstrap weights of each replicate of the contraction of its directions";
 }
 
 impl Stream {

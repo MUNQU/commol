@@ -9,10 +9,11 @@ use commol_core::NoSteps;
 use commol_core::{CONFIDENCE_LEVEL, Model, Real};
 use commol_difference::DifferenceEquations;
 use commol_inference::conformal::{AdaptiveLevel, ConformalSettings, NonconformityScore, Pooling};
-use commol_inference::identifiability::{Reference, sample_identifiability};
+use commol_inference::identifiability::sample_identifiability;
 use commol_inference::profiles::{ProfiledQuantity, beale, bootstrap_thresholds, chi_square};
 use commol_inference::resampling::{BayesianBootstrap, BlockScheme, ReplicateRunner};
 use commol_inference::scores::coverage;
+use commol_inference::settings::identifiability::{Reference, SampleIdentifiabilitySettings};
 use commol_inference::smc::{AbcTarget, Distance, RandomWalk, SmcSampler, abc_rejection};
 use commol_inference::{ObservationDraws, ParameterSample, Priors};
 
@@ -52,6 +53,19 @@ fn sample() -> ParameterSample {
         None,
     )
     .unwrap()
+}
+
+/// A sample against its bounds with the correlation and contraction
+/// thresholds `correlation` and `contraction`.
+fn shares(correlation: f64, contraction: f64) -> SampleIdentifiabilitySettings {
+    SampleIdentifiabilitySettings {
+        reference: Reference::Bounds,
+        correlation_threshold: correlation,
+        contraction_threshold: contraction,
+        bound_share: 0.05,
+        log_parameters: vec![],
+        priors: None,
+    }
 }
 
 #[test]
@@ -136,7 +150,13 @@ fn every_share_has_one_check() {
         ),
         (
             "correlation_threshold",
-            sample_identifiability(&sample(), Reference::Bounds, 1.0)
+            sample_identifiability(&sample(), &shares(1.0, 0.5), 0)
+                .unwrap_err()
+                .to_string(),
+        ),
+        (
+            "contraction_threshold",
+            sample_identifiability(&sample(), &shares(0.5, 1.0), 0)
                 .unwrap_err()
                 .to_string(),
         ),

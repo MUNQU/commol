@@ -19,8 +19,11 @@ from commol.identifiability.results import (
     Accuracy,
     CollinearitySection,
     Combination,
+    BoundSideName,
     CorrelatedPair,
+    Direction,
     IdentifiabilityReport,
+    ParameterScale,
     ParameterVerdicts,
     PointRank,
     PracticalVerdict,
@@ -35,7 +38,11 @@ from commol.identifiability.results import (
 from commol.profiles.results import RESET_REASON
 
 if TYPE_CHECKING:
-    from commol.commol_rs._commol_rs import AccuracyProtocol, TighteningProtocol
+    from commol.commol_rs._commol_rs import (
+        AccuracyProtocol,
+        SampleAnalysisProtocol,
+        TighteningProtocol,
+    )
     from commol.identifiability.methods import (
         Collinearity,
         ProfileIdentifiability,
@@ -275,6 +282,47 @@ def run_collinearity(
     return _report(calibrator, practical_verdicts=practical, collinearity=[section])
 
 
+def _sample_sides(
+    name: str, sides: list[BoundSideName], section: SampleSection
+) -> list[str]:
+    """The reasons of the bounds that set a side of the marginal of `name`."""
+    share = f"{100 * section.bound_share:g} %"
+    reasons = []
+    for side in sides:
+        mass = section.mass_below[name] if side == "lower" else section.mass_above[name]
+        end = "bottom" if side == "lower" else "top"
+        reasons.append(
+            f"Sample: the {side} bound, not the data, sets one side; "
+            f"{100 * mass:.0f} % of its mass is in the {end} {share} of its "
+            "reference."
+        )
+    return reasons
+
+
+def _sample_warnings(
+    analysis: "SampleAnalysisProtocol",
+    names: list[str],
+    method: "SampleIdentifiability",
+) -> list[str]:
+    """The warnings of a `SampleSection`: no directions, or hidden ridges."""
+    if analysis.hidden_ridges is None:
+        return [
+            f"The sample has {analysis.distinct_rows} distinct draws for "
+            f"{len(names)} parameters, and no directions: a direction needs more "
+            "distinct draws than parameters."
+        ]
+    if analysis.hidden_ridges == 0:
+        return []
+    count = analysis.hidden_ridges
+    plural = "direction" if count == 1 else "directions"
+    return [
+        f"{count} {plural} among the determined parameters "
+        f"contract{'s' if count == 1 else ''} less than "
+        f"{method.contraction_threshold:g}: a ridge that no pair shows "
+        f"(n_eff / p = {analysis.draws_per_parameter:.1f})."
+    ]
+
+
 def run_sample_identifiability(
     calibrator: CalibrationPort, method: "SampleIdentifiability"
 ) -> IdentifiabilityReport:
@@ -287,9 +335,16 @@ def run_sample_identifiability(
         CorrelatedPair(first=names[j], second=names[k], correlation=r)
         for j, k, r in analysis.correlated_pairs
     ]
+    scales: dict[str, ParameterScale] = {
+        name: "log" if name in method.log_parameters else "natural" for name in names
+    }
     section = SampleSection(
         reference=method.reference,
         correlation_threshold=method.correlation_threshold,
+        contraction_threshold=method.contraction_threshold,
+        bound_share=method.bound_share,
+        log_parameters=list(method.log_parameters),
+        effective_size=analysis.effective_size,
         contraction=dict(zip(names, analysis.contraction, strict=True)),
         correlation={
             name: dict(zip(names, row, strict=True))
@@ -297,18 +352,44 @@ def run_sample_identifiability(
         },
         correlated_pairs=pairs,
         modes=dict(zip(names, analysis.modes, strict=True)),
+        mass_below=dict(zip(names, analysis.mass_below, strict=True)),
+        mass_above=dict(zip(names, analysis.mass_above, strict=True)),
+        at_bound={
+            name: list(verdict.at_bound)
+            for name, verdict in zip(names, analysis.verdicts, strict=True)
+        },
+        overlap=dict(zip(names, analysis.overlap, strict=True)),
+        bins=analysis.bins,
+        directions=[
+            Direction(
+                contraction=direction.contraction,
+                loadings=dict(zip(names, direction.loadings, strict=True)),
+                scales=scales,
+            )
+            for direction in analysis.directions
+        ],
+        hidden_ridges=analysis.hidden_ridges,
+        draws_per_parameter=analysis.draws_per_parameter,
+        warnings=_sample_warnings(analysis, names, method),
     )
     practical: dict[str, PracticalVerdict] = {}
     for name, verdict in zip(names, analysis.verdicts, strict=True):
-        reasons = [
+        contraction = section.contraction[name]
+        reasons = []
+        if verdict.low_contraction:
+            reasons.append(
+                f"Sample: contraction {contraction:.2f}, below "
+                f"{method.contraction_threshold:g}."
+            )
+        reasons.extend(
             f"Sample: correlation {r:.3f} with {names[k]}."
             for k, r in verdict.correlated_with
-        ]
+        )
         if verdict.modes >= 2:
             reasons.append(f"Sample: its marginal has {verdict.modes} modes.")
         if verdict.verdict == "determined":
-            contraction = section.contraction[name]
             reasons = [f"Sample: contraction {contraction:.2f}, no strong pair."]
+        reasons.extend(_sample_sides(name, verdict.at_bound, section))
         practical[name] = PracticalVerdict(verdict=verdict.verdict, reasons=reasons)
     return _report(calibrator, practical_verdicts=practical, sample=[section])
 

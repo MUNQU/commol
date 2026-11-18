@@ -9,7 +9,7 @@ use crate::parallelism::parallel;
 use commol_calibration::FitRecord;
 use commol_core::{Accuracy, SimulationEngine};
 use commol_inference::identifiability::{
-    self, CollinearityVerdict, Reference, SampleVerdict, StructuralVerdict, Subset,
+    self, CollinearityVerdict, Direction, SampleVerdict, StructuralVerdict, Subset,
 };
 use commol_inference::sensitivity::{Design, FiniteDifferences};
 use commol_inference::settings::identifiability::{
@@ -370,19 +370,45 @@ fn collinearity(
 pub struct PySampleVerdict {
     /// "determined" or "poorly_determined"
     verdict: String,
+    /// Whether its contraction is below the threshold
+    low_contraction: bool,
     /// The other parameters, by index, correlated with it above the
     /// threshold, with the correlation
     correlated_with: Vec<(usize, f64)>,
     /// The number of modes of its marginal
     modes: usize,
+    /// The sides, "lower" or "upper", whose bound sets that side of its
+    /// marginal
+    at_bound: Vec<&'static str>,
 }
 
 impl From<SampleVerdict> for PySampleVerdict {
     fn from(verdict: SampleVerdict) -> Self {
         Self {
             verdict: verdict.verdict.name().to_string(),
+            low_contraction: verdict.low_contraction,
             correlated_with: verdict.correlated_with,
             modes: verdict.modes,
+            at_bound: verdict.at_bound.iter().map(|side| side.name()).collect(),
+        }
+    }
+}
+
+/// A direction of the parameters of a sample
+#[pyclass(name = "Direction", frozen, get_all)]
+#[derive(Clone)]
+pub struct PyDirection {
+    /// `1 − λ` of its eigenvalue `λ`
+    contraction: f64,
+    /// The loading of each parameter, in order
+    loadings: Vec<f64>,
+}
+
+impl From<Direction> for PyDirection {
+    fn from(direction: Direction) -> Self {
+        Self {
+            contraction: direction.contraction,
+            loadings: direction.loadings,
         }
     }
 }
@@ -390,6 +416,10 @@ impl From<SampleVerdict> for PySampleVerdict {
 /// The practical identifiability of a sample
 #[pyclass(name = "SampleAnalysis", frozen, get_all)]
 pub struct PySampleAnalysis {
+    /// Kish's effective size of the distinct rows
+    effective_size: f64,
+    /// The number of distinct rows of the sample
+    distinct_rows: usize,
     /// The contraction of each parameter against its reference
     contraction: Vec<f64>,
     /// The weighted correlation matrix
@@ -399,11 +429,29 @@ pub struct PySampleAnalysis {
     correlated_pairs: Vec<(usize, usize, f64)>,
     /// The modes of each marginal
     modes: Vec<Vec<f64>>,
+    /// The mass of each parameter in the lower share of its reference
+    mass_below: Vec<f64>,
+    /// The mass of each parameter in the upper share of its reference
+    mass_above: Vec<f64>,
+    /// The overlap of each parameter with its reference
+    overlap: Vec<f64>,
+    /// The number of bins of the overlap
+    bins: usize,
+    /// The directions, from the least contracted
+    directions: Vec<PyDirection>,
+    /// The directions among the determined parameters below the threshold,
+    /// or None without directions
+    hidden_ridges: Option<usize>,
+    /// The effective size per parameter
+    draws_per_parameter: f64,
     /// The verdict of each parameter
     verdicts: Vec<PySampleVerdict>,
 }
 
-/// The contraction, correlations and modes of `sample`
+/// What `sample` learned against its reference: the contraction,
+/// correlations, modes, masses at each side, bounds that set a side, overlap
+/// and directions; the bootstrap of the directions draws from the seed of
+/// the problem
 ///
 /// Args:
 ///     problem: The calibration problem
@@ -412,8 +460,9 @@ pub struct PySampleAnalysis {
 ///
 /// Raises:
 ///     ValueError: If a setting is not valid, the sample's parameters are
-///         not the problem's, or a prior is missing or does not fit its
-///         bounds
+///         not the problem's, a prior is missing or does not fit its
+///         bounds, or `log_parameters` names a parameter that is not one of
+///         the sample's, has a lower bound below 0 or a draw at 0
 #[pyfunction]
 fn sample_identifiability(
     problem: &PyCalibrationProblem,
@@ -422,21 +471,22 @@ fn sample_identifiability(
 ) -> PyResult<PySampleAnalysis> {
     let settings: SampleIdentifiabilitySettings = crate::json::read(settings)?;
     let sample = problem_sample(problem, sample)?;
-    let priors = settings
-        .reference_priors(sample.names(), sample.bounds())
-        .map_err(value_error)?;
-    let reference = match &priors {
-        Some(priors) => Reference::Prior(priors),
-        None => Reference::Bounds,
-    };
-    let analysis =
-        identifiability::sample_identifiability(sample, reference, settings.correlation_threshold)
-            .map_err(method_error)?;
+    let analysis = identifiability::sample_identifiability(sample, &settings, problem.seed)
+        .map_err(method_error)?;
     Ok(PySampleAnalysis {
+        effective_size: analysis.effective_size,
+        distinct_rows: analysis.distinct_rows,
         contraction: analysis.contraction,
         correlation: analysis.correlation,
         correlated_pairs: analysis.correlated_pairs,
         modes: analysis.modes,
+        mass_below: analysis.mass_below,
+        mass_above: analysis.mass_above,
+        overlap: analysis.overlap,
+        bins: analysis.bins,
+        directions: analysis.directions.into_iter().map(Into::into).collect(),
+        hidden_ridges: analysis.hidden_ridges,
+        draws_per_parameter: analysis.draws_per_parameter,
         verdicts: analysis.verdicts.into_iter().map(Into::into).collect(),
     })
 }
@@ -505,6 +555,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCollinearityVerdict>()?;
     m.add_class::<PyCollinearityAnalysis>()?;
     m.add_class::<PySampleVerdict>()?;
+    m.add_class::<PyDirection>()?;
     m.add_class::<PySampleAnalysis>()?;
     m.add_class::<PyStartsAnalysis>()?;
     m.add_function(wrap_pyfunction!(structural_rank, m)?)?;

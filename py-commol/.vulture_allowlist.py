@@ -10,6 +10,7 @@ ParallelismProtocol
 PredictiveProtocol
 CalibrationProblemProtocol
 ParameterSampleProtocol
+SampleAnalysisProtocol
 CalibrationResultProtocol
 ObservationDrawsProtocol
 AccuracyProtocol

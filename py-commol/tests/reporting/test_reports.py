@@ -308,6 +308,7 @@ def test_an_identifiability_report_has_a_section_of_each_method() -> None:
         "SubsetIndex",
         "CollinearitySection",
         "CorrelatedPair",
+        "Direction",
         "SampleSection",
         "StartsSection",
         "ProfileSection",

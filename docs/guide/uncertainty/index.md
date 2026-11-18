@@ -115,7 +115,7 @@ coverage guarantee, from the scores of observations the fit did not use.
 | Several starts, `Calibrator.run(starts=n)` | Which parameters fit the data: distinct ends with equal losses | No | [Optimizers](../calibration-optimizers.md#several-starts) |
 | `StructuralRank` | Which parameters any data of this design can determine, and which combinations | No | [Identifiability](identifiability.md#structural-rank) |
 | `Collinearity` | Which parameters can be fitted together | No | [Identifiability](identifiability.md#collinearity) |
-| `SampleIdentifiability` | Which parameters a sample determines: contraction, correlations, modes | No | [Identifiability](identifiability.md#a-sample) |
+| `SampleIdentifiability` | What a sample learned about each parameter against its bounds or priors: contraction, correlations, modes, bounds that set a side, overlap, directions | No | [Identifiability](identifiability.md#a-sample) |
 | `StartsIdentifiability` | Which parameters differ between starts of equal loss | No | [Identifiability](identifiability.md#starts) |
 | `BayesianBootstrap` | How far the parameters move when the data are reweighted by blocks | No | [Resampling](resampling.md#bayesian-bootstrap) |
 | `ResidualBootstrap` | How far the parameters move when the residuals of the fit are resampled by blocks | No | [Resampling](resampling.md#residual-block-bootstrap) |

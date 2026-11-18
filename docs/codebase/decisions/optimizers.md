@@ -34,8 +34,8 @@ and the constrained swarm, because the swarm draws its particles between the
 bounds, and `SearchSpace::transform` for Nelder-Mead, before the
 `SineTransform` of the argmin fork. A method that reads the bounds as a box
 refuses it too: `structural_rank` draws its points in them and
-`sample_identifiability` with `Reference::Bounds` takes the variance of the
-uniform distribution on them.
+`sample_identifiability` with `reference="bounds"` measures the sample
+against the uniform distribution on them.
 
 The swarm of the argmin fork checks its own bounds too. It refuses a bound
 that is not finite. It also refuses finite bounds when twice the distance

@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 use super::PriorsSettings;
 use crate::priors::Priors;
 use crate::ranges::{
-    CORRELATION_THRESHOLD, LOSS_TOLERANCE, MAX_SUBSET_SIZE, PARAMETER_TOLERANCE, POINTS, THRESHOLD,
+    BOUND_SHARE, CONTRACTION_THRESHOLD, CORRELATION_THRESHOLD, LOSS_TOLERANCE, MAX_SUBSET_SIZE,
+    PARAMETER_TOLERANCE, POINTS, THRESHOLD,
 };
 
 /// Where the structural rank reads the model, as the Python API names it.
@@ -72,8 +73,15 @@ pub enum Reference {
 pub struct SampleIdentifiabilitySettings {
     /// What the contraction is measured against.
     pub reference: Reference,
-    /// The correlation at or above which a pair is flagged.
+    /// The absolute correlation above which a pair is flagged.
     pub correlation_threshold: f64,
+    /// The contraction below which a parameter is poorly determined.
+    pub contraction_threshold: f64,
+    /// The share of the reference at each side in which the mass of the
+    /// sample is measured.
+    pub bound_share: f64,
+    /// The parameters whose shape measures read `ln θ`.
+    pub log_parameters: Vec<String>,
     /// The priors of `reference="prior"`, or None.
     pub priors: Option<PriorsSettings>,
 }
@@ -81,7 +89,11 @@ pub struct SampleIdentifiabilitySettings {
 checked!(
     SampleIdentifiabilitySettings,
     "SampleIdentifiability",
-    [Rule::Real(CORRELATION_THRESHOLD)],
+    [
+        Rule::Real(CORRELATION_THRESHOLD),
+        Rule::Real(CONTRACTION_THRESHOLD),
+        Rule::Real(BOUND_SHARE)
+    ],
     check = SampleIdentifiabilitySettings::check
 );
 
@@ -123,6 +135,46 @@ impl SampleIdentifiabilitySettings {
             .as_ref()
             .map(|priors| priors.priors(names, bounds))
             .transpose()
+    }
+
+    /// Whether each parameter of a sample with `names`, `bounds` and the
+    /// draws `values` reads `ln θ`.
+    ///
+    /// # Errors
+    ///
+    /// When `log_parameters` names a parameter the sample does not hold,
+    /// one with a lower bound below 0, or one with a draw at 0.
+    pub fn log_scales(
+        &self,
+        names: &[String],
+        bounds: &[(f64, f64)],
+        values: &[Vec<f64>],
+    ) -> Result<Vec<bool>, String> {
+        for name in &self.log_parameters {
+            let Some(j) = names.iter().position(|n| n == name) else {
+                return Err(format!(
+                    "log_parameters names '{name}', which is not a parameter of the sample: \
+                     {names:?}"
+                ));
+            };
+            let (lower, upper) = bounds[j];
+            if lower < 0.0 {
+                return Err(format!(
+                    "log_parameters reads ln θ, so each of its parameters has a lower bound of \
+                     at least 0: '{name}' has the bounds [{lower}, {upper}]"
+                ));
+            }
+            if values.iter().any(|draw| draw[j] == 0.0) {
+                return Err(format!(
+                    "log_parameters reads ln θ, so each of its parameters has every draw above \
+                     0: '{name}' has a draw at 0"
+                ));
+            }
+        }
+        Ok(names
+            .iter()
+            .map(|n| self.log_parameters.contains(n))
+            .collect())
     }
 }
 

@@ -12,6 +12,7 @@
 //! special functions come from the private module `special`, on `libm`.
 
 use std::fmt;
+use std::sync::OnceLock;
 
 use argmin::core::{CostFunction, Error, Executor, Gradient};
 use argmin::solver::newtonroot::NewtonRoot;
@@ -29,6 +30,32 @@ use crate::special::{
 /// Iterations of the inversion of a distribution function by safeguarded
 /// Newton steps.
 const INVERSION_STEPS: u64 = 200;
+
+/// Nodes of the Gauss–Legendre rule of each quadrature over the quantile.
+const QUADRATURE_NODES: usize = 64;
+
+/// How many bandwidths a Gaussian kernel reaches: beyond, its value is below
+/// `e^{−32}` of its peak.
+pub(crate) const KERNEL_REACH: f64 = 8.0;
+
+/// A side of the bounds of a parameter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BoundSide {
+    /// The lower bound.
+    Lower,
+    /// The upper bound.
+    Upper,
+}
+
+impl BoundSide {
+    /// The name of the side: `"lower"` or `"upper"`.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Lower => "lower",
+            Self::Upper => "upper",
+        }
+    }
+}
 
 /// A family of distributions and its parameters, read from the JSON of a
 /// distribution of the Python API, tagged by `kind`.
@@ -454,6 +481,89 @@ impl Distribution {
         }
     }
 
+    /// The variance of `ln x`, by the Gauss–Legendre quadrature of `ln Q(u)`
+    /// over `u` in `(0, 1)`, with `Q` the quantile. The change of variable
+    /// `u = s³(10 − 15s + 6s²)`, whose derivative `30 s²(1 − s)²` vanishes at
+    /// both ends, tames the singularity of `ln Q` at a bound of 0.
+    ///
+    /// Below `x = 10⁻²⁸⁰` the quantile nears the smallest number of f64, as
+    /// for a gamma or beta of shape `a` below 0.03, so `ln Q` is read there
+    /// from the power law of the distribution function near 0: `F(x) ∝ x^a`
+    /// gives `ln Q(u) = ln x₀ + (ln u − ln u₀) / a`, with `u₀ = F(x₀)` and
+    /// `1/a = F(x₀) / (x₀ p(x₀))`.
+    ///
+    /// The caller checks that the lower bound is at least 0.
+    pub fn log_variance(&self) -> f64 {
+        let tiny = 1e-280;
+        let level = self.cdf(tiny);
+        let power = level / (tiny * self.log_density(tiny).exp());
+        let power_law = level > 0.0 && power.is_finite();
+        let log_quantile = |u: f64| {
+            if power_law && u < level {
+                libm::log(tiny) + (libm::log(u) - libm::log(level)) * power
+            } else {
+                libm::log(self.quantile(u))
+            }
+        };
+        let points: Vec<(f64, f64)> = gauss_legendre()
+            .iter()
+            .map(|&(s, weight)| {
+                let u = s * s * s * (10.0 + s * (-15.0 + 6.0 * s));
+                let slope = 30.0 * s * s * (1.0 - s) * (1.0 - s);
+                (log_quantile(u), weight * slope)
+            })
+            .collect();
+        let mean: f64 = points.iter().map(|(y, w)| w * y).sum();
+        points.iter().map(|(y, w)| w * (y - mean).powi(2)).sum()
+    }
+
+    /// The density at the bound `side`, smoothed by a Gaussian kernel of
+    /// `bandwidth` reflected at that bound: `∫ 2 K_h(b − t(Q(u))) du`, with
+    /// `b = t(bound)`, `Q` the quantile, and `t = ln` when `log` holds (the
+    /// density of `ln x`), else the identity. It is what a reflected kernel
+    /// density of a sample of this distribution estimates at the bound.
+    ///
+    /// The quadrature reads the levels `u` within eight bandwidths of the
+    /// bound, the reach of the kernel, through `u = U s²` (`1 − U s²` at the upper
+    /// bound), which keeps the integrand smooth where the density is 0 or
+    /// infinite at the bound.
+    ///
+    /// The caller checks that the bound of `side` is finite, and above 0
+    /// when `log` holds.
+    pub fn smoothed_at_bound(&self, side: BoundSide, bandwidth: f64, log: bool) -> f64 {
+        let scale = |x: f64| if log { libm::log(x) } else { x };
+        let unscale = |y: f64| if log { libm::exp(y) } else { y };
+        let reach = KERNEL_REACH * bandwidth;
+        let kernel = |distance: f64| {
+            let z = distance / bandwidth;
+            libm::exp(-0.5 * z * z) / (bandwidth * (2.0 * std::f64::consts::PI).sqrt())
+        };
+        let (bound, mass) = match side {
+            BoundSide::Lower => {
+                let bound = scale(self.lower);
+                (bound, self.cdf(unscale(bound + reach)))
+            }
+            BoundSide::Upper => {
+                let bound = scale(self.upper);
+                (bound, 1.0 - self.cdf(unscale(bound - reach)))
+            }
+        };
+        if mass <= 0.0 {
+            return 0.0;
+        }
+        gauss_legendre()
+            .iter()
+            .map(|&(s, weight)| {
+                let level = match side {
+                    BoundSide::Lower => mass * s * s,
+                    BoundSide::Upper => 1.0 - mass * s * s,
+                };
+                let at = scale(self.quantile(level.clamp(0.0, 1.0)));
+                weight * 2.0 * kernel(bound - at) * 2.0 * mass * s
+            })
+            .sum()
+    }
+
     /// `Φ(b) − Φ(a)`, by the survival function in the upper tail.
     fn normal_between(&self, a: f64, b: f64) -> f64 {
         if self.upper_tail {
@@ -467,6 +577,40 @@ impl Distribution {
     pub fn sample(&self, generator: &mut Generator) -> f64 {
         self.quantile(generator.open_uniform())
     }
+}
+
+/// The nodes and weights of the Gauss–Legendre rule of [`QUADRATURE_NODES`]
+/// points on `[0, 1]`: the roots of the Legendre polynomial, by Newton's
+/// method from the approximation of Tricomi.
+fn gauss_legendre() -> &'static [(f64, f64)] {
+    static RULE: OnceLock<Vec<(f64, f64)>> = OnceLock::new();
+    RULE.get_or_init(|| {
+        let n = QUADRATURE_NODES;
+        let mut rule = Vec::with_capacity(n);
+        for i in 0..n / 2 {
+            let mut z = (std::f64::consts::PI * (i as f64 + 0.75) / (n as f64 + 0.5)).cos();
+            let mut slope = 0.0;
+            for _ in 0..100 {
+                let (mut current, mut previous) = (1.0, 0.0);
+                for j in 1..=n {
+                    let before = previous;
+                    previous = current;
+                    let j = j as f64;
+                    current = ((2.0 * j - 1.0) * z * previous - (j - 1.0) * before) / j;
+                }
+                slope = n as f64 * (z * current - previous) / (z * z - 1.0);
+                let step = current / slope;
+                z -= step;
+                if step.abs() < 1e-15 {
+                    break;
+                }
+            }
+            let weight = 1.0 / ((1.0 - z * z) * slope * slope);
+            rule.push((0.5 * (1.0 - z), weight));
+            rule.push((0.5 * (1.0 + z), weight));
+        }
+        rule
+    })
 }
 
 /// `cdf(x) − p`, whose root is the quantile at `p`, and its derivative, the
@@ -632,5 +776,16 @@ mod tests {
         let error =
             Distribution::new(Family::Normal { mean: 0.0, sd: 1.0 }, 100.0, 101.0).unwrap_err();
         assert!(error.contains("no mass"), "{error}");
+    }
+
+    #[test]
+    fn a_bound_with_no_mass_within_the_kernel_has_no_smoothed_density() {
+        // Beta(50, 1) puts x⁵⁰ below x, which is 0 in floating point within
+        // eight bandwidths of 1e-8 of the lower bound.
+        let d = Distribution::new(Family::Beta { a: 50.0, b: 1.0 }, 0.0, 1.0).unwrap();
+        assert_eq!(d.smoothed_at_bound(BoundSide::Lower, 1e-8, false), 0.0);
+        // The upper bound has the density 50.
+        let upper = d.smoothed_at_bound(BoundSide::Upper, 1e-5, false);
+        assert!((upper - 50.0).abs() < 0.1, "{upper}");
     }
 }

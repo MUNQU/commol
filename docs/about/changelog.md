@@ -205,6 +205,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Drop `trials` from the observations of a loss, or fit them with a
   `BinomialObservations()` model. See
   [Noise parameters](../guide/uncertainty/observation-models.md#noise-parameters).
+- **Breaking:** `SampleIdentifiability` judges what a sample learned against
+  its reference, and takes two more required settings,
+  `contraction_threshold` and `bound_share`, and the optional
+  `log_parameters`. A parameter whose contraction is below
+  `contraction_threshold` is now `poorly_determined`, with the reason
+  "Sample: contraction 0.03, below 0.5."; a mode now counts only when its dip
+  is deeper than three standard errors of a kernel density reflected at the
+  bounds, after equal draws are merged, so a flat marginal no longer shows
+  noise modes. Verdicts change: a sample of its reference was
+  `poorly_determined` by its false modes and is now so by its contraction,
+  and a sample whose marginals all contract less than the threshold is no
+  longer `determined`. `SampleSection` adds `contraction_threshold`,
+  `bound_share`, `log_parameters`, `effective_size`, `mass_below`,
+  `mass_above`, `at_bound` (the sides whose bound, not the data, sets the
+  marginal, which do not set the verdict), `overlap`, `bins`, `directions`
+  (each a `Direction`, with its data `DirectionData`), `hidden_ridges`,
+  `draws_per_parameter` and `warnings`, and `SampleSectionData` the same
+  keys in the same order; every measure of the shape of a parameter of
+  `log_parameters` (its contraction, correlations, modes, density at a bound
+  and directions) reads `ln θ`. A
+  `SampleIdentifiability` or a report written before this change does not
+  read back: give the two thresholds. In Rust, `sample_identifiability`
+  takes the settings and a seed, and `identifiability::Reference` is
+  removed; `identifiability::Direction`, `distribution::BoundSide`,
+  `ParameterSample::distinct`, `Distribution::log_variance`,
+  `Distribution::smoothed_at_bound` and `Stream::SampleDirections` are
+  new. See [A sample](../guide/uncertainty/identifiability.md#a-sample).
 - **Breaking:** a build logs one `INFO` record, with the number of bins,
   parameters, transitions and outputs; the records of each bin,
   accumulator, stratification, matrix, parameter and transition of a

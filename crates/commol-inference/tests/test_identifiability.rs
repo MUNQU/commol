@@ -7,16 +7,23 @@ use commol_calibration::{
 use commol_core::{Accuracy, AccuracySettings, Model};
 use commol_difference::DifferenceEquations;
 use commol_inference::identifiability::{
-    PracticalVerdict, Reference, StructuralVerdict, Tightening, collinearity, collinearity_index,
+    PracticalVerdict, StructuralVerdict, Tightening, collinearity, collinearity_index,
     sample_identifiability, structural_rank,
 };
 use commol_inference::sensitivity::{
     Design, FiniteDifferences, Matrix, PartSensitivities, Sensitivities, SensitivityError,
     SensitivitySource,
 };
+use std::f64::consts::{FRAC_1_SQRT_2, PI};
+
+use commol_core::json::Pairs;
+use commol_inference::distribution::{BoundSide, Distribution, Family};
+use commol_inference::settings::PriorsSettings;
+use commol_inference::settings::identifiability::{Reference, SampleIdentifiabilitySettings};
 use commol_inference::{MethodError, ParameterSample};
 use commol_random::Generator;
-use commol_random::sample::normal;
+use commol_random::sample::{gamma, normal};
+use rayon::prelude::*;
 
 /// A → B at the rate `rate`, from A = 1000, with the parameters `ids`.
 fn decay(rate: &str, ids: &[&str]) -> DifferenceEquations {
@@ -186,6 +193,19 @@ fn sample(columns: &[Vec<f64>]) -> ParameterSample {
     .unwrap()
 }
 
+/// The settings of a sample against its bounds, with `correlation_threshold`,
+/// a contraction threshold of 0.5 and a bound share of 0.05.
+fn bounds(correlation_threshold: f64) -> SampleIdentifiabilitySettings {
+    SampleIdentifiabilitySettings {
+        reference: Reference::Bounds,
+        correlation_threshold,
+        contraction_threshold: 0.5,
+        bound_share: 0.05,
+        log_parameters: vec![],
+        priors: None,
+    }
+}
+
 /// `n` standard normal draws.
 fn normals(n: usize, seed: u64) -> Vec<f64> {
     let mut generator = Generator::from_seed(seed);
@@ -197,7 +217,7 @@ fn contraction_of_a_spread_and_a_tight_sample() {
     let n = 1000;
     let spread: Vec<f64> = (0..n).map(|i| (i as f64 + 0.5) / n as f64).collect();
     let tight: Vec<f64> = normals(n, 1).iter().map(|z| 0.5 + 0.001 * z).collect();
-    let result = sample_identifiability(&sample(&[spread, tight]), Reference::Bounds, 0.9).unwrap();
+    let result = sample_identifiability(&sample(&[spread, tight]), &bounds(0.9), 0).unwrap();
 
     assert!(
         result.contraction[0].abs() < 0.01,
@@ -212,7 +232,7 @@ fn a_ridge_gives_a_correlated_pair() {
     let a: Vec<f64> = normals(500, 2).iter().map(|z| 0.5 + 0.1 * z).collect();
     let b: Vec<f64> = a.iter().map(|x| 1.0 - x).collect();
     let c: Vec<f64> = normals(500, 3).iter().map(|z| 0.5 + 0.1 * z).collect();
-    let result = sample_identifiability(&sample(&[a, b, c]), Reference::Bounds, 0.9).unwrap();
+    let result = sample_identifiability(&sample(&[a, b, c]), &bounds(0.9), 0).unwrap();
 
     assert!((result.correlation[0][1] + 1.0).abs() < 1e-9);
     assert_eq!(result.correlated_pairs.len(), 1);
@@ -227,7 +247,7 @@ fn a_sample_gives_the_verdict_of_each_parameter() {
     let a: Vec<f64> = normals(500, 2).iter().map(|z| 0.5 + 0.1 * z).collect();
     let b: Vec<f64> = a.iter().map(|x| 1.0 - x).collect();
     let c: Vec<f64> = normals(500, 3).iter().map(|z| 0.5 + 0.1 * z).collect();
-    let result = sample_identifiability(&sample(&[a, b, c]), Reference::Bounds, 0.9).unwrap();
+    let result = sample_identifiability(&sample(&[a, b, c]), &bounds(0.9), 0).unwrap();
 
     let r = result.correlation[0][1];
     let verdicts = &result.verdicts;
@@ -248,7 +268,7 @@ fn a_correlation_equal_to_the_threshold_is_not_above_it() {
     // Centered columns with Σxy = 1 and Σx² = Σy² = 2: r = 1/2.
     let x = vec![0.75, 0.25, 0.5, 0.5];
     let y = vec![0.75, 0.5, 0.25, 0.5];
-    let result = sample_identifiability(&sample(&[x, y]), Reference::Bounds, 0.5).unwrap();
+    let result = sample_identifiability(&sample(&[x, y]), &bounds(0.5), 0).unwrap();
 
     assert_eq!(result.correlation[0][1], 0.5);
     assert!(result.correlated_pairs.is_empty());
@@ -263,8 +283,7 @@ fn a_bimodal_marginal_is_flagged() {
         .map(|(i, z)| if i % 2 == 0 { 0.2 } else { 0.8 } + 0.03 * z)
         .collect();
     let unimodal: Vec<f64> = normals(400, 5).iter().map(|z| 0.5 + 0.1 * z).collect();
-    let result =
-        sample_identifiability(&sample(&[bimodal, unimodal]), Reference::Bounds, 0.9).unwrap();
+    let result = sample_identifiability(&sample(&[bimodal, unimodal]), &bounds(0.9), 0).unwrap();
 
     assert_eq!(result.verdicts[0].modes, 2);
     assert_eq!(result.verdicts[1].modes, 1);
@@ -682,9 +701,9 @@ fn a_correlation_threshold_is_strictly_between_zero_and_one() {
     let spread = |seed| normals(50, seed).iter().map(|z| 0.5 + 0.1 * z).collect();
     let draws = sample(&[spread(6), spread(7)]);
 
-    assert!(sample_identifiability(&draws, Reference::Bounds, 0.5).is_ok());
+    assert!(sample_identifiability(&draws, &bounds(0.5), 0).is_ok());
     for threshold in [0.0, 1.0] {
-        let error = sample_identifiability(&draws, Reference::Bounds, threshold).unwrap_err();
+        let error = sample_identifiability(&draws, &bounds(threshold), 0).unwrap_err();
         assert!(matches!(error, MethodError::Invalid(_)), "{error}");
     }
 }
@@ -840,11 +859,11 @@ fn collinearity_needs_two_parameters_that_are_not_noise_parameters() {
 
 #[test]
 fn the_priors_of_a_sample_identifiability_match_its_reference() {
-    use commol_inference::settings::identifiability::SampleIdentifiabilitySettings;
-
     let read = |reference: &str, priors: &str| {
         commol_core::json::read::<SampleIdentifiabilitySettings>(&format!(
-            r#"{{"reference": "{reference}", "correlation_threshold": 0.9, "priors": {priors}}}"#
+            r#"{{"reference": "{reference}", "correlation_threshold": 0.9,
+            "contraction_threshold": 0.5, "bound_share": 0.05, "log_parameters": [],
+            "priors": {priors}}}"#
         ))
     };
     let names = ["k".to_string()];
@@ -889,11 +908,11 @@ fn a_measure_over_the_bounds_refuses_an_infinite_bound() {
          be finite: parameter 'k' has the bounds [0.05, inf]. Give it finite bounds"
     );
     assert_eq!(
-        sample_identifiability(&half_line, Reference::Bounds, 0.9)
+        sample_identifiability(&half_line, &bounds(0.9), 0)
             .unwrap_err()
             .to_string(),
-        "reference='bounds' measures the contraction against the uniform distribution on \
-         the bounds, so they must be finite: parameter 'k' has the bounds [0, inf]. Give \
+        "reference='bounds' measures the sample against the uniform distribution on the \
+         bounds, so they must be finite: parameter 'k' has the bounds [0, inf]. Give \
          reference='prior' with the priors of the sample"
     );
 }
@@ -935,4 +954,709 @@ fn the_structural_rank_reads_no_part() {
     assert_eq!(analysis.generic_rank, 1);
     let indices = collinearity(&source, &[vec![0.1, 1000.0]], &[1.0], 2, 20.0).unwrap();
     assert_eq!(indices.pair_gamma[0][1], f64::INFINITY);
+}
+
+/// A sample of `columns` with `bounds`, equally weighted, of the parameters
+/// `p0`, `p1`, …
+fn sample_on(columns: &[Vec<f64>], bounds: &[(f64, f64)]) -> ParameterSample {
+    let draws = columns[0].len();
+    let values: Vec<Vec<f64>> = (0..draws)
+        .map(|i| columns.iter().map(|column| column[i]).collect())
+        .collect();
+    ParameterSample::new(
+        (0..columns.len()).map(|j| format!("p{j}")).collect(),
+        bounds.to_vec(),
+        values,
+        &vec![0.0; draws],
+        None,
+    )
+    .unwrap()
+}
+
+/// The settings of a sample against the priors `priors` of `p0`, `p1`, …,
+/// with `log_parameters`.
+fn with_priors(priors: &[Family], log_parameters: &[&str]) -> SampleIdentifiabilitySettings {
+    let families = priors
+        .iter()
+        .enumerate()
+        .map(|(j, family)| (format!("p{j}"), *family))
+        .collect();
+    SampleIdentifiabilitySettings {
+        reference: Reference::Prior,
+        priors: Some(PriorsSettings {
+            distributions: Some(Pairs(families)),
+        }),
+        log_parameters: log_parameters.iter().map(|name| name.to_string()).collect(),
+        ..bounds(0.9)
+    }
+}
+
+/// `n` draws of `draw`.
+fn draws(n: usize, generator: &mut Generator, draw: impl Fn(&mut Generator) -> f64) -> Vec<f64> {
+    (0..n).map(|_| draw(generator)).collect()
+}
+
+/// A draw of the normal of `mean` and `sd` truncated to `[low, high]`.
+fn truncated(generator: &mut Generator, mean: f64, sd: f64, (low, high): (f64, f64)) -> f64 {
+    loop {
+        let x = mean + sd * normal(generator);
+        if (low..=high).contains(&x) {
+            return x;
+        }
+    }
+}
+
+#[test]
+fn a_sample_of_its_reference_is_poorly_determined_by_its_contraction() {
+    // Uniform draws on the bounds, and draws of LogNormal(0, 2) read on the
+    // log scale.
+    let mut generator = Generator::from_seed(11);
+    let uniform = draws(2000, &mut generator, |g| g.uniform());
+    let log_normal = draws(2000, &mut generator, |g| (2.0 * normal(g)).exp());
+    let sample = sample_on(&[uniform, log_normal], &[(0.0, 1.0), (0.0, f64::INFINITY)]);
+    let priors = [
+        Family::Uniform,
+        Family::LogNormal {
+            mu: 0.0,
+            sigma: 2.0,
+        },
+    ];
+
+    let result = sample_identifiability(&sample, &with_priors(&priors, &["p1"]), 0).unwrap();
+
+    for (j, verdict) in result.verdicts.iter().enumerate() {
+        assert!(
+            result.contraction[j].abs() < 0.1,
+            "{:?}",
+            result.contraction
+        );
+        assert_eq!(verdict.verdict, PracticalVerdict::PoorlyDetermined);
+        assert!(verdict.low_contraction, "{verdict:?}");
+        assert!(verdict.correlated_with.is_empty(), "{verdict:?}");
+        assert_eq!(verdict.modes, 1, "{verdict:?}");
+    }
+}
+
+#[test]
+fn a_flat_or_smooth_marginal_has_one_mode() {
+    // Each parameter is drawn from its reference: Uniform, LogUniform read
+    // on the log scale, Normal on infinite bounds and Gamma.
+    let priors = [
+        Family::Uniform,
+        Family::LogUniform,
+        Family::Normal { mean: 0.0, sd: 1.0 },
+        Family::Gamma {
+            shape: 2.0,
+            rate: 1.0,
+        },
+    ];
+    let bounds = [
+        (0.0, 1.0),
+        (0.01, 100.0),
+        (f64::NEG_INFINITY, f64::INFINITY),
+        (0.0, f64::INFINITY),
+    ];
+    let settings = with_priors(&priors, &["p1"]);
+    let mut marginals = 0;
+    let mut multimodal = Vec::new();
+    for n in [300, 2000, 20_000] {
+        let counts: Vec<Vec<usize>> = (0..200)
+            .into_par_iter()
+            .map(|seed| {
+                let mut generator = Generator::from_seed(seed + 1000 * n as u64);
+                let columns = [
+                    draws(n, &mut generator, |g| g.uniform()),
+                    draws(n, &mut generator, |g| 0.01 * 10_000f64.powf(g.uniform())),
+                    draws(n, &mut generator, normal),
+                    draws(n, &mut generator, |g| gamma(g, 2.0, 1.0)),
+                ];
+                let result =
+                    sample_identifiability(&sample_on(&columns, &bounds), &settings, seed).unwrap();
+                result.modes.iter().map(Vec::len).collect()
+            })
+            .collect();
+        for count in counts {
+            marginals += count.len();
+            multimodal.extend(count.into_iter().filter(|&modes| modes > 1));
+        }
+    }
+
+    assert_eq!(marginals, 2400);
+    assert!(multimodal.len() <= 24, "{multimodal:?}");
+}
+
+#[test]
+fn a_wide_range_or_a_heavy_draw_keeps_the_modes_of_the_mass() {
+    // 90 % near 0 and two clusters of 5 % far away: the grid keeps its step
+    // of h/4 over a range of 10⁹ bandwidths.
+    let mut generator = Generator::from_seed(21);
+    let wide: Vec<f64> = (0..3000)
+        .map(|i| {
+            let center = match i % 20 {
+                0 => 3.3e5,
+                1 => 1e6,
+                _ => 0.0,
+            };
+            center + 0.01 * normal(&mut generator)
+        })
+        .collect();
+    let sample = sample_on(&[wide], &[(-1e7, 1e7)]);
+    let modes = &sample_identifiability(&sample, &bounds(0.9), 0)
+        .unwrap()
+        .modes[0];
+    assert_eq!(modes.len(), 3, "{modes:?}");
+    for (mode, center) in modes.iter().zip([0.0, 3.3e5, 1e6]) {
+        assert!((mode - center).abs() < 0.01, "{modes:?}");
+    }
+
+    // One draw of 2 % of the weight far from 999 others is one draw, not a
+    // mode: the standard error of the density reads the weight of each.
+    let mut values: Vec<Vec<f64>> =
+        draws(999, &mut generator, |g| truncated(g, 0.3, 0.05, (0.0, 1.0)))
+            .into_iter()
+            .map(|x| vec![x])
+            .collect();
+    values.push(vec![0.8]);
+    let mut log_weights = vec![0.0; 999];
+    log_weights.push((0.02 * 999.0 / 0.98f64).ln());
+    let heavy = ParameterSample::new(
+        vec!["p0".to_string()],
+        vec![(0.0, 1.0)],
+        values,
+        &log_weights,
+        None,
+    )
+    .unwrap();
+    let result = sample_identifiability(&heavy, &bounds(0.9), 0).unwrap();
+    assert_eq!(result.modes[0].len(), 1, "{:?}", result.modes);
+}
+
+#[test]
+fn the_spread_is_that_of_the_weighted_draws() {
+    // Weights of 1 and 4e-18: the spread is that of the weights, not NaN.
+    let values = vec![vec![0.2, 0.3], vec![0.5, 0.1], vec![0.9, 0.7]];
+    let nearly_one = ParameterSample::new(
+        vec!["p0".to_string(), "p1".to_string()],
+        vec![(0.0, 1.0); 2],
+        values,
+        &[0.0, -40.0, -40.0],
+        None,
+    )
+    .unwrap();
+    let result = sample_identifiability(&nearly_one, &bounds(0.9), 0).unwrap();
+    assert!(
+        result.contraction.iter().all(|c| (c - 1.0).abs() < 1e-12),
+        "{:?}",
+        result.contraction
+    );
+
+    // Half the weight at each end of [0, 1]: the variance 1/4, the largest
+    // on the bounds, a contraction of 1 − 3 = −2, the same for copies.
+    let ends = sample_on(&[vec![0.0, 1.0]], &[(0.0, 1.0)]);
+    let copies = sample_on(&[vec![0.0, 0.0, 1.0, 1.0]], &[(0.0, 1.0)]);
+    for sample in [ends, copies] {
+        let contraction = sample_identifiability(&sample, &bounds(0.9), 0)
+            .unwrap()
+            .contraction;
+        assert!((contraction[0] + 2.0).abs() < 1e-12, "{contraction:?}");
+    }
+}
+
+#[test]
+fn real_modes_are_kept() {
+    let unit = (0.0, 1.0);
+    for seed in 0..10 {
+        let mut generator = Generator::from_seed(seed);
+        let g = &mut generator;
+        // Two weak modes; a minor mode of 15 %; two narrow modes of 97 % of
+        // the mass, with 3 % of the draws spread far.
+        let weak: Vec<f64> = (0..2000)
+            .map(|i| truncated(g, if i % 2 == 0 { 0.35 } else { 0.65 }, 0.08, unit))
+            .collect();
+        let minor: Vec<f64> = (0..2000)
+            .map(|i| truncated(g, if i % 20 < 3 { 0.7 } else { 0.3 }, 0.05, unit))
+            .collect();
+        let narrow: Vec<f64> = (0..2000)
+            .map(|i| {
+                if i % 100 < 3 {
+                    100.0 * g.uniform()
+                } else {
+                    truncated(g, if i % 2 == 0 { 0.3 } else { 0.6 }, 0.01, unit)
+                }
+            })
+            .collect();
+        let sample = sample_on(&[weak, minor, narrow], &[unit, unit, (0.0, 100.0)]);
+
+        let result = sample_identifiability(&sample, &bounds(0.9), seed).unwrap();
+
+        for modes in &result.modes {
+            assert_eq!(modes.len(), 2, "seed {seed}: {:?}", result.modes);
+        }
+    }
+
+    // A unimodal sample under a normal or a gamma prior has its mode at the
+    // mode of the sample, not where it is far from its prior.
+    let mut generator = Generator::from_seed(3);
+    let near_one = draws(20_000, &mut generator, |g| 1.0 + 0.5 * normal(g));
+    let skewed = draws(20_000, &mut generator, |g| gamma(g, 20.0, 10.0));
+    let sample = sample_on(
+        &[near_one, skewed],
+        &[(f64::NEG_INFINITY, f64::INFINITY), (0.0, f64::INFINITY)],
+    );
+    let priors = [
+        Family::Normal { mean: 0.0, sd: 1.0 },
+        Family::Gamma {
+            shape: 2.0,
+            rate: 1.0,
+        },
+    ];
+
+    let result = sample_identifiability(&sample, &with_priors(&priors, &[]), 3).unwrap();
+
+    assert_eq!(result.modes[0].len(), 1);
+    assert!((result.modes[0][0] - 1.0).abs() < 0.1, "{:?}", result.modes);
+    assert_eq!(result.modes[1].len(), 1);
+    assert!((result.modes[1][0] - 1.9).abs() < 0.1, "{:?}", result.modes);
+}
+
+/// The columns of `a_bound_that_sets_a_side` against the uniform on their
+/// bounds, with those bounds and the sides each bound sets.
+type Column = (fn(&mut Generator) -> f64, (f64, f64), &'static [BoundSide]);
+
+/// A sample of a prior: its draw, its prior and its bounds.
+type OfPrior = (fn(&mut Generator) -> f64, Family, (f64, f64));
+
+/// The sides each bound sets, of each column against its bounds and against
+/// its prior.
+type Sides = (Vec<Vec<BoundSide>>, Vec<Vec<BoundSide>>);
+
+#[test]
+fn a_bound_that_sets_a_side() {
+    use BoundSide::{Lower, Upper};
+    let unit = (0.0, 1.0);
+    let against_bounds: [Column; 10] = [
+        (|g| g.uniform(), unit, &[]),
+        (|g| truncated(g, 0.93, 0.02, (0.0, 1.0)), unit, &[]),
+        (|g| truncated(g, 0.95, 0.03, (0.0, 1.0)), unit, &[]),
+        (|g| truncated(g, 0.99, 0.004, (0.0, 1.0)), unit, &[]),
+        (|g| truncated(g, 0.985, 0.005, (0.0, 1.0)), unit, &[]),
+        // A pile at the upper bound: 47 % of its mass in the top 5 %.
+        (|g| truncated(g, 1.0, 0.08, (0.0, 1.0)), unit, &[Upper]),
+        (|g| truncated(g, 0.0, 0.05, (0.0, 1.0)), unit, &[Lower]),
+        (
+            |g| truncated(g, 0.0, 0.05, (0.0, 0.2)),
+            (0.0, 0.2),
+            &[Lower],
+        ),
+        (|g| 0.5 + 0.5 * g.uniform(), unit, &[Upper]),
+        // The density 2u.
+        (|g| g.uniform().sqrt(), unit, &[Upper]),
+    ];
+    // Samples of their references, which no bound sets.
+    let of_priors: [OfPrior; 3] = [
+        (
+            |g| gamma(g, 2.0, 10.0),
+            Family::Gamma {
+                shape: 2.0,
+                rate: 10.0,
+            },
+            (0.0, f64::INFINITY),
+        ),
+        (
+            |g| gamma(g, 0.5, 1.0),
+            Family::Gamma {
+                shape: 0.5,
+                rate: 1.0,
+            },
+            (0.0, f64::INFINITY),
+        ),
+        (
+            |g| g.uniform().powf(0.2),
+            Family::Beta { a: 5.0, b: 1.0 },
+            unit,
+        ),
+    ];
+    let priors: Vec<Family> = of_priors.iter().map(|(_, family, _)| *family).collect();
+    let prior_settings = with_priors(&priors, &[]);
+    // Twenty seeds at 300 and 2000 draws, four at 20 000.
+    for (n, seeds) in [(300, 20), (2000, 20), (20_000, 4)] {
+        let runs: Vec<Sides> = (0..seeds)
+            .into_par_iter()
+            .map(|seed| {
+                let mut generator = Generator::from_seed(seed + 1000 * n as u64);
+                let columns: Vec<Vec<f64>> = against_bounds
+                    .iter()
+                    .map(|(draw, _, _)| draws(n, &mut generator, draw))
+                    .collect();
+                let limits: Vec<(f64, f64)> = against_bounds.iter().map(|c| c.1).collect();
+                let by_bounds =
+                    sample_identifiability(&sample_on(&columns, &limits), &bounds(0.9), seed)
+                        .unwrap();
+                let columns: Vec<Vec<f64>> = of_priors
+                    .iter()
+                    .map(|(draw, _, _)| draws(n, &mut generator, draw))
+                    .collect();
+                let limits: Vec<(f64, f64)> = of_priors.iter().map(|c| c.2).collect();
+                let by_priors =
+                    sample_identifiability(&sample_on(&columns, &limits), &prior_settings, seed)
+                        .unwrap();
+                let sides = |result: &commol_inference::identifiability::SampleIdentifiability| {
+                    result
+                        .verdicts
+                        .iter()
+                        .map(|verdict| verdict.at_bound.clone())
+                        .collect()
+                };
+                (sides(&by_bounds), sides(&by_priors))
+            })
+            .collect();
+        for (j, (_, _, expected)) in against_bounds.iter().enumerate() {
+            let matching = runs.iter().filter(|run| run.0[j] == *expected).count();
+            if expected.is_empty() {
+                assert_eq!(matching, runs.len(), "column {j} at {n} draws");
+            } else if n == 300 {
+                // Few draws: the test of the side has less power.
+                assert!(matching >= 15, "column {j}: {matching} of 20 at 300 draws");
+            } else if n == 2000 {
+                assert!(matching >= 18, "column {j}: {matching} of 20");
+            } else {
+                // The power of the test grows with the draws.
+                assert_eq!(matching, runs.len(), "column {j} at {n} draws");
+            }
+        }
+        for j in 0..of_priors.len() {
+            assert!(
+                runs.iter().all(|run| run.1[j].is_empty()),
+                "prior {j} at {n} draws"
+            );
+        }
+    }
+}
+
+#[test]
+fn an_infinite_side_has_mass_and_no_bound() {
+    // Draws far in the lower tail of a normal prior on infinite bounds, and
+    // a pile at 0 under a gamma prior, whose upper side is infinite.
+    let mut generator = Generator::from_seed(5);
+    let tail = draws(2000, &mut generator, |g| -2.5 + 0.3 * normal(g));
+    let pile = draws(2000, &mut generator, |g| 0.02 * normal(g).abs());
+    let sample = sample_on(
+        &[tail, pile],
+        &[(f64::NEG_INFINITY, f64::INFINITY), (0.0, f64::INFINITY)],
+    );
+    let priors = [
+        Family::Normal { mean: 0.0, sd: 1.0 },
+        Family::Gamma {
+            shape: 2.0,
+            rate: 1.0,
+        },
+    ];
+
+    let result = sample_identifiability(&sample, &with_priors(&priors, &[]), 0).unwrap();
+
+    // P(N(−2.5, 0.3) < Φ⁻¹(0.05) = −1.645) = Φ(2.85) = 0.998.
+    assert!((result.mass_below[0] - 0.998).abs() < 0.005, "{result:?}");
+    assert_eq!(result.mass_above[0], 0.0);
+    assert!(result.verdicts[0].at_bound.is_empty());
+    // The gamma prior holds 5 % of its mass below 0.355: every draw.
+    assert!((result.mass_below[1] - 1.0).abs() < 1e-12);
+    assert_eq!(result.verdicts[1].at_bound, [BoundSide::Lower]);
+}
+
+#[test]
+fn the_overlap_of_a_sample_with_its_reference() {
+    let mean_overlap = |n: usize| {
+        let overlaps: Vec<f64> = (0..200)
+            .map(|seed| {
+                let mut generator = Generator::from_seed(seed);
+                let uniform = draws(n, &mut generator, |g| g.uniform());
+                let result =
+                    sample_identifiability(&sample_on(&[uniform], &[(0.0, 1.0)]), &bounds(0.9), 0)
+                        .unwrap();
+                result.overlap[0]
+            })
+            .collect();
+        overlaps.iter().sum::<f64>() / overlaps.len() as f64
+    };
+    // B = ⌈2 · 500^{1/3}⌉ = 16 and ⌈2 · 30^{1/3}⌉ = 7.
+    assert!(mean_overlap(500) > 0.85);
+    assert!((mean_overlap(30) - 0.82).abs() < 0.02);
+    let mut generator = Generator::from_seed(1);
+    let uniform = draws(500, &mut generator, |g| g.uniform());
+    let result =
+        sample_identifiability(&sample_on(&[uniform], &[(0.0, 1.0)]), &bounds(0.9), 0).unwrap();
+    assert_eq!(result.bins, 16);
+
+    // A sample on one value fills one bin of B.
+    let on_one = draws(1000, &mut generator, |g| 0.53 + 1e-6 * normal(g));
+    let result =
+        sample_identifiability(&sample_on(&[on_one], &[(0.0, 1.0)]), &bounds(0.9), 0).unwrap();
+    assert_eq!(result.bins, 20);
+    assert!((result.overlap[0] - 0.05).abs() < 1e-12);
+    let one_point = sample_on(&[vec![0.3]], &[(0.0, 1.0)]);
+    let result = sample_identifiability(&one_point, &bounds(0.9), 0).unwrap();
+    assert_eq!((result.bins, result.overlap[0]), (2, 0.5));
+}
+
+#[test]
+fn log_parameters_set_the_scale_of_every_shape_measure() {
+    // The variance of ln θ under the reference, against closed forms:
+    // σ² of the log-normal, the trigamma of the shape of the gamma, and the
+    // width squared over 12 of the log-uniform.
+    let half_line = (0.0, f64::INFINITY);
+    let cases = [
+        (
+            Family::LogNormal {
+                mu: 0.3,
+                sigma: 0.7,
+            },
+            half_line,
+            0.49,
+        ),
+        (
+            Family::Gamma {
+                shape: 2.0,
+                rate: 3.0,
+            },
+            half_line,
+            PI * PI / 6.0 - 1.0,
+        ),
+        (
+            Family::Gamma {
+                shape: 0.5,
+                rate: 1.0,
+            },
+            half_line,
+            PI * PI / 2.0,
+        ),
+        (Family::LogUniform, (0.1, 10.0), 100f64.ln().powi(2) / 12.0),
+        // Shapes whose quantile falls below the smallest f64: the trigamma
+        // ψ₁(a), and ψ₁(a) − ψ₁(a + b) for the beta.
+        (
+            Family::Gamma {
+                shape: 0.01,
+                rate: 1.0,
+            },
+            half_line,
+            10_001.621_213_528_317,
+        ),
+        (
+            Family::Gamma {
+                shape: 0.001,
+                rate: 0.001,
+            },
+            half_line,
+            1_000_001.642_533_196,
+        ),
+        (
+            Family::Beta { a: 0.002, b: 2.0 },
+            (0.0, 1.0),
+            250_000.996_011_968,
+        ),
+    ];
+    for (family, (lower, upper), expected) in cases {
+        let variance = Distribution::new(family, lower, upper)
+            .unwrap()
+            .log_variance();
+        assert!(
+            (variance - expected).abs() < 1e-6 * expected,
+            "{family}: {variance} {expected}"
+        );
+    }
+
+    // A product held fixed, and a pile at the bound 0.
+    let mut generator = Generator::from_seed(8);
+    let first = draws(2000, &mut generator, |g| {
+        (5f64.ln() * (2.0 * g.uniform() - 1.0)).exp()
+    });
+    let second: Vec<f64> = first
+        .iter()
+        .map(|x| (-x.ln() + 0.01 * normal(&mut generator)).exp())
+        .collect();
+    let pile = draws(2000, &mut generator, |g| {
+        truncated(g, 0.0, 0.02, (0.0, 1.0))
+    });
+    let sample = sample_on(
+        &[first, second, pile],
+        &[(0.1, 10.0), (0.1, 10.0), (0.0, 1.0)],
+    );
+    let natural = sample_identifiability(&sample, &bounds(0.9), 0).unwrap();
+    let logs = SampleIdentifiabilitySettings {
+        log_parameters: vec!["p0".to_string(), "p1".to_string(), "p2".to_string()],
+        ..bounds(0.9)
+    };
+    let log = sample_identifiability(&sample, &logs, 0).unwrap();
+
+    assert_eq!(log.mass_below, natural.mass_below);
+    assert_eq!(log.mass_above, natural.mass_above);
+    assert_eq!(log.overlap, natural.overlap);
+    // p0 is log-uniform on [0.2, 5]: in ln θ it spreads (ln 25)² / 12 against
+    // the variance of ln θ under the uniform on [0.1, 10], a contraction of
+    // −0.10, and in θ a variance of 1.65 against 8.17, one of 0.80.
+    let reference = Distribution::new(Family::Uniform, 0.1, 10.0).unwrap();
+    let in_log = 1.0 - 25f64.ln().powi(2) / 12.0 / reference.log_variance();
+    let in_natural =
+        1.0 - (24.96 / (2.0 * 25f64.ln()) - (4.8 / 25f64.ln()).powi(2)) / reference.variance();
+    assert!(
+        (log.contraction[0] - in_log).abs() < 0.05,
+        "{:?}",
+        log.contraction
+    );
+    assert!(
+        (natural.contraction[0] - in_natural).abs() < 0.05,
+        "{:?}",
+        natural.contraction
+    );
+    assert!(log.verdicts[0].low_contraction);
+    assert!(!natural.verdicts[0].low_contraction);
+    // On the log scale the product is a line: its direction holds both
+    // parameters equally and contracts almost wholly.
+    let ridge = log.directions.last().unwrap();
+    assert!(ridge.contraction > 0.999, "{ridge:?}");
+    assert!(
+        (ridge.loadings[0] - FRAC_1_SQRT_2).abs() < 0.01,
+        "{ridge:?}"
+    );
+    assert!(
+        (ridge.loadings[1] - FRAC_1_SQRT_2).abs() < 0.01,
+        "{ridge:?}"
+    );
+    // On the natural scale the product is a curve, which no direction of
+    // the first two parameters follows as closely.
+    assert!(
+        natural
+            .directions
+            .iter()
+            .filter(|direction| direction.loadings[2].abs() < 0.1)
+            .all(|direction| direction.contraction < 0.99),
+        "{:?}",
+        natural.directions
+    );
+    // A log-uniform marginal is flat in ln θ, with one mode in parameter
+    // units; the bound 0 is no bound of ln θ.
+    assert_eq!(log.modes[0].len(), 1);
+    assert!((0.1..=10.0).contains(&log.modes[0][0]));
+    assert_eq!(natural.verdicts[2].at_bound, [BoundSide::Lower]);
+    assert!(log.verdicts[2].at_bound.is_empty());
+}
+
+#[test]
+fn directions_and_their_contraction() {
+    // Against standard normal priors: the first two parameters have the
+    // covariance [[0.25, 0.2], [0.2, 0.25]], eigenvalues 0.45 along (1, 1)
+    // and 0.05 along (1, −1); the third spreads twice as wide as its prior.
+    let mut generator = Generator::from_seed(9);
+    let n = 20_000;
+    let along = draws(n, &mut generator, normal);
+    let across = draws(n, &mut generator, normal);
+    let first: Vec<f64> = along
+        .iter()
+        .zip(&across)
+        .map(|(a, b)| (0.45f64.sqrt() * a + 0.05f64.sqrt() * b) * FRAC_1_SQRT_2)
+        .collect();
+    let second: Vec<f64> = along
+        .iter()
+        .zip(&across)
+        .map(|(a, b)| (0.45f64.sqrt() * a - 0.05f64.sqrt() * b) * FRAC_1_SQRT_2)
+        .collect();
+    let wide = draws(n, &mut generator, |g| 2.0 * normal(g));
+    let infinite = (f64::NEG_INFINITY, f64::INFINITY);
+    let sample = sample_on(&[first, second, wide], &[infinite; 3]);
+    let priors = [Family::Normal { mean: 0.0, sd: 1.0 }; 3];
+
+    let result = sample_identifiability(&sample, &with_priors(&priors, &[]), 0).unwrap();
+
+    let found: Vec<(f64, Vec<f64>)> = result
+        .directions
+        .iter()
+        .map(|d| (d.contraction, d.loadings.clone()))
+        .collect();
+    let expected = [
+        (-3.0, [0.0, 0.0, 1.0]),
+        (0.55, [FRAC_1_SQRT_2, FRAC_1_SQRT_2, 0.0]),
+        (0.95, [FRAC_1_SQRT_2, -FRAC_1_SQRT_2, 0.0]),
+    ];
+    for ((contraction, loadings), (want, want_loadings)) in found.iter().zip(&expected) {
+        assert!(
+            (contraction - want).abs() < 0.1 * want.abs().min(1.0),
+            "{found:?}"
+        );
+        for (loading, want) in loadings.iter().zip(want_loadings) {
+            assert!((loading - want).abs() < 0.03, "{found:?}");
+        }
+    }
+
+    // Three distinct rows, ten copies each, give no directions for three
+    // parameters.
+    let rows: Vec<f64> = (0..30).map(|i| f64::from(i % 3)).collect();
+    let few = sample_on(&[rows.clone(), rows.clone(), rows], &[infinite; 3]);
+    let result = sample_identifiability(&few, &with_priors(&priors, &[]), 0).unwrap();
+    assert_eq!(result.distinct_rows, 3);
+    assert!(result.directions.is_empty());
+    assert_eq!(result.hidden_ridges, None);
+}
+
+#[test]
+fn the_count_of_hidden_ridges() {
+    // Ten parameters of contraction 0.6 against standard normal priors, at
+    // 300 draws: independent, or sharing a ridge of pairwise correlation
+    // 1/6, whose direction contracts by 0.
+    let priors = [Family::Normal { mean: 0.0, sd: 1.0 }; 10];
+    let settings = with_priors(&priors, &[]);
+    let counts = |ridge: bool| -> Vec<usize> {
+        (0..50)
+            .into_par_iter()
+            .map(|seed| {
+                let mut generator = Generator::from_seed(500 + seed);
+                let common = draws(300, &mut generator, normal);
+                let columns: Vec<Vec<f64>> = (0..10)
+                    .map(|_| {
+                        common
+                            .iter()
+                            .map(|c| {
+                                let own = normal(&mut generator);
+                                if ridge {
+                                    (0.4f64 - 1.0 / 15.0).sqrt() * own + (1.0f64 / 15.0).sqrt() * c
+                                } else {
+                                    0.4f64.sqrt() * own
+                                }
+                            })
+                            .collect()
+                    })
+                    .collect();
+                let infinite = (f64::NEG_INFINITY, f64::INFINITY);
+                let sample = sample_on(&columns, &[infinite; 10]);
+                let result = sample_identifiability(&sample, &settings, seed).unwrap();
+                assert!((result.draws_per_parameter - 30.0).abs() < 1e-9);
+                result.hidden_ridges.unwrap()
+            })
+            .collect()
+    };
+
+    let independent = counts(false);
+    let mean = independent.iter().sum::<usize>() as f64 / 50.0;
+    assert!(mean < 0.3, "{independent:?}");
+    assert!(counts(true).iter().all(|&count| count == 1));
+}
+
+#[test]
+fn the_directions_do_not_depend_on_units() {
+    let mut generator = Generator::from_seed(12);
+    let a = draws(500, &mut generator, |g| truncated(g, 0.5, 0.1, (0.0, 1.0)));
+    let b: Vec<f64> = a
+        .iter()
+        .map(|x| (0.5 * x + 0.2 * generator.uniform()).min(1.0))
+        .collect();
+    let sample = sample_on(&[a.clone(), b.clone()], &[(0.0, 1.0); 2]);
+    let scaled: Vec<f64> = a.iter().map(|x| 1000.0 * x).collect();
+    let rescaled = sample_on(&[scaled, b], &[(0.0, 1000.0), (0.0, 1.0)]);
+
+    let first = sample_identifiability(&sample, &bounds(0.9), 0).unwrap();
+    let second = sample_identifiability(&rescaled, &bounds(0.9), 0).unwrap();
+
+    assert_eq!(first.directions.len(), 2);
+    assert_eq!(second.directions.len(), 2);
+    for (d, e) in first.directions.iter().zip(&second.directions) {
+        assert!((d.contraction - e.contraction).abs() < 1e-9, "{d:?} {e:?}");
+    }
 }
