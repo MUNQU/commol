@@ -688,8 +688,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `StochasticSteps` with a `rounding`, and the model then did not build: the
   amount of a bin had to be whole even with a rounding. The model now builds
   and holds the amount the optimizer found, and a run of it rounds that amount
-  as the calibration did: from 12 units. With `"random"`, a bin of several
-  compartments can still start from other units for the same seed. See
+  as the calibration did: from 12 units. See
   [Whole units](../guide/stochastic.md#whole-units).
 - A matrix sum could read a name to which a category id that two
   stratifications share gives two meanings, and count a compartment twice:
@@ -698,6 +697,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `g1` as `total_g1`, which also summed `type:g1`, so `B_g1_g1` and
   `A_g1_g1` counted twice. It now reads the sum of the compartments of `g1`.
   See [Matrix sums](../guide/mathematical-expressions.md#matrix-sums).
+- A model that `Model.apply_calibration_parameters` wrote back onto
+  `StochasticEvents` or `StochasticSteps` could start, for the seed of the
+  calibration, from other units than the calibration scored and then run
+  another path, so its loss could differ from `result.final_loss`: with
+  `"random"` in a bin of several compartments, and with `"largest_remainder"`
+  when two remainders tie, such as `B = 12` split `0.7, 0.2, 0.1`. The
+  write-back rebuilt the scored amounts within a relative `1e-9`, and the
+  rounding can turn on the last bit. On these engines it now writes each
+  compartment that the bins and the splits do not rebuild bit for bit as a
+  `compartment_amounts` override of the amount the calibration scored, so
+  each replicate starts and runs as the calibration scored it, also after
+  `to_json` and `from_json`. On every engine, a write-back first drops the
+  overrides of the compartments its values and its remainder set, also those
+  the user declared, so it leaves no override, of an earlier write-back or
+  not, that its own state does not need. A deterministic engine still rebuilds within a relative `1e-9`. See
+  [Whole units](../guide/stochastic.md#whole-units).
+- The engine read about one number of 17 significant digits in 10, such as a
+  value a calibration found, one unit in the last place off from the number
+  the model holds. It now reads every number bit for bit. A run of a model
+  that holds such a number can change in its last bits, and a seeded run of
+  a stochastic engine with `"random"` whose amounts or splits hold such a
+  number can follow another path.
 - A calibrated initial condition on `StochasticEvents` or `StochasticSteps`
   with no `rounding` built when its bounds were whole, such as `[0, 50]`, and
   then every start failed, because the optimizer writes values that are not

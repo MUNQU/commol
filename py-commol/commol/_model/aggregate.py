@@ -248,7 +248,12 @@ class Aggregate(ModelStructure, InitialConditions):
         the bin, and category values the splits. Every compartment those do
         not reproduce, such as an exact compartment value or a value that
         overlaps a per-compartment override, is written as a per-compartment
-        override.
+        override; the overrides of the compartments the values set, of an
+        earlier write-back or declared, are dropped first, so none is kept
+        that this state does not need. On a stochastic engine, whose start can turn on
+        the last bit of an amount, a compartment those reproduce only to its
+        last bits is an override too, so the written state is the scored one
+        bit for bit.
 
         Parameters
         ----------

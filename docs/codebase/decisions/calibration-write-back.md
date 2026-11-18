@@ -22,23 +22,9 @@ not whole when it writes it (`Units::set_initial_condition`), so the
 write-back refuses `{"B": 12.3}` and the model never holds an amount it
 cannot build.
 
-The write-back rebuilds the scored amounts as it does on every engine, within
-`_MATCH_TOLERANCE` (`_model/calibration_write_back.py`). For a bin of one
-compartment it writes the amount itself, so a run of one seed is the run the
-calibration scored. In a bin of several compartments the rebuilt amounts can
-differ in their last bits. `"largest_remainder"` starts from the same units
-unless two remainders tie within those bits. `"random"` can draw other units.
-The last category with a positive share draws nothing
-([Stochastic engines and seeds](engines.md#stochastic-engines-and-seeds)),
-but every other conditional share of a bin still meets the branches of
-`binomial` (`crates/commol-random/src/sample.rs`), a share of 0.5 and a mean
-of 10, which an equal split always hits, or draws a count that its last bits
-change. So the draw alone does not make a written-back model run as scored:
-the pins of the write-back
-([#474](https://github.com/MUNQU/commol/issues/474)) do, and where a rebuilt
-amount still differs in its last bits, a replicate of the written model can
-differ along its whole path, and the seed of the problem can give a loss
-other than `result.final_loss`.
+A replicate of the written model, for the seed of the problem, is the run the
+calibration scored
+([A written-back model runs as the calibration scored it](#a-written-back-model-runs-as-the-calibration-scored-it)).
 
 | Alternative | Why not |
 |---|---|
@@ -53,6 +39,61 @@ other than `result.final_loss`.
 `crates/commol-model/src/builder.rs::a_bin_that_is_not_whole_builds_with_a_rounding`,
 `crates/commol-stochastic/src/units.rs::a_bin_of_a_half_rounds_up_whatever_its_split`,
 `tests/stochastic/test_whole_units.py::TestWholeUnits::test_a_rounding_makes_each_bin_its_nearest_whole_number`.
+
+## A written-back model runs as the calibration scored it
+
+**Rule:** on a stochastic engine, the write-back rebuilds the scored initial
+state bit for bit, because its rounding to whole units can turn on the last
+bit of an amount: `"largest_remainder"` breaks a tie of remainders by their
+last bits (`B = 12` split `0.7, 0.2, 0.1` gives the remainders 0.4, 0.4 and
+0.2), and `binomial` (`crates/commol-random/src/sample.rs`) branches at a
+conditional share of 0.5 and at a mean of 10, which an equal split always
+hits, or draws a count that the last bits of its share change, which shifts
+the stream of the run; only the last category with a positive share draws
+nothing ([Stochastic engines and seeds](engines.md#stochastic-engines-and-seeds)).
+`calibrated_structure` (`_model/calibration_write_back.py`)
+drops the overrides of the compartments that the values and the remainder
+set, so no pin of an earlier write-back nor an override the user declared
+there is left, writes the bins and the splits, and, when the engine is
+stochastic (`is_stochastic`, `_model/engine_state.py`), pins each
+compartment that they rebuild other than in every bit to the scored amount.
+The engine reads a pin as Python writes it (`float_roundtrip` of `serde_json`,
+[A data object crosses as the JSON of its dump](python-models.md#a-data-object-crosses-as-the-json-of-its-dump)).
+A replicate of the written model, saved and loaded or not, then starts for
+the seed of the problem from the units the calibration scored and follows the
+same path, so a run of it gives `result.final_loss`.
+
+A new calibration of the written model can score other units, because the
+plan splits a value by the pinned shares, and a later `update_bin_amounts`
+keeps the pins ([#483](https://github.com/MUNQU/commol/issues/483)).
+
+A deterministic engine keeps the contract of `_MATCH_TOLERANCE`, a relative
+`1e-9`: pins of the last bits would give most calibrated stratified models
+overrides they do not need. A rate that turns on a start value (`if`, a
+comparison, `floor`, `ceil`, `round`, `%`) can then run otherwise:
+`if(B_g1 >= 1.05, 0.2, 0.01)` with `B = 1.5` split `0.7, 0.2, 0.1` scores
+`B_g2 = 1.30` at 5, and the written model, which starts from
+`B_g1 = 1.0499999999999998`, gives 1.11.
+
+| Alternative | Why not |
+|---|---|
+| A sampler that does not turn on the last bits, such as the last category of `multinomial`, which takes the units left with no draw | O: it removes one branch of one sampler, and each rounding or sampler that branches on a value would need a fix of its own. `binomial` still branches at a share of 0.5 and at a mean of 10, so a bin split in thirds can still run otherwise, and `"largest_remainder"` still breaks a tie by the last bits. |
+| Break a tie of the largest remainders within a tolerance | O and KISS: it covers one rounding, and it moves the edge without removing it: two remainders as far apart as the tolerance still split on their last bits. |
+| Pin in any bit on every engine | The invariant "What the user saves, the engine reloads" reads both ways: most calibrated stratified models of a deterministic engine would save overrides of their last bits, which hide the amount of a bin and its split from the user who reads the model, for the few rates that turn on a start value. |
+| Make the plan split a value as the build does, so the bins and splits rebuild every bit | S: the plan splits a value by the initial state of the engine ([Calibrated initial conditions are applied in layers](calibrated-initial-conditions.md#calibrated-initial-conditions-are-applied-in-layers)), and the remainder and a category take their amounts from that state, not from a fraction. A change there changes the calibration of every engine. |
+| The default parse of `serde_json` | The invariant "What the user saves, the engine reloads": it reads some numbers of 17 digits, such as a value a calibration found (those of `a_number_reads_back_bit_for_bit`), one unit in the last place off, so a pin would not hold the scored amount. The correct parse costs more per number, but the engine parses a model once when it builds it, not in each run. |
+
+**Guards:**
+`tests/stochastic/test_calibration.py::test_a_written_back_model_runs_as_the_calibration_scored_it`,
+`tests/stochastic/test_calibration.py::test_a_stratified_amount_is_written_back_with_its_split`,
+`tests/stochastic/test_calibration.py::test_successive_write_backs_end_with_the_pins_of_a_fresh_one`,
+`tests/calibration/test_initial_conditions.py::test_a_write_back_drops_the_overrides_of_the_compartments_it_sets`,
+`crates/commol-core/tests/json.rs::a_number_reads_back_bit_for_bit`;
+on a deterministic engine,
+`tests/calibration/test_write_back.py::TestApplyCalibrationParameters::test_applied_model_reproduces_the_loss_the_optimizer_scored`
+and
+`tests/calibration/test_initial_conditions.py::test_the_write_back_of_a_split_by_category_rebuilds_the_scored_state`
+(no pin).
 
 ## A report marks what the calibration set, as the engine resolves it
 
