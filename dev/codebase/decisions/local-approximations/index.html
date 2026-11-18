@@ -3179,6 +3179,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#information-matching-reads-the-meat-through-a-trace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Information matching reads the meat through a trace
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-laplace-approximation-needs-observation-models" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3838,6 +3849,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#information-matching-reads-the-meat-through-a-trace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Information matching reads the meat through a trace
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-laplace-approximation-needs-observation-models" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4018,7 +4040,9 @@ information matching and later gradient methods read them.</p>
 fit sum to zero and <code>B</code> would have rank below <code>p</code>. <code>block_length</code> has no
 default; <code>"auto"</code> is the length of non-overlapping blocks of the residuals.
 Information matching (<code>smc/gibbs.rs</code>) reads the same <code>H</code> as <code>J</code> and the same
-<code>B</code> as <code>I</code>, so it takes a likelihood and holds under dependence.</p>
+<code>B</code> as <code>I</code>, so it takes a likelihood and holds under dependence; it reads <code>B</code>
+only through a trace, so it needs two blocks, not more than <code>p</code>
+(<a href="#information-matching-reads-the-meat-through-a-trace">below</a>).</p>
 <table>
 <thead>
 <tr>
@@ -4048,6 +4072,44 @@ Information matching (<code>smc/gibbs.rs</code>) reads the same <code>H</code> a
 <p><strong>Guards:</strong> <code>tests/uncertainty/test_local.py::TestSandwich</code>,
 <code>tests/uncertainty/test_coverage.py::TestSandwich</code>,
 <code>tests/uncertainty/test_local.py::TestInformationMatching</code>.</p>
+<h2 id="information-matching-reads-the-meat-through-a-trace">Information matching reads the meat through a trace<a class="headerlink" href="#information-matching-reads-the-meat-through-a-trace" title="Permanent link">&para;</a></h2>
+<p><code>information_matching_eta</code> (<code>smc/gibbs.rs</code>) gives <code>η = p / tr(J⁻¹ I)</code>, the
+magnitude adjustment of a composite likelihood (Pauli, Racugno and Ventura
+2011; Ribatet, Cooley and Davison 2012), with <code>J</code> the Gauss–Newton <code>H</code> and
+<code>I</code> the meat <code>B</code>, both on the unbounded scale, where the trace has the value
+it has on the scale of the parameters. It equals <code>tr(J I⁻¹ J) / tr(J)</code> when
+<code>I = J/η</code>. It refuses one block, whose score of a fit is zero, a trace of 0,
+when every score is 0, and a trace below <code>10⁻¹⁰</code> times that of one block per
+observation, when each parameter's scores fall inside one block. With <code>G</code>
+blocks the trace reads at most <code>p(G − 1)</code> degrees of freedom, fewer when the
+blocks share the curvature unevenly, and its reciprocal is skewed upward
+when they are few.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tr(J I⁻¹ J) / tr(J)</code> (Holmes and Walker 2017; Lyddon, Holmes and Walker 2019)</td>
+<td>It inverts <code>I</code>: the inverse of an estimate from <code>G</code> block scores of <code>p</code> parameters, <code>G − 1</code> degrees of freedom after the fit, has the mean <code>(G − 1)/(G − p − 2)</code> times <code>I⁻¹</code>, none for <code>G ≤ p + 2</code>, so 12 blocks for 10 parameters give an <code>η</code> about 16 times too large, and <code>G ≤ p</code> has no inverse at all.</td>
+</tr>
+<tr>
+<td>Correct the inverse by <code>(G − p − 2)/(G − 1)</code></td>
+<td>It still needs <code>G &gt; p + 2</code>, so blocks short enough for that are too short for the dependence.</td>
+</tr>
+<tr>
+<td>A leverage correction of each block (CR2)</td>
+<td>It needs the curvature of each block; kept for when a coverage study of uneven blocks needs it, as for the sandwich.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_smc.rs::information_matching_gives_eta_near_its_value_with_few_blocks_per_parameter</code>,
+<code>crates/commol-inference/tests/test_smc.rs::information_matching_needs_two_blocks_and_scores_that_are_not_all_0</code>,
+<code>tests/uncertainty/test_local.py::TestInformationMatching</code>,
+<code>tests/uncertainty/test_coverage.py::TestInformationMatching</code>.</p>
 <h2 id="the-laplace-approximation-needs-observation-models">The Laplace approximation needs observation models<a class="headerlink" href="#the-laplace-approximation-needs-observation-models" title="Permanent link">&para;</a></h2>
 <p><code>laplace_approximation</code> (<code>local/approximation.rs</code>) refuses a loss: a loss has
 no noise scale, so its curvature is no inverse variance. The message names

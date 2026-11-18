@@ -6005,6 +6005,17 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   read each observation with its own residual, and accept such a series. Give one of the two
   observations a label of its own for the methods that refuse it. See
   <a href="../../guide/calibration-observations/#one-position-two-observations">One position, two observations</a>.</li>
+<li><code>InformationMatchingEta</code> gave an <code>η</code> far too large, so a posterior far
+  too narrow, with few blocks per parameter: with 10 parameters, 35
+  positions, noise of sd 1 and <code>loss_function="sse"</code>, <code>block_length=3</code> gave
+  <code>η = 8.0</code> and <code>block_length=1</code> gave <code>0.77</code> where <code>1/(2σ²) = 0.5</code>, since
+  <code>tr(J I⁻¹ J) / tr(J)</code> inverts the estimate of <code>I</code>. It now gives
+  <code>η = p / tr(J⁻¹ I)</code>, which reads <code>I</code> only through a trace: 0.51, 0.47 and,
+  with 5 blocks of 7, 0.52. It takes two blocks or more, also fewer than the
+  parameters, where a <code>ValueError</code> asked for more blocks than parameters,
+  and raises a <code>ValueError</code> when every block score is 0 because the scores
+  of each parameter fall inside one block.
+  See <a href="../../guide/uncertainty/smc/#what-means">What <code>η</code> means</a>.</li>
 <li>A calibrated value of a bin, and the initial-condition remainder, split by
   the proportions of amounts below the smallest normal <code>float</code>, about
   <code>2.2e-308</code>, which hold fewer digits the smaller they are: with

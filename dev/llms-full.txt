@@ -5990,17 +5990,17 @@ None of them has a default: each sets the cost and the accuracy of the run.
 
 `η` weighs the data against the priors. The loss has no scale of its own, so `η` has no default: with `η` too large the posterior is too narrow, with `η` too small too wide. For the sum of squares of a model with Gaussian noise of variance `σ²`, `η = 1/(2σ²)` makes the Gibbs posterior the Bayesian posterior.
 
-| `eta`                                                                        | How it is chosen                                                                                                                                                                                                   | Needs                                                                                            | Cost                                          |
-| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | --------------------------------------------- |
-| A number above 0                                                             | By you                                                                                                                                                                                                             | Nothing                                                                                          | One sampler                                   |
-| `InformationMatchingEta(block_length, starts=1)`                             | `η = tr(J I⁻¹ J) / tr(J)` at the fit: the Gauss–Newton curvature `J` of the objective against the variance `I` of the scores of its terms, summed over blocks of `block_length` positions (Holmes and Walker 2017) | `loss_function="sse"` or observation models, a deterministic engine, more blocks than parameters | A fit, finite differences and one sampler     |
-| `BootstrapCoverageEta(replicates, block_length, confidence_level, starts=1)` | The posteriors of Bayesian-bootstrap data sets hold the fit at `confidence_level` (Syring and Martin 2019)                                                                                                         | Any loss and engine                                                                              | A fit and one sampler per replicate, then one |
+| `eta`                                                                        | How it is chosen                                                                                                                                                                                                                          | Needs                                                                                    | Cost                                          |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------- |
+| A number above 0                                                             | By you                                                                                                                                                                                                                                    | Nothing                                                                                  | One sampler                                   |
+| `InformationMatchingEta(block_length, starts=1)`                             | `η = p / tr(J⁻¹ I)` at the fit, for `p` parameters: the Gauss–Newton curvature `J` of the objective against the variance `I` of the scores of its terms, summed over blocks of `block_length` positions (Pauli, Racugno and Ventura 2011) | `loss_function="sse"` or observation models, a deterministic engine, at least two blocks | A fit, finite differences and one sampler     |
+| `BootstrapCoverageEta(replicates, block_length, confidence_level, starts=1)` | The posteriors of Bayesian-bootstrap data sets hold the fit at `confidence_level` (Syring and Martin 2019)                                                                                                                                | Any loss and engine                                                                      | A fit and one sampler per replicate, then one |
 
 Both calibrations read the fit `Calibrator.run(starts)`, the best of [several starts](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#several-starts).
 
 Both take `block_length="auto"`, the automatic length of [Blocks and their length](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#blocks-and-their-length) for non-overlapping blocks. `GibbsResult.block_length` gives the length used, and `block_length_estimates` the estimate of each series, by label, as the bootstraps, the sandwich and the conformal methods give them. Both are `None` for a number `η`, and `block_length_estimates` is `None` for an integer `block_length`.
 
-Information matching is cheap and local; it needs a sum of smooth terms, so `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic engine raise a `ValueError` that points to the other choices. `J` and `I` are the curvature and the meat of the [sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich): `I` sums the scores over blocks, so it holds when the noise depends on its neighbours inside a block, and `block_length` has no default: `block_length=1` gives the independent version, every observation its own block. Bootstrap coverage runs one tempered sampler per replicate to a large `η`, reads the posterior of every smaller `η` by reweighting, so its search runs no model, and finds for each replicate and parameter the `η` where the interval stops holding the fit. `η` is the one quantile of commol of the log thresholds at `1 − c` (with equal weights, as [`weighted_quantiles`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-one-quantile) reads them), which interpolates between two of them; it needs at least `1/(2(1 − c))` replicates times parameters, so that the level is not below the smallest threshold.
+Information matching is cheap and local; it needs a sum of smooth terms, so `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic engine raise a `ValueError` that points to the other choices. `J` and `I` are the curvature and the meat of the [sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich): `I` sums the scores over blocks, so it holds when the noise depends on its neighbours inside a block, and `block_length` has no default: `block_length=1` gives the independent version, every observation its own block. `I` enters only through a trace, so `η` needs no inverse of `I`: it takes two blocks or more, also fewer blocks than parameters, and blocks can be long enough to hold the dependence. Each parameter adds `G − 1` pieces of information about the scale, at most, for `G` blocks: with few blocks and few parameters, or with parameters that the data read in one part of the series only, `η` varies much from one data set to the next and comes out too large more often than too small, so the intervals are too narrow. Blocks that each hold several positions of every parameter, with `p(G − 1)` of about 10 or more for `p` parameters, keep it near its value. Bootstrap coverage runs one tempered sampler per replicate to a large `η`, reads the posterior of every smaller `η` by reweighting, so its search runs no model, and finds for each replicate and parameter the `η` where the interval stops holding the fit. `η` is the one quantile of commol of the log thresholds at `1 − c` (with equal weights, as [`weighted_quantiles`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-one-quantile) reads them), which interpolates between two of them; it needs at least `1/(2(1 − c))` replicates times parameters, so that the level is not below the smallest threshold.
 
 With a stochastic engine the loss reads the problem's `replicates` with common random numbers, as the optimizers do, so it is a function of the parameters.
 
@@ -6058,6 +6058,7 @@ A step whose acceptance rate is small moves each particle many times, and the ru
 
 - [ ] Each calibrated parameter has a prior you can defend, on bounds that fit it.
 - [ ] `η` is a number you can justify, or one of its calibrations.
+- [ ] Information matching has `p(G − 1)` of about 10 or more, for `p` parameters and `G` blocks.
 - [ ] A Gibbs posterior ends at temperature 1; an ABC run says why it stopped.
 - [ ] With a stochastic engine, ABC reads one replicate per particle, not the problem's summary.
 
@@ -34299,9 +34300,9 @@ class BayesianPosterior(WithPriors, UncertaintyMethod[SMCResult], RangeChecked):
 
 Bases: `RangeChecked`
 
-Calibrate `η` by information matching: `η = tr(J I⁻¹ J) / tr(J)` at the fit, with `J` the Gauss–Newton curvature of the objective and `I` the variance of the scores of its terms, summed over blocks of positions as the meat of `Sandwich` (Holmes and Walker 2017; Lyddon, Holmes and Walker 2019). For the sum of squares of a model with Gaussian noise of variance `σ²` it estimates `1/(2σ²)`; for a correct observation model, 1.
+Calibrate `η` by information matching: `η = p / tr(J⁻¹ I)` at the fit, for `p` parameters, with `J` the Gauss–Newton curvature of the objective and `I` the variance of the scores of its terms, summed over blocks of positions as the meat of `Sandwich`: the magnitude adjustment of a composite likelihood (Pauli, Racugno and Ventura 2011). For the sum of squares of a model with Gaussian noise of variance `σ²` it estimates `1/(2σ²)`; for a correct observation model, 1.
 
-It needs `loss_function="sse"` or observation models, and a deterministic engine, and is cheap and local. The variance sums the scores over blocks of positions, so it holds under dependence inside a block.
+It needs `loss_function="sse"` or observation models, and a deterministic engine, and is cheap and local. The variance sums the scores over blocks of positions, so it holds under dependence inside a block, and enters only through a trace, so it takes two blocks or more, also fewer blocks than parameters; with few blocks and few parameters `η` varies much and comes out too large more often than too small.
 
 Attributes:
 
@@ -34315,23 +34316,26 @@ Source code in `commol/smc/methods.py`
 ```python
 class InformationMatchingEta(RangeChecked):
     """
-    Calibrate `η` by information matching: `η = tr(J I⁻¹ J) / tr(J)` at the
-    fit, with ``J`` the Gauss–Newton curvature of the objective and ``I`` the
-    variance of the scores of its terms, summed over blocks of positions as
-    the meat of `Sandwich` (Holmes and Walker 2017; Lyddon, Holmes and Walker
-    2019). For the sum of squares of a model with Gaussian noise of variance
-    ``σ²`` it estimates ``1/(2σ²)``; for a correct observation model, 1.
+    Calibrate `η` by information matching: ``η = p / tr(J⁻¹ I)`` at the fit,
+    for ``p`` parameters, with ``J`` the Gauss–Newton curvature of the
+    objective and ``I`` the variance of the scores of its terms, summed over
+    blocks of positions as the meat of `Sandwich`: the magnitude adjustment
+    of a composite likelihood (Pauli, Racugno and Ventura 2011). For the sum
+    of squares of a model with Gaussian noise of variance ``σ²`` it estimates
+    ``1/(2σ²)``; for a correct observation model, 1.
 
     It needs ``loss_function="sse"`` or observation models, and a
     deterministic engine, and is cheap and local. The variance sums the
     scores over blocks of positions, so it holds under dependence inside a
-    block.
+    block, and enters only through a trace, so it takes two blocks or more,
+    also fewer blocks than parameters; with few blocks and few parameters
+    `η` varies much and comes out too large more often than too small.
 
     Attributes
     ----------
     block_length : int | "auto"
-        Positions per block of the scores; there must be more blocks than
-        parameters.
+        Positions per block of the scores; they must make at least two
+        blocks.
     starts : int
         Starts of the fit (default 1): the initial guess, then rows of a Latin
         hypercube over the bounds.
@@ -39073,6 +39077,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 
 - A series with two observations at one position, such as an increment over 2 steps and a total over 40 steps that both end at 40, is refused by the methods that read one residual per position of a series, with a message that names the series and the position: `ResidualNoise`, `ResidualBootstrap`, `block_length="auto"` of every method, and `RollingConformal`, which counts a horizon in observations. Before, the residual noise and the residual bootstrap gave both observations the residual of one of them, and the automatic block length read them as consecutive positions, with no message. A calibration, the likelihood, the scores, and the Bayesian and wild bootstraps, the block jackknife, the sandwich and the other conformal methods with a `block_length` of a number read each observation with its own residual, and accept such a series. Give one of the two observations a label of its own for the methods that refuse it. See [One position, two observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#one-position-two-observations).
+- `InformationMatchingEta` gave an `η` far too large, so a posterior far too narrow, with few blocks per parameter: with 10 parameters, 35 positions, noise of sd 1 and `loss_function="sse"`, `block_length=3` gave `η = 8.0` and `block_length=1` gave `0.77` where `1/(2σ²) = 0.5`, since `tr(J I⁻¹ J) / tr(J)` inverts the estimate of `I`. It now gives `η = p / tr(J⁻¹ I)`, which reads `I` only through a trace: 0.51, 0.47 and, with 5 blocks of 7, 0.52. It takes two blocks or more, also fewer than the parameters, where a `ValueError` asked for more blocks than parameters, and raises a `ValueError` when every block score is 0 because the scores of each parameter fall inside one block. See [What `η` means](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means).
 - A calibrated value of a bin, and the initial-condition remainder, split by the proportions of amounts below the smallest normal `float`, about `2.2e-308`, which hold fewer digits the smaller they are: with `B = 1e-310` split `0.3, 0.7`, `B = 1.5` gave `B_x = 0.44999999999997775`, so `Model.apply_calibration_parameters` wrote both compartments as overrides, and after `update_bin_amounts({"B": 20})` `B` still started from 1.5. Where such amounts hold the split of the fractions up to their rounding, a value now splits by the fractions, so the write-back writes the bin and its split with no override. Amounts further from the fractions, such as an override, keep their proportions. See [What an id can name](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/#what-an-id-can-name).
 - After a calibrated category, the initial-condition remainder split compartments that start at 0, as those of a bin left `None`, by the fractions the model declares, not by the calibrated category: with `A` left `None`, `group` split `0.4, 0.6` and `g1 = 0.3` calibrated, the remainder `A` split `0.4, 0.6`, so the write-back, which writes `g1 = 0.3`, overrode both compartments of `A`. It now splits by the fractions with each calibrated category in place of its declared split. See [The remainder](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/#the-remainder).
 - `Model.apply_calibration_parameters` wrote a calibrated amount that is not whole, such as `B = 11.85`, onto a model of `StochasticEvents` or `StochasticSteps` with a `rounding`, and the model then did not build: the amount of a bin had to be whole even with a rounding. The model now builds and holds the amount the optimizer found, and a run of it rounds that amount as the calibration did: from 12 units. See [Whole units](https://munqu.github.io/commol/latest/guide/stochastic/#whole-units).
