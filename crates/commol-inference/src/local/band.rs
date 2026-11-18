@@ -15,8 +15,8 @@ use commol_statistics::statistics::interval_levels;
 use crate::error::MethodError;
 use crate::predictive::Band;
 use crate::sensitivity::{FiniteDifferences, Matrix, SensitivityError, SensitivitySource};
-use crate::special::{normal_quantile, student_t_quantile};
 use crate::transform::Transform;
+use commol_statistics::special::{normal_quantile, student_t_quantile};
 
 /// The linearized band of every output at some positions.
 #[derive(Debug, Clone, PartialEq)]

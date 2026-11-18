@@ -9,6 +9,9 @@
 //! - [`numeric`]: `log Σ exp`, `x ln y` and `x ln(1 + y)`, the special
 //!   functions `ln Γ`, `ln B`, digamma and trigamma, and the log densities of
 //!   the normal, the log-normal and the Student t, one copy of each;
+//! - [`special`]: the normal distribution function and its quantile, the
+//!   regularized incomplete gamma and beta functions, and the quantiles of
+//!   the Student t and of the F of one degree of freedom;
 //! - [`statistics`]: the one quantile of commol, and the weighted mean,
 //!   covariance, summary and effective size of a sample.
 //!
@@ -20,4 +23,5 @@
 
 pub mod linear_algebra;
 pub mod numeric;
+pub mod special;
 pub mod statistics;

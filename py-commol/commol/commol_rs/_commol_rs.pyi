@@ -207,6 +207,9 @@ class CalibrationProblemProtocol(Protocol):
     def observation_draws(
         self, sample: ParameterSampleProtocol, observations: str, noise: str
     ) -> ObservationDrawsProtocol: ...
+    def observation_bounds(
+        self, sample: ParameterSampleProtocol, observations: str, noise: str
+    ) -> ObservationBoundsProtocol: ...
     def check_observations(self, observations: str) -> None: ...
     def log_score(
         self, sample: ParameterSampleProtocol, observations: str
@@ -383,7 +386,10 @@ class ObservationDrawsProtocol(Protocol):
         self, observed: list[float], confidence_levels: list[float]
     ) -> list[float]: ...
     def crps(self, observed: list[float]) -> list[float]: ...
-    def pit(self, observed: list[float]) -> list[float]: ...
+
+class ObservationBoundsProtocol(Protocol):
+    def pit(self) -> list[float]: ...
+    def quantile_residuals(self) -> list[float]: ...
 
 class WeightedSummaryProtocol(Protocol):
     mean: float
@@ -683,6 +689,9 @@ class ForwardAnalysisProtocol(Protocol):
     def observation_draws(
         self, sample: ParameterSampleProtocol, observations: str
     ) -> ObservationDrawsProtocol: ...
+    def observation_bounds(
+        self, sample: ParameterSampleProtocol, observations: str
+    ) -> ObservationBoundsProtocol: ...
     def check_observations(self, observations: str) -> None: ...
 
 class InferenceModule(Protocol):
@@ -690,6 +699,7 @@ class InferenceModule(Protocol):
     ParameterSample: type[ParameterSampleProtocol]
     Predictive: type[PredictiveProtocol]
     ObservationDraws: type[ObservationDrawsProtocol]
+    ObservationBounds: type[ObservationBoundsProtocol]
     BootstrapRun: type[BootstrapRunProtocol]
     JackknifeRun: type[JackknifeRunProtocol]
     Profile: type[ProfileProtocol]

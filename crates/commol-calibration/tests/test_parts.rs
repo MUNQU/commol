@@ -1,6 +1,6 @@
 //! An observation splits its window into parts: the boundaries of the parts,
-//! the means the operator reads for them, and the density of their sum
-//! under each observation model.
+//! the means the operator reads for them, and the density and the tails of
+//! their sum under each observation model.
 
 use commol_calibration::{
     Argument, CalibrationParameter, CalibrationProblem, DiscrepancyConfig, EvaluationError, Noise,
@@ -246,6 +246,63 @@ fn the_exact_sum_is_the_convolution_of_its_parts() {
         sum: Some(Sum::Exact),
     };
     assert!(exact.sum_log_density(0.0, &[300.0, 300.0, 300.0]) < -745.0);
+}
+
+#[test]
+fn the_tails_of_a_sum() {
+    let parts = [3.0, 10.0, 7.5, 0.5];
+    let mean: f64 = parts.iter().sum();
+    let close = |actual: f64, expected: f64| (actual - expected).abs() <= 1e-12 * expected.abs();
+    // The exact reading: the sums of the convolution below and above y,
+    // the tail above far beyond the mean.
+    for phi in [0.3, 2.0] {
+        let last = 1500;
+        let probabilities: Vec<f64> = convolution(&parts, phi, last)
+            .into_iter()
+            .map(f64::exp)
+            .collect();
+        let exact = Noise::NegativeBinomial {
+            overdispersion: phi,
+            sum: Some(Sum::Exact),
+        };
+        for y in [0usize, 4, 21, 60, 150] {
+            let tails = exact.sum_tails(y as f64, &parts);
+            let below: f64 = probabilities[..y].iter().sum();
+            let above: f64 = probabilities[y + 1..].iter().sum();
+            let case = format!("φ = {phi}, y = {y}: {tails:?}");
+            assert!(close(tails.at, probabilities[y]), "{case}");
+            assert!(
+                y == 0 && tails.below == 0.0 || close(tails.below, below),
+                "{case}"
+            );
+            assert!(close(tails.above, above), "{case} against {above:e}");
+        }
+    }
+    // The other readings are those of their model of the total.
+    let phi = 0.8;
+    let squares: f64 = parts.iter().map(|mu| mu * mu).sum();
+    let matched = Noise::NegativeBinomial {
+        overdispersion: phi * squares / (mean * mean),
+        sum: None,
+    };
+    let moments = Noise::NegativeBinomial {
+        overdispersion: phi,
+        sum: Some(Sum::Moments),
+    };
+    for y in [0.0, 4.0, 21.0, 60.0] {
+        assert_eq!(moments.sum_tails(y, &parts), matched.tails(y, mean));
+        assert_eq!(
+            Noise::Poisson.sum_tails(y, &parts),
+            Noise::Poisson.tails(y, mean)
+        );
+        // N(M, K sd²), K = 4 parts: the sd doubles.
+        assert_eq!(
+            Noise::Normal { sd: 1.5 }.sum_tails(y, &parts),
+            Noise::Normal { sd: 3.0 }.tails(y, mean)
+        );
+    }
+    // One part is the model itself.
+    assert_eq!(moments.sum_tails(4.0, &[5.0]), moments.tails(4.0, 5.0));
 }
 
 #[test]

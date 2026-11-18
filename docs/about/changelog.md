@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `commol.scores.quantile_residuals(predictive, observations, DistributionNoise())`:
+  the randomized quantile residuals of Dunn and Smyth (1996), `Φ⁻¹` of the
+  PIT of the mixture of the observation models over the draws, read from the
+  nearer tail, so a value far in the upper tail has a finite residual. They
+  are standard normal for data the predictive did not see; another noise
+  raises a `TypeError`. The engine gives both tails of every observation
+  model, sums of parts included, from special functions now in
+  `commol-statistics`. See
+  [Quantile residuals](../guide/uncertainty/index.md#quantile-residuals).
+
 - `ObservedDataPoint(parts=K)`: a value that is the sum of `K` independent
   observations over equal parts of its window, such as a weekly total of
   daily counts; `parts=1` by default, and more than 1 needs a `window`. The
@@ -156,6 +166,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Building Models](../guide/building-models.md#a-condition-on-a-set-of-categories).
 
 ### Changed
+
+- `commol.scores.pit(predictive, observations, DistributionNoise())` reads the
+  distribution functions of the observation models: each value is
+  `F(y⁻) + v · p(y)` of the mixture over the draws, exact for any sample, also
+  a sample of one point such as `Calibrator.point_sample(fit)`, and `F(y)`
+  whatever the seed for a model with no atoms. Before, it was the PIT of
+  draws of the noise, a Monte Carlo estimate of the same value. With
+  `NoNoise()` and `ResidualNoise(...)` the values do not change, up to
+  rounding.
+
+- The incomplete gamma and beta functions read Stirling's series from a
+  shape of 10, so the distribution functions, quantiles and draws by
+  inversion of `Gamma` and `Beta` priors, the p-values of PRCC and the
+  Student t quantiles of local bands change in their last digits, more
+  accurate than before.
 
 - A multinomial draw gives the last category with a positive share the units
   left, with no draw, when the shares sum to 1 within rounding: in a bin split

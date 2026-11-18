@@ -606,7 +606,8 @@ pub struct ObservationDraws {
     /// The weight of every draw; they sum to 1.
     pub weights: Vec<f64>,
     /// The seed of the noise and of the replicates of the draws; a score
-    /// that draws random numbers, such as [`crate::scores::pit`], takes a
+    /// that draws random numbers, such as the PIT of
+    /// [`crate::scores::ObservationBounds`], takes a
     /// stream of it.
     pub seed: u64,
 }

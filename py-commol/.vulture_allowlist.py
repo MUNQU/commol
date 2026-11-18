@@ -13,6 +13,7 @@ ParameterSampleProtocol
 SampleAnalysisProtocol
 CalibrationResultProtocol
 ObservationDrawsProtocol
+ObservationBoundsProtocol
 AccuracyProtocol
 TighteningProtocol
 BootstrapRunProtocol

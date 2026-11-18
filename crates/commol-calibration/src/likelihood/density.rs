@@ -1,5 +1,5 @@
 //! The log density of each observation model at an observed value, given its
-//! predicted mean and its noise.
+//! predicted mean and its noise, and its two tails there.
 //!
 //! Every elementary function comes from `libm`, so a value is the same on
 //! every platform.
@@ -9,14 +9,67 @@ use commol_statistics::numeric::{
     digamma, ln_gamma, log_normal_log_density, normal_log_density, student_t_log_density, trigamma,
     x_log_y, x_log1p_y,
 };
+use commol_statistics::special::{
+    beta_factor, beta_tails, gamma_factor, gamma_p, gamma_q, normal_cdf, normal_sf,
+};
 
 /// Above this observed count, the negative binomial reads `ln Γ` instead of
 /// the sum of its first terms, unless the overdispersion is below
 /// [`SMALL_OVERDISPERSION`].
 const SUM_TERMS: f64 = 1000.0;
 /// Below this overdispersion, `ln Γ(y + 1/φ) − ln Γ(1/φ)` loses digits, so
-/// the negative binomial sums its terms whatever the count.
+/// the negative binomial sums its terms whatever the count, and its tails
+/// are those of the Poisson.
 const SMALL_OVERDISPERSION: f64 = 1e-8;
+
+/// The two tails of an observation model at a value `y`, and the mass
+/// between them: `P(Y < y) + p(y) + P(Y > y) = 1`. Each tail keeps its
+/// relative accuracy, also where it is far below the other.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Tails {
+    /// `P(Y < y)`.
+    pub below: f64,
+    /// `p(y)`, the probability of `y` under a count model; 0 for a
+    /// continuous model.
+    pub at: f64,
+    /// `P(Y > y)`.
+    pub above: f64,
+}
+
+impl Tails {
+    /// The tails of a continuous model with `P(Y ≤ y) = below` and
+    /// `P(Y > y) = above`.
+    fn continuous(below: f64, above: f64) -> Self {
+        Self {
+            below,
+            at: 0.0,
+            above,
+        }
+    }
+
+    /// The tails at `y` of the mass at `point`: each 0 or 1.
+    pub fn point_mass(y: f64, point: f64) -> Self {
+        let side = |holds: bool| f64::from(u8::from(holds));
+        Self {
+            below: side(point < y),
+            at: side(point == y),
+            above: side(point > y),
+        }
+    }
+
+    /// Adds `weight` times the tails `other`, one term of a mixture.
+    pub fn add_weighted(&mut self, weight: f64, other: Self) {
+        self.below += weight * other.below;
+        self.at += weight * other.at;
+        self.above += weight * other.above;
+    }
+
+    /// The randomized probability integral transform at the place `v` in
+    /// `[0, 1]` of `y` within its mass: `P(Y < y) + v · p(y)`.
+    pub fn pit(&self, v: f64) -> f64 {
+        self.below + v * self.at
+    }
+}
 
 /// What the predicted value of a log-normal model is: `"mean"` or
 /// `"median"` in the Python API.
@@ -133,6 +186,86 @@ impl Noise {
                 ln_gamma(n + 1.0) - ln_gamma(y + 1.0) - ln_gamma(n - y + 1.0)
                     + x_log_y(y, p)
                     + x_log1p_y(n - y, -p)
+            }
+        }
+    }
+
+    /// The tails at `y` when the predicted mean is `mean`, which
+    /// [`Self::mean_outside`] allows; `y` lies in the support of the model.
+    ///
+    /// | Model | `P(Y < y)` and `P(Y > y)` |
+    /// |---|---|
+    /// | `Normal`, `LogNormal` | `Φ(z)` and `Φ(−z)`, `z` the standardized value (of `log y`) |
+    /// | `StudentT` | `½ I_x(ν/2, ½)` beyond `\|t\|`, `x = ν/(ν + t²)`, and its complement |
+    /// | `Poisson` | `Q(y, μ)` and `P(y + 1, μ)` |
+    /// | `NegativeBinomial` | `I_{1−q}(1/φ, y)` and `I_q(y + 1, 1/φ)`, `q = φμ/(1 + φμ)`; the Poisson's from `φ ≤ 1e-8` |
+    /// | `Binomial` | `I_{1−p}(n − y + 1, y)` and `I_p(y + 1, n − y)`, `p = μ/n` |
+    ///
+    /// `p(y)` of a count model is the factor of its incomplete gamma or beta
+    /// function, read from Stirling's series at large arguments
+    /// ([`commol_statistics::special`]). A count model with no mean, a
+    /// binomial of no trials or one of probability 1 is a mass at one count.
+    pub fn tails(&self, y: f64, mean: f64) -> Tails {
+        match *self {
+            Self::Normal { sd } => {
+                let z = (y - mean) / sd;
+                Tails::continuous(normal_cdf(z), normal_sf(z))
+            }
+            Self::LogNormal { sigma, center } => {
+                let z = (libm::log(y) - log_location(mean, sigma, center)) / sigma;
+                Tails::continuous(normal_cdf(z), normal_sf(z))
+            }
+            Self::StudentT { df, scale } => student_t_tails((y - mean) / scale, df),
+            Self::Poisson => poisson_tails(y, mean),
+            Self::NegativeBinomial { overdispersion, .. }
+                if overdispersion <= SMALL_OVERDISPERSION =>
+            {
+                poisson_tails(y, mean)
+            }
+            Self::NegativeBinomial { overdispersion, .. } => {
+                let a = overdispersion * mean;
+                let (q, p) = (a / (1.0 + a), 1.0 / (1.0 + a));
+                if q == 0.0 {
+                    // No mean, or one so small that φ μ underflows.
+                    return Tails::point_mass(y, 0.0);
+                }
+                let size = 1.0 / overdispersion;
+                Tails {
+                    below: if y == 0.0 {
+                        0.0
+                    } else {
+                        beta_tails(y, size, q, p).1
+                    },
+                    // p(y) = q (y + 1/φ) · p(y): the factor of I_p(1/φ, y + 1).
+                    at: beta_factor(size, y + 1.0, p, q) / (q * (size + y)),
+                    above: beta_tails(y + 1.0, size, q, p).0,
+                }
+            }
+            Self::Binomial { trials } => {
+                let n = trials as f64;
+                let (p, q) = (mean / n, (n - mean) / n);
+                // No trials, or a probability of 0 or 1, also one that
+                // underflows.
+                if n == 0.0 || p == 0.0 {
+                    return Tails::point_mass(y, 0.0);
+                }
+                if q == 0.0 {
+                    return Tails::point_mass(y, n);
+                }
+                Tails {
+                    below: if y == 0.0 {
+                        0.0
+                    } else {
+                        beta_tails(y, n - y + 1.0, p, q).1
+                    },
+                    // (n + 1) p q · p(y): the factor of I_p(y + 1, n − y + 1).
+                    at: beta_factor(y + 1.0, n - y + 1.0, p, q) / ((n + 1.0) * p * q),
+                    above: if y == n {
+                        0.0
+                    } else {
+                        beta_tails(y + 1.0, n - y, p, q).0
+                    },
+                }
             }
         }
     }
@@ -277,6 +410,42 @@ impl Noise {
             }
             _ => self.log_density(y, y.max(0.0) + distance),
         }
+    }
+}
+
+/// The tails at the standardized value `t` of a Student t of `df` degrees
+/// of freedom: `½ I_x(ν/2, ½)` beyond `|t|`, `x = ν/(ν + t²)`, and its
+/// complement `½ + ½ I_{1−x}(½, ν/2)`, with `1 − x = t²/(ν + t²)` read
+/// without a difference.
+fn student_t_tails(t: f64, df: f64) -> Tails {
+    let (x, complement) = if t.abs() < 1.0 {
+        let total = df + t * t;
+        (df / total, t * t / total)
+    } else {
+        // ν/t², with no overflow of t².
+        let ratio = df / t.abs() / t.abs();
+        (ratio / (1.0 + ratio), 1.0 / (1.0 + ratio))
+    };
+    let (beyond, within) = beta_tails(0.5 * df, 0.5, x, complement);
+    let (far, near) = (0.5 * beyond, 0.5 + 0.5 * within);
+    if t < 0.0 {
+        Tails::continuous(far, near)
+    } else {
+        Tails::continuous(near, far)
+    }
+}
+
+/// The tails at the count `y` of a Poisson of mean `mean`: `Q(y, μ)` below
+/// and `P(y + 1, μ)` above.
+fn poisson_tails(y: f64, mean: f64) -> Tails {
+    if mean == 0.0 {
+        return Tails::point_mass(y, 0.0);
+    }
+    Tails {
+        below: if y == 0.0 { 0.0 } else { gamma_q(y, mean) },
+        // μ · p(y): the factor of P(y + 1, μ).
+        at: gamma_factor(y + 1.0, mean) / mean,
+        above: gamma_p(y + 1.0, mean),
     }
 }
 

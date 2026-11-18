@@ -16,8 +16,8 @@ use rayon::prelude::*;
 use crate::error::MethodError;
 use crate::profiles::tracer::ProfiledQuantity;
 use crate::resampling::{FitUnit, ReplicateRunner, Resampler, RunnerEvent, RunnerStage};
-use crate::special::{f_one_quantile, normal_quantile};
 use commol_random::Stream;
+use commol_statistics::special::{f_one_quantile, normal_quantile};
 
 /// `½ χ²₁(confidence_level)`: the threshold of `−log L` for a pointwise
 /// interval of `confidence_level` (Wilks).

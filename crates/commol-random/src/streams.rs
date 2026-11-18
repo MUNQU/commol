@@ -66,8 +66,8 @@ streams! {
     SobolBootstrap = 3, "Sobol", "the rows of each bootstrap replicate";
     PredictiveDraws = 4, "the predictive of a sample and a propagation",
         "the seed of each draw, whose replicates a stochastic engine runs";
-    PitTies = 5, "the PIT of observation draws",
-        "the place of an observation among the draws that tie with it";
+    PitTies = 5, "the PIT and the quantile residuals of a predictive",
+        "the place `v` of each observed value within the mass `p(y)` the predictive gives it";
     LocalDraws = 6, "the Laplace approximation and the sandwich",
         "the draws of the normal or the Student t on the unbounded scale";
     ImportanceDraws = 7, "importance sampling and the Laplace mixture",

@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from commol._model.model import Model
     from commol.commol_rs._commol_rs import (
         ForwardAnalysisProtocol,
+        ObservationBoundsProtocol,
         ObservationDrawsProtocol,
         PredictiveProtocol,
     )
@@ -191,14 +192,40 @@ class SensitivityAnalysis:
             residuals of a fit, distribution noise the observation models of a
             problem, and an analysis has neither.
         """
-        if not isinstance(noise, NoNoise):
-            raise ValueError(
-                f"{type(noise).__name__} needs a calibration: residual noise reads "
-                "the residuals of a fit and distribution noise the observation "
-                "models of a problem, and a sensitivity analysis has no data. Read "
-                "the observations with NoNoise()."
-            )
+        _check_no_noise(noise)
         return self._rust.observation_draws(sample._rust, engine_json(observed_data))
+
+    def _observation_bounds(
+        self,
+        sample: ParameterSample,
+        observed_data: list[ObservedDataPoint],
+        noise: _ObservationNoise,
+    ) -> "ObservationBoundsProtocol":
+        """
+        The tails of each observed value under every draw, for
+        `commol.scores.pit`: each draw a mass at its value.
+
+        Parameters
+        ----------
+        sample : ParameterSample
+            The draws, in the order of the inputs.
+        observed_data : list[ObservedDataPoint]
+            The observations.
+        noise : NoNoise | ResidualNoise | DistributionNoise
+            The observation noise; only ``NoNoise()``.
+
+        Returns
+        -------
+        ObservationBoundsProtocol
+            The tails of each draw, computed in Rust.
+
+        Raises
+        ------
+        ValueError
+            If the noise is not ``NoNoise()``, as `_observation_draws` says.
+        """
+        _check_no_noise(noise)
+        return self._rust.observation_bounds(sample._rust, engine_json(observed_data))
 
     def _check_observations(self, observed_data: list[ObservedDataPoint]) -> None:
         """
@@ -286,3 +313,14 @@ class SensitivityAnalysis:
             If a point of the design leaves the values its model allows.
         """
         return run_method(self, method, SensitivityMethod)
+
+
+def _check_no_noise(noise: _ObservationNoise) -> None:
+    """Refuse a noise other than ``NoNoise()``, which an analysis cannot read."""
+    if not isinstance(noise, NoNoise):
+        raise ValueError(
+            f"{type(noise).__name__} needs a calibration: residual noise reads "
+            "the residuals of a fit and distribution noise the observation "
+            "models of a problem, and a sensitivity analysis has no data. Read "
+            "the observations with NoNoise()."
+        )

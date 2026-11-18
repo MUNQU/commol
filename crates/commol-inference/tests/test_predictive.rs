@@ -370,17 +370,22 @@ fn the_pit_of_ties_follows_the_seed_of_the_draws() {
         .map(|(_, w)| w)
         .sum();
 
-    let pit = scores::pit(&draws, &observed).unwrap();
+    let pit_of = |draws: &ObservationDraws| {
+        scores::ObservationBounds::of_draws(draws, &observed)
+            .unwrap()
+            .pit()
+    };
+    let pit = pit_of(&draws);
 
     assert_eq!(draws.seed, 11);
-    assert_eq!(scores::pit(&draws_of(11), &observed).unwrap(), pit);
+    assert_eq!(pit_of(&draws_of(11)), pit);
     assert!(pit[0] >= below && pit[0] <= below + at, "{pit:?}");
     // The same values drawn with another seed randomize the tie otherwise.
     let reseeded = ObservationDraws {
         seed: 12,
         ..draws.clone()
     };
-    assert_ne!(scores::pit(&reseeded, &observed).unwrap(), pit);
+    assert_ne!(pit_of(&reseeded), pit);
 }
 
 #[test]
@@ -595,5 +600,321 @@ fn draws_of_a_sum_have_the_distribution_of_their_reading() {
             (share - expected).abs() < error(expected),
             "{sum:?} {share} {expected}"
         );
+    }
+}
+
+/// A of the decay of `problem` at step 1, 900 at `k = 0.1`, times the
+/// factor `c` and a known scale per observation: `n` observations at
+/// step 1, whose means rise from 18·c to 990·c, read by `model`.
+fn factor_problem(
+    model: commol_calibration::ObservationModel,
+    n: usize,
+) -> CalibrationProblem<DifferenceEquations> {
+    factor_problem_of(model, n, ObservedDataPoint::new(1.0, "A".to_string(), 1.0))
+}
+
+/// The problem of `factor_problem` with `n` copies of `observation`, each
+/// with its scale.
+fn factor_problem_of(
+    model: commol_calibration::ObservationModel,
+    n: usize,
+    observation: ObservedDataPoint,
+) -> CalibrationProblem<DifferenceEquations> {
+    use commol_calibration::{CalibrationParameterType, DiscrepancyConfig};
+    let label = observation.label.clone();
+    let observations = (0..n)
+        .map(|i| ObservedDataPoint {
+            factor_id: Some("c".to_string()),
+            scale: 0.02 + 1.08 * i as f64 / n as f64,
+            ..observation.clone()
+        })
+        .collect();
+    CalibrationProblem::new(
+        problem().forward().base_engine().clone(),
+        observations,
+        vec![CalibrationParameter::with_type(
+            "c".to_string(),
+            CalibrationParameterType::Factor,
+            0.001,
+            10.0,
+        )],
+        None,
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![(label, model)]),
+    )
+    .unwrap()
+}
+
+fn factor_sample(values: Vec<f64>, log_weights: &[f64]) -> ParameterSample {
+    ParameterSample::new(
+        vec!["c".to_string()],
+        vec![(0.001, 10.0)],
+        values.into_iter().map(|c| vec![c]).collect(),
+        log_weights,
+        None,
+    )
+    .unwrap()
+}
+
+/// The predicted mean of each observation of `problem` at the factor `c`,
+/// and the means of their parts.
+fn means_at(problem: &CalibrationProblem<DifferenceEquations>, c: f64) -> (Vec<f64>, Vec<f64>) {
+    let mut workspace = Workspace::default();
+    problem.predict_once(&[c], None, &mut workspace).unwrap();
+    (workspace.predictions, workspace.parts)
+}
+
+#[test]
+fn the_bounds_of_a_sample_mix_its_draws_by_weight() {
+    use commol_calibration::{Noise, ObservationModel};
+    use commol_inference::DistributionNoise;
+
+    let problem = factor_problem(ObservationModel::Poisson, 3);
+    let noise = DistributionNoise::new(&problem).unwrap();
+    let observations: Vec<ObservedDataPoint> = problem
+        .observed_data()
+        .iter()
+        .zip([10.0, 40.0, 400.0])
+        .map(|(obs, value)| ObservedDataPoint {
+            value,
+            ..obs.clone()
+        })
+        .collect();
+    let (first, second) = (0.2, 0.9);
+    let sample = factor_sample(vec![first, second], &[0.3_f64.ln(), 0.7_f64.ln()]);
+
+    let bounds = scores::observation_bounds(&problem, &sample, &observations, &noise, 3).unwrap();
+
+    let (low, _) = means_at(&problem, first);
+    let (high, _) = means_at(&problem, second);
+    let mixture = bounds.mixture();
+    let places = bounds.places();
+    let pit = bounds.pit();
+    for (i, obs) in observations.iter().enumerate() {
+        let (a, b) = (
+            Noise::Poisson.tails(obs.value, low[i]),
+            Noise::Poisson.tails(obs.value, high[i]),
+        );
+        assert_eq!(bounds.tails[0][i], a);
+        assert_eq!(bounds.tails[1][i], b);
+        let close = |actual: f64, expected: f64| {
+            assert!(
+                (actual - expected).abs() <= 1e-15 * expected.abs().max(1e-300),
+                "{i}: {actual} against {expected}"
+            );
+        };
+        close(mixture[i].below, 0.3 * a.below + 0.7 * b.below);
+        close(mixture[i].at, 0.3 * a.at + 0.7 * b.at);
+        close(mixture[i].above, 0.3 * a.above + 0.7 * b.above);
+        close(pit[i], mixture[i].below + places[i] * mixture[i].at);
+    }
+    assert_eq!(bounds.seed, 3);
+}
+
+#[test]
+fn copies_of_a_point_have_its_bounds() {
+    use commol_calibration::{Argument, ObservationModel};
+    use commol_inference::DistributionNoise;
+
+    let problem = factor_problem(
+        ObservationModel::NegativeBinomial {
+            overdispersion: Argument::Value(0.4),
+            sum: None,
+        },
+        5,
+    );
+    let noise = DistributionNoise::new(&problem).unwrap();
+    let observations = problem.observed_data();
+    let bounds_of = |copies: usize| {
+        scores::observation_bounds(
+            &problem,
+            &factor_sample(vec![0.05; copies], &vec![0.0; copies]),
+            observations,
+            &noise,
+            8,
+        )
+        .unwrap()
+    };
+    let (point, copies) = (bounds_of(1), bounds_of(20));
+
+    for (one, many) in point.mixture().iter().zip(copies.mixture()) {
+        for (a, b) in [
+            (one.below, many.below),
+            (one.at, many.at),
+            (one.above, many.above),
+        ] {
+            assert!((a - b).abs() <= 1e-14 * a.abs(), "{a} {b}");
+        }
+    }
+    for (a, b) in point.pit().iter().zip(copies.pit()) {
+        assert!((a - b).abs() <= 1e-14, "{a} {b}");
+    }
+}
+
+/// The Kolmogorov–Smirnov distance of `values` from the standard normal.
+fn normal_distance(values: &[f64]) -> f64 {
+    let mut sorted = values.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    let n = sorted.len() as f64;
+    sorted
+        .iter()
+        .enumerate()
+        .map(|(i, &z)| {
+            let f = commol_statistics::special::normal_cdf(z);
+            (f - i as f64 / n).max((i + 1) as f64 / n - f)
+        })
+        .fold(0.0, f64::max)
+}
+
+#[test]
+fn quantile_residuals_of_unseen_data_are_standard_normal() {
+    use commol_calibration::{Argument, Center, ObservationModel, Sum};
+    use commol_inference::{DistributionNoise, ObservationNoise};
+    use commol_random::Generator;
+    use commol_random::sample::{gamma, normal, poisson};
+
+    let n = 400;
+    // The distance of 1 % of the Kolmogorov–Smirnov test of n values.
+    let critical = 1.628 / (n as f64).sqrt();
+    let value = |x: f64| Argument::Value(x);
+    let negative_binomial = |phi: f64, sum| ObservationModel::NegativeBinomial {
+        overdispersion: value(phi),
+        sum,
+    };
+    // At a point: data drawn from each model at the factor 0.3 (means from
+    // 5 to 300) and read there; the observations of several parts are the
+    // windows of B over steps 1 to 20 in four parts.
+    let models = [
+        ObservationModel::Normal { sd: value(4.0) },
+        ObservationModel::LogNormal {
+            sigma: value(0.4),
+            center: Center::Mean,
+        },
+        ObservationModel::LogNormal {
+            sigma: value(0.4),
+            center: Center::Median,
+        },
+        ObservationModel::StudentT {
+            df: value(3.0),
+            scale: value(2.0),
+        },
+        ObservationModel::Poisson,
+        negative_binomial(0.5, None),
+        negative_binomial(5e-9, None),
+        ObservationModel::Binomial { trials: Some(1000) },
+    ];
+    let windowed = |model: ObservationModel| {
+        let window = ObservedDataPoint {
+            parts: 4,
+            ..ObservedDataPoint::with_window(20.0, "B".to_string(), 1.0, 20.0)
+        };
+        factor_problem_of(model, n, window)
+    };
+    let mut problems: Vec<(String, CalibrationProblem<DifferenceEquations>)> = models
+        .into_iter()
+        .map(|model| (format!("{model:?}"), factor_problem(model, n)))
+        .collect();
+    for model in [
+        negative_binomial(0.5, Some(Sum::Exact)),
+        negative_binomial(0.5, Some(Sum::Moments)),
+        ObservationModel::Poisson,
+        ObservationModel::Normal { sd: value(4.0) },
+    ] {
+        problems.push((format!("{model:?} of four parts"), windowed(model)));
+    }
+    let point = factor_sample(vec![0.3], &[0.0]);
+    for (index, (name, problem)) in problems.iter().enumerate() {
+        let noise = DistributionNoise::new(problem).unwrap();
+        let (predicted, parts) = means_at(problem, 0.3);
+        let mut drawn = vec![0.0; n];
+        let mut generator = Generator::from_seed(300 + index as u64);
+        noise.observe(
+            problem.observed_data(),
+            &[0.3],
+            &predicted,
+            &parts,
+            &mut generator,
+            &mut drawn,
+        );
+        let observations: Vec<ObservedDataPoint> = problem
+            .observed_data()
+            .iter()
+            .zip(&drawn)
+            .map(|(obs, &value)| ObservedDataPoint {
+                value,
+                ..obs.clone()
+            })
+            .collect();
+        let residuals =
+            scores::observation_bounds(problem, &point, &observations, &noise, index as u64)
+                .unwrap()
+                .quantile_residuals();
+        let distance = normal_distance(&residuals);
+        assert!(distance < critical, "{name}: {distance} ≥ {critical}");
+    }
+
+    // Held out from a conjugate posterior and read with its draws: the
+    // factor of a normal model of a known sd, under a flat prior, and of a
+    // Poisson model, under the gamma prior of shape 1 and rate 0.
+    let draws = 2000;
+    let truth = 0.3;
+    let mut generator = Generator::from_seed(7);
+    for (name, model) in [
+        ("normal", ObservationModel::Normal { sd: value(20.0) }),
+        ("Poisson", ObservationModel::Poisson),
+    ] {
+        let problem = factor_problem(model, n);
+        let noise = DistributionNoise::new(&problem).unwrap();
+        let (unit, _) = means_at(&problem, 1.0);
+        // The training data: one draw of each observation at the truth.
+        let trained: Vec<f64> = unit
+            .iter()
+            .map(|&m| match name {
+                "normal" => truth * m + 20.0 * normal(&mut generator),
+                _ => poisson(&mut generator, truth * m) as f64,
+            })
+            .collect();
+        let posterior = |generator: &mut Generator| -> f64 {
+            match name {
+                // N(Σ y m / Σ m², σ²/Σ m²).
+                "normal" => {
+                    let squares: f64 = unit.iter().map(|m| m * m).sum();
+                    let centre: f64 =
+                        trained.iter().zip(&unit).map(|(y, m)| y * m).sum::<f64>() / squares;
+                    centre + 20.0 / squares.sqrt() * normal(generator)
+                }
+                // Gamma(1 + Σ y, Σ m).
+                _ => gamma(
+                    generator,
+                    1.0 + trained.iter().sum::<f64>(),
+                    unit.iter().sum::<f64>(),
+                ),
+            }
+        };
+        let values: Vec<f64> = (0..draws).map(|_| posterior(&mut generator)).collect();
+        let sample = factor_sample(values, &vec![0.0; draws]);
+        // Each held-out value: a fresh draw of the posterior, then of the
+        // model there.
+        let observations: Vec<ObservedDataPoint> = problem
+            .observed_data()
+            .iter()
+            .zip(&unit)
+            .map(|(obs, &m)| {
+                let c = posterior(&mut generator);
+                let value = match name {
+                    "normal" => c * m + 20.0 * normal(&mut generator),
+                    _ => poisson(&mut generator, c * m) as f64,
+                };
+                ObservedDataPoint {
+                    value,
+                    ..obs.clone()
+                }
+            })
+            .collect();
+        let residuals = scores::observation_bounds(&problem, &sample, &observations, &noise, 1)
+            .unwrap()
+            .quantile_residuals();
+        let distance = normal_distance(&residuals);
+        assert!(distance < critical, "{name}: {distance} ≥ {critical}");
     }
 }

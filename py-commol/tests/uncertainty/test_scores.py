@@ -23,9 +23,11 @@ from commol.observations import (
     DistributionNoise,
     NegativeBinomialObservations,
     NoNoise,
+    NormalObservations,
     PoissonObservations,
     ResidualNoise,
 )
+from commol.sensitivity import InputSpace, SensitivityAnalysis
 from commol.uncertainty import ParameterSample, Predictive, SampleMethod
 from tests.support import (
     abc_builder,
@@ -228,6 +230,152 @@ class TestPit:
         assert pit(1) == first
         other = pit(2)
         assert all(a != b for a, b in zip(first, other, strict=True))
+
+    def test_the_pit_of_observation_models_is_exact(self) -> None:
+        # Two draws of weights 0.3 and 0.7: the PIT of the mixture of their
+        # Poisson models, F(y⁻) + v · p(y), whatever the number of draws.
+        flows, weights = [4.0, 9.0], [0.3, 0.7]
+        observations = flow_observations([0.0, 3.0, 7.0, 12.0], windowed=True)
+
+        def pit(seed: int) -> list[float]:
+            predictive = _flow_predictive(PoissonObservations(), flows, weights, seed)
+            return scores.pit(
+                predictive, observations, DistributionNoise()
+            ).per_observation
+
+        first = pit(1)
+        for value, y in zip(first, [0, 3, 7, 12], strict=True):
+            tails = [_poisson_tails(flow, y) for flow in flows]
+            below = sum(w * b for w, (b, _) in zip(weights, tails, strict=True))
+            at = sum(w * a for w, (_, a) in zip(weights, tails, strict=True))
+            assert below <= value <= below + at
+        assert pit(1) == first
+        assert pit(2) != first
+
+        # A model with no atoms gives F(y) whatever the seed.
+        def normal_pit(seed: int) -> list[float]:
+            predictive = _flow_predictive(
+                NormalObservations(sd=2.0), flows, weights, seed
+            )
+            return scores.pit(
+                predictive, observations, DistributionNoise()
+            ).per_observation
+
+        expected = [
+            sum(
+                w * NormalDist(flow, 2.0).cdf(y)
+                for w, flow in zip(weights, flows, strict=True)
+            )
+            for y in (0.0, 3.0, 7.0, 12.0)
+        ]
+        assert normal_pit(1) == pytest.approx(expected, rel=1e-12)
+        assert normal_pit(2) == normal_pit(1)
+
+
+def _poisson_tails(mean: float, y: int) -> tuple[float, float]:
+    """``P(Y < y)`` and ``p(y)`` of a Poisson of mean `mean`."""
+    terms = [
+        math.exp(k * math.log(mean) - mean - math.lgamma(k + 1)) for k in range(y + 1)
+    ]
+    return sum(terms[:y]), terms[y]
+
+
+def _flow_predictive(
+    model: PoissonObservations | NormalObservations,
+    flows: list[float],
+    weights: list[float] | None = None,
+    seed: int = 1,
+) -> Predictive:
+    """A predictive of the flow ``c`` of `flow_calibrator`, whose prediction
+    of each windowed observation is ``c``, at the draws `flows`."""
+    calibrator = flow_calibrator(
+        [1.0], windowed=True, seed=seed, observation_models={"B": model}
+    )
+    sample = ParameterSample(
+        names=["c"],
+        bounds=[(0.0, 50.0)],
+        values=[[flow] for flow in flows],
+        log_weights=[math.log(w) for w in weights or [1.0] * len(flows)],
+        method=SampleMethod(name="draws"),
+    )
+    return Predictive(calibrator, sample, [0, 1])
+
+
+class TestQuantileResiduals:
+    def test_they_are_the_normal_quantile_of_the_pit(self) -> None:
+        predictive = _flow_predictive(PoissonObservations(), [4.0, 9.0])
+        observations = flow_observations([0.0, 3.0, 7.0, 12.0, 20.0], windowed=True)
+
+        pit = scores.pit(predictive, observations, DistributionNoise())
+        residuals = scores.quantile_residuals(
+            predictive, observations, DistributionNoise()
+        )
+
+        expected = [STANDARD.inv_cdf(u) for u in pit.per_observation]
+        assert residuals.per_observation == pytest.approx(expected, rel=1e-9)
+        assert residuals.per_series == {"B": pytest.approx(sum(expected) / 5)}
+
+    def test_the_upper_tail_is_read_from_its_own_side(self) -> None:
+        # A normal 9 sd above its mean: Φ(9) is 1 in floating point.
+        normal = _flow_predictive(NormalObservations(sd=1.0), [10.0])
+        far = flow_observations([19.0], windowed=True)
+        residual = scores.quantile_residuals(normal, far, DistributionNoise())
+        assert residual.per_observation == [pytest.approx(9.0, rel=1e-9)]
+        assert scores.pit(normal, far, DistributionNoise()).per_observation == [1.0]
+
+        # A Poisson of mean 0.5 at 15: P(Y > 15) + (1 − v) p(15) lies between
+        # P(Y > 15) and P(Y ≥ 15).
+        poisson = _flow_predictive(PoissonObservations(), [0.5])
+        residual = scores.quantile_residuals(
+            poisson, flow_observations([15.0], windowed=True), DistributionNoise()
+        )
+        _, at = _poisson_tails(0.5, 15)
+        above = sum(
+            math.exp(k * math.log(0.5) - 0.5 - math.lgamma(k + 1))
+            for k in range(16, 60)
+        )
+        value = residual.per_observation[0]
+        assert -STANDARD.inv_cdf(above + at) <= value <= -STANDARD.inv_cdf(above)
+        assert 8.4 < value < 8.9
+
+    def test_they_need_distribution_noise(self) -> None:
+        predictive = _flow_predictive(PoissonObservations(), [4.0])
+        calibrator = predictive.source
+        assert isinstance(calibrator, Calibrator)
+        observations = flow_observations([3.0], windowed=True)
+        residual = ResidualNoise(
+            fit=calibrator.run(), block_length=1, residual_scale="additive"
+        )
+
+        for noise in (NoNoise(), residual):
+            with pytest.raises(TypeError, match="they take DistributionNoise"):
+                scores.quantile_residuals(predictive, observations, noise)  # type: ignore[arg-type]
+
+    def test_they_need_observation_models_and_a_calibrator(self) -> None:
+        observations = flow_observations([3.0], windowed=True)
+        loss = flow_calibrator([1.0], windowed=True)
+        sample = ParameterSample.equally_weighted(
+            ["c"], [(0.0, 50.0)], [[4.0]], SampleMethod(name="point")
+        )
+        with pytest.raises(ValueError, match="needs observation models"):
+            scores.quantile_residuals(
+                Predictive(loss, sample, [0, 1]), observations, DistributionNoise()
+            )
+
+        analysis = SensitivityAnalysis(
+            loss.simulation,
+            InputSpace.from_sample(sample, loss.problem.parameters),
+            seed=1,
+        )
+        of_analysis = Predictive(analysis, sample, [0, 1])
+        with pytest.raises(ValueError, match="DistributionNoise needs a calibration"):
+            scores.quantile_residuals(of_analysis, observations, DistributionNoise())
+        # The PIT of an analysis reads its draws.
+        pit = scores.pit(
+            of_analysis, flow_observations([4.0, 5.0], windowed=True), NoNoise()
+        )
+        assert pit.per_observation[1] == 1.0
+        assert 0.0 <= pit.per_observation[0] <= 1.0
 
 
 class TestLogScore:

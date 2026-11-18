@@ -9,7 +9,7 @@
 //!
 //! A draw inverts the distribution function of one uniform number of the
 //! [`Generator`], so a seed gives the same draws on every platform: the
-//! special functions come from the private module `special`, on `libm`.
+//! special functions come from `commol_statistics::special`, on `libm`.
 
 use std::fmt;
 use std::sync::OnceLock;
@@ -22,7 +22,7 @@ use commol_statistics::numeric::{
 };
 
 use crate::ranges;
-use crate::special::{
+use commol_statistics::special::{
     beta_i, gamma_p, gamma_q, normal_cdf, normal_density, normal_quantile, normal_quantile_sf,
     normal_sf,
 };

@@ -97,6 +97,41 @@ information matching and later gradient methods read them.
 `crates/commol-inference/tests/test_local.rs::the_information_of_a_sum_is_that_of_its_density`,
 `tests/uncertainty/test_local.py::TestInformationMatching::test_a_correct_model_with_sums_gives_one`.
 
+## Distribution functions live in commol-calibration
+
+`Noise::tails` (`likelihood/density.rs`) gives `P(Y < y)`, `p(y)` and
+`P(Y > y)` of every model, `Noise::sum_tails` (`likelihood/sums.rs`) those of
+a sum of parts by its reading (the cumulative sums of the recursion for
+`"exact"`), and `Likelihood::tails` those of each observation, at the nearest
+mean its model allows. Both tails come back, each accurate in its own tail:
+`Φ(8.3)` is 1 in `f64`, so a quantile residual read from `F` alone would be
+infinite in the upper tail. The special functions live whole in
+`crates/commol-statistics/src/special.rs`, one copy for the distributions of
+the priors and for the models: the factor of the incomplete gamma and beta
+reads Stirling's series from a shape of 10, the incomplete beta takes `x` and
+`1 − x`, and `p(y)` of a count model is that factor, so a tail of a count of
+`10⁴` keeps 10 digits. The series and continued fraction of the incomplete
+gamma take up to `16 √a` terms, so a Poisson of mean `10⁸` keeps them too. A
+negative binomial of `φ ≤ 1e-8` has the tails of the Poisson. Two limits
+remain, from the conditioning of the continued fraction of the beta at a
+large shape: a negative binomial of size `1/φ` keeps about `10⁻¹⁷/φ`, and a
+Student t about `10⁻¹⁶ ν`, as its log density. An `"exact"` sum reads
+`P(Y > y)` as a complement down to 0.01, and sums the counts above `y`
+beyond that, `O(n²)` in the last count. The predictive mixes the tails of its draws (`ObservationBounds`,
+`crates/commol-inference/src/scores.rs`), the one primitive of the PIT, the
+quantile residuals and every later reader.
+
+| Alternative | Why not |
+|---|---|
+| A distribution function next to `draw_observation` in commol-inference | The calibration crate could not read it for the sums of parts. |
+| `F` alone | Its upper tail rounds to 1, and a residual there is infinite. |
+| The PIT from the draws of the noise | It carries the Monte Carlo error of the draws, and a sample of one point gives 0 or 1. |
+
+**Guards:** `crates/commol-calibration/tests/test_likelihood.rs::the_tails_of_each_model_match_reference_values`,
+`crates/commol-calibration/tests/test_likelihood.rs::the_tails_at_the_edges_of_each_model`,
+`crates/commol-calibration/tests/test_parts.rs::the_tails_of_a_sum`,
+`crates/commol-inference/tests/test_predictive.rs::quantile_residuals_of_unseen_data_are_standard_normal`.
+
 ## The sandwich sums scores over blocks
 
 `sandwich` (`local/sandwich.rs`) gives `H⁻¹ B H⁻¹` with

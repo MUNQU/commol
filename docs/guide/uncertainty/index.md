@@ -349,8 +349,52 @@ held-out positions above, and say whether you score a band of the model
 | `interval_score(predictive, observations, noise, confidence_level)` | `(u − l) + (2/α)(l − y)₊ + (2/α)(y − u)₊`, `α = 1 − c` | Lower |
 | `weighted_interval_score(predictive, observations, noise, confidence_levels)` | The weighted interval score of Bracher et al. (2021) | Lower |
 | `crps(predictive, observations, noise)` | `Σ wᵢ|xᵢ − y| − ½ Σᵢⱼ wᵢwⱼ|xᵢ − xⱼ|`, the CRPS of a stochastic calibration's loss | Lower |
-| `pit(predictive, observations, noise)` | `F(y)`, randomized where draws tie with `y`, from the seed of the source (`Calibrator.seed` or `SensitivityAnalysis.seed`): the same draws give the same values | Uniform |
+| `pit(predictive, observations, noise)` | `F(y⁻) + v · p(y)` of the predictive, `v` uniform from the seed of the source (`Calibrator.seed` or `SensitivityAnalysis.seed`): the same predictive gives the same values. With `DistributionNoise()`, `F` is the mixture of the distribution functions of the observation models over the draws, exact for any sample; with another noise, that of the weighted draws | Uniform |
+| `quantile_residuals(predictive, observations, DistributionNoise())` | `Φ⁻¹` of the PIT, with the same `v`, read from the nearer tail; another noise raises a `TypeError` | Standard normal |
 | `log_score(predictive, observations, DistributionNoise())` | `log Σ_d w_d · p(y | μ_d)`, the log density of `y` under the mixture of the observation models over the draws; another noise raises a `TypeError` | Higher |
+
+### Quantile residuals
+
+`quantile_residuals` gives the randomized quantile residuals of Dunn and
+Smyth (1996): `Φ⁻¹(u)`, with `u` the PIT of `pit`. They are the residuals of
+count data too, where a Pearson residual of a mean near 0 has no bound. Above
+`u = ½` a residual reads the upper tail, `−Φ⁻¹(P(Y > y) + (1 − v) · p(y))`, so
+a value 9 standard deviations above its mean has the residual 9, where
+`Φ⁻¹(u)` of a PIT that rounds to 1 would be infinite.
+
+The residuals are standard normal for data the predictive did not see, such
+as held-out observations, and for data drawn at the parameters the
+predictive reads. In the data a predictive was fitted to they shrink: in a
+linear normal model of `n` observations and `p` parameters, their variance
+is about `1 − p/n` at a fit and about `(n − p)/(n + p)` with the draws of a
+posterior, 0.72 and 0.56 at `n = 35`, `p = 10`. An in-sample check reads them
+at the fit, `Calibrator.point_sample(fit)`, or at one draw of a sample,
+`sample.resample(1, seed)`, which is standard normal only when the sample is
+an exact posterior.
+
+```python
+from commol.observations import DistributionNoise, NormalObservations
+
+normal_problem = CalibrationProblem(
+    observed_data=fitted,
+    parameters=problem.parameters,
+    observation_models={"B": NormalObservations(sd=2.0)},
+    optimization_config=NelderMeadConfig(max_iterations=2000),
+    seed=42,
+)
+normal_calibrator = Calibrator(Simulation(basic_model(None, None)), normal_problem)
+fit = normal_calibrator.run()
+
+# In the fitted data: at the fit, and at one draw of the sample.
+at_fit = Predictive(normal_calibrator, normal_calibrator.point_sample(fit), positions=[0, 40])
+print(len(scores.quantile_residuals(at_fit, fitted, DistributionNoise()).per_observation))  # 8
+one_draw = Predictive(normal_calibrator, sample.resample(1, seed=3), positions=[0, 40])
+print(len(scores.quantile_residuals(one_draw, fitted, DistributionNoise()).per_observation))  # 8
+
+# Held out: the mixture of the draws of the sample.
+mixture = Predictive(normal_calibrator, sample, positions=[0, 60])
+print(len(scores.quantile_residuals(mixture, held_out, DistributionNoise()).per_observation))  # 4
+```
 
 ## The entry point
 

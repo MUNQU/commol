@@ -517,6 +517,46 @@ impl PyCalibrationProblem {
         .map_err(method_error)
     }
 
+    /// The tails of the observed value of each of `observations` under every
+    /// draw of `sample`, with the weights: from the distribution functions
+    /// of the observation models with `DistributionNoise`, and from the
+    /// draws of the noise otherwise, each draw a mass at its value; the
+    /// readers take their uniform numbers from the seed of the problem
+    ///
+    /// Args:
+    ///     sample: The draws
+    ///     observations: The JSON of the observations, which need not be the
+    ///         problem's
+    ///     noise: The JSON of the noise: `NoNoise`, `ResidualNoise` or
+    ///         `DistributionNoise`
+    ///
+    /// Raises:
+    ///     ValueError: As `observation_draws`, and if an observed value is
+    ///         outside the support of its observation model
+    ///     InfeasibleStateError: If a draw leaves the values its model allows
+    fn observation_bounds(
+        &self,
+        py: Python<'_>,
+        sample: &PyParameterSample,
+        observations: &str,
+        noise: &str,
+    ) -> PyResult<PyObservationBounds> {
+        let points = observed_data(&crate::json::read::<Vec<_>>(observations)?);
+        if !matches!(
+            crate::json::read::<NoiseSettings>(noise)?,
+            NoiseSettings::Distribution
+        ) {
+            let draws = self.observation_draws(py, sample, observations, noise)?;
+            return bounds_of_draws(&draws.inner, &points);
+        }
+        let noise = DistributionNoise::new(&self.inner).map_err(value_error)?;
+        parallel(py, || {
+            scores::observation_bounds(&self.inner, &sample.inner, &points, &noise, self.seed)
+        })?
+        .map(|inner| PyObservationBounds { inner })
+        .map_err(method_error)
+    }
+
     /// Check `observations` against the problem, with no run: the positions
     /// the engine accepts and what the observation operator reads
     /// (`ForwardModel::with_observations`)
@@ -967,11 +1007,41 @@ impl PyObservationDraws {
     fn crps(&self, observed: Vec<f64>) -> PyResult<Vec<f64>> {
         scores::crps(&self.inner, &observed).map_err(value_error)
     }
+}
 
-    /// The randomized PIT value of each observation, its ties randomized
-    /// from the seed of the draws
-    fn pit(&self, observed: Vec<f64>) -> PyResult<Vec<f64>> {
-        scores::pit(&self.inner, &observed).map_err(value_error)
+/// The bounds of `draws` at the values of `observations`, each draw a mass
+/// at its value.
+pub(crate) fn bounds_of_draws(
+    draws: &ObservationDraws,
+    observations: &[commol_calibration::ObservedDataPoint],
+) -> PyResult<PyObservationBounds> {
+    let observed: Vec<f64> = observations.iter().map(|obs| obs.value).collect();
+    scores::ObservationBounds::of_draws(draws, &observed)
+        .map(|inner| PyObservationBounds { inner })
+        .map_err(value_error)
+}
+
+/// The tails of every draw at a set of observed values, with the weights
+/// of the draws and their seed
+#[pyclass(name = "ObservationBounds", frozen)]
+pub struct PyObservationBounds {
+    pub(crate) inner: scores::ObservationBounds,
+}
+
+// coverage: code that a PyO3 attribute generates: the wrappers of the methods without arguments
+// count 0 while the methods run
+#[pymethods]
+impl PyObservationBounds {
+    /// The randomized PIT of each observation, `F(y⁻) + v·p(y)` of the
+    /// mixture of the draws, `v` from the seed of the draws
+    fn pit(&self) -> Vec<f64> {
+        self.inner.pit()
+    }
+
+    /// The randomized quantile residual of each observation, `Φ⁻¹` of its
+    /// PIT read from the nearer tail
+    fn quantile_residuals(&self) -> Vec<f64> {
+        self.inner.quantile_residuals()
     }
 }
 
@@ -1130,6 +1200,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyParameterSample>()?;
     m.add_class::<PyPredictive>()?;
     m.add_class::<PyObservationDraws>()?;
+    m.add_class::<PyObservationBounds>()?;
     m.add_class::<PyBootstrapRun>()?;
     m.add_class::<PyJackknifeRun>()?;
     m.add_function(wrap_pyfunction!(bootstrap, m)?)?;

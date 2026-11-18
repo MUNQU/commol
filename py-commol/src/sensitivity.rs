@@ -19,7 +19,8 @@ use pyo3::prelude::*;
 
 use crate::engine::{Engine, PyEngine};
 use crate::inference::{
-    PyObservationDraws, PyParameterSample, PyPredictive, method_error, value_error,
+    PyObservationBounds, PyObservationDraws, PyParameterSample, PyPredictive, bounds_of_draws,
+    method_error, value_error,
 };
 
 /// The draws of a method and their log weights, `(values, log_weights)`.
@@ -158,6 +159,28 @@ impl PyForwardAnalysis {
         })?
         .map(|inner| PyObservationDraws { inner })
         .map_err(method_error)
+    }
+
+    /// The tails of the observed value of each of `observations` under every
+    /// draw of `sample`, with no observation noise: each draw a mass at its
+    /// value, the readers' uniform numbers from the seed of the analysis
+    ///
+    /// Args:
+    ///     sample: The draws
+    ///     observations: The JSON of the observations
+    ///
+    /// Raises:
+    ///     ValueError: As `observation_draws`
+    ///     InfeasibleStateError: If a draw leaves the values its model allows
+    fn observation_bounds(
+        &self,
+        py: Python<'_>,
+        sample: &PyParameterSample,
+        observations: &str,
+    ) -> PyResult<PyObservationBounds> {
+        let draws = self.observation_draws(py, sample, observations)?;
+        let points = commol_calibration::observed_data(&crate::json::read::<Vec<_>>(observations)?);
+        bounds_of_draws(&draws.inner, &points)
     }
 
     /// Check `observations` against the analysis, with no run: the positions
