@@ -4189,7 +4189,11 @@ noise that is correlated in time or between series.</p>
 <p>With <code>"auto"</code>, <code>diagnostics.block_length_estimates</code> gives the estimate of each
 series and <code>diagnostics.block_length</code> the length used. The estimate depends on
 how a method draws its blocks: moving blocks get a length about 15 % longer
-than stationary or non-overlapping ones.</p>
+than stationary or non-overlapping ones. <code>"auto"</code> reads the residuals of a
+series one per position, so it refuses a series with two observations at one
+position; a number does, except for <code>ResidualBootstrap</code>, which draws one
+residual per position
+(<a href="../../calibration-observations/#one-position-two-observations">One position, two observations</a>).</p>
 <h2 id="bayesian-bootstrap">Bayesian bootstrap<a class="headerlink" href="#bayesian-bootstrap" title="Permanent link">&para;</a></h2>
 <p><code>BayesianBootstrap(replicates, block_length, starts=1)</code> draws, for each
 replicate, one Dirichlet(1, …, 1) weight per block, scaled to mean 1, and
@@ -4380,7 +4384,10 @@ normalization comes from its own values, as the fit's does.</p>
 blocks of residuals of the fit to every draw's prediction of each observation,
 which gives a prediction interval with no noise model. It serves the series the
 fit has residuals of, at any position, and rejects an observation of any other
-series.</p>
+series. It and <code>ResidualBootstrap</code> draw one residual per position of a series,
+so they refuse a series with two observations at one position, in the fit or
+in the observations they serve
+(<a href="../../calibration-observations/#one-position-two-observations">One position, two observations</a>).</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">predictive</span> <span class="o">=</span> <span class="n">Predictive</span><span class="p">(</span><span class="n">calibrator</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">sample</span><span class="p">,</span> <span class="n">positions</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">81</span><span class="p">)))</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">noise</span> <span class="o">=</span> <span class="n">ResidualNoise</span><span class="p">(</span>
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">fit</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">fit</span><span class="p">,</span>

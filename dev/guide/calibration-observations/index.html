@@ -1188,6 +1188,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Counts per period: windows">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#one-position-two-observations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One position, two observations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3937,6 +3954,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Counts per period: windows">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#one-position-two-observations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One position, two observations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4378,6 +4412,41 @@ calibration, so a report shows exactly what the loss compared. See
 <a href="../simulations/#windowed-totals">Windowed totals</a>. An observation without
 <code>window</code> reads its output at <code>at</code>; <code>SimulationResults.sample</code> reads a run
 there in the same way (<a href="../simulations/#values-at-positions">Values at positions</a>).</p>
+<h3 id="one-position-two-observations">One position, two observations<a class="headerlink" href="#one-position-two-observations" title="Permanent link">&para;</a></h3>
+<p>A label may hold two observations at one position: an increment over 2 steps
+and a total over 40 steps that both end at 40. Each is its own observation,
+with its own window and its own residual, so the loss, the likelihood, the
+scores and the predictive with <code>NoNoise()</code> or <code>DistributionNoise()</code> read both.</p>
+<p>A few methods read a series as one value per position, and they refuse such a
+label with a message that names it and the position
+(<code>one_per_position</code> in <code>crates/commol-inference/src/resampling/blocks.rs</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>What it reads per position</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ResidualNoise</code>, <code>ResidualBootstrap</code></td>
+<td>One residual of the series, drawn for every observation there</td>
+</tr>
+<tr>
+<td><code>block_length="auto"</code> of any method</td>
+<td>The residuals of the series as consecutive values</td>
+</tr>
+<tr>
+<td><code>RollingConformal</code></td>
+<td>One observation per horizon</td>
+</tr>
+</tbody>
+</table>
+<p>The two observations also have different scales: a total over 40 steps is
+about 20 times an increment over 2. Give one of them a label of its own when a
+method needs one scale per series. With a <code>block_length</code> of a number, the
+Bayesian and wild bootstraps, the block jackknife and the sandwich keep both
+in one label, each in the block of its position.</p>
 <h2 id="positions-between-integers">Positions between integers<a class="headerlink" href="#positions-between-integers" title="Permanent link">&para;</a></h2>
 <p>An observation is at a position that the engine of the model reports at, as
 for <a href="../simulations/#simulation"><code>Simulation.run_at</code></a>: a model in continuous

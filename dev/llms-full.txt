@@ -4280,6 +4280,20 @@ print(calibrate_k1(windowed))  # 0.4
 
 `SimulationResults.windowed_totals` applies the same reduction outside calibration, so a report shows exactly what the loss compared. See [Windowed totals](https://munqu.github.io/commol/latest/guide/simulations/#windowed-totals). An observation without `window` reads its output at `at`; `SimulationResults.sample` reads a run there in the same way ([Values at positions](https://munqu.github.io/commol/latest/guide/simulations/#values-at-positions)).
 
+### One position, two observations
+
+A label may hold two observations at one position: an increment over 2 steps and a total over 40 steps that both end at 40. Each is its own observation, with its own window and its own residual, so the loss, the likelihood, the scores and the predictive with `NoNoise()` or `DistributionNoise()` read both.
+
+A few methods read a series as one value per position, and they refuse such a label with a message that names it and the position (`one_per_position` in `crates/commol-inference/src/resampling/blocks.rs`):
+
+| Method                               | What it reads per position                                    |
+| ------------------------------------ | ------------------------------------------------------------- |
+| `ResidualNoise`, `ResidualBootstrap` | One residual of the series, drawn for every observation there |
+| `block_length="auto"` of any method  | The residuals of the series as consecutive values             |
+| `RollingConformal`                   | One observation per horizon                                   |
+
+The two observations also have different scales: a total over 40 steps is about 20 times an increment over 2. Give one of them a label of its own when a method needs one scale per series. With a `block_length` of a number, the Bayesian and wild bootstraps, the block jackknife and the sandwich keep both in one label, each in the block of its position.
+
 ## Positions between integers
 
 An observation is at a position that the engine of the model reports at, as for [`Simulation.run_at`](https://munqu.github.io/commol/latest/guide/simulations/#simulation): a model in continuous time (`DifferentialEquations`, `StochasticEvents`) at any position, such as `2.5`, with windows of any length; a model of whole steps (`DifferenceEquations`, `StochasticSteps`) at integer steps only. The calibration reads the engine at those positions (`SimulationEngine::run_at_positions_into_buffer`), and the engine checks each one (`SimulationEngine::check_position`): `Calibrator` raises `ValueError` for a position the engine does not accept, and the engine's message names the observation, or the constraint, that holds it (`check_positions` in `crates/commol-calibration/src/calibration_problem.rs`).
@@ -5703,7 +5717,7 @@ A block holds every observation, of every series, whose position falls in one wi
 | An integer | You know how far the dependence of the noise reaches                                                                                                                                                             |
 | `"auto"`   | You do not know: the rule of Politis and White (2004), with the correction of Patton, Politis and White (2009), estimates a length for each series on the residuals of the fit, and the method takes the largest |
 
-With `"auto"`, `diagnostics.block_length_estimates` gives the estimate of each series and `diagnostics.block_length` the length used. The estimate depends on how a method draws its blocks: moving blocks get a length about 15 % longer than stationary or non-overlapping ones.
+With `"auto"`, `diagnostics.block_length_estimates` gives the estimate of each series and `diagnostics.block_length` the length used. The estimate depends on how a method draws its blocks: moving blocks get a length about 15 % longer than stationary or non-overlapping ones. `"auto"` reads the residuals of a series one per position, so it refuses a series with two observations at one position; a number does, except for `ResidualBootstrap`, which draws one residual per position ([One position, two observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#one-position-two-observations)).
 
 ## Bayesian bootstrap
 
@@ -5800,7 +5814,7 @@ Each replicate starts from the fit. With `starts > 1` it also starts from the [o
 
 ## Prediction intervals
 
-The draws of a bootstrap give a band of the model. `ResidualNoise` adds moving blocks of residuals of the fit to every draw's prediction of each observation, which gives a prediction interval with no noise model. It serves the series the fit has residuals of, at any position, and rejects an observation of any other series.
+The draws of a bootstrap give a band of the model. `ResidualNoise` adds moving blocks of residuals of the fit to every draw's prediction of each observation, which gives a prediction interval with no noise model. It serves the series the fit has residuals of, at any position, and rejects an observation of any other series. It and `ResidualBootstrap` draw one residual per position of a series, so they refuse a series with two observations at one position, in the fit or in the observations they serve ([One position, two observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#one-position-two-observations)).
 
 ```python
 predictive = Predictive(calibrator, result.sample, positions=list(range(81)))
@@ -6709,7 +6723,7 @@ print(widths)  # [6.3, 5.2]
 
 ## Rolling origins
 
-`RollingConformal(origins, score, by, confidence_level, positions, starts=1)` gives intervals ahead of the data, with one quantile per horizon. Horizon `k` is the `k`-th observation of a series after an origin: a count, not a distance on the axis, because positions can be irregular. Each origin fits the observations at or before it (one refit per origin, from the fit of every observation) and scores the later ones. The intervals are around the fit of every observation, at `positions`, which must all be after the data; the `k`-th position is horizon `k`, so give positions spaced as the observations. A horizon with fewer than `1/α − 1` origins that reach it has an unbounded interval.
+`RollingConformal(origins, score, by, confidence_level, positions, starts=1)` gives intervals ahead of the data, with one quantile per horizon. Horizon `k` is the `k`-th observation of a series after an origin: a count, not a distance on the axis, because positions can be irregular. Each origin fits the observations at or before it (one refit per origin, from the fit of every observation) and scores the later ones. The intervals are around the fit of every observation, at `positions`, which must all be after the data; the `k`-th position is horizon `k`, so give positions spaced as the observations. A horizon with fewer than `1/α − 1` origins that reach it has an unbounded interval. A series with two observations at one position has no single count of horizons, so `RollingConformal` refuses it ([One position, two observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#one-position-two-observations)).
 
 ```python
 from commol.conformal import RollingConformal
@@ -23080,7 +23094,7 @@ Bases: `RangeChecked`
 
 Observation noise made of the residuals of a fit, with no noise model.
 
-Each draw adds moving blocks of `block_length` positions of residuals of the fit, drawn with replacement across every series at once, to its predictions, on `residual_scale`. The band is then a prediction interval. It serves the series the fit has residuals of, at any position: the residual of a series at a drawn position is the one at the nearest position where the series was observed.
+Each draw adds moving blocks of `block_length` positions of residuals of the fit, drawn with replacement across every series at once, to its predictions, on `residual_scale`. The band is then a prediction interval. It serves the series the fit has residuals of, at any position: the residual of a series at a drawn position is the one at the nearest position where the series was observed. A position of a series draws one residual, so a series with two observations at one position, in the fit or in the observations served, is refused.
 
 Attributes:
 
@@ -23103,7 +23117,9 @@ class ResidualNoise(RangeChecked):
     predictions, on `residual_scale`. The band is then a prediction interval.
     It serves the series the fit has residuals of, at any position: the
     residual of a series at a drawn position is the one at the nearest
-    position where the series was observed.
+    position where the series was observed. A position of a series draws one
+    residual, so a series with two observations at one position, in the fit
+    or in the observations served, is refused.
 
     Attributes
     ----------
@@ -35932,7 +35948,8 @@ class Predictive:
         ------
         ValueError
             If an observation names an unknown output or factor, a series the
-            residual noise has no residuals of, or a series with no
+            residual noise has no residuals of or that has two observations at
+            one position for the residual noise, or a series with no
             observation model; `DistributionNoise` comes with a problem that
             has a loss; or the noise is not `NoNoise()` and the source is an
             analysis.
@@ -36415,10 +36432,10 @@ Returns:
 
 Raises:
 
-| Type                   | Description                                                                                                                                                                                                                                                       |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError`           | If an observation names an unknown output or factor, a series the residual noise has no residuals of, or a series with no observation model; DistributionNoise comes with a problem that has a loss; or the noise is not NoNoise() and the source is an analysis. |
-| `InfeasibleStateError` | If a draw leaves the values its model allows. The message names the parameter set, then says what the run says (the compartment, the step and the flows), or what the initial amounts exceed.                                                                     |
+| Type                   | Description                                                                                                                                                                                                                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError`           | If an observation names an unknown output or factor, a series the residual noise has no residuals of or that has two observations at one position for the residual noise, or a series with no observation model; DistributionNoise comes with a problem that has a loss; or the noise is not NoNoise() and the source is an analysis. |
+| `InfeasibleStateError` | If a draw leaves the values its model allows. The message names the parameter set, then says what the run says (the compartment, the step and the flows), or what the initial amounts exceed.                                                                                                                                         |
 
 Source code in `commol/uncertainty/predictive.py`
 
@@ -36456,7 +36473,8 @@ def at_observations(
     ------
     ValueError
         If an observation names an unknown output or factor, a series the
-        residual noise has no residuals of, or a series with no
+        residual noise has no residuals of or that has two observations at
+        one position for the residual noise, or a series with no
         observation model; `DistributionNoise` comes with a problem that
         has a loss; or the noise is not `NoNoise()` and the source is an
         analysis.
@@ -39054,6 +39072,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- A series with two observations at one position, such as an increment over 2 steps and a total over 40 steps that both end at 40, is refused by the methods that read one residual per position of a series, with a message that names the series and the position: `ResidualNoise`, `ResidualBootstrap`, `block_length="auto"` of every method, and `RollingConformal`, which counts a horizon in observations. Before, the residual noise and the residual bootstrap gave both observations the residual of one of them, and the automatic block length read them as consecutive positions, with no message. A calibration, the likelihood, the scores, and the Bayesian and wild bootstraps, the block jackknife, the sandwich and the other conformal methods with a `block_length` of a number read each observation with its own residual, and accept such a series. Give one of the two observations a label of its own for the methods that refuse it. See [One position, two observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#one-position-two-observations).
 - A calibrated value of a bin, and the initial-condition remainder, split by the proportions of amounts below the smallest normal `float`, about `2.2e-308`, which hold fewer digits the smaller they are: with `B = 1e-310` split `0.3, 0.7`, `B = 1.5` gave `B_x = 0.44999999999997775`, so `Model.apply_calibration_parameters` wrote both compartments as overrides, and after `update_bin_amounts({"B": 20})` `B` still started from 1.5. Where such amounts hold the split of the fractions up to their rounding, a value now splits by the fractions, so the write-back writes the bin and its split with no override. Amounts further from the fractions, such as an override, keep their proportions. See [What an id can name](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/#what-an-id-can-name).
 - After a calibrated category, the initial-condition remainder split compartments that start at 0, as those of a bin left `None`, by the fractions the model declares, not by the calibrated category: with `A` left `None`, `group` split `0.4, 0.6` and `g1 = 0.3` calibrated, the remainder `A` split `0.4, 0.6`, so the write-back, which writes `g1 = 0.3`, overrode both compartments of `A`. It now splits by the fractions with each calibrated category in place of its declared split. See [The remainder](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/#the-remainder).
 - `Model.apply_calibration_parameters` wrote a calibrated amount that is not whole, such as `B = 11.85`, onto a model of `StochasticEvents` or `StochasticSteps` with a `rounding`, and the model then did not build: the amount of a bin had to be whole even with a rounding. The model now builds and holds the amount the optimizer found, and a run of it rounds that amount as the calibration did: from 12 units. See [Whole units](https://munqu.github.io/commol/latest/guide/stochastic/#whole-units).

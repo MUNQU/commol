@@ -155,7 +155,7 @@ print(widths)  # [6.3, 5.2]
 
 ## Rolling origins
 
-`RollingConformal(origins, score, by, confidence_level, positions, starts=1)` gives intervals ahead of the data, with one quantile per horizon. Horizon `k` is the `k`-th observation of a series after an origin: a count, not a distance on the axis, because positions can be irregular. Each origin fits the observations at or before it (one refit per origin, from the fit of every observation) and scores the later ones. The intervals are around the fit of every observation, at `positions`, which must all be after the data; the `k`-th position is horizon `k`, so give positions spaced as the observations. A horizon with fewer than `1/α − 1` origins that reach it has an unbounded interval.
+`RollingConformal(origins, score, by, confidence_level, positions, starts=1)` gives intervals ahead of the data, with one quantile per horizon. Horizon `k` is the `k`-th observation of a series after an origin: a count, not a distance on the axis, because positions can be irregular. Each origin fits the observations at or before it (one refit per origin, from the fit of every observation) and scores the later ones. The intervals are around the fit of every observation, at `positions`, which must all be after the data; the `k`-th position is horizon `k`, so give positions spaced as the observations. A horizon with fewer than `1/α − 1` origins that reach it has an unbounded interval. A series with two observations at one position has no single count of horizons, so `RollingConformal` refuses it ([One position, two observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#one-position-two-observations)).
 
 ```python
 from commol.conformal import RollingConformal

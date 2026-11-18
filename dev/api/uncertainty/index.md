@@ -1218,7 +1218,8 @@ class Predictive:
         ------
         ValueError
             If an observation names an unknown output or factor, a series the
-            residual noise has no residuals of, or a series with no
+            residual noise has no residuals of or that has two observations at
+            one position for the residual noise, or a series with no
             observation model; `DistributionNoise` comes with a problem that
             has a loss; or the noise is not `NoNoise()` and the source is an
             analysis.
@@ -1701,10 +1702,10 @@ Returns:
 
 Raises:
 
-| Type                   | Description                                                                                                                                                                                                                                                       |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError`           | If an observation names an unknown output or factor, a series the residual noise has no residuals of, or a series with no observation model; DistributionNoise comes with a problem that has a loss; or the noise is not NoNoise() and the source is an analysis. |
-| `InfeasibleStateError` | If a draw leaves the values its model allows. The message names the parameter set, then says what the run says (the compartment, the step and the flows), or what the initial amounts exceed.                                                                     |
+| Type                   | Description                                                                                                                                                                                                                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError`           | If an observation names an unknown output or factor, a series the residual noise has no residuals of or that has two observations at one position for the residual noise, or a series with no observation model; DistributionNoise comes with a problem that has a loss; or the noise is not NoNoise() and the source is an analysis. |
+| `InfeasibleStateError` | If a draw leaves the values its model allows. The message names the parameter set, then says what the run says (the compartment, the step and the flows), or what the initial amounts exceed.                                                                                                                                         |
 
 Source code in `commol/uncertainty/predictive.py`
 
@@ -1742,7 +1743,8 @@ def at_observations(
     ------
     ValueError
         If an observation names an unknown output or factor, a series the
-        residual noise has no residuals of, or a series with no
+        residual noise has no residuals of or that has two observations at
+        one position for the residual noise, or a series with no
         observation model; `DistributionNoise` comes with a problem that
         has a loss; or the noise is not `NoNoise()` and the source is an
         analysis.

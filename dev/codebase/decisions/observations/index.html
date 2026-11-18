@@ -2999,6 +2999,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-reader-of-positions-refuses-two-observations-at-one" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A reader of positions refuses two observations at one
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3793,6 +3804,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-reader-of-positions-refuses-two-observations-at-one" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A reader of positions refuses two observations at one
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3816,7 +3838,8 @@
 <h1 id="observations">Observations<a class="headerlink" href="#observations" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
 <p>How an observation reads a run: the one operator of the engine, the known
-scale of an observation and the coefficients of a weighted sum of outputs.
+scale of an observation, the coefficients of a weighted sum of outputs and
+the readers that refuse two observations of a series at one position.
 What a weight means and how a calibration runs are on
 <a href="../calibration/">Calibration</a>.</p>
 <h2 id="one-observation-operator">One observation operator<a class="headerlink" href="#one-observation-operator" title="Permanent link">&para;</a></h2>
@@ -3925,6 +3948,51 @@ rules of one built in Python.</p>
 <code>profiles::tracer::tests::the_absolute_error_of_a_prediction_counts_each_output_by_its_coefficient</code>,
 <code>sensitivity::finite_differences::tests::observations_with_other_coefficients_are_another_series</code>,
 <code>tests/calibration/test_coefficients.py</code>.</p>
+<h2 id="a-reader-of-positions-refuses-two-observations-at-one">A reader of positions refuses two observations at one<a class="headerlink" href="#a-reader-of-positions-refuses-two-observations-at-one" title="Permanent link">&para;</a></h2>
+<p>A label may hold two observations at one position (an increment and a total
+that end there), each with its own window, scale and residual. The loss, the
+likelihood, the scores, the predictive with <code>NoNoise</code> or <code>DistributionNoise</code>,
+and the block methods of a given <code>block_length</code> that weigh blocks or
+multiply residuals in place (the Bayesian and wild bootstraps, the block
+jackknife, the sandwich, the conformal methods other than rolling origins)
+read each observation alone and accept it. A reader that pairs
+the observations of a series by position refuses it, with a message that
+names the series and the position: <code>ResidualNoise</code> and <code>ResidualBootstrap</code>
+(<code>SeriesResiduals::new</code>, one residual per position, and
+<code>ResidualNoise::check</code> for the observations it serves), the automatic block
+length (<code>automatic_block_length</code>, the residuals as consecutive values) and
+<code>RollingConformal</code> (a horizon is a count of observations). They share one
+check, <code>one_per_position</code> (<code>crates/commol-inference/src/resampling/blocks.rs</code>):
+two observations share a position when their <code>at</code> are equal, as
+<code>distinct_positions</code> counts the positions of the grid.
+A new reader that pairs a series by position calls it, or reads each
+observation with its own residual.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Keep one residual per position</td>
+<td>It drops a residual with no message: a total gets the residuals of its increments.</td>
+</tr>
+<tr>
+<td>A residual per observation at a position, matched by rank</td>
+<td>The second observation of a position has no residual at most positions, so it would draw its own every time and no noise; the two have different scales, so a block mixes them.</td>
+</tr>
+<tr>
+<td>Refuse at the calibration</td>
+<td>A loss and a likelihood read the two well, and a total beside its increments is valid data.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_resampling.rs::readers_of_a_series_by_position_refuse_two_observations_at_one_position</code>,
+<code>crates/commol-inference/tests/test_resampling.rs::residual_noise_refuses_two_held_out_observations_of_a_series_at_one_position</code>,
+<code>tests/uncertainty/test_resampling.py::TestResidualBootstraps::test_observations_at_one_position_are_refused</code>,
+<code>tests/uncertainty/test_resampling.py::TestResidualNoise::test_held_out_observations_at_one_position_are_refused</code>.</p>
 
 
 

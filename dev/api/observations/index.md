@@ -254,7 +254,7 @@ Bases: `RangeChecked`
 
 Observation noise made of the residuals of a fit, with no noise model.
 
-Each draw adds moving blocks of `block_length` positions of residuals of the fit, drawn with replacement across every series at once, to its predictions, on `residual_scale`. The band is then a prediction interval. It serves the series the fit has residuals of, at any position: the residual of a series at a drawn position is the one at the nearest position where the series was observed.
+Each draw adds moving blocks of `block_length` positions of residuals of the fit, drawn with replacement across every series at once, to its predictions, on `residual_scale`. The band is then a prediction interval. It serves the series the fit has residuals of, at any position: the residual of a series at a drawn position is the one at the nearest position where the series was observed. A position of a series draws one residual, so a series with two observations at one position, in the fit or in the observations served, is refused.
 
 Attributes:
 
@@ -277,7 +277,9 @@ class ResidualNoise(RangeChecked):
     predictions, on `residual_scale`. The band is then a prediction interval.
     It serves the series the fit has residuals of, at any position: the
     residual of a series at a drawn position is the one at the nearest
-    position where the series was observed.
+    position where the series was observed. A position of a series draws one
+    residual, so a series with two observations at one position, in the fit
+    or in the observations served, is refused.
 
     Attributes
     ----------

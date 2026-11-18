@@ -100,7 +100,7 @@ A block holds every observation, of every series, whose position falls in one wi
 | An integer | You know how far the dependence of the noise reaches                                                                                                                                                             |
 | `"auto"`   | You do not know: the rule of Politis and White (2004), with the correction of Patton, Politis and White (2009), estimates a length for each series on the residuals of the fit, and the method takes the largest |
 
-With `"auto"`, `diagnostics.block_length_estimates` gives the estimate of each series and `diagnostics.block_length` the length used. The estimate depends on how a method draws its blocks: moving blocks get a length about 15 % longer than stationary or non-overlapping ones.
+With `"auto"`, `diagnostics.block_length_estimates` gives the estimate of each series and `diagnostics.block_length` the length used. The estimate depends on how a method draws its blocks: moving blocks get a length about 15 % longer than stationary or non-overlapping ones. `"auto"` reads the residuals of a series one per position, so it refuses a series with two observations at one position; a number does, except for `ResidualBootstrap`, which draws one residual per position ([One position, two observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#one-position-two-observations)).
 
 ## Bayesian bootstrap
 
@@ -197,7 +197,7 @@ Each replicate starts from the fit. With `starts > 1` it also starts from the [o
 
 ## Prediction intervals
 
-The draws of a bootstrap give a band of the model. `ResidualNoise` adds moving blocks of residuals of the fit to every draw's prediction of each observation, which gives a prediction interval with no noise model. It serves the series the fit has residuals of, at any position, and rejects an observation of any other series.
+The draws of a bootstrap give a band of the model. `ResidualNoise` adds moving blocks of residuals of the fit to every draw's prediction of each observation, which gives a prediction interval with no noise model. It serves the series the fit has residuals of, at any position, and rejects an observation of any other series. It and `ResidualBootstrap` draw one residual per position of a series, so they refuse a series with two observations at one position, in the fit or in the observations they serve ([One position, two observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#one-position-two-observations)).
 
 ```python
 predictive = Predictive(calibrator, result.sample, positions=list(range(81)))

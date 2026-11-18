@@ -4314,7 +4314,10 @@ or before it (one refit per origin, from the fit of every observation) and
 scores the later ones. The intervals are around the fit of every observation,
 at <code>positions</code>, which must all be after the data; the <code>k</code>-th position is
 horizon <code>k</code>, so give positions spaced as the observations. A horizon with fewer
-than <code>1/α − 1</code> origins that reach it has an unbounded interval.</p>
+than <code>1/α − 1</code> origins that reach it has an unbounded interval. A series with
+two observations at one position has no single count of horizons, so
+<code>RollingConformal</code> refuses it
+(<a href="../../calibration-observations/#one-position-two-observations">One position, two observations</a>).</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol.conformal</span><span class="w"> </span><span class="kn">import</span> <span class="n">RollingConformal</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">every_point</span> <span class="o">=</span> <span class="n">CalibrationProblem</span><span class="p">(</span>
