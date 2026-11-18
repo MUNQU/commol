@@ -4205,7 +4205,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/sample.rs</code></td>
-<td><code>ParameterSample</code>: weighted draws, their invariants and statistics, resampling.</td>
+<td><code>ParameterSample</code>: weighted draws, their invariants and statistics, resampling, the distinct draws with their summed weights (<code>distinct</code>).</td>
 <td>What a method does.</td>
 </tr>
 <tr>
@@ -4250,7 +4250,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/identifiability/</code></td>
-<td>The analyses: <code>structural_rank</code> (ranks, null space, combinations), <code>collinearity</code> (Brun's indices), <code>sample_identifiability</code> (contraction, correlations, modes), <code>starts_identifiability</code>.</td>
+<td>The analyses: <code>structural_rank</code> (ranks, null space, combinations), <code>collinearity</code> (Brun's indices), <code>sample_identifiability</code> (what a sample learned against its reference: contraction, correlations, modes, masses at each side, bounds that set a side, overlap, directions; the kernel density of a marginal and its modes in <code>sample/marginal.rs</code>), <code>starts_identifiability</code>.</td>
 <td>Derivatives; reports.</td>
 </tr>
 <tr>
@@ -4265,7 +4265,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/distribution.rs</code>, <code>special.rs</code></td>
-<td><code>Family</code> and <code>Distribution</code>, one family truncated to the bounds of a parameter (density, distribution function, quantile, closed-form moments, draws by inversion); the normal distribution function and its inverse, the regularized incomplete gamma and beta functions and the quantiles of the Student t and the F (<code>special.rs</code>, on <code>libm</code>). The quantile sets the bracket of the root and takes the root finder from the argmin fork (<code>NewtonRoot</code>).</td>
+<td><code>Family</code> and <code>Distribution</code>, one family truncated to the bounds of a parameter (density, distribution function, quantile, closed-form moments, draws by inversion; by Gauss–Legendre quadrature over the quantile, the variance of <code>ln x</code> and the density at a bound smoothed by a reflected kernel); the normal distribution function and its inverse, the regularized incomplete gamma and beta functions and the quantiles of the Student t and the F (<code>special.rs</code>, on <code>libm</code>). The quantile sets the bracket of the root and takes the root finder from the argmin fork (<code>NewtonRoot</code>).</td>
 <td>Distributions from a dependency, whose draws change with it; a root finder of its own.</td>
 </tr>
 <tr>

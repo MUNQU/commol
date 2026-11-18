@@ -119,16 +119,27 @@ class Collinearity(IdentifiabilityMethod[IdentifiabilityReport], RangeChecked):
 
 Bases: `IdentifiabilityMethod[IdentifiabilityReport]`, `EngineChecked`, `RangeChecked`
 
-Practical identifiability from any parameter sample: how much it contracts each parameter, which parameters move together, and which marginals have several modes.
+Practical identifiability from any parameter sample: what it learned about each parameter against its reference (the bounds or the priors).
+
+A parameter is `poorly_determined` when its contraction is below `contraction_threshold`, its correlation with another is above `correlation_threshold`, or its marginal has several modes. The section also gives the mass of each parameter in the outer `bound_share` of its reference at each side, the bounds that set a side of a marginal (`at_bound`, which does not set the verdict), the overlap of each marginal with its reference and the directions of the parameters, with the count of directions among the `determined` parameters that contract less than `contraction_threshold`. Equal draws are merged, each with the summed weight of its copies. The bootstrap of that count draws from the seed of the calibrator, `Calibrator.seed`.
 
 Attributes:
 
-| Name                    | Type              | Description                                                                                                                                                                                        |
-| ----------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sample`                | `ParameterSample` | The sample, such as the draws of an uncertainty method.                                                                                                                                            |
-| `reference`             | `{bounds, prior}` | The distribution the contraction compares with: "bounds", the uniform distribution on the bounds, or "prior", the prior of each parameter in priors, such as the priors the sample was drawn with. |
-| `correlation_threshold` | `float`           | The absolute correlation above which a pair is listed and its parameters are poorly determined, strictly between 0 and 1. No default: it is a modelling judgment.                                  |
-| `priors`                | \`Priors          | dict[str, distribution]                                                                                                                                                                            |
+| Name                    | Type              | Description                                                                                                                                                                                                                             |
+| ----------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sample`                | `ParameterSample` | The sample, such as the draws of an uncertainty method.                                                                                                                                                                                 |
+| `reference`             | `{bounds, prior}` | The distribution the sample is measured against: "bounds", the uniform distribution on the bounds, or "prior", the prior of each parameter in priors, such as the priors the sample was drawn with.                                     |
+| `correlation_threshold` | `float`           | The absolute correlation above which a pair is listed and its parameters are poorly determined, strictly between 0 and 1. No default: it is a modelling judgment.                                                                       |
+| `contraction_threshold` | `float`           | The contraction 1 − Var(sample) / Var(reference) below which a parameter is poorly determined, strictly between 0 and 1; also the contraction below which a direction counts as a hidden ridge. No default: it is a modelling judgment. |
+| `bound_share`           | `float`           | The share ε of the reference at each side, strictly between 0 and 0.5: the section gives the mass of the sample where the distribution function of the reference is below ε and above 1 − ε. No default: it is a modelling judgment.    |
+| `log_parameters`        | `list[str]`       | The parameters whose shape measures (contraction, correlation, modes, density at a bound, directions) read ln θ; each has a lower bound of at least 0 and every draw above 0. Default: none.                                            |
+| `priors`                | \`Priors          | dict[str, distribution]                                                                                                                                                                                                                 |
+
+Raises:
+
+| Type         | Description                                                                                                                                    |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | When the analysis runs, if log_parameters names a parameter the sample does not hold, one with a lower bound below 0, or one with a draw at 0. |
 
 Source code in `commol/identifiability/methods.py`
 
@@ -137,24 +148,56 @@ class SampleIdentifiability(
     IdentifiabilityMethod[IdentifiabilityReport], EngineChecked, RangeChecked
 ):
     """
-    Practical identifiability from any parameter sample: how much it contracts
-    each parameter, which parameters move together, and which marginals have
-    several modes.
+    Practical identifiability from any parameter sample: what it learned
+    about each parameter against its reference (the bounds or the priors).
+
+    A parameter is ``poorly_determined`` when its contraction is below
+    `contraction_threshold`, its correlation with another is above
+    `correlation_threshold`, or its marginal has several modes. The section
+    also gives the mass of each parameter in the outer `bound_share` of its
+    reference at each side, the bounds that set a side of a marginal
+    (``at_bound``, which does not set the verdict), the overlap of each
+    marginal with its reference and the directions of the parameters, with
+    the count of directions among the ``determined`` parameters that
+    contract less than `contraction_threshold`. Equal draws are merged, each
+    with the summed weight of its copies. The bootstrap of that count draws
+    from the seed of the calibrator, ``Calibrator.seed``.
 
     Attributes
     ----------
     sample : ParameterSample
         The sample, such as the draws of an uncertainty method.
     reference : {"bounds", "prior"}
-        The distribution the contraction compares with: ``"bounds"``, the
+        The distribution the sample is measured against: ``"bounds"``, the
         uniform distribution on the bounds, or ``"prior"``, the prior of each
         parameter in `priors`, such as the priors the sample was drawn with.
     correlation_threshold : float
         The absolute correlation above which a pair is listed and its
         parameters are poorly determined, strictly between 0 and 1. No
         default: it is a modelling judgment.
+    contraction_threshold : float
+        The contraction ``1 − Var(sample) / Var(reference)`` below which a
+        parameter is poorly determined, strictly between 0 and 1; also the
+        contraction below which a direction counts as a hidden ridge. No
+        default: it is a modelling judgment.
+    bound_share : float
+        The share ``ε`` of the reference at each side, strictly between 0
+        and 0.5: the section gives the mass of the sample where the
+        distribution function of the reference is below ``ε`` and above
+        ``1 − ε``. No default: it is a modelling judgment.
+    log_parameters : list[str]
+        The parameters whose shape measures (contraction, correlation,
+        modes, density at a bound, directions) read ``ln θ``; each has a
+        lower bound of at least 0 and every draw above 0. Default: none.
     priors : Priors | dict[str, distribution] | None
         The prior of each parameter, with ``reference="prior"`` only.
+
+    Raises
+    ------
+    ValueError
+        When the analysis runs, if `log_parameters` names a parameter the
+        sample does not hold, one with a lower bound below 0, or one with a
+        draw at 0.
     """
 
     _runner = staticmethod(run_sample_identifiability)
@@ -164,6 +207,9 @@ class SampleIdentifiability(
     sample: ParameterSample
     reference: SampleReference
     correlation_threshold: float
+    contraction_threshold: float
+    bound_share: float
+    log_parameters: list[str] = Field(default_factory=list)
     priors: Priors | None = None
 
     @model_validator(mode="before")
@@ -1009,51 +1055,116 @@ class SubsetIndex(_FrozenResult):
 
 Bases: `_FrozenResult`
 
-The evidence of `SampleIdentifiability`.
+The evidence of `SampleIdentifiability`: what the sample learned about each parameter against its reference.
 
 Attributes:
 
-| Name                    | Type                          | Description                                                                                                                                |
-| ----------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `reference`             | `{bounds, prior}`             | The distribution the contraction compares with: "bounds", the uniform distribution on the bounds, or "prior", the prior of each parameter. |
-| `correlation_threshold` | `float`                       | The absolute correlation above which a pair is listed.                                                                                     |
-| `contraction`           | `dict[str, float]`            | 1 − Var(sample) / Var(reference) of each parameter: near 0 when the sample spreads as the reference, near 1 when it sits on a value.       |
-| `correlation`           | `dict[str, dict[str, float]]` | The weighted correlation matrix.                                                                                                           |
-| `correlated_pairs`      | `list[CorrelatedPair]`        | The pairs above the threshold.                                                                                                             |
-| `modes`                 | `dict[str, list[float]]`      | The modes of the marginal of each parameter.                                                                                               |
+| Name                    | Type                             | Description                                                                                                                                          |
+| ----------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reference`             | `{bounds, prior}`                | The distribution the sample is measured against: "bounds", the uniform distribution on the bounds, or "prior", the prior of each parameter.          |
+| `correlation_threshold` | `float`                          | The absolute correlation above which a pair is listed.                                                                                               |
+| `contraction_threshold` | `float`                          | The contraction below which a parameter is poorly determined.                                                                                        |
+| `bound_share`           | `float`                          | The share of the reference at each side in which mass_below and mass_above are measured.                                                             |
+| `log_parameters`        | `list[str]`                      | The parameters whose shape measures read ln θ.                                                                                                       |
+| `effective_size`        | `float`                          | Kish's effective size of the distinct draws, each with the summed weight of its copies.                                                              |
+| `contraction`           | `dict[str, float]`               | 1 − Var(sample) / Var(reference) of each parameter, on its scale: near 0 when the sample spreads as the reference, near 1 when it sits on a value.   |
+| `correlation`           | `dict[str, dict[str, float]]`    | The weighted correlation matrix, on the scale of each parameter.                                                                                     |
+| `correlated_pairs`      | `list[CorrelatedPair]`           | The pairs above the threshold.                                                                                                                       |
+| `modes`                 | `dict[str, list[float]]`         | The modes of the marginal of each parameter, in parameter units.                                                                                     |
+| `mass_below`            | `dict[str, float]`               | The weight of the draws where the distribution function of the reference is below bound_share.                                                       |
+| `mass_above`            | `dict[str, float]`               | The weight of the draws where it is above 1 − bound_share.                                                                                           |
+| `at_bound`              | `dict[str, list[BoundSideName]]` | The sides whose finite bound, not the data, sets that side of the marginal of each parameter. It does not set the verdict.                           |
+| `overlap`               | `dict[str, float]`               | Σ_b min(w_b, 1/B) of each parameter over bins bins of equal reference mass: 1 when the sample spreads as its reference, 1/B when it sits in one bin. |
+| `bins`                  | `int`                            | The number of bins B = ⌈2 n_eff^{1/3}⌉ of the overlap.                                                                                               |
+| `directions`            | `list[Direction]`                | The directions of the parameters, from the least contracted; empty when the sample has at most as many distinct draws as parameters.                 |
+| `hidden_ridges`         | \`int                            | None\`                                                                                                                                               |
+| `draws_per_parameter`   | `float`                          | The effective size per parameter, n_eff / p; below about 30 the count of hidden ridges over-counts.                                                  |
+| `warnings`              | `list[str]`                      | What the section warns of: hidden ridges, or no directions.                                                                                          |
 
 Source code in `commol/identifiability/results.py`
 
 ```python
 class SampleSection(_FrozenResult):
     """
-    The evidence of `SampleIdentifiability`.
+    The evidence of `SampleIdentifiability`: what the sample learned about
+    each parameter against its reference.
 
     Attributes
     ----------
     reference : {"bounds", "prior"}
-        The distribution the contraction compares with: ``"bounds"``, the
+        The distribution the sample is measured against: ``"bounds"``, the
         uniform distribution on the bounds, or ``"prior"``, the prior of each
         parameter.
     correlation_threshold : float
         The absolute correlation above which a pair is listed.
+    contraction_threshold : float
+        The contraction below which a parameter is poorly determined.
+    bound_share : float
+        The share of the reference at each side in which `mass_below` and
+        `mass_above` are measured.
+    log_parameters : list[str]
+        The parameters whose shape measures read ``ln θ``.
+    effective_size : float
+        Kish's effective size of the distinct draws, each with the summed
+        weight of its copies.
     contraction : dict[str, float]
-        ``1 − Var(sample) / Var(reference)`` of each parameter: near 0 when
-        the sample spreads as the reference, near 1 when it sits on a value.
+        ``1 − Var(sample) / Var(reference)`` of each parameter, on its scale:
+        near 0 when the sample spreads as the reference, near 1 when it sits
+        on a value.
     correlation : dict[str, dict[str, float]]
-        The weighted correlation matrix.
+        The weighted correlation matrix, on the scale of each parameter.
     correlated_pairs : list[CorrelatedPair]
         The pairs above the threshold.
     modes : dict[str, list[float]]
-        The modes of the marginal of each parameter.
+        The modes of the marginal of each parameter, in parameter units.
+    mass_below : dict[str, float]
+        The weight of the draws where the distribution function of the
+        reference is below `bound_share`.
+    mass_above : dict[str, float]
+        The weight of the draws where it is above ``1 − bound_share``.
+    at_bound : dict[str, list[BoundSideName]]
+        The sides whose finite bound, not the data, sets that side of the
+        marginal of each parameter. It does not set the verdict.
+    overlap : dict[str, float]
+        ``Σ_b min(w_b, 1/B)`` of each parameter over `bins` bins of equal
+        reference mass: 1 when the sample spreads as its reference, ``1/B``
+        when it sits in one bin.
+    bins : int
+        The number of bins ``B = ⌈2 n_eff^{1/3}⌉`` of the overlap.
+    directions : list[Direction]
+        The directions of the parameters, from the least contracted; empty
+        when the sample has at most as many distinct draws as parameters.
+    hidden_ridges : int | None
+        How many directions among the parameters called ``determined`` have
+        a contraction, corrected by a Bayesian bootstrap, below
+        `contraction_threshold`: a ridge that no pair shows. None without
+        directions.
+    draws_per_parameter : float
+        The effective size per parameter, ``n_eff / p``; below about 30 the
+        count of hidden ridges over-counts.
+    warnings : list[str]
+        What the section warns of: hidden ridges, or no directions.
     """
 
     reference: SampleReference
     correlation_threshold: float
+    contraction_threshold: float
+    bound_share: float
+    log_parameters: list[str]
+    effective_size: float
     contraction: dict[str, float]
     correlation: dict[str, dict[str, float]]
     correlated_pairs: list[CorrelatedPair]
     modes: dict[str, list[float]]
+    mass_below: dict[str, float]
+    mass_above: dict[str, float]
+    at_bound: dict[str, list[BoundSideName]]
+    overlap: dict[str, float]
+    bins: int
+    directions: list[Direction]
+    hidden_ridges: int | None
+    draws_per_parameter: float
+    warnings: list[str]
 ```
 
 ## CorrelatedPair
@@ -1087,6 +1198,49 @@ class CorrelatedPair(_FrozenResult):
     first: str
     second: str
     correlation: float
+```
+
+## Direction
+
+Bases: `_FrozenResult`
+
+A direction of the parameters of a sample: an eigenvector of the covariance of the sample, each parameter on its scale divided by the standard deviation of its reference.
+
+Attributes:
+
+| Name          | Type                        | Description                                                                                                                                                            |
+| ------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `contraction` | `float`                     | 1 − λ, with λ the eigenvalue: near 0 when the sample spreads along the direction as its reference does, below 0 when it spreads more.                                  |
+| `loadings`    | `dict[str, float]`          | The loading of each parameter; the largest in absolute value is positive. The direction moves θ / sd of each parameter, or ln θ / sd on the log scale, by its loading. |
+| `scales`      | `dict[str, ParameterScale]` | The scale of each parameter: "natural", or "log" for the parameters of log_parameters.                                                                                 |
+
+Source code in `commol/identifiability/results.py`
+
+```python
+class Direction(_FrozenResult):
+    """
+    A direction of the parameters of a sample: an eigenvector of the
+    covariance of the sample, each parameter on its scale divided by the
+    standard deviation of its reference.
+
+    Attributes
+    ----------
+    contraction : float
+        ``1 − λ``, with ``λ`` the eigenvalue: near 0 when the sample spreads
+        along the direction as its reference does, below 0 when it spreads
+        more.
+    loadings : dict[str, float]
+        The loading of each parameter; the largest in absolute value is
+        positive. The direction moves ``θ / sd`` of each parameter, or
+        ``ln θ / sd`` on the log scale, by its loading.
+    scales : dict[str, ParameterScale]
+        The scale of each parameter: ``"natural"``, or ``"log"`` for the
+        parameters of ``log_parameters``.
+    """
+
+    contraction: float
+    loadings: dict[str, float]
+    scales: dict[str, ParameterScale]
 ```
 
 ## StartsSection
@@ -1425,10 +1579,23 @@ class SampleSectionData(TypedDict):
 
     reference: "SampleReference"
     correlation_threshold: float
+    contraction_threshold: float
+    bound_share: float
+    log_parameters: list[str]
+    effective_size: float
     contraction: dict[str, float]
     correlation: dict[str, dict[str, float]]
     correlated_pairs: list[CorrelatedPairData]
     modes: dict[str, list[float]]
+    mass_below: dict[str, float]
+    mass_above: dict[str, float]
+    at_bound: dict[str, list["BoundSideName"]]
+    overlap: dict[str, float]
+    bins: int
+    directions: list[DirectionData]
+    hidden_ridges: int | None
+    draws_per_parameter: float
+    warnings: list[str]
 ```
 
 ## CorrelatedPairData
@@ -1446,6 +1613,23 @@ class CorrelatedPairData(TypedDict):
     first: str
     second: str
     correlation: float
+```
+
+## DirectionData
+
+Bases: `TypedDict`
+
+`Direction` as plain data.
+
+Source code in `commol/identifiability/report.py`
+
+```python
+class DirectionData(TypedDict):
+    """`Direction` as plain data."""
+
+    contraction: float
+    loadings: dict[str, float]
+    scales: dict[str, "ParameterScale"]
 ```
 
 ## StartsSectionData

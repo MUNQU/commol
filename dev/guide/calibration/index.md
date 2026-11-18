@@ -123,7 +123,7 @@ The engine holds every rule of a problem and of its parameters, and checks them 
 
 #### Infinite bounds
 
-An infinite bound gives a prior on a half-line, such as `[0, inf]` for [sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md), so a problem keeps it with either optimizer. An optimizer needs finite bounds: each start of a fit refuses an infinite bound, with a message that names the parameter (see [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#nelder-mead)). So do the methods that read the bounds as a box: `StructuralRank`, which draws its points inside them, and `SampleIdentifiability(reference="bounds")`, which measures the contraction against the uniform distribution on them; give it `reference="prior"`. A NaN bound is always refused.
+An infinite bound gives a prior on a half-line, such as `[0, inf]` for [sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/index.md), so a problem keeps it with either optimizer. An optimizer needs finite bounds: each start of a fit refuses an infinite bound, with a message that names the parameter (see [Optimizers](https://munqu.github.io/commol/latest/guide/calibration-optimizers/#nelder-mead)). So do the methods that read the bounds as a box: `StructuralRank`, which draws its points inside them, and `SampleIdentifiability(reference="bounds")`, which measures the sample against the uniform distribution on them; give it `reference="prior"`. A NaN bound is always refused.
 
 ## Losses
 

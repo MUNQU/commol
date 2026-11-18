@@ -3122,6 +3122,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-sample-is-judged-against-its-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A sample is judged against its reference
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3815,6 +3826,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-sample-is-judged-against-its-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A sample is judged against its reference
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4013,8 +4035,9 @@ on, and makes one they disagree on <code>conflicting</code>, with every reason.
 Thresholds and tolerances of the methods are required arguments: they are
 modelling judgments. Rust decides each verdict and gives its causes
 (<code>StructuralAnalysis::verdicts</code>; <code>Collinearity::verdicts</code>: insensitive, the
-parameters it is collinear with; <code>SampleIdentifiability::verdicts</code>: the
-parameters it is correlated with, its number of modes;
+parameters it is collinear with; <code>SampleIdentifiability::verdicts</code>: a contraction below the threshold,
+the parameters it is correlated with, its number of modes, and the bounds
+that set a side, which do not set the verdict;
 <code>StartsIdentifiability::flagged</code>). The runners of
 <code>identifiability/runners.py</code> write the reasons from the causes and
 decide nothing.</p>
@@ -4039,6 +4062,121 @@ decide nothing.</p>
 <p><strong>Guards:</strong> <code>tests/uncertainty/test_identifiability_report.py</code> (<code>TestReport</code>),
 <code>crates/commol-inference/tests/test_identifiability.rs::collinearity_gives_the_verdict_of_each_parameter</code>,
 <code>crates/commol-inference/tests/test_identifiability.rs::a_sample_gives_the_verdict_of_each_parameter</code>.</p>
+<h2 id="a-sample-is-judged-against-its-reference">A sample is judged against its reference<a class="headerlink" href="#a-sample-is-judged-against-its-reference" title="Permanent link">&para;</a></h2>
+<p><code>sample_identifiability</code> (<code>crates/commol-inference/src/identifiability/sample.rs</code>)
+reads the distinct draws of a sample, each with the summed weight of its
+copies (<code>ParameterSample::distinct</code>), and measures each parameter against its
+reference: the uniform distribution on the bounds, or its prior
+(<code>Distribution</code>). The contraction, <code>1 − Var / Var_ref</code>, reads the variance
+of the weighted draws, <code>Σ wᵢ (xᵢ − x̄)²</code> with no correction for the size:
+a sample and its distinct draws give the same, and no sample on the bounds
+spreads more than the widest distribution on them. The contraction enters
+the verdict. The shape measures
+read <code>θ</code>, or <code>ln θ</code> for <code>log_parameters</code>; the masses at each side and the
+overlap read the distribution function of the reference.</p>
+<ul>
+<li><strong>Modes.</strong> A weighted Gaussian kernel density with Silverman's bandwidth
+  <code>h</code>, reflected at each finite bound, on a grid over the draws ± 3<code>h</code> cut
+  at the bounds, of step at most <code>h/4</code> (<code>sample/marginal.rs</code>); the grid
+  keeps only the points a kernel reaches, and one point of density 0 in
+  each gap, so the step holds on a range of any width. The standard error
+  at <code>x</code> is <code>√(Σ wᵢ² (Σ K_h(x − cᵢ))²)</code>, the inner sum over the kernels of
+  draw <code>i</code> and its reflections <code>cᵢ</code>: one draw of a large weight is one draw,
+  not a mode. With equal weights it is <code>√(f R(K) / (n h))</code>, times
+  <code>√(1 + e^{−d²/h²})</code> at a distance <code>d</code> from a reflected bound. The lower peak of the
+  shallowest dip goes while <code>f(peak) − f(valley) − 3·hypot(se_peak,
+  se_valley)</code> is not positive; the ends of the grid are candidates.</li>
+<li><strong>A bound that sets a side</strong> (<code>at_bound</code>): the density at the bound is not
+  more than three standard errors below its highest point up to the nearest
+  mode, and exceeds the reference smoothed by the same reflected kernel
+  (<code>Distribution::smoothed_at_bound</code>) by more than three standard errors.
+  It is a cause apart: commol cannot tell a natural bound from a chosen one.</li>
+<li><strong>Directions.</strong> The eigenvectors of <code>D⁻¹ Σ D⁻¹</code>, <code>D</code> the standard
+  deviations of the reference on the scale of each parameter
+  (<code>Distribution::log_variance</code> for <code>ln θ</code>), so they do not depend on units.
+  The count of hidden ridges reads the determined parameters only, with the
+  contraction of each direction corrected by a Bayesian bootstrap of the
+  weights, <code>2ĉ − mean ĉ*</code>, from <code>Stream::SampleDirections</code> of the seed of the
+  problem; it is a warning of the section, not a verdict.</li>
+</ul>
+<p>The numbers of the estimators are constants of the code, not settings, as
+the step of a finite difference: three standard errors
+(<code>STANDARD_ERRORS</code>), Rice's <code>⌈2 n_eff^{1/3}⌉</code> bins of the overlap,
+<code>BOOTSTRAP_REPLICATES</code> (100) replicates of the count, a kernel cut at eight
+bandwidths (<code>KERNEL_REACH</code>), 64 Gauss–Legendre nodes for each quadrature
+over the quantile (below <code>10⁻²⁸⁰</code>, where the quantile of a small shape
+underflows, <code>ln Q</code> follows the power law of the distribution function near
+0). Three standard errors hold per dip, not jointly: a flat marginal shows a
+false second mode in about 0.5 % of samples of 2000 draws and 2 % of 20 000
+(1000 seeds each), and in under 1 % of
+the marginals of the guard over four references and three sizes.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A mode above a tenth of the highest density, or a wider bandwidth</td>
+<td>The noise bumps of a flat marginal are as high as the highest, and more smoothing erases real modes.</td>
+</tr>
+<tr>
+<td>Hartigan's dip test</td>
+<td>No count nor place of modes, blind to a pile at a bound, no weighted version.</td>
+</tr>
+<tr>
+<td>The density on the scale of the distribution function of the reference</td>
+<td>It reads the ratio of the sample to a non-uniform prior: <code>N(1, 0.5²)</code> under <code>N(0, 1)</code> gets a mode at 1.33.</td>
+</tr>
+<tr>
+<td>Merging equal values of one marginal</td>
+<td>An atom of 30 % at a bound drops the size to 11 and hides a mode.</td>
+</tr>
+<tr>
+<td>A bound flagged by the mass beyond the quantile <code>ε</code> of the reference</td>
+<td>It depends on <code>ε</code> and on the width of the range, and flags narrow modes near a bound as <code>n</code> grows.</td>
+</tr>
+<tr>
+<td><code>at_bound</code> in the verdict</td>
+<td>A value at a natural bound, such as a rate of 0, is determined.</td>
+</tr>
+<tr>
+<td>One scale for the whole sample</td>
+<td>A dispersion with a lower bound of 0 and a draw there would forbid the log scale for all.</td>
+</tr>
+<tr>
+<td>Directions as a cause of each parameter</td>
+<td>It needs a threshold of loading.</td>
+</tr>
+<tr>
+<td>No correction of the eigenvalues</td>
+<td>Ten determined parameters show a false direction below the threshold in 90 % of samples of 300 draws.</td>
+</tr>
+<tr>
+<td>A threshold of Marchenko–Pastur</td>
+<td>It hides real directions: a direction of 0.45 is found in 2 % of samples.</td>
+</tr>
+<tr>
+<td>A direction as a <code>Combination</code></td>
+<td>A combination is a product of powers that the rank of the sensitivities determines exactly; a direction has a contraction and mixes natural and log scales.</td>
+</tr>
+<tr>
+<td>The thresholds of the estimators as settings</td>
+<td>No user can choose them better than the estimator.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_identifiability.rs</code>
+(<code>a_sample_of_its_reference_is_poorly_determined_by_its_contraction</code>,
+<code>a_flat_or_smooth_marginal_has_one_mode</code>, <code>real_modes_are_kept</code>,
+<code>a_bound_that_sets_a_side</code>, <code>an_infinite_side_has_mass_and_no_bound</code>,
+<code>the_overlap_of_a_sample_with_its_reference</code>,
+<code>log_parameters_set_the_scale_of_every_shape_measure</code>,
+<code>directions_and_their_contraction</code>, <code>the_count_of_hidden_ridges</code>,
+<code>the_directions_do_not_depend_on_units</code>),
+<code>tests/uncertainty/test_identifiability_sample.py</code>.</p>
 
 
 

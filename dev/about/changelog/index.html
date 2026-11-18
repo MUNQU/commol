@@ -5486,6 +5486,33 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   Drop <code>trials</code> from the observations of a loss, or fit them with a
   <code>BinomialObservations()</code> model. See
   <a href="../../guide/uncertainty/observation-models/#noise-parameters">Noise parameters</a>.</li>
+<li><strong>Breaking:</strong> <code>SampleIdentifiability</code> judges what a sample learned against
+  its reference, and takes two more required settings,
+  <code>contraction_threshold</code> and <code>bound_share</code>, and the optional
+  <code>log_parameters</code>. A parameter whose contraction is below
+  <code>contraction_threshold</code> is now <code>poorly_determined</code>, with the reason
+  "Sample: contraction 0.03, below 0.5."; a mode now counts only when its dip
+  is deeper than three standard errors of a kernel density reflected at the
+  bounds, after equal draws are merged, so a flat marginal no longer shows
+  noise modes. Verdicts change: a sample of its reference was
+  <code>poorly_determined</code> by its false modes and is now so by its contraction,
+  and a sample whose marginals all contract less than the threshold is no
+  longer <code>determined</code>. <code>SampleSection</code> adds <code>contraction_threshold</code>,
+  <code>bound_share</code>, <code>log_parameters</code>, <code>effective_size</code>, <code>mass_below</code>,
+  <code>mass_above</code>, <code>at_bound</code> (the sides whose bound, not the data, sets the
+  marginal, which do not set the verdict), <code>overlap</code>, <code>bins</code>, <code>directions</code>
+  (each a <code>Direction</code>, with its data <code>DirectionData</code>), <code>hidden_ridges</code>,
+  <code>draws_per_parameter</code> and <code>warnings</code>, and <code>SampleSectionData</code> the same
+  keys in the same order; every measure of the shape of a parameter of
+  <code>log_parameters</code> (its contraction, correlations, modes, density at a bound
+  and directions) reads <code>ln θ</code>. A
+  <code>SampleIdentifiability</code> or a report written before this change does not
+  read back: give the two thresholds. In Rust, <code>sample_identifiability</code>
+  takes the settings and a seed, and <code>identifiability::Reference</code> is
+  removed; <code>identifiability::Direction</code>, <code>distribution::BoundSide</code>,
+  <code>ParameterSample::distinct</code>, <code>Distribution::log_variance</code>,
+  <code>Distribution::smoothed_at_bound</code> and <code>Stream::SampleDirections</code> are
+  new. See <a href="../../guide/uncertainty/identifiability/#a-sample">A sample</a>.</li>
 <li><strong>Breaking:</strong> a build logs one <code>INFO</code> record, with the number of bins,
   parameters, transitions and outputs; the records of each bin,
   accumulator, stratification, matrix, parameter and transition of a
