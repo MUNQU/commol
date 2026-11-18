@@ -5289,6 +5289,17 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
+<p><code>commol.scores.quantile_residuals(predictive, observations, DistributionNoise())</code>:
+  the randomized quantile residuals of Dunn and Smyth (1996), <code>Φ⁻¹</code> of the
+  PIT of the mixture of the observation models over the draws, read from the
+  nearer tail, so a value far in the upper tail has a finite residual. They
+  are standard normal for data the predictive did not see; another noise
+  raises a <code>TypeError</code>. The engine gives both tails of every observation
+  model, sums of parts included, from special functions now in
+  <code>commol-statistics</code>. See
+  <a href="../../guide/uncertainty/#quantile-residuals">Quantile residuals</a>.</p>
+</li>
+<li>
 <p><code>ObservedDataPoint(parts=K)</code>: a value that is the sum of <code>K</code> independent
   observations over equal parts of its window, such as a weekly total of
   daily counts; <code>parts=1</code> by default, and more than 1 needs a <code>window</code>. The
@@ -5438,7 +5449,25 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
 <ul>
-<li>A multinomial draw gives the last category with a positive share the units
+<li>
+<p><code>commol.scores.pit(predictive, observations, DistributionNoise())</code> reads the
+  distribution functions of the observation models: each value is
+  <code>F(y⁻) + v · p(y)</code> of the mixture over the draws, exact for any sample, also
+  a sample of one point such as <code>Calibrator.point_sample(fit)</code>, and <code>F(y)</code>
+  whatever the seed for a model with no atoms. Before, it was the PIT of
+  draws of the noise, a Monte Carlo estimate of the same value. With
+  <code>NoNoise()</code> and <code>ResidualNoise(...)</code> the values do not change, up to
+  rounding.</p>
+</li>
+<li>
+<p>The incomplete gamma and beta functions read Stirling's series from a
+  shape of 10, so the distribution functions, quantiles and draws by
+  inversion of <code>Gamma</code> and <code>Beta</code> priors, the p-values of PRCC and the
+  Student t quantiles of local bands change in their last digits, more
+  accurate than before.</p>
+</li>
+<li>
+<p>A multinomial draw gives the last category with a positive share the units
   left, with no draw, when the shares sum to 1 within rounding: in a bin split
   by <code>rounding="random"</code>, the last compartment, and in <code>StochasticSteps</code>, the
   last flow out of a compartment whose proportional rates sum to 1 within
@@ -5448,7 +5477,8 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   distribution of the draws is the same, but a seeded run of
   <code>StochasticEvents</code> or <code>StochasticSteps</code> with <code>rounding="random"</code>, or of
   <code>StochasticSteps</code> with such rates, can change from this version. See
-  <a href="../../guide/stochastic/#whole-units">Whole units</a>.</li>
+  <a href="../../guide/stochastic/#whole-units">Whole units</a>.</p>
+</li>
 <li><code>InitialCompartment</code>, the entry of <code>Aggregate.initial_state</code>, has a fifth
   field, <code>scored</code>: whether a scored amount (<code>scored_amounts</code>) set the amount
   of the compartment. Code that unpacks an entry into four names, such as

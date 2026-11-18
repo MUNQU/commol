@@ -5118,14 +5118,45 @@ print(round(at_fit.median), at_fit.lower)  # -72 None
 
 The functions of `commol.scores` compare a predictive with observations, and return a `Score`: the value of each observation, the mean of each series and the overall mean. Which observations to score and the observation noise are arguments with no default: score data the method did not see, such as the held-out positions above, and say whether you score a band of the model (`NoNoise()`) or a prediction interval (`ResidualNoise(...)`, `DistributionNoise()`).
 
-| Function                                                                      | Score                                                                                                                                                           | Better                                                                                                                      |
-| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `coverage(predictive, observations, noise, confidence_level)`                 | 1 inside the central interval, 0 outside; the mean is the empirical coverage                                                                                    | Close to the level                                                                                                          |
-| `interval_score(predictive, observations, noise, confidence_level)`           | `(u − l) + (2/α)(l − y)₊ + (2/α)(y − u)₊`, `α = 1 − c`                                                                                                          | Lower                                                                                                                       |
-| `weighted_interval_score(predictive, observations, noise, confidence_levels)` | The weighted interval score of Bracher et al. (2021)                                                                                                            | Lower                                                                                                                       |
-| `crps(predictive, observations, noise)`                                       | \`Σ wᵢ                                                                                                                                                          | xᵢ − y                                                                                                                      |
-| `pit(predictive, observations, noise)`                                        | `F(y)`, randomized where draws tie with `y`, from the seed of the source (`Calibrator.seed` or `SensitivityAnalysis.seed`): the same draws give the same values | Uniform                                                                                                                     |
-| `log_score(predictive, observations, DistributionNoise())`                    | \`log Σ_d w_d · p(y                                                                                                                                             | μ_d)`, the log density of `y`under the mixture of the observation models over the draws; another noise raises a`TypeError\` |
+| Function                                                                      | Score                                                                                                                                                                                                                                                                                                                                                                   | Better                                                                                                                      |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `coverage(predictive, observations, noise, confidence_level)`                 | 1 inside the central interval, 0 outside; the mean is the empirical coverage                                                                                                                                                                                                                                                                                            | Close to the level                                                                                                          |
+| `interval_score(predictive, observations, noise, confidence_level)`           | `(u − l) + (2/α)(l − y)₊ + (2/α)(y − u)₊`, `α = 1 − c`                                                                                                                                                                                                                                                                                                                  | Lower                                                                                                                       |
+| `weighted_interval_score(predictive, observations, noise, confidence_levels)` | The weighted interval score of Bracher et al. (2021)                                                                                                                                                                                                                                                                                                                    | Lower                                                                                                                       |
+| `crps(predictive, observations, noise)`                                       | \`Σ wᵢ                                                                                                                                                                                                                                                                                                                                                                  | xᵢ − y                                                                                                                      |
+| `pit(predictive, observations, noise)`                                        | `F(y⁻) + v · p(y)` of the predictive, `v` uniform from the seed of the source (`Calibrator.seed` or `SensitivityAnalysis.seed`): the same predictive gives the same values. With `DistributionNoise()`, `F` is the mixture of the distribution functions of the observation models over the draws, exact for any sample; with another noise, that of the weighted draws | Uniform                                                                                                                     |
+| `quantile_residuals(predictive, observations, DistributionNoise())`           | `Φ⁻¹` of the PIT, with the same `v`, read from the nearer tail; another noise raises a `TypeError`                                                                                                                                                                                                                                                                      | Standard normal                                                                                                             |
+| `log_score(predictive, observations, DistributionNoise())`                    | \`log Σ_d w_d · p(y                                                                                                                                                                                                                                                                                                                                                     | μ_d)`, the log density of `y`under the mixture of the observation models over the draws; another noise raises a`TypeError\` |
+
+### Quantile residuals
+
+`quantile_residuals` gives the randomized quantile residuals of Dunn and Smyth (1996): `Φ⁻¹(u)`, with `u` the PIT of `pit`. They are the residuals of count data too, where a Pearson residual of a mean near 0 has no bound. Above `u = ½` a residual reads the upper tail, `−Φ⁻¹(P(Y > y) + (1 − v) · p(y))`, so a value 9 standard deviations above its mean has the residual 9, where `Φ⁻¹(u)` of a PIT that rounds to 1 would be infinite.
+
+The residuals are standard normal for data the predictive did not see, such as held-out observations, and for data drawn at the parameters the predictive reads. In the data a predictive was fitted to they shrink: in a linear normal model of `n` observations and `p` parameters, their variance is about `1 − p/n` at a fit and about `(n − p)/(n + p)` with the draws of a posterior, 0.72 and 0.56 at `n = 35`, `p = 10`. An in-sample check reads them at the fit, `Calibrator.point_sample(fit)`, or at one draw of a sample, `sample.resample(1, seed)`, which is standard normal only when the sample is an exact posterior.
+
+```python
+from commol.observations import DistributionNoise, NormalObservations
+
+normal_problem = CalibrationProblem(
+    observed_data=fitted,
+    parameters=problem.parameters,
+    observation_models={"B": NormalObservations(sd=2.0)},
+    optimization_config=NelderMeadConfig(max_iterations=2000),
+    seed=42,
+)
+normal_calibrator = Calibrator(Simulation(basic_model(None, None)), normal_problem)
+fit = normal_calibrator.run()
+
+# In the fitted data: at the fit, and at one draw of the sample.
+at_fit = Predictive(normal_calibrator, normal_calibrator.point_sample(fit), positions=[0, 40])
+print(len(scores.quantile_residuals(at_fit, fitted, DistributionNoise()).per_observation))  # 8
+one_draw = Predictive(normal_calibrator, sample.resample(1, seed=3), positions=[0, 40])
+print(len(scores.quantile_residuals(one_draw, fitted, DistributionNoise()).per_observation))  # 8
+
+# Held out: the mixture of the draws of the sample.
+mixture = Predictive(normal_calibrator, sample, positions=[0, 60])
+print(len(scores.quantile_residuals(mixture, held_out, DistributionNoise()).per_observation))  # 4
+```
 
 ## The entry point
 
@@ -5379,7 +5410,7 @@ print(low < 0.05 < high)  # True
 
 `DistributionNoise()` draws every observation from the model of its series around each draw's prediction, with the draw's noise parameters, so `Predictive.at_observations(observations, DistributionNoise())` gives a prediction interval and every score of `commol.scores` scores one. It needs a problem with `observation_models`, and serves the series they name, at any position.
 
-`scores.log_score(predictive, observations, DistributionNoise())` scores the observed values by the densities of these models ([Scores](https://munqu.github.io/commol/latest/guide/uncertainty/#scores)).
+`scores.log_score(predictive, observations, DistributionNoise())` scores the observed values by the densities of these models, and `scores.pit(predictive, observations, DistributionNoise())` and `scores.quantile_residuals(predictive, observations, DistributionNoise())` by their distribution functions, exactly: `F(y⁻) + v · p(y)` of the mixture of the models over the draws, also for a sample of one point ([Quantile residuals](https://munqu.github.io/commol/latest/guide/uncertainty/#quantile-residuals)). The distribution function of an observation of several parts is that of the reading of its model ([Sums of parts](#sums-of-parts)): the recursion of `"exact"`, the matched negative binomial of `"moments"`, `Poisson(M)` and `N(M, K · sd²)`.
 
 ## Checklist
 
@@ -8188,7 +8219,7 @@ The package root `commol` holds the main flow: build a model, choose its structu
 | [`commol.quantities`](https://munqu.github.io/commol/latest/api/quantities/index.md)           | `Level`, `Increments`, `ValueAt`, `Gain`, `Peak`, `PeakPosition`, `Trajectory`, `Ratio`, `quantity_schedule`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | [`commol.observations`](https://munqu.github.io/commol/latest/api/observations/index.md)       | `NormalObservations`, `LogNormalObservations`, `StudentTObservations`, `PoissonObservations`, `NegativeBinomialObservations`, `BinomialObservations`, `NoNoise`, `ResidualNoise`, `DistributionNoise`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | [`commol.uncertainty`](https://munqu.github.io/commol/latest/api/uncertainty/index.md)         | `ParameterSample`, `SampleMethod`, `Predictive`, `Scenarios`, `weighted_quantiles`, `member_statistics`; the results `ParameterSummary`, `PredictiveBand`, `SeriesBand`, `ObservationDraws`, `ScenarioSummary` and the figures of a predictive, `PredictivePlot`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| [`commol.scores`](https://munqu.github.io/commol/latest/api/scores/index.md)                   | `coverage`, `interval_score`, `weighted_interval_score`, `crps`, `pit`, `log_score`; the result `Score`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| [`commol.scores`](https://munqu.github.io/commol/latest/api/scores/index.md)                   | `coverage`, `interval_score`, `weighted_interval_score`, `crps`, `pit`, `quantile_residuals`, `log_score`; the result `Score`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | [`commol.resampling`](https://munqu.github.io/commol/latest/api/resampling/index.md)           | `BayesianBootstrap`, `ResidualBootstrap`, `WildBootstrap`, `BlockJackknife`, `ParametricBootstrap`; the results `BootstrapResult`, `JackknifeResult`, `ResamplingDiagnostics`, `BoundError`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | [`commol.profiles`](https://munqu.github.io/commol/latest/api/profiles/index.md)               | `ProfileLikelihood`, `PredictionProfile`, `PredictionSpec`, `Threshold`; the results `ProfileResult`, `Profile`, `ProfileInterval`, `ProfileStructure`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | [`commol.local`](https://munqu.github.io/commol/latest/api/local/index.md)                     | `Laplace`, `Sandwich`, `LaplaceMixture`, `LikelihoodTarget`, `GibbsTarget`; the results `LaplaceResult`, `SandwichResult`, `ImportanceResult`, `MixtureComponent`, `DeltaBand`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
@@ -10492,6 +10523,36 @@ class Calibrator:
             The draws, computed in Rust.
         """
         return self._engine_problem.observation_draws(
+            sample._rust, engine_json(observed_data), engine_json(noise)
+        )
+
+    def _observation_bounds(
+        self,
+        sample: ParameterSample,
+        observed_data: list[ObservedDataPoint],
+        noise: _ObservationNoise,
+    ) -> "ObservationBoundsProtocol":
+        """
+        The tails of each observed value under every draw of `sample`, for
+        `commol.scores.pit` and `commol.scores.quantile_residuals`.
+
+        Parameters
+        ----------
+        sample : ParameterSample
+            The draws, in the problem's order.
+        observed_data : list[ObservedDataPoint]
+            The observations.
+        noise : NoNoise | ResidualNoise | DistributionNoise
+            The observation noise: `DistributionNoise` reads the distribution
+            functions of the observation models, and the others the draws of
+            their noise, drawn from the calibrator's seed.
+
+        Returns
+        -------
+        ObservationBoundsProtocol
+            The tails of each draw, computed in Rust.
+        """
+        return self._engine_problem.observation_bounds(
             sample._rust, engine_json(observed_data), engine_json(noise)
         )
 
@@ -27760,7 +27821,7 @@ pit(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: _O
 
 The probability integral transform of each observation.
 
-`F(y)` of the weighted draws, randomized between `F(y⁻)` and `F(y)` where draws tie with `y`, so a discrete predictive gives uniform values too. The ties take their random numbers from the seed of the source of the predictive (`Calibrator.seed` or `SensitivityAnalysis.seed`), the seed of the draws, so the same draws give the same values.
+`F(y⁻) + v · p(y)` of the predictive: the mixture over the draws of the distribution of an observation, with `v` uniform in `[0, 1]`, so a discrete predictive gives uniform values too. With `DistributionNoise` the distribution of each draw is its observation model, read exactly: a sample of one point gives its PIT, and a model with no atoms gives `F(y)` whatever the seed. With the other noises it is the mass at the draw's value, so `F` is that of the weighted draws and `p(y)` the weight of the draws that tie with `y`. The values `v` come from the seed of the source of the predictive (`Calibrator.seed` or `SensitivityAnalysis.seed`), so the same predictive gives the same values; `quantile_residuals` reads the same `v`.
 
 Parameters:
 
@@ -27776,6 +27837,12 @@ Returns:
 | ------- | ------------------------------------------------------------- |
 | `Score` | Values in [0, 1]; calibrated predictions give uniform values. |
 
+Raises:
+
+| Type         | Description                                                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError` | As Predictive.at_observations, and if an observed value is outside the support of its observation model with DistributionNoise. |
+
 Source code in `commol/scores/rules.py`
 
 ```python
@@ -27787,11 +27854,17 @@ def pit(
     """
     The probability integral transform of each observation.
 
-    ``F(y)`` of the weighted draws, randomized between ``F(y⁻)`` and ``F(y)``
-    where draws tie with ``y``, so a discrete predictive gives uniform values
-    too. The ties take their random numbers from the seed of the source of
-    the predictive (``Calibrator.seed`` or ``SensitivityAnalysis.seed``), the
-    seed of the draws, so the same draws give the same values.
+    ``F(y⁻) + v · p(y)`` of the predictive: the mixture over the draws of the
+    distribution of an observation, with ``v`` uniform in ``[0, 1]``, so a
+    discrete predictive gives uniform values too. With `DistributionNoise`
+    the distribution of each draw is its observation model, read exactly:
+    a sample of one point gives its PIT, and a model with no atoms gives
+    ``F(y)`` whatever the seed. With the other noises it is the mass at the
+    draw's value, so ``F`` is that of the weighted draws and ``p(y)`` the
+    weight of the draws that tie with ``y``. The values ``v`` come from the
+    seed of the source of the predictive (``Calibrator.seed`` or
+    ``SensitivityAnalysis.seed``), so the same predictive gives the same
+    values; `quantile_residuals` reads the same ``v``.
 
     Parameters
     ----------
@@ -27800,15 +27873,120 @@ def pit(
     observations : Sequence[ObservedDataPoint]
         The observations to score.
     noise : NoNoise | ResidualNoise | DistributionNoise
-        The observation noise of the draws (`Predictive.at_observations`).
+        The observation noise of the predictive.
 
     Returns
     -------
     Score
         Values in ``[0, 1]``; calibrated predictions give uniform values.
+
+    Raises
+    ------
+    ValueError
+        As `Predictive.at_observations`, and if an observed value is outside
+        the support of its observation model with `DistributionNoise`.
     """
-    draws = predictive.at_observations(observations, noise)
-    return _score(draws, draws._draws.pit(draws.observed))
+    bounds = predictive.source._observation_bounds(
+        predictive.sample, list(observations), noise
+    )
+    return _score_of(observations, bounds.pit())
+```
+
+## quantile_residuals
+
+```python
+quantile_residuals(predictive: Predictive, observations: Sequence[ObservedDataPoint], noise: DistributionNoise) -> Score
+```
+
+The randomized quantile residual of each observation (Dunn and Smyth 1996).
+
+`Φ⁻¹(u)` of the PIT `u` of `pit`, with the same `v`, read from the nearer tail: `−Φ⁻¹(P(Y > y) + (1 − v) · p(y))` above `u = ½`, so a value far in the upper tail has a finite residual. Standard normal for data the predictive did not see; in the data a predictive was fitted to, the residuals shrink.
+
+Parameters:
+
+| Name           | Type                          | Description                                           | Default    |
+| -------------- | ----------------------------- | ----------------------------------------------------- | ---------- |
+| `predictive`   | `Predictive`                  | The predictive, of a problem with observation_models. | *required* |
+| `observations` | `Sequence[ObservedDataPoint]` | The observations to score.                            | *required* |
+| `noise`        | `DistributionNoise`           | The observation models of the problem.                | *required* |
+
+Returns:
+
+| Type    | Description                                |
+| ------- | ------------------------------------------ |
+| `Score` | The quantile residual of each observation. |
+
+Raises:
+
+| Type                   | Description                                                                                                                                                                                                                                                |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TypeError`            | If noise is not DistributionNoise.                                                                                                                                                                                                                         |
+| `ValueError`           | If the problem has a loss, an observation names an unknown output or factor or a series with no observation model, an observed value is outside the support of its model, or the predictive is of a sensitivity analysis, which has no observation models. |
+| `InfeasibleStateError` | If a draw leaves the values its model allows, as Predictive.at_observations.                                                                                                                                                                               |
+
+References
+
+Dunn, P. K., & Smyth, G. K. (1996). Randomized quantile residuals. Journal of Computational and Graphical Statistics, 5(3), 236–244. https://doi.org/10.1080/10618600.1996.10474708
+
+Source code in `commol/scores/rules.py`
+
+```python
+def quantile_residuals(
+    predictive: Predictive,
+    observations: Sequence[ObservedDataPoint],
+    noise: DistributionNoise,
+) -> Score:
+    """
+    The randomized quantile residual of each observation (Dunn and Smyth 1996).
+
+    ``Φ⁻¹(u)`` of the PIT ``u`` of `pit`, with the same ``v``, read from the
+    nearer tail: ``−Φ⁻¹(P(Y > y) + (1 − v) · p(y))`` above ``u = ½``, so a
+    value far in the upper tail has a finite residual. Standard normal for
+    data the predictive did not see; in the data a predictive was fitted to,
+    the residuals shrink.
+
+    Parameters
+    ----------
+    predictive : Predictive
+        The predictive, of a problem with ``observation_models``.
+    observations : Sequence[ObservedDataPoint]
+        The observations to score.
+    noise : DistributionNoise
+        The observation models of the problem.
+
+    Returns
+    -------
+    Score
+        The quantile residual of each observation.
+
+    Raises
+    ------
+    TypeError
+        If `noise` is not `DistributionNoise`.
+    ValueError
+        If the problem has a loss, an observation names an unknown output or
+        factor or a series with no observation model, an observed value is
+        outside the support of its model, or the predictive is of a
+        sensitivity analysis, which has no observation models.
+    InfeasibleStateError
+        If a draw leaves the values its model allows, as `Predictive.at_observations`.
+
+    References
+    ----------
+    Dunn, P. K., & Smyth, G. K. (1996). Randomized quantile residuals.
+    Journal of Computational and Graphical Statistics, 5(3), 236–244.
+    https://doi.org/10.1080/10618600.1996.10474708
+    """
+    if not isinstance(noise, DistributionNoise):
+        raise TypeError(
+            f"Quantile residuals need the distribution functions of the "
+            f"observation models, so they take DistributionNoise(); "
+            f"{type(noise).__name__} has none."
+        )
+    bounds = predictive.source._observation_bounds(
+        predictive.sample, list(observations), noise
+    )
+    return _score_of(observations, bounds.quantile_residuals())
 ```
 
 ## log_score
@@ -28110,14 +28288,40 @@ class SensitivityAnalysis:
             residuals of a fit, distribution noise the observation models of a
             problem, and an analysis has neither.
         """
-        if not isinstance(noise, NoNoise):
-            raise ValueError(
-                f"{type(noise).__name__} needs a calibration: residual noise reads "
-                "the residuals of a fit and distribution noise the observation "
-                "models of a problem, and a sensitivity analysis has no data. Read "
-                "the observations with NoNoise()."
-            )
+        _check_no_noise(noise)
         return self._rust.observation_draws(sample._rust, engine_json(observed_data))
+
+    def _observation_bounds(
+        self,
+        sample: ParameterSample,
+        observed_data: list[ObservedDataPoint],
+        noise: _ObservationNoise,
+    ) -> "ObservationBoundsProtocol":
+        """
+        The tails of each observed value under every draw, for
+        `commol.scores.pit`: each draw a mass at its value.
+
+        Parameters
+        ----------
+        sample : ParameterSample
+            The draws, in the order of the inputs.
+        observed_data : list[ObservedDataPoint]
+            The observations.
+        noise : NoNoise | ResidualNoise | DistributionNoise
+            The observation noise; only ``NoNoise()``.
+
+        Returns
+        -------
+        ObservationBoundsProtocol
+            The tails of each draw, computed in Rust.
+
+        Raises
+        ------
+        ValueError
+            If the noise is not ``NoNoise()``, as `_observation_draws` says.
+        """
+        _check_no_noise(noise)
+        return self._rust.observation_bounds(sample._rust, engine_json(observed_data))
 
     def _check_observations(self, observed_data: list[ObservedDataPoint]) -> None:
         """
@@ -39351,6 +39555,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- `commol.scores.quantile_residuals(predictive, observations, DistributionNoise())`: the randomized quantile residuals of Dunn and Smyth (1996), `Φ⁻¹` of the PIT of the mixture of the observation models over the draws, read from the nearer tail, so a value far in the upper tail has a finite residual. They are standard normal for data the predictive did not see; another noise raises a `TypeError`. The engine gives both tails of every observation model, sums of parts included, from special functions now in `commol-statistics`. See [Quantile residuals](https://munqu.github.io/commol/latest/guide/uncertainty/#quantile-residuals).
 - `ObservedDataPoint(parts=K)`: a value that is the sum of `K` independent observations over equal parts of its window, such as a weekly total of daily counts; `parts=1` by default, and more than 1 needs a `window`. The prediction is the sum of the means of the parts, and the observation model of the series reads the sum: `PoissonObservations` as `Poisson(M)`, `NormalObservations` as `N(M, K · sd²)`, and `NegativeBinomialObservations(sum="exact" | "moments")` as the exact convolution of the parts or the negative binomial of its mean and variance. A negative binomial series with parts needs `sum`, and one without parts refuses it; the other models refuse parts. The draws of `DistributionNoise()` and `ParametricBootstrap`, the log score, the gradients and the expected information read the sum as its model does. See [Parts of a window](https://munqu.github.io/commol/latest/guide/calibration-observations/#parts-of-a-window) and [Sums of parts](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#sums-of-parts).
 - `Aggregate.scored_amounts`, a `dict[str, ScoredAmount]`: the scored amounts that `Model.apply_calibration_parameters` writes for the compartments that the bins and the fractions build only to their last bits, each with the amount they `built` and the amount the calibration `scored`, at most 64 units in the last place apart. The build applies a scored amount last, while its compartment still builds `built`, has no `compartment_amounts` entry and is not of a bin left `None`, and ignores it otherwise, so an edit of the model takes effect, whatever its path. `compartment_amounts` holds only what the user declares, a value a calibration sets for an exact compartment among them, which an update of its bin keeps as before. `describe()` says in one line how many compartments start from a scored amount. A file with a non-empty `scored_amounts` needs this release or later; a model with none writes no field. See [Writing back](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/#writing-back).
 - Ctrl-C stops a method that logs its steps: it starts no new step, waits for the steps already running, and raises `KeyboardInterrupt`, whatever the level of the logger. See [Stop a long method](https://munqu.github.io/commol/latest/getting-started/quickstart/#stop-a-long-method).
@@ -39369,6 +39574,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+- `commol.scores.pit(predictive, observations, DistributionNoise())` reads the distribution functions of the observation models: each value is `F(y⁻) + v · p(y)` of the mixture over the draws, exact for any sample, also a sample of one point such as `Calibrator.point_sample(fit)`, and `F(y)` whatever the seed for a model with no atoms. Before, it was the PIT of draws of the noise, a Monte Carlo estimate of the same value. With `NoNoise()` and `ResidualNoise(...)` the values do not change, up to rounding.
+- The incomplete gamma and beta functions read Stirling's series from a shape of 10, so the distribution functions, quantiles and draws by inversion of `Gamma` and `Beta` priors, the p-values of PRCC and the Student t quantiles of local bands change in their last digits, more accurate than before.
 - A multinomial draw gives the last category with a positive share the units left, with no draw, when the shares sum to 1 within rounding: in a bin split by `rounding="random"`, the last compartment, and in `StochasticSteps`, the last flow out of a compartment whose proportional rates sum to 1 within rounding. Before, that category drew a uniform or not by the last bit of the shares, so two shares one bit apart, such as an amount written back by `Model.apply_calibration_parameters`, gave another run of the same seed. The distribution of the draws is the same, but a seeded run of `StochasticEvents` or `StochasticSteps` with `rounding="random"`, or of `StochasticSteps` with such rates, can change from this version. See [Whole units](https://munqu.github.io/commol/latest/guide/stochastic/#whole-units).
 - `InitialCompartment`, the entry of `Aggregate.initial_state`, has a fifth field, `scored`: whether a scored amount (`scored_amounts`) set the amount of the compartment. Code that unpacks an entry into four names, such as `name, bin, categories, amount = entry`, now raises `ValueError`; read the fields by name. See [Writing back](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/#writing-back).
 - The engine checks that a calibration problem leaves no value missing when the problem is built, as it does for a `SensitivityAnalysis`: it writes each value at the point of its bounds nearest 0, with the `initial_condition_remainder`, and refuses a parameter or an initial amount that the model leaves `None` and the problem does not set. The `Calibrator` checks no value of its own: it builds the problem, then checks the unit of the remainder (`ModelStructure.check_calibration_values`). A problem with one fault gets the message it got before. A problem with several can report another one first: the unit of the remainder is now checked after every check of the engine, and the values after the settings of the optimizer and the loss, so a remainder in the wrong unit and an unknown observed output report the output. The warning on constraint positions beyond the observations is no longer logged when the problem does not build. In Rust, `CalibrationProblem::new` takes the remainder after the parameters, in place of `with_initial_condition_remainder`, and `check_model_values` and its binding `commol_rs.calibration.check_model_values` are removed, so every caller of `new` gets the check. See [A run needs every value](https://munqu.github.io/commol/latest/codebase/decisions/model-structure/#a-run-needs-every-value).

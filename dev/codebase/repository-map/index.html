@@ -4029,6 +4029,11 @@
 <td>A second copy of a helper or a density; anything of a model.</td>
 </tr>
 <tr>
+<td><code>crates/commol-statistics/src/special.rs</code></td>
+<td>The special functions of the distributions, one copy of each: the normal distribution function, its tail and its quantile (<code>normal_cdf</code>, <code>normal_sf</code>, <code>normal_quantile</code>, <code>normal_quantile_sf</code>), the regularized incomplete gamma and beta functions with both tails (<code>gamma_p</code>, <code>gamma_q</code>, <code>beta_i</code>, <code>beta_tails</code>) and their factors from Stirling's series (<code>gamma_factor</code>, <code>beta_factor</code>), the quantiles of the Student t and of the F of one degree of freedom; on <code>libm</code>.</td>
+<td>A second copy of a special function.</td>
+</tr>
+<tr>
 <td><code>crates/commol-statistics/src/linear_algebra.rs</code></td>
 <td>The linear algebra of commol: <code>spectral_radius</code>, the largest modulus of the eigenvalues of a square matrix, from the real Schur decomposition of <code>nalgebra</code>, which the model compiler reads for each matrix between categories.</td>
 <td>A second eigenvalue routine.</td>
@@ -4155,7 +4160,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-calibration/src/likelihood/</code></td>
-<td>The observation models: <code>ObservationModel</code> and <code>Argument</code> (<code>likelihood/mod.rs</code>), <code>Likelihood</code> (the model and trials of each observation, the checks of models, noise parameters and observed values, the pointwise log-likelihood), <code>Noise</code> (<code>density.rs</code>: a model with numbers for its noise, its log density, the means it allows, its scores and Fisher information), the readings of a sum of parts (<code>sums.rs</code>: <code>Sum</code>, the exact recursion and the moments, their densities, scores and information), <code>TermDerivatives</code> (the gradient and the expected curvature of each observation's term, also of a loss through <code>Discrepancy::term_derivatives</code>).</td>
+<td>The observation models: <code>ObservationModel</code> and <code>Argument</code> (<code>likelihood/mod.rs</code>), <code>Likelihood</code> (the model and trials of each observation, the checks of models, noise parameters and observed values, the pointwise log-likelihood), <code>Noise</code> (<code>density.rs</code>: a model with numbers for its noise, its log density, its tails (<code>Tails</code>), the means it allows, its scores and Fisher information), the readings of a sum of parts (<code>sums.rs</code>: <code>Sum</code>, the exact recursion and the moments, their densities, tails, scores and information), <code>TermDerivatives</code> (the gradient and the expected curvature of each observation's term, also of a loss through <code>Discrepancy::term_derivatives</code>).</td>
 <td>Draws; running engines.</td>
 </tr>
 <tr>
@@ -4230,7 +4235,7 @@
 </tr>
 <tr>
 <td><code>crates/commol-inference/src/scores.rs</code></td>
-<td>Coverage, interval score, weighted interval score, sample CRPS, PIT, the log score of observation models, and their means per series.</td>
+<td>Coverage, interval score, weighted interval score, sample CRPS, the log score of observation models, and their means per series; <code>ObservationBounds</code>, the tails of every draw at each observed value (<code>observation_bounds</code> from the observation models, <code>of_draws</code> from the draws), and the PIT and the quantile residuals that read it.</td>
 <td>—</td>
 </tr>
 <tr>
@@ -4264,8 +4269,8 @@
 <td>Penalties.</td>
 </tr>
 <tr>
-<td><code>crates/commol-inference/src/distribution.rs</code>, <code>special.rs</code></td>
-<td><code>Family</code> and <code>Distribution</code>, one family truncated to the bounds of a parameter (density, distribution function, quantile, closed-form moments, draws by inversion; by Gauss–Legendre quadrature over the quantile, the variance of <code>ln x</code> and the density at a bound smoothed by a reflected kernel); the normal distribution function and its inverse, the regularized incomplete gamma and beta functions and the quantiles of the Student t and the F (<code>special.rs</code>, on <code>libm</code>). The quantile sets the bracket of the root and takes the root finder from the argmin fork (<code>NewtonRoot</code>).</td>
+<td><code>crates/commol-inference/src/distribution.rs</code></td>
+<td><code>Family</code> and <code>Distribution</code>, one family truncated to the bounds of a parameter (density, distribution function, quantile, closed-form moments, draws by inversion; by Gauss–Legendre quadrature over the quantile, the variance of <code>ln x</code> and the density at a bound smoothed by a reflected kernel), on the special functions of <code>commol_statistics::special</code>. The quantile sets the bracket of the root and takes the root finder from the argmin fork (<code>NewtonRoot</code>).</td>
 <td>Distributions from a dependency, whose draws change with it; a root finder of its own.</td>
 </tr>
 <tr>
@@ -4813,8 +4818,8 @@ results.</p>
 </tr>
 <tr>
 <td>Add or change an observation model or the likelihood</td>
-<td><code>crates/commol-calibration/src/likelihood/</code> (<code>likelihood/mod.rs</code>, <code>density.rs</code>, <code>sums.rs</code>)</td>
-<td><code>crates/commol-inference/src/predictive.rs</code> (<code>draw_observation</code>, <code>draw_sum</code>), <code>py-commol/commol/observations/models.py</code>, <code>docs/guide/uncertainty/observation-models.md</code></td>
+<td><code>crates/commol-calibration/src/likelihood/</code> (<code>likelihood/mod.rs</code>, <code>density.rs</code>, <code>sums.rs</code>: densities, tails, scores, information)</td>
+<td><code>crates/commol-inference/src/predictive.rs</code> (<code>draw_observation</code>, <code>draw_sum</code>), <code>crates/commol-statistics/src/special.rs</code>, <code>py-commol/commol/observations/models.py</code>, <code>docs/guide/uncertainty/observation-models.md</code></td>
 </tr>
 <tr>
 <td>Add an uncertainty method</td>

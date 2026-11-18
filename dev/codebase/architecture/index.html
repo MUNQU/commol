@@ -3990,12 +3990,12 @@ the statistics that the base, the compiler, calibration and inference use.</p>
 <tr>
 <td>Statistics</td>
 <td><code>commol-statistics</code></td>
-<td>One copy of each numerical helper (<code>log Σ exp</code>, <code>x ln y</code>, the special functions of the gamma family), of the log densities of the normal, the log-normal and the Student t, of the weighted statistics: the one quantile of commol, the weighted summary of a column, the covariance and the effective size, and the spectral radius of a matrix. It depends on no crate of commol.</td>
+<td>One copy of each numerical helper (<code>log Σ exp</code>, <code>x ln y</code>, the special functions of the gamma family, the normal distribution function and its quantile, the incomplete gamma and beta functions), of the log densities of the normal, the log-normal and the Student t, of the weighted statistics: the one quantile of commol, the weighted summary of a column, the covariance and the effective size, and the spectral radius of a matrix. It depends on no crate of commol.</td>
 </tr>
 <tr>
 <td>Inference</td>
 <td><code>commol-inference</code></td>
-<td>What every uncertainty method returns or reads: the weighted parameter sample, the predictive of a sample, its observation noise and its scores; the resampling methods, which fit copies of the problem with other data (<code>CalibrationProblem::with_data</code>); the conformal prediction intervals; the port of sensitivities and the identifiability analyses; the distributions and priors, and the sequential Monte Carlo sampler with its targets (Gibbs posterior, ABC, the posterior of observation models); the noise, the parametric bootstrap and the log score of observation models; the input spaces, designs, quantities of interest and estimators of global sensitivity, which run on a forward model with no observations; the profile likelihood of parameters and predictions and its thresholds. It depends on calibration, never the reverse.</td>
+<td>What every uncertainty method returns or reads: the weighted parameter sample, the predictive of a sample, its observation noise and its scores; the resampling methods, which fit copies of the problem with other data (<code>CalibrationProblem::with_data</code>); the conformal prediction intervals; the port of sensitivities and the identifiability analyses; the distributions and priors, and the sequential Monte Carlo sampler with its targets (Gibbs posterior, ABC, the posterior of observation models); the noise, the parametric bootstrap, the log score, the exact PIT and the quantile residuals of observation models; the input spaces, designs, quantities of interest and estimators of global sensitivity, which run on a forward model with no observations; the profile likelihood of parameters and predictions and its thresholds. It depends on calibration, never the reverse.</td>
 </tr>
 </tbody>
 </table>

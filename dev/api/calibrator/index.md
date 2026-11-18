@@ -189,6 +189,36 @@ class Calibrator:
             sample._rust, engine_json(observed_data), engine_json(noise)
         )
 
+    def _observation_bounds(
+        self,
+        sample: ParameterSample,
+        observed_data: list[ObservedDataPoint],
+        noise: _ObservationNoise,
+    ) -> "ObservationBoundsProtocol":
+        """
+        The tails of each observed value under every draw of `sample`, for
+        `commol.scores.pit` and `commol.scores.quantile_residuals`.
+
+        Parameters
+        ----------
+        sample : ParameterSample
+            The draws, in the problem's order.
+        observed_data : list[ObservedDataPoint]
+            The observations.
+        noise : NoNoise | ResidualNoise | DistributionNoise
+            The observation noise: `DistributionNoise` reads the distribution
+            functions of the observation models, and the others the draws of
+            their noise, drawn from the calibrator's seed.
+
+        Returns
+        -------
+        ObservationBoundsProtocol
+            The tails of each draw, computed in Rust.
+        """
+        return self._engine_problem.observation_bounds(
+            sample._rust, engine_json(observed_data), engine_json(noise)
+        )
+
     def _check_observations(self, observed_data: list[ObservedDataPoint]) -> None:
         """
         Check `observed_data` against the problem in Rust, with no run.
