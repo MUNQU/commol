@@ -16,6 +16,10 @@ pub const REPLICATES: Count = Count::at_least("replicates", 1);
 /// The replicates of a method that needs two, such as EnbPI or the bootstrap
 /// of Sobol indices.
 pub const TWO_REPLICATES: Count = Count::at_least("replicates", 2);
+/// The largest lag of a dependence analysis.
+pub const MAX_LAG: Count = Count::at_least("max_lag", 1);
+/// The randomizations of the quantile residuals of a dependence analysis.
+pub const RANDOMIZATIONS: Count = Count::at_least("randomizations", 1);
 /// The positions of a block of the observations.
 pub const BLOCK_LENGTH: Count = Count::at_least("block_length", 1);
 /// The draws a sample or a prior gives when asked for some.
@@ -182,6 +186,8 @@ pub const RANGES: &[Ranges] = &[
     crate::settings::resampling::WildBootstrapSettings::RANGES,
     crate::settings::resampling::BlockJackknifeSettings::RANGES,
     crate::settings::resampling::ResidualNoiseSettings::RANGES,
+    crate::settings::dependence::AtParametersSettings::RANGES,
+    crate::settings::dependence::RefittedSettings::RANGES,
     crate::settings::conformal::SplitConformalSettings::RANGES,
     crate::settings::conformal::RollingConformalSettings::RANGES,
     crate::settings::conformal::JackknifePlusSettings::RANGES,

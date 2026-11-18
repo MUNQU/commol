@@ -48,7 +48,7 @@ The root `commol` holds the main flow: build, the structures, simulate and
 calibrate. Every other public name is in the module of its page of the guide
 (`commol.engines`, `commol.description`, `commol.plotting`,
 `commol.parallelism`, `commol.distributions`, `commol.quantities`, `commol.observations`,
-`commol.uncertainty`, `commol.scores`, `commol.resampling`,
+`commol.uncertainty`, `commol.scores`, `commol.dependence`, `commol.resampling`,
 `commol.profiles`, `commol.local`, `commol.smc`, `commol.conformal`,
 `commol.identifiability`, `commol.sensitivity`), and the root exports no name
 of a module. Each public module is a package that holds its code; the code of
@@ -84,7 +84,7 @@ the bottom:
 | `_simulation` | Runs and replicates, their reports and the data of their figures |
 | `uncertainty` | A sample, its predictive and the data of its figures |
 | `_calibration` | The calibrator and the bases of the methods (`InferenceMethod`, `CalibrationPort`, `run_method`) |
-| `scores`, `resampling`, `profiles`, `local`, `smc`, `conformal`, `identifiability`, `sensitivity` | The method families, each with its methods, results and runners |
+| `scores`, `dependence`, `resampling`, `profiles`, `local`, `smc`, `conformal`, `identifiability`, `sensitivity` | The method families, each with its methods, results and runners |
 | `commol` | The root, which imports what the main flow writes |
 
 A package that needs something of a package above it reads it through a

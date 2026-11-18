@@ -119,6 +119,8 @@ RESULTS = {
     "ChaosRun",
     "SMCRun",
     "EtaCalibration",
+    "SeriesDependence",
+    "SeriesStatistics",
 }
 """Each class of the bridge that carries a result of the engine to Python."""
 
@@ -423,6 +425,7 @@ LAYERS = (
     "uncertainty",
     "_calibration",
     "scores",
+    "dependence",
     "resampling",
     "profiles",
     "local",

@@ -146,6 +146,12 @@ PAGES = {
         "Sobol",
         "PolynomialChaos",
     },
+    "dependence": {
+        "AtParameters",
+        "Refitted",
+        "residual_dependence",
+        "series_dependence",
+    },
     "scores": {
         "coverage",
         "crps",
@@ -318,6 +324,16 @@ RESULTS = {
     "commol.scores": frozenset(
         {
             "Score",
+        }
+    ),
+    "commol.dependence": frozenset(
+        {
+            "DependenceSettings",
+            "DrawPValues",
+            "ProblemDependence",
+            "SeriesCorrelation",
+            "SeriesDependence",
+            "SeriesStatistics",
         }
     ),
 }

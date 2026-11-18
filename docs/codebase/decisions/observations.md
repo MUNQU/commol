@@ -206,7 +206,10 @@ names the series and the position: `ResidualNoise` and `ResidualBootstrap`
 (`SeriesResiduals::new`, one residual per position, and
 `ResidualNoise::check` for the observations it serves), the automatic block
 length (`automatic_block_length`, the residuals as consecutive values) and
-`RollingConformal` (a horizon is a count of observations). They share one
+`RollingConformal` (a horizon is a count of observations). The dependence
+analyses (`crates/commol-inference/src/dependence/grid.rs`) pair a series
+by position too, and give such a series no statistics, with the message,
+since the other series of the problem still have theirs. They share one
 check, `one_per_position` (`crates/commol-inference/src/resampling/blocks.rs`):
 two observations share a position when their `at` are equal, as
 `distinct_positions` counts the positions of the grid.

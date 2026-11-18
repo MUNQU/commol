@@ -23,6 +23,7 @@ from commol.conformal import (
     RollingConformal,
     SplitConformal,
 )
+from commol.dependence import AtParameters, Refitted
 from commol.distributions import (
     Beta,
     Gamma,
@@ -194,6 +195,8 @@ EXAMPLES: dict[str, Callable[[], BaseModel]] = {
         replicates=2, block_length=1, multipliers="rademacher"
     ),
     "BlockJackknife": lambda: BlockJackknife(block_length=1),
+    "AtParameters": lambda: AtParameters(replicates=3),
+    "Refitted": lambda: Refitted(replicates=3, starts=2),
     "NoNoise": NoNoise,
     "ResidualNoise": lambda: ResidualNoise(
         fit=FIT, block_length=1, residual_scale="additive"

@@ -1,7 +1,7 @@
 """Calibration of a model against observed data."""
 
 import logging
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Literal, TypeVar
 
 from pydantic import BaseModel
 
@@ -13,6 +13,7 @@ if TYPE_CHECKING:
         ObservationBoundsProtocol,
         ObservationDrawsProtocol,
         PredictiveProtocol,
+        SeriesDependenceProtocol,
     )
 
 from commol._calibration.method import (
@@ -245,6 +246,57 @@ class Calibrator:
         """
         return self._engine_problem.observation_bounds(
             sample._rust, engine_json(observed_data), engine_json(noise)
+        )
+
+    def _residual_dependence(
+        self,
+        sample: ParameterSample,
+        observed_data: list[ObservedDataPoint],
+        noise: _ObservationNoise,
+        max_lag: int | Literal["auto"],
+        randomizations: int,
+        reference: str,
+        confidence_level: float,
+    ) -> "SeriesDependenceProtocol":
+        """
+        The dependence of the residuals of `sample` at `observed_data`, for
+        `commol.dependence.residual_dependence`.
+
+        Parameters
+        ----------
+        sample : ParameterSample
+            The draws, in the problem's order.
+        observed_data : list[ObservedDataPoint]
+            The observations.
+        noise : NoNoise | ResidualNoise | DistributionNoise
+            The residuals: `DistributionNoise` reads the quantile residuals,
+            `NoNoise` the additive ones.
+        max_lag : int | "auto"
+            The largest lag.
+        randomizations : int
+            The randomizations of the quantile residuals.
+        reference : str
+            The JSON of `AtParameters` or `Refitted`.
+        confidence_level : float
+            The level of the band of ``τ``.
+
+        Returns
+        -------
+        SeriesDependenceProtocol
+            The analysis, computed in Rust from the calibrator's seed; the
+            refits of `Refitted` log a record of each to the logger
+            ``commol.dependence``.
+        """
+        return commol_rs.inference.residual_dependence(
+            self._engine_problem,
+            sample._rust,
+            engine_json(observed_data),
+            engine_json(noise),
+            max_lag,
+            randomizations,
+            reference,
+            confidence_level,
+            logging.getLogger("commol.dependence"),
         )
 
     def _check_observations(self, observed_data: list[ObservedDataPoint]) -> None:

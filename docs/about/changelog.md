@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `commol.dependence`: whether the values of each series are independent,
+  and how strongly they depend. `series_dependence(values, observations,
+  max_lag, replicates, confidence_level, seed)` reads any values, one per
+  observation; `residual_dependence(predictive, observations, noise,
+  max_lag, randomizations, reference, confidence_level)` reads the quantile
+  residuals (`DistributionNoise()`) or the additive residuals (`NoNoise()`)
+  of a predictive. Each series, read on the grid of its smallest spacing
+  with each lag over its pairs, has its autocorrelations, the robust
+  portmanteau `Q̃` of Dalla, Giraitis and Phillips (2022) with its p-value,
+  and the integrated autocorrelation time `τ` by Geyer's initial monotone
+  sequence with its band; the series together have their correlations and
+  the factor by which the dependence multiplies the information. The
+  required `reference` is `AtParameters(replicates)`, for held-out data, or
+  `Refitted(replicates, starts=1)`, which refits data drawn at the fit and
+  holds for the data of the fit. The result is `SeriesDependence`. See
+  [Dependence](../guide/uncertainty/dependence.md).
+
 - `commol.scores.quantile_residuals(predictive, observations, DistributionNoise())`:
   the randomized quantile residuals of Dunn and Smyth (1996), `Φ⁻¹` of the
   PIT of the mixture of the observation models over the draws, read from the

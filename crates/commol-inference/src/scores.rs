@@ -241,24 +241,28 @@ impl ObservationBounds {
     }
 
     /// The randomized quantile residual of each observation (Dunn and Smyth
-    /// 1996): `Φ⁻¹(u)` of the PIT `u` of [`Self::pit`], read from the
-    /// nearer tail, `Φ⁻¹(u)` up to `½` and `−Φ⁻¹(1 − u)` above, with
-    /// `1 − u = P(Y > y) + (1 − v) · p(y)`, so a residual far in the upper
-    /// tail stays finite. Standard normal for data the predictive did not
-    /// see.
+    /// 1996): [`quantile_residual`] of the mixture with the places of
+    /// [`Self::places`], from the PIT `u` of [`Self::pit`] read from the
+    /// nearer tail. Standard normal for data the predictive did not see.
     pub fn quantile_residuals(&self) -> Vec<f64> {
         self.mixture()
             .iter()
             .zip(self.places())
-            .map(|(tails, v)| {
-                let u = tails.pit(v);
-                if u <= 0.5 {
-                    normal_quantile(u)
-                } else {
-                    normal_quantile_sf(tails.above + (1.0 - v) * tails.at)
-                }
-            })
+            .map(|(tails, v)| quantile_residual(tails, v))
             .collect()
+    }
+}
+
+/// The randomized quantile residual of an observed value with `tails` and
+/// the place `v` within its mass: `Φ⁻¹(u)` of its PIT `u` up to `½`, and
+/// `−Φ⁻¹(P(Y > y) + (1 − v) · p(y))` above, so a residual far in the upper
+/// tail stays finite.
+pub fn quantile_residual(tails: &Tails, v: f64) -> f64 {
+    let u = tails.pit(v);
+    if u <= 0.5 {
+        normal_quantile(u)
+    } else {
+        normal_quantile_sf(tails.above + (1.0 - v) * tails.at)
     }
 }
 

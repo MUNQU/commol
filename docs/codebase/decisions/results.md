@@ -142,7 +142,9 @@ seed comes from.
 | A method that fits from one start, with no `starts` | A fit that ends at a local minimum gives a wrong center, and the user cannot ask for more starts. |
 
 **Rule:** a new method takes no seed and reads the seed of its source; a new
-method that fits the data takes `starts` with the default 1.
+method that fits the data takes `starts` with the default 1. A function with
+no source, as `series_dependence` of any values, takes the seed, such as
+`Calibrator.seed`.
 
 **Guards:** `tests/uncertainty/test_identifiability.py::TestStructuralRank::test_structural_rank_takes_the_seed_of_the_calibrator`,
 `crates/commol-random/tests/test_seeds.rs::a_seed_that_is_set_is_kept_and_one_that_is_not_is_drawn`,

@@ -165,6 +165,12 @@ impl Discrepancy {
         Ok(())
     }
 
+    /// The summary of the replicates that a loss compares with the
+    /// observations; `None` for the one run of a deterministic engine.
+    pub fn summary(&self) -> Option<ReplicateSummary> {
+        self.summary
+    }
+
     /// The factor each residual is multiplied by: `1 / rms` of its series
     /// when normalization is enabled, otherwise 1.
     pub fn normalization(&self) -> &[f64] {

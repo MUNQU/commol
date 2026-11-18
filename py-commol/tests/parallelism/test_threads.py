@@ -7,6 +7,7 @@ from collections.abc import Callable
 import pytest
 
 from commol import Calibrator, Simulation, parallelism
+from commol.dependence import Refitted, residual_dependence
 from commol.distributions import Priors
 from commol.parallelism.threads import Levels
 from commol.profiles import ProfileLikelihood, Threshold
@@ -14,6 +15,7 @@ from commol.quantities import ValueAt
 from commol.resampling import BayesianBootstrap, BlockJackknife
 from commol.sensitivity import InputSpace, SensitivityAnalysis, Sobol
 from commol.smc import GibbsPosterior
+from commol.observations import NoNoise
 from commol.uncertainty import Predictive
 from tests.support import (
     abc_swarm_calibrator,
@@ -61,6 +63,18 @@ def _bootstrap_predictive(calibrator: Calibrator) -> object:
     return Predictive(calibrator, result.sample, list(range(21)))
 
 
+def _refitted_dependence(calibrator: Calibrator) -> object:
+    return residual_dependence(
+        Predictive(calibrator, calibrator.point_sample(calibrator.run()), [1.0]),
+        calibrator.problem.observed_data,
+        NoNoise(),
+        max_lag=2,
+        randomizations=1,
+        reference=Refitted(replicates=4),
+        confidence_level=0.9,
+    )
+
+
 def _sobol(_: Calibrator) -> object:
     simulation = Simulation(two_decays(k1=0.3, k2=0.1))
     inputs = InputSpace.uniform_on_bounds(
@@ -103,6 +117,7 @@ METHODS: dict[str, Callable[[Calibrator], object]] = {
             parameters=["k1", "k2"], threshold=Threshold.beale(0.95), max_steps=4
         )
     ),
+    "dependence": _refitted_dependence,
     "sobol": _sobol,
     "replicates": _replicates,
 }

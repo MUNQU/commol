@@ -144,6 +144,7 @@ coverage guarantee, from the scores of observations the fit did not use.
 | `PolynomialChaos` | A polynomial surrogate of an output and its Sobol indices, in few runs | No | [Sensitivity Analysis](sensitivity.md#polynomial-chaos) |
 | `ProfileLikelihood` | The interval of each parameter and whether the data determine it, from refits with the parameter held | No: `Threshold.chi_square` needs one, `beale` and `bootstrap_calibrated` do not | [Profile Likelihood](profiles.md) |
 | `PredictionProfile` | The interval of a prediction: the values the data do not reject | No, as `ProfileLikelihood` | [Profile Likelihood](profiles.md#prediction-profiles) |
+| `residual_dependence`, `series_dependence` | Whether the residuals or values of each series are independent, and how many times the observations count their information | No: quantile residuals need one, additive residuals do not | [Dependence](dependence.md) |
 
 ## The parameter sample
 
@@ -370,7 +371,9 @@ is about `1 − p/n` at a fit and about `(n − p)/(n + p)` with the draws of a
 posterior, 0.72 and 0.56 at `n = 35`, `p = 10`. An in-sample check reads them
 at the fit, `Calibrator.point_sample(fit)`, or at one draw of a sample,
 `sample.resample(1, seed)`, which is standard normal only when the sample is
-an exact posterior.
+an exact posterior. The dependence of the residuals, along each series and
+between series, is `commol.dependence.residual_dependence`
+([Dependence](dependence.md)).
 
 ```python
 from commol.observations import DistributionNoise, NormalObservations
@@ -465,6 +468,7 @@ print(first == second, len({first, second}))  # True 1
 | The curvature at the fit: Laplace, the sandwich and the Laplace mixture | [Local Approximations](local.md) |
 | Intervals and verdicts from profiles of the likelihood or the loss | [Profile Likelihood](profiles.md) |
 | Prediction intervals with a coverage guarantee | [Conformal Prediction Intervals](conformal.md) |
+| Whether the residuals of each series are independent | [Dependence](dependence.md) |
 | How the inputs move the outputs, with no data | [Sensitivity Analysis](sensitivity.md) |
 | Several starts of an optimizer | [Optimizers](../calibration-optimizers.md#several-starts) |
 | Reports of a predictive | [Reports](../reports.md) |

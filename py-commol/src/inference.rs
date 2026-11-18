@@ -1214,6 +1214,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyWeightedSummary>()?;
     m.add_function(wrap_pyfunction!(weighted_summary, m)?)?;
     m.add_function(wrap_pyfunction!(effective_size, m)?)?;
+    crate::dependence::register(m)?;
     crate::identifiability::register(m)?;
     crate::smc::register(m)?;
     crate::local::register(m)?;

@@ -1,7 +1,7 @@
 """The predictive of a parameter sample: the run of every draw and its bands."""
 
 from collections.abc import Iterable, Sequence
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 
 from pydantic import ConfigDict, Field
 
@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         ObservationBoundsProtocol,
         ObservationDrawsProtocol,
         PredictiveProtocol,
+        SeriesDependenceProtocol,
     )
     from commol._data.intervals import PredictionIntervalsData
     from commol.quantities.quantities import QuantityBase
@@ -37,6 +38,11 @@ class PredictiveSource(Protocol):
     @property
     def simulation(self) -> "Simulation":
         """The simulation of the source."""
+        ...
+
+    @property
+    def seed(self) -> int:
+        """The seed of the random numbers of the source."""
         ...
 
     def _predictive(
@@ -64,6 +70,23 @@ class PredictiveSource(Protocol):
         The tails of each observed value of `observed_data` under every draw
         of `sample`, with `noise`: of the observation models for
         `DistributionNoise`, of the draws of the noise otherwise.
+        """
+        ...
+
+    def _residual_dependence(
+        self,
+        sample: ParameterSample,
+        observed_data: list[ObservedDataPoint],
+        noise: _ObservationNoise,
+        max_lag: int | Literal["auto"],
+        randomizations: int,
+        reference: str,
+        confidence_level: float,
+    ) -> "SeriesDependenceProtocol":
+        """
+        The dependence of the residuals of `sample` at `observed_data`, for
+        `commol.dependence.residual_dependence`; `reference` is the JSON of
+        its reference.
         """
         ...
 

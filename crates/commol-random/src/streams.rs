@@ -96,6 +96,11 @@ streams! {
     StartSeeds = 22, "the starts of a calibration", "the seed of the particle swarm of each start";
     SampleDirections = 23, "the identifiability of a sample",
         "the Bayesian-bootstrap weights of each replicate of the contraction of its directions";
+    DependenceRandomizations = 24, "a dependence analysis of residuals",
+        "the place `v` of each observed value within its mass, one set per randomization, common to every draw";
+    DependenceReference = 25, "a dependence analysis of residuals at the parameters",
+        "the data of each replicate of its reference";
+    DependenceSigns = 26, "a dependence analysis", "the signs ±1 of each replicate of a wild band";
 }
 
 impl Stream {
