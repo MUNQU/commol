@@ -1,6 +1,5 @@
 """Write calibrated initial conditions back onto a model definition."""
 
-import math
 from collections.abc import Collection, Mapping, Sequence
 from typing import TYPE_CHECKING
 
@@ -8,20 +7,14 @@ from commol._model.engine_state import (
     InitialCompartment,
     calibrated_initial_state,
     initial_state,
-    is_stochastic,
+    write_back,
 )
+from commol._model.initial_conditions import ScoredAmount
 
 if TYPE_CHECKING:
     from commol._model.aggregate import Aggregate
     from commol._model.model import Model
     from commol._problem.problem import CalibrationProblem
-
-# Relative tolerance under which a rebuilt amount matches the scored one on a
-# deterministic engine. A stochastic engine makes its start whole by a rounding
-# that can turn on the last bit of an amount (a tie of the largest remainders,
-# a share just below 1 in a draw), so there a rebuilt amount matches only when
-# it is the scored one.
-_MATCH_TOLERANCE = 1e-9
 
 
 def calibrated_structure[S: "Aggregate"](
@@ -36,13 +29,19 @@ def calibrated_structure[S: "Aggregate"](
     and splits are first updated so the definition stays readable: each bin
     whose every compartment a calibrated value or the remainder sets takes
     the amount the engine gave it, in the unit of the bin, and each
-    calibrated category takes the split the engine applied. Every compartment
-    whose rebuilt amount still differs from the scored one is then pinned as
-    a per-compartment override: in any bit on a stochastic engine, whose
-    rounding to whole units can turn on the last bit, and beyond
-    ``_MATCH_TOLERANCE`` on a deterministic engine. The result therefore
-    rebuilds the scored state, bit for bit on a stochastic engine, whatever
-    the combination of bin, category and exact-compartment values.
+    calibrated category takes the split the engine applied. The scored
+    amounts of an earlier write-back are dropped. Every compartment whose
+    rebuilt amount still differs from the scored one in any bit, sign
+    included, as ``-0.0`` from ``0.0``, is then written: a rounding to whole
+    units or a rate that steps on a start value (``if``, a comparison,
+    ``floor``, ``1 / x``) can turn on its last bit. The engine sorts each one
+    (`engine_state.write_back`): a scored amount when its expansion lies
+    within the last bits of the scored amount, it has no override and its
+    bin has an amount, which the build drops once an edit changes the
+    compartment; otherwise a per-compartment override, such as an
+    exact-compartment value or a compartment the user overrides. The result
+    therefore rebuilds the scored state bit for bit on every engine,
+    whatever the combination of bin, category and exact-compartment values.
 
     Parameters
     ----------
@@ -88,22 +87,14 @@ def calibrated_structure[S: "Aggregate"](
         scored.state,
         scored.covered,
     )
-    rebuilt = initial_state(process, candidate)
-    bin_amounts = _bin_amounts(rebuilt, scored.state)
-    target = scored.state
-    tolerance = 0.0 if is_stochastic(model) else _MATCH_TOLERANCE
-    pins = {
-        compartment.name: max(0.0, target[compartment.name])
-        for compartment in rebuilt
-        if not math.isclose(
-            compartment.amount,
-            target[compartment.name],
-            rel_tol=tolerance,
-            abs_tol=tolerance * max(1.0, bin_amounts[compartment.bin]),
-        )
+    candidate.scored_amounts = {}
+    written = write_back(process, candidate, scored.state)
+    if written.compartment_amounts:
+        candidate._upsert_compartment_amounts(written.compartment_amounts)
+    candidate.scored_amounts = {
+        name: ScoredAmount(built=built, scored=amount)
+        for name, (built, amount) in written.scored_amounts.items()
     }
-    if pins:
-        candidate._upsert_compartment_amounts(pins)
     return candidate
 
 
@@ -120,14 +111,14 @@ def _declared_update[S: "Aggregate"](
     resolves as the split of a category.
 
     The overrides of the compartments that a value or the remainder sets are
-    dropped, so the pins that follow are only those of this write-back, not
-    those of an earlier one. Every bin whose every compartment a calibrated
-    value or the remainder sets takes the amount the engine gave it; a bin of
-    which a value sets only some compartments keeps its amount, and the pins
-    that follow cover those compartments. Every calibrated category takes the
-    split the engine applied. A group of category updates that the definition
-    rejects is skipped; the pins that follow cover the compartments it would
-    have set.
+    dropped, so the overrides that follow are only those of this write-back,
+    not those of an earlier one. Every bin whose every compartment a
+    calibrated value or the remainder sets takes the amount the engine gave
+    it; a bin of which a value sets only some compartments keeps its amount,
+    and the overrides that follow cover those compartments. Every calibrated
+    category takes the split the engine applied. A group of category updates
+    that the definition rejects is skipped; the overrides that follow cover
+    the compartments it would have set.
     """
     covered_names = set(covered)
     candidate = model.structure.model_copy(deep=True)
@@ -162,7 +153,7 @@ def covered_bins(
 
     With the compartments that the calibrated values and the remainder set,
     these are the bins whose amount the write-back writes; a value that sets
-    only part of a bin leaves its amount and pins its compartments.
+    only part of a bin leaves its amount and overrides its compartments.
 
     Parameters
     ----------

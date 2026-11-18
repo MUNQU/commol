@@ -41,6 +41,26 @@ pub struct InitialConditions {
     /// compartment, also on a bin whose amount is `None`.
     #[serde(default)]
     pub compartment_amounts: IndexMap<String, f64>,
+    /// The amount a calibration scored for single expanded compartments, by
+    /// compartment name, where the bins and the fractions build it only to
+    /// its last bits ([`ScoredAmount`]).
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub scored_amounts: IndexMap<String, ScoredAmount>,
+}
+
+/// The amount a calibration scored for a compartment, and the amount the
+/// bins and the fractions built for it when the calibration was written
+/// back.
+///
+/// The build applies `scored` only while the compartment still expands to
+/// `built` in every bit, has no `compartment_amounts` entry and is not of a
+/// bin left `None`; otherwise the entry is stale and the build ignores it.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ScoredAmount {
+    /// The amount the bins and the fractions built.
+    pub built: f64,
+    /// The amount the calibration scored.
+    pub scored: f64,
 }
 
 /// How a stratification splits the amount of a compartment among its
@@ -342,7 +362,28 @@ mod tests {
         let conditions: InitialConditions = serde_json::from_str(json).unwrap();
 
         assert!(conditions.compartment_amounts.is_empty());
+        assert!(conditions.scored_amounts.is_empty());
         assert!(conditions.stratification_fractions.is_empty());
+    }
+
+    #[test]
+    fn scored_amounts_read_and_write_back_bit_for_bit() {
+        let json = r#"{"bin_amounts":{"B":1.5},"stratification_fractions":{},"compartment_amounts":{},"scored_amounts":{"B_g1":{"built":1.0499999999999998,"scored":1.05},"B_g2":{"built":0.0,"scored":-0.0}}}"#;
+
+        let conditions: InitialConditions = json::read(json).unwrap();
+
+        let g1 = conditions.scored_amounts["B_g1"];
+        assert_eq!(g1.built.to_bits(), 1.05_f64.next_down().to_bits());
+        assert_eq!(g1.scored.to_bits(), 1.05_f64.to_bits());
+        assert!(conditions.scored_amounts["B_g2"].scored.is_sign_negative());
+        assert_eq!(json::write(&conditions), json);
+    }
+
+    #[test]
+    fn no_scored_amount_writes_no_field() {
+        let conditions: InitialConditions = json::read(r#"{"bin_amounts":{}}"#).unwrap();
+
+        assert!(!json::write(&conditions).contains("scored_amounts"));
     }
 
     #[test]

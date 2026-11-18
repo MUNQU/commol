@@ -17,8 +17,8 @@ use commol_core::math_expression::variables::{
 };
 use commol_core::{
     Aggregate, InitialConditions, MathExpression, MathExpressionContext, Model, NEIGHBORS,
-    NEIGHBORS_PREFIX, ParameterValue, Process, RateMathExpression, Rounding, SeriesMode,
-    StratificationFractions,
+    NEIGHBORS_PREFIX, ParameterValue, Process, RateMathExpression, Rounding, ScoredAmount,
+    SeriesMode, StratificationFractions,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -653,6 +653,8 @@ pub struct InitialCompartment {
     /// The fraction of each category of `categories`, in their order,
     /// whatever the amount of the bin and the overrides.
     pub fractions: Vec<f64>,
+    /// Whether a current `scored_amounts` entry set the amount.
+    pub scored: bool,
 }
 
 /// Expand a process into its compartments and their initial amounts.
@@ -671,15 +673,21 @@ pub struct InitialCompartment {
 /// After the expansion, `compartment_amounts` overrides replace the amount
 /// of the named compartments, also of a bin whose amount is `None`: an
 /// override states the amount of its compartment
-/// ([`CompiledModel::check_values`] reads it as a value).
+/// ([`CompiledModel::check_values`] reads it as a value). Then each
+/// `scored_amounts` entry replaces the amount of its compartment while it is
+/// current: the compartment expands to its `built` amount in every bit, has
+/// no override and is not of a bin left `None`. Any other entry is stale,
+/// valid data whose condition no longer holds, and is ignored; an entry that
+/// names no compartment is stale too.
 ///
 /// # Errors
 ///
 /// Returns the message of the rule of a bin amount, the fractions of a
 /// stratification (`check_stratification_fractions`) or an override
 /// ([`crate::rules::check_bin_amount`],
-/// [`crate::rules::check_compartment_amount`]), or a message when an
-/// override names a compartment that is not part of the expansion.
+/// [`crate::rules::check_compartment_amount`],
+/// [`crate::rules::check_scored_amount`]), or a message when an override
+/// names a compartment that is not part of the expansion.
 pub fn initial_state(
     process: &Process,
     aggregate: &Aggregate,
@@ -718,14 +726,17 @@ pub fn initial_state(
                 categories: output.categories,
                 amount,
                 fractions,
+                scored: false,
             }
         })
         .collect();
 
     let overrides = &initial_conditions.compartment_amounts;
-    if overrides.is_empty() {
+    let scored = &initial_conditions.scored_amounts;
+    if overrides.is_empty() && scored.is_empty() {
         return Ok(state);
     }
+    let built: Vec<f64> = state.iter().map(|compartment| compartment.amount).collect();
 
     let compartment_index: HashMap<String, usize> = state
         .iter()
@@ -750,7 +761,99 @@ pub fn initial_state(
         state[compartment_index[compartment]].amount = *amount;
     }
 
+    for (compartment, amount) in scored {
+        crate::rules::check_scored_amount(compartment, amount.built, amount.scored)?;
+    }
+    for (compartment, amount) in scored {
+        let Some(&index) = compartment_index.get(compartment) else {
+            continue;
+        };
+        let current = built[index].to_bits() == amount.built.to_bits();
+        if current && takes_a_scored_amount(initial_conditions, &state[index]) {
+            state[index].amount = amount.scored;
+            state[index].scored = true;
+        }
+    }
+
     Ok(state)
+}
+
+/// Whether a scored amount can set the amount of `compartment`: it has no
+/// `compartment_amounts` entry, which the user declares and which wins, and
+/// its bin has an amount, since a scored amount never gives a value to a bin
+/// left `None`.
+fn takes_a_scored_amount(conditions: &InitialConditions, compartment: &InitialCompartment) -> bool {
+    !conditions
+        .compartment_amounts
+        .contains_key(&compartment.name)
+        && !matches!(conditions.bin_amounts.get(&compartment.bin), Some(None))
+}
+
+/// What a calibration write-back writes for each compartment that a
+/// structure starts other than as the calibration scored it, in any bit.
+#[derive(Debug, Default, PartialEq)]
+pub struct WrittenBack {
+    /// The scored amount of each compartment that takes one
+    /// ([`InitialConditions::scored_amounts`]): its expansion, `built`, is
+    /// within the last bits of the scored amount
+    /// ([`crate::rules::corrects`]).
+    pub scored_amounts: Vec<(String, ScoredAmount)>,
+    /// The scored amount of every other compartment, as an override: a
+    /// compartment with an override, of a bin left `None`, or whose expansion
+    /// lies further from the scored amount.
+    pub compartment_amounts: Vec<(String, f64)>,
+}
+
+/// Sort each compartment that `aggregate` starts other than in `scored`, in
+/// any bit, into a scored amount or an override, so a structure that holds
+/// them starts from `scored` bit for bit.
+///
+/// The scored amounts of `aggregate` are ignored: the write-back replaces
+/// them. A compartment that starts as `scored` has it in every bit is left as
+/// it is.
+///
+/// # Errors
+///
+/// Returns the message of [`initial_state`], or a message when `scored`
+/// has no amount for a compartment.
+pub fn write_back(
+    process: &Process,
+    aggregate: &Aggregate,
+    scored: &HashMap<String, f64>,
+) -> Result<WrittenBack, String> {
+    let mut declared = aggregate.clone();
+    declared.initial_conditions.scored_amounts.clear();
+    let state = initial_state(process, &declared)?;
+    declared.initial_conditions.compartment_amounts.clear();
+    let expansion = initial_state(process, &declared)?;
+
+    let mut written = WrittenBack::default();
+    for (compartment, expanded) in state.into_iter().zip(expansion) {
+        let amount = *scored.get(&compartment.name).ok_or_else(|| {
+            format!(
+                "The scored state has no amount of the compartment '{}'",
+                compartment.name
+            )
+        })?;
+        if compartment.amount.to_bits() == amount.to_bits() {
+            continue;
+        }
+        if takes_a_scored_amount(&aggregate.initial_conditions, &compartment)
+            && crate::rules::corrects(expanded.amount, amount)
+        {
+            let built = expanded.amount;
+            written.scored_amounts.push((
+                compartment.name,
+                ScoredAmount {
+                    built,
+                    scored: amount,
+                },
+            ));
+        } else {
+            written.compartment_amounts.push((compartment.name, amount));
+        }
+    }
+    Ok(written)
 }
 
 /// Check that the process of an aggregate model has a bin and a transition:
@@ -2181,6 +2284,7 @@ mod tests {
                         .into_iter()
                         .map(|(name, amount)| (name.to_string(), amount))
                         .collect(),
+                    scored_amounts: Default::default(),
                 },
                 neighbors: None,
             }),
@@ -2227,6 +2331,193 @@ mod tests {
 
         assert_eq!(compartments, vec!["A_g1", "A_g2", "B_g1", "B_g2"]);
         assert_eq!(amounts, vec![600.0, 250.0, 0.0, 0.0]);
+    }
+
+    /// A model with bin A of 1000 split `0.7, 0.3` by `group`, and the
+    /// scored amount `scored` of `A_g1` built from `built`.
+    fn scored_model(built: f64, scored: f64) -> Model {
+        let mut model = make_model(
+            vec![group_stratification()],
+            vec![group_fractions(0.7, 0.3)],
+            vec![],
+        );
+        aggregate_mut(&mut model)
+            .initial_conditions
+            .scored_amounts
+            .insert(
+                "A_g1".to_string(),
+                commol_core::ScoredAmount { built, scored },
+            );
+        model
+    }
+
+    /// The amount of `A_g1` in the initial state of `model`.
+    fn a_g1(model: &Model) -> f64 {
+        let compartments = ["A_g1".to_string()];
+        initial_amounts(model, &compartments).unwrap()[0]
+    }
+
+    #[test]
+    fn a_scored_amount_replaces_the_amount_its_compartment_still_builds() {
+        let built = 1000.0 * 0.7;
+        let model = scored_model(built, built.next_up());
+
+        assert_eq!(a_g1(&model).to_bits(), built.next_up().to_bits());
+        assert!(model_initial_state(&model).unwrap()[0].scored);
+    }
+
+    #[test]
+    fn a_scored_amount_is_stale_once_its_compartment_builds_another_amount() {
+        let built = 1000.0 * 0.7;
+        let mut model = scored_model(built, built.next_up());
+        set_bin_amount(&mut model, "A", 900.0);
+
+        assert_eq!(a_g1(&model), 900.0 * 0.7);
+    }
+
+    #[test]
+    fn an_override_wins_over_a_scored_amount_of_its_compartment() {
+        let built = 1000.0 * 0.7;
+        let mut model = scored_model(built, built.next_up());
+        aggregate_mut(&mut model)
+            .initial_conditions
+            .compartment_amounts
+            .insert("A_g1".to_string(), built);
+
+        assert_eq!(a_g1(&model).to_bits(), built.to_bits());
+    }
+
+    #[test]
+    fn a_scored_amount_never_gives_a_value_to_a_bin_left_none() {
+        let mut model = scored_model(0.0, 0.0_f64.next_up());
+        aggregate_mut(&mut model)
+            .initial_conditions
+            .bin_amounts
+            .insert("A".to_string(), None);
+
+        assert_eq!(a_g1(&model).to_bits(), 0.0_f64.to_bits());
+    }
+
+    #[test]
+    fn a_scored_amount_that_names_no_compartment_is_stale() {
+        let mut model = scored_model(700.0, 700.0);
+        let conditions = &mut aggregate_mut(&mut model).initial_conditions;
+        let amount = conditions.scored_amounts.shift_remove("A_g1").unwrap();
+        conditions
+            .scored_amounts
+            .insert("Missing".to_string(), amount);
+
+        assert_eq!(a_g1(&model), 1000.0 * 0.7);
+    }
+
+    #[test]
+    fn a_scored_amount_far_from_its_built_amount_is_refused() {
+        let model = scored_model(1000.0 * 0.7, 300.0);
+
+        let error = model_initial_state(&model).unwrap_err();
+
+        assert!(
+            error.starts_with("Compartment 'A_g1': a scored amount"),
+            "{error}"
+        );
+    }
+
+    /// The amounts `model` starts from, with `changes` in place.
+    fn scored_state(model: &Model, changes: &[(&str, f64)]) -> HashMap<String, f64> {
+        let mut state: HashMap<String, f64> = model_initial_state(model)
+            .unwrap()
+            .into_iter()
+            .map(|compartment| (compartment.name, compartment.amount))
+            .collect();
+        for (name, amount) in changes {
+            state.insert(name.to_string(), *amount);
+        }
+        state
+    }
+
+    #[test]
+    fn a_write_back_corrects_the_last_bits_of_an_expansion_and_overrides_the_rest() {
+        let mut model = make_model(
+            vec![group_stratification()],
+            vec![group_fractions(0.7, 0.3)],
+            vec![("B_g2", 5.0)],
+        );
+        let built = 1000.0 * 0.7;
+        aggregate_mut(&mut model)
+            .initial_conditions
+            .scored_amounts
+            .insert(
+                "A_g1".to_string(),
+                commol_core::ScoredAmount {
+                    built,
+                    scored: built.next_down(),
+                },
+            );
+        let scored = scored_state(
+            &model,
+            &[
+                ("A_g1", built.next_up()),
+                ("A_g2", 250.0),
+                ("B_g2", 5.0_f64.next_up()),
+            ],
+        );
+
+        let written = write_back(&model.process, aggregate(&model), &scored).unwrap();
+
+        // A_g1 differs in its last bit from its expansion, a scored amount
+        // (the one in the structure is ignored); A_g2 differs by more, and
+        // B_g2 has an override: both are overrides. B_g1 starts as scored.
+        assert_eq!(
+            written,
+            WrittenBack {
+                scored_amounts: vec![(
+                    "A_g1".to_string(),
+                    commol_core::ScoredAmount {
+                        built,
+                        scored: built.next_up()
+                    }
+                )],
+                compartment_amounts: vec![
+                    ("A_g2".to_string(), 250.0),
+                    ("B_g2".to_string(), 5.0_f64.next_up())
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn a_write_back_overrides_a_compartment_of_a_bin_left_none() {
+        let mut model = make_model(
+            vec![group_stratification()],
+            vec![group_fractions(0.7, 0.3)],
+            vec![],
+        );
+        aggregate_mut(&mut model)
+            .initial_conditions
+            .bin_amounts
+            .insert("B".to_string(), None);
+        let scored = scored_state(&model, &[("B_g1", -0.0)]);
+
+        let written = write_back(&model.process, aggregate(&model), &scored).unwrap();
+
+        assert_eq!(
+            written.compartment_amounts,
+            vec![("B_g1".to_string(), -0.0)]
+        );
+        assert!(written.compartment_amounts[0].1.is_sign_negative());
+        assert!(written.scored_amounts.is_empty());
+    }
+
+    #[test]
+    fn a_write_back_needs_a_scored_amount_of_every_compartment() {
+        let model = make_model(vec![], vec![], vec![]);
+
+        let error = write_back(&model.process, aggregate(&model), &HashMap::new()).unwrap_err();
+
+        assert_eq!(
+            error,
+            "The scored state has no amount of the compartment 'A'"
+        );
     }
 
     #[test]

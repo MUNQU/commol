@@ -26,6 +26,7 @@ ROOT = frozenset(
         "Aggregate",
         "Complete",
         "Groups",
+        "ScoredAmount",
         # Simulate
         "Simulation",
         "InfeasibleStateError",

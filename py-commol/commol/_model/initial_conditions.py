@@ -1,8 +1,9 @@
 """Initial amounts: the amount of each bin, category splits and overrides.
 
-The engine holds the rule of an initial amount (`check_bin_amount` and
-`check_compartment_amount` of `crates/commol-model/src/rules.rs`): each
-amount is checked with it when the object is built or an amount changes. It
+The engine holds the rule of an initial amount (`check_bin_amount`,
+`check_compartment_amount` and `check_scored_amount` of
+`crates/commol-model/src/rules.rs`): each amount is checked with it when the
+object is built or an amount changes. It
 also resolves a category id, bare or qualified (`resolve_category` of
 `crates/commol-model/src/initial_conditions.rs`).
 """
@@ -42,6 +43,34 @@ _FRACTION_FIELDS = {
 }
 
 
+class ScoredAmount(BaseModel):
+    """
+    The amount a calibration scored for one compartment, and the amount the
+    model built for it when the calibration was written back.
+
+    `Model.apply_calibration_parameters` writes one into
+    ``scored_amounts`` for each compartment that the bins and the fractions
+    rebuild only to its last bits, so the written model starts from the
+    state the calibration scored, bit for bit. The build applies ``scored``
+    only while the compartment still expands to ``built`` in every bit, has
+    no ``compartment_amounts`` entry and is not of a bin left None; after
+    an edit that changes it, the entry is stale and the build ignores it.
+
+    Attributes
+    ----------
+    built : float
+        The amount the bins and the fractions built for the compartment.
+    scored : float
+        The amount the calibration scored, at most 64 units in the last
+        place from ``built``.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    built: float = Field(..., description="The amount the bins and fractions built.")
+    scored: float = Field(..., description="The amount the calibration scored.")
+
+
 class InitialConditions(BaseModel):
     """
     How much starts where: the amount of each bin and the split of it.
@@ -72,6 +101,10 @@ class InitialConditions(BaseModel):
         Amounts of single expanded compartments, by compartment name, applied
         after the expansion. An override states the amount of its compartment
         also on a bin left None.
+    scored_amounts : dict[str, ScoredAmount]
+        The amounts a calibration scored that the bins and the fractions
+        rebuild only to their last bits, by compartment name, written by
+        `Model.apply_calibration_parameters`; applied last, while current.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -94,6 +127,14 @@ class InitialConditions(BaseModel):
         default_factory=dict,
         description=(
             "Amounts of single expanded compartments, applied after the expansion."
+        ),
+    )
+    scored_amounts: dict[str, ScoredAmount] = Field(
+        default_factory=dict,
+        exclude_if=lambda amounts: not amounts,
+        description=(
+            "The amounts a calibration scored that the bins and fractions "
+            "rebuild only to their last bits, applied last while current."
         ),
     )
 
@@ -143,6 +184,17 @@ class InitialConditions(BaseModel):
     def _validate_compartment_amounts(cls, value: dict[str, float]) -> dict[str, float]:
         """Check every compartment amount with the rule of the engine."""
         commol_rs.model.check_compartment_amounts(list(value.items()))
+        return value
+
+    @field_validator("scored_amounts")
+    @classmethod
+    def _validate_scored_amounts(
+        cls, value: dict[str, ScoredAmount]
+    ) -> dict[str, ScoredAmount]:
+        """Check every scored amount with the rule of the engine."""
+        commol_rs.model.check_scored_amounts(
+            [(name, amount.built, amount.scored) for name, amount in value.items()]
+        )
         return value
 
     def resolve_category(self, category: str) -> tuple[str, str]:
@@ -295,7 +347,9 @@ class InitialConditions(BaseModel):
         Upsert per-compartment overrides by expanded compartment name.
 
         A compartment already present in ``compartment_amounts`` has its
-        amount replaced; a new one is appended. Compartment names depend on
+        amount replaced; a new one is appended. A scored amount of the
+        compartment, which the override makes stale, is dropped. Compartment
+        names depend on
         the expansion of the process, so
         :meth:`~commol._model.aggregate.Aggregate.update_compartment_amounts`
         validates them against the engine, not here.
@@ -308,6 +362,13 @@ class InitialConditions(BaseModel):
         """
         commol_rs.model.check_compartment_amounts(list(amounts.items()))
         self.compartment_amounts.update(amounts)
+        # An override wins over a scored amount of its compartment, so the
+        # scored amount is dropped as stale.
+        self.scored_amounts = {
+            name: amount
+            for name, amount in self.scored_amounts.items()
+            if name not in amounts
+        }
 
     def update_bin_amounts(self, amounts: Mapping[str, float | None]) -> None:
         """
@@ -316,6 +377,16 @@ class InitialConditions(BaseModel):
         Every amount is checked before any bin changes, so a rejected call
         leaves the initial conditions unchanged. The bins of one unit keep no
         sum: to move an amount between bins, update every bin involved.
+
+        The expansion of each bin takes its new amount. A
+        ``compartment_amounts`` override of a compartment of the bin is a
+        declaration of the user and stays, also a value a calibration set by
+        an exact compartment id or a prefix, so the bin then sums to the new
+        amount only where no override holds: with ``B = 12`` split in halves
+        and ``B_g1 = 8.4`` declared, ``{"B": 20}`` starts ``B_g1`` at 8.4 and
+        ``B_g2`` at 10. To restart the bin from its amount, remove those
+        overrides. The scored amounts of a calibration write-back
+        (``scored_amounts``) of the bin stop applying by themselves.
 
         Parameters
         ----------

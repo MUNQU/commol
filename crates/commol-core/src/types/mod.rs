@@ -26,7 +26,7 @@ pub mod transitions;
 
 // Re-export all public types for convenient access
 pub use aggregate::{
-    Aggregate, AggregateVariant, FRACTIONS_BY, InitialConditions, Neighbors,
+    Aggregate, AggregateVariant, FRACTIONS_BY, InitialConditions, Neighbors, ScoredAmount,
     StratificationFractions,
 };
 pub use engine::{

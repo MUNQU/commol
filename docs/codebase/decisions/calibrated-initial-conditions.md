@@ -27,8 +27,11 @@ and the write-back (`configured_engine`, then the binding
 `Aggregate.with_calibrated_values`
 (`_model/calibration_write_back.py`) writes back the amount of every bin
 whose every compartment a value or the remainder sets and the split of every
-calibrated category, and pins as per-compartment overrides every compartment
-that these cannot reproduce.
+calibrated category, and writes every compartment that these do not
+reproduce bit for bit as the engine sorts it (`write_back` of
+`crates/commol-model/src/builder.rs`): a scored amount when they build it to
+its last bits, a per-compartment override otherwise
+([Calibration write-back](calibration-write-back.md#a-scored-amount-of-the-write-back-lives-in-its-own-field)).
 
 An id names an expanded compartment (`A_g1`), a bin or a bin prefix (`A`, or
 `A_g1` over a deeper stratification), or a category of a binary

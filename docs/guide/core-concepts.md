@@ -346,6 +346,14 @@ A category name that two stratifications declare must be qualified with its
 stratification, as in `{"group:g1": 0.5}`. Calibration writes its results back
 through these same methods.
 
+An override is your declaration, and an update of its bin keeps it: with
+`B = 12` split in halves and `B_g1 = 8.4` declared, `update_bin_amounts({"B":
+20})` starts `B_g1` at 8.4 and `B_g2` at 10, so the bin sums to 20 only where
+no override holds. To restart the bin from its amount, remove its overrides
+from `compartment_amounts`. The scored amounts a calibration write-back records
+(`scored_amounts`) stop applying by themselves; see
+[Writing back](calibration-initial-conditions.md#writing-back).
+
 ## Several sources or targets
 
 A transition can have several sources or several targets. It then moves

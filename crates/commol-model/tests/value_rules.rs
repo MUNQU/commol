@@ -49,6 +49,17 @@ fn compartment_amount(amount: f64) -> Model {
     model
 }
 
+fn scored_amount(built: f64, scored: f64) -> Model {
+    let mut model = model();
+    model
+        .aggregate_mut()
+        .unwrap()
+        .initial_conditions
+        .scored_amounts
+        .insert("A".to_string(), commol_core::ScoredAmount { built, scored });
+    model
+}
+
 fn impulse(at: Option<Vec<f64>>, every: Option<(f64, f64)>) -> Model {
     let mut model = model();
     let transition = &mut model.process.transitions[0];
@@ -140,6 +151,18 @@ fn every_value_outside_its_rule_is_rejected() {
             "Compartment 'A': initial amount is a finite number of at least 0, got inf",
         ),
         (
+            scored_amount(800.0, 300.0),
+            rules::check_scored_amount("A", 800.0, 300.0),
+            "Compartment 'A': a scored amount corrects the last bits of the amount its \
+             bin and fractions build, at most 64 units in the last place from it; got \
+             300.0 for 800.0",
+        ),
+        (
+            scored_amount(800.0, -1.0),
+            rules::check_scored_amount("A", 800.0, -1.0),
+            "Compartment 'A': initial amount is a finite number of at least 0, got -1",
+        ),
+        (
             impulse(both.0.clone(), both.1),
             rules::check_impulse("ab", both.0.as_deref(), both.1),
             "Transition 'ab': set impulse_at or impulse_every, not both",
@@ -221,6 +244,12 @@ fn every_value_outside_its_rule_is_rejected() {
 fn a_value_inside_its_rule_is_accepted() {
     assert_eq!(rules::check_bin_amount("B", 0.0), Ok(()));
     assert_eq!(rules::check_compartment_amount("A", 3.5), Ok(()));
+    let built: f64 = 0.1 * 3.0;
+    let far = f64::from_bits(built.to_bits() + rules::SCORED_AMOUNT_ULPS);
+    assert_eq!(rules::check_scored_amount("A", built, far), Ok(()));
+    assert_eq!(rules::check_scored_amount("A", 0.0, -0.0), Ok(()));
+    assert!(rules::check_scored_amount("A", built, far.next_up()).is_err());
+    assert!(rules::corrects(-0.0, 0.0_f64.next_up()));
     assert_eq!(rules::check_impulse("ab", None, None), Ok(()));
     assert_eq!(rules::check_impulse("ab", Some(&[0.0, 2.5]), None), Ok(()));
     assert_eq!(rules::check_impulse("ab", None, Some((0.5, 0.0))), Ok(()));
