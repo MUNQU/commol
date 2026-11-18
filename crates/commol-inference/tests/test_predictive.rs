@@ -457,3 +457,143 @@ fn a_predictive_sends_each_draw_and_runs_none_once_the_steps_stop() {
     let error = Predictive::new(problem.forward(), &draws, &[1.0], 0, &Stopped).unwrap_err();
     assert!(error.to_string().contains(STOPPED), "{error}");
 }
+
+/// The problem of the increment of B over 20 steps in four parts of five,
+/// read by `model`, at `k = 0.1`: the means of the parts fall from 410 to
+/// 50.
+fn sum_problem(
+    model: commol_calibration::ObservationModel,
+) -> CalibrationProblem<DifferenceEquations> {
+    let base = problem();
+    let observation = ObservedDataPoint {
+        parts: 4,
+        ..ObservedDataPoint::with_window(20.0, "B".to_string(), 800.0, 20.0)
+    };
+    CalibrationProblem::new(
+        base.forward().base_engine().clone(),
+        vec![observation],
+        vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+        None,
+        vec![],
+        commol_calibration::DiscrepancyConfig::Likelihood(vec![("B".to_string(), model)]),
+    )
+    .unwrap()
+}
+
+#[test]
+fn draws_of_a_sum_have_the_variance_of_their_parts() {
+    use commol_calibration::{Argument, ObservationModel, Sum};
+    use commol_inference::{DistributionNoise, ObservationNoise};
+    use commol_random::Generator;
+
+    let phi = 0.3;
+    let negative_binomial = |sum| ObservationModel::NegativeBinomial {
+        overdispersion: Argument::Value(phi),
+        sum: Some(sum),
+    };
+    let cases = [
+        (negative_binomial(Sum::Exact), Some(phi)),
+        (negative_binomial(Sum::Moments), Some(phi)),
+        (ObservationModel::Poisson, Some(0.0)),
+        (
+            ObservationModel::Normal {
+                sd: Argument::Value(3.0),
+            },
+            None,
+        ),
+    ];
+    for (model, overdispersion) in cases {
+        let problem = sum_problem(model);
+        let mut workspace = Workspace::default();
+        problem.predict_once(&[0.1], None, &mut workspace).unwrap();
+        let (predicted, parts) = (workspace.predictions, workspace.parts);
+        assert_eq!(parts.len(), 4);
+        let mean: f64 = parts.iter().sum();
+        let expected_variance = match overdispersion {
+            Some(phi) => mean + phi * parts.iter().map(|mu| mu * mu).sum::<f64>(),
+            None => 4.0 * 9.0,
+        };
+        let noise = DistributionNoise::new(&problem).unwrap();
+        let observations = problem.observed_data();
+        let mut generator = Generator::from_seed(5);
+        let count = 40_000;
+        let mut out = [0.0];
+        let draws: Vec<f64> = (0..count)
+            .map(|_| {
+                noise.observe(
+                    observations,
+                    &[0.1],
+                    &predicted,
+                    &parts,
+                    &mut generator,
+                    &mut out,
+                );
+                out[0]
+            })
+            .collect();
+        let draw_mean = draws.iter().sum::<f64>() / count as f64;
+        let variance =
+            draws.iter().map(|d| (d - draw_mean).powi(2)).sum::<f64>() / (count - 1) as f64;
+        // Four standard errors of the mean, and of the variance (about
+        // √(2/n) of it, wider for the heavier tails of a negative binomial).
+        let mean_error = 4.0 * (expected_variance / count as f64).sqrt();
+        assert!((draw_mean - mean).abs() < mean_error, "{draw_mean} {mean}");
+        let variance_error = 4.0 * 3.0 * (2.0 / count as f64).sqrt() * expected_variance;
+        assert!(
+            (variance - expected_variance).abs() < variance_error,
+            "{variance} {expected_variance}"
+        );
+    }
+}
+
+#[test]
+fn draws_of_a_sum_have_the_distribution_of_their_reading() {
+    use commol_calibration::{Argument, Noise, ObservationModel, Sum};
+    use commol_inference::{DistributionNoise, ObservationNoise};
+    use commol_random::Generator;
+
+    // Unequal parts and a large φ, where the moments of the sum are not its
+    // distribution: each reading draws the count 0 as often as its density
+    // says, and the two densities there are far apart.
+    let (phi, parts) = (2.0, [0.2, 0.5, 1.0, 30.0]);
+    let count = 40_000;
+    let zero = |sum| {
+        Noise::NegativeBinomial {
+            overdispersion: phi,
+            sum: Some(sum),
+        }
+        .sum_log_density(0.0, &parts)
+        .exp()
+    };
+    let error = |p: f64| 4.0 * (p * (1.0 - p) / count as f64).sqrt();
+    let (exact, moments) = (zero(Sum::Exact), zero(Sum::Moments));
+    assert!((exact - moments).abs() > 2.0 * (error(exact) + error(moments)));
+    for (sum, expected) in [(Sum::Exact, exact), (Sum::Moments, moments)] {
+        let problem = sum_problem(ObservationModel::NegativeBinomial {
+            overdispersion: Argument::Value(phi),
+            sum: Some(sum),
+        });
+        let noise = DistributionNoise::new(&problem).unwrap();
+        let predicted = [parts.iter().sum::<f64>()];
+        let mut generator = Generator::from_seed(9);
+        let mut out = [0.0];
+        let zeros = (0..count)
+            .filter(|_| {
+                noise.observe(
+                    problem.observed_data(),
+                    &[0.1],
+                    &predicted,
+                    &parts,
+                    &mut generator,
+                    &mut out,
+                );
+                out[0] == 0.0
+            })
+            .count();
+        let share = zeros as f64 / count as f64;
+        assert!(
+            (share - expected).abs() < error(expected),
+            "{sum:?} {share} {expected}"
+        );
+    }
+}

@@ -21,6 +21,7 @@ from commol import (
     CalibrationProblem,
     Calibrator,
     NelderMeadConfig,
+    ObservedDataPoint,
     Simulation,
 )
 from commol._calibration.method import UncertaintyMethod
@@ -40,7 +41,7 @@ from commol.local.results import (
     LaplaceResult,
     SandwichResult,
 )
-from commol.observations import NormalObservations
+from commol.observations import NegativeBinomialObservations, NormalObservations
 from commol.smc import GibbsPosterior, InformationMatchingEta
 from commol.uncertainty import Predictive
 from commol.uncertainty.predictive import by_output
@@ -50,9 +51,11 @@ from tests.support import (
     bounded,
     build,
     build_ode,
+    decay_part_means,
     fan_calibrator,
     flow_calibrator,
     flow_observations,
+    sum_calibrator,
     two_wells_calibrator,
 )
 
@@ -491,6 +494,34 @@ class TestInformationMatching:
 
         # η = n sd² / Σ r²: its relative error is about √(2/n).
         assert result.eta == pytest.approx(1.0, rel=3 * math.sqrt(2 / count))
+
+    def test_a_correct_model_with_sums_gives_one(self) -> None:
+        # A decay A → B whose windows of two steps are each the sum of two
+        # negative binomial parts of dispersion φ: the exact sum is the
+        # correct model of the data, of the rate and of φ.
+        k, phi, count, parts = 0.01, 0.5, 150, 2
+        ends = [parts * (index + 1) for index in range(count)]
+        means = np.array(decay_part_means(k, ends, parts))
+        size = 1 / phi
+        values = np.random.default_rng(21).negative_binomial(
+            size, size / (size + means)
+        )
+        observations = [
+            ObservedDataPoint(
+                at=end, output="B", value=float(value), window=parts, parts=parts
+            )
+            for end, value in zip(ends, values.sum(axis=1), strict=True)
+        ]
+        calibrator = sum_calibrator(
+            observations,
+            {"B": NegativeBinomialObservations(overdispersion="phi", sum="exact")},
+            noise=[bounded("phi", 0.01, 3.0, kind="noise")],
+        )
+
+        result = calibrator.uncertainty(_matching(block_length=1))
+
+        # Across seeds of the data, η spreads by about 0.1 around one.
+        assert result.eta == pytest.approx(1.0, rel=0.25)
 
     def test_information_matching_takes_a_likelihood(self) -> None:
         # The noise parameter sd adds its own information, 2n / sd², and the

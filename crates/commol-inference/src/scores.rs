@@ -9,6 +9,7 @@
 //! per series. Which observations to score, for example the ones held out of
 //! a calibration, is the caller's choice.
 
+use commol_calibration::likelihood::parts_of;
 use commol_calibration::{CalibrationProblem, ObservedDataPoint, SeriesIndex, weighted_crps};
 use commol_core::{CONFIDENCE_LEVEL, SimulationEngine};
 use commol_random::Generator;
@@ -182,8 +183,10 @@ pub fn pit(draws: &ObservationDraws, observed: &[f64]) -> Result<Vec<f64>, Strin
 /// The log score of each of `observations`: the log density of its
 /// observed value under the predictive, the mixture over the draws of
 /// `sample` of the observation models of `noise`,
-/// `log Σ_d w_d · p(y | μ_d, θ_d)`, where `μ_d` is the draw's predicted mean
-/// (the nearest the model allows) and `θ_d` its noise parameters. A
+/// `log Σ_d w_d · p(y | μ_d, θ_d)`, where `μ_d` is the draw's predicted mean,
+/// or the means of the parts of an observation of several parts, each the
+/// nearest the model allows ([`commol_calibration::Noise::sum_log_density`]),
+/// and `θ_d` its noise parameters. A
 /// replicate of a draw is a draw with an equal share of its weight, seeded
 /// from `seed` as in [`crate::Predictive::new`]. Higher
 /// is better; an observation the predictive gives no mass scores `−∞`.
@@ -212,11 +215,14 @@ where
         .terms(observations)
         .expect("checked by the noise");
     let runs = observe_sets(problem.forward(), sample.values(), observations, Some(seed))?;
-    let mut draws: Vec<(f64, &[f64], &[f64])> = Vec::new();
+    // Each draw: the log of its share of the weight, its parameter values and
+    // the means of the parts of each observation.
+    type Draw<'a> = (f64, &'a [f64], Vec<&'a [f64]>);
+    let mut draws: Vec<Draw> = Vec::new();
     for ((replicates, &weight), values) in runs.iter().zip(sample.weights()).zip(sample.values()) {
         let share = libm::log(weight / replicates.len() as f64);
-        for predicted in replicates {
-            draws.push((share, values, predicted));
+        for means in replicates {
+            draws.push((share, values, parts_of(&terms, &means.parts).collect()));
         }
     }
     Ok(observations
@@ -226,9 +232,13 @@ where
         .map(|(i, (obs, &term))| {
             let logs: Vec<f64> = draws
                 .iter()
-                .map(|&(share, values, predicted)| {
+                .map(|(share, values, parts)| {
                     let model = likelihood.noise(term, values);
-                    share + model.log_density(obs.value, model.nearest_mean(predicted[i]))
+                    let nearest: Vec<f64> = parts[i]
+                        .iter()
+                        .map(|&mean| model.nearest_mean(mean))
+                        .collect();
+                    share + model.sum_log_density(obs.value, &nearest)
                 })
                 .collect();
             log_sum_exp(&logs)

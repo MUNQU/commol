@@ -5,10 +5,17 @@ import json
 import math
 from statistics import NormalDist
 
+import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from commol import Calibrator, NelderMeadConfig
+from commol import (
+    CalibrationProblem,
+    Calibrator,
+    NelderMeadConfig,
+    ObservedDataPoint,
+    Simulation,
+)
 from commol.commol_rs import _commol_rs as commol_rs
 from commol.identifiability import ProfileIdentifiability
 from commol.identifiability.results import IdentifiabilityReport
@@ -27,6 +34,10 @@ from commol.resampling import (
     WildBootstrap,
 )
 from tests.support import (
+    a_to_b_builder,
+    bounded,
+    build,
+    flow_observations,
     line_calibrator,
 )
 
@@ -267,6 +278,71 @@ class TestPredictionProfiles:
         assert result.profiles["B"].center == pytest.approx(scale * mean)
         assert interval.lower == pytest.approx(scale * (mean - half_width), rel=1e-5)
         assert interval.upper == pytest.approx(scale * (mean + half_width), rel=1e-5)
+
+    def test_a_profile_of_a_sum_reads_its_parts(self) -> None:
+        # The line b + c·t observed at t = 1, …, 10, and its flow over the
+        # windows (2k − 2, 2k] as sums of two parts of unit noise each, so of
+        # variance 2: the profile of B(15) is the weighted least squares
+        # interval of a linear model.
+        model = build(
+            a_to_b_builder(
+                parameters={"c": None}, rate="c * A / A", amounts={"A": 1e6, "B": None}
+            )
+        )
+        flows = [4.3, 3.6, 4.4, 3.9, 4.2]
+        observations = [
+            *flow_observations(VALUES, windowed=False),
+            *(
+                ObservedDataPoint(
+                    at=2 * (k + 1),
+                    output="B",
+                    label="flows",
+                    value=value,
+                    window=2,
+                    parts=2,
+                )
+                for k, value in enumerate(flows)
+            ),
+        ]
+        problem = CalibrationProblem(
+            observed_data=observations,
+            parameters=[
+                bounded("c", 0.0, 50.0, initial_guess=25.0),
+                bounded("B", 0.0, 50.0, kind="initial_condition", initial_guess=25.0),
+            ],
+            observation_models={
+                "B": NormalObservations(sd=1.0),
+                "flows": NormalObservations(sd=1.0),
+            },
+            optimization_config=NelderMeadConfig(
+                max_iterations=2000, sd_tolerance=1e-14
+            ),
+            seed=1,
+        )
+        calibrator = Calibrator(Simulation(model), problem)
+        level = 0.9
+        spec = PredictionSpec(at=15, output="B", label="B at 15")
+
+        result = calibrator.uncertainty(
+            PredictionProfile(specs=[spec], threshold=Threshold.chi_square(level))
+        )
+
+        design = np.array(
+            [[1.0, t] for t in range(1, N + 1)] + [[0.0, 2.0]] * len(flows)
+        )
+        weights = np.array([1.0] * N + [0.5] * len(flows))
+        values = np.array([*VALUES, *flows])
+        information = design.T @ (weights[:, None] * design)
+        b, c = np.linalg.solve(information, design.T @ (weights * values))
+        row = np.array([1.0, spec.at])
+        mean = b + c * spec.at
+        half_width = NormalDist().inv_cdf((1 + level) / 2) * math.sqrt(
+            row @ np.linalg.solve(information, row)
+        )
+        interval = result.intervals[spec.label]
+        assert result.profiles[spec.label].center == pytest.approx(mean, rel=1e-6)
+        assert interval.lower == pytest.approx(mean - half_width, rel=1e-5)
+        assert interval.upper == pytest.approx(mean + half_width, rel=1e-5)
 
 
 class TestResult:

@@ -35,8 +35,8 @@ use crate::ranges::{
     ALPHA, AT, COGNITIVE, COGNITIVE_FINAL, COGNITIVE_INITIAL, GAMMA, HEADER_INTERVAL,
     IMPROVEMENT_TOL_ABS, IMPROVEMENT_TOL_REL, IMPROVEMENT_WINDOW, INERTIA_FACTOR, INERTIA_MAX,
     INERTIA_MIN, INITIAL_SIMPLEX_SIZE, ITERATIONS, MAX_ITERATIONS, MUTATION_PROBABILITY,
-    MUTATION_SCALE, PARTICLES, RADIUS_TOL, REPLICATES, RHO, SCALE, SD_TOLERANCE, SIGMA, SOCIAL,
-    SOCIAL_FINAL, SOCIAL_INITIAL, TRIALS, VALUE, VELOCITY_CLAMP_FACTOR,
+    MUTATION_SCALE, PARTICLES, PARTS, RADIUS_TOL, REPLICATES, RHO, SCALE, SD_TOLERANCE, SIGMA,
+    SOCIAL, SOCIAL_FINAL, SOCIAL_INITIAL, TRIALS, VALUE, VELOCITY_CLAMP_FACTOR,
     VELOCITY_MUTATION_THRESHOLD, WEIGHT, WINDOW,
 };
 use crate::types::{
@@ -69,6 +69,9 @@ pub struct Observation {
     pub scale: f64,
     /// The length of the window of a cumulative output, if any.
     pub window: Option<f64>,
+    /// The count of equal parts of the window
+    /// ([`ObservedDataPoint::parts`]).
+    pub parts: usize,
     /// The trials of a binomial observation model that reads them here.
     pub trials: Option<u64>,
 }
@@ -82,6 +85,7 @@ checked!(
         Rule::Real(WEIGHT),
         Rule::Real(SCALE),
         Rule::Real(WINDOW),
+        Rule::Count(PARTS),
         Rule::Count(TRIALS),
     ],
     check = Observation::check
@@ -90,8 +94,8 @@ checked!(
 impl Observation {
     /// Check that the observation has one of `output` and `outputs`, a
     /// label, coefficients only with `outputs` and that pass
-    /// [`ObservedDataPoint::check_coefficients`], and a window that starts at
-    /// 0 or after it.
+    /// [`ObservedDataPoint::check_coefficients`], a window that starts at
+    /// 0 or after it, and a window for more than one part.
     ///
     /// # Errors
     ///
@@ -121,7 +125,9 @@ impl Observation {
                 self.label
             ));
         }
-        ObservedDataPoint::from(self).check_coefficients()?;
+        let point = ObservedDataPoint::from(self);
+        point.check_coefficients()?;
+        point.check_parts()?;
         self.window.map_or(Ok(()), |window| {
             crate::observation::check_window_end(self.at, window).map(|_| ())
         })
@@ -143,6 +149,7 @@ impl From<&Observation> for ObservedDataPoint {
             factor_id: observation.factor_id.clone(),
             scale: observation.scale,
             window: observation.window,
+            parts: observation.parts,
             trials: observation.trials,
         }
     }

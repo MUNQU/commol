@@ -39,6 +39,9 @@ enum Shape {
     /// Two outputs, `x = a` and `y = b + a²`: with a precise `y`, the
     /// posterior of `(a, b)` bends along `b = y − a²`.
     Banana,
+    /// One output `x = a·t + b·t²`, whose increments over equal parts grow
+    /// along the axis.
+    Quadratic,
 }
 
 /// An engine whose outputs at a position `t` are a closed form of its
@@ -93,6 +96,7 @@ impl SimulationEngine for Curve {
             Shape::Line => vec![a + b * t],
             Shape::Square => vec![a * a],
             Shape::Banana => vec![a, b + a * a],
+            Shape::Quadratic => vec![a * t + b * t * t],
         }));
         Ok(())
     }
@@ -103,7 +107,7 @@ impl SimulationEngine for Curve {
 
     fn output_names(&self) -> Vec<String> {
         match self.shape {
-            Shape::Line | Shape::Square => vec!["x".to_string()],
+            Shape::Line | Shape::Square | Shape::Quadratic => vec!["x".to_string()],
             Shape::Banana => vec!["x".to_string(), "y".to_string()],
         }
     }
@@ -1085,4 +1089,160 @@ fn a_draw_of_an_importance_sample_that_fails_is_sent_as_run() {
     let events = kept.events();
     assert_eq!(events[0], "began 10");
     assert!(events.len() > 1, "{events:?}");
+}
+
+/// The central difference of `f` in argument `index` of `point`.
+fn central(f: &dyn Fn(&[f64]) -> f64, point: &[f64], index: usize) -> f64 {
+    let h = 1e-5 * point[index].abs().max(1e-3);
+    let mut up = point.to_vec();
+    let mut down = point.to_vec();
+    up[index] += h;
+    down[index] -= h;
+    (f(&up) - f(&down)) / (2.0 * h)
+}
+
+/// The noise of a model of the arguments `(μ₁, …, μ_K, noise arguments…)`.
+type NoiseOf = Box<dyn Fn(&[f64]) -> Noise>;
+
+/// A model of a sum of parts with each reading: its name, its noise and the
+/// count of its noise arguments.
+fn sum_readings() -> Vec<(&'static str, NoiseOf, usize)> {
+    use commol_calibration::Sum;
+    let negative_binomial = |sum: Sum| -> NoiseOf {
+        Box::new(move |arguments: &[f64]| Noise::NegativeBinomial {
+            overdispersion: arguments[arguments.len() - 1],
+            sum: Some(sum),
+        })
+    };
+    vec![
+        ("exact", negative_binomial(Sum::Exact), 1),
+        ("moments", negative_binomial(Sum::Moments), 1),
+        ("poisson", Box::new(|_: &[f64]| Noise::Poisson), 0),
+        (
+            "normal",
+            Box::new(|arguments: &[f64]| Noise::Normal {
+                sd: arguments[arguments.len() - 1],
+            }),
+            1,
+        ),
+    ]
+}
+
+#[test]
+fn the_gradient_of_a_sum_is_that_of_its_density() {
+    let parts = [1.5, 4.0, 2.5, 0.2];
+    for (name, noise_of, arguments) in sum_readings() {
+        let mut point: Vec<f64> = parts.to_vec();
+        if arguments == 1 {
+            point.push(0.4);
+        }
+        for y in [0.0, 3.0, 8.0, 21.0] {
+            let log_density = |point: &[f64]| noise_of(point).sum_log_density(y, &point[..4]);
+            let scores = noise_of(&point).sum_scores(y, &parts);
+            assert_eq!(scores.len(), point.len(), "{name}");
+            for (index, score) in scores.iter().enumerate() {
+                let expected = central(&log_density, &point, index);
+                assert!(
+                    (score - expected).abs() <= 1e-6 * expected.abs().max(1.0),
+                    "{name}, y = {y}, argument {index}: {score} against {expected}"
+                );
+            }
+        }
+    }
+
+    // Through the block of the parts: the gradient of the term of the sum on
+    // the unbounded scale is the difference of its log density in the
+    // parameters, times the derivative of the scale.
+    use commol_calibration::Sum;
+    let window = |at: f64, value: f64| ObservedDataPoint {
+        parts: 5,
+        ..ObservedDataPoint::with_window(at, "x".to_string(), value, 10.0)
+    };
+    let problem = CalibrationProblem::new(
+        Curve::new(Shape::Quadratic),
+        vec![window(10.0, 40.0), window(20.0, 160.0)],
+        vec![
+            CalibrationParameter::new("a".to_string(), 0.1, 5.0),
+            CalibrationParameter::new("b".to_string(), 0.01, 2.0),
+            noise("phi", 0.01, 3.0),
+        ],
+        None,
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![(
+            "x".to_string(),
+            ObservationModel::NegativeBinomial {
+                overdispersion: Argument::Parameter("phi".to_string()),
+                sum: Some(Sum::Exact),
+            },
+        )]),
+    )
+    .unwrap();
+    let fit = [1.2, 0.3, 0.5];
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+    let curvature = Curvature::gauss_newton(&problem, &source, &fit).unwrap();
+    let bounds = [(0.1, 5.0), (0.01, 2.0), (0.01, 3.0)];
+    for i in 0..2 {
+        let term = |values: &[f64]| {
+            -problem
+                .pointwise_log_likelihood(values, &mut Workspace::default())
+                .unwrap()[i]
+        };
+        for (j, &(lower, upper)) in bounds.iter().enumerate() {
+            let expected = central(&term, &fit, j) * logit_derivative(fit[j], lower, upper);
+            let actual = curvature.gradients()[(i, j)];
+            assert!(
+                (actual - expected).abs() <= 1e-5 * expected.abs().max(1e-3),
+                "term {i}, parameter {j}: {actual} against {expected}"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_information_of_a_sum_is_that_of_its_density() {
+    let parts = [1.5, 4.0, 2.5];
+    for (name, noise_of, arguments) in sum_readings() {
+        if name == "normal" {
+            continue;
+        }
+        let mut point: Vec<f64> = parts.to_vec();
+        if arguments == 1 {
+            point.push(0.4);
+        }
+        let size = point.len();
+        // Σ_y p(y) s(y) s(y)ᵀ, with the scores from differences of the log
+        // density, over every count that carries mass.
+        let mut expected = vec![0.0; size * size];
+        for y in 0..200 {
+            let y = f64::from(y);
+            let log_density = |point: &[f64]| noise_of(point).sum_log_density(y, &point[..3]);
+            let probability = log_density(&point).exp();
+            let scores: Vec<f64> = (0..size)
+                .map(|index| central(&log_density, &point, index))
+                .collect();
+            for a in 0..size {
+                for b in 0..size {
+                    expected[a * size + b] += probability * scores[a] * scores[b];
+                }
+            }
+        }
+        let information = noise_of(&point).sum_information(&parts);
+        for a in 0..size {
+            for b in 0..size {
+                let scale = (expected[a * size + a] * expected[b * size + b]).sqrt();
+                let (actual, expected) = (information[a * size + b], expected[a * size + b]);
+                assert!(
+                    (actual - expected).abs() <= 1e-6 * scale,
+                    "{name}, entry ({a}, {b}): {actual} against {expected}"
+                );
+            }
+        }
+    }
+    // A normal sum: the information of N(M, K sd²) over (μ₁, μ₂, sd).
+    let information = Noise::Normal { sd: 2.0 }.sum_information(&[1.0, 3.0]);
+    let mean = 1.0 / 8.0;
+    let expected = [mean, mean, 0.0, mean, mean, 0.0, 0.0, 0.0, 0.5];
+    for (actual, expected) in information.iter().zip(expected) {
+        assert!((actual - expected).abs() < 1e-15, "{information:?}");
+    }
 }

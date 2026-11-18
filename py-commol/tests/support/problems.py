@@ -149,6 +149,42 @@ def flow_calibrator(
     return Calibrator(Simulation(model), problem)
 
 
+def decay_part_means(k: float, ends: Sequence[int], length: int) -> list[list[float]]:
+    """
+    The increments of B over each step of the window of `length` that ends at
+    each of `ends`, in a decay A → B at the rate `k` from 1000 in A: the
+    means of the parts of one step each, ``1000 · k · (1 − k)^(t − 1)`` at
+    step ``t``.
+    """
+    return [
+        [1000 * k * (1 - k) ** (t - 1) for t in range(end - length + 1, end + 1)]
+        for end in ends
+    ]
+
+
+def sum_calibrator(
+    observations: Sequence[ObservedDataPoint],
+    observation_models: Mapping[str, _ObservationModel],
+    *,
+    noise: Sequence[CalibrationParameter] = (),
+    seed: int = 1,
+) -> Calibrator:
+    """
+    Fit the rate ``k`` in ``[0.001, 0.5]`` of a decay A → B
+    (``a_to_b_builder``, 1000 in A) to `observations` of B, with
+    `observation_models` and the `noise` parameters after ``k``.
+    """
+    model = build(a_to_b_builder(parameters={"k": None}))
+    problem = CalibrationProblem(
+        observed_data=list(observations),
+        parameters=[bounded("k", 0.001, 0.5, initial_guess=0.05), *noise],
+        observation_models=dict(observation_models),
+        optimization_config=NelderMeadConfig(max_iterations=1000, sd_tolerance=1e-12),
+        seed=seed,
+    )
+    return Calibrator(Simulation(model), problem)
+
+
 def fan_calibrator(series: Sequence[Sequence[float]], *, seed: int = 1) -> Calibrator:
     """
     Fit the constant flows ``c0``, ``c1``, … of ``fan_builder`` to `series`:

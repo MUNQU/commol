@@ -3,8 +3,9 @@
 [Back to Design decisions](../design-decisions.md)
 
 How an observation reads a run: the one operator of the engine, the known
-scale of an observation, the coefficients of a weighted sum of outputs and
-the readers that refuse two observations of a series at one position.
+scale of an observation, the coefficients of a weighted sum of outputs, the
+parts of a window and the readers that refuse two observations of a series at
+one position.
 What a weight means and how a calibration runs are on
 [Calibration](calibration.md).
 
@@ -125,6 +126,71 @@ rules of one built in Python.
 `profiles::tracer::tests::the_absolute_error_of_a_prediction_counts_each_output_by_its_coefficient`,
 `sensitivity::finite_differences::tests::observations_with_other_coefficients_are_another_series`,
 `tests/calibration/test_coefficients.py`.
+
+## The parts of a window are observations of every reader
+
+An observation with `parts=K` (`ObservedDataPoint.parts`, 1 by default, the
+rule `PARTS` of `crates/commol-calibration/src/ranges.rs`) is the sum of `K` independent observations over
+equal parts of its window, with the boundaries
+`b_k = start + k · (at − start) / K` (`ObservedDataPoint::part_boundaries`),
+`b₀` the start of the window and `b_K` its end, so the parts share their
+boundary rows. The operator keeps the rows of every boundary
+(`ObservationOperator::apply_parts`) and gives the mean of each part, times
+the coefficients, the scale and the factor; its prediction is their sum, so an
+observation of one part is its window read whole. The operator is built wherever an operator is
+(`ForwardModel::new`, `with_observations`, `on_schedule`,
+`CalibrationProblem::observing`), so the `Workspace` holds the part means of
+the problem's observations and of held-out ones, `ObservationNoise::observe`
+gets them, and `Sensitivities.parts` holds their derivatives as a block of
+its own, from the same runs, which the structural rank and the collinearity
+do not read. `check_positions` refuses an interior boundary the engine does
+not accept, naming it.
+
+**Rule:** a count of equal parts, a field of the observation with one
+spelling: in commol `period` is a length (`decisions/time.md`), and the window
+changes by observation, as `window` and `trials` do. A label may mix any
+parts, as it mixes windows: the window sets the scale of an observation, not
+`parts`. A problem with a loss refuses `parts > 1`
+([Calibration](calibration.md#a-problem-has-a-loss-or-observation-models)).
+
+**Guards:** `crates/commol-calibration/tests/test_parts.rs`,
+`crates/commol-inference/tests/test_identifiability.rs::the_structural_rank_reads_no_part`,
+`tests/calibration/test_observations.py::TestParts`,
+`tests/uncertainty/test_scores.py::TestLogScore::test_a_held_out_sum_reads_its_parts`,
+`tests/uncertainty/test_profiles.py::TestPredictionProfiles::test_a_profile_of_a_sum_reads_its_parts`.
+
+## A model reads the sum of the parts
+
+`Noise::sum_log_density`, `sum_scores` and `sum_information`
+(`crates/commol-calibration/src/likelihood/sums.rs`) read a term from the
+means of its parts; with one part they are the functions of one mean. A
+Poisson reads `Poisson(M)` and a normal `N(M, K · sd²)`, both exact. A
+negative binomial series with parts needs `sum` (`Sum::Exact` or
+`Sum::Moments`), and one without parts refuses it (`Likelihood::new`).
+`"exact"` is the recursion of Panjer over the parts, in `O(K · y + y²)`, with
+`log p(0)` kept apart and the terms scaled down past `1e150`; `"moments"` is
+`NB(M, φ · Σμₜ²/M²)`. Every other model refuses parts. The draws read the sum
+as the density does (`draw_sum` of `predictive.rs`): each part, summed, or
+the matched negative binomial for `"moments"`.
+
+**Rule:** a term of several parts reads the density of their sum, and its
+draws, scores and information read that same density; a model with no closed
+form for the sum refuses parts.
+
+| Alternative | Why not |
+|---|---|
+| Moments only | They drift by up to 56 % of an interval with few effective parts, and bias `φ`. |
+| Exact only | 1.3·10⁹ operations per evaluation at a total of 50 000. |
+| A default `sum`, or a switch by the size of the total | A judgment hidden in the library. |
+| Approximate sums of the log-normal and the Student t | No caller ([L8](https://github.com/MUNQU/commol/issues/498#issuecomment-6983148460)). |
+| The Poisson below a small `φ` | A jump in the likelihood at the threshold; the recursion, with `log1p(φμ)/(φμ)` and no division by `φ`, reaches the Poisson at `φ = 0` within 6e-14 ([L9](https://github.com/MUNQU/commol/issues/498#issuecomment-6983149187)). |
+| Truncating the recursion where `q_max^j < 1e-17` | It saves 10–100× at small `φ` and costs up to 7.6e-3 in `log p` far in the upper tail; only with a declared tolerance and a test of that tail ([L10](https://github.com/MUNQU/commol/issues/498#issuecomment-6983149799)). |
+
+**Guards:** `crates/commol-calibration/tests/test_parts.rs::the_exact_sum_is_the_convolution_of_its_parts`,
+`crates/commol-calibration/tests/test_parts.rs::the_moments_of_a_sum`,
+`crates/commol-inference/tests/test_predictive.rs::draws_of_a_sum_have_the_variance_of_their_parts`,
+`tests/uncertainty/test_observation_sums.py::TestSums`,
+`tests/uncertainty/test_part_sums_coverage.py::TestPartSums`.
 
 ## A reader of positions refuses two observations at one
 

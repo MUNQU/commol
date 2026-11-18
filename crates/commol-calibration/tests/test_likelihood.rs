@@ -176,6 +176,7 @@ fn log_densities_equal_the_reference() {
         (
             Noise::NegativeBinomial {
                 overdispersion: 0.25,
+                sum: None,
             },
             7.0,
             12.5,
@@ -184,6 +185,7 @@ fn log_densities_equal_the_reference() {
         (
             Noise::NegativeBinomial {
                 overdispersion: 0.01,
+                sum: None,
             },
             1500.0,
             1800.0,
@@ -440,6 +442,7 @@ fn models_and_their_arguments_are_checked() {
             line_parameters(),
             models(ObservationModel::NegativeBinomial {
                 overdispersion: Argument::Value(-1.0),
+                sum: None,
             }),
             "overdispersion is a finite number of at least 0, got -1",
         ),
@@ -537,6 +540,7 @@ fn an_observation_with_trials_names_the_model_of_its_series() {
         (
             models(ObservationModel::NegativeBinomial {
                 overdispersion: Argument::Value(0.5),
+                sum: None,
             }),
             "NegativeBinomial",
         ),
@@ -672,6 +676,7 @@ fn fisher_information_of_each_model_has_its_closed_form() {
     let phi = 0.4;
     let negative_binomial = |a: &[f64]| Noise::NegativeBinomial {
         overdispersion: a[1],
+        sum: None,
     };
     let information = negative_binomial(&[mean, phi]).information(mean);
     let expected = count_information(&negative_binomial, &[mean, phi], 400);
@@ -776,9 +781,16 @@ fn differenced(f: impl Fn(&[f64]) -> f64, at: &[f64], index: usize) -> f64 {
 /// arguments sum to the difference in their parameter.
 fn assert_scores(problem: &CalibrationProblem<LineEngine>, values: &[f64], predictions: &[f64]) {
     let discrepancy = problem.discrepancy();
-    let terms = problem.term_derivatives(values, predictions).unwrap();
+    // Every observation has one part, whose mean is its prediction.
+    let terms = problem
+        .term_derivatives(values, predictions, predictions)
+        .unwrap();
     for (i, term) in terms.iter().enumerate() {
-        let expected = differenced(|p| discrepancy.of_run(values, p).unwrap(), predictions, i);
+        let expected = differenced(
+            |p| discrepancy.of_run(values, p, p).unwrap(),
+            predictions,
+            i,
+        );
         close_to(term.gradient[0], expected, 1e-6);
     }
     for j in 0..values.len() {
@@ -792,7 +804,11 @@ fn assert_scores(problem: &CalibrationProblem<LineEngine>, values: &[f64], predi
                     .map(|(_, gradient)| *gradient)
             })
             .sum();
-        let expected = differenced(|v| discrepancy.of_run(v, predictions).unwrap(), values, j);
+        let expected = differenced(
+            |v| discrepancy.of_run(v, predictions, predictions).unwrap(),
+            values,
+            j,
+        );
         assert!(
             (summed - expected).abs() <= 1e-6 * expected.abs().max(1e-3),
             "parameter {j}: {summed} against {expected}"
@@ -854,6 +870,7 @@ fn scores_equal_the_differences_of_the_terms() {
         (
             ObservationModel::NegativeBinomial {
                 overdispersion: parameter("s"),
+                sum: None,
             },
             vec![noise("s", 0.0, 5.0)],
             vec![0.3],
@@ -889,18 +906,21 @@ fn terms_skip_a_weight_of_zero_and_name_a_mean_outside_their_model() {
     .with_data(&[1.0, 2.0], &[1.0, 0.0])
     .unwrap();
     // The second mean, −1, is outside the model, but its weight is 0.
-    let terms = problem.term_derivatives(&[0.0, 0.0], &[1.5, -1.0]).unwrap();
+    let terms = problem
+        .term_derivatives(&[0.0, 0.0], &[1.5, -1.0], &[1.5, -1.0])
+        .unwrap();
     assert_eq!(
         (terms[1].gradient.clone(), terms[1].curvature.clone()),
         (vec![0.0], vec![0.0])
     );
 
     let error = problem
-        .term_derivatives(&[0.0, 0.0], &[-1.0, 2.0])
+        .term_derivatives(&[0.0, 0.0], &[-1.0, 2.0], &[-1.0, 2.0])
         .unwrap_err();
     assert_eq!(
         error,
-        "Observation 'x' at 0 has the mean -1, outside the means its observation model allows"
+        "Observation 'x' at 0 has a mean of a part outside the means its observation model \
+         allows (its prediction is -1)"
     );
 
     let rmse = self::problem(
@@ -909,6 +929,8 @@ fn terms_skip_a_weight_of_zero_and_name_a_mean_outside_their_model() {
         LossConfig::RootMeanSquaredError.into(),
     )
     .unwrap();
-    let error = rmse.term_derivatives(&[0.0, 0.0], &[1.0, 2.0]).unwrap_err();
+    let error = rmse
+        .term_derivatives(&[0.0, 0.0], &[1.0, 2.0], &[1.0, 2.0])
+        .unwrap_err();
     assert!(error.contains("no derivative at a perfect fit"), "{error}");
 }

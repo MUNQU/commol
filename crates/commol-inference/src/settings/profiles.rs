@@ -105,6 +105,7 @@ impl PredictionSpec {
             factor_id: self.factor_id.clone(),
             scale: self.scale,
             window: self.window,
+            parts: 1,
             trials: None,
         }
     }

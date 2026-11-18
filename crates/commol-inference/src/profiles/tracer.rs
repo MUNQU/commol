@@ -261,9 +261,10 @@ where
     /// The noise floor `ν₁`: the error of one evaluation of the objective
     /// at the fit, from the accuracy of a run, to first order:
     /// `Σᵢ |∂ℓᵢ/∂mᵢ| · eᵢ`, with `ℓᵢ` the term of observation `i`
-    /// ([`CalibrationProblem::term_derivatives`]), `mᵢ` its prediction and
-    /// `eᵢ = rtol · |mᵢ| + k · atol` the error of a run on it, for an
-    /// observation that sums `k` outputs; `rtol` is the relative and `atol`
+    /// ([`CalibrationProblem::term_derivatives`]), `mᵢ` its prediction (the
+    /// mean of each part, for an observation of several parts, summed over
+    /// them) and `eᵢ = rtol · |mᵢ| + k · atol` the error of a run on it, for
+    /// an observation that sums `k` outputs; `rtol` is the relative and `atol`
     /// the absolute [`SimulationEngine::accuracy`] of the engine. They are the
     /// tolerances of each step of a solver, so `ν₁` is an estimate,
     /// not a bound. 0 when it cannot be computed: a loss with no term
@@ -729,24 +730,44 @@ fn floors<E: SimulationEngine>(problem: &CalibrationProblem<E>, fit: &[f64]) -> 
         .run_observed(fit, &mut workspace)
         .ok()?
         .to_vec();
-    let terms = problem.term_derivatives(fit, &predictions).ok()?;
+    let parts = workspace.parts.clone();
+    let terms = problem.term_derivatives(fit, &predictions, &parts).ok()?;
     let engine = problem.forward().base_engine();
     let Accuracy { relative, absolute } = engine.accuracy();
-    let errors: Vec<f64> = problem
+    // The error of the mean of each part, observation after observation.
+    let mut means = parts.iter();
+    let errors: Vec<Vec<f64>> = problem
         .observed_data()
         .iter()
-        .zip(&predictions)
-        .map(|(obs, &mean)| prediction_error(obs, mean, relative, absolute))
+        .zip(&terms)
+        .map(|(obs, term)| {
+            means
+                .by_ref()
+                .take(term.parts)
+                .map(|&mean| prediction_error(obs, mean, relative, absolute))
+                .collect()
+        })
         .collect();
     let first: f64 = terms
         .iter()
         .zip(&errors)
-        .map(|(term, error)| term.gradient[0].abs() * error)
+        .flat_map(|(term, errors)| {
+            errors
+                .iter()
+                .enumerate()
+                .map(|(t, error)| term.gradient[t].abs() * error)
+        })
         .sum();
     let second: f64 = terms
         .iter()
         .zip(&errors)
-        .map(|(term, error)| 0.5 * term.curvature[0].abs() * error * error)
+        .flat_map(|(term, errors)| {
+            let size = term.gradient.len();
+            errors
+                .iter()
+                .enumerate()
+                .map(move |(t, error)| 0.5 * term.curvature[t * size + t].abs() * error * error)
+        })
         .sum();
     let n = predictions.len() as f64;
     let unit = f64::EPSILON / 2.0;

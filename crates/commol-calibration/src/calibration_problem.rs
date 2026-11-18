@@ -153,9 +153,12 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     /// ([`SimulationEngine::check_varied_values`]), a value is missing once
     /// they are written ([`SimulationEngine::check_values`]),
     /// a window is outside its rule ([`crate::check_window_end`]), a
-    /// position is one the engine rejects, an observation names an unknown
-    /// output or factor, a constraint is invalid, or the observation models
-    /// do not fit the observations and parameters
+    /// position (of an observation, the start of its window, a boundary of
+    /// its parts or a constraint) is one the engine rejects, an observation
+    /// names an unknown output or factor, a problem with a loss has an
+    /// observation with a field of an observation model
+    /// (`check_loss_fields`), a constraint is invalid, or the observation
+    /// models do not fit the observations and parameters
     /// ([`crate::Likelihood::new`]).
     pub fn new(
         base_engine: E,
@@ -175,6 +178,9 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             );
         }
         check_contents(observed_data.len(), &parameters, &constraints)?;
+        if matches!(discrepancy, DiscrepancyConfig::Loss(_)) {
+            check_loss_fields(&observed_data, base_engine.is_stochastic())?;
+        }
         let values =
             ValueWriter::checked(&base_engine, &parameters, remainder, ValueSource::Varied)?;
         check_positions(&base_engine, &observed_data, &constraints)?;
@@ -455,7 +461,9 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             }
         }
         self.forward.observe(values, workspace);
-        let discrepancy = self.discrepancy.of(values, &mut workspace.predictions)?;
+        let discrepancy =
+            self.discrepancy
+                .of(values, &mut workspace.predictions, &workspace.parts)?;
         if discrepancy.is_finite() {
             Ok(discrepancy)
         } else {
@@ -484,7 +492,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             )
         })?;
         self.predict_once(values, None, workspace)?;
-        Ok(likelihood.pointwise(values, &workspace.predictions)?)
+        Ok(likelihood.pointwise(values, &workspace.parts)?)
     }
 
     /// The predicted observations of one run at `values`, which are inside
@@ -518,27 +526,29 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     }
 
     /// The derivatives of each observation's term of the discrepancy at the
-    /// parameter `values`, given the predictions of one run
-    /// ([`Discrepancy::term_derivatives`]).
+    /// parameter `values`, given the predictions of one run and the means of
+    /// their parts ([`Discrepancy::term_derivatives`]).
     ///
     /// # Errors
     ///
     /// Returns a message for a loss with no curvature, or that names the
-    /// observation whose mean lies outside its observation model.
+    /// observation the mean of one of whose parts lies outside its
+    /// observation model.
     pub fn term_derivatives(
         &self,
         values: &[f64],
         predictions: &[f64],
+        parts: &[f64],
     ) -> Result<Vec<TermDerivatives>, String> {
         self.discrepancy
-            .term_derivatives(values, predictions)
+            .term_derivatives(values, predictions, parts)
             .map_err(|error| match error {
                 TermError::NoCurvature(message) => message,
                 TermError::MeanOutside(index) => {
                     let obs = &self.observed_data[index];
                     format!(
-                        "Observation '{}' at {} has the mean {}, outside the means its \
-                         observation model allows",
+                        "Observation '{}' at {} has a mean of a part outside the means its \
+                         observation model allows (its prediction is {})",
                         obs.label, obs.at, predictions[index]
                     )
                 }
@@ -576,12 +586,50 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     }
 }
 
+/// Refuse the fields of an observation model in a problem with a loss: more
+/// than one part ([`ObservedDataPoint::parts`]), which a loss of the
+/// residuals of totals does not read, and trials, which only a binomial
+/// observation model reads. `stochastic` says that the engine is
+/// stochastic, whose problem needs a loss.
+///
+/// # Errors
+///
+/// Returns a message that names the observation and the field, and says
+/// that the field needs observation models, which need a deterministic
+/// engine when the engine is stochastic.
+pub(crate) fn check_loss_fields(
+    observed_data: &[ObservedDataPoint],
+    stochastic: bool,
+) -> Result<(), String> {
+    let Some((obs, field)) = observed_data.iter().find_map(|obs| {
+        if obs.parts > 1 {
+            Some((obs, format!("parts={}", obs.parts)))
+        } else {
+            obs.trials.map(|trials| (obs, format!("trials={trials}")))
+        }
+    }) else {
+        return Ok(());
+    };
+    let engine = if stochastic {
+        "; observation models need a deterministic engine, and this engine is stochastic"
+    } else {
+        ""
+    };
+    Err(format!(
+        "Observation '{}' at {} has {field}, a field of an observation model, which a \
+         problem with a loss does not read: it needs observation_models instead of \
+         loss_function{engine}",
+        obs.label, obs.at
+    ))
+}
+
 /// Check every position of a calibration problem with the engine.
 ///
 /// The engine decides which positions its model type accepts
 /// ([`SimulationEngine::check_position`]); this function names the object
-/// that holds the first one it rejects: the observation (at its position or
-/// at the start of its window) or the constraint.
+/// that holds the first one it rejects: the observation (at its position, at
+/// the start of its window or at a boundary of its parts) or the
+/// constraint.
 ///
 /// # Errors
 ///
@@ -607,6 +655,16 @@ pub(crate) fn check_positions<E: SimulationEngine>(
                     obs.label, obs.at
                 )
             })?;
+            let boundaries = obs.part_boundaries(start);
+            for &boundary in &boundaries[1..boundaries.len() - 1] {
+                engine.check_position(boundary).map_err(|reason| {
+                    format!(
+                        "Observation '{}' at {} with the window {window} and parts={} \
+                         has a boundary of its parts at {boundary}: {reason}",
+                        obs.label, obs.at, obs.parts
+                    )
+                })?;
+            }
         }
     }
     for constraint in constraints {

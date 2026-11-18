@@ -15,9 +15,9 @@
 //! seed, so the predictive draws fresh noise for every draw instead of the
 //! same replicates for all.
 
-use commol_calibration::likelihood::log_location;
+use commol_calibration::likelihood::{log_location, parts_of};
 use commol_calibration::{
-    CalibrationProblem, EvaluationError, ForwardModel, Likelihood, Noise, ObservedDataPoint,
+    CalibrationProblem, EvaluationError, ForwardModel, Likelihood, Noise, ObservedDataPoint, Sum,
 };
 use commol_core::{CONFIDENCE_LEVEL, NoSteps, SimulationEngine};
 use commol_random::sample::{binomial, gamma, normal, poisson};
@@ -51,16 +51,29 @@ pub trait ObservationNoise: Sync {
     }
 
     /// Write into `out` what `observations` show when a draw with parameter
-    /// `values` predicts `predicted`, one value per observation, drawn with
-    /// `generator`.
+    /// `values` predicts `predicted`, one value per observation, and `parts`,
+    /// the mean of each part of each observation, observation after
+    /// observation ([`commol_calibration::ObservationOperator::apply_parts`]),
+    /// drawn with `generator`.
     fn observe(
         &self,
         observations: &[ObservedDataPoint],
         values: &[f64],
         predicted: &[f64],
+        parts: &[f64],
         generator: &mut Generator,
         out: &mut [f64],
     );
+}
+
+/// The predicted means of a set of observations in one run: one per
+/// observation, and one per part of each, observation after observation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ObservedMeans {
+    /// The prediction of each observation.
+    pub predicted: Vec<f64>,
+    /// The mean of each part of each observation.
+    pub parts: Vec<f64>,
 }
 
 /// No observation noise: an observation shows the predicted value.
@@ -73,6 +86,7 @@ impl ObservationNoise for NoNoise {
         _observations: &[ObservedDataPoint],
         _values: &[f64],
         predicted: &[f64],
+        _parts: &[f64],
         _generator: &mut Generator,
         out: &mut [f64],
     ) {
@@ -82,7 +96,9 @@ impl ObservationNoise for NoNoise {
 
 /// Observation noise of the observation models of a problem: each draw
 /// draws every observation from the model of its series around the draw's
-/// predicted mean, with the noise parameters of the draw's values.
+/// predicted mean, with the noise parameters of the draw's values; an
+/// observation of several parts is drawn as its model reads their sum
+/// (`draw_sum`).
 ///
 /// A mean outside the means a model allows draws at the nearest allowed one
 /// ([`Noise::nearest_mean`]).
@@ -126,7 +142,8 @@ impl ObservationNoise for DistributionNoise {
         &self,
         observations: &[ObservedDataPoint],
         values: &[f64],
-        predicted: &[f64],
+        _predicted: &[f64],
+        parts: &[f64],
         generator: &mut Generator,
         out: &mut [f64],
     ) {
@@ -134,9 +151,50 @@ impl ObservationNoise for DistributionNoise {
             .likelihood
             .terms(observations)
             .expect("checked before the draws");
-        for ((&term, &mean), shown) in terms.iter().zip(predicted).zip(out.iter_mut()) {
-            *shown = draw_observation(self.likelihood.noise(term, values), mean, generator);
+        for ((&term, means), shown) in terms
+            .iter()
+            .zip(parts_of(&terms, parts))
+            .zip(out.iter_mut())
+        {
+            *shown = draw_sum(self.likelihood.noise(term, values), means, generator);
         }
+    }
+}
+
+/// One observed sum of parts of means `parts` drawn from `noise` as it reads
+/// the sum ([`commol_calibration::likelihood::sums`]): one part is
+/// [`draw_observation`]; a Poisson, a normal and a negative binomial read
+/// [`Sum::Exact`] draw each part and sum them; a negative binomial read by
+/// [`Sum::Moments`] draws the negative binomial of the mean and the
+/// variance of the sum. Each part is drawn at the nearest mean the model
+/// allows.
+pub(crate) fn draw_sum(noise: Noise, parts: &[f64], generator: &mut Generator) -> f64 {
+    if let [mean] = parts {
+        return draw_observation(noise, *mean, generator);
+    }
+    match noise {
+        Noise::NegativeBinomial {
+            overdispersion,
+            sum: Some(Sum::Moments),
+        } => {
+            let means: Vec<f64> = parts.iter().map(|&mu| noise.nearest_mean(mu)).collect();
+            let total: f64 = means.iter().sum();
+            let squares: f64 = means.iter().map(|mu| mu * mu).sum();
+            let share = if total > 0.0 {
+                squares / (total * total)
+            } else {
+                1.0
+            };
+            let matched = Noise::NegativeBinomial {
+                overdispersion: overdispersion * share,
+                sum: None,
+            };
+            draw_observation(matched, total, generator)
+        }
+        _ => parts
+            .iter()
+            .map(|&mean| draw_observation(noise, mean, generator))
+            .sum(),
     }
 }
 
@@ -160,7 +218,7 @@ pub(crate) fn draw_observation(noise: Noise, mean: f64, generator: &mut Generato
             mean + scale * z / (chi_square / df).sqrt()
         }
         Noise::Poisson => poisson(generator, mean) as f64,
-        Noise::NegativeBinomial { overdispersion } => {
+        Noise::NegativeBinomial { overdispersion, .. } => {
             if overdispersion * mean < POISSON_LIMIT {
                 poisson(generator, mean) as f64
             } else {
@@ -606,9 +664,16 @@ where
         .map(|(replicates, values)| {
             replicates
                 .into_iter()
-                .map(|predicted| {
-                    let mut shown = vec![0.0; predicted.len()];
-                    noise.observe(observations, values, &predicted, &mut generator, &mut shown);
+                .map(|means| {
+                    let mut shown = vec![0.0; means.predicted.len()];
+                    noise.observe(
+                        observations,
+                        values,
+                        &means.predicted,
+                        &means.parts,
+                        &mut generator,
+                        &mut shown,
+                    );
                     shown
                 })
                 .collect()
@@ -622,11 +687,10 @@ where
     })
 }
 
-/// The values of `observations` for each parameter set of `sets`, read
-/// through the forward model observed at them
-/// ([`ForwardModel::with_observations`]), in parallel:
-/// `[set][replicate][observation]`. `seed` seeds the replicates as
-/// [`run_sets`] does.
+/// The means of `observations` and of their parts for each parameter set of
+/// `sets`, read through the forward model observed at them
+/// ([`ForwardModel::with_observations`]), in parallel: `[set][replicate]`.
+/// `seed` seeds the replicates as [`run_sets`] does.
 ///
 /// # Errors
 ///
@@ -638,7 +702,7 @@ pub(crate) fn observe_sets<E>(
     sets: &[Vec<f64>],
     observations: &[ObservedDataPoint],
     seed: Option<u64>,
-) -> Result<Vec<Vec<Vec<f64>>>, PredictiveError>
+) -> Result<Vec<Vec<ObservedMeans>>, PredictiveError>
 where
     E: SimulationEngine + Send + Sync,
 {
@@ -654,9 +718,11 @@ where
                 replicates
                     .iter()
                     .map(|rows| {
-                        let mut out = vec![0.0; operator.count()];
-                        operator.apply(rows, values, &mut out);
-                        out
+                        let mut predicted = vec![0.0; operator.count()];
+                        let mut parts = vec![0.0; operator.part_count()];
+                        operator.apply(rows, values, &mut predicted);
+                        operator.apply_parts(rows, values, &mut parts);
+                        ObservedMeans { predicted, parts }
                     })
                     .collect()
             })

@@ -76,7 +76,14 @@ gives each observation's gradient and expected curvature over its arguments:
 `−2 w n² r` and `2 w n²` for the sum of squares, the same times
 `c = 1 / (2 √(W · S))` for the root mean squared error (its derivative per
 unit of `S`), `−w` times `Noise::scores` and `w` times `Noise::information`
-for an observation model. The mean absolute error is refused: its sandwich
+for an observation model. A term of several parts reads the density of its
+reading (`sum_scores` and `sum_information` of `likelihood/sums.rs`): its
+scores over the mean of each part, which the curvature chains with the block
+of the parts, and its expected information; for `"exact"` both come from the
+recursion and from its derivative in `φ`, the information summed over the
+counts from 0 until the terms above the mean are negligible, with the recursion tilted towards `M` plus 10 standard deviations. The information of the moments
+under `"exact"` is off by up to −15 %/+27 % and gives `η` of 0.90–0.96 for a
+correct model. The mean absolute error is refused: its sandwich
 needs a density of the residuals at 0 and a bandwidth. The sandwich,
 information matching and later gradient methods read them.
 
@@ -85,7 +92,10 @@ information matching and later gradient methods read them.
 | Derivatives in each method | Every method would repeat the models and their noise arguments. |
 | A kernel density for the absolute error | It hides a bandwidth choice; the bootstrap needs none. |
 
-**Guards:** `crates/commol-calibration/tests/test_likelihood.rs::scores_equal_the_differences_of_the_terms`.
+**Guards:** `crates/commol-calibration/tests/test_likelihood.rs::scores_equal_the_differences_of_the_terms`,
+`crates/commol-inference/tests/test_local.rs::the_gradient_of_a_sum_is_that_of_its_density`,
+`crates/commol-inference/tests/test_local.rs::the_information_of_a_sum_is_that_of_its_density`,
+`tests/uncertainty/test_local.py::TestInformationMatching::test_a_correct_model_with_sums_gives_one`.
 
 ## The sandwich sums scores over blocks
 

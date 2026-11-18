@@ -4,6 +4,7 @@
 //! Every elementary function comes from `libm`, so a value is the same on
 //! every platform.
 
+use super::sums::Sum;
 use commol_statistics::numeric::{
     digamma, ln_gamma, log_normal_log_density, normal_log_density, student_t_log_density, trigamma,
     x_log_y, x_log1p_y,
@@ -59,6 +60,9 @@ pub enum Noise {
     NegativeBinomial {
         /// The overdispersion `φ`, at least 0.
         overdispersion: f64,
+        /// How it reads the sum of the parts of a window
+        /// ([`super::sums`]), or `None` for a series without parts.
+        sum: Option<Sum>,
     },
     /// Binomial of `trials` trials and mean `μ`, so the probability is
     /// `μ / trials`.
@@ -117,7 +121,9 @@ impl Noise {
                 student_t_log_density(z * z, df, 1, libm::log(scale))
             }
             Self::Poisson => negative_binomial(y, mean, 0.0),
-            Self::NegativeBinomial { overdispersion } => negative_binomial(y, mean, overdispersion),
+            Self::NegativeBinomial { overdispersion, .. } => {
+                negative_binomial(y, mean, overdispersion)
+            }
             Self::Binomial { trials } => {
                 let n = trials as f64;
                 if n == 0.0 {
@@ -184,7 +190,7 @@ impl Noise {
                 ]
             }
             Self::Poisson => vec![1.0 / mean],
-            Self::NegativeBinomial { overdispersion } => vec![
+            Self::NegativeBinomial { overdispersion, .. } => vec![
                 1.0 / (mean + overdispersion * mean * mean),
                 0.0,
                 0.0,
@@ -236,7 +242,7 @@ impl Noise {
                 ]
             }
             Self::Poisson => vec![y / mean - 1.0],
-            Self::NegativeBinomial { overdispersion } => {
+            Self::NegativeBinomial { overdispersion, .. } => {
                 let phi = overdispersion;
                 vec![
                     (y - mean) / (mean * (1.0 + phi * mean)),
@@ -287,7 +293,7 @@ pub fn log_location(mean: f64, sigma: f64, center: Center) -> f64 {
 /// Poisson:
 ///
 /// `Σ_{j<y} ln(1 + jφ) + y ln μ − y ln(1 + φμ) − ln(1 + φμ)/φ − ln y!`.
-fn negative_binomial(y: f64, mean: f64, overdispersion: f64) -> f64 {
+pub(super) fn negative_binomial(y: f64, mean: f64, overdispersion: f64) -> f64 {
     if mean == 0.0 {
         return if y == 0.0 { 0.0 } else { f64::NEG_INFINITY };
     }
@@ -313,11 +319,11 @@ fn negative_binomial(y: f64, mean: f64, overdispersion: f64) -> f64 {
 const SMALL_PRODUCT: f64 = 1e-4;
 /// The counts summed for the information of a dispersion stop once a term
 /// falls below this share of the sum, above the mean.
-const NEGLIGIBLE: f64 = 1e-17;
+pub(super) const NEGLIGIBLE: f64 = 1e-17;
 
 /// `(ln(1 + a) − a/(1 + a)) / φ²` with `a = φμ`, accurate as `φ → 0`, where
 /// it tends to `μ²/2`.
-fn dispersion_bracket(mean: f64, phi: f64) -> f64 {
+pub(super) fn dispersion_bracket(mean: f64, phi: f64) -> f64 {
     let a = phi * mean;
     if a < SMALL_PRODUCT {
         mean * mean * (0.5 - 2.0 * a / 3.0 + 0.75 * a * a)
@@ -354,6 +360,11 @@ fn dispersion_first_terms(y: f64, phi: f64) -> f64 {
 fn dispersion_information(mean: f64, phi: f64) -> f64 {
     if mean <= 0.0 {
         return 0.0;
+    }
+    if phi == 0.0 {
+        // The limit of the Poisson: the score ((y − μ)² − y)/2 has the
+        // variance μ²/2.
+        return mean * mean / 2.0;
     }
     let r = 1.0 / phi;
     // `ln p(y)`, from `p(0) = (1 + φμ)^(−1/φ)` and
@@ -412,6 +423,7 @@ mod tests {
         let poisson = Noise::Poisson.log_density(4.0, 2.5);
         let limit = Noise::NegativeBinomial {
             overdispersion: 1e-12,
+            sum: None,
         }
         .log_density(4.0, 2.5);
         assert!((poisson - limit).abs() < 1e-9);

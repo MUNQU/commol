@@ -188,10 +188,10 @@ observation models of the problem) a prediction interval. The log score needs
 a density, so it takes only `DistributionNoise`; the parametric bootstrap
 (`ParametricResampler`) draws its data sets with the same draws. The Rust port
 `ObservationNoise` (`crates/commol-inference/src/predictive.rs`) sees one
-draw's whole vector of observations with the draw's parameter values, so a
-noise can draw blocks of residuals across observations, and a noise model can
-read calibrated noise parameters. `ResidualNoise` serves only series the fit
-has residuals of.
+draw's whole vector of observations with the draw's parameter values and the
+means of their parts, so a noise can draw blocks of residuals across
+observations, and a noise model can read calibrated noise parameters and
+draw a sum as it reads it. `ResidualNoise` serves only series the fit has residuals of.
 
 | Alternative | Why not |
 |---|---|
@@ -202,8 +202,7 @@ has residuals of.
 
 **Guards:** `crates/commol-inference/tests/test_resampling.rs::residual_noise_rejects_a_series_with_no_residuals`,
 `tests/uncertainty/test_resampling.py::TestResidualNoise`,
-`crates/commol-inference/tests/test_likelihood_target.rs`,
-`tests/uncertainty/test_scores.py::TestLogScore`.
+`crates/commol-inference/tests/test_likelihood_target.rs`, `tests/uncertainty/test_scores.py::TestLogScore`.
 
 ## Conformal variants share one score and one quantile
 

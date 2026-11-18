@@ -8,6 +8,12 @@
 //! The scaled Jacobian `S_ij = J_ij · θ̃_j / s_i` is the change of
 //! observation `i`, relative to the scale `s_i` of its series, for a relative
 //! change of parameter `j`, so it does not depend on the units of either.
+//!
+//! Beside the Jacobian of the observations, the sensitivities hold the
+//! Jacobian of the means of the parts of each observation
+//! ([`PartSensitivities`]), from the same runs: the curvature of a sum of
+//! parts reads it, and the structural rank and the collinearity, which ask
+//! what the observations determine, do not.
 
 mod finite_differences;
 
@@ -47,6 +53,55 @@ pub struct Sensitivities {
     pub errors: Matrix,
     /// The series (label) of each observation.
     pub labels: Vec<String>,
+    /// The Jacobian of the means of the parts of the observations.
+    pub parts: PartSensitivities,
+}
+
+/// The Jacobian of the means of the parts of each observation
+/// ([`commol_calibration::ObservationOperator::apply_parts`]) at one point,
+/// one row per part, observation after observation.
+#[derive(Debug, Clone)]
+pub struct PartSensitivities {
+    /// The number of parts of each observation.
+    pub counts: Vec<usize>,
+    /// The mean of each part at the point.
+    pub means: Vec<f64>,
+    /// `jacobian[(k, j)]`: the derivative of part `k` with respect to
+    /// parameter `j`.
+    pub jacobian: Matrix,
+    /// The estimated error of each entry of `jacobian`.
+    pub errors: Matrix,
+}
+
+impl PartSensitivities {
+    /// The parts of observations of one part each, which are the
+    /// observations: their predictions, Jacobian and errors.
+    pub fn one_per_observation(predictions: &[f64], jacobian: &Matrix, errors: &Matrix) -> Self {
+        Self {
+            counts: vec![1; predictions.len()],
+            means: predictions.to_vec(),
+            jacobian: jacobian.clone(),
+            errors: errors.clone(),
+        }
+    }
+
+    fn columns(&self, columns: &[usize]) -> Self {
+        Self {
+            counts: self.counts.clone(),
+            means: self.means.clone(),
+            jacobian: self.jacobian.select_columns(columns),
+            errors: self.errors.select_columns(columns),
+        }
+    }
+
+    /// The observation of each part.
+    fn observation_of(&self) -> Vec<usize> {
+        self.counts
+            .iter()
+            .enumerate()
+            .flat_map(|(observation, &count)| std::iter::repeat_n(observation, count))
+            .collect()
+    }
 }
 
 impl Sensitivities {
@@ -62,12 +117,14 @@ impl Sensitivities {
             jacobian: self.jacobian.select_columns(columns),
             errors: self.errors.select_columns(columns),
             labels: self.labels.clone(),
+            parts: self.parts.columns(columns),
         }
     }
 
     /// The scaled sensitivities `S_ij = J_ij · θ̃_j / s_i`, with
     /// `θ̃_j = |θ_j|`, or the width of its bounds when `θ_j = 0`; the errors
-    /// scale in the same way.
+    /// and the parts, each by the scale of its observation, scale in the
+    /// same way.
     ///
     /// # Panics
     ///
@@ -88,16 +145,27 @@ impl Sensitivities {
             .zip(parameters)
             .map(|(&value, parameter)| parameter_magnitude(value, parameter))
             .collect();
-        let scale = |matrix: &Matrix| {
+        let scale = |matrix: &Matrix, row_scales: &[f64]| {
             Matrix::from_fn(matrix.nrows(), columns, |i, j| {
-                matrix[(i, j)] * magnitudes[j] / scales[i]
+                matrix[(i, j)] * magnitudes[j] / row_scales[i]
             })
         };
+        let part_scales: Vec<f64> = self
+            .parts
+            .observation_of()
+            .into_iter()
+            .map(|observation| scales[observation])
+            .collect();
         Self {
             predictions: self.predictions.clone(),
-            jacobian: scale(&self.jacobian),
-            errors: scale(&self.errors),
+            jacobian: scale(&self.jacobian, scales),
+            errors: scale(&self.errors, scales),
             labels: self.labels.clone(),
+            parts: PartSensitivities {
+                jacobian: scale(&self.parts.jacobian, &part_scales),
+                errors: scale(&self.parts.errors, &part_scales),
+                ..self.parts.clone()
+            },
         }
     }
 }
@@ -251,9 +319,11 @@ mod tests {
     #[test]
     fn scaling_multiplies_by_the_magnitude_and_divides_by_the_scale() {
         let jacobian = Matrix::from_row_slice(2, 2, &[1.0, 2.0, 3.0, 4.0]);
+        let errors = jacobian.clone() * 0.5;
         let sensitivities = Sensitivities {
             predictions: vec![0.0, 0.0],
-            errors: jacobian.clone() * 0.5,
+            parts: PartSensitivities::one_per_observation(&[0.0, 0.0], &jacobian, &errors),
+            errors,
             jacobian,
             labels: vec!["A".to_string(), "B".to_string()],
         };
@@ -267,6 +337,7 @@ mod tests {
 
         let expected = Matrix::from_row_slice(2, 2, &[1.0, 3.0, 1.5, 3.0]);
         assert_eq!(scaled.jacobian, expected);
-        assert_eq!(scaled.errors, expected * 0.5);
+        assert_eq!(scaled.errors, expected.clone() * 0.5);
+        assert_eq!(scaled.parts.jacobian, expected);
     }
 }

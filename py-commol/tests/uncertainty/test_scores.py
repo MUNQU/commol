@@ -21,6 +21,7 @@ from commol import (
 )
 from commol.observations import (
     DistributionNoise,
+    NegativeBinomialObservations,
     NoNoise,
     PoissonObservations,
     ResidualNoise,
@@ -30,8 +31,10 @@ from tests.support import (
     abc_builder,
     bounded,
     build,
+    decay_part_means,
     flow_calibrator,
     flow_observations,
+    sum_calibrator,
 )
 
 MU, SIGMA, DRAWS = 1.0, 0.1, 4001
@@ -244,6 +247,39 @@ class TestLogScore:
         expected = [y * math.log(5.0) - 5.0 - math.lgamma(y + 1) for y in (3.0, 7.0)]
         assert score.per_observation == pytest.approx(expected, rel=1e-12)
         assert score.per_series == {"B": pytest.approx(sum(expected) / 2)}
+
+    def test_a_held_out_sum_reads_its_parts(self) -> None:
+        # A decay A → B with windows of two parts each, and a held-out window
+        # of four: its log score at one draw is its log density in a problem
+        # that holds it, and its draws sum four parts.
+        def windows(ends: list[int], length: int) -> list[ObservedDataPoint]:
+            return [
+                ObservedDataPoint(
+                    at=end,
+                    output="B",
+                    value=float(round(sum(means))),
+                    window=length,
+                    parts=length,
+                )
+                for end, means in zip(
+                    ends, decay_part_means(0.05, ends, length), strict=True
+                )
+            ]
+
+        fitted = windows([2, 4, 6, 8], 2)
+        held_out = windows([12], 4)
+        models = {"B": NegativeBinomialObservations(overdispersion=0.3, sum="exact")}
+        calibrator = sum_calibrator(fitted, models)
+        holding = sum_calibrator([*fitted, *held_out], models)
+        sample = ParameterSample.equally_weighted(
+            ["k"], [(0.001, 0.5)], [[0.05]], SampleMethod(name="point")
+        )
+        predictive = Predictive(calibrator, sample, [0, 12])
+
+        score = scores.log_score(predictive, held_out, DistributionNoise())
+
+        density = holding._engine_problem.pointwise_log_likelihood([0.05])[-1]
+        assert score.per_observation == [pytest.approx(density, rel=1e-12)]
 
     @pytest.mark.parametrize("noise", ["none", "residual"])
     def test_log_score_needs_distribution_noise(

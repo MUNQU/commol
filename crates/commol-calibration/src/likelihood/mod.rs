@@ -1,20 +1,25 @@
 //! The likelihood of the observations: one observation model per series,
 //! which says how an observed value scatters around its predicted mean.
 //!
-//! The observation operator gives the mean of each observation (its sums,
-//! windows, scales and factors); a model only adds the scatter. The
+//! The observation operator gives the mean of each part of each observation
+//! (its sums, windows, scales and factors); a model only adds the scatter.
+//! An observation of one part reads the model at its mean; one of several
+//! parts is the sum of one observation per part ([`sums`]). The
 //! log-likelihood is `Σ wᵢ · log p(yᵢ | μᵢ)`: a weight is a power of its term,
 //! so a weight of 2 counts the observation twice, as it does in every loss.
 //!
 //! | Module | Holds |
 //! |---|---|
 //! | [`density`] | [`Noise`]: a model with numbers for its noise, and its log density |
+//! | [`sums`] | [`Sum`]: the density of a sum of parts, its scores and its information |
 
 pub mod density;
+pub mod sums;
 
 use std::collections::HashMap;
 
 pub use density::{Center, Noise, log_location};
+pub use sums::Sum;
 
 use commol_core::Real;
 use serde::{Deserialize, Serialize};
@@ -91,6 +96,10 @@ pub enum ObservationModel {
     NegativeBinomial {
         /// The overdispersion `φ`, at least 0; 0 is the Poisson.
         overdispersion: Argument,
+        /// How it reads the sum of the parts of a window: required when an
+        /// observation of the series has more than one part, refused
+        /// otherwise.
+        sum: Option<Sum>,
     },
     /// Binomial of mean `μ`: `trials` for every observation of the series,
     /// or `None` to read [`ObservedDataPoint::trials`] of each.
@@ -136,12 +145,25 @@ impl Slot {
 /// An observation model resolved against the parameters.
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Resolved {
-    Normal { sd: Slot },
-    LogNormal { sigma: Slot, center: Center },
-    StudentT { df: Slot, scale: Slot },
+    Normal {
+        sd: Slot,
+    },
+    LogNormal {
+        sigma: Slot,
+        center: Center,
+    },
+    StudentT {
+        df: Slot,
+        scale: Slot,
+    },
     Poisson,
-    NegativeBinomial { overdispersion: Slot },
-    Binomial { trials: Option<u64> },
+    NegativeBinomial {
+        overdispersion: Slot,
+        sum: Option<Sum>,
+    },
+    Binomial {
+        trials: Option<u64>,
+    },
 }
 
 impl Resolved {
@@ -157,25 +179,30 @@ impl Resolved {
     }
 }
 
-/// Which model an observation reads, and the trials it brings.
+/// Which model an observation reads, the trials it brings and the number of
+/// parts of its window.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Term {
     model: usize,
     trials: Option<u64>,
+    parts: usize,
 }
 
 /// The derivatives of one observation's term of the objective with respect
-/// to its arguments: its mean `μ` first, then the noise arguments of its
-/// observation model. A loss has the mean only.
+/// to its arguments: the mean `μₜ` of each of its parts first, then the
+/// noise arguments of its observation model. An observation of one part,
+/// and every observation of a loss, has its mean only.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TermDerivatives {
+    /// The number of parts, whose means are the first arguments.
+    pub parts: usize,
     /// The parameter each noise argument reads, `None` for a number.
     pub parameters: Vec<Option<usize>>,
-    /// The first derivatives of the term over `(μ, noise arguments…)`: its
-    /// score, whose outer products the sandwich sums.
+    /// The first derivatives of the term over `(μ₁, …, μ_K, noise
+    /// arguments…)`: its score, whose outer products the sandwich sums.
     pub gradient: Vec<f64>,
     /// The expected second derivatives of the term, row-major over
-    /// `(μ, noise arguments…)`.
+    /// `(μ₁, …, μ_K, noise arguments…)`.
     pub curvature: Vec<f64>,
 }
 
@@ -202,7 +229,11 @@ impl Likelihood {
     /// noise parameter or whose bounds leave its range, a noise parameter
     /// is named by no model, a binomial series has trials on its model and
     /// on an observation or on neither, an observation of another series has
-    /// trials, or an observed value is outside the support of its model.
+    /// trials, a negative binomial series has an observation of several
+    /// parts and no `sum` or a `sum` and no such observation, a series of
+    /// another model that reads no sum has an observation of several parts
+    /// ([`Self::terms`]), or an observed value is outside the support of its
+    /// model.
     pub fn new(
         models: &[(String, ObservationModel)],
         observed_data: &[ObservedDataPoint],
@@ -241,9 +272,35 @@ impl Likelihood {
                     scale: slot(scale, STUDENT_T_SCALE)?,
                 },
                 ObservationModel::Poisson => Resolved::Poisson,
-                ObservationModel::NegativeBinomial { overdispersion } => {
+                ObservationModel::NegativeBinomial {
+                    overdispersion,
+                    sum,
+                } => {
+                    let with_parts = observed_data
+                        .iter()
+                        .find(|obs| &obs.label == label && obs.parts > 1);
+                    match (with_parts, sum) {
+                        (Some(obs), None) => {
+                            return Err(format!(
+                                "The NegativeBinomial model of '{label}' needs sum, \
+                                 \"exact\" or \"moments\": observation '{}' at {} has \
+                                 parts={}, and the model of a series with parts says how it \
+                                 reads their sum",
+                                obs.label, obs.at, obs.parts
+                            ));
+                        }
+                        (None, Some(_)) => {
+                            return Err(format!(
+                                "The NegativeBinomial model of '{label}' has sum, but no \
+                                 observation of the series has more than one part; give \
+                                 sum only to a series with parts"
+                            ));
+                        }
+                        _ => {}
+                    }
                     Resolved::NegativeBinomial {
                         overdispersion: slot(overdispersion, OVERDISPERSION)?,
+                        sum: *sum,
                     }
                 }
                 ObservationModel::Binomial { trials } => Resolved::Binomial { trials: *trials },
@@ -293,13 +350,16 @@ impl Likelihood {
     }
 
     /// The term of each of `observations`, which need not be the problem's:
-    /// the model of its series and its trials.
+    /// the model of its series, its trials and its parts.
     ///
     /// # Errors
     ///
     /// Returns a message that names the observation when its series has no
     /// model, a binomial series has trials on its model and on the
-    /// observation or on neither, or another series has trials.
+    /// observation or on neither, another series has trials, or the
+    /// observation has more than one part and its model reads no sum: a
+    /// log-normal, Student t or binomial model, or a negative binomial
+    /// without `sum`.
     pub fn terms(&self, observations: &[ObservedDataPoint]) -> Result<Vec<Term>, String> {
         observations
             .iter()
@@ -343,7 +403,38 @@ impl Likelihood {
                     }
                     (_, None) => None,
                 };
-                Ok(Term { model, trials })
+                if obs.parts > 1 {
+                    match self.series[model].1 {
+                        Resolved::Poisson
+                        | Resolved::Normal { .. }
+                        | Resolved::NegativeBinomial { sum: Some(_), .. } => {}
+                        Resolved::NegativeBinomial { sum: None, .. } => {
+                            return Err(format!(
+                                "Observation '{}' at {} has parts={}, and the \
+                                 NegativeBinomial model of its series has no sum; give it \
+                                 sum=\"exact\" or sum=\"moments\" to read a sum of parts",
+                                obs.label, obs.at, obs.parts
+                            ));
+                        }
+                        resolved => {
+                            return Err(format!(
+                                "Observation '{}' at {} has parts={}, but its series '{}' has \
+                                 a {} model, which reads no sum of parts; only Poisson, \
+                                 Normal and NegativeBinomial models read one",
+                                obs.label,
+                                obs.at,
+                                obs.parts,
+                                obs.label,
+                                resolved.name()
+                            ));
+                        }
+                    }
+                }
+                Ok(Term {
+                    model,
+                    trials,
+                    parts: obs.parts,
+                })
             })
             .collect()
     }
@@ -369,8 +460,12 @@ impl Likelihood {
                 scale: value(scale, true),
             },
             Resolved::Poisson => Noise::Poisson,
-            Resolved::NegativeBinomial { overdispersion } => Noise::NegativeBinomial {
+            Resolved::NegativeBinomial {
+                overdispersion,
+                sum,
+            } => Noise::NegativeBinomial {
                 overdispersion: value(overdispersion, true),
+                sum,
             },
             Resolved::Binomial { .. } => Noise::Binomial {
                 trials: term.trials.expect("a binomial term has trials"),
@@ -395,55 +490,58 @@ impl Likelihood {
             Resolved::Normal { sd } => vec![of(sd)],
             Resolved::LogNormal { sigma, .. } => vec![of(sigma)],
             Resolved::StudentT { df, scale } => vec![of(df), of(scale)],
-            Resolved::NegativeBinomial { overdispersion } => vec![of(overdispersion)],
+            Resolved::NegativeBinomial { overdispersion, .. } => vec![of(overdispersion)],
             Resolved::Poisson | Resolved::Binomial { .. } => Vec::new(),
         }
     }
 
     /// The derivatives of each observation's term of `−log L` at the
-    /// parameter `values` and the means `predictions`: its gradient
-    /// `−wᵢ s(yᵢ)` ([`Noise::scores`]) and its expected curvature `wᵢ`
-    /// times the Fisher information of its model ([`Noise::information`]),
-    /// with the parameters its noise arguments read.
+    /// parameter `values` and the means of the parts `parts`, observation
+    /// after observation: its gradient `−wᵢ s(yᵢ)` ([`Noise::sum_scores`])
+    /// and its expected curvature `wᵢ` times the Fisher information of its
+    /// model ([`Noise::sum_information`]), with the parameters its noise
+    /// arguments read.
     ///
     /// # Errors
     ///
-    /// The index of the first observation with weight whose mean lies
-    /// outside the means its model allows.
+    /// The index of the first observation with weight with the mean of a
+    /// part outside the means its model allows.
     pub fn term_derivatives(
         &self,
         values: &[f64],
-        predictions: &[f64],
+        parts: &[f64],
     ) -> Result<Vec<TermDerivatives>, usize> {
         self.terms
             .iter()
             .zip(&self.observed)
             .zip(&self.weights)
-            .zip(predictions)
+            .zip(parts_of(&self.terms, parts))
             .enumerate()
-            .map(|(index, (((&term, &y), &weight), &mean))| {
+            .map(|(index, (((&term, &y), &weight), means))| {
                 let noise = self.noise(term, values);
                 let parameters = self.argument_parameters(term);
                 if weight == 0.0 {
-                    let size = 1 + parameters.len();
+                    let size = term.parts + parameters.len();
                     return Ok(TermDerivatives {
+                        parts: term.parts,
                         parameters,
                         gradient: vec![0.0; size],
                         curvature: vec![0.0; size * size],
                     });
                 }
-                if noise.mean_outside(mean).is_some() {
+                if noise.sum_mean_outside(means).is_some() {
                     return Err(index);
                 }
                 Ok(TermDerivatives {
+                    parts: term.parts,
                     parameters,
                     gradient: noise
-                        .scores(y, mean)
+                        .sum_scores(y, means)
                         .into_iter()
                         .map(|score| -weight * score)
                         .collect(),
                     curvature: noise
-                        .information(mean)
+                        .sum_information(means)
                         .into_iter()
                         .map(|entry| weight * entry)
                         .collect(),
@@ -480,14 +578,16 @@ impl Likelihood {
     }
 
     /// The weighted log density of each observation of the problem,
-    /// `wᵢ · log p(yᵢ | μᵢ)`, where `predictions` holds `μᵢ`; 0 for an
-    /// observation of weight 0.
+    /// `wᵢ · log p(yᵢ | μᵢ)`, where `parts` holds the means of the parts of
+    /// each observation, observation after observation
+    /// ([`Noise::sum_log_density`]); 0 for an observation of weight 0.
     ///
     /// # Errors
     ///
-    /// [`Violation::MeanOutsideModel`] when a mean of an observation with
-    /// weight lies outside its model: `amount` is the sum of the distances.
-    pub fn pointwise(&self, values: &[f64], predictions: &[f64]) -> Result<Vec<f64>, Violation> {
+    /// [`Violation::MeanOutsideModel`] when the mean of a part of an
+    /// observation with weight lies outside its model: `amount` is the sum
+    /// of the distances.
+    pub fn pointwise(&self, values: &[f64], parts: &[f64]) -> Result<Vec<f64>, Violation> {
         let mut outside = 0.0;
         let mut any = false;
         let terms = self
@@ -495,19 +595,19 @@ impl Likelihood {
             .iter()
             .zip(&self.observed)
             .zip(&self.weights)
-            .zip(predictions)
-            .map(|(((&term, &y), &weight), &mean)| {
+            .zip(parts_of(&self.terms, parts))
+            .map(|(((&term, &y), &weight), means)| {
                 if weight == 0.0 {
                     return 0.0;
                 }
                 let noise = self.noise(term, values);
-                match noise.mean_outside(mean) {
+                match noise.sum_mean_outside(means) {
                     Some(distance) => {
                         any = true;
                         outside += distance;
                         0.0
                     }
-                    None => weight * noise.log_density(y, mean),
+                    None => weight * noise.sum_log_density(y, means),
                 }
             })
             .collect();
@@ -518,14 +618,14 @@ impl Likelihood {
         }
     }
 
-    /// The log-likelihood `Σ wᵢ · log p(yᵢ | μᵢ)` of the predictions of one
-    /// run; `−∞` where an observation has no mass.
+    /// The log-likelihood `Σ wᵢ · log p(yᵢ | μᵢ)` of the means of the parts
+    /// of one run; `−∞` where an observation has no mass.
     ///
     /// # Errors
     ///
     /// As [`Self::pointwise`].
-    pub fn log_likelihood(&self, values: &[f64], predictions: &[f64]) -> Result<f64, Violation> {
-        self.pointwise(values, predictions)
+    pub fn log_likelihood(&self, values: &[f64], parts: &[f64]) -> Result<f64, Violation> {
+        self.pointwise(values, parts)
             .map(|terms| terms.into_iter().sum())
     }
 
@@ -545,6 +645,21 @@ impl Likelihood {
             })
             .sum()
     }
+}
+
+/// The means of the parts of each of `terms`, in order, from `parts`, which
+/// holds them observation after observation.
+///
+/// # Panics
+///
+/// Panics when `parts` holds fewer means than the terms have parts.
+pub fn parts_of<'a>(terms: &'a [Term], parts: &'a [f64]) -> impl Iterator<Item = &'a [f64]> + 'a {
+    let mut start = 0;
+    terms.iter().map(move |term| {
+        let means = &parts[start..start + term.parts];
+        start += term.parts;
+        means
+    })
 }
 
 /// The message of a noise parameter that no observation model names.

@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `ObservedDataPoint(parts=K)`: a value that is the sum of `K` independent
+  observations over equal parts of its window, such as a weekly total of
+  daily counts; `parts=1` by default, and more than 1 needs a `window`. The
+  prediction is the sum of the means of the parts, and the observation model
+  of the series reads the sum: `PoissonObservations` as `Poisson(M)`,
+  `NormalObservations` as `N(M, K · sd²)`, and
+  `NegativeBinomialObservations(sum="exact" | "moments")` as the exact
+  convolution of the parts or the negative binomial of its mean and
+  variance. A negative binomial series with parts needs `sum`, and one
+  without parts refuses it; the other models refuse parts. The draws of
+  `DistributionNoise()` and `ParametricBootstrap`, the log score, the
+  gradients and the expected information read the sum as its model does. See
+  [Parts of a window](../guide/calibration-observations.md#parts-of-a-window)
+  and [Sums of parts](../guide/uncertainty/observation-models.md#sums-of-parts).
+
 - `Aggregate.scored_amounts`, a `dict[str, ScoredAmount]`: the scored
   amounts that `Model.apply_calibration_parameters` writes for the
   compartments that the bins and the fractions build only to their last
@@ -183,6 +198,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bin below half a unit starts empty. With no rounding, such an amount is
   refused as before, with the message that names the two roundings. See
   [Whole units](../guide/stochastic.md#whole-units).
+- **Breaking:** a problem with a `loss_function` refuses an observation with
+  `trials` or with `parts` above 1, fields of an observation model that a loss
+  does not read, with a message that names the observation and the field and
+  says that it needs `observation_models`. Before, a loss ignored `trials`.
+  Drop `trials` from the observations of a loss, or fit them with a
+  `BinomialObservations()` model. See
+  [Noise parameters](../guide/uncertainty/observation-models.md#noise-parameters).
 - **Breaking:** a build logs one `INFO` record, with the number of bins,
   parameters, transitions and outputs; the records of each bin,
   accumulator, stratification, matrix, parameter and transition of a
@@ -704,6 +726,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Limits of the parser](../guide/mathematical-expressions.md#limits-of-the-parser).
 
 ### Fixed
+
+- The curvature of a `NegativeBinomialObservations` of `overdispersion` 0,
+  which the Laplace approximation, the sandwich and the noise floor of a
+  profile read, is the limit of the Poisson, `μ²/2` for `φ`. Before, it ran
+  with no end.
 
 - A series with two observations at one position, such as an increment
   over 2 steps and a total over 40 steps that both end at 40, is refused by

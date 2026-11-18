@@ -105,13 +105,13 @@ impl<'a, E: SimulationEngine> AbcTarget<'a, E> {
         self.stochastic
     }
 
-    /// The distance of the predictions of one run at the parameter
-    /// `values`.
-    pub fn distance(&self, values: &[f64], predictions: &[f64]) -> f64 {
+    /// The distance of the predictions of one run, and of the means of their
+    /// parts, at the parameter `values`.
+    pub fn distance(&self, values: &[f64], predictions: &[f64], parts: &[f64]) -> f64 {
         let discrepancy = self.problem.discrepancy();
         match self.distance {
             Distance::Loss => discrepancy
-                .of_run(values, predictions)
+                .of_run(values, predictions, parts)
                 .expect("the loss of a run has no violation"),
             Distance::Series(metric) => {
                 let loss = metric.loss();
@@ -156,7 +156,7 @@ impl<E: SimulationEngine + Sync> TemperedTarget for AbcTarget<'_, E> {
         }
         match self.problem.predict_once(values, seed, workspace) {
             Ok(()) => {
-                let distance = self.distance(values, &workspace.predictions);
+                let distance = self.distance(values, &workspace.predictions, &workspace.parts);
                 Ok(distance.is_finite().then_some(distance))
             }
             Err(EvaluationError::Violation(_)) => Ok(None),
