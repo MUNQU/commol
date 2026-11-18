@@ -2838,6 +2838,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#amounts-below-the-smallest-normal-number-split-by-the-fractions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Amounts below the smallest normal number split by the fractions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#an-initial-condition-id-names-one-target" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2853,17 +2864,6 @@
     <span class="md-ellipsis">
       
         The remainder keeps the sum the model declares
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#whole-units-need-a-rounding-to-vary-an-initial-condition" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Whole units need a rounding to vary an initial condition
       
     </span>
   </a>
@@ -3783,6 +3783,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#amounts-below-the-smallest-normal-number-split-by-the-fractions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Amounts below the smallest normal number split by the fractions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#an-initial-condition-id-names-one-target" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3798,17 +3809,6 @@
     <span class="md-ellipsis">
       
         The remainder keeps the sum the model declares
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#whole-units-need-a-rounding-to-vary-an-initial-condition" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Whole units need a rounding to vary an initial condition
       
     </span>
   </a>
@@ -3837,13 +3837,14 @@
 
 <h1 id="calibrated-initial-conditions">Calibrated initial conditions<a class="headerlink" href="#calibrated-initial-conditions" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
-<p>How calibrated values reach the initial state, what each id names, which
-compartment keeps the sum the model declares, and what an engine of whole
-units needs to vary an initial condition. How the fractions of the categories
-compose and how an amount overrides them is in
-<a href="../initial-conditions/">Initial conditions</a>, and how a calibrated amount is
+<p>How calibrated values reach the initial state, what each id names and which
+compartment keeps the sum the model declares. How the fractions of the
+categories compose and how an amount overrides them is in
+<a href="../initial-conditions/">Initial conditions</a>, how a calibrated amount is
 written back onto the model is in
-<a href="../calibration-write-back/">Calibration write-back</a>.</p>
+<a href="../calibration-write-back/">Calibration write-back</a>, and what an engine of
+whole units needs to vary an initial condition is in
+<a href="../calibration/#whole-units-need-a-rounding-to-vary-an-initial-condition">Calibration</a>.</p>
 <h2 id="calibrated-initial-conditions-are-applied-in-layers">Calibrated initial conditions are applied in layers<a class="headerlink" href="#calibrated-initial-conditions-are-applied-in-layers" title="Permanent link">&para;</a></h2>
 <p><code>InitialConditionPlan</code> in <code>crates/commol-model/src/initial_conditions.rs</code>
 applies calibrated values in a fixed order: bins, category splits, exact
@@ -3909,11 +3910,14 @@ of a run. Compartments that start with nothing, such as those of a bin left
 <code>None</code>, or a side of a category whose fraction is 0, split a value as the
 fractions declare it within them: the product of the fractions that differ
 between them (<code>CompiledModel::fractions</code>, <code>weights</code> in
-<code>crates/commol-model/src/initial_conditions.rs</code>). A fraction they all take
+<code>crates/commol-model/src/initial_conditions.rs</code>), with each calibrated
+category written before them in place of its declared split
+(<code>split_category</code>), as the write-back writes it. A fraction they all take
 scales every share alike, and when it is 0 it would empty them all, so it
 does not count. They split evenly only when that product gives them
 nothing.</p>
 <p><strong>Guards:</strong>
+<code>crates/commol-model/tests/initial_conditions.rs::a_remainder_after_a_calibrated_category_splits_by_the_fractions_it_sets</code>,
 <code>crates/commol-model/tests/initial_conditions.rs::a_bin_and_the_remainder_keep_the_split_of_the_initial_state_after_a_run</code>,
 <code>crates/commol-model/tests/initial_conditions.rs::a_bin_left_for_calibration_splits_a_value_by_its_fractions</code>,
 <code>crates/commol-model/tests/initial_conditions.rs::a_prefix_that_starts_empty_keeps_its_declared_split</code>,
@@ -3923,6 +3927,73 @@ nothing.</p>
 <code>crates/commol-model/tests/initial_conditions.rs::the_plan_gives_the_kind_and_the_compartments_of_each_value</code>,
 <code>tests/calibration/test_initial_conditions.py::test_the_kind_of_each_target_comes_from_the_engine</code>,
 <code>tests/calibration/test_initial_conditions.py::test_a_calibrator_on_a_simulation_that_has_run_splits_a_bin_by_the_initial_state</code>.</p>
+<h2 id="amounts-below-the-smallest-normal-number-split-by-the-fractions">Amounts below the smallest normal number split by the fractions<a class="headerlink" href="#amounts-below-the-smallest-normal-number-split-by-the-fractions" title="Permanent link">&para;</a></h2>
+<p><strong>Rule:</strong> when the fractions give a share to a compartment whose amount is
+subnormal or 0, and every amount lies within the rounding of its share of
+their sum by that split, the compartments take the split of the fractions,
+each calibrated category in its place, as compartments that hold nothing do
+(<code>weights</code> and <code>rounds_the_split</code>). The rounding is <code>2(n + k)</code> units in the
+last place for <code>n</code> compartments of <code>k</code> fractions each: an amount and its
+share each pass through fewer than <code>2(n + k)</code> roundings of at most half a
+unit, absolute below the smallest normal number. Amounts further from that
+split, such as an override, keep their shares of the amounts.</p>
+<p>A share of the amounts is only as precise as the amounts, and an amount
+below the smallest normal number (<code>f64::MIN_POSITIVE</code>, about <code>2.2e-308</code>)
+holds fewer bits the smaller it is, down to none at 0. <code>B = 1e-310</code> split
+<code>0.3, 0.7</code> starts <code>B_x</code> from a number of 43 bits, so a value <code>B = 1.5</code> split
+by the state gives <code>B_x = 0.44999999999997775</code>, about 400 units in the last
+place from what the bin and its split build, and the write-back would
+override both compartments. Split by the fractions, a value over such
+amounts splits as over normal amounts, and the bins and the splits rebuild it
+to its last bits. A split of 10 000 compartments rounds up to 90 units.</p>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Why not</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The split of the fractions whenever an amount is subnormal</td>
+<td>L: a value would no longer split as the initial state does where the amounts depart from the fractions, so a bin would ignore an override of one of its compartments.</td>
+</tr>
+<tr>
+<td>The split of the fractions when the sum of the amounts is subnormal</td>
+<td>The invariant "What the user saves, the engine reloads": it misses a subnormal compartment beside normal ones, as <code>B = 1e-305</code> split <code>1e-9, 1 - 1e-9</code>, and an amount that underflows to 0, as <code>B = 1e-300</code> split <code>1e-30, 1</code>: both would still write an override.</td>
+</tr>
+<tr>
+<td>The split of the fractions whenever the amounts round it, at any magnitude</td>
+<td>S and KISS: it changes the last bits of the calibration of every stratified model on every engine, where the shares of normal amounts lose only the last bits that the scored amounts of the write-back correct.</td>
+</tr>
+<tr>
+<td>The fractions as the model declares them after a calibrated category</td>
+<td>The invariant "What the user saves, the engine reloads": the write-back writes the category into the fractions, which then do not rebuild the remainder. With <code>g1 = 0.43</code> over <code>A = 1e-310</code>, or <code>g1 = 0.3</code> over <code>A</code> left <code>None</code>, the remainder <code>A</code> would write overrides.</td>
+</tr>
+<tr>
+<td>The bound of a scored amount, 64 units in the last place</td>
+<td>It bounds another rounding, a build against a scored amount. Below the smallest normal number, 64 units are an absolute <code>3.2e-322</code>, wider than the rounding there, so a bin of <code>1e-321</code> would take an override <code>B_x = 0</code> for the split; and a split of 10 000 compartments rounds further than 64.</td>
+</tr>
+<tr>
+<td>An exact match of the amounts to the split</td>
+<td>The sum and each share round, so the amounts hold the split only up to their rounding.</td>
+</tr>
+<tr>
+<td>The shares of the amounts scaled up by a power of two</td>
+<td>The bits are lost when the build rounds the amount, not in the division: a scaled amount keeps its 43 bits.</td>
+</tr>
+<tr>
+<td>Rebuild the state at a scale where every amount is normal (each bin and override times <code>2^k</code>)</td>
+<td>KISS and S: the plan reads the state of the engine, which holds what earlier layers and a Rust caller wrote, not only what the model builds, so it would need a second state to rebuild.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Guards:</strong>
+<code>crates/commol-model/tests/initial_conditions.rs::amounts_below_the_smallest_normal_number_split_a_value_by_the_fractions</code>,
+<code>crates/commol-model/tests/initial_conditions.rs::amounts_below_the_smallest_normal_number_keep_the_shares_of_an_override</code>,
+<code>crates/commol-model/src/initial_conditions.rs::a_split_of_many_compartments_below_the_smallest_normal_number_holds_its_rounding</code>,
+<code>tests/calibration/test_initial_conditions.py::test_a_bin_of_a_subnormal_amount_splits_a_value_by_its_fractions</code>,
+<code>tests/calibration/test_initial_conditions.py::test_a_subnormal_remainder_takes_the_split_of_a_calibrated_category</code>.</p>
 <h2 id="an-initial-condition-id-names-one-target">An initial-condition id names one target<a class="headerlink" href="#an-initial-condition-id-names-one-target" title="Permanent link">&para;</a></h2>
 <p>A category has two ids, bare (<code>g1</code>) and qualified (<code>group:g1</code>); a
 compartment, a bin and a bin prefix have one, their name. <code>resolve_target</code> in
@@ -4045,91 +4116,6 @@ that sets amounts is checked without a change there.</p>
 and the targets of an id, <code>the_remainder_keeps_the_declared_sum_of_what_it_covers</code>,
 <code>a_remainder_keeps_only_an_amount_the_model_states</code> and
 <code>a_remainder_takes_what_the_values_leave_of_the_amount_a_value_states</code>).</p>
-<h2 id="whole-units-need-a-rounding-to-vary-an-initial-condition">Whole units need a rounding to vary an initial condition<a class="headerlink" href="#whole-units-need-a-rounding-to-vary-an-initial-condition" title="Permanent link">&para;</a></h2>
-<p>A method says where the numbers of its values come from
-(<code>ValueSource</code> of <code>crates/commol-calibration/src/values.rs</code>): it varies them,
-such as an optimizer or a sampler, or it writes numbers it knows, such as the
-draws of a sample. A varied source builds its writer with <code>ValueWriter::varied</code>:
-it asks the engine whether it takes every number of the values of the plan
-(<code>SimulationEngine::check_varied_values</code>, a required method that takes the
-plan, so the values are resolved first and a new engine states its answer).
-<code>StochasticEvents</code> and <code>StochasticSteps</code> answer through <code>Units</code>: with no
-<code>rounding</code>, they refuse an initial condition, whatever its bounds, and the
-message names it and the two roundings. The deterministic engines take every
-number.</p>
-<table>
-<thead>
-<tr>
-<th>Builder</th>
-<th>Source</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>CalibrationProblem::new</code></td>
-<td>Varied</td>
-</tr>
-<tr>
-<td><code>ForwardModel::unobserved</code></td>
-<td>Its argument: <code>ForwardAnalysis::new</code> passes varied for independent inputs, and known (every draw) for a sample, which is the design of the analysis</td>
-</tr>
-<tr>
-<td><code>configured_engine</code> (the write-back of <code>Model.apply_calibration_parameters</code>)</td>
-<td>Known (<code>ValueWriter::known</code>): the engine checks each number when it writes it (<code>Units::set_initial_condition</code>)</td>
-</tr>
-<tr>
-<td><code>plan_model_values</code></td>
-<td>Known (<code>ValueWriter::known</code>), only to resolve the values: it writes no number</td>
-</tr>
-</tbody>
-</table>
-<p><code>CalibrationProblem::new</code> and <code>ForwardModel::unobserved</code> then write numbers
-of their source to a copy of the engine and check that no value is missing
-(<a href="../model-structure/#a-run-needs-every-value">A run needs every value</a>).
-A varied source writes the point of the bounds of each value nearest 0,
-which is whole when 0 is within the bounds or the bound nearest 0 is whole,
-so it does not show that every number is taken. A known source writes each of its sets, so every draw of a
-sample is checked when the analysis is built, and the message names its set.</p>
-<table>
-<thead>
-<tr>
-<th>Alternative</th>
-<th>Why not</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Check the bounds in <code>commol-calibration</code></td>
-<td>The calibration would hold a rule of the engine, against the golden rule.</td>
-</tr>
-<tr>
-<td>Refuse when the plan is built (<code>InitialConditionPlan::new</code>)</td>
-<td>Every plan is built, also for a write of known values, so a whole value written back would need a rounding for a reason that does not apply to it.</td>
-</tr>
-<tr>
-<td>Treat every input of an analysis as varied</td>
-<td>A sample writes only its draws: a sample of whole amounts would be refused for numbers it never writes.</td>
-</tr>
-<tr>
-<td>A default <code>check_varied_values</code> that takes every number</td>
-<td>A new engine of whole units that forgets it would take every number with no error.</td>
-</tr>
-<tr>
-<td>Refuse only when a bound is not whole</td>
-<td>Bounds <code>[0, 50]</code> pass, and every start fails on the first value that is not whole.</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Guards:</strong>
-<code>crates/commol-calibration/tests/test_varied_values.rs</code>,
-<code>crates/commol-stochastic/tests/oracles.rs</code> (<code>calibrated_initial_conditions_go_through_the_rounding</code>),
-<code>tests/stochastic/test_calibration.py::test_a_calibrated_amount_needs_a_rounding</code>,
-<code>tests/stochastic/test_calibration.py::test_every_initial_condition_that_varies_needs_a_rounding</code>,
-<code>tests/stochastic/test_whole_units.py::test_an_analysis_that_varies_an_amount_needs_a_rounding</code>,
-<code>tests/stochastic/test_whole_units.py::test_an_analysis_of_a_sample_writes_its_draws_as_known_amounts</code>,
-<code>tests/stochastic/test_whole_units.py::test_every_draw_of_a_sample_is_checked_when_the_analysis_is_built</code>,
-<code>tests/stochastic/test_whole_units.py::test_a_known_amount_is_written_back_when_it_is_whole</code>,
-<code>tests/stochastic/test_calibration.py::test_a_calibrated_amount_with_a_rounding_is_calibrated</code>.</p>
 
 
 

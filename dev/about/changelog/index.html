@@ -5991,6 +5991,25 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
+<li>A calibrated value of a bin, and the initial-condition remainder, split by
+  the proportions of amounts below the smallest normal <code>float</code>, about
+  <code>2.2e-308</code>, which hold fewer digits the smaller they are: with
+  <code>B = 1e-310</code> split <code>0.3, 0.7</code>, <code>B = 1.5</code> gave
+  <code>B_x = 0.44999999999997775</code>, so <code>Model.apply_calibration_parameters</code> wrote
+  both compartments as overrides, and after <code>update_bin_amounts({"B": 20})</code>
+  <code>B</code> still started from 1.5. Where such amounts hold the split of the
+  fractions up to their rounding, a value now splits by the fractions, so
+  the write-back writes the bin and its split with no override. Amounts
+  further from the fractions, such as an override, keep their proportions.
+  See <a href="../../guide/calibration-initial-conditions/#what-an-id-can-name">What an id can name</a>.</li>
+<li>After a calibrated category, the initial-condition remainder split
+  compartments that start at 0, as those of a bin left <code>None</code>, by the
+  fractions the model declares, not by the calibrated category: with <code>A</code>
+  left <code>None</code>, <code>group</code> split <code>0.4, 0.6</code> and <code>g1 = 0.3</code> calibrated, the
+  remainder <code>A</code> split <code>0.4, 0.6</code>, so the write-back, which writes
+  <code>g1 = 0.3</code>, overrode both compartments of <code>A</code>. It now splits by the
+  fractions with each calibrated category in place of its declared split.
+  See <a href="../../guide/calibration-initial-conditions/#the-remainder">The remainder</a>.</li>
 <li><code>Model.apply_calibration_parameters</code> wrote a calibrated amount that is not
   whole, such as <code>B = 11.85</code>, onto a model of <code>StochasticEvents</code> or
   <code>StochasticSteps</code> with a <code>rounding</code>, and the model then did not build: the

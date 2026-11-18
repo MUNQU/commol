@@ -3929,11 +3929,8 @@ more than half of 162). They stay out of <code>compartment_amounts</code>, so
 <code>describe()</code> gives them one line, and <code>Model.applied_parameters</code> no row.</p>
 <p>A new calibration of the written model can score other units or amounts,
 because the plan splits a value by the shares of the scored amounts.</p>
-<p>A known limit: a bin whose prior amount is subnormal, such as <code>B = 1e-310</code>
-split <code>0.3, 0.7</code>, makes the plan split a calibrated <code>B = 1.5</code> by coarse
-subnormal shares (<code>weights</code> of <code>crates/commol-model/src/initial_conditions.rs</code>),
-so its compartments lie hundreds of units in the last place from the split,
-and the write-back writes them as overrides.</p>
+<p>A bin whose declared amount is subnormal splits a value by the fractions
+(<a href="../calibrated-initial-conditions/#amounts-below-the-smallest-normal-number-split-by-the-fractions">Amounts below the smallest normal number split by the fractions</a>).</p>
 <table>
 <thead>
 <tr>
