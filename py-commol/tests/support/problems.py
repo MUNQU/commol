@@ -17,7 +17,7 @@ from commol.observations.models import _ObservationModel
 from commol.sensitivity import InputSpace
 
 from .flows import Flow, flow_model
-from .models import a_to_b_builder, abc_builder, build
+from .models import a_to_b_builder, abc_builder, build, fan_builder
 
 
 def initial_condition_problem(
@@ -143,6 +143,33 @@ def flow_calibrator(
         parameters=[bounded("c", *bounds, initial_guess=sum(bounds) / 2), *noise],
         loss_function=None if observation_models else "sse",
         observation_models=dict(observation_models) if observation_models else None,
+        optimization_config=NelderMeadConfig(max_iterations=1000, sd_tolerance=1e-14),
+        seed=seed,
+    )
+    return Calibrator(Simulation(model), problem)
+
+
+def fan_calibrator(series: Sequence[Sequence[float]], *, seed: int = 1) -> Calibrator:
+    """
+    Fit the constant flows ``c0``, ``c1``, … of ``fan_builder`` to `series`:
+    ``series[i]`` holds the flows of one step into ``B{i}`` at positions 1,
+    2, …, each ``c{i}`` in [0, 20], by the sum of squares.
+
+    The fit of ``c{i}`` is the mean of ``series[i]``, which is also its
+    initial guess, so the fit costs a few iterations.
+    """
+    model = build(fan_builder(len(series)))
+    problem = CalibrationProblem(
+        observed_data=[
+            ObservedDataPoint(at=t, output=f"B{i}", value=float(value), window=1)
+            for i, values in enumerate(series)
+            for t, value in enumerate(values, start=1)
+        ],
+        parameters=[
+            bounded(f"c{i}", 0.0, 20.0, initial_guess=sum(values) / len(values))
+            for i, values in enumerate(series)
+        ],
+        loss_function="sse",
         optimization_config=NelderMeadConfig(max_iterations=1000, sd_tolerance=1e-14),
         seed=seed,
     )

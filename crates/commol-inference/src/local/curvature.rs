@@ -231,11 +231,6 @@ impl Curvature {
         &self.unbounded_fit
     }
 
-    /// `dθ/du` of each parameter at the fit: the diagonal of `D`.
-    pub fn derivatives(&self) -> &[f64] {
-        &self.derivatives
-    }
-
     /// The curvature `H_u` on the unbounded scale.
     pub fn matrix(&self) -> &Matrix {
         &self.matrix

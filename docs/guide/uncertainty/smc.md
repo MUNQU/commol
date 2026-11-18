@@ -185,7 +185,7 @@ variance `σ²`, `η = 1/(2σ²)` makes the Gibbs posterior the Bayesian posteri
 | `eta` | How it is chosen | Needs | Cost |
 |---|---|---|---|
 | A number above 0 | By you | Nothing | One sampler |
-| `InformationMatchingEta(block_length, starts=1)` | `η = tr(J I⁻¹ J) / tr(J)` at the fit: the Gauss–Newton curvature `J` of the objective against the variance `I` of the scores of its terms, summed over blocks of `block_length` positions (Holmes and Walker 2017) | `loss_function="sse"` or observation models, a deterministic engine, more blocks than parameters | A fit, finite differences and one sampler |
+| `InformationMatchingEta(block_length, starts=1)` | `η = p / tr(J⁻¹ I)` at the fit, for `p` parameters: the Gauss–Newton curvature `J` of the objective against the variance `I` of the scores of its terms, summed over blocks of `block_length` positions (Pauli, Racugno and Ventura 2011) | `loss_function="sse"` or observation models, a deterministic engine, at least two blocks | A fit, finite differences and one sampler |
 | `BootstrapCoverageEta(replicates, block_length, confidence_level, starts=1)` | The posteriors of Bayesian-bootstrap data sets hold the fit at `confidence_level` (Syring and Martin 2019) | Any loss and engine | A fit and one sampler per replicate, then one |
 
 Both calibrations read the fit `Calibrator.run(starts)`, the best of
@@ -205,7 +205,16 @@ engine raise a `ValueError` that points to the other choices. `J` and `I` are
 the curvature and the meat of the [sandwich](local.md#sandwich): `I` sums the
 scores over blocks, so it holds when the noise depends on its neighbours
 inside a block, and `block_length` has no default: `block_length=1` gives
-the independent version, every observation its own block. Bootstrap
+the independent version, every observation its own block. `I` enters only
+through a trace, so `η` needs no inverse of `I`: it takes two blocks or more,
+also fewer blocks than parameters, and blocks can be long enough to hold the
+dependence. Each parameter adds `G − 1` pieces of information about the
+scale, at most, for `G` blocks: with few blocks and few parameters, or with
+parameters that the data read in one part of the series only, `η` varies
+much from one data set to the next and comes out too large more often than
+too small, so the intervals are too narrow. Blocks that each hold several
+positions of every parameter, with `p(G − 1)` of about 10 or more for `p`
+parameters, keep it near its value. Bootstrap
 coverage runs one tempered sampler per replicate to a large `η`, reads the
 posterior of every smaller `η` by reweighting, so its search runs no model,
 and finds for each replicate and parameter the `η` where the interval stops
@@ -299,6 +308,7 @@ Monte Carlo error.
 
 - [ ] Each calibrated parameter has a prior you can defend, on bounds that fit it.
 - [ ] `η` is a number you can justify, or one of its calibrations.
+- [ ] Information matching has `p(G − 1)` of about 10 or more, for `p` parameters and `G` blocks.
 - [ ] A Gibbs posterior ends at temperature 1; an ABC run says why it stopped.
 - [ ] With a stochastic engine, ABC reads one replicate per particle, not the problem's summary.
 

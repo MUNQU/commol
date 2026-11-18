@@ -49,8 +49,8 @@ of its modules.
   `abc_builder` (A → B → C), `abcd_builder` (A → B → C → D) and
   `a_to_b_builder`, and the special models
   `override_builder`, `shared_category_builder`,
-  `conditional_pathway_builder` and `mixed_units_builder` (A and B in `item`,
-  C in `mg/l`). A factory returns a `FactoryBuilder`: a
+  `conditional_pathway_builder`, `mixed_units_builder` (A and B in `item`,
+  C in `mg/l`) and `fan_builder` (constant flows from A to `B0`, `B1`, …). A factory returns a `FactoryBuilder`: a
   `ModelBuilder` of the process and the `Aggregate` that lays it out
   (`builder.structure`, which `set_structure` replaces). A keyword overrides
   one part of the default model, so a test names only what it changes. `build` builds for difference

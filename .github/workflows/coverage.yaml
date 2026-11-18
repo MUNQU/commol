@@ -35,6 +35,8 @@ jobs:
             tests: >-
               tests/uncertainty/test_coverage.py::TestGibbsPosterior
               tests/uncertainty/test_coverage.py::TestABCSMC
+          - name: information matching with few blocks
+            tests: tests/uncertainty/test_coverage.py::TestInformationMatching
           - name: harness, wild bootstrap and prediction interval
             tests: >-
               tests/uncertainty/test_coverage.py::TestHarness

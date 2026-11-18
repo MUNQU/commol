@@ -29,25 +29,6 @@ use crate::sensitivity::Matrix;
 /// since `B` would have rank below the parameters, or when `H` or the
 /// sandwich is singular.
 pub fn sandwich(curvature: &Curvature, blocks: &BlockScheme) -> Result<Gaussian, MethodError> {
-    let meat = block_meat(curvature, blocks)?;
-    let bread = inverse(curvature.matrix())?;
-    let covariance = &bread * meat * &bread;
-    Gaussian::new(
-        curvature.transform().clone(),
-        curvature.unbounded_fit().to_vec(),
-        covariance,
-        Some((blocks.count() - 1) as f64),
-    )
-}
-
-/// The meat `B = G/(G − 1) · Σ_b s_b s_bᵀ` of the gradients of
-/// `curvature` over the blocks of `blocks`, on the unbounded scale.
-///
-/// # Errors
-///
-/// [`MethodError::Invalid`] when there are not more blocks than parameters,
-/// since `B` would have rank below the parameters.
-pub fn block_meat(curvature: &Curvature, blocks: &BlockScheme) -> Result<Matrix, MethodError> {
     let count = blocks.count();
     let p = curvature.fit().len();
     if count <= p {
@@ -66,6 +47,27 @@ pub fn block_meat(curvature: &Curvature, blocks: &BlockScheme) -> Result<Matrix,
             plural(p, "parameter")
         )));
     }
+    let meat = block_meat(curvature, blocks);
+    let bread = inverse(curvature.matrix())?;
+    let covariance = &bread * meat * &bread;
+    Gaussian::new(
+        curvature.transform().clone(),
+        curvature.unbounded_fit().to_vec(),
+        covariance,
+        Some((blocks.count() - 1) as f64),
+    )
+}
+
+/// The meat `B = G/(G − 1) · Σ_b s_b s_bᵀ` of the gradients of
+/// `curvature` over the blocks of `blocks`, on the unbounded scale. With
+/// `G ≤ p` its rank is below the parameters `p`, since the block scores of a
+/// fit sum to zero.
+///
+/// `blocks` has at least two blocks.
+pub fn block_meat(curvature: &Curvature, blocks: &BlockScheme) -> Matrix {
+    let count = blocks.count();
+    debug_assert!(count >= 2, "the meat of one block");
+    let p = curvature.fit().len();
     let gradients = curvature.gradients();
     let mut meat = Matrix::zeros(p, p);
     for block in blocks.blocks() {
@@ -82,7 +84,7 @@ pub fn block_meat(curvature: &Curvature, blocks: &BlockScheme) -> Result<Matrix,
         }
     }
     meat *= count as f64 / (count - 1) as f64;
-    Ok(meat)
+    meat
 }
 
 /// The blocks of `problem` of `block_length` positions, or of the

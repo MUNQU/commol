@@ -6,7 +6,9 @@ The harness's model is linear, ``y_j = θ x_j + ε_j`` with ``ε_j ~ N(0, σ²)`
 and a flat prior, so the posterior of ``θ`` is ``N(θ̂, σ²/Σx²)`` with
 ``θ̂ = Σxy/Σx²``. The oracle draws from it; a 90 % interval of its draws
 covers ``θ`` in 90 % of the data sets. The Gibbs posterior fits a constant
-flow with Gaussian noise (``flow_calibrator``); ABC fits the probability of a
+flow with Gaussian noise (``flow_calibrator``), and, with information
+matching, six constant flows (``fan_calibrator``) with fewer blocks than
+parameters, under independent and AR(1) noise; ABC fits the probability of a
 chain binomial from the units that moved in one step.
 
 The Laplace approximation fits the same flow with a normal model of known
@@ -55,6 +57,7 @@ from tests.support import (
     bounded,
     build,
     build_stochastic,
+    fan_calibrator,
     flow_calibrator,
     flow_observations,
 )
@@ -106,6 +109,7 @@ class TestHarness:
 
 
 FLOW, FLOW_NOISE, FLOW_COUNT = 10.0, 1.0, 30
+FAN = 6
 
 
 @pytest.mark.coverage_study
@@ -136,6 +140,41 @@ class TestGibbsPosterior:
             return {"c": calibrator.uncertainty(method).sample.interval(LEVEL)["c"]}
 
         study = coverage_study(interval, {"c": FLOW}, LEVEL, data_sets=200, seed=3)
+
+        assert study.calibrated(), study
+
+
+@pytest.mark.coverage_study
+class TestInformationMatching:
+    @pytest.mark.parametrize(
+        ("positions", "block_length", "phi"),
+        [(24, 6, 0.0), (60, 12, 0.3)],
+        ids=["independent", "autocorrelated"],
+    )
+    def test_information_matching_with_few_blocks_per_parameter_is_calibrated(
+        self, positions: int, block_length: int, phi: float
+    ) -> None:
+        # Six constant flows; 24 positions in blocks of 6, or 60 positions of
+        # AR(1) noise in blocks of 12, make 4 or 5 blocks for 6 parameters.
+        method = GibbsPosterior(
+            priors=Priors.uniform_on_bounds(),
+            eta=InformationMatchingEta(block_length=block_length),
+            particles=400,
+            target_cess=0.5,
+            resample_threshold=0.5,
+            stay_probability=0.05,
+        )
+        names = [f"c{i}" for i in range(FAN)]
+
+        def interval(index: int, rng: np.random.Generator) -> dict[str, Interval]:
+            series = [(FLOW + _ar1(rng, phi, positions)).tolist() for _ in names]
+            calibrator = fan_calibrator(series, seed=index)
+            intervals = calibrator.uncertainty(method).sample.interval(LEVEL)
+            return {name: intervals[name] for name in names}
+
+        study = coverage_study(
+            interval, dict.fromkeys(names, FLOW), LEVEL, data_sets=200, seed=5
+        )
 
         assert study.calibrated(), study
 

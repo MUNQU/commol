@@ -310,6 +310,31 @@ def a_to_b_builder(
     )
 
 
+def fan_builder(count: int) -> FactoryBuilder:
+    """
+    ``count`` constant flows from bin A to bins ``B0``, ``B1``, …: the
+    transition ``t{i}`` moves ``c{i}`` each step (the rate ``c{i} * A / A``,
+    absolute because it names A), every ``c{i}`` left for calibration, and
+    10⁶ in A.
+    """
+    builder = FactoryBuilder(name="Fan", version="1.0")
+    builder.add_bin(id="A", name="A")
+    for i in range(count):
+        builder.add_bin(id=f"B{i}", name=f"B{i}")
+        builder.add_transition(
+            id=f"t{i}", source=["A"], target=[f"B{i}"], rate=f"c{i} * A / A"
+        )
+    return _finish(
+        builder,
+        parameters={f"c{i}": None for i in range(count)},
+        units={},
+        amounts={"A": 1e6} | {f"B{i}": 0 for i in range(count)},
+        stratifications=None,
+        conditions=None,
+        compartment_amounts=None,
+    )
+
+
 def override_builder(amount: float = 300) -> FactoryBuilder:
     """
     ``a_to_b_builder`` split into halves ``g1`` and ``g2``, with ``A_g1`` set.

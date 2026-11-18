@@ -777,6 +777,200 @@ fn a_calibration_of_eta_needs_a_fit_inside_the_support() {
     assert!(error.contains("infeasible"), "{error}");
 }
 
+/// Outputs `x0`, `x1`, … of one constant each, its parameter `k0`, `k1`, …,
+/// at every position.
+#[derive(Clone, Debug)]
+struct Means {
+    values: Vec<f64>,
+}
+
+impl SimulationEngine for Means {
+    fn check_varied_values(&self, _plan: &Self::ValuePlan) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn check_values(&self) -> Result<(), String> {
+        Ok(())
+    }
+
+    type ValuePlan = NoPlan;
+
+    fn check_position(&self, _position: f64) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn run_at_positions_into_buffer(
+        &mut self,
+        positions: &[f64],
+        buffer: &mut Vec<Vec<f64>>,
+    ) -> Result<(), SimulationError> {
+        buffer.clear();
+        buffer.extend(positions.iter().map(|_| self.values.clone()));
+        Ok(())
+    }
+
+    fn step(&mut self) -> Result<(), SimulationError> {
+        Ok(())
+    }
+
+    fn output_names(&self) -> Vec<String> {
+        (0..self.values.len()).map(|i| format!("x{i}")).collect()
+    }
+
+    fn state_outputs(&self) -> usize {
+        self.values.len()
+    }
+
+    fn reset(&mut self) {}
+
+    fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
+        let index: usize = parameter_id[1..].parse().map_err(|_| parameter_id)?;
+        self.values[index] = value;
+        Ok(())
+    }
+
+    fn current_position(&self) -> f64 {
+        0.0
+    }
+
+    fn plan_values(&self, _: &[ModelValue], _: Option<&str>) -> Result<NoPlan, String> {
+        Ok(NoPlan)
+    }
+
+    fn apply_values(&mut self, _: &NoPlan, _: &[f64]) -> Result<f64, String> {
+        Ok(0.0)
+    }
+}
+
+/// The sum of squares of `series[i]`, observed as `x{i}` at the positions
+/// 0, 1, …, against the constant `k{i}` in `[0, 20]`, with its fit: the
+/// mean of each series.
+fn means_problem(series: &[Vec<f64>]) -> (CalibrationProblem<Means>, Vec<f64>) {
+    let observations = series
+        .iter()
+        .enumerate()
+        .flat_map(|(i, values)| {
+            values
+                .iter()
+                .enumerate()
+                .map(move |(t, &value)| ObservedDataPoint::new(t as f64, format!("x{i}"), value))
+        })
+        .collect();
+    let problem = CalibrationProblem::new(
+        Means {
+            values: vec![0.0; series.len()],
+        },
+        observations,
+        (0..series.len())
+            .map(|i| CalibrationParameter::new(format!("k{i}"), 0.0, 20.0))
+            .collect(),
+        None,
+        vec![],
+        LossConfig::SumSquaredError,
+    )
+    .unwrap();
+    let fit = series
+        .iter()
+        .map(|values| values.iter().sum::<f64>() / values.len() as f64)
+        .collect();
+    (problem, fit)
+}
+
+/// The median of `values`, of an odd length.
+fn median(mut values: Vec<f64>) -> f64 {
+    values.sort_by(f64::total_cmp);
+    values[values.len() / 2]
+}
+
+#[test]
+fn information_matching_gives_eta_near_its_value_with_few_blocks_per_parameter() {
+    // 10 constants observed at 35 positions with noise of sd 1: the sum of
+    // squares has η = 1/(2σ²) = 0.5. Blocks of 1, 3, 7 and 18 positions
+    // make 35, 12, 5 and 2 blocks for 10 parameters.
+    let mut stream = Generator::from_seed(4);
+    let data_sets: Vec<Vec<Vec<f64>>> = (0..101)
+        .map(|_| {
+            (0..10)
+                .map(|_| {
+                    (0..35)
+                        .map(|_| 5.0 + commol_random::sample::normal(&mut stream))
+                        .collect()
+                })
+                .collect()
+        })
+        .collect();
+    for block_length in [1, 3, 7, 18] {
+        let etas = data_sets
+            .iter()
+            .map(|series| {
+                let (problem, fit) = means_problem(series);
+                information_matching_eta(&problem, &fit, Some(block_length))
+                    .unwrap()
+                    .eta
+            })
+            .collect();
+        let eta = median(etas);
+        assert!((eta / 0.5 - 1.0).abs() < 0.1, "{block_length}: {eta}");
+    }
+}
+
+#[test]
+fn information_matching_needs_two_blocks_and_scores_that_are_not_all_0() {
+    let series = vec![vec![5.0, 6.0, 4.0], vec![2.0, 1.0, 3.0]];
+    let (problem, fit) = means_problem(&series);
+    let error = information_matching_eta(&problem, &fit, Some(3))
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("block_length 3 makes 1 block; information matching needs at least two"),
+        "{error}"
+    );
+    // Two blocks for two parameters are enough.
+    let eta = information_matching_eta(&problem, &fit, Some(2))
+        .unwrap()
+        .eta;
+    assert!(eta.is_finite() && eta > 0.0, "{eta}");
+
+    // `x0` only in the first block and `x1` only in the second: each block
+    // score is the score of one parameter, 0 at the fit.
+    let observations = [
+        (0.0, "x0", 5.0),
+        (1.0, "x0", 6.0),
+        (2.0, "x1", 2.0),
+        (3.0, "x1", 1.0),
+    ]
+    .iter()
+    .map(|&(at, output, value)| ObservedDataPoint::new(at, output.to_string(), value))
+    .collect();
+    let problem = CalibrationProblem::new(
+        Means {
+            values: vec![0.0; 2],
+        },
+        observations,
+        (0..2)
+            .map(|i| CalibrationParameter::new(format!("k{i}"), 0.0, 20.0))
+            .collect(),
+        None,
+        vec![],
+        LossConfig::SumSquaredError,
+    )
+    .unwrap();
+    let error = information_matching_eta(&problem, &[5.5, 1.5], Some(2)).unwrap_err();
+    assert!(matches!(error, MethodError::Invalid(_)), "{error}");
+    assert!(
+        error
+            .to_string()
+            .contains("block_length 2 makes block scores that are all 0"),
+        "{error}"
+    );
+
+    // Data the fit runs through: every score is 0.
+    let (problem, fit) = means_problem(&[vec![5.0; 4], vec![2.0; 4]]);
+    let error = information_matching_eta(&problem, &fit, Some(1)).unwrap_err();
+    assert!(matches!(error, MethodError::Failed(_)), "{error}");
+    assert!(error.to_string().contains("all 0"), "{error}");
+}
+
 #[test]
 fn eta_is_a_number_or_a_calibration_of_it() {
     use commol_inference::settings::smc::Eta;
