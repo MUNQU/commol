@@ -705,6 +705,57 @@ fn a_mean_on_the_edge_of_its_model_has_no_finite_curvature() {
     assert!(error.to_string().contains("not finite"), "{error}");
 }
 
+/// The Poisson counts of `x = a·t`, `a` in `[−1, 5]`, `b = 0`: `first` at
+/// `t = 0`, where the mean is 0 with no slope, then 1, 2 and 4.
+fn counts_from_zero(first: f64) -> CalibrationProblem<Curve> {
+    CalibrationProblem::new(
+        Curve::new(Shape::Quadratic),
+        observed("x", &[first, 1.0, 2.0, 4.0]),
+        vec![CalibrationParameter::new("a".to_string(), -1.0, 5.0)],
+        None,
+        vec![],
+        DiscrepancyConfig::Likelihood(vec![("x".to_string(), ObservationModel::Poisson)]),
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_count_of_zero_at_a_mean_of_zero_adds_no_score() {
+    // The fit of the counts 1, 2 and 4 of means a, 2a and 3a: a = 7/6.
+    let problem = counts_from_zero(0.0);
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+
+    let curvature = Curvature::gauss_newton(&problem, &source, &[7.0 / 6.0]).unwrap();
+
+    let gradients = curvature.gradients();
+    assert_eq!(gradients[(0, 0)], 0.0);
+    // The other terms keep their scores, which sum to 0 at the fit.
+    assert!(
+        gradients.iter().all(|entry| entry.is_finite()),
+        "{gradients}"
+    );
+    let total: f64 = gradients.iter().sum();
+    assert!(total.abs() < 1e-6, "{total}");
+}
+
+#[test]
+fn a_count_with_no_probability_at_its_mean_has_no_curvature() {
+    // A count of 1 at a mean of 0: the score 1/0 − 1, although the slope of
+    // the mean is 0.
+    let problem = counts_from_zero(1.0);
+    let source = FiniteDifferences::new(&problem, Design::Observations).unwrap();
+
+    let error = Curvature::gauss_newton(&problem, &source, &[1.0]).unwrap_err();
+
+    assert!(matches!(error, MethodError::Invalid(_)), "{error:?}");
+    assert!(
+        error
+            .to_string()
+            .starts_with("Observation 'x' at 0 has no probability at the fit"),
+        "{error}"
+    );
+}
+
 #[test]
 fn a_posterior_is_minus_infinity_outside_its_support() {
     // A Poisson mean below 0 is outside the model.

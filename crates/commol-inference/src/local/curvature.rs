@@ -53,9 +53,11 @@ impl Curvature {
     /// # Errors
     ///
     /// [`MethodError::Invalid`] when a value of `fit` sits on a bound of its
-    /// parameter, the engine is stochastic, or the discrepancy has no
-    /// curvature (the mean absolute error); [`MethodError::Failed`] when the
-    /// derivatives fail or the curvature is not finite.
+    /// parameter, the engine is stochastic, the discrepancy has no
+    /// curvature (the mean absolute error), or an observation has no finite
+    /// derivatives of its term ([`CalibrationProblem::term_derivatives`]);
+    /// [`MethodError::Failed`] when the derivatives fail or the curvature is
+    /// not finite.
     pub fn gauss_newton<E, S>(
         problem: &CalibrationProblem<E>,
         source: &S,

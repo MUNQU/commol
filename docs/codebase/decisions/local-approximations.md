@@ -3,8 +3,8 @@
 [Back to Design decisions](../design-decisions.md)
 
 How the curvature, the Laplace approximation, the sandwich and the Laplace
-mixture read a fit, and where their scores, their Fisher information and PSIS
-live.
+mixture read a fit, and where PSIS lives. Their scores, Fisher information and
+distribution functions are on [Scores and distribution functions](scores.md).
 
 ## The curvature lives on the unbounded scale
 
@@ -68,69 +68,6 @@ and column; a note changes no result.
 **Guards:** `crates/commol-inference/tests/test_local.rs::curvatures_of_a_linear_model_equal_the_information`,
 `crates/commol-inference/tests/test_local.rs::the_hessian_of_a_linear_model_equals_the_information`,
 `crates/commol-calibration/tests/test_likelihood.rs::fisher_information_of_each_model_has_its_closed_form`.
-
-## Scores and information live in commol-calibration
-
-`Discrepancy::term_derivatives` (`crates/commol-calibration/src/discrepancy.rs`)
-gives each observation's gradient and expected curvature over its arguments:
-`−2 w n² r` and `2 w n²` for the sum of squares, the same times
-`c = 1 / (2 √(W · S))` for the root mean squared error (its derivative per
-unit of `S`), `−w` times `Noise::scores` and `w` times `Noise::information`
-for an observation model. A term of several parts reads the density of its
-reading (`sum_scores` and `sum_information` of `likelihood/sums.rs`): its
-scores over the mean of each part, which the curvature chains with the block
-of the parts, and its expected information; for `"exact"` both come from the
-recursion and from its derivative in `φ`, the information summed over the
-counts from 0 until the terms above the mean are negligible, with the recursion tilted towards `M` plus 10 standard deviations. The information of the moments
-under `"exact"` is off by up to −15 %/+27 % and gives `η` of 0.90–0.96 for a
-correct model. The mean absolute error is refused: its sandwich
-needs a density of the residuals at 0 and a bandwidth. The sandwich,
-information matching and later gradient methods read them.
-
-| Alternative | Why not |
-|---|---|
-| Derivatives in each method | Every method would repeat the models and their noise arguments. |
-| A kernel density for the absolute error | It hides a bandwidth choice; the bootstrap needs none. |
-
-**Guards:** `crates/commol-calibration/tests/test_likelihood.rs::scores_equal_the_differences_of_the_terms`,
-`crates/commol-inference/tests/test_local.rs::the_gradient_of_a_sum_is_that_of_its_density`,
-`crates/commol-inference/tests/test_local.rs::the_information_of_a_sum_is_that_of_its_density`,
-`tests/uncertainty/test_local.py::TestInformationMatching::test_a_correct_model_with_sums_gives_one`.
-
-## Distribution functions live in commol-calibration
-
-`Noise::tails` (`likelihood/density.rs`) gives `P(Y < y)`, `p(y)` and
-`P(Y > y)` of every model, `Noise::sum_tails` (`likelihood/sums.rs`) those of
-a sum of parts by its reading (the cumulative sums of the recursion for
-`"exact"`), and `Likelihood::tails` those of each observation, at the nearest
-mean its model allows. Both tails come back, each accurate in its own tail:
-`Φ(8.3)` is 1 in `f64`, so a quantile residual read from `F` alone would be
-infinite in the upper tail. The special functions live whole in
-`crates/commol-statistics/src/special.rs`, one copy for the distributions of
-the priors and for the models: the factor of the incomplete gamma and beta
-reads Stirling's series from a shape of 10, the incomplete beta takes `x` and
-`1 − x`, and `p(y)` of a count model is that factor, so a tail of a count of
-`10⁴` keeps 10 digits. The series and continued fraction of the incomplete
-gamma take up to `16 √a` terms, so a Poisson of mean `10⁸` keeps them too. A
-negative binomial of `φ ≤ 1e-8` has the tails of the Poisson. Two limits
-remain, from the conditioning of the continued fraction of the beta at a
-large shape: a negative binomial of size `1/φ` keeps about `10⁻¹⁷/φ`, and a
-Student t about `10⁻¹⁶ ν`, as its log density. An `"exact"` sum reads
-`P(Y > y)` as a complement down to 0.01, and sums the counts above `y`
-beyond that, `O(n²)` in the last count. The predictive mixes the tails of its draws (`ObservationBounds`,
-`crates/commol-inference/src/scores.rs`), the one primitive of the PIT, the
-quantile residuals and every later reader.
-
-| Alternative | Why not |
-|---|---|
-| A distribution function next to `draw_observation` in commol-inference | The calibration crate could not read it for the sums of parts. |
-| `F` alone | Its upper tail rounds to 1, and a residual there is infinite. |
-| The PIT from the draws of the noise | It carries the Monte Carlo error of the draws, and a sample of one point gives 0 or 1. |
-
-**Guards:** `crates/commol-calibration/tests/test_likelihood.rs::the_tails_of_each_model_match_reference_values`,
-`crates/commol-calibration/tests/test_likelihood.rs::the_tails_at_the_edges_of_each_model`,
-`crates/commol-calibration/tests/test_parts.rs::the_tails_of_a_sum`,
-`crates/commol-inference/tests/test_predictive.rs::quantile_residuals_of_unseen_data_are_standard_normal`.
 
 ## The sandwich sums scores over blocks
 

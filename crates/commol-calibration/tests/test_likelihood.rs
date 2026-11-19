@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use commol_calibration::{
     Argument, CalibrationParameter, CalibrationParameterType, CalibrationProblem, Center,
     DerivativesError, DiscrepancyConfig, LossConfig, Noise, ObservationModel, ObservedDataPoint,
-    OptimizationObjective, ReplicateSummary, Replicates, Tails, Violation, Workspace,
+    OptimizationObjective, ReplicateSummary, Replicates, Sum, Tails, Violation, Workspace,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
 
@@ -938,6 +938,73 @@ fn terms_skip_a_weight_of_zero_and_name_a_mean_outside_their_model() {
     assert!(
         error.to_string().contains("no derivative at a perfect fit"),
         "{error}"
+    );
+}
+
+#[test]
+fn terms_name_a_score_that_is_not_finite() {
+    let problem = problem(
+        observed(&[1.0, 0.0]),
+        line_parameters(),
+        models(ObservationModel::Poisson),
+    )
+    .unwrap();
+    // A count of 0 at a mean of 0 has its limit, the score −1.
+    let terms = problem
+        .term_derivatives(&[0.0, 0.0], &[1.0, 0.0], &[1.0, 0.0])
+        .unwrap();
+    assert_eq!(terms[1].gradient, vec![1.0]);
+
+    // A count of 1 at a mean of 0 has no probability.
+    let error = problem
+        .term_derivatives(&[0.0, 0.0], &[0.0, 0.0], &[0.0, 0.0])
+        .unwrap_err();
+    assert_eq!(
+        error,
+        DerivativesError::Invalid(
+            "Observation 'x' at 0 has no probability at the fit (its prediction is 0): the fit is \
+             outside the support of its observation model. Check the value, or the model \
+             that predicts it"
+                .to_string()
+        )
+    );
+
+    // At a mean of 1e-310 it keeps the log probability −714, but its score
+    // 1/μ − 1 overflows.
+    let error = problem
+        .term_derivatives(&[0.0, 0.0], &[1e-310, 0.0], &[1e-310, 0.0])
+        .unwrap_err();
+    assert!(matches!(error, DerivativesError::Invalid(_)), "{error}");
+    let error = error.to_string();
+    assert!(
+        error.starts_with("Observation 'x' at 0 has a score that is not finite at the fit"),
+        "{error}"
+    );
+    assert!(
+        error.ends_with("the local methods need a fit inside those means"),
+        "{error}"
+    );
+}
+
+#[test]
+fn sums_of_parts_of_mean_zero_have_the_limit_of_their_scores() {
+    // Read as its total, a Poisson sum of parts of mean 0 has the score −1
+    // of each part, as one part has.
+    assert_eq!(
+        Noise::Poisson.sum_scores(0.0, &[0.0, 0.0]).unwrap(),
+        vec![-1.0, -1.0]
+    );
+    assert_eq!(Noise::Poisson.sum_scores(0.0, &[0.0]).unwrap(), vec![-1.0]);
+    // The moments of a negative binomial with no mean read the exact sum:
+    // −1 for each part and 0 for φ, as one part has.
+    let noise = Noise::NegativeBinomial {
+        overdispersion: 0.7,
+        sum: Some(Sum::Moments),
+    };
+    assert_eq!(noise.sum_scores(0.0, &[0.0]).unwrap(), vec![-1.0, 0.0]);
+    assert_eq!(
+        noise.sum_scores(0.0, &[0.0, 0.0]).unwrap(),
+        vec![-1.0, -1.0, 0.0]
     );
 }
 

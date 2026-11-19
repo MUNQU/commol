@@ -506,10 +506,14 @@ impl Likelihood {
     ///
     /// # Errors
     ///
-    /// [`TermError::MeanOutside`] with the index of the first observation
-    /// with weight with the mean of a part outside the means its model
-    /// allows; [`TermError::Failed`] with the message of the first whose
-    /// exact sum does not end ([`UnendedSum`]).
+    /// For the first observation with weight whose term has no finite
+    /// derivatives: [`TermError::MeanOutside`] when the mean of a part lies
+    /// outside the means its model allows, [`TermError::NoProbability`] when
+    /// a score is not finite because its value has no probability there,
+    /// and [`TermError::ScoreAtEdge`] when a score is not finite at a mean
+    /// next to the edge of the means, where its value keeps a probability;
+    /// [`TermError::Failed`] with the message of the first whose exact sum
+    /// does not end ([`UnendedSum`]).
     pub fn term_derivatives(
         &self,
         values: &[f64],
@@ -537,15 +541,25 @@ impl Likelihood {
                     return Err(TermError::MeanOutside(index));
                 }
                 let failed = |error: UnendedSum| TermError::Failed(self.unended(index, error));
+                let gradient: Vec<f64> = noise
+                    .sum_scores(y, means)
+                    .map_err(failed)?
+                    .into_iter()
+                    .map(|score| -weight * score)
+                    .collect();
+                if gradient.iter().any(|entry| !entry.is_finite()) {
+                    return Err(
+                        if noise.sum_log_density(y, means).map_err(failed)? == f64::NEG_INFINITY {
+                            TermError::NoProbability(index)
+                        } else {
+                            TermError::ScoreAtEdge(index)
+                        },
+                    );
+                }
                 Ok(TermDerivatives {
                     parts: term.parts,
                     parameters,
-                    gradient: noise
-                        .sum_scores(y, means)
-                        .map_err(failed)?
-                        .into_iter()
-                        .map(|score| -weight * score)
-                        .collect(),
+                    gradient,
                     curvature: noise
                         .sum_information(means)
                         .map_err(failed)?

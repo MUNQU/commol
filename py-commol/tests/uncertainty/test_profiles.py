@@ -39,6 +39,7 @@ from tests.support import (
     build,
     flow_observations,
     line_calibrator,
+    structural_zero_calibrator,
 )
 
 # ``5 + 2 t`` at t = 1, …, 10 plus a fixed draw of unit noise.
@@ -525,3 +526,22 @@ def test_a_prediction_profile_has_no_identifiability() -> None:
     assert result.structure == {}
     with pytest.raises(ValueError, match="predictions have no verdict on a parameter"):
         ProfileIdentifiability(result=result)
+
+
+def test_a_count_of_zero_at_a_mean_of_zero_keeps_the_floors() -> None:
+    # Its information is infinite at a mean of 0, which the engine computes
+    # with no error: the floors skip it.
+    method = ProfileLikelihood(
+        parameters=["k1"], threshold=Threshold.chi_square(0.9), max_steps=5
+    )
+
+    without = structural_zero_calibrator(11).uncertainty(method)
+    with_zeros = structural_zero_calibrator(1).uncertainty(method)
+
+    assert without.evaluation_floor is not None
+    assert with_zeros.evaluation_floor is not None
+    assert math.isfinite(with_zeros.evaluation_floor)
+    # The rounding of the sum grows with its 40 terms instead of 30.
+    assert with_zeros.evaluation_floor == pytest.approx(
+        without.evaluation_floor, rel=0.5
+    )
