@@ -316,7 +316,7 @@ EXAMPLES_OF_RESULTS: dict[str, Callable[[], ResultModel | None]] = {
     "SeriesStatistics": lambda: _two_series().series[1],
     "SeriesCorrelation": lambda: _two_series().correlations[0],
     "ProblemDependence": lambda: _of_draws().problem,
-    "DrawPValues": lambda: _of_draws().series[0].draw_p_values,
+    "DrawPValues": lambda: _of_draws().problem.draw_p_values,
     "DependenceSettings": lambda: _refitted().settings,
     # Resampling
     "BootstrapResult": _bootstrap,

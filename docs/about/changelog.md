@@ -25,8 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the factor by which the dependence multiplies the information. The
   required `reference` is `AtParameters(replicates)`, for held-out data, or
   `Refitted(replicates, starts=1)`, which refits data drawn at the fit and
-  holds for the data of the fit. The result is `SeriesDependence`. See
-  [Dependence](../guide/uncertainty/dependence.md).
+  holds for the data of the fit. `Q̃` sums only the lags of 4 pairs or
+  more: `few_pairs` gives the others with their pairs, and a series with
+  no lag left has no `Q̃`, with its `portmanteau_reason`. The result is
+  `SeriesDependence`. See [Dependence](../guide/uncertainty/dependence.md).
 
 - `commol.scores.quantile_residuals(predictive, observations, DistributionNoise())`:
   the randomized quantile residuals of Dunn and Smyth (1996), `Φ⁻¹` of the

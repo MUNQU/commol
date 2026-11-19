@@ -101,7 +101,13 @@ def test_series_that_have_no_statistics_say_why() -> None:
     assert gap.pairs == [2, 0]
     assert gap.correlations[0] is not None
     assert gap.correlations[1] is None
-    assert gap.degrees_of_freedom == 1
+    # Every lag reads fewer than 4 pairs: no lag enters Q̃.
+    assert gap.few_pairs == [(1, 2), (2, 0)]
+    assert gap.degrees_of_freedom == 0
+    assert gap.portmanteau is None
+    assert gap.p_value is None
+    assert gap.portmanteau_reason == "every lag reads fewer than 4 pairs"
+    assert twice.portmanteau_reason == twice.reason
     # Only the series with statistics pair up.
     assert [(c.first, c.second) for c in result.correlations] == [
         ("short", "constant"),
@@ -123,6 +129,8 @@ def test_any_values_of_one_set() -> None:
     variance = 17.5 / 6
     assert x.correlations == pytest.approx([5.75 / 5 / variance, -1 / 4 / variance])
     assert x.pairs == [5, 4]
+    assert x.few_pairs == []
+    assert x.portmanteau_reason is None
     q = 5.75**2 / 29.3125 + 1 / 4.25
     assert x.portmanteau == pytest.approx(q)
     assert x.degrees_of_freedom == 2
@@ -331,6 +339,24 @@ class TestResiduals:
         assert 0 <= series.draw_p_values.share_below <= 1
         assert result.problem.p_value is None
         assert result.problem.draw_p_values is not None
+
+    def test_draws_with_no_lag_of_enough_pairs_have_no_p_values(self) -> None:
+        calibrator = flow_calibrator(FLOWS[:4], windowed=True)
+        sample = calibrator.uncertainty(
+            BayesianBootstrap(replicates=4, block_length=1)
+        ).sample
+
+        result = _residuals(
+            Predictive(calibrator, sample, [1.0]),
+            calibrator.problem.observed_data,
+            NoNoise(),
+        )
+
+        (series,) = result.series
+        assert series.few_pairs == [(1, 3), (2, 2), (3, 1)]
+        assert series.portmanteau is None
+        assert series.draw_p_values is None
+        assert series.portmanteau_reason == "every lag reads fewer than 4 pairs"
 
 
 class TestReferences:

@@ -170,7 +170,9 @@ pub(crate) fn result(
                 max_lag: lags[s],
                 correlations: Vec::new(),
                 pairs: Vec::new(),
+                few_pairs: Vec::new(),
                 portmanteau: None,
+                portmanteau_reason: series.reason.clone(),
                 degrees_of_freedom: 0,
                 p_value: None,
                 draw_p_values: None,
@@ -182,7 +184,9 @@ pub(crate) fn result(
             if let Some(summary) = &summary.series[s] {
                 statistics.correlations.clone_from(&summary.correlations);
                 statistics.pairs.clone_from(&summary.pairs);
+                statistics.few_pairs.clone_from(&summary.few_pairs);
                 statistics.portmanteau = summary.portmanteau;
+                statistics.portmanteau_reason = summary.portmanteau_reason.map(String::from);
                 statistics.degrees_of_freedom = summary.degrees_of_freedom;
                 statistics.tau = summary.tau.clone().ok();
                 statistics.tau_reason = summary.tau.clone().err();

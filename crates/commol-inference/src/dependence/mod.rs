@@ -17,7 +17,9 @@
 //! ([`commol_statistics::dependence`]): a series with two observations at
 //! one position, or with a position off its grid, has none, with the
 //! reason; an observation of weight 0, which a replicate of a resampler
-//! can hold, is left out.
+//! can hold, is left out. A lag of fewer than
+//! [`PORTMANTEAU_PAIRS`](commol_statistics::dependence::PORTMANTEAU_PAIRS)
+//! pairs keeps its correlation and leaves `Q̃`.
 
 pub(crate) mod grid;
 pub(crate) mod law;
@@ -86,8 +88,15 @@ pub struct SeriesStatistics {
     pub correlations: Vec<Option<f64>>,
     /// The pairs of values each lag reads.
     pub pairs: Vec<usize>,
+    /// Each lag of fewer than
+    /// [`PORTMANTEAU_PAIRS`](commol_statistics::dependence::PORTMANTEAU_PAIRS)
+    /// pairs, left out of `Q̃` and its degrees of freedom, as `(lag, pairs)`.
+    pub few_pairs: Vec<(usize, usize)>,
     /// The robust portmanteau `Q̃`.
     pub portmanteau: Option<f64>,
+    /// Why there is no `Q̃`: the `reason` of a series with no statistics,
+    /// no lag of enough pairs, or none with a product other than 0.
+    pub portmanteau_reason: Option<String>,
     /// The lags in its sum.
     pub degrees_of_freedom: usize,
     /// The p-value of `Q̃` under the reference, with one draw.
