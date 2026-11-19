@@ -225,7 +225,7 @@ class TestSums:
             r"Observation 'B' at 7 has the total 60 in 7 parts; its "
             r"NegativeBinomial model with sum=\"exact\", the mean .* of the "
             r"total and the overdispersion 1000000(\.0)?, does not end within "
-            r"100000 counts\. Read the sum with sum=\"moments\""
+            r"1000000 counts\. Read the sum with sum=\"moments\""
         )
         weekly = Calibrator(
             _flow_simulation(), _problem(_sums([60.0, 80.0], 7), {"B": exact})
@@ -240,20 +240,20 @@ class TestSums:
         predictive = Predictive(weekly, point, [0, 14])
         with pytest.raises(RuntimeError, match="'B' at 7 has the total 0 in 7 parts"):
             scores.quantile_residuals(predictive, _sums([0.0], 7), DistributionNoise())
-        with pytest.raises(RuntimeError, match="'B' at 7 has the total 100000 in 7"):
-            scores.log_score(predictive, _sums([1e5], 7), DistributionNoise())
+        with pytest.raises(RuntimeError, match="'B' at 7 has the total 1000000 in 7"):
+            scores.log_score(predictive, _sums([1e6], 7), DistributionNoise())
 
         # A total at the counts stops the fit, with the same reason.
         far = Calibrator(
-            _flow_simulation(), _problem(_sums([60.0, 1e5], 7), {"B": exact})
+            _flow_simulation(), _problem(_sums([60.0, 1e6], 7), {"B": exact})
         )
-        with pytest.raises(RuntimeError, match="'B' at 14 has the total 100000"):
+        with pytest.raises(RuntimeError, match="'B' at 14 has the total 1000000"):
             far.run()
 
         # The moments read the same totals.
         moments = NegativeBinomialObservations(overdispersion=1e6, sum="moments")
         fit = Calibrator(
-            _flow_simulation(), _problem(_sums([60.0, 1e5], 7), {"B": moments})
+            _flow_simulation(), _problem(_sums([60.0, 1e6], 7), {"B": moments})
         ).run()
         assert math.isfinite(fit.final_loss)
 

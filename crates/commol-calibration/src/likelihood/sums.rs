@@ -27,7 +27,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::density::{NEGLIGIBLE, Noise, Tails, dispersion_bracket, negative_binomial};
+use super::density::{
+    NEGLIGIBLE, Noise, SMALL_OVERDISPERSION, Tails, dispersion_bracket, negative_binomial,
+};
 
 /// How a negative binomial reads the sum of the parts of a window:
 /// `"exact"` or `"moments"` in the Python API.
@@ -35,8 +37,9 @@ use super::density::{NEGLIGIBLE, Noise, Tails, dispersion_bracket, negative_bino
 #[serde(rename_all = "snake_case")]
 pub enum Sum {
     /// The exact distribution of the sum of independent negative binomials
-    /// (`Recursion`): `O(K·y + y²)` per evaluation at a total `y`, over at
-    /// most [`MAX_COUNTS`] counts.
+    /// (`Recursion`): `O(K·y)` per evaluation at a total `y`, more for the
+    /// tails and the information, which reach further, over at most
+    /// [`MAX_COUNTS`] counts.
     Exact,
     /// A negative binomial with the mean and the variance of the sum.
     Moments,
@@ -48,7 +51,7 @@ pub enum Sum {
 /// has not reached a negligible term below it. Why this count:
 /// `docs/codebase/decisions/sums-of-parts.md` (An exact sum ends at a fixed
 /// count).
-pub const MAX_COUNTS: usize = 100_000;
+pub const MAX_COUNTS: usize = 1_000_000;
 
 /// The exact reading of a sum of negative binomials needs more than
 /// [`MAX_COUNTS`] counts.
@@ -322,7 +325,7 @@ fn count(y: f64) -> usize {
 /// to `y`; `P(Y > y)` is its complement while that is at least
 /// [`COMPLEMENT_TAIL`], and otherwise the sum of the counts above `y` until
 /// a term is negligible, so it keeps its relative accuracy in the upper
-/// tail. The sum above costs `O(n²)` in the last count `n` it reaches,
+/// tail. The sum above costs `O(K·n)` in the last count `n` it reaches,
 /// which a heavy tail (`φ μ` large) puts far beyond `y`; it fails at
 /// [`MAX_COUNTS`], at once when [`ends_within_counts`] shows it cannot end.
 fn exact_tails(parts: &[f64], phi: f64, y: f64) -> Result<Tails, UnendedSum> {
@@ -366,12 +369,17 @@ fn exact_tails(parts: &[f64], phi: f64, y: f64) -> Result<Tails, UnendedSum> {
 /// takes the whole count, with `pₜ` the negative binomial of the part `t`.
 /// Each `pₜ` falls above its mode, which is at most `μₜ ≤ M`, so the bound
 /// falls on `(M, MAX_COUNTS − 1]` and holds the mass of every count there
-/// above [`NEGLIGIBLE`].
+/// above [`NEGLIGIBLE`]. Below [`SMALL_OVERDISPERSION`], where `pₜ(n)` sums
+/// one term per count, it takes no bound: the sum is about `Poisson(M)`,
+/// which ends a few sd above `M`, or at worst runs to the cap.
 fn ends_within_counts(parts: &[f64], phi: f64) -> bool {
     let last = (MAX_COUNTS - 1) as f64;
     let mean: f64 = parts.iter().sum();
     if mean >= last {
         return false;
+    }
+    if phi < SMALL_OVERDISPERSION {
+        return true;
     }
     let zeros: Vec<f64> = parts
         .iter()
@@ -387,7 +395,7 @@ fn ends_within_counts(parts: &[f64], phi: f64) -> bool {
 }
 
 /// The exact information of a sum of negative binomials of overdispersion
-/// `phi` and means `parts` over `(μ₁, …, μ_K, φ)`; it fails at
+/// `phi` and means `parts` over `(μ₁, …, μ_K, φ)`, `O(K²)` per count; it fails at
 /// [`MAX_COUNTS`], at once when [`ends_within_counts`] shows it cannot end.
 fn exact_information(parts: &[f64], phi: f64) -> Result<Vec<f64>, UnendedSum> {
     let mean: f64 = parts.iter().sum();
@@ -442,20 +450,31 @@ fn exact_information(parts: &[f64], phi: f64) -> Result<Vec<f64>, UnendedSum> {
 /// `p(0) = Πₜ (1 + φμₜ)^(−1/φ)` and `p(n) = (1/n) Σ_{j=1..n} hⱼ p(n − j)`,
 /// `hⱼ = Σₜ cₜ qₜ^(j−1)`, `cₜ = μₜ/(1 + φμₜ)`, `qₜ = φμₜ/(1 + φμₜ)`.
 ///
+/// The jumps of a part are geometric, so its share of the sum over the jumps
+/// is a state, updated once per count: `p(n) = (1/n) Σₜ cₜ Aₜ(n − 1)`,
+/// `Aₜ(m) = Σ_{i≤m} qₜ^(m−i) p(i) = p(m) + qₜ Aₜ(m − 1)`. A count costs
+/// `O(K)` and the counts up to `y` cost `O(K·y)`, with no jump cut: every
+/// term is still a sum of positive terms.
+///
 /// The terms are positive and nothing divides by `φ`:
 /// `log p(0) = −Σₜ μₜ · ln(1 + φμₜ)/(φμₜ)`, with the ratio 1 at `φμₜ = 0`,
 /// so `φ = 0` is the Poisson of `M`. It holds `vₙ = p(n) ρⁿ / (p(0) e^L)`:
 /// the tilt `ρ` centres the terms on a count (the observed one, or a count
 /// above the tail the information sums), so they grow up to it; `L` scales
 /// them down whenever one exceeds [`LARGE`], and `log p(0)` stays apart, so
-/// a `p(0)` below the smallest number is no zero.
+/// a `p(0)` below the smallest number is no zero. On that scale
+/// `Aₜ(m) = vₘ + ρqₜ Aₜ(m − 1)` and `vₙ = (ρ/n) Σₜ cₜ Aₜ(n − 1)`.
 ///
 /// With the derivative in `φ`, it also holds `wₙ`, `∂p(n)/∂φ` on the scale
 /// of `vₙ`, from the derivative of the recursion:
 /// `p′(n) = (1/n) Σⱼ (hⱼ′ p(n − j) + hⱼ p′(n − j))`, `p′(0) = p(0) Σₜ B(μₜ)`
 /// with `B` the bracket of the dispersion score, and
-/// `∂(cₜ qₜ^(j−1))/∂φ = cₜ² ((j − 1)(1 − qₜ) qₜ^(j−2) − qₜ^(j−1))`. The
-/// derivative in `μₜ` comes from `∂p(n)/∂μₜ = (gₜ(n − 1) − p(n))/(1 + φμₜ)`,
+/// `∂(cₜ qₜ^(j−1))/∂φ = cₜ² ((j − 1)(1 − qₜ) qₜ^(j−2) − qₜ^(j−1))`. Its sums
+/// over the jumps are states as well: `Wₜ`, the `Aₜ` of the `wₘ`, and
+/// `Dₜ(m) = Σ_{i≤m} (m − i) (ρqₜ)^(m−i−1) vᵢ = ρqₜ Dₜ(m − 1) + Aₜ(m − 1)`, so
+/// `n wₙ = ρ Σₜ (cₜ Wₜ(n − 1) + cₜ² ((1 − qₜ) ρ Dₜ(n − 1) − Aₜ(n − 1)))`.
+/// The derivative in `μₜ` comes from
+/// `∂p(n)/∂μₜ = (gₜ(n − 1) − p(n))/(1 + φμₜ)`,
 /// `gₜ(n) = (1 − qₜ) p(n) + qₜ gₜ(n − 1)` ([`Self::accumulate`]).
 struct Recursion {
     /// `M`, the sum of the means of the parts.
@@ -466,14 +485,12 @@ struct Recursion {
     q: Vec<f64>,
     rho: f64,
     log_rho: f64,
-    /// `(ρ qₜ)^(j−1)` of the next jump `j`.
-    powers: Vec<f64>,
-    /// `(ρ qₜ)^(j−2)` of the next jump `j`.
-    previous: Vec<f64>,
-    /// `ρʲ hⱼ`, jump `j` at index `j − 1`.
-    jumps: Vec<f64>,
-    /// `ρʲ hⱼ′`, when the recursion has the derivative in `φ`.
-    jump_slopes: Option<Vec<f64>>,
+    /// `Aₜ` of the last count of each part.
+    sums: Vec<f64>,
+    /// `Wₜ` of the last count, when the recursion has the derivative in `φ`.
+    slope_sums: Vec<f64>,
+    /// `Dₜ` of the last count, when the recursion has the derivative in `φ`.
+    weighted_sums: Vec<f64>,
     values: Vec<f64>,
     slopes: Vec<f64>,
     log_scale: f64,
@@ -502,24 +519,25 @@ impl Recursion {
             })
             .sum::<f64>();
         let rho = tilt(parts, phi, &q, target);
-        let slope_of_zero: f64 = parts.iter().map(|&mu| dispersion_bracket(mu, phi)).sum();
+        let k = parts.len();
+        let (slopes, slope_sums, weighted_sums) = if with_slopes {
+            let slope_of_zero: f64 = parts.iter().map(|&mu| dispersion_bracket(mu, phi)).sum();
+            (vec![slope_of_zero], vec![slope_of_zero; k], vec![0.0; k])
+        } else {
+            (Vec::new(), Vec::new(), Vec::new())
+        };
         Self {
             mean: parts.iter().sum(),
             phi,
-            powers: vec![1.0; parts.len()],
-            previous: vec![0.0; parts.len()],
             c,
             q,
             rho,
             log_rho: libm::log(rho),
-            jumps: Vec::new(),
-            jump_slopes: with_slopes.then(Vec::new),
+            sums: vec![1.0; k],
+            slope_sums,
+            weighted_sums,
             values: vec![1.0],
-            slopes: if with_slopes {
-                vec![slope_of_zero]
-            } else {
-                Vec::new()
-            },
+            slopes,
             log_scale: log_zero,
         }
     }
@@ -550,54 +568,52 @@ impl Recursion {
         }
     }
 
-    /// The next jump `ρʲ hⱼ` and its slope.
-    fn push_jump(&mut self) {
-        let j = self.jumps.len() + 1;
-        let rho = self.rho;
-        let mut jump = 0.0;
-        let mut slope = 0.0;
-        for t in 0..self.c.len() {
-            let (c, q) = (self.c[t], self.q[t]);
-            let power = self.powers[t];
-            jump += c * rho * power;
-            if self.jump_slopes.is_some() {
-                // A count of jumps is far below 2^53.
-                let earlier = (j - 1) as f64 * (1.0 - q) * rho * self.previous[t];
-                slope += c * c * rho * (earlier - power);
-            }
-            self.previous[t] = power;
-            self.powers[t] = power * rho * q;
-        }
-        self.jumps.push(jump);
-        if let Some(slopes) = &mut self.jump_slopes {
-            slopes.push(slope);
-        }
-    }
-
-    /// The term of the next count; returns the factor that scaled the
-    /// terms, 1 when none was.
+    /// The term of the next count, and the states of the parts at it;
+    /// returns the factor that scaled the terms, 1 when none was.
     fn push(&mut self) -> f64 {
-        self.push_jump();
         let n = self.values.len();
         let inverse = 1.0 / n as f64;
-        let value: f64 = (1..=n)
-            .map(|j| self.jumps[j - 1] * self.values[n - j])
-            .sum::<f64>()
+        let rho = self.rho;
+        let value = rho
+            * self
+                .c
+                .iter()
+                .zip(&self.sums)
+                .map(|(c, sum)| c * sum)
+                .sum::<f64>()
             * inverse;
         self.values.push(value);
-        if let Some(jump_slopes) = &self.jump_slopes {
-            let slope: f64 = (1..=n)
-                .map(|j| {
-                    jump_slopes[j - 1] * self.values[n - j] + self.jumps[j - 1] * self.slopes[n - j]
-                })
-                .sum::<f64>()
+        if !self.slopes.is_empty() {
+            let slope = rho
+                * (0..self.c.len())
+                    .map(|t| {
+                        let c = self.c[t];
+                        let jumps = (1.0 - self.q[t]) * rho * self.weighted_sums[t] - self.sums[t];
+                        c * self.slope_sums[t] + c * c * jumps
+                    })
+                    .sum::<f64>()
                 * inverse;
             self.slopes.push(slope);
+            for t in 0..self.c.len() {
+                let ratio = rho * self.q[t];
+                self.weighted_sums[t] = ratio * self.weighted_sums[t] + self.sums[t];
+                self.slope_sums[t] = slope + ratio * self.slope_sums[t];
+            }
+        }
+        for (sum, &q) in self.sums.iter_mut().zip(&self.q) {
+            *sum = value + rho * q * *sum;
         }
         if value > LARGE {
             let factor = 1.0 / value;
-            self.values.iter_mut().for_each(|v| *v *= factor);
-            self.slopes.iter_mut().for_each(|w| *w *= factor);
+            for state in [
+                &mut self.values,
+                &mut self.slopes,
+                &mut self.sums,
+                &mut self.slope_sums,
+                &mut self.weighted_sums,
+            ] {
+                state.iter_mut().for_each(|v| *v *= factor);
+            }
             self.log_scale -= libm::log(factor);
             factor
         } else {

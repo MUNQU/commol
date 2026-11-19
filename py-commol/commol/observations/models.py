@@ -103,8 +103,8 @@ class NegativeBinomialObservations(_ObservationModel, RangeChecked):
     of one independent negative binomial per part, each with this ``φ``, and
     a series with such an observation says how its model reads that sum:
     ``sum="exact"`` reads its exact distribution, at a cost of about
-    ``K·y + y²`` operations for ``K`` parts and a total ``y``, over at most
-    100 000 counts (a sum that needs more raises an error that says so);
+    ``K·y`` operations for ``K`` parts and a total ``y``, over at most
+    1 000 000 counts (a sum that needs more raises an error that says so);
     ``sum="moments"`` reads a negative binomial with the mean and the
     variance of the sum, ``NB(M, φ · Σμₜ²/M²)``, fast but off when a total
     spreads over few effective parts with a large ``φ``. A series without

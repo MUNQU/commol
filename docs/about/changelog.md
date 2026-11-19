@@ -49,9 +49,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `NegativeBinomialObservations(sum="exact" | "moments")` as the exact
   convolution of the parts or the negative binomial of its mean and
   variance. A negative binomial series with parts needs `sum`, and one
-  without parts refuses it; the other models refuse parts. `"exact"`
-  computes at most 100 000 counts: a total at that count, or a tail or an
-  information with no negligible term below it, as at a large
+  without parts refuses it; the other models refuse parts. `"exact"` costs about
+  `K · y` operations at a total `y`, about 1 ms at a total of 10⁵ in seven
+  parts, and computes at most 1 000 000 counts: a total at that count, or a
+  tail or an information with no negligible term below it, as at a large
   `overdispersion`, raises a `RuntimeError` that names the observation, its
   total, the mean of the total, `φ` and the counts, and points to
   `sum="moments"`; it never switches on its own. The draws of
