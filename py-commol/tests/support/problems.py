@@ -425,6 +425,7 @@ def line_calibrator(
     *,
     observation_models: Mapping[str, _ObservationModel] | None = None,
     seed: int = 1,
+    initial_guess: tuple[float, float] = (25.0, 25.0),
 ) -> Calibrator:
     """
     Fit the line ``B(t) = b + c·t`` to `values` of B at positions 1, 2, ….
@@ -432,9 +433,9 @@ def line_calibrator(
     ``a_to_b_builder`` with the constant flow ``c * A / A`` from 10⁶ in A,
     and the initial amount ``b`` of B as an initial condition: a model
     linear in its two parameters, ``c`` in ``[0, 50]`` and ``B`` in
-    ``[0, 50]``. The fit minimizes the sum of squares, or, with
-    `observation_models` (of the series ``"B"``), maximizes their
-    likelihood.
+    ``[0, 50]``, from `initial_guess` ``(c, B)``. The fit minimizes the sum
+    of squares, or, with `observation_models` (of the series ``"B"``),
+    maximizes their likelihood.
     """
     model = build(
         a_to_b_builder(
@@ -444,8 +445,10 @@ def line_calibrator(
     problem = CalibrationProblem(
         observed_data=flow_observations(values, windowed=False),
         parameters=[
-            bounded("c", 0.0, 50.0, initial_guess=25.0),
-            bounded("B", 0.0, 50.0, kind="initial_condition", initial_guess=25.0),
+            bounded("c", 0.0, 50.0, initial_guess=initial_guess[0]),
+            bounded(
+                "B", 0.0, 50.0, kind="initial_condition", initial_guess=initial_guess[1]
+            ),
         ],
         loss_function=None if observation_models else "sse",
         observation_models=dict(observation_models) if observation_models else None,

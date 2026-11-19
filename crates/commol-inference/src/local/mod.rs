@@ -27,4 +27,6 @@ pub use band::{DeltaBand, delta_band};
 pub use curvature::Curvature;
 pub use gaussian::{Gaussian, laplace};
 pub use mixture::{Component, MixtureRun, laplace_mixture};
-pub use sandwich::{SandwichRun, block_meat, blocks_at, sandwich, sandwich_approximation};
+pub use sandwich::{
+    SandwichRun, block_meat, block_scores, blocks_at, sandwich, sandwich_approximation,
+};

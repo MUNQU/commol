@@ -225,21 +225,16 @@ pub fn normal_quantile_sf(q: f64) -> f64 {
     -normal_quantile(q)
 }
 
-/// Bisection steps of the Student-t quantile: each halves its bracket.
+/// Bisection steps of a quantile: each halves its bracket.
 const BISECTION_STEPS: usize = 200;
 
-/// The quantile of the Student t with `df > 0` degrees of freedom at
-/// `p` in `(0, 1)`, by bisection on its upper tail
-/// `1 − F(t) = ½ I_{ν/(ν+t²)}(ν/2, ½)` for `t ≥ 0`, and symmetry.
-pub fn student_t_quantile(p: f64, df: f64) -> f64 {
-    if p < 0.5 {
-        return -student_t_quantile(1.0 - p, df);
-    }
-    let tail = 1.0 - p;
-    let upper_tail = |t: f64| 0.5 * beta_i(0.5 * df, 0.5, df / (df + t * t));
+/// The point `x ≥ 0` where the nondecreasing `cdf` reaches `level`: the
+/// bracket `[0, start]`, doubled until `cdf` reaches `level` at its top,
+/// then bisection to the precision of `f64`.
+fn bisect(cdf: impl Fn(f64) -> f64, level: f64, start: f64) -> f64 {
     let mut low = 0.0;
-    let mut high = 1.0;
-    while upper_tail(high) > tail {
+    let mut high = start;
+    while cdf(high) < level {
         low = high;
         high *= 2.0;
     }
@@ -248,13 +243,24 @@ pub fn student_t_quantile(p: f64, df: f64) -> f64 {
         if middle <= low || middle >= high {
             break;
         }
-        if upper_tail(middle) > tail {
+        if cdf(middle) < level {
             low = middle;
         } else {
             high = middle;
         }
     }
     0.5 * (low + high)
+}
+
+/// The quantile of the Student t with `df > 0` degrees of freedom at
+/// `p` in `(0, 1)`, by bisection on its upper tail
+/// `1 − F(t) = ½ I_{ν/(ν+t²)}(ν/2, ½)` for `t ≥ 0`, and symmetry.
+pub fn student_t_quantile(p: f64, df: f64) -> f64 {
+    if p < 0.5 {
+        return -student_t_quantile(1.0 - p, df);
+    }
+    let upper_tail = |t: f64| 0.5 * beta_i(0.5 * df, 0.5, df / (df + t * t));
+    bisect(|t| -upper_tail(t), -(1.0 - p), 1.0)
 }
 
 /// The regularized lower incomplete gamma function `P(a, x)`, `a > 0`.
@@ -357,24 +363,14 @@ pub fn beta_tails(a: f64, b: f64, x: f64, y: f64) -> (f64, f64) {
 /// distribution function `I_{x/(x+ν)}(1/2, ν/2)`, to the precision of
 /// `f64`.
 pub fn f_one_quantile(nu: f64, level: f64) -> f64 {
-    let cdf = |x: f64| beta_i(0.5, nu / 2.0, x / (x + nu));
-    let mut hi = 1.0;
-    while cdf(hi) < level {
-        hi *= 2.0;
-    }
-    let mut lo = 0.0;
-    for _ in 0..200 {
-        let mid = 0.5 * (lo + hi);
-        if mid <= lo || mid >= hi {
-            break;
-        }
-        if cdf(mid) < level {
-            lo = mid;
-        } else {
-            hi = mid;
-        }
-    }
-    0.5 * (lo + hi)
+    bisect(|x| beta_i(0.5, nu / 2.0, x / (x + nu)), level, 1.0)
+}
+
+/// The quantile at `level`, in `(0, 1)`, of the chi-square distribution
+/// with `nu > 0` degrees of freedom: bisection on its distribution function
+/// `P(ν/2, x/2)`, to the precision of `f64`.
+pub fn chi_square_quantile(nu: f64, level: f64) -> f64 {
+    bisect(|x| gamma_p(nu / 2.0, x / 2.0), level, nu.max(1.0))
 }
 
 /// The continued fraction of `I_x(a, b)` (modified Lentz).
@@ -446,6 +442,34 @@ mod tests {
             assert!((student_t_quantile(p, 2.0) - two).abs() < 1e-12, "{p}");
         }
         assert!((student_t_quantile(0.95, 1e6) - normal_quantile(0.95)).abs() < 1e-5);
+    }
+
+    #[test]
+    fn chi_square_quantiles_have_their_closed_forms() {
+        // With 2 degrees of freedom the distribution function is
+        // `1 − e^{−x/2}`; the medians of 1, 10 and 10⁶ degrees of freedom.
+        for level in [0.05_f64, 0.5, 0.9] {
+            let two = -2.0 * (1.0 - level).ln();
+            assert!(
+                close(chi_square_quantile(2.0, level), two, 1e-12),
+                "{level}"
+            );
+        }
+        assert!(close(
+            chi_square_quantile(1.0, 0.5),
+            0.454_936_423_119_572,
+            1e-12
+        ));
+        assert!(close(
+            chi_square_quantile(10.0, 0.5),
+            9.341_817_765_591_97,
+            1e-12
+        ));
+        assert!(close(
+            chi_square_quantile(1e6, 0.5),
+            999_999.333_333_412_3,
+            1e-12
+        ));
     }
 
     #[test]

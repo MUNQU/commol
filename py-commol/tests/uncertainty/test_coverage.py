@@ -60,6 +60,7 @@ from tests.support import (
     fan_calibrator,
     flow_calibrator,
     flow_observations,
+    line_calibrator,
 )
 from tests.support.coverage import CoverageStudy, Interval, StudyMethod, coverage_study
 
@@ -174,6 +175,35 @@ class TestInformationMatching:
 
         study = coverage_study(
             interval, dict.fromkeys(names, FLOW), LEVEL, data_sets=200, seed=5
+        )
+
+        assert study.calibrated(), study
+
+    def test_information_matching_of_a_line_in_few_blocks_is_calibrated(self) -> None:
+        # The line B(t) = 10 + 2t at 24 positions with noise of sd 1, in 8
+        # blocks of 3: the blocks share the curvature of the slope unevenly
+        # and read about 5 degrees of freedom.
+        method = GibbsPosterior(
+            priors=Priors.uniform_on_bounds(),
+            eta=InformationMatchingEta(block_length=3),
+            particles=400,
+            target_cess=0.5,
+            resample_threshold=0.5,
+            stay_probability=0.05,
+        )
+        positions = np.arange(1, 25)
+
+        def interval(index: int, rng: np.random.Generator) -> dict[str, Interval]:
+            values = 10.0 + 2.0 * positions + rng.normal(0.0, 1.0, positions.size)
+            slope, intercept = np.polyfit(positions, values, 1)
+            calibrator = line_calibrator(
+                values.tolist(), seed=index, initial_guess=(slope, intercept)
+            )
+            intervals = calibrator.uncertainty(method).sample.interval(LEVEL)
+            return {name: intervals[name] for name in ("c", "B")}
+
+        study = coverage_study(
+            interval, {"c": 2.0, "B": 10.0}, LEVEL, data_sets=200, seed=7
         )
 
         assert study.calibrated(), study

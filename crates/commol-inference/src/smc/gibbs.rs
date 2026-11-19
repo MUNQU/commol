@@ -9,15 +9,17 @@
 use commol_calibration::{CalibrationProblem, LossConfig, Workspace};
 use commol_core::{CONFIDENCE_LEVEL, SimulationEngine, Steps};
 use commol_random::Generator;
+use commol_statistics::special::chi_square_quantile;
 use commol_statistics::statistics::{interval_levels, normalized_weights, quantiles};
 
 use super::TemperedTarget;
 use super::kernel::Kernel;
 use super::sampler::{SmcEvent, SmcRun, SmcSampler, SmcState, SmcSteps, Stop, stopped};
 use crate::error::MethodError;
-use crate::local::{CurvatureKind, block_meat, blocks_at, curvature_at};
+use crate::local::{Curvature, CurvatureKind, block_scores, blocks_at, curvature_at};
 use crate::priors::Priors;
 use crate::resampling::{BayesianBootstrap, BlockScheme, Estimates};
+use crate::sensitivity::Matrix;
 use crate::target::discrepancy_in_support;
 use commol_random::Stream;
 
@@ -147,25 +149,32 @@ pub(crate) fn reached_the_posterior(run: SmcRun, posterior: &str) -> Result<SmcR
 /// magnitude adjustment of a composite likelihood (Pauli, Racugno and Ventura
 /// 2011; Ribatet, Cooley and Davison 2012), for `p` parameters. `J` is the
 /// Gauss–Newton [`crate::local::Curvature`] of the objective, and `I` the
-/// meat of the sandwich ([`block_meat`]): the outer products of the
-/// gradients of the terms summed over blocks of `block_length` positions, or
-/// of the automatic length for `None`, so `I` holds under dependence inside
-/// blocks. The terms are those of the sum of squares or of `−log L`; with a
-/// correct observation model `I ≈ J` and `η ≈ 1`. `I` enters only through a
-/// trace, so `η` needs no inverse of `I`, takes fewer blocks than
-/// parameters, and is the same on every scale of the parameters. With
-/// `I = J/η` it equals `tr(J I⁻¹ J) / tr(J)` (Holmes and Walker 2017;
-/// Lyddon, Holmes and Walker 2019). The outcome keeps the block length and,
-/// with the automatic length, the estimate of each series
-/// ([`BlockScheme::estimates`]).
+/// variance of the scores of the terms summed over blocks of `block_length`
+/// positions, or of the automatic length for `None`, so `I` holds under
+/// dependence inside blocks. The terms are those of the sum of squares or of
+/// `−log L`; with a correct observation model `I ≈ J` and `η ≈ 1`. `I`
+/// enters only through a trace, so `η` needs no inverse of `I`, takes fewer
+/// blocks than parameters, and is the same on every scale of the
+/// parameters. With `I = J/η` it equals `tr(J I⁻¹ J) / tr(J)` (Holmes and
+/// Walker 2017; Lyddon, Holmes and Walker 2019).
+///
+/// The trace sums `s_bᵀ J⁻¹ s_b` over the block scores ([`block_scores`]),
+/// times `p / (p − L)` with `L = Σ_b tr((J⁻¹ J_b)²)` and `J_b` the curvature
+/// of block `b` ([`Curvature::block_matrix`]): the leverage of the blocks,
+/// `G/(G − 1)` when each holds `1/G` of `J`, which gives the trace its mean
+/// when the blocks share the curvature unevenly. `η` is then scaled by
+/// `median(χ²_ν)/ν`, with `ν` Satterthwaite's degrees of freedom of the
+/// trace, so that the median of `η` over data sets is its value. The outcome
+/// keeps `ν`, the block length and, with the automatic length, the estimate
+/// of each series ([`BlockScheme::estimates`]).
 ///
 /// # Errors
 ///
 /// [`MethodError::Invalid`] when the loss is not the sum of squares, the
 /// engine is stochastic, the fit is on a bound, the blocks are fewer than
-/// two, or every block score is 0 while the scores of the terms are not;
-/// [`MethodError::Failed`] when the derivatives fail at the fit, `J` is
-/// singular or every score is 0.
+/// two, every block score is 0 while the scores of the terms are not, or
+/// each block holds all the curvature of its parameters; [`MethodError::Failed`] when
+/// the derivatives fail at the fit, `J` is singular or every score is 0.
 pub fn information_matching_eta<E>(
     problem: &CalibrationProblem<E>,
     fit: &[f64],
@@ -203,7 +212,6 @@ where
             blocks.length()
         )));
     }
-    let meat = block_meat(&curvature, &blocks);
     // On the unbounded scale: `tr(J⁻¹ I)` is the same on every scale.
     let inverse = curvature.matrix().clone().try_inverse().ok_or_else(|| {
         MethodError::Failed(
@@ -212,9 +220,9 @@ where
                 .to_string(),
         )
     })?;
-    // `J` is positive definite and `I` positive semi-definite, so the trace
-    // is 0 only when every block score is; `tr(J⁻¹ Σᵢ gᵢ gᵢᵀ)`, the trace of
-    // one block per observation, is its scale.
+    // `J` is positive definite, so the trace is 0 only when every block
+    // score is; `tr(J⁻¹ Σᵢ gᵢ gᵢᵀ)`, the trace of one block per observation,
+    // is its scale.
     let gradients = curvature.gradients();
     let independent = (gradients * &inverse).component_mul(gradients).sum();
     if independent.is_nan() || independent <= 0.0 {
@@ -224,7 +232,11 @@ where
                 .to_string(),
         ));
     }
-    let trace = (inverse * meat).trace();
+    let scores = block_scores(&curvature, &blocks);
+    let trace = (&scores * &inverse).component_mul(&scores).sum();
+    let p = fit.len() as f64;
+    let leverage = BlockLeverage::new(&curvature, &blocks, &inverse);
+    let read = p - leverage.squares;
     if trace.is_nan() || trace <= 1e-10 * independent {
         return Err(MethodError::Invalid(format!(
             "block_length {} makes block scores that are all 0: the scores of each \
@@ -233,11 +245,66 @@ where
             blocks.length()
         )));
     }
+    if read <= 1e-10 * p {
+        return Err(MethodError::Invalid(format!(
+            "block_length {} makes blocks that each hold all the curvature of their \
+             parameters, so they read no degree of freedom about the scale. Use shorter \
+             blocks",
+            blocks.length()
+        )));
+    }
+    let degrees_of_freedom = leverage.degrees_of_freedom(read);
+    let median = chi_square_quantile(degrees_of_freedom, 0.5) / degrees_of_freedom;
     Ok(InformationCalibration {
-        eta: fit.len() as f64 / trace,
+        eta: read * median / trace,
+        degrees_of_freedom,
         block_length: blocks.length(),
         estimates: blocks.estimates().map(<[_]>::to_vec),
     })
+}
+
+/// The shares of the blocks of the curvature, `A_b = J⁻¹ J_b`, with
+/// `Σ_b A_b = I` for a Gauss–Newton `J`, read through the sums the trace of
+/// information matching needs.
+struct BlockLeverage {
+    /// `Σ_b tr(A_b²)`: with independent scores of the variance `J/η`,
+    /// `E[Σ_b s_bᵀ J⁻¹ s_b] = (p − Σ_b tr(A_b²)) / η`.
+    squares: f64,
+    /// `Σ_b tr(A_b³)`.
+    cubes: f64,
+    /// `Σ_b A_b²`.
+    sum_of_squares: Matrix,
+}
+
+impl BlockLeverage {
+    fn new(curvature: &Curvature, blocks: &BlockScheme, inverse: &Matrix) -> Self {
+        let p = curvature.fit().len();
+        let mut leverage = Self {
+            squares: 0.0,
+            cubes: 0.0,
+            sum_of_squares: Matrix::zeros(p, p),
+        };
+        for block in blocks.blocks() {
+            let share = inverse * curvature.block_matrix(block);
+            let square = &share * &share;
+            leverage.squares += square.trace();
+            leverage.cubes += (&square * &share).trace();
+            leverage.sum_of_squares += square;
+        }
+        leverage
+    }
+
+    /// The degrees of freedom `ν = (p − L)² / (L − 2 Σ_b tr(A_b³) +
+    /// tr((Σ_b A_b²)²))` of the trace, with `read = p − L` and
+    /// `L = Σ_b tr(A_b²)`: Satterthwaite's, for which the trace is about
+    /// `(p − L)/η · χ²_ν/ν` with independent Gaussian scores of the variance
+    /// `J/η`. It is `p(G − 1)` when every block holds `1/G` of `J`, and at
+    /// least 1.
+    fn degrees_of_freedom(&self, read: f64) -> f64 {
+        let spread =
+            self.squares - 2.0 * self.cubes + (&self.sum_of_squares * &self.sum_of_squares).trace();
+        (read * read / spread).max(1.0)
+    }
 }
 
 /// The outcome of [`information_matching_eta`].
@@ -245,6 +312,8 @@ where
 pub struct InformationCalibration {
     /// The calibrated `η`.
     pub eta: f64,
+    /// The degrees of freedom `ν` of the trace that `η` reads.
+    pub degrees_of_freedom: f64,
     /// The positions per block of the scores.
     pub block_length: usize,
     /// With the automatic length, the estimate of each series by label.
