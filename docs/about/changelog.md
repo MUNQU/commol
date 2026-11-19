@@ -798,6 +798,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `SampleIdentifiability` calls no parameter `determined` when the effective
+  size of the distinct draws is below `p + 1` for `p` parameters, worth
+  fewer equal draws than a covariance of the parameters needs: each
+  verdict is `poorly_determined` with the reason "Sample: effective size
+  1, below p + 1 = 3 for 2 parameters.", and the warnings of the section
+  say it.
+  Before, a sample whose weight sat on one draw had a contraction near 1
+  and every parameter read `determined`. Between `p + 1` and `30·p` the
+  warnings name the effective size, since the count of hidden ridges
+  over-counts there. In Rust, `SampleIdentifiability::size`,
+  `identifiability::SampleSize` and `FEW_DRAWS_PER_PARAMETER` are new. See
+  [Limits of a sample](../guide/uncertainty/identifiability.md#limits-of-a-sample).
+
 - An observation at `at=-0.0` beside an observation or a constraint at
   `0.0` is one position. Before, every method that builds blocks (the
   bootstraps, the block jackknife, `ResidualNoise` and the others) raised

@@ -299,28 +299,52 @@ def _sample_sides(
     return reasons
 
 
+def _plural(count: int, noun: str) -> str:
+    """`count` and `noun`, plural unless `count` is 1."""
+    return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
+
+
 def _sample_warnings(
     analysis: "SampleAnalysisProtocol",
     names: list[str],
     method: "SampleIdentifiability",
 ) -> list[str]:
-    """The warnings of a `SampleSection`: no directions, or hidden ridges."""
+    """The warnings of a `SampleSection`: an effective size below ``p + 1``
+    or below ``FEW_DRAWS_PER_PARAMETER · p``, no directions, or hidden
+    ridges."""
+    p = len(names)
+    size = f"{analysis.effective_size:.3g}"
+    parameters = _plural(p, "parameter")
+    warnings = []
+    if analysis.size == "too_few":
+        warnings.append(
+            f"The effective size {size} is below p + 1 = {p + 1} for "
+            f"{parameters}: the weights are worth fewer draws than a covariance "
+            "of the parameters needs, so no parameter is determined."
+        )
+    elif analysis.size == "few":
+        per_parameter = commol_rs.inference.FEW_DRAWS_PER_PARAMETER
+        warnings.append(
+            f"The effective size {size} is below {per_parameter:g} · p = "
+            f"{per_parameter * p:g} for {parameters}: the count of hidden "
+            "ridges over-counts."
+        )
     if analysis.hidden_ridges is None:
-        return [
+        warnings.append(
             f"The sample has {analysis.distinct_rows} distinct draws for "
-            f"{len(names)} parameters, and no directions: a direction needs more "
+            f"{p} parameters, and no directions: a direction needs more "
             "distinct draws than parameters."
-        ]
-    if analysis.hidden_ridges == 0:
-        return []
-    count = analysis.hidden_ridges
-    plural = "direction" if count == 1 else "directions"
-    return [
-        f"{count} {plural} among the determined parameters "
-        f"contract{'s' if count == 1 else ''} less than "
-        f"{method.contraction_threshold:g}: a ridge that no pair shows "
-        f"(n_eff / p = {analysis.draws_per_parameter:.1f})."
-    ]
+        )
+    elif analysis.hidden_ridges > 0:
+        count = analysis.hidden_ridges
+        plural = "direction" if count == 1 else "directions"
+        warnings.append(
+            f"{count} {plural} among the determined parameters "
+            f"contract{'s' if count == 1 else ''} less than "
+            f"{method.contraction_threshold:g}: a ridge that no pair shows "
+            f"(n_eff / p = {analysis.draws_per_parameter:.1f})."
+        )
+    return warnings
 
 
 def run_sample_identifiability(
@@ -376,6 +400,12 @@ def run_sample_identifiability(
     for name, verdict in zip(names, analysis.verdicts, strict=True):
         contraction = section.contraction[name]
         reasons = []
+        if analysis.size == "too_few":
+            reasons.append(
+                f"Sample: effective size {analysis.effective_size:.3g}, below "
+                f"p + 1 = {len(names) + 1} for "
+                f"{_plural(len(names), 'parameter')}."
+            )
         if verdict.low_contraction:
             reasons.append(
                 f"Sample: contraction {contraction:.2f}, below "

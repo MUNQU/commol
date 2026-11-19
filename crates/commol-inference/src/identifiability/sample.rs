@@ -4,7 +4,8 @@
 //! bounds set a side of a marginal, and which directions of the parameters
 //! the sample leaves as spread as the reference.
 //!
-//! A parameter is poorly determined when its contraction is below the
+//! A parameter is poorly determined when the effective size of the sample
+//! is below `p + 1` for `p` parameters, its contraction is below the
 //! threshold, it is correlated with another above the threshold, or its
 //! marginal has several modes; otherwise it is determined. A bound that sets
 //! a side (`at_bound`) is a cause apart, which does not set the verdict.
@@ -36,11 +37,59 @@ use crate::settings::identifiability::SampleIdentifiabilitySettings;
 /// each direction among the determined parameters.
 const BOOTSTRAP_REPLICATES: u64 = 100;
 
+/// The effective size per parameter below which the count of hidden ridges
+/// over-counts (the guide's "Limits of a sample").
+pub const FEW_DRAWS_PER_PARAMETER: f64 = 30.0;
+
+/// The relative rounding of a Kish size: `n` equal weights, renormalized,
+/// give `n` within a few units in the last place, on either side.
+const SIZE_ROUNDING: f64 = 1e-9;
+
+/// The effective size `n_eff` of a sample of `p` parameters, which sets
+/// what the sample can tell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SampleSize {
+    /// `n_eff < p + 1`: the weights are worth fewer equally weighted draws
+    /// than the `p + 1` that the least sample covariance of `p` parameters
+    /// that is not singular needs, so the sample determines no parameter.
+    TooFew,
+    /// `p + 1 ≤ n_eff < 30·p` ([`FEW_DRAWS_PER_PARAMETER`]): the verdicts
+    /// hold, and the count of hidden ridges over-counts.
+    Few,
+    /// `n_eff ≥ 30·p`.
+    Enough,
+}
+
+impl SampleSize {
+    /// The size of `effective_size` draws of `p` parameters; a size within
+    /// [`SIZE_ROUNDING`] of a floor is at it.
+    fn of(effective_size: f64, p: usize) -> Self {
+        let below = |floor: f64| effective_size < floor * (1.0 - SIZE_ROUNDING);
+        if below((p + 1) as f64) {
+            Self::TooFew
+        } else if below(FEW_DRAWS_PER_PARAMETER * p as f64) {
+            Self::Few
+        } else {
+            Self::Enough
+        }
+    }
+
+    /// The name of the size: `"too_few"`, `"few"` or `"enough"`.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::TooFew => "too_few",
+            Self::Few => "few",
+            Self::Enough => "enough",
+        }
+    }
+}
+
 /// The verdict of one parameter and its causes.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SampleVerdict {
-    /// Poorly determined when its contraction is below the threshold, it is
-    /// correlated with another parameter, or its marginal has several modes.
+    /// Poorly determined when the sample is [`SampleSize::TooFew`], its
+    /// contraction is below the threshold, it is correlated with another
+    /// parameter, or its marginal has several modes.
     pub verdict: PracticalVerdict,
     /// Whether its contraction is below the threshold.
     pub low_contraction: bool,
@@ -75,6 +124,9 @@ pub struct SampleIdentifiability {
     pub effective_size: f64,
     /// The number of distinct rows of the sample.
     pub distinct_rows: usize,
+    /// The effective size against the number of parameters: below `p + 1`,
+    /// every verdict is poorly determined.
+    pub size: SampleSize,
     /// `1 − Var(sample) / Var(reference)` of each parameter, on its scale:
     /// near 0 when the sample spreads as the reference, near 1 when it sits
     /// on one value.
@@ -115,6 +167,12 @@ pub struct SampleIdentifiability {
 /// of the directions draws from the stream
 /// [`Stream::SampleDirections`] of `seed`.
 ///
+/// A sample whose effective size is below `p + 1` for `p` parameters is
+/// worth fewer equally weighted draws than a sample covariance of `p`
+/// parameters needs not to be singular, so its spread says nothing of what
+/// the data fix: every verdict is poorly determined
+/// ([`SampleSize::TooFew`]), whatever the contraction.
+///
 /// The density of each marginal is a weighted Gaussian kernel density on the
 /// scale of the parameter, with Silverman's bandwidth
 /// `h = 0.9 · min(σ, IQR / 1.34) · n_eff^{−1/5}`, reflected at each finite
@@ -152,6 +210,8 @@ pub fn sample_identifiability(
     let weights = distinct.weights();
     let size = distinct.effective_size();
     let rows = distinct.len();
+    let sample_size = SampleSize::of(size, p);
+    let too_few = sample_size == SampleSize::TooFew;
 
     let natural: Vec<Vec<f64>> = (0..p)
         .map(|j| distinct.values().iter().map(|draw| draw[j]).collect())
@@ -282,7 +342,10 @@ pub fn sample_identifiability(
             let low_contraction = contraction[j] < settings.contraction_threshold;
             SampleVerdict {
                 verdict: PracticalVerdict::of(
-                    low_contraction || !correlated_with.is_empty() || modes[j].len() >= 2,
+                    too_few
+                        || low_contraction
+                        || !correlated_with.is_empty()
+                        || modes[j].len() >= 2,
                 ),
                 low_contraction,
                 correlated_with,
@@ -312,6 +375,7 @@ pub fn sample_identifiability(
     Ok(SampleIdentifiability {
         effective_size: size,
         distinct_rows: rows,
+        size: sample_size,
         contraction,
         correlation,
         correlated_pairs,

@@ -309,13 +309,14 @@ distinct draws (`effective_size`).
 | `at_bound` | The sides whose finite bound sets that side of the marginal | See below |
 | `overlap`, `bins` | `Σ_b min(w_b, 1/B)` over `B = ⌈2 n_eff^{1/3}⌉` bins of equal reference mass (Rice's rule) | 1 for a sample of its reference, `1/B` for a sample in one bin |
 | `directions` | The eigenvectors of the covariance with each parameter divided by the standard deviation of its reference (`Direction`): a `contraction`, the `loadings` and the `scales` | A direction of contraction near 0 is a combination the data do not inform |
-| `hidden_ridges`, `draws_per_parameter`, `warnings` | How many directions among the `determined` parameters contract less than `contraction_threshold`, and `n_eff / p` | A ridge that no pair shows |
+| `hidden_ridges`, `draws_per_parameter`, `warnings` | How many directions among the `determined` parameters contract less than `contraction_threshold`, `n_eff / p`, and what the section warns of | A ridge that no pair shows; an effective size below `p + 1` or `30·p` |
 
-A parameter is `poorly_determined` when its contraction is below
-`contraction_threshold`, it is in a correlated pair, or its marginal has two
-or more modes. The count of hidden ridges corrects the contraction of each
-direction by a Bayesian bootstrap whose weights are drawn from the seed of
-the calibrator (`Calibrator.seed`), so `problem.seed` repeats it.
+A parameter is `poorly_determined` when the effective size is below `p + 1`
+for `p` parameters, its contraction is below `contraction_threshold`, it is
+in a correlated pair, or its marginal has two or more modes. The count of
+hidden ridges corrects the contraction of each direction by a Bayesian
+bootstrap whose weights are drawn from the seed of the calibrator
+(`Calibrator.seed`), so `problem.seed` repeats it.
 `"prior"` without `priors`, or `"bounds"` with them, raises a `ValueError`:
 the engine never measures against a reference you did not choose.
 
@@ -422,8 +423,17 @@ print(logged.at_bound["k2"])  # ['lower']
 - **The effective size.** The weights of the distinct draws, which set the
   standard errors, and their Kish size do not see correlated draws, such as
   the particles of a short chain: they can overstate the size, and the
-  standard errors are then too small. A sample whose weight sits on one
-  draw has a contraction near 1: read `effective_size` before the verdict.
+  standard errors are then too small. The Kish size is the number of
+  equally weighted draws the weights are worth, and a covariance of `p`
+  parameters from fewer than `p + 1` equal draws is singular. A sample
+  worth fewer than `p + 1` draws, such as one whose weight sits on one
+  draw, has a contraction near 1 that the weights make, not the data: every
+  verdict is `poorly_determined`, with the reason "Sample: effective size
+  1, below p + 1 = 3 for 2 parameters.", and `warnings` says it. Its own
+  weighted covariance may still have full rank; the floor reads what the
+  weights are worth. No setting moves it: below `p + 1` no covariance
+  estimate exists to judge. Between `p + 1` and `30·p`, `warnings` names
+  the effective size.
 - **Hidden ridges.** Below `n_eff ≈ 30·p` the count of hidden ridges
   over-counts: the eigenvalues of a sample covariance spread with the
   dimension, and the bootstrap correction does not remove all of it.

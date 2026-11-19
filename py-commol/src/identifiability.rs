@@ -420,6 +420,9 @@ pub struct PySampleAnalysis {
     effective_size: f64,
     /// The number of distinct rows of the sample
     distinct_rows: usize,
+    /// "too_few" when the effective size is below `p + 1`, "few" below
+    /// `FEW_DRAWS_PER_PARAMETER · p`, else "enough"
+    size: &'static str,
     /// The contraction of each parameter against its reference
     contraction: Vec<f64>,
     /// The weighted correlation matrix
@@ -476,6 +479,7 @@ fn sample_identifiability(
     Ok(PySampleAnalysis {
         effective_size: analysis.effective_size,
         distinct_rows: analysis.distinct_rows,
+        size: analysis.size.name(),
         contraction: analysis.contraction,
         correlation: analysis.correlation,
         correlated_pairs: analysis.correlated_pairs,
@@ -558,6 +562,10 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDirection>()?;
     m.add_class::<PySampleAnalysis>()?;
     m.add_class::<PyStartsAnalysis>()?;
+    m.add(
+        "FEW_DRAWS_PER_PARAMETER",
+        identifiability::FEW_DRAWS_PER_PARAMETER,
+    )?; // coverage: an error that only PyO3 returns, when the module cannot take it
     m.add_function(wrap_pyfunction!(structural_rank, m)?)?;
     m.add_function(wrap_pyfunction!(collinearity, m)?)?;
     m.add_function(wrap_pyfunction!(sample_identifiability, m)?)?;
