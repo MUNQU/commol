@@ -4711,16 +4711,17 @@ distinct draws (<code>effective_size</code>).</p>
 </tr>
 <tr>
 <td><code>hidden_ridges</code>, <code>draws_per_parameter</code>, <code>warnings</code></td>
-<td>How many directions among the <code>determined</code> parameters contract less than <code>contraction_threshold</code>, and <code>n_eff / p</code></td>
-<td>A ridge that no pair shows</td>
+<td>How many directions among the <code>determined</code> parameters contract less than <code>contraction_threshold</code>, <code>n_eff / p</code>, and what the section warns of</td>
+<td>A ridge that no pair shows; an effective size below <code>p + 1</code> or <code>30·p</code></td>
 </tr>
 </tbody>
 </table>
-<p>A parameter is <code>poorly_determined</code> when its contraction is below
-<code>contraction_threshold</code>, it is in a correlated pair, or its marginal has two
-or more modes. The count of hidden ridges corrects the contraction of each
-direction by a Bayesian bootstrap whose weights are drawn from the seed of
-the calibrator (<code>Calibrator.seed</code>), so <code>problem.seed</code> repeats it.
+<p>A parameter is <code>poorly_determined</code> when the effective size is below <code>p + 1</code>
+for <code>p</code> parameters, its contraction is below <code>contraction_threshold</code>, it is
+in a correlated pair, or its marginal has two or more modes. The count of
+hidden ridges corrects the contraction of each direction by a Bayesian
+bootstrap whose weights are drawn from the seed of the calibrator
+(<code>Calibrator.seed</code>), so <code>problem.seed</code> repeats it.
 <code>"prior"</code> without <code>priors</code>, or <code>"bounds"</code> with them, raises a <code>ValueError</code>:
 the engine never measures against a reference you did not choose.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">commol.distributions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Priors</span><span class="p">,</span> <span class="n">Uniform</span>
@@ -4814,8 +4815,17 @@ reference, which no scale changes.</p>
 <li><strong>The effective size.</strong> The weights of the distinct draws, which set the
   standard errors, and their Kish size do not see correlated draws, such as
   the particles of a short chain: they can overstate the size, and the
-  standard errors are then too small. A sample whose weight sits on one
-  draw has a contraction near 1: read <code>effective_size</code> before the verdict.</li>
+  standard errors are then too small. The Kish size is the number of
+  equally weighted draws the weights are worth, and a covariance of <code>p</code>
+  parameters from fewer than <code>p + 1</code> equal draws is singular. A sample
+  worth fewer than <code>p + 1</code> draws, such as one whose weight sits on one
+  draw, has a contraction near 1 that the weights make, not the data: every
+  verdict is <code>poorly_determined</code>, with the reason "Sample: effective size
+  1, below p + 1 = 3 for 2 parameters.", and <code>warnings</code> says it. Its own
+  weighted covariance may still have full rank; the floor reads what the
+  weights are worth. No setting moves it: below <code>p + 1</code> no covariance
+  estimate exists to judge. Between <code>p + 1</code> and <code>30·p</code>, <code>warnings</code> names
+  the effective size.</li>
 <li><strong>Hidden ridges.</strong> Below <code>n_eff ≈ 30·p</code> the count of hidden ridges
   over-counts: the eigenvalues of a sample covariance spread with the
   dimension, and the bootstrap correction does not remove all of it.</li>

@@ -4121,7 +4121,8 @@ modelling judgments. Rust decides each verdict and gives its causes
 (<code>StructuralAnalysis::verdicts</code>; <code>Collinearity::verdicts</code>: insensitive, the
 parameters it is collinear with; <code>SampleIdentifiability::verdicts</code>: a contraction below the threshold,
 the parameters it is correlated with, its number of modes, and the bounds
-that set a side, which do not set the verdict;
+that set a side, which do not set the verdict; <code>SampleIdentifiability::size</code>,
+an effective size below <code>p + 1</code>;
 <code>StartsIdentifiability::flagged</code>). The runners of
 <code>identifiability/runners.py</code> write the reasons from the causes and
 decide nothing.</p>
@@ -4159,7 +4160,26 @@ the verdict. The shape measures
 read <code>θ</code>, or <code>ln θ</code> for <code>log_parameters</code>; the masses at each side and the
 overlap read the distribution function of the reference.</p>
 <ul>
-<li><strong>Modes.</strong> A weighted Gaussian kernel density with Silverman's bandwidth
+<li>
+<p><strong>The effective size.</strong> Kish's size is the number of equally weighted
+  draws the weights are worth (the size whose mean has the same variance),
+  and a covariance of <code>p</code> parameters from <code>m</code> equal draws is singular when
+  <code>m ≤ p</code>. Below <code>p + 1</code> (<code>SampleSize::TooFew</code>) the sample is worth fewer
+  draws than the least covariance estimate of its parameters needs: a
+  sample whose weight sits on one draw has a variance near 0 and a
+  contraction near 1, which the weights make and the data did not earn.
+  Every verdict is then poorly determined, and the section warns. The
+  floor reads the equivalent equal draws, not the weighted covariance
+  itself, which has full rank for 500 distinct rows with 0.999 of the
+  weight on one. It is set by <code>p</code> alone, as the least size at which the
+  estimator exists, so it is a constant of the estimator like
+  <code>STANDARD_ERRORS</code>, not a setting; a Kish size within <code>10⁻⁹</code> of a floor,
+  as of equal weights, is at it. Below <code>FEW_DRAWS_PER_PARAMETER · p</code> (30·p,
+  <code>SampleSize::Few</code>) the verdicts hold and the section names the effective
+  size, since the count of hidden ridges over-counts there.</p>
+</li>
+<li>
+<p><strong>Modes.</strong> A weighted Gaussian kernel density with Silverman's bandwidth
   <code>h</code>, reflected at each finite bound, on a grid over the draws ± 3<code>h</code> cut
   at the bounds, of step at most <code>h/4</code> (<code>sample/marginal.rs</code>); the grid
   keeps only the points a kernel reaches, and one point of density 0 in
@@ -4169,7 +4189,8 @@ overlap read the distribution function of the reference.</p>
   not a mode. With equal weights it is <code>√(f R(K) / (n h))</code>, times
   <code>√(1 + e^{−d²/h²})</code> at a distance <code>d</code> from a reflected bound. The lower peak of the
   shallowest dip goes while <code>f(peak) − f(valley) − 3·hypot(se_peak,
-  se_valley)</code> is not positive; the ends of the grid are candidates.</li>
+  se_valley)</code> is not positive; the ends of the grid are candidates.</p>
+</li>
 <li><strong>A bound that sets a side</strong> (<code>at_bound</code>): the density at the bound is not
   more than three standard errors below its highest point up to the nearest
   mode, and exceeds the reference smoothed by the same reflected kernel
@@ -4250,6 +4271,18 @@ the marginals of the guard over four references and three sizes.</p>
 <td>The thresholds of the estimators as settings</td>
 <td>No user can choose them better than the estimator.</td>
 </tr>
+<tr>
+<td>The rank of the weighted covariance as the floor</td>
+<td>500 distinct rows with 0.999 of the weight on one have full rank and a contraction near 1.</td>
+</tr>
+<tr>
+<td>A setting for the floor of the effective size</td>
+<td>Below <code>p + 1</code> equivalent draws no covariance estimate exists to judge, and above it <code>contraction_threshold</code> and the warning at <code>30·p</code> already judge; a lower floor admits verdicts from one draw.</td>
+</tr>
+<tr>
+<td>Only a warning below the floor, with the verdicts as they are</td>
+<td>The verdict is the field a user reads; a contraction near 1 from one draw reads <code>determined</code>.</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_identifiability.rs</code>
@@ -4259,7 +4292,8 @@ the marginals of the guard over four references and three sizes.</p>
 <code>the_overlap_of_a_sample_with_its_reference</code>,
 <code>log_parameters_set_the_scale_of_every_shape_measure</code>,
 <code>directions_and_their_contraction</code>, <code>the_count_of_hidden_ridges</code>,
-<code>the_directions_do_not_depend_on_units</code>),
+<code>the_directions_do_not_depend_on_units</code>,
+<code>a_sample_of_too_few_effective_draws_has_no_determined_parameter</code>),
 <code>tests/uncertainty/test_identifiability_sample.py</code>.</p>
 
 

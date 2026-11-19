@@ -6176,6 +6176,20 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
+<p><code>SampleIdentifiability</code> calls no parameter <code>determined</code> when the effective
+  size of the distinct draws is below <code>p + 1</code> for <code>p</code> parameters, worth
+  fewer equal draws than a covariance of the parameters needs: each
+  verdict is <code>poorly_determined</code> with the reason "Sample: effective size
+  1, below p + 1 = 3 for 2 parameters.", and the warnings of the section
+  say it.
+  Before, a sample whose weight sat on one draw had a contraction near 1
+  and every parameter read <code>determined</code>. Between <code>p + 1</code> and <code>30·p</code> the
+  warnings name the effective size, since the count of hidden ridges
+  over-counts there. In Rust, <code>SampleIdentifiability::size</code>,
+  <code>identifiability::SampleSize</code> and <code>FEW_DRAWS_PER_PARAMETER</code> are new. See
+  <a href="../../guide/uncertainty/identifiability/#limits-of-a-sample">Limits of a sample</a>.</p>
+</li>
+<li>
 <p>An observation at <code>at=-0.0</code> beside an observation or a constraint at
   <code>0.0</code> is one position. Before, every method that builds blocks (the
   bootstraps, the block jackknife, <code>ResidualNoise</code> and the others) raised

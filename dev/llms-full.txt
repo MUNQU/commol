@@ -5671,9 +5671,9 @@ Three settings have no default, as every threshold of this page: `correlation_th
 | `at_bound`                                         | The sides whose finite bound sets that side of the marginal                                                                                                               | See below                                                                                                                                    |
 | `overlap`, `bins`                                  | `Σ_b min(w_b, 1/B)` over `B = ⌈2 n_eff^{1/3}⌉` bins of equal reference mass (Rice's rule)                                                                                 | 1 for a sample of its reference, `1/B` for a sample in one bin                                                                               |
 | `directions`                                       | The eigenvectors of the covariance with each parameter divided by the standard deviation of its reference (`Direction`): a `contraction`, the `loadings` and the `scales` | A direction of contraction near 0 is a combination the data do not inform                                                                    |
-| `hidden_ridges`, `draws_per_parameter`, `warnings` | How many directions among the `determined` parameters contract less than `contraction_threshold`, and `n_eff / p`                                                         | A ridge that no pair shows                                                                                                                   |
+| `hidden_ridges`, `draws_per_parameter`, `warnings` | How many directions among the `determined` parameters contract less than `contraction_threshold`, `n_eff / p`, and what the section warns of                              | A ridge that no pair shows; an effective size below `p + 1` or `30·p`                                                                        |
 
-A parameter is `poorly_determined` when its contraction is below `contraction_threshold`, it is in a correlated pair, or its marginal has two or more modes. The count of hidden ridges corrects the contraction of each direction by a Bayesian bootstrap whose weights are drawn from the seed of the calibrator (`Calibrator.seed`), so `problem.seed` repeats it. `"prior"` without `priors`, or `"bounds"` with them, raises a `ValueError`: the engine never measures against a reference you did not choose.
+A parameter is `poorly_determined` when the effective size is below `p + 1` for `p` parameters, its contraction is below `contraction_threshold`, it is in a correlated pair, or its marginal has two or more modes. The count of hidden ridges corrects the contraction of each direction by a Bayesian bootstrap whose weights are drawn from the seed of the calibrator (`Calibrator.seed`), so `problem.seed` repeats it. `"prior"` without `priors`, or `"bounds"` with them, raises a `ValueError`: the engine never measures against a reference you did not choose.
 
 ```python
 from commol.distributions import Priors, Uniform
@@ -5739,7 +5739,7 @@ print(logged.at_bound["k2"])  # ['lower']
 #### Limits of a sample
 
 - **Few draws lose weak modes.** A mode counts when its dip is deeper than three standard errors of the density; a weak mode needs many draws to pass. Each dip is tested on its own, so a flat marginal of many draws shows a false second mode in about 2 % of samples of 20 000 draws (0.5 % at 2000).
-- **The effective size.** The weights of the distinct draws, which set the standard errors, and their Kish size do not see correlated draws, such as the particles of a short chain: they can overstate the size, and the standard errors are then too small. A sample whose weight sits on one draw has a contraction near 1: read `effective_size` before the verdict.
+- **The effective size.** The weights of the distinct draws, which set the standard errors, and their Kish size do not see correlated draws, such as the particles of a short chain: they can overstate the size, and the standard errors are then too small. The Kish size is the number of equally weighted draws the weights are worth, and a covariance of `p` parameters from fewer than `p + 1` equal draws is singular. A sample worth fewer than `p + 1` draws, such as one whose weight sits on one draw, has a contraction near 1 that the weights make, not the data: every verdict is `poorly_determined`, with the reason "Sample: effective size 1, below p + 1 = 3 for 2 parameters.", and `warnings` says it. Its own weighted covariance may still have full rank; the floor reads what the weights are worth. No setting moves it: below `p + 1` no covariance estimate exists to judge. Between `p + 1` and `30·p`, `warnings` names the effective size.
 - **Hidden ridges.** Below `n_eff ≈ 30·p` the count of hidden ridges over-counts: the eigenvalues of a sample covariance spread with the dimension, and the bootstrap correction does not remove all of it.
 - **A covariance is linear.** The directions and the correlations see a straight ridge; a curved or multimodal posterior, such as a product on the natural scale or two sets of values, hides behind a contraction that looks high. Read the modes and the figures of the sample with them.
 
@@ -16525,27 +16525,27 @@ The evidence of `SampleIdentifiability`: what the sample learned about each para
 
 Attributes:
 
-| Name                    | Type                             | Description                                                                                                                                          |
-| ----------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `reference`             | `{bounds, prior}`                | The distribution the sample is measured against: "bounds", the uniform distribution on the bounds, or "prior", the prior of each parameter.          |
-| `correlation_threshold` | `float`                          | The absolute correlation above which a pair is listed.                                                                                               |
-| `contraction_threshold` | `float`                          | The contraction below which a parameter is poorly determined.                                                                                        |
-| `bound_share`           | `float`                          | The share of the reference at each side in which mass_below and mass_above are measured.                                                             |
-| `log_parameters`        | `list[str]`                      | The parameters whose shape measures read ln θ.                                                                                                       |
-| `effective_size`        | `float`                          | Kish's effective size of the distinct draws, each with the summed weight of its copies.                                                              |
-| `contraction`           | `dict[str, float]`               | 1 − Var(sample) / Var(reference) of each parameter, on its scale: near 0 when the sample spreads as the reference, near 1 when it sits on a value.   |
-| `correlation`           | `dict[str, dict[str, float]]`    | The weighted correlation matrix, on the scale of each parameter.                                                                                     |
-| `correlated_pairs`      | `list[CorrelatedPair]`           | The pairs above the threshold.                                                                                                                       |
-| `modes`                 | `dict[str, list[float]]`         | The modes of the marginal of each parameter, in parameter units.                                                                                     |
-| `mass_below`            | `dict[str, float]`               | The weight of the draws where the distribution function of the reference is below bound_share.                                                       |
-| `mass_above`            | `dict[str, float]`               | The weight of the draws where it is above 1 − bound_share.                                                                                           |
-| `at_bound`              | `dict[str, list[BoundSideName]]` | The sides whose finite bound, not the data, sets that side of the marginal of each parameter. It does not set the verdict.                           |
-| `overlap`               | `dict[str, float]`               | Σ_b min(w_b, 1/B) of each parameter over bins bins of equal reference mass: 1 when the sample spreads as its reference, 1/B when it sits in one bin. |
-| `bins`                  | `int`                            | The number of bins B = ⌈2 n_eff^{1/3}⌉ of the overlap.                                                                                               |
-| `directions`            | `list[Direction]`                | The directions of the parameters, from the least contracted; empty when the sample has at most as many distinct draws as parameters.                 |
-| `hidden_ridges`         | \`int                            | None\`                                                                                                                                               |
-| `draws_per_parameter`   | `float`                          | The effective size per parameter, n_eff / p; below about 30 the count of hidden ridges over-counts.                                                  |
-| `warnings`              | `list[str]`                      | What the section warns of: hidden ridges, or no directions.                                                                                          |
+| Name                    | Type                             | Description                                                                                                                                              |
+| ----------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reference`             | `{bounds, prior}`                | The distribution the sample is measured against: "bounds", the uniform distribution on the bounds, or "prior", the prior of each parameter.              |
+| `correlation_threshold` | `float`                          | The absolute correlation above which a pair is listed.                                                                                                   |
+| `contraction_threshold` | `float`                          | The contraction below which a parameter is poorly determined.                                                                                            |
+| `bound_share`           | `float`                          | The share of the reference at each side in which mass_below and mass_above are measured.                                                                 |
+| `log_parameters`        | `list[str]`                      | The parameters whose shape measures read ln θ.                                                                                                           |
+| `effective_size`        | `float`                          | Kish's effective size of the distinct draws, each with the summed weight of its copies. Below p + 1 for p parameters every verdict is poorly_determined. |
+| `contraction`           | `dict[str, float]`               | 1 − Var(sample) / Var(reference) of each parameter, on its scale: near 0 when the sample spreads as the reference, near 1 when it sits on a value.       |
+| `correlation`           | `dict[str, dict[str, float]]`    | The weighted correlation matrix, on the scale of each parameter.                                                                                         |
+| `correlated_pairs`      | `list[CorrelatedPair]`           | The pairs above the threshold.                                                                                                                           |
+| `modes`                 | `dict[str, list[float]]`         | The modes of the marginal of each parameter, in parameter units.                                                                                         |
+| `mass_below`            | `dict[str, float]`               | The weight of the draws where the distribution function of the reference is below bound_share.                                                           |
+| `mass_above`            | `dict[str, float]`               | The weight of the draws where it is above 1 − bound_share.                                                                                               |
+| `at_bound`              | `dict[str, list[BoundSideName]]` | The sides whose finite bound, not the data, sets that side of the marginal of each parameter. It does not set the verdict.                               |
+| `overlap`               | `dict[str, float]`               | Σ_b min(w_b, 1/B) of each parameter over bins bins of equal reference mass: 1 when the sample spreads as its reference, 1/B when it sits in one bin.     |
+| `bins`                  | `int`                            | The number of bins B = ⌈2 n_eff^{1/3}⌉ of the overlap.                                                                                                   |
+| `directions`            | `list[Direction]`                | The directions of the parameters, from the least contracted; empty when the sample has at most as many distinct draws as parameters.                     |
+| `hidden_ridges`         | \`int                            | None\`                                                                                                                                                   |
+| `draws_per_parameter`   | `float`                          | The effective size per parameter, n_eff / p; below about 30 the count of hidden ridges over-counts.                                                      |
+| `warnings`              | `list[str]`                      | What the section warns of: an effective size below p + 1 or below 30·p, no directions, or hidden ridges.                                                 |
 
 Source code in `commol/identifiability/results.py`
 
@@ -16572,7 +16572,8 @@ class SampleSection(_FrozenResult):
         The parameters whose shape measures read ``ln θ``.
     effective_size : float
         Kish's effective size of the distinct draws, each with the summed
-        weight of its copies.
+        weight of its copies. Below ``p + 1`` for ``p`` parameters every
+        verdict is ``poorly_determined``.
     contraction : dict[str, float]
         ``1 − Var(sample) / Var(reference)`` of each parameter, on its scale:
         near 0 when the sample spreads as the reference, near 1 when it sits
@@ -16609,7 +16610,8 @@ class SampleSection(_FrozenResult):
         The effective size per parameter, ``n_eff / p``; below about 30 the
         count of hidden ridges over-counts.
     warnings : list[str]
-        What the section warns of: hidden ridges, or no directions.
+        What the section warns of: an effective size below ``p + 1`` or
+        below ``30·p``, no directions, or hidden ridges.
     """
 
     reference: SampleReference
@@ -40775,6 +40777,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- `SampleIdentifiability` calls no parameter `determined` when the effective size of the distinct draws is below `p + 1` for `p` parameters, worth fewer equal draws than a covariance of the parameters needs: each verdict is `poorly_determined` with the reason "Sample: effective size 1, below p + 1 = 3 for 2 parameters.", and the warnings of the section say it. Before, a sample whose weight sat on one draw had a contraction near 1 and every parameter read `determined`. Between `p + 1` and `30·p` the warnings name the effective size, since the count of hidden ridges over-counts there. In Rust, `SampleIdentifiability::size`, `identifiability::SampleSize` and `FEW_DRAWS_PER_PARAMETER` are new. See [Limits of a sample](https://munqu.github.io/commol/latest/guide/uncertainty/identifiability/#limits-of-a-sample).
 - An observation at `at=-0.0` beside an observation or a constraint at `0.0` is one position. Before, every method that builds blocks (the bootstraps, the block jackknife, `ResidualNoise` and the others) raised `PanicException: every position is listed`, and a constraint at `0.0` beside an observation at `-0.0` made `Calibrator` raise `PanicException: the schedule holds every constraint position`. The dense design of `StructuralRank` read an observation at `-0.0` as a second position 0, which changed its singular values.
 - The curvature of a `NegativeBinomialObservations` of `overdispersion` 0, which the Laplace approximation, the sandwich and the noise floor of a profile read, is the limit of the Poisson, `μ²/2` for `φ`. Before, it ran with no end.
 - A series with two observations at one position, such as an increment over 2 steps and a total over 40 steps that both end at 40, is refused by the methods that read one residual per position of a series, with a message that names the series and the position: `ResidualNoise`, `ResidualBootstrap`, `block_length="auto"` of every method, and `RollingConformal`, which counts a horizon in observations. Before, the residual noise and the residual bootstrap gave both observations the residual of one of them, and the automatic block length read them as consecutive positions, with no message. A calibration, the likelihood, the scores, and the Bayesian and wild bootstraps, the block jackknife, the sandwich and the other conformal methods with a `block_length` of a number read each observation with its own residual, and accept such a series. Give one of the two observations a label of its own for the methods that refuse it. See [One position, two observations](https://munqu.github.io/commol/latest/guide/calibration-observations/#one-position-two-observations).
