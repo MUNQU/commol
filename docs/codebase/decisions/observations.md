@@ -54,7 +54,12 @@ The operator finds the row of each position and of each start with the
 tolerance of the axis (`observation::index_at`: equal within `1e-9` of the
 larger of their magnitudes and 1), so a start computed as `at − window`
 (`window_start`) reads the row of the position it rounds away from. Results
-read a position with the same `index_at`.
+read a position with the same `index_at`, and so do the rows of a constraint
+(`feasibility.rs`) and the positions of the blocks (`position_indices` of
+`resampling/blocks.rs`), so `-0.0` finds the row of `0.0`, which `total_cmp`
+orders apart. The schedule of a run keeps the first of the two in the
+order of `total_cmp`, `-0.0`; the blocks and the dense design of
+`StructuralRank` (`dense_observations`) list the position as `0.0`.
 
 **Guards:** `observation::tests`,
 `crates/commol-calibration/tests/test_positions.rs::a_window_that_starts_at_zero_within_the_rounding_of_its_end_is_accepted`,
@@ -62,7 +67,11 @@ read a position with the same `index_at`.
 `crates/commol-inference/tests/test_predictive.rs::observation_draws_are_the_predictions_the_loss_compares`,
 `tests/uncertainty/test_predictive.py::TestObservations`,
 `crates/commol-inference/tests/test_global_sensitivity.rs::a_gain_reads_its_start_exactly`,
-`tests/uncertainty/test_propagation.py::TestPropagation::test_a_gain_reads_its_start_exactly`.
+`tests/uncertainty/test_propagation.py::TestPropagation::test_a_gain_reads_its_start_exactly`,
+`crates/commol-calibration/tests/test_positions.rs::a_constraint_at_zero_beside_an_observation_at_minus_zero_reads_one_position`,
+`resampling::blocks::tests::minus_zero_is_the_position_zero`,
+`sensitivity::finite_differences::tests::minus_zero_is_the_unit_position_zero`,
+`tests/uncertainty/test_resampling.py::TestResidualBootstraps::test_minus_zero_is_the_position_zero`.
 
 ## A known scale is a number of the observation
 

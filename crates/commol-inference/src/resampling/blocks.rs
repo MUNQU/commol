@@ -8,7 +8,7 @@
 //! resolve a block length, given or automatic, with
 //! [`BlockScheme::resolve`] or [`BlockScheme::at_fit`].
 
-use commol_calibration::{CalibrationProblem, ObservedDataPoint, SeriesIndex};
+use commol_calibration::{CalibrationProblem, ObservedDataPoint, SeriesIndex, index_at};
 use commol_core::SimulationEngine;
 
 use crate::error::MethodError;
@@ -148,15 +148,17 @@ impl BlockScheme {
     }
 }
 
-/// The distinct positions of `observations`, ascending.
+/// The distinct positions of `observations`, ascending. `−0.0` is the
+/// position `0.0`, and is listed as `0.0`.
 pub fn distinct_positions(observations: &[ObservedDataPoint]) -> Vec<f64> {
-    let mut positions: Vec<f64> = observations.iter().map(|obs| obs.at).collect();
+    let mut positions: Vec<f64> = observations.iter().map(|obs| obs.at + 0.0).collect();
     positions.sort_by(f64::total_cmp);
     positions.dedup();
     positions
 }
 
-/// The index in `positions` of each observation's position.
+/// The index in `positions` of each observation's position, found as every
+/// reader of the axis finds a position ([`index_at`]).
 ///
 /// # Panics
 ///
@@ -164,11 +166,7 @@ pub fn distinct_positions(observations: &[ObservedDataPoint]) -> Vec<f64> {
 pub fn position_indices(observations: &[ObservedDataPoint], positions: &[f64]) -> Vec<usize> {
     observations
         .iter()
-        .map(|obs| {
-            positions
-                .binary_search_by(|p| p.total_cmp(&obs.at))
-                .expect("every position is listed")
-        })
+        .map(|obs| index_at(positions, obs.at).expect("every position is listed"))
         .collect()
 }
 
@@ -385,6 +383,20 @@ mod tests {
         assert_eq!(scheme.blocks(), [vec![0, 1], vec![2, 3], vec![4]]);
         assert_eq!(scheme.spans(), [(0.0, 1.0), (2.0, 3.0), (4.0, 4.0)]);
         assert_eq!(scheme.block_of(), [0, 0, 1, 1, 2]);
+    }
+
+    #[test]
+    fn minus_zero_is_the_position_zero() {
+        let mut observations = observed(&[-0.0], "x");
+        observations.extend(observed(&[0.0, 1.0], "y"));
+
+        let positions = distinct_positions(&observations);
+        let scheme = BlockScheme::new(&observations, 1).unwrap();
+
+        let bits: Vec<u64> = positions.iter().map(|p| p.to_bits()).collect();
+        assert_eq!(bits, [0.0f64.to_bits(), 1.0f64.to_bits()]);
+        assert_eq!(position_indices(&observations, &positions), [0, 0, 1]);
+        assert_eq!(scheme.blocks(), [vec![0, 1], vec![2]]);
     }
 
     #[test]
