@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://munqu.github.io/commol/dev/codebase/decisions/local-approximations/">
       
       
-        <link rel="prev" href="../sensitivity/">
+        <link rel="prev" href="../scores/">
       
       
         <link rel="next" href="../profiles/">
@@ -3156,6 +3156,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scores and Distribution Functions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -3234,28 +3262,6 @@
     <span class="md-ellipsis">
       
         Gauss–Newton by default, the Hessian on request
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#scores-and-information-live-in-commol-calibration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Scores and information live in commol-calibration
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#distribution-functions-live-in-commol-calibration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Distribution functions live in commol-calibration
       
     </span>
   </a>
@@ -3950,28 +3956,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#scores-and-information-live-in-commol-calibration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Scores and information live in commol-calibration
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#distribution-functions-live-in-commol-calibration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Distribution functions live in commol-calibration
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#the-sandwich-sums-scores-over-blocks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4038,8 +4022,8 @@
 <h1 id="local-approximations">Local approximations<a class="headerlink" href="#local-approximations" title="Permanent link">&para;</a></h1>
 <p><a href="../../design-decisions/">Back to Design decisions</a></p>
 <p>How the curvature, the Laplace approximation, the sandwich and the Laplace
-mixture read a fit, and where their scores, their Fisher information and PSIS
-live.</p>
+mixture read a fit, and where PSIS lives. Their scores, Fisher information and
+distribution functions are on <a href="../scores/">Scores and distribution functions</a>.</p>
 <h2 id="the-curvature-lives-on-the-unbounded-scale">The curvature lives on the unbounded scale<a class="headerlink" href="#the-curvature-lives-on-the-unbounded-scale" title="Permanent link">&para;</a></h2>
 <p><code>Curvature</code> (<code>crates/commol-inference/src/local/curvature.rs</code>) holds
 <code>H_u = D · H_θ · D</code>, with <code>D = dθ/du</code> at the fit on the scale of
@@ -4138,92 +4122,6 @@ and column; a note changes no result.</p>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_local.rs::curvatures_of_a_linear_model_equal_the_information</code>,
 <code>crates/commol-inference/tests/test_local.rs::the_hessian_of_a_linear_model_equals_the_information</code>,
 <code>crates/commol-calibration/tests/test_likelihood.rs::fisher_information_of_each_model_has_its_closed_form</code>.</p>
-<h2 id="scores-and-information-live-in-commol-calibration">Scores and information live in commol-calibration<a class="headerlink" href="#scores-and-information-live-in-commol-calibration" title="Permanent link">&para;</a></h2>
-<p><code>Discrepancy::term_derivatives</code> (<code>crates/commol-calibration/src/discrepancy.rs</code>)
-gives each observation's gradient and expected curvature over its arguments:
-<code>−2 w n² r</code> and <code>2 w n²</code> for the sum of squares, the same times
-<code>c = 1 / (2 √(W · S))</code> for the root mean squared error (its derivative per
-unit of <code>S</code>), <code>−w</code> times <code>Noise::scores</code> and <code>w</code> times <code>Noise::information</code>
-for an observation model. A term of several parts reads the density of its
-reading (<code>sum_scores</code> and <code>sum_information</code> of <code>likelihood/sums.rs</code>): its
-scores over the mean of each part, which the curvature chains with the block
-of the parts, and its expected information; for <code>"exact"</code> both come from the
-recursion and from its derivative in <code>φ</code>, the information summed over the
-counts from 0 until the terms above the mean are negligible, with the recursion tilted towards <code>M</code> plus 10 standard deviations. The information of the moments
-under <code>"exact"</code> is off by up to −15 %/+27 % and gives <code>η</code> of 0.90–0.96 for a
-correct model. The mean absolute error is refused: its sandwich
-needs a density of the residuals at 0 and a bandwidth. The sandwich,
-information matching and later gradient methods read them.</p>
-<table>
-<thead>
-<tr>
-<th>Alternative</th>
-<th>Why not</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Derivatives in each method</td>
-<td>Every method would repeat the models and their noise arguments.</td>
-</tr>
-<tr>
-<td>A kernel density for the absolute error</td>
-<td>It hides a bandwidth choice; the bootstrap needs none.</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_likelihood.rs::scores_equal_the_differences_of_the_terms</code>,
-<code>crates/commol-inference/tests/test_local.rs::the_gradient_of_a_sum_is_that_of_its_density</code>,
-<code>crates/commol-inference/tests/test_local.rs::the_information_of_a_sum_is_that_of_its_density</code>,
-<code>tests/uncertainty/test_local.py::TestInformationMatching::test_a_correct_model_with_sums_gives_one</code>.</p>
-<h2 id="distribution-functions-live-in-commol-calibration">Distribution functions live in commol-calibration<a class="headerlink" href="#distribution-functions-live-in-commol-calibration" title="Permanent link">&para;</a></h2>
-<p><code>Noise::tails</code> (<code>likelihood/density.rs</code>) gives <code>P(Y &lt; y)</code>, <code>p(y)</code> and
-<code>P(Y &gt; y)</code> of every model, <code>Noise::sum_tails</code> (<code>likelihood/sums.rs</code>) those of
-a sum of parts by its reading (the cumulative sums of the recursion for
-<code>"exact"</code>), and <code>Likelihood::tails</code> those of each observation, at the nearest
-mean its model allows. Both tails come back, each accurate in its own tail:
-<code>Φ(8.3)</code> is 1 in <code>f64</code>, so a quantile residual read from <code>F</code> alone would be
-infinite in the upper tail. The special functions live whole in
-<code>crates/commol-statistics/src/special.rs</code>, one copy for the distributions of
-the priors and for the models: the factor of the incomplete gamma and beta
-reads Stirling's series from a shape of 10, the incomplete beta takes <code>x</code> and
-<code>1 − x</code>, and <code>p(y)</code> of a count model is that factor, so a tail of a count of
-<code>10⁴</code> keeps 10 digits. The series and continued fraction of the incomplete
-gamma take up to <code>16 √a</code> terms, so a Poisson of mean <code>10⁸</code> keeps them too. A
-negative binomial of <code>φ ≤ 1e-8</code> has the tails of the Poisson. Two limits
-remain, from the conditioning of the continued fraction of the beta at a
-large shape: a negative binomial of size <code>1/φ</code> keeps about <code>10⁻¹⁷/φ</code>, and a
-Student t about <code>10⁻¹⁶ ν</code>, as its log density. An <code>"exact"</code> sum reads
-<code>P(Y &gt; y)</code> as a complement down to 0.01, and sums the counts above <code>y</code>
-beyond that, <code>O(n²)</code> in the last count. The predictive mixes the tails of its draws (<code>ObservationBounds</code>,
-<code>crates/commol-inference/src/scores.rs</code>), the one primitive of the PIT, the
-quantile residuals and every later reader.</p>
-<table>
-<thead>
-<tr>
-<th>Alternative</th>
-<th>Why not</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>A distribution function next to <code>draw_observation</code> in commol-inference</td>
-<td>The calibration crate could not read it for the sums of parts.</td>
-</tr>
-<tr>
-<td><code>F</code> alone</td>
-<td>Its upper tail rounds to 1, and a residual there is infinite.</td>
-</tr>
-<tr>
-<td>The PIT from the draws of the noise</td>
-<td>It carries the Monte Carlo error of the draws, and a sample of one point gives 0 or 1.</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_likelihood.rs::the_tails_of_each_model_match_reference_values</code>,
-<code>crates/commol-calibration/tests/test_likelihood.rs::the_tails_at_the_edges_of_each_model</code>,
-<code>crates/commol-calibration/tests/test_parts.rs::the_tails_of_a_sum</code>,
-<code>crates/commol-inference/tests/test_predictive.rs::quantile_residuals_of_unseen_data_are_standard_normal</code>.</p>
 <h2 id="the-sandwich-sums-scores-over-blocks">The sandwich sums scores over blocks<a class="headerlink" href="#the-sandwich-sums-scores-over-blocks" title="Permanent link">&para;</a></h2>
 <p><code>sandwich</code> (<code>local/sandwich.rs</code>) gives <code>H⁻¹ B H⁻¹</code> with
 <code>B = G/(G − 1) · Σ_b s_b s_bᵀ</code> over the non-overlapping blocks of

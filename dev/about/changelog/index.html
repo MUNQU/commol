@@ -3143,6 +3143,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scores and Distribution Functions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/local-approximations/" class="md-nav__link">
         
   
@@ -6232,6 +6260,30 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>PanicException: the schedule holds every constraint position</code>. The
   dense design of <code>StructuralRank</code> read an observation at <code>-0.0</code> as a
   second position 0, which changed its singular values.</p>
+</li>
+<li>
+<p>An observation of value 0 at a predicted mean of exactly 0 of a
+  <code>PoissonObservations</code>, <code>NegativeBinomialObservations</code> or
+  <code>BinomialObservations</code> (and a binomial count of all its trials at a mean
+  of all of them), such as a series that stays 0 until a process starts,
+  has the limit of its score there. These observations add nothing to the
+  log-likelihood. With a given <code>block_length</code>, and when other series
+  observe their positions, <code>InformationMatchingEta</code> and the meat of
+  <code>Sandwich</code> give the same result with and without them. With
+  <code>block_length="auto"</code>, or at positions of their own, they can still
+  change the blocks (#517). The floors of a <code>ProfileLikelihood</code> stay
+  finite with them. Before, their score was NaN, information matching
+  failed with a message that the scores were all 0, and the evaluation
+  floor of a profile was NaN.</p>
+</li>
+<li>
+<p>A score that is not finite at the fit, such as that of a count above 0 at a
+  mean of 0, raises a <code>ValueError</code> from the local methods, the sandwich and
+  information matching. The error names the observation and says whether
+  the fit is outside the support of its observation model. Before, it
+  reached them as a NaN. <code>InformationMatchingEta</code> reports a curvature that
+  is singular to working precision as singular. Before, it reported that
+  the scores were all 0.</p>
 </li>
 <li>
 <p>The curvature of a <code>NegativeBinomialObservations</code> of <code>overdispersion</code> 0,
