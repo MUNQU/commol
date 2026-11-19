@@ -20,7 +20,7 @@ const SUM_TERMS: f64 = 1000.0;
 /// Below this overdispersion, `ln Γ(y + 1/φ) − ln Γ(1/φ)` loses digits, so
 /// the negative binomial sums its terms whatever the count, and its tails
 /// are those of the Poisson.
-const SMALL_OVERDISPERSION: f64 = 1e-8;
+pub(super) const SMALL_OVERDISPERSION: f64 = 1e-8;
 
 /// The two tails of an observation model at a value `y`, and the mass
 /// between them: `P(Y < y) + p(y) + P(Y > y) = 1`. Each tail keeps its

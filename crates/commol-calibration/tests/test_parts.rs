@@ -397,10 +397,10 @@ fn an_exact_sum_that_does_not_end_fails() {
     assert_eq!(exact(1e6).sum_information(&heavy), Err(unended(14.0, 1e6)));
     assert_eq!(exact(1e6).sum_tails(0.0, &heavy), Err(unended(14.0, 1e6)));
     // A mean at the counts leaves no count above it.
-    let large = [2e4; 7];
+    let large = [2e5; 7];
     assert_eq!(
         exact(0.01).sum_information(&large),
-        Err(unended(1.4e5, 0.01))
+        Err(unended(1.4e6, 0.01))
     );
     // A total at the counts.
     let y = MAX_COUNTS as f64;
@@ -466,24 +466,25 @@ fn an_exact_sum_that_does_not_end_fails() {
     );
 
     let problem = model(y);
+    let total = MAX_COUNTS.to_string();
     let Err(EvaluationError::Failed(error)) = problem.evaluate(&[0.1], &mut Workspace::default())
     else {
         panic!("a total at the counts fails");
     };
-    says_why(&error, "100000");
+    says_why(&error, &total);
     let Err(EvaluationError::Failed(error)) =
         problem.pointwise_log_likelihood(&[0.1], &mut Workspace::default())
     else {
         panic!("a total at the counts fails");
     };
-    says_why(&error, "100000");
+    says_why(&error, &total);
     let tails = problem
         .discrepancy()
         .likelihood()
         .unwrap()
         .tails(problem.observed_data(), &[0.1], &parts)
         .unwrap_err();
-    says_why(&tails, "100000");
+    says_why(&tails, &total);
 }
 
 #[test]
@@ -535,5 +536,97 @@ fn parts_need_a_window_in_the_engine() {
     assert!(
         error.contains("Observation 'B' at 6 has parts=3 and no window"),
         "{error}"
+    );
+}
+
+#[test]
+fn an_exact_sum_of_a_large_total_is_cheap() {
+    // Seven equal parts of a total of mean 10⁵: their sum is NB(M, φ/7). The
+    // exact reading gives its density, tails, scores and information in a
+    // time that grows about linearly with the total.
+    let (k, phi, y) = (7usize, 0.1, 100_000.0);
+    let parts = vec![y / k as f64; k];
+    let mean: f64 = parts.iter().sum();
+    let exact = Noise::NegativeBinomial {
+        overdispersion: phi,
+        sum: Some(Sum::Exact),
+    };
+    let started = std::time::Instant::now();
+    let density = exact.sum_log_density(y, &parts).unwrap();
+    let tails = [y, 2.0 * y].map(|y| exact.sum_tails(y, &parts).unwrap());
+    let scores = exact.sum_scores(y, &parts).unwrap();
+    let information = exact.sum_information(&parts).unwrap();
+    let elapsed = started.elapsed().as_secs_f64();
+    // About 0.07 s in a release build and 0.8 s in a debug one; the limit
+    // leaves room for a loaded machine.
+    assert!(elapsed < 20.0, "{elapsed} s");
+    eprintln!("an exact sum of a total of 10⁵: {elapsed:.3} s");
+
+    // NB(M, φ/7) at 40 digits: log p(y), and (P(Y < y), p(y), P(Y > y)) at
+    // y and 2y, the upper tail summed far above the mean. The terms carry
+    // log p(0) ≈ −508 apart, which holds log p(y) to about 1e-12.
+    assert!(
+        relative(density, -10.309_156_723_382_754) < 1e-12,
+        "{density}"
+    );
+    let expected = [
+        (
+            0.515_878_799_712_644_2,
+            3.332_653_193_603_074_6e-5,
+            0.484_087_873_755_419_8,
+        ),
+        (
+            0.999_999_999_977_965_6,
+            7.918_429_551_339_245e-15,
+            2.202_648_420_775_554_5e-11,
+        ),
+    ];
+    for (tails, (below, at, above)) in tails.iter().zip(expected) {
+        for (actual, expected) in [(tails.below, below), (tails.at, at), (tails.above, above)] {
+            assert!(
+                (actual - expected).abs() <= 1e-11 * expected,
+                "{tails:?} against {expected:e}"
+            );
+        }
+    }
+    // Moving every part by the same amount moves M by K times it, and φ/K
+    // is the overdispersion of the total: the scores and the information
+    // are those of NB(M, φ/K), as far as its own reading of ln Γ allows.
+    let total = Noise::NegativeBinomial {
+        overdispersion: phi / k as f64,
+        sum: None,
+    };
+    let [score_mean, score_phi] = total.scores(y, mean)[..] else {
+        panic!("a negative binomial has two scores");
+    };
+    for score in &scores[..k] {
+        assert!(relative(*score, score_mean) < 1e-10, "{scores:?}");
+    }
+    assert!(
+        relative(scores[k], score_phi / k as f64) < 1e-10,
+        "{scores:?}"
+    );
+    let expected = total.information(mean);
+    let size = k + 1;
+    let means: f64 = (0..k)
+        .flat_map(|a| (0..k).map(move |b| a * size + b))
+        .map(|entry| information[entry])
+        .sum();
+    let cross: f64 = (0..k).map(|a| information[a * size + k]).sum();
+    let close = |actual: f64, expected: f64| (actual - expected).abs() <= 1e-9 * expected.abs();
+    assert!(
+        close(means, (k * k) as f64 * expected[0]),
+        "{information:?}"
+    );
+    let dispersion = information[size * size - 1];
+    assert!(
+        close(dispersion, expected[3] / (k * k) as f64),
+        "{information:?} {expected:?}"
+    );
+    // The mean and φ of a negative binomial are orthogonal.
+    assert_eq!(expected[1], 0.0);
+    assert!(
+        cross.abs() <= 1e-12 * (means * dispersion).sqrt(),
+        "{information:?}"
     );
 }
