@@ -5441,9 +5441,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>NegativeBinomialObservations(sum="exact" | "moments")</code> as the exact
   convolution of the parts or the negative binomial of its mean and
   variance. A negative binomial series with parts needs <code>sum</code>, and one
-  without parts refuses it; the other models refuse parts. <code>"exact"</code>
-  computes at most 100 000 counts: a total at that count, or a tail or an
-  information with no negligible term below it, as at a large
+  without parts refuses it; the other models refuse parts. <code>"exact"</code> costs about
+  <code>K · y</code> operations at a total <code>y</code>, about 1 ms at a total of 10⁵ in seven
+  parts, and computes at most 1 000 000 counts: a total at that count, or a
+  tail or an information with no negligible term below it, as at a large
   <code>overdispersion</code>, raises a <code>RuntimeError</code> that names the observation, its
   total, the mean of the total, <code>φ</code> and the counts, and points to
   <code>sum="moments"</code>; it never switches on its own. The draws of

@@ -3916,8 +3916,11 @@ means of its parts; with one part they are the functions of one mean. A
 Poisson reads <code>Poisson(M)</code> and a normal <code>N(M, K · sd²)</code>, both exact. A
 negative binomial series with parts needs <code>sum</code> (<code>Sum::Exact</code> or
 <code>Sum::Moments</code>), and one without parts refuses it (<code>Likelihood::new</code>).
-<code>"exact"</code> is the recursion of Panjer over the parts, in <code>O(K · y + y²)</code>, with
-<code>log p(0)</code> kept apart and the terms scaled down past <code>1e150</code>; <code>"moments"</code> is
+<code>"exact"</code> is the recursion of Panjer over the parts, with <code>log p(0)</code> kept
+apart and the terms scaled down past <code>1e150</code>. The jumps of a part are
+geometric, so each part keeps its share of the sum over the jumps as a state
+updated once per count: <code>O(K)</code> per count, <code>O(K · y)</code> up to a total <code>y</code>, with
+no jump cut and only sums of positive terms for the density. <code>"moments"</code> is
 <code>NB(M, φ · Σμₜ²/M²)</code>. Every other model refuses parts. The draws read the sum
 as the density does (<code>draw_sum</code> of <code>predictive.rs</code>): each part, summed, or
 the matched negative binomial for <code>"moments"</code>.</p>
@@ -3938,7 +3941,7 @@ form for the sum refuses parts.</p>
 </tr>
 <tr>
 <td>Exact only</td>
-<td>1.3·10⁹ operations per evaluation at a total of 50 000.</td>
+<td>It refuses a total of 10⁶ or more, and a tail or an information that does not end within the cap, as at <code>φ = 10⁶</code>; <code>"moments"</code> reads them.</td>
 </tr>
 <tr>
 <td>A default <code>sum</code>, or a switch by the size of the total</td>
@@ -3956,23 +3959,39 @@ form for the sum refuses parts.</p>
 <td>Truncating the recursion where <code>q_max^j &lt; 1e-17</code></td>
 <td>It saves 10–100× at small <code>φ</code> and costs up to 7.6e-3 in <code>log p</code> far in the upper tail; only with a declared tolerance and a test of that tail (<a href="https://github.com/MUNQU/commol/issues/498#issuecomment-6983149799">L10</a>).</td>
 </tr>
+<tr>
+<td>A cut of the jumps once their remaining sum is below <code>1e-17</code>, <code>O(y · J)</code></td>
+<td><code>J ≈ 40 / (1 − q_max)</code> jumps against <code>K</code> states: 865 at <code>M = 10⁴, φ = 0.01</code> with a largest part of <code>0.2 M</code>, and no cut once <code>φ μ_max ≳ y / 40</code>, as from <code>φ = 0.1</code> at <code>M = 10³</code> (measured for <a href="https://github.com/MUNQU/commol/issues/513">#513</a>).</td>
+</tr>
+<tr>
+<td>The sum over every earlier count at each count, <code>O(K · y + y²)</code></td>
+<td>4 s for a density and 9 s for the scores at a total of 10⁵, 100 s for the four readings of seven parts of mean 10⁵ (<code>test_parts.rs::an_exact_sum_of_a_large_total_is_cheap</code>), against 0.07 s by the states. Against 40 digits on a grid of seven parts, totals 10² to 10⁵ and <code>φ</code> 0 to 10⁶, both err at most 3e-12 in <code>log p</code>, 3.3e-11 in a tail and 2.7e-9 of the largest score, where <code>log p(0)</code> is large (measured for <a href="https://github.com/MUNQU/commol/issues/513">#513</a>).</td>
+</tr>
+<tr>
+<td>A convolution of the parts by FFT, <code>O(K · y · log y)</code></td>
+<td>Its error is about <code>1e-16</code> of the largest probability, not of each: relative 1e-11 at <code>p = 5·10⁻⁸</code>, and a negative <code>p</code> at <code>3·10⁻⁶¹</code>, so neither the tails nor the log density of a far count hold; it also needs the probabilities of each part, and their derivatives for the scores (measured for <a href="https://github.com/MUNQU/commol/issues/513">#513</a>).</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Guards:</strong> <code>crates/commol-calibration/tests/test_parts.rs::the_exact_sum_is_the_convolution_of_its_parts</code>,
+<code>crates/commol-calibration/tests/test_parts.rs::an_exact_sum_of_a_large_total_is_cheap</code>,
 <code>crates/commol-calibration/tests/test_parts.rs::the_moments_of_a_sum</code>,
 <code>crates/commol-inference/tests/test_predictive.rs::draws_of_a_sum_have_the_variance_of_their_parts</code>,
 <code>tests/uncertainty/test_observation_sums.py::TestSums</code>,
 <code>tests/uncertainty/test_part_sums_coverage.py::TestPartSums</code>.</p>
 <h2 id="an-exact-sum-ends-at-a-fixed-count">An exact sum ends at a fixed count<a class="headerlink" href="#an-exact-sum-ends-at-a-fixed-count" title="Permanent link">&para;</a></h2>
-<p><code>"exact"</code> computes the counts below <code>MAX_COUNTS = 100 000</code> (<code>likelihood/sums.rs</code>).
+<p><code>"exact"</code> computes the counts below <code>MAX_COUNTS = 1 000 000</code> (<code>likelihood/sums.rs</code>).
 <code>Recursion::extend_to</code> refuses a count at the cap before computing it. Before
 the upper tail and the information start, <code>ends_within_counts</code> fails them at
-once when <code>p(MAX_COUNTS − 1) ≥ maxₜ pₜ(n) Π_{s≠t} pₛ(0)</code> is above <code>NEGLIGIBLE</code>.
-Between, as at <code>M = 10⁴, φ = 3</code>, they run to the cap, then fail. <code>UnendedSum</code>
-becomes a message that names the observation, its total, <code>M</code>, <code>φ</code> and the
-counts, and points to <code>sum="moments"</code>: a <code>RuntimeError</code> in every method. Seven
-equal parts need 13 902 counts at <code>M = 10⁴, φ = 0.01</code>, 81 971 at <code>φ = 1</code>, 54 257 at
-<code>M = 10³, φ = 10</code> (<code>Noise::sum_information</code>, release); the tests, at most 2 062.</p>
+once when <code>p(MAX_COUNTS − 1) ≥ maxₜ pₜ(n) Π_{s≠t} pₛ(0)</code> is above <code>NEGLIGIBLE</code>;
+below <code>φ = 1e-8</code>, where <code>pₜ(n)</code> sums <code>n</code> terms, the sum is about <code>Poisson(M)</code>
+and takes no bound. Between, as at <code>M = 10⁵, φ = 3</code>, they run to the cap in
+0.2 s, then fail. <code>UnendedSum</code> becomes a message that names the observation,
+its total, <code>M</code>, <code>φ</code> and the counts, and points to <code>sum="moments"</code>: a
+<code>RuntimeError</code> in every method. Seven equal parts need 13 902 counts at
+<code>M = 10⁴, φ = 0.01</code>, 81 971 at <code>φ = 1</code>, 507 453 at <code>φ = 10</code>, 54 257 at
+<code>M = 10³, φ = 10</code>, 237 757 at <code>M = 10⁵, φ = 0.1</code> and 780 366 at <code>φ = 1</code>
+(<code>Noise::sum_information</code>, release, 0.16 s); the tests, at most 237 757.</p>
 <p><strong>Rule:</strong> the exact reading ends within <code>MAX_COUNTS</code> or fails with the reason; it never switches to <code>"moments"</code> (<a href="https://github.com/MUNQU/commol/issues/498#issuecomment-6979416382">D2</a>).</p>
 <table>
 <thead>
@@ -3992,7 +4011,15 @@ equal parts need 13 902 counts at <code>M = 10⁴, φ = 0.01</code>, 81 971 at <
 </tr>
 <tr>
 <td>Only the check at the cap</td>
-<td>10⁵ counts take 4 s for a density, 12 s for an information, before it fails at <code>φ = 10⁶</code>.</td>
+<td>10⁶ counts take 0.2 s for an information before it fails at <code>φ = 10⁶</code>, in every term of every evaluation.</td>
+</tr>
+<tr>
+<td>A cap of 10⁵ counts</td>
+<td>It refuses a weekly total of 10⁵, and the information of seven parts of mean 10⁴ at <code>φ = 3</code> (185 239 counts).</td>
+</tr>
+<tr>
+<td>A cap of 10⁷ counts</td>
+<td>160 MB of terms, and 2 s for an information that runs to it.</td>
 </tr>
 </tbody>
 </table>

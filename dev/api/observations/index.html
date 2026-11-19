@@ -4518,8 +4518,8 @@ Every observed value must be a whole number, at least 0.</p>
 of one independent negative binomial per part, each with this <code>φ</code>, and
 a series with such an observation says how its model reads that sum:
 <code>sum="exact"</code> reads its exact distribution, at a cost of about
-<code>K·y + y²</code> operations for <code>K</code> parts and a total <code>y</code>, over at most
-100 000 counts (a sum that needs more raises an error that says so);
+<code>K·y</code> operations for <code>K</code> parts and a total <code>y</code>, over at most
+1 000 000 counts (a sum that needs more raises an error that says so);
 <code>sum="moments"</code> reads a negative binomial with the mean and the
 variance of the sum, <code>NB(M, φ · Σμₜ²/M²)</code>, fast but off when a total
 spreads over few effective parts with a large <code>φ</code>. A series without
@@ -4619,8 +4619,8 @@ series with an observation of more than one part, refused otherwise
 </span><span id="__span-0-103"><a id="__codelineno-0-103" name="__codelineno-0-103"></a><span class="sd">    of one independent negative binomial per part, each with this ``φ``, and</span>
 </span><span id="__span-0-104"><a id="__codelineno-0-104" name="__codelineno-0-104"></a><span class="sd">    a series with such an observation says how its model reads that sum:</span>
 </span><span id="__span-0-105"><a id="__codelineno-0-105" name="__codelineno-0-105"></a><span class="sd">    ``sum=&quot;exact&quot;`` reads its exact distribution, at a cost of about</span>
-</span><span id="__span-0-106"><a id="__codelineno-0-106" name="__codelineno-0-106"></a><span class="sd">    ``K·y + y²`` operations for ``K`` parts and a total ``y``, over at most</span>
-</span><span id="__span-0-107"><a id="__codelineno-0-107" name="__codelineno-0-107"></a><span class="sd">    100 000 counts (a sum that needs more raises an error that says so);</span>
+</span><span id="__span-0-106"><a id="__codelineno-0-106" name="__codelineno-0-106"></a><span class="sd">    ``K·y`` operations for ``K`` parts and a total ``y``, over at most</span>
+</span><span id="__span-0-107"><a id="__codelineno-0-107" name="__codelineno-0-107"></a><span class="sd">    1 000 000 counts (a sum that needs more raises an error that says so);</span>
 </span><span id="__span-0-108"><a id="__codelineno-0-108" name="__codelineno-0-108"></a><span class="sd">    ``sum=&quot;moments&quot;`` reads a negative binomial with the mean and the</span>
 </span><span id="__span-0-109"><a id="__codelineno-0-109" name="__codelineno-0-109"></a><span class="sd">    variance of the sum, ``NB(M, φ · Σμₜ²/M²)``, fast but off when a total</span>
 </span><span id="__span-0-110"><a id="__codelineno-0-110" name="__codelineno-0-110"></a><span class="sd">    spreads over few effective parts with a large ``φ``. A series without</span>
