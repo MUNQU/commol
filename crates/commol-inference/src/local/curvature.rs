@@ -40,6 +40,9 @@ pub struct Curvature {
     matrix: Matrix,
     gradients: Matrix,
     predictions: Vec<f64>,
+    terms: Vec<TermDerivatives>,
+    part_jacobian: Matrix,
+    first_parts: Vec<usize>,
     notes: Vec<String>,
 }
 
@@ -73,17 +76,14 @@ impl Curvature {
         let mut matrix = Matrix::zeros(p, p);
         let mut errors = Matrix::zeros(p, p);
         let mut gradients = Matrix::zeros(terms.len(), p);
-        let rows = |matrix: &Matrix, first: usize, count: usize| -> Vec<Vec<f64>> {
-            (first..first + count)
-                .map(|k| matrix.row(k).iter().copied().collect())
-                .collect()
-        };
+        let mut first_parts = Vec::with_capacity(terms.len());
         let mut first = 0;
         for (i, term) in terms.iter().enumerate() {
             let jacobian = rows(&parts.jacobian, first, term.parts);
             let error = rows(&parts.errors, first, term.parts);
+            first_parts.push(first);
             first += term.parts;
-            add_term(&mut matrix, &mut errors, term, &jacobian, &error);
+            add_term(&mut matrix, Some((&mut errors, &error)), term, &jacobian);
             for (j, gradient) in term_gradient(term, &jacobian).into_iter().enumerate() {
                 gradients[(i, j)] = gradient;
             }
@@ -104,6 +104,9 @@ impl Curvature {
         }
         curvature.gradients = gradients;
         curvature.predictions = sensitivities.predictions;
+        curvature.terms = terms;
+        curvature.part_jacobian = sensitivities.parts.jacobian;
+        curvature.first_parts = first_parts;
         Ok(curvature)
     }
 
@@ -178,6 +181,9 @@ impl Curvature {
         );
         curvature.gradients = expected.gradients;
         curvature.predictions = expected.predictions;
+        curvature.terms = expected.terms;
+        curvature.part_jacobian = expected.part_jacobian;
+        curvature.first_parts = expected.first_parts;
         Ok(curvature)
     }
 
@@ -222,6 +228,9 @@ impl Curvature {
             matrix,
             gradients: Matrix::zeros(0, p),
             predictions: Vec::new(),
+            terms: Vec::new(),
+            part_jacobian: Matrix::zeros(0, p),
+            first_parts: Vec::new(),
             notes,
         }
     }
@@ -259,6 +268,24 @@ impl Curvature {
         &self.predictions
     }
 
+    /// The Gauss–Newton curvature of the terms of `observations` alone, on
+    /// the unbounded scale: `J_b = D · Σ_{i∈b} Aᵢᵀ Cᵢ Aᵢ · D`. For a
+    /// Gauss–Newton curvature it is the share of a block `b` of
+    /// [`Self::matrix`], the sum of the shares of all observations; a
+    /// Hessian keeps the Gauss–Newton terms, whose shares do not sum to it.
+    pub fn block_matrix(&self, observations: &[usize]) -> Matrix {
+        let p = self.fit.len();
+        let mut matrix = Matrix::zeros(p, p);
+        for &i in observations {
+            let term = &self.terms[i];
+            let jacobian = rows(&self.part_jacobian, self.first_parts[i], term.parts);
+            add_term(&mut matrix, None, term, &jacobian);
+        }
+        Matrix::from_fn(p, p, |j, k| {
+            self.derivatives[j] * matrix[(j, k)] * self.derivatives[k]
+        })
+    }
+
     /// The entries whose estimated error is above 1 % of the scale of their
     /// row and column, in words.
     pub fn notes(&self) -> &[String] {
@@ -284,16 +311,23 @@ fn check_inside<E: SimulationEngine>(
     }
 }
 
-/// Add `Aᵀ C A` of one term to `matrix`, and the first-order error of the
-/// Jacobian rows to `errors`. Row `t` of `A`, below the number of parts, is
-/// the Jacobian of the mean of part `t`; row `K + k` is the unit vector of
-/// the parameter of noise argument `k`, or 0 for a number.
+/// Rows `first` to `first + count` of `matrix`.
+fn rows(matrix: &Matrix, first: usize, count: usize) -> Vec<Vec<f64>> {
+    (first..first + count)
+        .map(|k| matrix.row(k).iter().copied().collect())
+        .collect()
+}
+
+/// Add `Aᵀ C A` of one term to `matrix`, and, with `errors`, the
+/// first-order error of the Jacobian rows, of the errors `error` of each
+/// entry, to it. Row `t` of `A`, below the number of parts, is the Jacobian
+/// of the mean of part `t`; row `K + k` is the unit vector of the parameter
+/// of noise argument `k`, or 0 for a number.
 fn add_term(
     matrix: &mut Matrix,
-    errors: &mut Matrix,
+    errors: Option<(&mut Matrix, &[Vec<f64>])>,
     term: &TermDerivatives,
     jacobian: &[Vec<f64>],
-    error: &[Vec<f64>],
 ) {
     let parts = term.parts;
     let size = parts + term.parameters.len();
@@ -305,7 +339,12 @@ fn add_term(
             f64::from(u8::from(term.parameters[a - parts] == Some(j)))
         }
     };
-    let row_error = |a: usize, j: usize| if a < parts { error[a][j] } else { 0.0 };
+    let (mut errors, error) =
+        errors.map_or((None, None), |(errors, error)| (Some(errors), Some(error)));
+    let row_error = |a: usize, j: usize| match error {
+        Some(error) if a < parts => error[a][j],
+        _ => 0.0,
+    };
     for a in 0..size {
         for b in 0..size {
             let c = term.curvature[a * size + b];
@@ -320,7 +359,9 @@ fn add_term(
                 for k in 0..p {
                     let (v, dv) = (row(b, k), row_error(b, k));
                     matrix[(j, k)] += c * u * v;
-                    errors[(j, k)] += c.abs() * (du * v.abs() + u.abs() * dv);
+                    if let Some(errors) = errors.as_mut() {
+                        errors[(j, k)] += c.abs() * (du * v.abs() + u.abs() * dv);
+                    }
                 }
             }
         }

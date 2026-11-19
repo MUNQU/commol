@@ -141,8 +141,8 @@ quantile residuals and every later reader.
 fit sum to zero and `B` would have rank below `p`. `block_length` has no
 default; `"auto"` is the length of non-overlapping blocks of the residuals.
 Information matching (`smc/gibbs.rs`) reads the same `H` as `J` and the same
-`B` as `I`, so it takes a likelihood and holds under dependence; it reads `B`
-only through a trace, so it needs two blocks, not more than `p`
+block scores for `I`, so it takes a likelihood and holds under dependence; it
+reads them only through a trace, so it needs two blocks, not more than `p`
 ([below](#information-matching-reads-the-meat-through-a-trace)).
 
 | Alternative | Why not |
@@ -150,7 +150,7 @@ only through a trace, so it needs two blocks, not more than `p`
 | The independent sandwich (White) | Too narrow when the residuals are autocorrelated. |
 | Newey–West | It needs lags across series at irregular positions, and does not reuse the blocks. |
 | A warning below a fixed number of blocks | An arbitrary threshold; the t widens the intervals by the right amount. |
-| CR2 with Bell–McCaffrey degrees of freedom | Linear theory and the leverage of each block; kept for when a coverage study needs it. |
+| CR2 with Bell–McCaffrey degrees of freedom | Linear theory and the leverage of each block; kept for when a coverage study needs it. Information matching reads the leverage of its blocks ([below](#information-matching-reads-the-meat-through-a-trace)). |
 
 **Guards:** `tests/uncertainty/test_local.py::TestSandwich`,
 `tests/uncertainty/test_coverage.py::TestSandwich`,
@@ -161,25 +161,51 @@ only through a trace, so it needs two blocks, not more than `p`
 `information_matching_eta` (`smc/gibbs.rs`) gives `η = p / tr(J⁻¹ I)`, the
 magnitude adjustment of a composite likelihood (Pauli, Racugno and Ventura
 2011; Ribatet, Cooley and Davison 2012), with `J` the Gauss–Newton `H` and
-`I` the meat `B`, both on the unbounded scale, where the trace has the value
-it has on the scale of the parameters. It equals `tr(J I⁻¹ J) / tr(J)` when
-`I = J/η`. It refuses one block, whose score of a fit is zero, a trace of 0,
-when every score is 0, and a trace below `10⁻¹⁰` times that of one block per
-observation, when each parameter's scores fall inside one block. With `G`
-blocks the trace reads at most `p(G − 1)` degrees of freedom, fewer when the
-blocks share the curvature unevenly, and its reciprocal is skewed upward
-when they are few.
+`I` the variance of the block scores `s_b`, both on the unbounded scale,
+where the trace has the value it has on the scale of the parameters. It
+equals `tr(J I⁻¹ J) / tr(J)` when `I = J/η`. It refuses one block, whose
+score of a fit is zero, a trace of 0, when every score is 0, a trace below
+`10⁻¹⁰` times that of one block per observation, when each parameter's
+scores fall inside one block, and blocks that each hold all the curvature
+of their parameters.
+
+The trace reads at most `p(G − 1)` degrees of freedom for `G` blocks, fewer
+when the blocks share the curvature unevenly (a slope, a parameter read in
+one part of the series, a short last block), and `η` is its reciprocal.
+With `A_b = J⁻¹ J_b`, `J_b` the Gauss–Newton curvature of block `b`
+(`Curvature::block_matrix`), and `L = Σ_b tr(A_b²)`, the trace is
+`Σ_b s_bᵀ J⁻¹ s_b · p / (p − L)`, the leverage of the blocks in place of the
+`G/(G − 1)` of CR1, which it equals when every `J_b = J/G`; with independent
+scores of the variance `J/η` its mean is `p/η`. `η` is then scaled by
+`m(ν) = median(χ²_ν)/ν`, with Satterthwaite's degrees of freedom of the
+trace `ν = (p − L)² / (L − 2 Σ_b tr(A_b³) + tr((Σ_b A_b²)²))`, `p(G − 1)`
+for equal blocks, so that its median over data sets is its value. A numpy
+simulation of the estimator (sum of squares, noise of sd 1, 10⁵ data sets;
+the first row exact) gives the median of `η` over its value:
+
+| Design | `ν` | CR1 | Leverage | CR2 | CR3 | Leverage and `m(ν)` |
+|---|---|---|---|---|---|---|
+| One constant, 24 positions, blocks of 12 | 1 | 2.20 | 2.20 | 2.20 | 1.10 | 1.00 |
+| A line, 24 positions, blocks of 8 | 1.5 | 3.74 | 1.70 | 1.79 | 0.43 | 1.02 |
+| A line, 26 positions, blocks of 8 (last of 2) | 2.4 | 2.34 | 1.38 | 1.42 | 0.54 | 1.02 |
+| A line, 60 positions of AR(1) noise of 0.3, blocks of 12 | 3.0 | 2.01 | 1.36 | 1.41 | 0.74 | 1.07 |
+| 10 constants, 35 positions, blocks of 18 | 10 | 1.08 | 1.08 | 1.08 | 0.54 | 1.01 |
+
+With few degrees of freedom `η` still varies, which the posterior does not
+hold: 90 % intervals of the line cover about 87 % in 8 blocks of 3 (`ν ≈ 5`;
+CR1 81 %) and 84 % in 3 blocks of 8 (CR1 62 %).
 
 | Alternative | Why not |
 |---|---|
 | `tr(J I⁻¹ J) / tr(J)` (Holmes and Walker 2017; Lyddon, Holmes and Walker 2019) | It inverts `I`: the inverse of an estimate from `G` block scores of `p` parameters, `G − 1` degrees of freedom after the fit, has the mean `(G − 1)/(G − p − 2)` times `I⁻¹`, none for `G ≤ p + 2`, so 12 blocks for 10 parameters give an `η` about 16 times too large, and `G ≤ p` has no inverse at all. |
 | Correct the inverse by `(G − p − 2)/(G − 1)` | It still needs `G > p + 2`, so blocks short enough for that are too short for the dependence. |
-| A leverage correction of each block (CR2) | It needs the curvature of each block; kept for when a coverage study of uneven blocks needs it, as for the sandwich. |
+| The leverage alone, or CR2, `(I − A_b)^{-1/2}` on each block score (Bell and McCaffrey 2002) | The trace has its mean (0.94 of it under the AR(1) noise), but `η`, its reciprocal, a median 1.4 to 2.2 times its value below about 3 degrees of freedom; CR2 also needs a matrix root per block and is infinite for a block that holds all the curvature of a parameter. |
+| CR3, `(I − A_b)^{-1}`, the jackknife | Too large a trace: a median `η` of 0.43 to 0.77 times its value for a line in few blocks. |
+| A warning below a number of degrees of freedom | It leaves `η` too large; the guide states the coverage with few degrees of freedom instead. |
+| `η` scaled so the intervals of a level hold `t_ν` | `η` would depend on the level of the intervals asked for later, and its median would be far below its value. |
 
-**Guards:** `crates/commol-inference/tests/test_smc.rs::information_matching_gives_eta_near_its_value_with_few_blocks_per_parameter`,
-`crates/commol-inference/tests/test_smc.rs::information_matching_needs_two_blocks_and_scores_that_are_not_all_0`,
-`tests/uncertainty/test_local.py::TestInformationMatching`,
-`tests/uncertainty/test_coverage.py::TestInformationMatching`.
+**Guards:** `crates/commol-inference/tests/test_smc.rs::information_matching_gives_eta_near_its_value_with_few_blocks_per_parameter`, `crates/commol-inference/tests/test_smc.rs::information_matching_gives_eta_near_its_value_with_blocks_of_uneven_curvature`, `crates/commol-inference/tests/test_smc.rs::information_matching_reads_the_degrees_of_freedom_of_its_blocks`,
+`crates/commol-inference/tests/test_smc.rs::information_matching_needs_two_blocks_and_scores_that_are_not_all_0`, `tests/uncertainty/test_local.py::TestInformationMatching`, `tests/uncertainty/test_coverage.py::TestInformationMatching`.
 
 ## The Laplace approximation needs observation models
 

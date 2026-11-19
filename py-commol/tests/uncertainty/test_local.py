@@ -55,6 +55,7 @@ from tests.support import (
     fan_calibrator,
     flow_calibrator,
     flow_observations,
+    line_calibrator,
     sum_calibrator,
     two_wells_calibrator,
 )
@@ -550,3 +551,48 @@ class TestInformationMatching:
             result = calibrator.uncertainty(_matching(block_length))
 
             assert result.eta == pytest.approx(0.5, rel=0.1), block_length
+
+    def test_uneven_blocks_give_eta_near_its_value(self) -> None:
+        # A line at 24 positions in 3 blocks of 8, whose outer blocks hold
+        # most of the curvature of the slope: η corrects the trace by the
+        # leverage of the blocks and by median(χ²_ν)/ν. The median of η over
+        # data sets is checked in test_smc.rs; here, its closed form.
+        positions = np.arange(1.0, 25.0)
+        values = 10 + 2 * positions + np.random.default_rng(3).normal(size=24)
+        calibrator = line_calibrator(values.tolist())
+
+        eta = calibrator.uncertainty(_matching(block_length=8)).eta
+
+        design = np.column_stack([positions, np.ones_like(positions)])
+        curvature = 2 * design.T @ design
+        inverse = np.linalg.inv(curvature)
+        fit = np.linalg.lstsq(design, values)[0]
+        gradients = -2 * (values - design @ fit)[:, None] * design
+        blocks = [slice(start, start + 8) for start in (0, 8, 16)]
+        shares = [inverse @ (2 * design[b].T @ design[b]) for b in blocks]
+        trace = sum(g @ inverse @ g for g in (gradients[b].sum(axis=0) for b in blocks))
+        squares = sum(np.trace(a @ a) for a in shares)
+        spread = squares - 2 * sum(np.trace(a @ a @ a) for a in shares)
+        spread += np.trace(np.linalg.matrix_power(sum(a @ a for a in shares), 2))
+        nu = (2 - squares) ** 2 / spread
+        expected = (2 - squares) * _chi_square_median(nu) / nu / trace
+        assert nu == pytest.approx(1.48, abs=0.01)
+        assert eta == pytest.approx(expected, rel=1e-6)
+
+
+def _chi_square_median(nu: float) -> float:
+    """The median of χ²_ν, by bisection on the series of ``P(ν/2, x/2)``."""
+
+    def cdf(x: float) -> float:
+        a, y = nu / 2, x / 2
+        term = total = n = 1.0
+        while term > 1e-17 * total:
+            term, n = term * y / (a + n), n + 1
+            total += term
+        return math.exp(a * math.log(y) - y - math.lgamma(a + 1)) * total
+
+    low, high = 0.0, 2 * nu + 2
+    for _ in range(100):
+        middle = (low + high) / 2
+        low, high = (middle, high) if cdf(middle) < 0.5 else (low, middle)
+    return (low + high) / 2

@@ -16,6 +16,7 @@ use commol_inference::smc::{
 };
 use commol_inference::{Distribution, Family, MethodError, Priors};
 use commol_random::Generator;
+use commol_statistics::special::chi_square_quantile;
 use std::sync::Mutex;
 
 /// A prior of independent distributions and a kernel `exp(−level · v)`,
@@ -963,12 +964,208 @@ fn information_matching_needs_two_blocks_and_scores_that_are_not_all_0() {
             .contains("block_length 2 makes block scores that are all 0"),
         "{error}"
     );
+    // Away from the fit the block scores are not 0, but each block holds
+    // all the curvature of its parameter, so the blocks read no degree of
+    // freedom.
+    let error = information_matching_eta(&problem, &[5.0, 1.5], Some(2)).unwrap_err();
+    assert!(matches!(error, MethodError::Invalid(_)), "{error}");
+    assert!(
+        error
+            .to_string()
+            .contains("block_length 2 makes blocks that each hold all the curvature"),
+        "{error}"
+    );
 
     // Data the fit runs through: every score is 0.
     let (problem, fit) = means_problem(&[vec![5.0; 4], vec![2.0; 4]]);
     let error = information_matching_eta(&problem, &fit, Some(1)).unwrap_err();
     assert!(matches!(error, MethodError::Failed(_)), "{error}");
     assert!(error.to_string().contains("all 0"), "{error}");
+}
+
+/// The output `x0 = k0 + k1 · t` at every position `t`: a line.
+#[derive(Clone, Debug)]
+struct Line {
+    values: [f64; 2],
+}
+
+impl SimulationEngine for Line {
+    fn check_varied_values(&self, _plan: &Self::ValuePlan) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn check_values(&self) -> Result<(), String> {
+        Ok(())
+    }
+
+    type ValuePlan = NoPlan;
+
+    fn check_position(&self, _position: f64) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn run_at_positions_into_buffer(
+        &mut self,
+        positions: &[f64],
+        buffer: &mut Vec<Vec<f64>>,
+    ) -> Result<(), SimulationError> {
+        buffer.clear();
+        buffer.extend(
+            positions
+                .iter()
+                .map(|&t| vec![self.values[0] + self.values[1] * t]),
+        );
+        Ok(())
+    }
+
+    fn step(&mut self) -> Result<(), SimulationError> {
+        Ok(())
+    }
+
+    fn output_names(&self) -> Vec<String> {
+        vec!["x0".to_string()]
+    }
+
+    fn state_outputs(&self) -> usize {
+        1
+    }
+
+    fn reset(&mut self) {}
+
+    fn set_parameter(&mut self, parameter_id: &str, value: f64) -> Result<(), String> {
+        let index: usize = parameter_id[1..].parse().map_err(|_| parameter_id)?;
+        self.values[index] = value;
+        Ok(())
+    }
+
+    fn current_position(&self) -> f64 {
+        0.0
+    }
+
+    fn plan_values(&self, _: &[ModelValue], _: Option<&str>) -> Result<NoPlan, String> {
+        Ok(NoPlan)
+    }
+
+    fn apply_values(&mut self, _: &NoPlan, _: &[f64]) -> Result<f64, String> {
+        Ok(0.0)
+    }
+}
+
+/// The sum of squares of `values`, observed as `x0` at the positions 0, 1,
+/// …, against the line `k0 + k1 · t`, `k0` in `[−20, 20]` and `k1` in
+/// `[−5, 5]`, with its fit: the least-squares line.
+fn line_problem(values: &[f64]) -> (CalibrationProblem<Line>, Vec<f64>) {
+    let observations = values
+        .iter()
+        .enumerate()
+        .map(|(t, &value)| ObservedDataPoint::new(t as f64, "x0".to_string(), value))
+        .collect();
+    let problem = CalibrationProblem::new(
+        Line { values: [0.0; 2] },
+        observations,
+        vec![
+            CalibrationParameter::new("k0".to_string(), -20.0, 20.0),
+            CalibrationParameter::new("k1".to_string(), -5.0, 5.0),
+        ],
+        None,
+        vec![],
+        LossConfig::SumSquaredError,
+    )
+    .unwrap();
+    let n = values.len() as f64;
+    let mean_t = (n - 1.0) / 2.0;
+    let mean_y = values.iter().sum::<f64>() / n;
+    let (mut sty, mut stt) = (0.0, 0.0);
+    for (t, &value) in values.iter().enumerate() {
+        sty += (t as f64 - mean_t) * (value - mean_y);
+        stt += (t as f64 - mean_t) * (t as f64 - mean_t);
+    }
+    let slope = sty / stt;
+    (problem, vec![mean_y - slope * mean_t, slope])
+}
+
+#[test]
+fn information_matching_gives_eta_near_its_value_with_blocks_of_uneven_curvature() {
+    // Noise of sd 1, so the sum of squares has η = 1/(2σ²) = 0.5. One
+    // constant at 24 positions in 2 blocks reads one degree of freedom; at
+    // 26 the last block holds 2 positions. A line at 24 positions in 3
+    // blocks puts most of the curvature of its slope in the outer blocks,
+    // and at 26 its last block holds 2.
+    let mut stream = Generator::from_seed(7);
+    let mut noise = |n: usize| -> Vec<f64> {
+        (0..n)
+            .map(|_| commol_random::sample::normal(&mut stream))
+            .collect()
+    };
+    let data_sets = 4001;
+    for (n, block_length) in [(24, 12), (26, 12)] {
+        let etas = (0..data_sets)
+            .map(|_| {
+                let values: Vec<f64> = noise(n).iter().map(|e| 5.0 + e).collect();
+                let (problem, fit) = means_problem(&[values]);
+                information_matching_eta(&problem, &fit, Some(block_length))
+                    .unwrap()
+                    .eta
+            })
+            .collect();
+        let eta = median(etas);
+        assert!(
+            (eta / 0.5 - 1.0).abs() < 0.1,
+            "constant {n}/{block_length}: {eta}"
+        );
+    }
+    for (n, block_length) in [(24, 8), (26, 8)] {
+        let etas = (0..data_sets)
+            .map(|_| {
+                let values: Vec<f64> = noise(n)
+                    .iter()
+                    .enumerate()
+                    .map(|(t, e)| 5.0 + 0.5 * t as f64 + e)
+                    .collect();
+                let (problem, fit) = line_problem(&values);
+                information_matching_eta(&problem, &fit, Some(block_length))
+                    .unwrap()
+                    .eta
+            })
+            .collect();
+        let eta = median(etas);
+        assert!(
+            (eta / 0.5 - 1.0).abs() < 0.1,
+            "line {n}/{block_length}: {eta}"
+        );
+    }
+}
+
+#[test]
+fn information_matching_reads_the_degrees_of_freedom_of_its_blocks() {
+    // Blocks that each hold `1/G` of the curvature of every parameter read
+    // `p(G − 1)` degrees of freedom: 2 constants in 3 blocks of 4, 4.
+    let series = vec![
+        vec![5.0, 6.0, 4.0, 7.0, 5.5, 3.0, 6.5, 4.5, 5.0, 6.0, 2.0, 5.0],
+        vec![2.0, 1.0, 3.0, 2.5, 0.5, 2.0, 1.5, 3.5, 2.0, 1.0, 2.5, 3.0],
+    ];
+    let (problem, fit) = means_problem(&series);
+    let calibration = information_matching_eta(&problem, &fit, Some(4)).unwrap();
+    assert!(
+        (calibration.degrees_of_freedom - 4.0).abs() < 1e-9,
+        "{}",
+        calibration.degrees_of_freedom
+    );
+
+    // One constant in blocks of one position: the leverage correction is
+    // `n/(n − 1)` and `ν = n − 1`, so `η = median(χ²_{n−1}) / (2 Σ r²)`.
+    let values = &series[0];
+    let (problem, fit) = means_problem(std::slice::from_ref(values));
+    let calibration = information_matching_eta(&problem, &fit, Some(1)).unwrap();
+    let n = values.len() as f64;
+    let squares: f64 = values.iter().map(|value| (value - fit[0]).powi(2)).sum();
+    let expected = chi_square_quantile(n - 1.0, 0.5) / (2.0 * squares);
+    assert!((calibration.degrees_of_freedom - (n - 1.0)).abs() < 1e-9);
+    assert!(
+        (calibration.eta / expected - 1.0).abs() < 1e-6,
+        "{} {expected}",
+        calibration.eta
+    );
 }
 
 #[test]

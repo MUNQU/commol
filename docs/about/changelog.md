@@ -835,6 +835,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and raises a `ValueError` when every block score is 0 because the scores
   of each parameter fall inside one block.
   See [What `η` means](../guide/uncertainty/smc.md#what-means).
+- `InformationMatchingEta` gave an `η` too large, so a posterior too
+  narrow, when the blocks share the curvature unevenly or read few degrees
+  of freedom: with noise of sd 1 and `loss_function="sse"`, the median `η`
+  over data sets was 2.2 times `1/(2σ²)` for one constant flow at 24
+  positions with `block_length=12`, and 3.7 times for a line at 24
+  positions with `block_length=8`. It now corrects the trace by the share
+  of the curvature in each block, `p / (p − Σ_b tr((J⁻¹ J_b)²))` in place
+  of `G/(G − 1)`, and `η` by `median(χ²_ν)/ν` for the degrees of freedom
+  `ν` of the blocks: medians of 1.00 and 1.02 times. With many degrees of
+  freedom `η` changes less: `block_length=1` of one constant at `n`
+  positions gives `median(χ²_{n−1}) / (2 Σ r²)` where it gave
+  `(n − 1) / (2 Σ r²)`, 0.98 times as large at `n = 30`, and of a line at
+  24 positions a median `η` 0.91 times as large, which was 1.11 times its
+  value. See [What `η` means](../guide/uncertainty/smc.md#what-means).
 - A calibrated value of a bin, and the initial-condition remainder, split by
   the proportions of amounts below the smallest normal `float`, about
   `2.2e-308`, which hold fewer digits the smaller they are: with

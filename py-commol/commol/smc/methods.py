@@ -40,8 +40,12 @@ class InformationMatchingEta(RangeChecked):
     deterministic engine, and is cheap and local. The variance sums the
     scores over blocks of positions, so it holds under dependence inside a
     block, and enters only through a trace, so it takes two blocks or more,
-    also fewer blocks than parameters; with few blocks and few parameters
-    `η` varies much and comes out too large more often than too small.
+    also fewer blocks than parameters. The trace is corrected by the share
+    of the curvature each block holds, and `η` by the degrees of freedom the
+    blocks read, so that its median over data sets is its value also with
+    blocks that share the curvature unevenly; with few degrees of freedom
+    one data set still gives an `η` far from it, and intervals that cover
+    less than their level.
 
     Attributes
     ----------

@@ -290,7 +290,7 @@ print(holm({s.label: s.p_value for s in together.series}))  # {'south': 1.0, 'no
 |---|---|
 | The bootstraps and the jackknife | `block_length`: dependence inside a block is kept ([Blocks and their length](resampling.md#blocks-and-their-length)) |
 | `Sandwich` | Scores summed over blocks ([Sandwich](local.md#sandwich)) |
-| `InformationMatchingEta`, `BootstrapCoverageEta` | The scale `η` of a Gibbs posterior from blocks of scores or of data ([What `η` means](smc.md#what-means)) |
+| `InformationMatchingEta`, `BootstrapCoverageEta` | The scale `η` of a Gibbs posterior from blocks of scores or of data. Information matching corrects `η` for blocks that share the curvature unevenly and for the degrees of freedom they read; with few blocks its intervals still cover less than their level ([What `η` means](smc.md#what-means)) |
 | `EnbPI` | Prediction intervals of a series with dependent errors ([EnbPI](conformal.md#enbpi)) |
 | `Laplace`, `BayesianPosterior`, `block_length=1` | Each observation independent: an information factor above 1 says their intervals are too narrow |
 

@@ -67,24 +67,24 @@ pub fn sandwich(curvature: &Curvature, blocks: &BlockScheme) -> Result<Gaussian,
 pub fn block_meat(curvature: &Curvature, blocks: &BlockScheme) -> Matrix {
     let count = blocks.count();
     debug_assert!(count >= 2, "the meat of one block");
+    let scores = block_scores(curvature, blocks);
+    scores.transpose() * scores * (count as f64 / (count - 1) as f64)
+}
+
+/// The block scores `s_b = Σ_{i∈b} gᵢ` of the gradients of `curvature` over
+/// the blocks of `blocks`, on the unbounded scale: one row per block.
+pub fn block_scores(curvature: &Curvature, blocks: &BlockScheme) -> Matrix {
     let p = curvature.fit().len();
     let gradients = curvature.gradients();
-    let mut meat = Matrix::zeros(p, p);
-    for block in blocks.blocks() {
-        let mut score = vec![0.0; p];
+    let mut scores = Matrix::zeros(blocks.count(), p);
+    for (b, block) in blocks.blocks().iter().enumerate() {
         for &i in block {
-            for (j, entry) in score.iter_mut().enumerate() {
-                *entry += gradients[(i, j)];
-            }
-        }
-        for j in 0..p {
-            for k in 0..p {
-                meat[(j, k)] += score[j] * score[k];
+            for j in 0..p {
+                scores[(b, j)] += gradients[(i, j)];
             }
         }
     }
-    meat *= count as f64 / (count - 1) as f64;
-    meat
+    scores
 }
 
 /// The blocks of `problem` of `block_length` positions, or of the
