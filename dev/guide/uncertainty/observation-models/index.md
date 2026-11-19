@@ -152,6 +152,8 @@ An observation with [`parts=K`](https://munqu.github.io/commol/latest/guide/cali
 
 A negative binomial series with parts says how it reads them: `sum` has no default. `"moments"` is exact for equal parts and cheap; it drifts from the sum when the parts differ and the totals are large, with `φ ≳ 0.5`, and with few effective parts, `(Σμₜ)²/Σμₜ² ≲ 5`, and there it biases the fit of `φ`. `"exact"` costs about `K · y + y²` operations per evaluation of a total `y`, and its information is a sum over every count of non-negligible mass, which reaches far above `M` for a large `φ`: at totals in the thousands it is the cost of the fit.
 
+`"exact"` computes at most 100 000 counts, which hold the information of seven parts of a total of mean 10 000 up to `φ = 1`. A sum that needs more raises a `RuntimeError`, and never switches to `"moments"` on its own: an observed total of at least 100 000 in a fit or a score, or a tail (the PIT, the quantile residuals, the dependence of the residuals) or an information (the Laplace approximation, the sandwich) with no negligible term below the cap, as at `φ = 10⁶`. The message names the observation, its total, the mean of the total, `φ` and the counts, and points to `sum="moments"`.
+
 ```python
 weekly = Simulation(decay_model(0.05)).run(num_steps=40)
 size = 1 / 0.1

@@ -5363,6 +5363,8 @@ An observation with [`parts=K`](https://munqu.github.io/commol/latest/guide/cali
 
 A negative binomial series with parts says how it reads them: `sum` has no default. `"moments"` is exact for equal parts and cheap; it drifts from the sum when the parts differ and the totals are large, with `φ ≳ 0.5`, and with few effective parts, `(Σμₜ)²/Σμₜ² ≲ 5`, and there it biases the fit of `φ`. `"exact"` costs about `K · y + y²` operations per evaluation of a total `y`, and its information is a sum over every count of non-negligible mass, which reaches far above `M` for a large `φ`: at totals in the thousands it is the cost of the fit.
 
+`"exact"` computes at most 100 000 counts, which hold the information of seven parts of a total of mean 10 000 up to `φ = 1`. A sum that needs more raises a `RuntimeError`, and never switches to `"moments"` on its own: an observed total of at least 100 000 in a fit or a score, or a tail (the PIT, the quantile residuals, the dependence of the residuals) or an information (the Laplace approximation, the sandwich) with no negligible term below the cap, as at `φ = 10⁶`. The message names the observation, its total, the mean of the total, `φ` and the counts, and points to `sum="moments"`.
+
 ```python
 weekly = Simulation(decay_model(0.05)).run(num_steps=40)
 size = 1 / 0.1
@@ -13559,7 +13561,7 @@ Raises:
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TypeError`            | If noise is ResidualNoise.                                                                                                                                                                                                                                                                        |
 | `ValueError`           | If a setting is outside its range, the predictive is of a sensitivity analysis, quantile residuals have a loss or an observed value outside the support of its model, additive residuals have more than one randomization, or Refitted reads many draws or observations other than the problem's. |
-| `RuntimeError`         | If every refit fails.                                                                                                                                                                                                                                                                             |
+| `RuntimeError`         | If every refit fails, or the exact sum of an observation does not end within the counts of sum="exact" (NegativeBinomialObservations).                                                                                                                                                            |
 | `InfeasibleStateError` | If a draw leaves the values its model allows.                                                                                                                                                                                                                                                     |
 
 References
@@ -13640,7 +13642,8 @@ def residual_dependence(
         than one randomization, or `Refitted` reads many draws or
         observations other than the problem's.
     RuntimeError
-        If every refit fails.
+        If every refit fails, or the exact sum of an observation does not end
+        within the counts of ``sum="exact"`` (`NegativeBinomialObservations`).
     InfeasibleStateError
         If a draw leaves the values its model allows.
 
@@ -24469,7 +24472,7 @@ Negative binomial counts of mean `μ`, the prediction, and variance `μ + φμ²
 
 `φ = 0` is the Poisson, so bounds `[0, …]` of a noise parameter hold it. The dispersion `k` (`size` in R) is `1/φ`. Every observed value must be a whole number, at least 0.
 
-An observation of several parts (`ObservedDataPoint.parts`) is the sum of one independent negative binomial per part, each with this `φ`, and a series with such an observation says how its model reads that sum: `sum="exact"` reads its exact distribution, at a cost of about `K·y + y²` operations for `K` parts and a total `y`; `sum="moments"` reads a negative binomial with the mean and the variance of the sum, `NB(M, φ · Σμₜ²/M²)`, fast but off when a total spreads over few effective parts with a large `φ`. A series without such an observation has no `sum`.
+An observation of several parts (`ObservedDataPoint.parts`) is the sum of one independent negative binomial per part, each with this `φ`, and a series with such an observation says how its model reads that sum: `sum="exact"` reads its exact distribution, at a cost of about `K·y + y²` operations for `K` parts and a total `y`, over at most 100 000 counts (a sum that needs more raises an error that says so); `sum="moments"` reads a negative binomial with the mean and the variance of the sum, `NB(M, φ · Σμₜ²/M²)`, fast but off when a total spreads over few effective parts with a large `φ`. A series without such an observation has no `sum`.
 
 Attributes:
 
@@ -24494,7 +24497,8 @@ class NegativeBinomialObservations(_ObservationModel, RangeChecked):
     of one independent negative binomial per part, each with this ``φ``, and
     a series with such an observation says how its model reads that sum:
     ``sum="exact"`` reads its exact distribution, at a cost of about
-    ``K·y + y²`` operations for ``K`` parts and a total ``y``;
+    ``K·y + y²`` operations for ``K`` parts and a total ``y``, over at most
+    100 000 counts (a sum that needs more raises an error that says so);
     ``sum="moments"`` reads a negative binomial with the mean and the
     variance of the sum, ``NB(M, φ · Σμₜ²/M²)``, fast but off when a total
     spreads over few effective parts with a large ``φ``. A series without
@@ -28932,9 +28936,10 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                     |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | As Predictive.at_observations, and if an observed value is outside the support of its observation model with DistributionNoise. |
+| Type           | Description                                                                                                                     |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError`   | As Predictive.at_observations, and if an observed value is outside the support of its observation model with DistributionNoise. |
+| `RuntimeError` | If the exact sum of an observation does not end within the counts of sum="exact" at a draw (NegativeBinomialObservations).      |
 
 Source code in `commol/scores/rules.py`
 
@@ -28978,6 +28983,9 @@ def pit(
     ValueError
         As `Predictive.at_observations`, and if an observed value is outside
         the support of its observation model with `DistributionNoise`.
+    RuntimeError
+        If the exact sum of an observation does not end within the counts of
+        ``sum="exact"`` at a draw (`NegativeBinomialObservations`).
     """
     bounds = predictive.source._observation_bounds(
         predictive.sample, list(observations), noise
@@ -29016,6 +29024,7 @@ Raises:
 | `TypeError`            | If noise is not DistributionNoise.                                                                                                                                                                                                                         |
 | `ValueError`           | If the problem has a loss, an observation names an unknown output or factor or a series with no observation model, an observed value is outside the support of its model, or the predictive is of a sensitivity analysis, which has no observation models. |
 | `InfeasibleStateError` | If a draw leaves the values its model allows, as Predictive.at_observations.                                                                                                                                                                               |
+| `RuntimeError`         | If the exact sum of an observation does not end within the counts of sum="exact" at a draw (NegativeBinomialObservations).                                                                                                                                 |
 
 References
 
@@ -29063,6 +29072,9 @@ def quantile_residuals(
         sensitivity analysis, which has no observation models.
     InfeasibleStateError
         If a draw leaves the values its model allows, as `Predictive.at_observations`.
+    RuntimeError
+        If the exact sum of an observation does not end within the counts of
+        ``sum="exact"`` at a draw (`NegativeBinomialObservations`).
 
     References
     ----------
@@ -29108,10 +29120,11 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                                                                                         |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TypeError`  | If noise is not DistributionNoise.                                                                                                                                                                  |
-| `ValueError` | If the problem has a loss, an observation names an unknown output or factor or a series with no observation model, or the predictive is of a sensitivity analysis, which has no observation models. |
+| Type           | Description                                                                                                                                                                                         |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TypeError`    | If noise is not DistributionNoise.                                                                                                                                                                  |
+| `ValueError`   | If the problem has a loss, an observation names an unknown output or factor or a series with no observation model, or the predictive is of a sensitivity analysis, which has no observation models. |
+| `RuntimeError` | If the exact sum of an observation does not end within the counts of sum="exact" at a draw (NegativeBinomialObservations).                                                                          |
 
 Source code in `commol/scores/rules.py`
 
@@ -29153,6 +29166,9 @@ def log_score(
         If the problem has a loss, an observation names an unknown output or
         factor or a series with no observation model, or the predictive is of
         a sensitivity analysis, which has no observation models.
+    RuntimeError
+        If the exact sum of an observation does not end within the counts of
+        ``sum="exact"`` at a draw (`NegativeBinomialObservations`).
     """
     if not isinstance(noise, DistributionNoise):
         raise TypeError(
@@ -40697,7 +40713,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - `commol.dependence`: whether the values of each series are independent, and how strongly they depend. `series_dependence(values, observations, max_lag, replicates, confidence_level, seed)` reads any values, one per observation; `residual_dependence(predictive, observations, noise, max_lag, randomizations, reference, confidence_level)` reads the quantile residuals (`DistributionNoise()`) or the additive residuals (`NoNoise()`) of a predictive. Each series, read on the grid of its smallest spacing with each lag over its pairs, has its autocorrelations, the robust portmanteau `Q̃` of Dalla, Giraitis and Phillips (2022) with its p-value, and the integrated autocorrelation time `τ` by Geyer's initial monotone sequence with its band; the series together have their correlations and the factor by which the dependence multiplies the information. The required `reference` is `AtParameters(replicates)`, for held-out data, or `Refitted(replicates, starts=1)`, which refits data drawn at the fit and holds for the data of the fit. `Q̃` sums only the lags of 4 pairs or more: `few_pairs` gives the others with their pairs, and a series with no lag left has no `Q̃`, with its `portmanteau_reason`. The result is `SeriesDependence`. See [Dependence](https://munqu.github.io/commol/latest/guide/uncertainty/dependence/index.md).
 - `commol.scores.quantile_residuals(predictive, observations, DistributionNoise())`: the randomized quantile residuals of Dunn and Smyth (1996), `Φ⁻¹` of the PIT of the mixture of the observation models over the draws, read from the nearer tail, so a value far in the upper tail has a finite residual. They are standard normal for data the predictive did not see; another noise raises a `TypeError`. The engine gives both tails of every observation model, sums of parts included, from special functions now in `commol-statistics`. See [Quantile residuals](https://munqu.github.io/commol/latest/guide/uncertainty/#quantile-residuals).
-- `ObservedDataPoint(parts=K)`: a value that is the sum of `K` independent observations over equal parts of its window, such as a weekly total of daily counts; `parts=1` by default, and more than 1 needs a `window`. The prediction is the sum of the means of the parts, and the observation model of the series reads the sum: `PoissonObservations` as `Poisson(M)`, `NormalObservations` as `N(M, K · sd²)`, and `NegativeBinomialObservations(sum="exact" | "moments")` as the exact convolution of the parts or the negative binomial of its mean and variance. A negative binomial series with parts needs `sum`, and one without parts refuses it; the other models refuse parts. The draws of `DistributionNoise()` and `ParametricBootstrap`, the log score, the gradients and the expected information read the sum as its model does. See [Parts of a window](https://munqu.github.io/commol/latest/guide/calibration-observations/#parts-of-a-window) and [Sums of parts](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#sums-of-parts).
+- `ObservedDataPoint(parts=K)`: a value that is the sum of `K` independent observations over equal parts of its window, such as a weekly total of daily counts; `parts=1` by default, and more than 1 needs a `window`. The prediction is the sum of the means of the parts, and the observation model of the series reads the sum: `PoissonObservations` as `Poisson(M)`, `NormalObservations` as `N(M, K · sd²)`, and `NegativeBinomialObservations(sum="exact" | "moments")` as the exact convolution of the parts or the negative binomial of its mean and variance. A negative binomial series with parts needs `sum`, and one without parts refuses it; the other models refuse parts. `"exact"` computes at most 100 000 counts: a total at that count, or a tail or an information with no negligible term below it, as at a large `overdispersion`, raises a `RuntimeError` that names the observation, its total, the mean of the total, `φ` and the counts, and points to `sum="moments"`; it never switches on its own. The draws of `DistributionNoise()` and `ParametricBootstrap`, the log score, the gradients and the expected information read the sum as its model does. See [Parts of a window](https://munqu.github.io/commol/latest/guide/calibration-observations/#parts-of-a-window) and [Sums of parts](https://munqu.github.io/commol/latest/guide/uncertainty/observation-models/#sums-of-parts).
 - `Aggregate.scored_amounts`, a `dict[str, ScoredAmount]`: the scored amounts that `Model.apply_calibration_parameters` writes for the compartments that the bins and the fractions build only to their last bits, each with the amount they `built` and the amount the calibration `scored`, at most 64 units in the last place apart. The build applies a scored amount last, while its compartment still builds `built`, has no `compartment_amounts` entry and is not of a bin left `None`, and ignores it otherwise, so an edit of the model takes effect, whatever its path. `compartment_amounts` holds only what the user declares, a value a calibration sets for an exact compartment among them, which an update of its bin keeps as before. `describe()` says in one line how many compartments start from a scored amount. A file with a non-empty `scored_amounts` needs this release or later; a model with none writes no field. See [Writing back](https://munqu.github.io/commol/latest/guide/calibration-initial-conditions/#writing-back).
 - Ctrl-C stops a method that logs its steps: it starts no new step, waits for the steps already running, and raises `KeyboardInterrupt`, whatever the level of the logger. See [Stop a long method](https://munqu.github.io/commol/latest/getting-started/quickstart/#stop-a-long-method).
 - More long methods log their steps at `INFO`, on the logger of their module: each block of a block jackknife (`commol.resampling`); each fit of jackknife+, EnbPI and rolling conformal (`commol.conformal`); each generation of a Gibbs posterior, a Bayesian posterior and ABC-SMC, with its level, and each replicate and round of a calibrated `η` (`commol.smc`); and the model runs of ABC rejection (`commol.smc`), a Laplace mixture (`commol.local`), each sensitivity method (`commol.sensitivity`) and a predictive, at each 1 % of the runs. See [Log messages](https://munqu.github.io/commol/latest/getting-started/quickstart/#log-messages).

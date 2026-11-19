@@ -2975,6 +2975,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../codebase/decisions/sums-of-parts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sums of Parts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../codebase/decisions/settings/" class="md-nav__link">
         
   
@@ -5413,7 +5441,12 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   <code>NegativeBinomialObservations(sum="exact" | "moments")</code> as the exact
   convolution of the parts or the negative binomial of its mean and
   variance. A negative binomial series with parts needs <code>sum</code>, and one
-  without parts refuses it; the other models refuse parts. The draws of
+  without parts refuses it; the other models refuse parts. <code>"exact"</code>
+  computes at most 100 000 counts: a total at that count, or a tail or an
+  information with no negligible term below it, as at a large
+  <code>overdispersion</code>, raises a <code>RuntimeError</code> that names the observation, its
+  total, the mean of the total, <code>φ</code> and the counts, and points to
+  <code>sum="moments"</code>; it never switches on its own. The draws of
   <code>DistributionNoise()</code> and <code>ParametricBootstrap</code>, the log score, the
   gradients and the expected information read the sum as its model does. See
   <a href="../../guide/calibration-observations/#parts-of-a-window">Parts of a window</a>

@@ -272,9 +272,10 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                     |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `ValueError` | As Predictive.at_observations, and if an observed value is outside the support of its observation model with DistributionNoise. |
+| Type           | Description                                                                                                                     |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `ValueError`   | As Predictive.at_observations, and if an observed value is outside the support of its observation model with DistributionNoise. |
+| `RuntimeError` | If the exact sum of an observation does not end within the counts of sum="exact" at a draw (NegativeBinomialObservations).      |
 
 Source code in `commol/scores/rules.py`
 
@@ -318,6 +319,9 @@ def pit(
     ValueError
         As `Predictive.at_observations`, and if an observed value is outside
         the support of its observation model with `DistributionNoise`.
+    RuntimeError
+        If the exact sum of an observation does not end within the counts of
+        ``sum="exact"`` at a draw (`NegativeBinomialObservations`).
     """
     bounds = predictive.source._observation_bounds(
         predictive.sample, list(observations), noise
@@ -356,6 +360,7 @@ Raises:
 | `TypeError`            | If noise is not DistributionNoise.                                                                                                                                                                                                                         |
 | `ValueError`           | If the problem has a loss, an observation names an unknown output or factor or a series with no observation model, an observed value is outside the support of its model, or the predictive is of a sensitivity analysis, which has no observation models. |
 | `InfeasibleStateError` | If a draw leaves the values its model allows, as Predictive.at_observations.                                                                                                                                                                               |
+| `RuntimeError`         | If the exact sum of an observation does not end within the counts of sum="exact" at a draw (NegativeBinomialObservations).                                                                                                                                 |
 
 References
 
@@ -403,6 +408,9 @@ def quantile_residuals(
         sensitivity analysis, which has no observation models.
     InfeasibleStateError
         If a draw leaves the values its model allows, as `Predictive.at_observations`.
+    RuntimeError
+        If the exact sum of an observation does not end within the counts of
+        ``sum="exact"`` at a draw (`NegativeBinomialObservations`).
 
     References
     ----------
@@ -448,10 +456,11 @@ Returns:
 
 Raises:
 
-| Type         | Description                                                                                                                                                                                         |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TypeError`  | If noise is not DistributionNoise.                                                                                                                                                                  |
-| `ValueError` | If the problem has a loss, an observation names an unknown output or factor or a series with no observation model, or the predictive is of a sensitivity analysis, which has no observation models. |
+| Type           | Description                                                                                                                                                                                         |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TypeError`    | If noise is not DistributionNoise.                                                                                                                                                                  |
+| `ValueError`   | If the problem has a loss, an observation names an unknown output or factor or a series with no observation model, or the predictive is of a sensitivity analysis, which has no observation models. |
+| `RuntimeError` | If the exact sum of an observation does not end within the counts of sum="exact" at a draw (NegativeBinomialObservations).                                                                          |
 
 Source code in `commol/scores/rules.py`
 
@@ -493,6 +502,9 @@ def log_score(
         If the problem has a loss, an observation names an unknown output or
         factor or a series with no observation model, or the predictive is of
         a sensitivity analysis, which has no observation models.
+    RuntimeError
+        If the exact sum of an observation does not end within the counts of
+        ``sum="exact"`` at a draw (`NegativeBinomialObservations`).
     """
     if not isinstance(noise, DistributionNoise):
         raise TypeError(

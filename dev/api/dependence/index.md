@@ -171,7 +171,7 @@ Raises:
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TypeError`            | If noise is ResidualNoise.                                                                                                                                                                                                                                                                        |
 | `ValueError`           | If a setting is outside its range, the predictive is of a sensitivity analysis, quantile residuals have a loss or an observed value outside the support of its model, additive residuals have more than one randomization, or Refitted reads many draws or observations other than the problem's. |
-| `RuntimeError`         | If every refit fails.                                                                                                                                                                                                                                                                             |
+| `RuntimeError`         | If every refit fails, or the exact sum of an observation does not end within the counts of sum="exact" (NegativeBinomialObservations).                                                                                                                                                            |
 | `InfeasibleStateError` | If a draw leaves the values its model allows.                                                                                                                                                                                                                                                     |
 
 References
@@ -252,7 +252,8 @@ def residual_dependence(
         than one randomization, or `Refitted` reads many draws or
         observations other than the problem's.
     RuntimeError
-        If every refit fails.
+        If every refit fails, or the exact sum of an observation does not end
+        within the counts of ``sum="exact"`` (`NegativeBinomialObservations`).
     InfeasibleStateError
         If a draw leaves the values its model allows.
 
