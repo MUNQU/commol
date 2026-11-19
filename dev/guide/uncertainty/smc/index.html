@@ -4113,7 +4113,7 @@ how the observations scatter.</p>
 </span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a>        <span class="n">stay_probability</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
 </span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a>    <span class="p">)</span>
 </span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58" href="#__codelineno-0-58"></a><span class="p">)</span>
-</span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59" href="#__codelineno-0-59"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">gibbs</span><span class="o">.</span><span class="n">eta</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>  <span class="c1"># 0.71: (n − 1)/(2 Σ r²), about 1/(2σ̂²)</span>
+</span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59" href="#__codelineno-0-59"></a><span class="nb">print</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">gibbs</span><span class="o">.</span><span class="n">eta</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>  <span class="c1"># 0.69: median(χ²₂₉)/(2 Σ r²), about 1/(2σ̂²)</span>
 </span><span id="__span-0-60"><a id="__codelineno-0-60" name="__codelineno-0-60" href="#__codelineno-0-60"></a><span class="n">lower</span><span class="p">,</span> <span class="n">upper</span> <span class="o">=</span> <span class="n">gibbs</span><span class="o">.</span><span class="n">sample</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span><span class="mf">0.9</span><span class="p">)[</span><span class="s2">&quot;c&quot;</span><span class="p">]</span>
 </span><span id="__span-0-61"><a id="__codelineno-0-61" name="__codelineno-0-61" href="#__codelineno-0-61"></a><span class="nb">print</span><span class="p">(</span><span class="n">lower</span> <span class="o">&lt;</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">flows</span><span class="p">))</span> <span class="o">&lt;</span> <span class="n">upper</span><span class="p">)</span>  <span class="c1"># True</span>
 </span><span id="__span-0-62"><a id="__codelineno-0-62" name="__codelineno-0-62" href="#__codelineno-0-62"></a>
@@ -4283,7 +4283,7 @@ variance <code>σ²</code>, <code>η = 1/(2σ²)</code> makes the Gibbs posterio
 </tr>
 <tr>
 <td><code>InformationMatchingEta(block_length, starts=1)</code></td>
-<td><code>η = p / tr(J⁻¹ I)</code> at the fit, for <code>p</code> parameters: the Gauss–Newton curvature <code>J</code> of the objective against the variance <code>I</code> of the scores of its terms, summed over blocks of <code>block_length</code> positions (Pauli, Racugno and Ventura 2011)</td>
+<td><code>η = p / tr(J⁻¹ I)</code> at the fit, for <code>p</code> parameters: the Gauss–Newton curvature <code>J</code> of the objective against the variance <code>I</code> of the scores of its terms, summed over blocks of <code>block_length</code> positions (Pauli, Racugno and Ventura 2011), corrected for the share of <code>J</code> in each block and for the degrees of freedom of the blocks</td>
 <td><code>loss_function="sse"</code> or observation models, a deterministic engine, at least two blocks</td>
 <td>A fit, finite differences and one sampler</td>
 </tr>
@@ -4313,13 +4313,25 @@ inside a block, and <code>block_length</code> has no default: <code>block_length
 the independent version, every observation its own block. <code>I</code> enters only
 through a trace, so <code>η</code> needs no inverse of <code>I</code>: it takes two blocks or more,
 also fewer blocks than parameters, and blocks can be long enough to hold the
-dependence. Each parameter adds <code>G − 1</code> pieces of information about the
-scale, at most, for <code>G</code> blocks: with few blocks and few parameters, or with
-parameters that the data read in one part of the series only, <code>η</code> varies
-much from one data set to the next and comes out too large more often than
-too small, so the intervals are too narrow. Blocks that each hold several
-positions of every parameter, with <code>p(G − 1)</code> of about 10 or more for <code>p</code>
-parameters, keep it near its value. Bootstrap
+dependence.</p>
+<p>The blocks read at most <code>p(G − 1)</code> degrees of freedom <code>ν</code> about the scale,
+for <code>G</code> blocks, and fewer when they share the curvature <code>J</code> unevenly: a
+slope, whose curvature sits at the ends of the series, a parameter that the
+data read in one part of the series only, or a short last block. Information
+matching corrects for both, with <code>J_b</code> the curvature of block <code>b</code>: the trace
+by <code>p / (p − Σ_b tr((J⁻¹ J_b)²))</code>, the leverage of the blocks, which is
+<code>G/(G − 1)</code> when each block holds <code>1/G</code> of <code>J</code>; and <code>η</code> by
+<code>median(χ²_ν)/ν</code>, with <code>ν</code> the Satterthwaite degrees of freedom of the trace,
+because <code>η</code> is the reciprocal of the trace and comes out too large more often
+than too small. Its median over data sets is then its value: with noise of
+sd 1, exactly <code>1/(2σ²)</code> for one constant at 24 positions in 2 blocks
+(<code>ν = 1</code>) and 1.02 times it for a line at 24 positions in 3 blocks
+(<code>ν ≈ 1.5</code>), where the trace alone gives 2.2 and 3.7 times. With few degrees of freedom
+one data set still gives an <code>η</code> far from its value, and the intervals cover
+less than their level: for that line in 8 blocks of 3 (<code>ν ≈ 5</code>), 90 %
+intervals cover about 87 %, and in 3 blocks about 84 %. Blocks that each
+hold several positions of every parameter, with <code>p(G − 1)</code> of about 10 or
+more, keep them near their level. Bootstrap
 coverage runs one tempered sampler per replicate to a large <code>η</code>, reads the
 posterior of every smaller <code>η</code> by reweighting, so its search runs no model,
 and finds for each replicate and parameter the <code>η</code> where the interval stops
@@ -4456,7 +4468,7 @@ Monte Carlo error.</p>
 <ul>
 <li>[ ] Each calibrated parameter has a prior you can defend, on bounds that fit it.</li>
 <li>[ ] <code>η</code> is a number you can justify, or one of its calibrations.</li>
-<li>[ ] Information matching has <code>p(G − 1)</code> of about 10 or more, for <code>p</code> parameters and <code>G</code> blocks.</li>
+<li>[ ] Information matching has <code>p(G − 1)</code> of about 10 or more, for <code>p</code> parameters and <code>G</code> blocks, each holding several positions of every parameter.</li>
 <li>[ ] A Gibbs posterior ends at temperature 1; an ABC run says why it stopped.</li>
 <li>[ ] With a stochastic engine, ABC reads one replicate per particle, not the problem's summary.</li>
 </ul>

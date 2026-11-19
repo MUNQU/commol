@@ -6216,6 +6216,20 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   and raises a <code>ValueError</code> when every block score is 0 because the scores
   of each parameter fall inside one block.
   See <a href="../../guide/uncertainty/smc/#what-means">What <code>η</code> means</a>.</li>
+<li><code>InformationMatchingEta</code> gave an <code>η</code> too large, so a posterior too
+  narrow, when the blocks share the curvature unevenly or read few degrees
+  of freedom: with noise of sd 1 and <code>loss_function="sse"</code>, the median <code>η</code>
+  over data sets was 2.2 times <code>1/(2σ²)</code> for one constant flow at 24
+  positions with <code>block_length=12</code>, and 3.7 times for a line at 24
+  positions with <code>block_length=8</code>. It now corrects the trace by the share
+  of the curvature in each block, <code>p / (p − Σ_b tr((J⁻¹ J_b)²))</code> in place
+  of <code>G/(G − 1)</code>, and <code>η</code> by <code>median(χ²_ν)/ν</code> for the degrees of freedom
+  <code>ν</code> of the blocks: medians of 1.00 and 1.02 times. With many degrees of
+  freedom <code>η</code> changes less: <code>block_length=1</code> of one constant at <code>n</code>
+  positions gives <code>median(χ²_{n−1}) / (2 Σ r²)</code> where it gave
+  <code>(n − 1) / (2 Σ r²)</code>, 0.98 times as large at <code>n = 30</code>, and of a line at
+  24 positions a median <code>η</code> 0.91 times as large, which was 1.11 times its
+  value. See <a href="../../guide/uncertainty/smc/#what-means">What <code>η</code> means</a>.</li>
 <li>A calibrated value of a bin, and the initial-condition remainder, split by
   the proportions of amounts below the smallest normal <code>float</code>, about
   <code>2.2e-308</code>, which hold fewer digits the smaller they are: with

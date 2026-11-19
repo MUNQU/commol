@@ -140,7 +140,7 @@ Bases: `RangeChecked`
 
 Calibrate `η` by information matching: `η = p / tr(J⁻¹ I)` at the fit, for `p` parameters, with `J` the Gauss–Newton curvature of the objective and `I` the variance of the scores of its terms, summed over blocks of positions as the meat of `Sandwich`: the magnitude adjustment of a composite likelihood (Pauli, Racugno and Ventura 2011). For the sum of squares of a model with Gaussian noise of variance `σ²` it estimates `1/(2σ²)`; for a correct observation model, 1.
 
-It needs `loss_function="sse"` or observation models, and a deterministic engine, and is cheap and local. The variance sums the scores over blocks of positions, so it holds under dependence inside a block, and enters only through a trace, so it takes two blocks or more, also fewer blocks than parameters; with few blocks and few parameters `η` varies much and comes out too large more often than too small.
+It needs `loss_function="sse"` or observation models, and a deterministic engine, and is cheap and local. The variance sums the scores over blocks of positions, so it holds under dependence inside a block, and enters only through a trace, so it takes two blocks or more, also fewer blocks than parameters. The trace is corrected by the share of the curvature each block holds, and `η` by the degrees of freedom the blocks read, so that its median over data sets is its value also with blocks that share the curvature unevenly; with few degrees of freedom one data set still gives an `η` far from it, and intervals that cover less than their level.
 
 Attributes:
 
@@ -166,8 +166,12 @@ class InformationMatchingEta(RangeChecked):
     deterministic engine, and is cheap and local. The variance sums the
     scores over blocks of positions, so it holds under dependence inside a
     block, and enters only through a trace, so it takes two blocks or more,
-    also fewer blocks than parameters; with few blocks and few parameters
-    `η` varies much and comes out too large more often than too small.
+    also fewer blocks than parameters. The trace is corrected by the share
+    of the curvature each block holds, and `η` by the degrees of freedom the
+    blocks read, so that its median over data sets is its value also with
+    blocks that share the curvature unevenly; with few degrees of freedom
+    one data set still gives an `η` far from it, and intervals that cover
+    less than their level.
 
     Attributes
     ----------
