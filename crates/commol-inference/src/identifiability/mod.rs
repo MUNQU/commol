@@ -18,7 +18,10 @@ pub mod structural;
 pub use collinearity::{
     Collinearity, CollinearityVerdict, Subset, collinearity, collinearity_index,
 };
-pub use sample::{Direction, SampleIdentifiability, SampleVerdict, sample_identifiability};
+pub use sample::{
+    Direction, FEW_DRAWS_PER_PARAMETER, SampleIdentifiability, SampleSize, SampleVerdict,
+    sample_identifiability,
+};
 pub use starts::{StartsIdentifiability, starts_identifiability};
 pub use structural::{
     Combination, PointRank, StructuralAnalysis, StructuralVerdict, Tightening, TighterRank,

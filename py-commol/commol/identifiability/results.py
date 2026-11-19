@@ -392,7 +392,8 @@ class SampleSection(_FrozenResult):
         The parameters whose shape measures read ``ln θ``.
     effective_size : float
         Kish's effective size of the distinct draws, each with the summed
-        weight of its copies.
+        weight of its copies. Below ``p + 1`` for ``p`` parameters every
+        verdict is ``poorly_determined``.
     contraction : dict[str, float]
         ``1 − Var(sample) / Var(reference)`` of each parameter, on its scale:
         near 0 when the sample spreads as the reference, near 1 when it sits
@@ -429,7 +430,8 @@ class SampleSection(_FrozenResult):
         The effective size per parameter, ``n_eff / p``; below about 30 the
         count of hidden ridges over-counts.
     warnings : list[str]
-        What the section warns of: hidden ridges, or no directions.
+        What the section warns of: an effective size below ``p + 1`` or
+        below ``30·p``, no directions, or hidden ridges.
     """
 
     reference: SampleReference

@@ -272,9 +272,76 @@ def test_a_section_warns_of_a_hidden_ridge_and_of_no_directions(
     ]
     assert few.directions == []
     assert few.hidden_ridges is None
+    # Two distinct draws, of weights 2/3 and 1/3: an effective size of 1.8.
     assert few.warnings == [
+        "The effective size 1.8 is below p + 1 = 3 for 2 parameters: the "
+        "weights are worth fewer draws than a covariance of the parameters "
+        "needs, so no parameter is determined.",
         "The sample has 2 distinct draws for 2 parameters, and no directions: a "
-        "direction needs more distinct draws than parameters."
+        "direction needs more distinct draws than parameters.",
+    ]
+
+
+def test_a_sample_of_one_effective_draw_determines_nothing(
+    calibrator: Calibrator,
+) -> None:
+    # 500 draws whose weights put 0.999 on one draw: each contraction is near
+    # 1, and the effective size, about 1, is below p + 1 = 3.
+    rng = random.Random(5)
+    rows = [[rng.uniform(0.0, 0.5), rng.uniform(0.0, 0.3)] for _ in range(500)]
+    log_weights = [math.log(0.999)] + [math.log(0.001 / 499)] * 499
+    sample = ParameterSample(
+        names=["k1", "k2"],
+        bounds=BOUNDS,
+        values=rows,
+        log_weights=log_weights,
+        method=GIVEN,
+    )
+
+    report = calibrator.identifiability(
+        SampleIdentifiability(sample=sample, reference="bounds", **THRESHOLDS)
+    )
+    section = report.sample[0]
+
+    size = f"{section.effective_size:.3g}"
+    assert section.effective_size < 1.01
+    assert min(section.contraction.values()) > 0.99
+    reason = f"Sample: effective size {size}, below p + 1 = 3 for 2 parameters."
+    for name in ["k1", "k2"]:
+        practical = report.verdicts[name].practical
+        assert practical is not None
+        assert practical.verdict == "poorly_determined"
+        assert practical.reasons == [reason]
+    warning = (
+        f"The effective size {size} is below p + 1 = 3 for 2 parameters: the "
+        "weights are worth fewer draws than a covariance of the parameters "
+        "needs, so no parameter is determined."
+    )
+    assert section.warnings == [warning]
+    data = report.report()
+    assert data["sections"]["sample"][0]["warnings"] == [warning]
+    assert data["parameters"]["k1"]["practical"] == {
+        "verdict": "poorly_determined",
+        "reasons": [reason],
+    }
+
+
+def test_a_section_names_an_effective_size_below_thirty_per_parameter(
+    calibrator: Calibrator,
+) -> None:
+    # 40 draws near the middle of the bounds: above p + 1, below 30 · p.
+    rng = random.Random(6)
+    rows = [[0.25 + 0.01 * rng.random(), 0.15 + 0.01 * rng.random()] for _ in range(40)]
+    sample = ParameterSample.equally_weighted(["k1", "k2"], BOUNDS, rows, GIVEN)
+
+    section = _section(calibrator, sample)
+
+    assert {v for v, _ in _reasons(calibrator, sample).values()} == {"determined"}
+    assert section.hidden_ridges == 0
+    assert section.effective_size == pytest.approx(40.0)
+    assert section.warnings == [
+        "The effective size 40 is below 30 · p = 60 for 2 parameters: the count "
+        "of hidden ridges over-counts."
     ]
 
 

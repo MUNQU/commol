@@ -7,7 +7,7 @@ use commol_calibration::{
 use commol_core::{Accuracy, AccuracySettings, Model};
 use commol_difference::DifferenceEquations;
 use commol_inference::identifiability::{
-    PracticalVerdict, StructuralVerdict, Tightening, collinearity, collinearity_index,
+    PracticalVerdict, SampleSize, StructuralVerdict, Tightening, collinearity, collinearity_index,
     sample_identifiability, structural_rank,
 };
 use commol_inference::sensitivity::{
@@ -1659,4 +1659,85 @@ fn the_directions_do_not_depend_on_units() {
     for (d, e) in first.directions.iter().zip(&second.directions) {
         assert!((d.contraction - e.contraction).abs() < 1e-9, "{d:?} {e:?}");
     }
+}
+
+#[test]
+fn a_sample_of_too_few_effective_draws_has_no_determined_parameter() {
+    // 500 uniform draws of two parameters whose weights put 0.999 on one
+    // draw: the weighted variance is near 0, so each contraction is near 1,
+    // but the effective size is about 1, below p + 1 = 3.
+    let mut generator = Generator::from_seed(14);
+    let columns = [
+        draws(500, &mut generator, |g| g.uniform()),
+        draws(500, &mut generator, |g| g.uniform()),
+    ];
+    let values: Vec<Vec<f64>> = (0..500)
+        .map(|i| vec![columns[0][i], columns[1][i]])
+        .collect();
+    let log_weights: Vec<f64> = (0..500)
+        .map(|i| {
+            if i == 0 {
+                0.999f64.ln()
+            } else {
+                (0.001f64 / 499.0).ln()
+            }
+        })
+        .collect();
+    let sample = ParameterSample::new(
+        vec!["p0".to_string(), "p1".to_string()],
+        vec![(0.0, 1.0); 2],
+        values,
+        &log_weights,
+        None,
+    )
+    .unwrap();
+
+    let result = sample_identifiability(&sample, &bounds(0.9), 0).unwrap();
+
+    assert!(result.effective_size < 1.01, "{}", result.effective_size);
+    assert_eq!(result.size, SampleSize::TooFew);
+    for (j, verdict) in result.verdicts.iter().enumerate() {
+        assert!(result.contraction[j] > 0.99, "{:?}", result.contraction);
+        assert!(!verdict.low_contraction, "{verdict:?}");
+        assert_eq!(verdict.verdict, PracticalVerdict::PoorlyDetermined);
+    }
+    assert_eq!(result.hidden_ridges, Some(0));
+
+    // Equal weights: 30 draws of two parameters are above p + 1 and below
+    // 30 per parameter; 500 are not.
+    let tight = |n: usize, generator: &mut Generator| -> ParameterSample {
+        let a = draws(n, generator, |g| 0.5 + 0.01 * g.uniform());
+        let b = draws(n, generator, |g| 0.5 + 0.01 * g.uniform());
+        sample_on(&[a, b], &[(0.0, 1.0); 2])
+    };
+    let few = sample_identifiability(&tight(30, &mut generator), &bounds(0.9), 0).unwrap();
+    let enough = sample_identifiability(&tight(500, &mut generator), &bounds(0.9), 0).unwrap();
+    assert_eq!(few.size, SampleSize::Few);
+    assert_eq!(enough.size, SampleSize::Enough);
+    for result in [&few, &enough] {
+        assert!(
+            result
+                .verdicts
+                .iter()
+                .all(|v| v.verdict == PracticalVerdict::Determined),
+            "{:?}",
+            result.verdicts
+        );
+    }
+
+    // Equal weights at a floor are at it, whichever way their Kish size
+    // rounds: 5 draws of 4 parameters, 30 draws of 1.
+    let at = |n: usize, p: usize, generator: &mut Generator| -> SampleSize {
+        let columns: Vec<Vec<f64>> = (0..p)
+            .map(|_| draws(n, generator, |g| g.uniform()))
+            .collect();
+        let sample = sample_on(&columns, &vec![(0.0, 1.0); p]);
+        sample_identifiability(&sample, &bounds(0.9), 0)
+            .unwrap()
+            .size
+    };
+    assert_eq!(at(5, 4, &mut generator), SampleSize::Few);
+    assert_eq!(at(4, 4, &mut generator), SampleSize::TooFew);
+    assert_eq!(at(30, 1, &mut generator), SampleSize::Enough);
+    assert_eq!(at(29, 1, &mut generator), SampleSize::Few);
 }

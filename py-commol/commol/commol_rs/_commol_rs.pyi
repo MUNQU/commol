@@ -565,6 +565,8 @@ class SampleAnalysisProtocol(Protocol):
     @property
     def distinct_rows(self) -> int: ...
     @property
+    def size(self) -> Literal["too_few", "few", "enough"]: ...
+    @property
     def contraction(self) -> list[float]: ...
     @property
     def correlation(self) -> list[list[float]]: ...
@@ -749,6 +751,7 @@ class ForwardAnalysisProtocol(Protocol):
     def check_observations(self, observations: str) -> None: ...
 
 class InferenceModule(Protocol):
+    FEW_DRAWS_PER_PARAMETER: float
     CalibrationProblem: type[CalibrationProblemProtocol]
     ParameterSample: type[ParameterSampleProtocol]
     Predictive: type[PredictiveProtocol]

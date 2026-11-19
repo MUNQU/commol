@@ -125,7 +125,8 @@ modelling judgments. Rust decides each verdict and gives its causes
 (`StructuralAnalysis::verdicts`; `Collinearity::verdicts`: insensitive, the
 parameters it is collinear with; `SampleIdentifiability::verdicts`: a contraction below the threshold,
 the parameters it is correlated with, its number of modes, and the bounds
-that set a side, which do not set the verdict;
+that set a side, which do not set the verdict; `SampleIdentifiability::size`,
+an effective size below `p + 1`;
 `StartsIdentifiability::flagged`). The runners of
 `identifiability/runners.py` write the reasons from the causes and
 decide nothing.
@@ -152,6 +153,23 @@ spreads more than the widest distribution on them. The contraction enters
 the verdict. The shape measures
 read `θ`, or `ln θ` for `log_parameters`; the masses at each side and the
 overlap read the distribution function of the reference.
+
+- **The effective size.** Kish's size is the number of equally weighted
+  draws the weights are worth (the size whose mean has the same variance),
+  and a covariance of `p` parameters from `m` equal draws is singular when
+  `m ≤ p`. Below `p + 1` (`SampleSize::TooFew`) the sample is worth fewer
+  draws than the least covariance estimate of its parameters needs: a
+  sample whose weight sits on one draw has a variance near 0 and a
+  contraction near 1, which the weights make and the data did not earn.
+  Every verdict is then poorly determined, and the section warns. The
+  floor reads the equivalent equal draws, not the weighted covariance
+  itself, which has full rank for 500 distinct rows with 0.999 of the
+  weight on one. It is set by `p` alone, as the least size at which the
+  estimator exists, so it is a constant of the estimator like
+  `STANDARD_ERRORS`, not a setting; a Kish size within `10⁻⁹` of a floor,
+  as of equal weights, is at it. Below `FEW_DRAWS_PER_PARAMETER · p` (30·p,
+  `SampleSize::Few`) the verdicts hold and the section names the effective
+  size, since the count of hidden ridges over-counts there.
 
 - **Modes.** A weighted Gaussian kernel density with Silverman's bandwidth
   `h`, reflected at each finite bound, on a grid over the draws ± 3`h` cut
@@ -203,6 +221,9 @@ the marginals of the guard over four references and three sizes.
 | A threshold of Marchenko–Pastur | It hides real directions: a direction of 0.45 is found in 2 % of samples. |
 | A direction as a `Combination` | A combination is a product of powers that the rank of the sensitivities determines exactly; a direction has a contraction and mixes natural and log scales. |
 | The thresholds of the estimators as settings | No user can choose them better than the estimator. |
+| The rank of the weighted covariance as the floor | 500 distinct rows with 0.999 of the weight on one have full rank and a contraction near 1. |
+| A setting for the floor of the effective size | Below `p + 1` equivalent draws no covariance estimate exists to judge, and above it `contraction_threshold` and the warning at `30·p` already judge; a lower floor admits verdicts from one draw. |
+| Only a warning below the floor, with the verdicts as they are | The verdict is the field a user reads; a contraction near 1 from one draw reads `determined`. |
 
 **Guards:** `crates/commol-inference/tests/test_identifiability.rs`
 (`a_sample_of_its_reference_is_poorly_determined_by_its_contraction`,
@@ -211,5 +232,6 @@ the marginals of the guard over four references and three sizes.
 `the_overlap_of_a_sample_with_its_reference`,
 `log_parameters_set_the_scale_of_every_shape_measure`,
 `directions_and_their_contraction`, `the_count_of_hidden_ridges`,
-`the_directions_do_not_depend_on_units`),
+`the_directions_do_not_depend_on_units`,
+`a_sample_of_too_few_effective_draws_has_no_determined_parameter`),
 `tests/uncertainty/test_identifiability_sample.py`.
