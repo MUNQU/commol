@@ -36,6 +36,13 @@ pub enum TermError {
     NoCurvature(String),
     /// The mean of this observation lies outside its observation model.
     MeanOutside(usize),
+    /// The value of this observation has no probability at its mean, so its
+    /// score is not finite: the point is outside the support of its model.
+    NoProbability(usize),
+    /// The score of this observation is not finite at a mean next to the
+    /// edge of the means its model allows, where its value keeps a
+    /// probability.
+    ScoreAtEdge(usize),
     /// The model of an observation could not be read there; the message
     /// says why, as an exact sum that does not end
     /// ([`crate::UnendedSum`]).
@@ -48,7 +55,7 @@ pub enum TermError {
 #[derive(Debug, Clone, PartialEq)]
 pub enum DerivativesError {
     /// The discrepancy has no derivatives there: a loss with no curvature,
-    /// or a mean outside its observation model.
+    /// a mean outside its observation model, or a score that is not finite.
     Invalid(String),
     /// The model of an observation could not be read there.
     Failed(String),
@@ -318,9 +325,8 @@ impl Discrepancy {
     /// # Errors
     ///
     /// [`TermError::NoCurvature`] for the mean absolute error, and for the
-    /// root mean squared error of a perfect fit; [`TermError::MeanOutside`]
-    /// when a mean lies outside its observation model; [`TermError::Failed`]
-    /// when an exact sum does not end.
+    /// root mean squared error of a perfect fit; for observation models, as
+    /// [`Likelihood::term_derivatives`].
     pub fn term_derivatives(
         &self,
         values: &[f64],

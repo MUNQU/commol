@@ -344,6 +344,11 @@ impl Noise {
     /// to the arguments `(μ, noise arguments…)` of [`Self::information`]:
     /// the scores of one observation, whose variance is
     /// [`Self::information`].
+    ///
+    /// A count at an end of the means of its model is its limit there:
+    /// `−1` for a count of 0 at a mean of 0 of a Poisson, a negative
+    /// binomial (whose `φ` score is 0 there) or a binomial, and `1` for a
+    /// binomial count of `n` at a mean of `n`.
     pub fn scores(&self, y: f64, mean: f64) -> Vec<f64> {
         match *self {
             Self::Normal { sd } => {
@@ -374,11 +379,19 @@ impl Noise {
                     -1.0 / scale + (df + 1.0) * z2 / (scale * (df + z2)),
                 ]
             }
+            // At a count of 0 the score of the mean drops its `0/μ`, so it is
+            // finite at a mean of 0, where it is the limit of the general one.
+            Self::Poisson if y == 0.0 => vec![-1.0],
             Self::Poisson => vec![y / mean - 1.0],
             Self::NegativeBinomial { overdispersion, .. } => {
                 let phi = overdispersion;
+                let mean_score = if y == 0.0 {
+                    -1.0 / (1.0 + phi * mean)
+                } else {
+                    (y - mean) / (mean * (1.0 + phi * mean))
+                };
                 vec![
-                    (y - mean) / (mean * (1.0 + phi * mean)),
+                    mean_score,
                     dispersion_score(y, mean, phi, dispersion_first_terms(y, phi)),
                 ]
             }
@@ -386,6 +399,15 @@ impl Noise {
                 let n = trials as f64;
                 if n == 0.0 {
                     return vec![0.0];
+                }
+                // At `y = 0` and `y = n` the factor `y` or `n − y` cancels:
+                // `−n/(n − μ)` and `n/μ`, finite at the end of the means each
+                // count shares.
+                if y == 0.0 {
+                    return vec![-n / (n - mean)];
+                }
+                if y == n {
+                    return vec![n / mean];
                 }
                 vec![(y - mean) * n / (mean * (n - mean))]
             }
@@ -615,5 +637,52 @@ mod tests {
         assert_eq!(Noise::Poisson.log_density(1.0, 0.0), f64::NEG_INFINITY);
         assert_eq!(Noise::Binomial { trials: 0 }.log_density(0.0, 0.0), 0.0);
         assert_eq!(Noise::Binomial { trials: 3 }.log_density(3.0, 3.0), 0.0);
+    }
+
+    /// The slope of `log p(y | μ)` from the end `end` of the means a step
+    /// `step` inside them, against the score of the mean there.
+    fn assert_end_score(noise: Noise, y: f64, end: f64, step: f64) {
+        let score = noise.scores(y, end)[0];
+        let slope = (noise.log_density(y, end + step) - noise.log_density(y, end)) / step;
+        assert!(score.is_finite(), "{noise:?}: {score}");
+        assert!((score - slope).abs() < 1e-5, "{noise:?}: {score} {slope}");
+    }
+
+    #[test]
+    fn the_poisson_score_of_a_count_of_zero_at_a_mean_of_zero_is_its_limit() {
+        assert_eq!(Noise::Poisson.scores(0.0, 0.0), vec![-1.0]);
+        assert_end_score(Noise::Poisson, 0.0, 0.0, 1e-6);
+        // Inside the means, a count of 0 reads the same score.
+        assert_eq!(Noise::Poisson.scores(0.0, 2.5), vec![-1.0]);
+    }
+
+    #[test]
+    fn the_negative_binomial_scores_of_a_count_of_zero_at_a_mean_of_zero_are_their_limits() {
+        let noise = Noise::NegativeBinomial {
+            overdispersion: 0.7,
+            sum: None,
+        };
+        assert_eq!(noise.scores(0.0, 0.0), vec![-1.0, 0.0]);
+        assert_end_score(noise, 0.0, 0.0, 1e-6);
+        // Inside the means, `(0 − μ)/(μ(1 + φμ))`.
+        let mean = 2.5;
+        let general = -mean / (mean * (1.0 + 0.7 * mean));
+        assert!((noise.scores(0.0, mean)[0] - general).abs() < 1e-15);
+    }
+
+    #[test]
+    fn the_binomial_scores_at_the_ends_of_its_trials_are_their_limits() {
+        let noise = Noise::Binomial { trials: 4 };
+        assert_eq!(noise.scores(0.0, 0.0), vec![-1.0]);
+        assert_eq!(noise.scores(4.0, 4.0), vec![1.0]);
+        assert_end_score(noise, 0.0, 0.0, 1e-6);
+        assert_end_score(noise, 4.0, 4.0, -1e-6);
+        // Inside the trials, the ends of the counts read the general score.
+        let mean = 1.5;
+        assert!((noise.scores(0.0, mean)[0] - (-mean * 4.0 / (mean * (4.0 - mean)))).abs() < 1e-15);
+        assert!(
+            (noise.scores(4.0, mean)[0] - ((4.0 - mean) * 4.0 / (mean * (4.0 - mean)))).abs()
+                < 1e-15
+        );
     }
 }

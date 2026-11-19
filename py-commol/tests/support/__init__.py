@@ -58,9 +58,11 @@ from .problems import (
     rare_flow_calibrator,
     smooth_calibrator,
     smooth_model,
+    structural_zero_calibrator,
     sum_calibrator,
     swarm,
     two_wells_calibrator,
+    weak_parameter_calibrator,
 )
 from .reference import ABC_START, abc_flows, reference_run, total
 from .simulation import initial_state, run
@@ -116,6 +118,7 @@ __all__ = [
     "settled",
     "smooth_calibrator",
     "smooth_model",
+    "structural_zero_calibrator",
     "sum_calibrator",
     "swarm",
     "shared_category_builder",
@@ -125,5 +128,6 @@ __all__ = [
     "total",
     "total_at",
     "TWO_WELLS_FIT",
+    "weak_parameter_calibrator",
     "two_wells_calibrator",
 ]

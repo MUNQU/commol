@@ -45,7 +45,9 @@ from tests.support import (
     build_stochastic,
     flow_calibrator,
     flow_observations,
+    structural_zero_calibrator,
     two_wells_calibrator,
+    weak_parameter_calibrator,
 )
 
 NOISE = 2.0
@@ -549,3 +551,42 @@ def test_the_priors_are_required() -> None:
     # A null in JSON names the field once, before the fix.
     with pytest.raises(ValueError, match=r"^priors: null is not a prior: give a prior"):
         commol_rs.json.check("ABCRejection", json.dumps(method | {"priors": None}))
+
+
+def test_information_matching_ignores_observations_of_mean_and_value_zero() -> None:
+    # An observation of value 0 at a mean of exactly 0 adds log p = 0 to the
+    # log-likelihood, and its score is its limit: it moves no score of a term.
+    method = _gibbs(eta=InformationMatchingEta(block_length=2), particles=50)
+
+    without = structural_zero_calibrator(11).uncertainty(method)
+    with_zeros = structural_zero_calibrator(1).uncertainty(method)
+
+    assert with_zeros.fit is not None
+    assert without.fit is not None
+    assert with_zeros.fit.best_parameters == pytest.approx(
+        without.fit.best_parameters, rel=1e-9
+    )
+    assert with_zeros.eta == pytest.approx(without.eta, rel=1e-9)
+    # The meat of the sandwich reads the same scores.
+    sandwiches = [
+        structural_zero_calibrator(first).uncertainty(Sandwich(block_length=2, draws=2))
+        for first in (11, 1)
+    ]
+    assert isinstance(sandwiches[0], SandwichResult)
+    assert isinstance(sandwiches[1], SandwichResult)
+    assert np.allclose(sandwiches[1].covariance, sandwiches[0].covariance, rtol=1e-9)
+
+
+def test_information_matching_refuses_a_curvature_singular_to_working_precision() -> (
+    None
+):
+    # k2 is read through 1e-160: the curvature of k2, about 1e-310, has a
+    # Cholesky factor, but its inverse is not finite.
+    calibrator = weak_parameter_calibrator(1e-160)
+
+    with pytest.raises(
+        RuntimeError, match="curvature of the objective at the fit is singular"
+    ):
+        calibrator.uncertainty(
+            _gibbs(eta=InformationMatchingEta(block_length=2), particles=50)
+        )

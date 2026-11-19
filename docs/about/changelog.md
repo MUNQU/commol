@@ -826,6 +826,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dense design of `StructuralRank` read an observation at `-0.0` as a
   second position 0, which changed its singular values.
 
+- An observation of value 0 at a predicted mean of exactly 0 of a
+  `PoissonObservations`, `NegativeBinomialObservations` or
+  `BinomialObservations` (and a binomial count of all its trials at a mean
+  of all of them), such as a series that stays 0 until a process starts,
+  has the limit of its score there. These observations add nothing to the
+  log-likelihood. With a given `block_length`, and when other series
+  observe their positions, `InformationMatchingEta` and the meat of
+  `Sandwich` give the same result with and without them. With
+  `block_length="auto"`, or at positions of their own, they can still
+  change the blocks (#517). The floors of a `ProfileLikelihood` stay
+  finite with them. Before, their score was NaN, information matching
+  failed with a message that the scores were all 0, and the evaluation
+  floor of a profile was NaN.
+
+- A score that is not finite at the fit, such as that of a count above 0 at a
+  mean of 0, raises a `ValueError` from the local methods, the sandwich and
+  information matching. The error names the observation and says whether
+  the fit is outside the support of its observation model. Before, it
+  reached them as a NaN. `InformationMatchingEta` reports a curvature that
+  is singular to working precision as singular. Before, it reported that
+  the scores were all 0.
+
 - The curvature of a `NegativeBinomialObservations` of `overdispersion` 0,
   which the Laplace approximation, the sandwich and the noise floor of a
   profile read, is the limit of the Poisson, `μ²/2` for `φ`. Before, it ran

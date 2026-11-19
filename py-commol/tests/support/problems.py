@@ -324,6 +324,90 @@ def overdispersed_calibrator(rates: Sequence[str] = ("k1", "k2")) -> Calibrator:
     return Calibrator(Simulation(model), problem)
 
 
+def structural_zero_calibrator(first_c: int) -> Calibrator:
+    """
+    ``k1`` of A → B → C with negative binomial counts of B and C.
+
+    C fills from B only from step 10, so its mean is exactly 0 up to step 10;
+    C is observed from step ``first_c``, at value 0 up to step 10.
+    """
+    model = build(
+        abc_builder(
+            parameters={"k1": None},
+            ab="k1 * A",
+            bc="if(step >= 10, 0.1 * B, 0)",
+            amounts={"A": 1000, "B": 0, "C": 0},
+        )
+    )
+    b = [48, 95, 140, 181, 222, 262, 298, 330, 362, 393]
+    b += [380, 365, 352, 340, 330, 318, 305, 297, 288, 278]
+    data = [
+        ObservedDataPoint(at=t, output="B", value=float(v), label="B")
+        for t, v in enumerate(b, start=1)
+    ]
+    c = [0] * 10 + [10, 95, 80, 170, 120, 240, 190, 310, 250, 380]
+    data += [
+        ObservedDataPoint(at=t, output="C", value=float(c[t - 1]), label="C")
+        for t in range(first_c, 21)
+    ]
+    problem = CalibrationProblem(
+        observed_data=data,
+        parameters=[
+            bounded("k1", 0.001, 0.2, initial_guess=0.05),
+            bounded("phi", 0.0, 1.0, kind="noise", initial_guess=0.1),
+        ],
+        observation_models={
+            label: NegativeBinomialObservations(overdispersion="phi")
+            for label in ("B", "C")
+        },
+        optimization_config=NelderMeadConfig(max_iterations=500),
+        seed=1,
+    )
+    return Calibrator(Simulation(model), problem)
+
+
+def weak_parameter_calibrator(scale: float) -> Calibrator:
+    """
+    ``k1`` and ``k2`` of A → B → C, with C fed from B at ``k2 · scale · B · step``.
+
+    B has negative binomial counts with noise parameter ``phi``; C is observed
+    at 0 with a normal model of sd 1. A tiny ``scale`` leaves ``k2`` barely
+    read by the data, so the curvature of ``k2`` is near 0.
+    """
+    model = build(
+        abc_builder(
+            parameters={"k1": None, "k2": None},
+            ab="k1 * A",
+            bc=f"k2 * {scale!r} * B * step",
+            amounts={"A": 1000, "B": 0, "C": 0},
+        )
+    )
+    counts = [48, 95, 140, 181, 222, 262, 298, 330, 362, 393]
+    counts += [420, 440, 455, 470, 480, 490, 500, 505, 512, 520]
+    data = [
+        ObservedDataPoint(at=t, output="B", value=float(v), label="B")
+        for t, v in enumerate(counts, start=1)
+    ]
+    data += [
+        ObservedDataPoint(at=t, output="C", value=0.0, label="C") for t in range(1, 21)
+    ]
+    problem = CalibrationProblem(
+        observed_data=data,
+        parameters=[
+            bounded("k1", 0.001, 0.2, initial_guess=0.05),
+            bounded("k2", 0.0, 1.0, initial_guess=0.5),
+            bounded("phi", 0.0, 1.0, kind="noise", initial_guess=0.1),
+        ],
+        observation_models={
+            "B": NegativeBinomialObservations(overdispersion="phi"),
+            "C": NormalObservations(sd=1.0),
+        },
+        optimization_config=NelderMeadConfig(max_iterations=500),
+        seed=1,
+    )
+    return Calibrator(Simulation(model), problem)
+
+
 def _smooth_rate(parameters: int, length: int) -> str:
     """``exp(Σ c_k T_k(x))``, ``T_k`` the Chebyshev polynomials and ``x`` the
     step mapped onto ``[−1, 1]`` over `length` steps."""

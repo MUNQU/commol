@@ -212,20 +212,27 @@ where
             blocks.length()
         )));
     }
-    // On the unbounded scale: `tr(J⁻¹ I)` is the same on every scale.
-    let inverse = curvature.matrix().clone().try_inverse().ok_or_else(|| {
-        MethodError::Failed(
-            "The curvature of the objective at the fit is singular: information matching \
-             needs every parameter read by the data"
-                .to_string(),
-        )
-    })?;
+    // On the unbounded scale: `tr(J⁻¹ I)` is the same on every scale. A
+    // curvature singular to working precision has an inverse that is not
+    // finite.
+    let inverse = curvature
+        .matrix()
+        .clone()
+        .try_inverse()
+        .filter(|inverse| inverse.iter().all(|entry| entry.is_finite()))
+        .ok_or_else(|| {
+            MethodError::Failed(
+                "The curvature of the objective at the fit is singular: information matching \
+                 needs every parameter read by the data"
+                    .to_string(),
+            )
+        })?;
     // `J` is positive definite, so the trace is 0 only when every block
     // score is; `tr(J⁻¹ Σᵢ gᵢ gᵢᵀ)`, the trace of one block per observation,
     // is its scale.
     let gradients = curvature.gradients();
     let independent = (gradients * &inverse).component_mul(gradients).sum();
-    if independent.is_nan() || independent <= 0.0 {
+    if independent <= 0.0 {
         return Err(MethodError::Failed(
             "The scores of the terms at the fit are all 0: the fit runs through every \
              observation, so information matching has no variance of the scores to read"

@@ -763,9 +763,12 @@ fn floors<E: SimulationEngine>(problem: &CalibrationProblem<E>, fit: &[f64]) -> 
         .zip(&errors)
         .flat_map(|(term, errors)| {
             let size = term.gradient.len();
+            // A part of exact mean has no error to curve: its information
+            // can be infinite (a mean of 0 of a count model).
             errors
                 .iter()
                 .enumerate()
+                .filter(|(_, error)| **error != 0.0)
                 .map(move |(t, error)| 0.5 * term.curvature[t * size + t].abs() * error * error)
         })
         .sum();

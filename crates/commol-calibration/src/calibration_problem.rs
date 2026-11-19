@@ -532,8 +532,10 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     /// # Errors
     ///
     /// [`DerivativesError::Invalid`] with a message for a loss with no
-    /// curvature, or that names the observation the mean of one of whose
-    /// parts lies outside its observation model;
+    /// curvature, or that names the observation whose term has no finite
+    /// derivatives: the mean of one of its parts lies outside its observation
+    /// model, its value has no probability at its prediction, or its score is
+    /// not finite next to the edge of the means of its model;
     /// [`DerivativesError::Failed`] with the message of an observation whose
     /// exact sum does not end ([`crate::UnendedSum`]).
     pub fn term_derivatives(
@@ -542,19 +544,32 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
         predictions: &[f64],
         parts: &[f64],
     ) -> Result<Vec<TermDerivatives>, DerivativesError> {
+        let named = |index: usize, what: &str| {
+            let obs = &self.observed_data[index];
+            format!(
+                "Observation '{}' at {} {what} (its prediction is {})",
+                obs.label, obs.at, predictions[index]
+            )
+        };
         self.discrepancy
             .term_derivatives(values, predictions, parts)
             .map_err(|error| match error {
                 TermError::NoCurvature(message) => DerivativesError::Invalid(message),
                 TermError::Failed(message) => DerivativesError::Failed(message),
-                TermError::MeanOutside(index) => {
-                    let obs = &self.observed_data[index];
-                    DerivativesError::Invalid(format!(
-                        "Observation '{}' at {} has a mean of a part outside the means its \
-                         observation model allows (its prediction is {})",
-                        obs.label, obs.at, predictions[index]
-                    ))
-                }
+                TermError::MeanOutside(index) => DerivativesError::Invalid(named(
+                    index,
+                    "has a mean of a part outside the means its observation model allows",
+                )),
+                TermError::NoProbability(index) => DerivativesError::Invalid(format!(
+                    "{}: the fit is outside the support of its observation model. Check the \
+                     value, or the model that predicts it",
+                    named(index, "has no probability at the fit")
+                )),
+                TermError::ScoreAtEdge(index) => DerivativesError::Invalid(format!(
+                    "{}, next to the edge of the means its observation model allows: the \
+                     local methods need a fit inside those means",
+                    named(index, "has a score that is not finite at the fit")
+                )),
             })
     }
 
