@@ -3,7 +3,9 @@ independence, and their power against an AR(1).
 
 `TestValues` reads values with no model: independent normal values whose
 standard deviation grows 30 times along 35 positions, against which the
-robust portmanteau ``Q̃`` holds its level, and an AR(1) of ``ρ = 0.5`` on
+robust portmanteau ``Q̃`` holds its level, independent values with
+``max_lag`` at the last lag of a short grid, with gaps or without, where
+the lags of fewer than 4 pairs leave ``Q̃``, and an AR(1) of ``ρ = 0.5`` on
 100 positions, which it finds. `TestReferences` reads the residuals of fits
 of `smooth_model`, a flow ``exp(Σ c_k T_k(x))`` of 3 or 10 coefficients:
 counts of independent Poisson data at 35 positions, read with a Poisson
@@ -38,8 +40,10 @@ below 0.05 when at most one refit reaches ``Q``."""
 logger = logging.getLogger(__name__)
 
 
-def _points(length: int) -> list[ObservedDataPoint]:
-    return [ObservedDataPoint(at=t, output="x", value=0.0) for t in range(length)]
+GAPS_ON_35 = [0, 1, 3, 4, 6, 9, 10, 13, 15, 16, 19, 21, 22, 25, 27, 28, 30, 32, 34]
+"""19 positions on a grid of 35 steps."""
+GAPS_ON_24 = [0, 1, 2, 4, 5, 7, 8, 11, 12, 13, 16, 18, 20, 23]
+"""14 positions on a grid of 24 steps."""
 
 
 def _autoregression(rng: np.random.Generator, rho: float, length: int) -> np.ndarray:
@@ -52,11 +56,17 @@ def _autoregression(rng: np.random.Generator, rho: float, length: int) -> np.nda
     return series
 
 
-def _rejects(values: np.ndarray, seed: int) -> bool:
+def _rejects(
+    values: np.ndarray,
+    seed: int,
+    positions: list[int] | None = None,
+    max_lag: int = 7,
+) -> bool:
+    at = range(len(values)) if positions is None else positions
     result = series_dependence(
         list(values),
-        _points(len(values)),
-        max_lag=7,
+        [ObservedDataPoint(at=t, output="x", value=0.0) for t in at],
+        max_lag=max_lag,
         replicates=1,
         confidence_level=0.9,
         seed=seed,
@@ -78,6 +88,37 @@ class TestValues:
 
         logger.info("heteroscedastic values: rejected %.3f", rate)
         assert 0.03 <= rate <= 0.08, rate
+
+    def test_lags_with_few_pairs_keep_the_level(self) -> None:
+        # max_lag at the last lag of each grid: the lags of fewer than 4
+        # pairs leave Q̃ and its degrees of freedom.
+        rng = np.random.default_rng(14)
+        designs = [(list(range(12)), 11), (GAPS_ON_35, 34), (GAPS_ON_24, 23)]
+
+        rates = [
+            float(
+                np.mean(
+                    [
+                        _rejects(
+                            rng.standard_normal(len(positions)),
+                            seed,
+                            positions,
+                            max_lag,
+                        )
+                        for seed in range(3000)
+                    ]
+                )
+            )
+            for positions, max_lag in designs
+        ]
+
+        rate = float(np.mean(rates))
+        logger.info(
+            "max_lag at the last lag: rejected %s, %.3f",
+            ", ".join(f"{r:.3f}" for r in rates),
+            rate,
+        )
+        assert 0.035 <= rate <= 0.08, rates
 
     def test_dependent_values_are_found(self) -> None:
         rng = np.random.default_rng(12)

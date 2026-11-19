@@ -25,6 +25,17 @@
 /// The values a series needs for its integrated time.
 pub const TIME_VALUES: usize = 4;
 
+/// The pairs a lag reads to enter the robust portmanteau.
+pub const PORTMANTEAU_PAIRS: usize = 4;
+
+/// Why a series has no robust portmanteau when no lag has
+/// [`PORTMANTEAU_PAIRS`] pairs.
+pub const FEW_PAIRS: &str = "every lag reads fewer than 4 pairs";
+/// Why a series has no robust portmanteau when its lags of enough pairs
+/// have no product other than 0.
+pub const NO_PRODUCT: &str =
+    "no lag of 4 pairs or more has a product other than 0, as of constant values";
+
 /// Why a series has no integrated time.
 pub const TOO_SHORT: &str = "it has fewer than 4 values";
 /// Why a constant series has no autocorrelation and no integrated time.
@@ -74,13 +85,20 @@ pub fn autocovariance(series: &[Option<f64>], lag: usize) -> Option<Autocovarian
 }
 
 /// The robust portmanteau statistic of a centered series.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Portmanteau {
     /// `Q̃ = Σ_k (Σ_t e_t e_{t−k})² / Σ_t e_t² e_{t−k}²`.
     pub statistic: f64,
-    /// The lags in the sum: those with a pair and a product other than 0.
-    /// Under independence `Q̃` is `χ²` of this many degrees of freedom.
+    /// The lags in the sum: those with [`PORTMANTEAU_PAIRS`] pairs or more
+    /// and a product other than 0. Under independence `Q̃` is `χ²` of this
+    /// many degrees of freedom.
     pub lags: usize,
+    /// Each lag of fewer than [`PORTMANTEAU_PAIRS`] pairs, left out of the
+    /// sum, as `(lag, pairs)`.
+    pub few_pairs: Vec<(usize, usize)>,
+    /// Why no lag is in the sum: [`FEW_PAIRS`] or [`NO_PRODUCT`]; None
+    /// when one is.
+    pub reason: Option<&'static str>,
 }
 
 /// The robust portmanteau `Q̃` of the centered `series` at the lags `1 …
@@ -88,20 +106,35 @@ pub struct Portmanteau {
 /// Phillips (2022), for the null of independence: each lag's sum of products
 /// over the pairs that exist, standardized by its own sum of squared
 /// products, so heteroscedastic independent values are `χ²(h)` too. A lag
-/// with no pair, or whose products are all 0, is left out.
+/// with fewer than [`PORTMANTEAU_PAIRS`] pairs, or whose products are all 0,
+/// is left out.
 pub fn robust_portmanteau(series: &[Option<f64>], max_lag: usize) -> Portmanteau {
     let mut statistic = 0.0;
     let mut lags = 0;
+    let mut few_pairs = Vec::new();
     for lag in 1..=max_lag {
-        let (sum, squares) = pairs(series, lag).fold((0.0, 0.0), |(sum, squares), (a, b)| {
-            (sum + a * b, squares + (a * b) * (a * b))
-        });
-        if squares > 0.0 {
+        let (sum, squares, count) = pairs(series, lag)
+            .fold((0.0, 0.0, 0usize), |(sum, squares, count), (a, b)| {
+                (sum + a * b, squares + (a * b) * (a * b), count + 1)
+            });
+        if count < PORTMANTEAU_PAIRS {
+            few_pairs.push((lag, count));
+        } else if squares > 0.0 {
             statistic += sum * sum / squares;
             lags += 1;
         }
     }
-    Portmanteau { statistic, lags }
+    let reason = (lags == 0).then_some(if few_pairs.len() == max_lag {
+        FEW_PAIRS
+    } else {
+        NO_PRODUCT
+    });
+    Portmanteau {
+        statistic,
+        lags,
+        few_pairs,
+        reason,
+    }
 }
 
 /// The integrated autocorrelation time of a series as its two moments, so
@@ -194,16 +227,30 @@ mod tests {
     }
 
     #[test]
-    fn a_lag_with_no_product_leaves_the_portmanteau() {
-        let series = some(&[1.0, 0.0, -1.0]);
-        // Lag 1: products 0 and 0; lag 2: product −1.
+    fn a_lag_with_no_product_or_few_pairs_leaves_the_portmanteau() {
+        let series = some(&[1.0, 0.0, -1.0, 0.0, 1.0, 0.0, -1.0]);
+        // Lag 1: 6 products 0; lag 2: −1, 0, −1, 0, −1, so (−3)² / 3; lag
+        // 3: 4 products 0; lag 4: 1, 0, 1, fewer than 4 pairs.
         assert_eq!(
-            robust_portmanteau(&series, 3),
+            robust_portmanteau(&series, 4),
             Portmanteau {
-                statistic: 1.0,
-                lags: 1
+                statistic: 3.0,
+                lags: 1,
+                few_pairs: vec![(4, 3)],
+                reason: None,
             }
         );
+        // Without lag 2, no lag is in the sum.
+        let alone = some(&[1.0, 0.0, 0.0, 0.0, 0.0, -1.0]);
+        assert_eq!(robust_portmanteau(&alone, 1).reason, Some(NO_PRODUCT));
+        assert_eq!(robust_portmanteau(&alone, 1).few_pairs, vec![]);
+        assert_eq!(
+            robust_portmanteau(&some(&[1.0, 2.0]), 2).reason,
+            Some(FEW_PAIRS)
+        );
+        // The reasons name the minimum.
+        let minimum = PORTMANTEAU_PAIRS.to_string();
+        assert!(FEW_PAIRS.contains(&minimum) && NO_PRODUCT.contains(&minimum));
     }
 
     #[test]

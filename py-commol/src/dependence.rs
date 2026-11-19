@@ -55,8 +55,12 @@ pub struct PySeriesStatistics {
     correlations: Vec<Option<f64>>,
     /// The pairs each lag reads
     pairs: Vec<usize>,
+    /// Each lag left out of the portmanteau for its few pairs, as `(lag, pairs)`
+    few_pairs: Vec<(usize, usize)>,
     /// The robust portmanteau
     portmanteau: Option<f64>,
+    /// Why there is none
+    portmanteau_reason: Option<String>,
     /// The lags in its sum
     degrees_of_freedom: usize,
     /// Its p-value, with one draw
@@ -116,7 +120,9 @@ fn python(py: Python<'_>, analysis: SeriesDependence) -> PyResult<PySeriesDepend
                     max_lag: s.max_lag,
                     correlations: s.correlations,
                     pairs: s.pairs,
+                    few_pairs: s.few_pairs,
                     portmanteau: s.portmanteau,
+                    portmanteau_reason: s.portmanteau_reason,
                     degrees_of_freedom: s.degrees_of_freedom,
                     p_value: s.p_value,
                     draw_p_values: spread(s.draw_p_values),

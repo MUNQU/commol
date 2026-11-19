@@ -65,10 +65,18 @@ class SeriesStatistics(ResultModel):
         None at a lag with no pair.
     pairs : list[int]
         The pairs of values each lag reads.
+    few_pairs : list[tuple[int, int]]
+        Each lag of fewer than 4 pairs, as ``(lag, pairs)``: it keeps its
+        correlation and is left out of ``Q̃`` and of its degrees of freedom.
     portmanteau : float | None
         The robust portmanteau ``Q̃`` (Dalla, Giraitis and Phillips 2022).
+    portmanteau_reason : str | None
+        Why there is no ``Q̃``: the series has no statistics, every lag
+        reads fewer than 4 pairs, or no lag of 4 pairs or more has a
+        product other than 0, as of constant values.
     degrees_of_freedom : int
-        The lags in the sum of ``Q̃``.
+        The lags in the sum of ``Q̃``: those of 4 pairs or more with a
+        product other than 0.
     p_value : float | None
         The p-value of ``Q̃`` under the reference, with one draw.
     draw_p_values : DrawPValues | None
@@ -96,7 +104,9 @@ class SeriesStatistics(ResultModel):
     max_lag: int
     correlations: list[float | None]
     pairs: list[int]
+    few_pairs: list[tuple[int, int]]
     portmanteau: float | None
+    portmanteau_reason: str | None
     degrees_of_freedom: int
     p_value: float | None
     draw_p_values: DrawPValues | None
@@ -114,7 +124,9 @@ class SeriesStatistics(ResultModel):
             max_lag=raw.max_lag,
             correlations=raw.correlations,
             pairs=raw.pairs,
+            few_pairs=raw.few_pairs,
             portmanteau=raw.portmanteau,
+            portmanteau_reason=raw.portmanteau_reason,
             degrees_of_freedom=raw.degrees_of_freedom,
             p_value=raw.p_value,
             draw_p_values=_draw_p_values(raw.draw_p_values),

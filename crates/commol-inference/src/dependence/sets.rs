@@ -188,8 +188,13 @@ pub(crate) struct SeriesSummary {
     pub correlations: Vec<Option<f64>>,
     /// The pairs of each lag.
     pub pairs: Vec<usize>,
+    /// Each lag left out of the portmanteau for its few pairs, as `(lag,
+    /// pairs)`.
+    pub few_pairs: Vec<(usize, usize)>,
     /// The mean robust portmanteau, None with no lag in its sum.
     pub portmanteau: Option<f64>,
+    /// Why there is no portmanteau.
+    pub portmanteau_reason: Option<&'static str>,
     /// The lags in the sum of the portmanteau.
     pub degrees_of_freedom: usize,
     /// `τ`, the ratio of the mean long-run variance to the mean variance,
@@ -302,6 +307,8 @@ pub(crate) fn summarize(sets: &[(f64, &SetStatistics)]) -> Summary {
                 .expect("a positive weight")
             });
             let (tau, cut_lag) = tau_of(members.iter().map(|(w, series)| (*w, &series.time)));
+            // The pairs of each lag come from the layout, the same in every
+            // set, so the first set gives the lags left out.
             Some(SeriesSummary {
                 correlations,
                 pairs: head
@@ -309,7 +316,11 @@ pub(crate) fn summarize(sets: &[(f64, &SetStatistics)]) -> Summary {
                     .iter()
                     .map(|lag| lag.map_or(0, |gamma| gamma.pairs))
                     .collect(),
+                few_pairs: head.portmanteau.few_pairs.clone(),
                 portmanteau,
+                portmanteau_reason: (degrees_of_freedom == 0)
+                    .then_some(head.portmanteau.reason)
+                    .flatten(),
                 degrees_of_freedom,
                 tau,
                 cut_lag,

@@ -128,6 +128,58 @@ fn the_statistics_of_a_known_series() {
 }
 
 #[test]
+fn a_lag_with_few_pairs_leaves_the_portmanteau() {
+    // Eight values with max_lag 7: lags 5, 6 and 7 read 3, 2 and 1 pairs,
+    // fewer than 4, and leave Q̃ and its degrees of freedom; their
+    // correlations stay.
+    let values = noise(8, 9);
+    let points = observations("x", &steps(8));
+
+    let all = analysis(&points, &values, 7);
+    let four = analysis(&points, &values, 4);
+
+    let (x, x4) = (&all.series[0], &four.series[0]);
+    assert_eq!(x.pairs, vec![7, 6, 5, 4, 3, 2, 1]);
+    assert_eq!(x.few_pairs, vec![(5, 3), (6, 2), (7, 1)]);
+    assert_eq!(x.degrees_of_freedom, 4);
+    close(x.portmanteau.unwrap(), x4.portmanteau.unwrap(), 1e-12);
+    close(x.p_value.unwrap(), x4.p_value.unwrap(), 1e-12);
+    assert!(x.correlations.iter().all(Option::is_some));
+    assert_eq!(x.portmanteau_reason, None);
+    assert!(x4.few_pairs.is_empty());
+
+    // A gap costs pairs: on 0 … 3 and 8 … 11, lags 1, 2 and 8 read 6, 4
+    // and 4 pairs, lags 3 to 7 read 2, 0, 1, 2 and 3.
+    let mut positions = steps(4);
+    positions.extend((8..12).map(f64::from));
+    let gapped = analysis(&observations("x", &positions), &noise(8, 10), 8);
+    let x = &gapped.series[0];
+    assert_eq!(x.pairs, vec![6, 4, 2, 0, 1, 2, 3, 4]);
+    assert_eq!(x.few_pairs, vec![(3, 2), (4, 0), (5, 1), (6, 2), (7, 3)]);
+    assert_eq!(x.degrees_of_freedom, 3);
+
+    // With no lag of 4 pairs, Q̃ has no test, and says why; τ still reads
+    // the series.
+    let short = analysis(&observations("x", &steps(4)), &[1.0, 3.0, 2.0, 5.0], 3);
+    let x = &short.series[0];
+    assert_eq!(x.few_pairs, vec![(1, 3), (2, 2), (3, 1)]);
+    assert_eq!(x.portmanteau, None);
+    assert_eq!(x.degrees_of_freedom, 0);
+    assert_eq!(x.p_value, None);
+    let reason = x.portmanteau_reason.as_deref().unwrap();
+    assert!(reason.contains("fewer than 4 pairs"), "{reason}");
+    assert!(x.correlations.iter().all(Option::is_some));
+    assert!(x.tau.is_some());
+    assert_eq!(x.cut_lag, Some(1));
+
+    // A constant series has lags of many pairs but no product other than
+    // 0.
+    let constant = analysis(&observations("x", &steps(8)), &[2.0; 8], 2);
+    let reason = constant.series[0].portmanteau_reason.as_deref().unwrap();
+    assert!(reason.contains("product other than 0"), "{reason}");
+}
+
+#[test]
 fn the_time_of_an_ar1_series() {
     let values = autoregression(&[0.5], &noise(2000, 3));
 

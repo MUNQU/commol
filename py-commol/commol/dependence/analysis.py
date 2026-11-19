@@ -33,7 +33,8 @@ def series_dependence(
     each series: the autocorrelation up to `max_lag`; the robust portmanteau
     ``Q̃ = Σ_k (Σ e_t e_{t−k})² / Σ e_t² e_{t−k}²`` of the values centered
     per series (Dalla, Giraitis and Phillips 2022), which holds under
-    heteroscedasticity, with its p-value against ``χ²(h)``; and the
+    heteroscedasticity, over the ``h`` lags of 4 pairs or more with a
+    product other than 0, with its p-value against ``χ²(h)``; and the
     integrated autocorrelation time ``τ`` by the initial monotone sequence
     of Geyer (1992), with its band under independence from `replicates`
     sets of the centered values with signs ±1 (a wild band). For the series
