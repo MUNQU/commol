@@ -6174,6 +6174,16 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
+<p>An observation at <code>at=-0.0</code> beside an observation or a constraint at
+  <code>0.0</code> is one position. Before, every method that builds blocks (the
+  bootstraps, the block jackknife, <code>ResidualNoise</code> and the others) raised
+  <code>PanicException: every position is listed</code>, and a constraint at <code>0.0</code>
+  beside an observation at <code>-0.0</code> made <code>Calibrator</code> raise
+  <code>PanicException: the schedule holds every constraint position</code>. The
+  dense design of <code>StructuralRank</code> read an observation at <code>-0.0</code> as a
+  second position 0, which changed its singular values.</p>
+</li>
+<li>
 <p>The curvature of a <code>NegativeBinomialObservations</code> of <code>overdispersion</code> 0,
   which the Laplace approximation, the sandwich and the noise floor of a
   profile read, is the limit of the Poisson, <code>μ²/2</code> for <code>φ</code>. Before, it ran

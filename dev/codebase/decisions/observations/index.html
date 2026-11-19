@@ -4013,14 +4013,23 @@ The operator finds the row of each position and of each start with the
 tolerance of the axis (<code>observation::index_at</code>: equal within <code>1e-9</code> of the
 larger of their magnitudes and 1), so a start computed as <code>at − window</code>
 (<code>window_start</code>) reads the row of the position it rounds away from. Results
-read a position with the same <code>index_at</code>.</p>
+read a position with the same <code>index_at</code>, and so do the rows of a constraint
+(<code>feasibility.rs</code>) and the positions of the blocks (<code>position_indices</code> of
+<code>resampling/blocks.rs</code>), so <code>-0.0</code> finds the row of <code>0.0</code>, which <code>total_cmp</code>
+orders apart. The schedule of a run keeps the first of the two in the
+order of <code>total_cmp</code>, <code>-0.0</code>; the blocks and the dense design of
+<code>StructuralRank</code> (<code>dense_observations</code>) list the position as <code>0.0</code>.</p>
 <p><strong>Guards:</strong> <code>observation::tests</code>,
 <code>crates/commol-calibration/tests/test_positions.rs::a_window_that_starts_at_zero_within_the_rounding_of_its_end_is_accepted</code>,
 <code>tests/calibration/test_observations.py::TestPositionsAndEngines::test_a_window_that_starts_at_zero_within_its_rounding_is_calibrated</code>,
 <code>crates/commol-inference/tests/test_predictive.rs::observation_draws_are_the_predictions_the_loss_compares</code>,
 <code>tests/uncertainty/test_predictive.py::TestObservations</code>,
 <code>crates/commol-inference/tests/test_global_sensitivity.rs::a_gain_reads_its_start_exactly</code>,
-<code>tests/uncertainty/test_propagation.py::TestPropagation::test_a_gain_reads_its_start_exactly</code>.</p>
+<code>tests/uncertainty/test_propagation.py::TestPropagation::test_a_gain_reads_its_start_exactly</code>,
+<code>crates/commol-calibration/tests/test_positions.rs::a_constraint_at_zero_beside_an_observation_at_minus_zero_reads_one_position</code>,
+<code>resampling::blocks::tests::minus_zero_is_the_position_zero</code>,
+<code>sensitivity::finite_differences::tests::minus_zero_is_the_unit_position_zero</code>,
+<code>tests/uncertainty/test_resampling.py::TestResidualBootstraps::test_minus_zero_is_the_position_zero</code>.</p>
 <h2 id="a-known-scale-is-a-number-of-the-observation">A known scale is a number of the observation<a class="headerlink" href="#a-known-scale-is-a-number-of-the-observation" title="Permanent link">&para;</a></h2>
 <p>A known share of the model output that an observation sees, such as the
 share of the units that report, is <code>ObservedDataPoint.scale</code> (1 by default),
