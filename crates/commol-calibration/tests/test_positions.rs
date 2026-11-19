@@ -139,3 +139,30 @@ fn a_window_is_finite_and_positive() {
         );
     }
 }
+
+#[test]
+fn a_constraint_at_zero_beside_an_observation_at_minus_zero_reads_one_position() {
+    // −0.0 and 0.0 are one position: the constraint at one of them finds the
+    // row that the schedule lists for the other, also for held-out
+    // observations.
+    for (observed, constrained) in [(-0.0, 0.0), (0.0, -0.0)] {
+        let problem = problem(
+            difference(),
+            vec![at(observed), at(4.0)],
+            vec![bounded(vec![constrained, 2.0])],
+        );
+        assert!(problem.is_ok(), "{observed} beside {constrained}");
+    }
+    for (held_out, constrained) in [(-0.0, 0.0), (0.0, -0.0)] {
+        let problem = problem(
+            difference(),
+            vec![at(4.0)],
+            vec![bounded(vec![constrained, 2.0])],
+        )
+        .unwrap();
+        assert!(
+            problem.observing(&[at(held_out)]).is_ok(),
+            "{held_out} beside {constrained}"
+        );
+    }
+}

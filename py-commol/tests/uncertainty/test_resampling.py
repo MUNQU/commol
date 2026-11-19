@@ -239,6 +239,54 @@ class TestResidualBootstraps:
         )
         assert len(wild.sample) + len(wild.failed) == 3
 
+    def test_minus_zero_is_the_position_zero(self) -> None:
+        # −0.0 and 0.0 are one position: the blocks, the residuals of each
+        # series and residual noise read the two observations there as one
+        # position of two series.
+        model = build(
+            a_to_b_builder(
+                parameters={"c": None}, rate="c * A / A", amounts={"A": 1e6, "B": 0}
+            )
+        )
+        observed = [
+            ObservedDataPoint(at=-0.0, output="A", value=1e6),
+            ObservedDataPoint(at=0.0, output="B", value=0.0),
+            *[ObservedDataPoint(at=t, output="B", value=10.0 * t) for t in range(1, 6)],
+        ]
+        calibrator = Calibrator(
+            Simulation(model),
+            CalibrationProblem(
+                observed_data=observed,
+                parameters=[bounded("c", 0.0, 50.0, initial_guess=25.0)],
+                loss_function="sse",
+                optimization_config=NelderMeadConfig(max_iterations=200),
+                seed=1,
+            ),
+        )
+
+        bootstrap = calibrator.uncertainty(
+            BayesianBootstrap(replicates=2, block_length=1)
+        )
+        assert len(bootstrap.sample) + len(bootstrap.failed) == 2
+        for method in (
+            ResidualBootstrap(
+                replicates=2, block_length=1, residual_scale="additive", scheme="moving"
+            ),
+            WildBootstrap(replicates=2, block_length=1, multipliers="rademacher"),
+        ):
+            result = calibrator.uncertainty(method)
+            assert len(result.sample) + len(result.failed) == 2
+        # Six positions give six blocks of one position; the first is 0.0.
+        jackknife = calibrator.uncertainty(BlockJackknife(block_length=1))
+        assert len(jackknife.blocks) == 6
+        assert math.copysign(1.0, jackknife.blocks[0][0]) == 1.0
+
+        noise = ResidualNoise(
+            fit=bootstrap.fit, block_length=1, residual_scale="additive"
+        )
+        predictive = Predictive(calibrator, bootstrap.sample, [0.0])
+        assert len(predictive.at_observations(observed[:2], noise).values[0]) == 2
+
 
 class TestBlockJackknife:
     def test_jackknife_of_a_mean_is_the_classical_standard_error(self) -> None:
