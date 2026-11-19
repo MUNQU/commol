@@ -245,7 +245,10 @@ pub enum PredictiveError {
     /// sample is not a sample of its parameters, a position is one its
     /// engine rejects, or an observation is one it cannot read.
     Mismatch(String),
-    /// A draw has no run; `draw` is its index in the sample.
+    /// A draw has no run, or its observation models cannot read an
+    /// observation there ([`EvaluationError::Failed`], as an exact sum that
+    /// does not end, [`commol_calibration::UnendedSum`]); `draw` is its
+    /// index in the sample.
     Draw {
         /// Index of the draw in the sample.
         draw: usize,

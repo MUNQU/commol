@@ -93,12 +93,17 @@ enum Reader {
 impl Reader {
     /// The residual sets of `observations` under the draw of parameter
     /// `values` whose runs gave `means`: one per randomization.
+    ///
+    /// # Errors
+    ///
+    /// [`MethodError::Failed`] when the exact sum of an observation does
+    /// not end ([`commol_calibration::UnendedSum`]).
     fn sets(
         &self,
         observations: &[ObservedDataPoint],
         values: &[f64],
         means: &[ObservedMeans],
-    ) -> Vec<Vec<f64>> {
+    ) -> Result<Vec<Vec<f64>>, MethodError> {
         match self {
             Self::Quantile {
                 likelihood,
@@ -108,16 +113,14 @@ impl Reader {
                 let share = 1.0 / means.len() as f64;
                 let mut tails = vec![commol_calibration::Tails::default(); observations.len()];
                 for run in means {
-                    for (sum, run_tails) in tails.iter_mut().zip(likelihood.tails_of(
-                        observations,
-                        terms,
-                        values,
-                        &run.parts,
-                    )) {
+                    let run_tails = likelihood
+                        .tails_of(observations, terms, values, &run.parts)
+                        .map_err(MethodError::Failed)?;
+                    for (sum, run_tails) in tails.iter_mut().zip(run_tails) {
                         sum.add_weighted(share, run_tails);
                     }
                 }
-                places
+                Ok(places
                     .iter()
                     .map(|places| {
                         tails
@@ -126,7 +129,7 @@ impl Reader {
                             .map(|(tails, &v)| quantile_residual(tails, v))
                             .collect()
                     })
-                    .collect()
+                    .collect())
             }
             Self::Additive { summary } => {
                 let residuals = observations
@@ -145,7 +148,7 @@ impl Reader {
                         obs.value - fitted
                     })
                     .collect();
-                vec![residuals]
+                Ok(vec![residuals])
             }
         }
     }
@@ -211,12 +214,16 @@ impl<E: SimulationEngine + Send + Sync> Analysis<'_, E> {
     /// The reference of `draw`, number `index`, at its parameters: data sets
     /// drawn from the observation models with no refit, or wild sets of
     /// its additive residuals.
+    ///
+    /// # Errors
+    ///
+    /// As [`Reader::sets`], for a drawn data set.
     fn at_parameters(
         &self,
         index: usize,
         draw: &Draw<'_>,
         replicates: usize,
-    ) -> (Vec<Summary>, Portmanteau) {
+    ) -> Result<(Vec<Summary>, Portmanteau), MethodError> {
         let Some(noise) = &self.noise else {
             let seed = Stream::DependenceSigns.replicate(self.seed, index as u64);
             let band = wild_band(
@@ -226,7 +233,7 @@ impl<E: SimulationEngine + Send + Sync> Analysis<'_, E> {
                 replicates,
                 seed,
             );
-            return (band, Portmanteau::ChiSquare);
+            return Ok((band, Portmanteau::ChiSquare));
         };
         let seed = Stream::DependenceReference.replicate(self.seed, index as u64);
         let summaries = (0..replicates)
@@ -244,11 +251,11 @@ impl<E: SimulationEngine + Send + Sync> Analysis<'_, E> {
                     &mut values,
                 );
                 let data = with_values(self.observations, &values);
-                let sets = self.reader.sets(&data, draw.values, &draw.means);
-                summary_of(&statistics_of(&self.layout, &self.lags, &sets))
+                let sets = self.reader.sets(&data, draw.values, &draw.means)?;
+                Ok(summary_of(&statistics_of(&self.layout, &self.lags, &sets)))
             })
-            .collect();
-        (summaries, Portmanteau::Replicates)
+            .collect::<Result<_, MethodError>>()?;
+        Ok((summaries, Portmanteau::Replicates))
     }
 
     /// The reference of refits of the one draw `draw`: data sets drawn at it,
@@ -281,7 +288,10 @@ impl<E: SimulationEngine + Send + Sync> Analysis<'_, E> {
         let fits = runner.fit_all(&perturbations);
         fits.require(FitUnit::Replicate, 1)?;
         let mut failed = fits.failed.clone();
-        let outcomes: Vec<(usize, Result<Summary, MethodError>)> = fits
+        // A replicate that has no run fails; a run whose residuals cannot be
+        // read stops the analysis.
+        type Outcome = Result<Result<Summary, MethodError>, MethodError>;
+        let outcomes: Vec<(usize, Outcome)> = fits
             .fits
             .par_iter()
             .map(|(index, fit)| {
@@ -299,9 +309,11 @@ impl<E: SimulationEngine + Send + Sync> Analysis<'_, E> {
                             .map_err(MethodError::from)
                             .map(|mut means| {
                                 let means = means.swap_remove(0);
-                                let sets =
-                                    self.reader.sets(problem.observed_data(), &values, &means);
-                                summary_of(&statistics_of(&self.layout, &self.lags, &sets))
+                                self.reader
+                                    .sets(problem.observed_data(), &values, &means)
+                                    .map(|sets| {
+                                        summary_of(&statistics_of(&self.layout, &self.lags, &sets))
+                                    })
                             })
                         });
                 (*index, outcome)
@@ -310,7 +322,7 @@ impl<E: SimulationEngine + Send + Sync> Analysis<'_, E> {
         let mut summaries = Vec::new();
         for (index, outcome) in outcomes {
             match outcome {
-                Ok(summary) => summaries.push(summary),
+                Ok(summary) => summaries.push(summary?),
                 // coverage: invariant, the refit ran this problem at these values
                 Err(error) => failed.push((index, error.to_string())),
             }
@@ -399,7 +411,9 @@ fn check<E: SimulationEngine>(
 /// model, additive residuals have more than one randomization, or a refit
 /// reference reads many draws or observations that are not the problem's;
 /// a prediction error when a draw has no run; [`MethodError::Failed`] when
-/// every refit fails.
+/// every refit fails, or the exact sum of an observation does not end, at a
+/// draw, a data set drawn at it or a refit
+/// ([`commol_calibration::UnendedSum`]).
 #[allow(clippy::too_many_arguments)]
 pub fn residual_dependence<E>(
     problem: &CalibrationProblem<E>,
@@ -459,16 +473,16 @@ where
         .into_par_iter()
         .zip(sample.values())
         .map(|(means, values)| {
-            let residuals = analysis.reader.sets(observations, values, &means);
+            let residuals = analysis.reader.sets(observations, values, &means)?;
             let statistics = statistics_of(&analysis.layout, &analysis.lags, &residuals);
-            Draw {
+            Ok(Draw {
                 values,
                 means,
                 residuals,
                 statistics,
-            }
+            })
         })
-        .collect();
+        .collect::<Result<_, MethodError>>()?;
     let weights = sample.weights();
     let mut weighted: Vec<(f64, &SetStatistics)> = Vec::new();
     for (draw, &weight) in draws.iter().zip(weights) {
@@ -482,7 +496,7 @@ where
         let observed = summary_of(&draw.statistics);
         let (replicates, portmanteau) = match &settings.reference {
             Reference::AtParameters(reference) => {
-                analysis.at_parameters(0, draw, reference.replicates)
+                analysis.at_parameters(0, draw, reference.replicates)?
             }
             Reference::Refitted(reference) => {
                 let refits = analysis.refitted(
@@ -509,15 +523,15 @@ where
             .par_iter()
             .enumerate()
             .map(|(index, draw)| {
-                let (reference, portmanteau) = analysis.at_parameters(index, draw, replicates);
-                test(
+                let (reference, portmanteau) = analysis.at_parameters(index, draw, replicates)?;
+                Ok(test(
                     &summary_of(&draw.statistics),
                     &reference,
                     portmanteau,
                     settings.confidence_level,
-                )
+                ))
             })
-            .collect();
+            .collect::<Result<_, MethodError>>()?;
         let series = (0..analysis.layout.series.len())
             .map(|s| {
                 let p_values: Option<Vec<f64>> = per_draw

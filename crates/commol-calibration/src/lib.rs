@@ -83,11 +83,12 @@ pub mod types;
 pub mod values;
 
 pub use calibration_problem::{CalibrationProblem, check_contents};
-pub use discrepancy::{Discrepancy, DiscrepancyConfig, TermError};
+pub use discrepancy::{DerivativesError, Discrepancy, DiscrepancyConfig, TermError};
 pub use feasibility::{EvaluationError, Feasibility, Violation};
 pub use forward::{ForwardModel, Workspace, check_unobserved, replicate_mean, schedule_of};
 pub use likelihood::{
-    Argument, Center, Likelihood, Noise, ObservationModel, Sum, Tails, Term, TermDerivatives,
+    Argument, Center, Likelihood, MAX_COUNTS, Noise, ObservationModel, Sum, Tails, Term,
+    TermDerivatives, UnendedSum,
 };
 pub use objective::{OptimizationObjective, Score};
 pub use observation::{

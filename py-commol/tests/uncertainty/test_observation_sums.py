@@ -1,5 +1,5 @@
 """Observation models of sums of parts: how each model reads a sum, which
-models refuse one, and the draws of a sum.
+models refuse one, the draws of a sum, and an exact sum that does not end.
 
 The problems fit a constant flow ``c`` from A to B (``a_to_b_builder`` with
 the rate ``c * A / A`` and 10⁶ in A), observed over windows of ``K`` steps of
@@ -23,6 +23,7 @@ from commol import (
     Simulation,
     scores,
 )
+from commol.local import Laplace
 from commol.observations import (
     BinomialObservations,
     DistributionNoise,
@@ -214,6 +215,47 @@ class TestSums:
             ),
         ):
             Calibrator(_flow_simulation(), _problem(_sums([30.0], 3), {"B": model}))
+
+    def test_an_exact_sum_that_does_not_end_says_why(self) -> None:
+        # Weekly totals in 7 parts at φ = 10⁶: the mass of the sum spreads
+        # far above its mean, so its information does not reach a negligible
+        # term within the counts of the exact reading.
+        exact = NegativeBinomialObservations(overdispersion=1e6, sum="exact")
+        why = (
+            r"Observation 'B' at 7 has the total 60 in 7 parts; its "
+            r"NegativeBinomial model with sum=\"exact\", the mean .* of the "
+            r"total and the overdispersion 1000000(\.0)?, does not end within "
+            r"100000 counts\. Read the sum with sum=\"moments\""
+        )
+        weekly = Calibrator(
+            _flow_simulation(), _problem(_sums([60.0, 80.0], 7), {"B": exact})
+        )
+        with pytest.raises(RuntimeError, match=why):
+            weekly.uncertainty(Laplace(draws=10))
+        # The scores read the same sum: its upper tail, and the density of a
+        # total at the counts.
+        point = ParameterSample.equally_weighted(
+            ["c"], [(0.0, 50.0)], [[FLOW]], SampleMethod(name="point")
+        )
+        predictive = Predictive(weekly, point, [0, 14])
+        with pytest.raises(RuntimeError, match="'B' at 7 has the total 0 in 7 parts"):
+            scores.quantile_residuals(predictive, _sums([0.0], 7), DistributionNoise())
+        with pytest.raises(RuntimeError, match="'B' at 7 has the total 100000 in 7"):
+            scores.log_score(predictive, _sums([1e5], 7), DistributionNoise())
+
+        # A total at the counts stops the fit, with the same reason.
+        far = Calibrator(
+            _flow_simulation(), _problem(_sums([60.0, 1e5], 7), {"B": exact})
+        )
+        with pytest.raises(RuntimeError, match="'B' at 14 has the total 100000"):
+            far.run()
+
+        # The moments read the same totals.
+        moments = NegativeBinomialObservations(overdispersion=1e6, sum="moments")
+        fit = Calibrator(
+            _flow_simulation(), _problem(_sums([60.0, 1e5], 7), {"B": moments})
+        ).run()
+        assert math.isfinite(fit.final_loss)
 
     def test_poisson_and_normal_sums_read_the_sum_of_their_means(self) -> None:
         flow, value = 10.0, 27.0

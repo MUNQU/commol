@@ -74,8 +74,10 @@ impl Violation {
 pub enum EvaluationError {
     /// The point is not feasible.
     Violation(Violation),
-    /// The engine or a constraint could not be evaluated; the message says
-    /// why. Calibration stops on it.
+    /// The engine, a constraint or an observation model could not be
+    /// evaluated, as an exact sum that does not end
+    /// ([`crate::UnendedSum`]); the message says why. Calibration stops on
+    /// it.
     Failed(String),
 }
 

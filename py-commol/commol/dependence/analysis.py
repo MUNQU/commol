@@ -175,7 +175,8 @@ def residual_dependence(
         than one randomization, or `Refitted` reads many draws or
         observations other than the problem's.
     RuntimeError
-        If every refit fails.
+        If every refit fails, or the exact sum of an observation does not end
+        within the counts of ``sum="exact"`` (`NegativeBinomialObservations`).
     InfeasibleStateError
         If a draw leaves the values its model allows.
 

@@ -19,12 +19,13 @@ pub mod sums;
 use std::collections::HashMap;
 
 pub use density::{Center, Noise, Tails, log_location};
-pub use sums::Sum;
+pub use sums::{MAX_COUNTS, Sum, UnendedSum};
 
 use commol_core::Real;
 use serde::{Deserialize, Serialize};
 
-use crate::feasibility::Violation;
+use crate::discrepancy::TermError;
+use crate::feasibility::{EvaluationError, Violation};
 use crate::ranges::{DF, LOG_NORMAL_SIGMA, OVERDISPERSION, SD, STUDENT_T_SCALE};
 use crate::types::{CalibrationParameter, CalibrationParameterType, ObservedDataPoint};
 
@@ -215,6 +216,8 @@ pub struct Likelihood {
     bounds: Vec<(f64, f64)>,
     terms: Vec<Term>,
     observed: Vec<f64>,
+    /// The position of each observation, which names it in an error.
+    positions: Vec<f64>,
     weights: Vec<f64>,
 }
 
@@ -325,6 +328,7 @@ impl Likelihood {
                 .collect(),
             terms: Vec::new(),
             observed: Vec::new(),
+            positions: Vec::new(),
             weights: Vec::new(),
         };
         likelihood.with_data(observed_data)
@@ -341,6 +345,7 @@ impl Likelihood {
         Ok(Self {
             terms,
             observed: observed_data.iter().map(|obs| obs.value).collect(),
+            positions: observed_data.iter().map(|obs| obs.at).collect(),
             weights: observed_data.iter().map(|obs| obs.weight).collect(),
             ..self.clone()
         })
@@ -501,13 +506,15 @@ impl Likelihood {
     ///
     /// # Errors
     ///
-    /// The index of the first observation with weight with the mean of a
-    /// part outside the means its model allows.
+    /// [`TermError::MeanOutside`] with the index of the first observation
+    /// with weight with the mean of a part outside the means its model
+    /// allows; [`TermError::Failed`] with the message of the first whose
+    /// exact sum does not end ([`UnendedSum`]).
     pub fn term_derivatives(
         &self,
         values: &[f64],
         parts: &[f64],
-    ) -> Result<Vec<TermDerivatives>, usize> {
+    ) -> Result<Vec<TermDerivatives>, TermError> {
         self.terms
             .iter()
             .zip(&self.observed)
@@ -527,18 +534,21 @@ impl Likelihood {
                     });
                 }
                 if noise.sum_mean_outside(means).is_some() {
-                    return Err(index);
+                    return Err(TermError::MeanOutside(index));
                 }
+                let failed = |error: UnendedSum| TermError::Failed(self.unended(index, error));
                 Ok(TermDerivatives {
                     parts: term.parts,
                     parameters,
                     gradient: noise
                         .sum_scores(y, means)
+                        .map_err(failed)?
                         .into_iter()
                         .map(|score| -weight * score)
                         .collect(),
                     curvature: noise
                         .sum_information(means)
+                        .map_err(failed)?
                         .into_iter()
                         .map(|entry| weight * entry)
                         .collect(),
@@ -570,7 +580,7 @@ impl Likelihood {
     ///
     /// # Errors
     ///
-    /// As [`Self::check_values`].
+    /// As [`Self::check_values`] and [`Self::tails_of`].
     pub fn tails(
         &self,
         observations: &[ObservedDataPoint],
@@ -578,18 +588,23 @@ impl Likelihood {
         parts: &[f64],
     ) -> Result<Vec<Tails>, String> {
         let terms = self.check_values(observations)?;
-        Ok(self.tails_of(observations, &terms, values, parts))
+        self.tails_of(observations, &terms, values, parts)
     }
 
     /// As [`Self::tails`], with the `terms` that [`Self::check_values`]
     /// gave for `observations`, so a reader of many draws checks once.
+    ///
+    /// # Errors
+    ///
+    /// The message of the first observation whose exact sum does not end
+    /// ([`UnendedSum`]).
     pub fn tails_of(
         &self,
         observations: &[ObservedDataPoint],
         terms: &[Term],
         values: &[f64],
         parts: &[f64],
-    ) -> Vec<Tails> {
+    ) -> Result<Vec<Tails>, String> {
         observations
             .iter()
             .zip(terms)
@@ -598,7 +613,9 @@ impl Likelihood {
                 let noise = self.noise(term, values);
                 let nearest: Vec<f64> =
                     means.iter().map(|&mean| noise.nearest_mean(mean)).collect();
-                noise.sum_tails(obs.value, &nearest)
+                noise
+                    .sum_tails(obs.value, &nearest)
+                    .map_err(|error| error.message(&obs.label, obs.at, obs.value, term.parts))
             })
             .collect()
     }
@@ -639,17 +656,21 @@ impl Likelihood {
     ///
     /// [`Violation::MeanOutsideModel`] when the mean of a part of an
     /// observation with weight lies outside its model: `amount` is the sum
-    /// of the distances.
-    pub fn pointwise(&self, values: &[f64], parts: &[f64]) -> Result<Vec<f64>, Violation> {
+    /// of the distances. Otherwise [`EvaluationError::Failed`] with the
+    /// message of the first observation whose exact sum does not end
+    /// ([`UnendedSum`]).
+    pub fn pointwise(&self, values: &[f64], parts: &[f64]) -> Result<Vec<f64>, EvaluationError> {
         let mut outside = 0.0;
         let mut any = false;
+        let mut unended = None;
         let terms = self
             .terms
             .iter()
             .zip(&self.observed)
             .zip(&self.weights)
             .zip(parts_of(&self.terms, parts))
-            .map(|(((&term, &y), &weight), means)| {
+            .enumerate()
+            .map(|(index, (((&term, &y), &weight), means))| {
                 if weight == 0.0 {
                     return 0.0;
                 }
@@ -660,15 +681,35 @@ impl Likelihood {
                         outside += distance;
                         0.0
                     }
-                    None => weight * noise.sum_log_density(y, means),
+                    None => match noise.sum_log_density(y, means) {
+                        Ok(log_density) => weight * log_density,
+                        Err(error) => {
+                            unended.get_or_insert((index, error));
+                            0.0
+                        }
+                    },
                 }
             })
             .collect();
         if any {
-            Err(Violation::MeanOutsideModel { amount: outside })
+            Err(Violation::MeanOutsideModel { amount: outside }.into())
+        } else if let Some((index, error)) = unended {
+            Err(EvaluationError::Failed(self.unended(index, error)))
         } else {
             Ok(terms)
         }
+    }
+
+    /// The message of the observation `index` of the problem, whose exact
+    /// sum does not end.
+    fn unended(&self, index: usize, error: UnendedSum) -> String {
+        let term = self.terms[index];
+        error.message(
+            &self.series[term.model].0,
+            self.positions[index],
+            self.observed[index],
+            term.parts,
+        )
     }
 
     /// The log-likelihood `Σ wᵢ · log p(yᵢ | μᵢ)` of the means of the parts
@@ -677,7 +718,7 @@ impl Likelihood {
     /// # Errors
     ///
     /// As [`Self::pointwise`].
-    pub fn log_likelihood(&self, values: &[f64], parts: &[f64]) -> Result<f64, Violation> {
+    pub fn log_likelihood(&self, values: &[f64], parts: &[f64]) -> Result<f64, EvaluationError> {
         self.pointwise(values, parts)
             .map(|terms| terms.into_iter().sum())
     }

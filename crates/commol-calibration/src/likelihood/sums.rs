@@ -13,6 +13,9 @@
 //! The tails of a sum are those of the same reading: of the model of the
 //! total, or the cumulative sums of the recursion.
 //!
+//! The exact reading computes at most [`MAX_COUNTS`] counts, and fails with
+//! [`UnendedSum`] when its sum needs more.
+//!
 //! The other models read no sum, and [`crate::Likelihood`] refuses their
 //! parts. One part is the observation of its window, which [`Noise`] reads
 //! alone, so every function here gives what [`Noise`] gives for one part.
@@ -24,7 +27,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::density::{NEGLIGIBLE, Noise, Tails, dispersion_bracket};
+use super::density::{NEGLIGIBLE, Noise, Tails, dispersion_bracket, negative_binomial};
 
 /// How a negative binomial reads the sum of the parts of a window:
 /// `"exact"` or `"moments"` in the Python API.
@@ -32,10 +35,43 @@ use super::density::{NEGLIGIBLE, Noise, Tails, dispersion_bracket};
 #[serde(rename_all = "snake_case")]
 pub enum Sum {
     /// The exact distribution of the sum of independent negative binomials
-    /// (`Recursion`): `O(K·y + y²)` per evaluation at a total `y`.
+    /// (`Recursion`): `O(K·y + y²)` per evaluation at a total `y`, over at
+    /// most [`MAX_COUNTS`] counts.
     Exact,
     /// A negative binomial with the mean and the variance of the sum.
     Moments,
+}
+
+/// The most counts, `0` to `MAX_COUNTS − 1`, that the exact reading of a
+/// sum computes. A sum that needs more fails with [`UnendedSum`]: the
+/// observed total is at the cap or above, or its tail or its information
+/// has not reached a negligible term below it. Why this count:
+/// `docs/codebase/decisions/sums-of-parts.md` (An exact sum ends at a fixed
+/// count).
+pub const MAX_COUNTS: usize = 100_000;
+
+/// The exact reading of a sum of negative binomials needs more than
+/// [`MAX_COUNTS`] counts.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct UnendedSum {
+    /// The mean `M` of the sum, the sum of the means of its parts.
+    pub mean: f64,
+    /// The overdispersion `φ` of the parts.
+    pub overdispersion: f64,
+}
+
+impl UnendedSum {
+    /// The message of an observation of `label` at `at`, of the observed
+    /// total `value` in `parts` parts, whose sum does not end.
+    pub fn message(&self, label: &str, at: f64, value: f64, parts: usize) -> String {
+        format!(
+            "Observation '{label}' at {at} has the total {value} in {parts} parts; its \
+             NegativeBinomial model with sum=\"exact\", the mean {} of the total and the \
+             overdispersion {}, does not end within {MAX_COUNTS} counts. Read the sum with \
+             sum=\"moments\", whose cost does not grow with the total",
+            self.mean, self.overdispersion
+        )
+    }
 }
 
 /// A value of the recursion above this is scaled down, with the values
@@ -74,21 +110,26 @@ impl Noise {
     /// The log density of the sum `y` of parts of means `parts`, each of
     /// which [`Noise::mean_outside`] allows.
     ///
+    /// # Errors
+    ///
+    /// [`UnendedSum`] for [`Sum::Exact`] when `y` is not below
+    /// [`MAX_COUNTS`].
+    ///
     /// # Panics
     ///
     /// Panics for more than one part of a model that reads no sum, or of a
     /// negative binomial without a [`Sum`].
-    pub fn sum_log_density(&self, y: f64, parts: &[f64]) -> f64 {
+    pub fn sum_log_density(&self, y: f64, parts: &[f64]) -> Result<f64, UnendedSum> {
         if let [mean] = parts {
-            return self.log_density(y, *mean);
+            return Ok(self.log_density(y, *mean));
         }
         match self.reading(parts) {
-            Reading::Total { noise, mean, .. } => noise.log_density(y, mean),
+            Reading::Total { noise, mean, .. } => Ok(noise.log_density(y, mean)),
             Reading::Exact { overdispersion } => {
                 let last = count(y);
                 let mut recursion = Recursion::new(parts, overdispersion, y, false);
-                recursion.extend_to(last);
-                recursion.log_probability(last)
+                recursion.extend_to(last)?;
+                Ok(recursion.log_probability(last))
             }
         }
     }
@@ -97,15 +138,20 @@ impl Noise {
     /// [`Noise::mean_outside`] allows: those of the model of the total, or
     /// for [`Sum::Exact`] the sums of the recursion below and above `y`.
     ///
+    /// # Errors
+    ///
+    /// As [`Self::sum_log_density`], and [`UnendedSum`] when the sum above
+    /// `y` has not reached a negligible term within [`MAX_COUNTS`].
+    ///
     /// # Panics
     ///
     /// As [`Self::sum_log_density`].
-    pub fn sum_tails(&self, y: f64, parts: &[f64]) -> Tails {
+    pub fn sum_tails(&self, y: f64, parts: &[f64]) -> Result<Tails, UnendedSum> {
         if let [mean] = parts {
-            return self.tails(y, *mean);
+            return Ok(self.tails(y, *mean));
         }
         match self.reading(parts) {
-            Reading::Total { noise, mean, .. } => noise.tails(y, mean),
+            Reading::Total { noise, mean, .. } => Ok(noise.tails(y, mean)),
             Reading::Exact { overdispersion } => exact_tails(parts, overdispersion, y),
         }
     }
@@ -113,12 +159,16 @@ impl Noise {
     /// The derivatives of the log density of the sum `y` over
     /// `(μ₁, …, μ_K, noise arguments…)`.
     ///
+    /// # Errors
+    ///
+    /// As [`Self::sum_log_density`].
+    ///
     /// # Panics
     ///
     /// As [`Self::sum_log_density`].
-    pub fn sum_scores(&self, y: f64, parts: &[f64]) -> Vec<f64> {
+    pub fn sum_scores(&self, y: f64, parts: &[f64]) -> Result<Vec<f64>, UnendedSum> {
         if let [mean] = parts {
-            return self.scores(y, *mean);
+            return Ok(self.scores(y, *mean));
         }
         match self.reading(parts) {
             Reading::Total {
@@ -128,7 +178,7 @@ impl Noise {
             } => {
                 let scores = noise.scores(y, mean);
                 let columns = jacobian.len() / scores.len();
-                (0..columns)
+                Ok((0..columns)
                     .map(|c| {
                         scores
                             .iter()
@@ -136,17 +186,17 @@ impl Noise {
                             .map(|(r, score)| jacobian[r * columns + c] * score)
                             .sum()
                     })
-                    .collect()
+                    .collect())
             }
             Reading::Exact { overdispersion } => {
                 let last = count(y);
                 let mut recursion = Recursion::new(parts, overdispersion, y, true);
-                recursion.extend_to(last);
+                recursion.extend_to(last)?;
                 let mut accumulated = vec![0.0; parts.len()];
                 for n in 0..last {
                     recursion.accumulate(n, &mut accumulated);
                 }
-                recursion.scores(last, &accumulated)
+                Ok(recursion.scores(last, &accumulated))
             }
         }
     }
@@ -157,12 +207,17 @@ impl Noise {
     /// [`Sum::Exact`] `Σ_y p(y) s(y) s(y)ᵀ`, summed over the counts from 0
     /// until the terms above the mean are negligible.
     ///
+    /// # Errors
+    ///
+    /// [`UnendedSum`] for [`Sum::Exact`] when the terms are not negligible
+    /// within [`MAX_COUNTS`].
+    ///
     /// # Panics
     ///
     /// As [`Self::sum_log_density`].
-    pub fn sum_information(&self, parts: &[f64]) -> Vec<f64> {
+    pub fn sum_information(&self, parts: &[f64]) -> Result<Vec<f64>, UnendedSum> {
         if let [mean] = parts {
-            return self.information(*mean);
+            return Ok(self.information(*mean));
         }
         match self.reading(parts) {
             Reading::Total {
@@ -183,7 +238,7 @@ impl Noise {
                             .sum();
                     }
                 }
-                chained
+                Ok(chained)
             }
             Reading::Exact { overdispersion } => exact_information(parts, overdispersion),
         }
@@ -268,40 +323,80 @@ fn count(y: f64) -> usize {
 /// [`COMPLEMENT_TAIL`], and otherwise the sum of the counts above `y` until
 /// a term is negligible, so it keeps its relative accuracy in the upper
 /// tail. The sum above costs `O(n²)` in the last count `n` it reaches,
-/// which a heavy tail (`φ μ` large) puts far beyond `y`.
-fn exact_tails(parts: &[f64], phi: f64, y: f64) -> Tails {
+/// which a heavy tail (`φ μ` large) puts far beyond `y`; it fails at
+/// [`MAX_COUNTS`], at once when [`ends_within_counts`] shows it cannot end.
+fn exact_tails(parts: &[f64], phi: f64, y: f64) -> Result<Tails, UnendedSum> {
     let last = count(y);
     let mut recursion = Recursion::new(parts, phi, y, false);
-    recursion.extend_to(last);
+    recursion.extend_to(last)?;
     let probability = |recursion: &Recursion, n: usize| libm::exp(recursion.log_probability(n));
     let below = (0..last).fold(0.0, |sum, n| sum + probability(&recursion, n));
     let at = probability(&recursion, last);
     let complement = (1.0 - below) - at;
     if complement >= COMPLEMENT_TAIL {
-        return Tails {
+        return Ok(Tails {
             below,
             at,
             above: complement,
-        };
+        });
+    }
+    if !ends_within_counts(parts, phi) {
+        return Err(recursion.unended());
     }
     let mean: f64 = parts.iter().sum();
     let mut above = 0.0;
     let mut n = last;
     loop {
         n += 1;
-        recursion.extend_to(n);
+        recursion.extend_to(n)?;
         let term = probability(&recursion, n);
         above += term;
         if n as f64 > mean && term <= NEGLIGIBLE * above {
-            return Tails { below, at, above };
+            return Ok(Tails { below, at, above });
         }
     }
 }
 
-/// The exact information of a sum of negative binomials of overdispersion
-/// `phi` and means `parts` over `(μ₁, …, μ_K, φ)`.
-fn exact_information(parts: &[f64], phi: f64) -> Vec<f64> {
+/// Whether the sum of negative binomials of overdispersion `phi` and means
+/// `parts` can reach, within [`MAX_COUNTS`], a count `n > M` of mass at most
+/// [`NEGLIGIBLE`], where the upper tail and the information may stop. It
+/// cannot when `M ≥ MAX_COUNTS − 1`, or when a lower bound of `p(n)` at
+/// `n = MAX_COUNTS − 1` is above [`NEGLIGIBLE`]:
+/// `p(n) ≥ maxₜ pₜ(n) Π_{s≠t} pₛ(0)`, the mass of the sum where one part
+/// takes the whole count, with `pₜ` the negative binomial of the part `t`.
+/// Each `pₜ` falls above its mode, which is at most `μₜ ≤ M`, so the bound
+/// falls on `(M, MAX_COUNTS − 1]` and holds the mass of every count there
+/// above [`NEGLIGIBLE`].
+fn ends_within_counts(parts: &[f64], phi: f64) -> bool {
+    let last = (MAX_COUNTS - 1) as f64;
     let mean: f64 = parts.iter().sum();
+    if mean >= last {
+        return false;
+    }
+    let zeros: Vec<f64> = parts
+        .iter()
+        .map(|&mu| negative_binomial(0.0, mu, phi))
+        .collect();
+    let none: f64 = zeros.iter().sum();
+    let lower = parts
+        .iter()
+        .zip(&zeros)
+        .map(|(&mu, &zero)| negative_binomial(last, mu, phi) - zero)
+        .fold(f64::NEG_INFINITY, f64::max);
+    none + lower <= libm::log(NEGLIGIBLE)
+}
+
+/// The exact information of a sum of negative binomials of overdispersion
+/// `phi` and means `parts` over `(μ₁, …, μ_K, φ)`; it fails at
+/// [`MAX_COUNTS`], at once when [`ends_within_counts`] shows it cannot end.
+fn exact_information(parts: &[f64], phi: f64) -> Result<Vec<f64>, UnendedSum> {
+    let mean: f64 = parts.iter().sum();
+    if !ends_within_counts(parts, phi) {
+        return Err(UnendedSum {
+            mean,
+            overdispersion: phi,
+        });
+    }
     let variance: f64 = parts.iter().map(|mu| mu * (1.0 + phi * mu)).sum();
     let size = parts.len() + 1;
     let mut recursion = Recursion::new(
@@ -316,7 +411,7 @@ fn exact_information(parts: &[f64], phi: f64) -> Vec<f64> {
     let mut n = 0usize;
     loop {
         if n > 0 {
-            let factor = recursion.extend_to(n);
+            let factor = recursion.extend_to(n)?;
             accumulated.iter_mut().for_each(|value| *value *= factor);
         }
         let probability = libm::exp(recursion.log_probability(n));
@@ -334,7 +429,7 @@ fn exact_information(parts: &[f64], phi: f64) -> Vec<f64> {
         }
         total += term;
         if n as f64 > mean && term <= NEGLIGIBLE * total && probability <= NEGLIGIBLE {
-            return information;
+            return Ok(information);
         }
         recursion.accumulate(n, &mut accumulated);
         n += 1;
@@ -363,6 +458,10 @@ fn exact_information(parts: &[f64], phi: f64) -> Vec<f64> {
 /// derivative in `μₜ` comes from `∂p(n)/∂μₜ = (gₜ(n − 1) − p(n))/(1 + φμₜ)`,
 /// `gₜ(n) = (1 − qₜ) p(n) + qₜ gₜ(n − 1)` ([`Self::accumulate`]).
 struct Recursion {
+    /// `M`, the sum of the means of the parts.
+    mean: f64,
+    /// The overdispersion `φ` of the parts.
+    phi: f64,
     c: Vec<f64>,
     q: Vec<f64>,
     rho: f64,
@@ -405,6 +504,8 @@ impl Recursion {
         let rho = tilt(parts, phi, &q, target);
         let slope_of_zero: f64 = parts.iter().map(|&mu| dispersion_bracket(mu, phi)).sum();
         Self {
+            mean: parts.iter().sum(),
+            phi,
             powers: vec![1.0; parts.len()],
             previous: vec![0.0; parts.len()],
             c,
@@ -425,12 +526,28 @@ impl Recursion {
 
     /// Compute the terms up to the count `last`; returns the factor that
     /// scaled the terms before, 1 when none was scaled.
-    fn extend_to(&mut self, last: usize) -> f64 {
+    ///
+    /// # Errors
+    ///
+    /// [`UnendedSum`], before any term, when `last` is not below
+    /// [`MAX_COUNTS`].
+    fn extend_to(&mut self, last: usize) -> Result<f64, UnendedSum> {
+        if last >= MAX_COUNTS {
+            return Err(self.unended());
+        }
         let mut factor = 1.0;
         while self.values.len() <= last {
             factor *= self.push();
         }
-        factor
+        Ok(factor)
+    }
+
+    /// The error of this sum when it needs more than [`MAX_COUNTS`] counts.
+    fn unended(&self) -> UnendedSum {
+        UnendedSum {
+            mean: self.mean,
+            overdispersion: self.phi,
+        }
     }
 
     /// The next jump `ρʲ hⱼ` and its slope.
