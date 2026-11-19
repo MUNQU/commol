@@ -10,6 +10,7 @@ use std::collections::HashSet;
 
 use commol_core::{MathExpression, MathExpressionContext, ScaledMatrix};
 
+use crate::observation::index_at;
 use crate::types::{CalibrationConstraint, CalibrationParameter};
 
 /// Why a point is not feasible.
@@ -172,9 +173,7 @@ impl Feasibility {
             .chain(output_sums.iter().map(|(name, _)| name.as_str()))
             .collect();
         let row_of = |position: f64| {
-            positions
-                .binary_search_by(|candidate| candidate.total_cmp(&position))
-                .expect("the schedule holds every constraint position")
+            index_at(positions, position).expect("the schedule holds every constraint position")
         };
 
         let mut parameter_constraints = Vec::new();
@@ -268,8 +267,7 @@ impl Feasibility {
         let mut feasibility = self.clone();
         for constraint in &mut feasibility.position_constraints {
             for (position, row) in &mut constraint.rows {
-                *row = positions
-                    .binary_search_by(|candidate| candidate.total_cmp(position))
+                *row = index_at(positions, *position)
                     .expect("the schedule holds every constraint position");
             }
         }

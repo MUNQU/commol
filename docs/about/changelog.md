@@ -796,6 +796,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An observation at `at=-0.0` beside an observation or a constraint at
+  `0.0` is one position. Before, every method that builds blocks (the
+  bootstraps, the block jackknife, `ResidualNoise` and the others) raised
+  `PanicException: every position is listed`, and a constraint at `0.0`
+  beside an observation at `-0.0` made `Calibrator` raise
+  `PanicException: the schedule holds every constraint position`. The
+  dense design of `StructuralRank` read an observation at `-0.0` as a
+  second position 0, which changed its singular values.
+
 - The curvature of a `NegativeBinomialObservations` of `overdispersion` 0,
   which the Laplace approximation, the sandwich and the noise floor of a
   profile read, is the limit of the Poisson, `μ²/2` for `φ`. Before, it ran

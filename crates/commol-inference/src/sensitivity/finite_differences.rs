@@ -339,7 +339,8 @@ fn dense_observations(observed_data: &[ObservedDataPoint]) -> Vec<ObservedDataPo
     let mut positions: BTreeSet<u64> = (0..=last.floor() as u64)
         .map(|t| (t as f64).to_bits())
         .collect();
-    positions.extend(observed_data.iter().map(|obs| obs.at.to_bits()));
+    // `−0.0` is the unit position `0.0`.
+    positions.extend(observed_data.iter().map(|obs| (obs.at + 0.0).to_bits()));
     let mut positions: Vec<f64> = positions.into_iter().map(f64::from_bits).collect();
     positions.sort_by(f64::total_cmp);
     series
@@ -387,5 +388,16 @@ mod tests {
         let dense = dense_observations(&[plain, weighted]);
         assert_eq!(dense.len(), 4);
         assert_eq!(dense[3].coefficients, Some(vec![1.0, 0.6]));
+    }
+
+    #[test]
+    fn minus_zero_is_the_unit_position_zero() {
+        let dense = dense_observations(&[
+            ObservedDataPoint::new(-0.0, "A".to_string(), 0.0),
+            ObservedDataPoint::new(1.0, "A".to_string(), 0.0),
+        ]);
+
+        let positions: Vec<u64> = dense.iter().map(|obs| obs.at.to_bits()).collect();
+        assert_eq!(positions, [0.0f64.to_bits(), 1.0f64.to_bits()]);
     }
 }
