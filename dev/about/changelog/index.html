@@ -5387,8 +5387,10 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   the factor by which the dependence multiplies the information. The
   required <code>reference</code> is <code>AtParameters(replicates)</code>, for held-out data, or
   <code>Refitted(replicates, starts=1)</code>, which refits data drawn at the fit and
-  holds for the data of the fit. The result is <code>SeriesDependence</code>. See
-  <a href="../../guide/uncertainty/dependence/">Dependence</a>.</p>
+  holds for the data of the fit. <code>Q̃</code> sums only the lags of 4 pairs or
+  more: <code>few_pairs</code> gives the others with their pairs, and a series with
+  no lag left has no <code>Q̃</code>, with its <code>portmanteau_reason</code>. The result is
+  <code>SeriesDependence</code>. See <a href="../../guide/uncertainty/dependence/">Dependence</a>.</p>
 </li>
 <li>
 <p><code>commol.scores.quantile_residuals(predictive, observations, DistributionNoise())</code>:

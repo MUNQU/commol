@@ -12,7 +12,7 @@ series_dependence(values: Sequence[float], observations: Sequence[ObservedDataPo
 
 The dependence of one value per observation, series by series.
 
-The values of each label, in position order, are read on the grid of the smallest spacing of the series, and each lag over the pairs of values that exist at that distance (Parzen 1963; Stoffer and Toloi 1992). For each series: the autocorrelation up to `max_lag`; the robust portmanteau `Q̃ = Σ_k (Σ e_t e_{t−k})² / Σ e_t² e_{t−k}²` of the values centered per series (Dalla, Giraitis and Phillips 2022), which holds under heteroscedasticity, with its p-value against `χ²(h)`; and the integrated autocorrelation time `τ` by the initial monotone sequence of Geyer (1992), with its band under independence from `replicates` sets of the centered values with signs ±1 (a wild band). For the series together: their correlations at lag 0, and over the standardized series `z` the factors `Var(Σz) / ΣVar(z)` and `τ` of `Σz`, whose product `LRV(Σz) / ΣVar(z)` is the factor by which the dependence multiplies the information, with its p-value against the wild sets.
+The values of each label, in position order, are read on the grid of the smallest spacing of the series, and each lag over the pairs of values that exist at that distance (Parzen 1963; Stoffer and Toloi 1992). For each series: the autocorrelation up to `max_lag`; the robust portmanteau `Q̃ = Σ_k (Σ e_t e_{t−k})² / Σ e_t² e_{t−k}²` of the values centered per series (Dalla, Giraitis and Phillips 2022), which holds under heteroscedasticity, over the `h` lags of 4 pairs or more with a product other than 0, with its p-value against `χ²(h)`; and the integrated autocorrelation time `τ` by the initial monotone sequence of Geyer (1992), with its band under independence from `replicates` sets of the centered values with signs ±1 (a wild band). For the series together: their correlations at lag 0, and over the standardized series `z` the factors `Var(Σz) / ΣVar(z)` and `τ` of `Σz`, whose product `LRV(Σz) / ΣVar(z)` is the factor by which the dependence multiplies the information, with its p-value against the wild sets.
 
 Parameters:
 
@@ -64,7 +64,8 @@ def series_dependence(
     each series: the autocorrelation up to `max_lag`; the robust portmanteau
     ``Q̃ = Σ_k (Σ e_t e_{t−k})² / Σ e_t² e_{t−k}²`` of the values centered
     per series (Dalla, Giraitis and Phillips 2022), which holds under
-    heteroscedasticity, with its p-value against ``χ²(h)``; and the
+    heteroscedasticity, over the ``h`` lags of 4 pairs or more with a
+    product other than 0, with its p-value against ``χ²(h)``; and the
     integrated autocorrelation time ``τ`` by the initial monotone sequence
     of Geyer (1992), with its band under independence from `replicates`
     sets of the centered values with signs ±1 (a wild band). For the series
@@ -472,22 +473,24 @@ The series reads its values in position order, on the grid of its smallest spaci
 
 Attributes:
 
-| Name                 | Type                  | Description                            |
-| -------------------- | --------------------- | -------------------------------------- |
-| `label`              | `str`                 | The label of the series.               |
-| `values`             | `int`                 | The values it reads.                   |
-| `reason`             | \`str                 | None\`                                 |
-| `max_lag`            | `int`                 | The largest lag, in steps of the grid. |
-| `correlations`       | \`list\[float         | None\]\`                               |
-| `pairs`              | `list[int]`           | The pairs of values each lag reads.    |
-| `portmanteau`        | \`float               | None\`                                 |
-| `degrees_of_freedom` | `int`                 | The lags in the sum of Q̃.              |
-| `p_value`            | \`float               | None\`                                 |
-| `draw_p_values`      | \`DrawPValues         | None\`                                 |
-| `tau`                | \`float               | None\`                                 |
-| `tau_reason`         | \`str                 | None\`                                 |
-| `tau_band`           | \`tuple[float, float] | None\`                                 |
-| `cut_lag`            | \`int                 | None\`                                 |
+| Name                 | Type                    | Description                                                                                                                   |
+| -------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `label`              | `str`                   | The label of the series.                                                                                                      |
+| `values`             | `int`                   | The values it reads.                                                                                                          |
+| `reason`             | \`str                   | None\`                                                                                                                        |
+| `max_lag`            | `int`                   | The largest lag, in steps of the grid.                                                                                        |
+| `correlations`       | \`list\[float           | None\]\`                                                                                                                      |
+| `pairs`              | `list[int]`             | The pairs of values each lag reads.                                                                                           |
+| `few_pairs`          | `list[tuple[int, int]]` | Each lag of fewer than 4 pairs, as (lag, pairs): it keeps its correlation and is left out of Q̃ and of its degrees of freedom. |
+| `portmanteau`        | \`float                 | None\`                                                                                                                        |
+| `portmanteau_reason` | \`str                   | None\`                                                                                                                        |
+| `degrees_of_freedom` | `int`                   | The lags in the sum of Q̃: those of 4 pairs or more with a product other than 0.                                               |
+| `p_value`            | \`float                 | None\`                                                                                                                        |
+| `draw_p_values`      | \`DrawPValues           | None\`                                                                                                                        |
+| `tau`                | \`float                 | None\`                                                                                                                        |
+| `tau_reason`         | \`str                   | None\`                                                                                                                        |
+| `tau_band`           | \`tuple[float, float]   | None\`                                                                                                                        |
+| `cut_lag`            | \`int                   | None\`                                                                                                                        |
 
 Source code in `commol/dependence/results.py`
 
@@ -516,10 +519,18 @@ class SeriesStatistics(ResultModel):
         None at a lag with no pair.
     pairs : list[int]
         The pairs of values each lag reads.
+    few_pairs : list[tuple[int, int]]
+        Each lag of fewer than 4 pairs, as ``(lag, pairs)``: it keeps its
+        correlation and is left out of ``Q̃`` and of its degrees of freedom.
     portmanteau : float | None
         The robust portmanteau ``Q̃`` (Dalla, Giraitis and Phillips 2022).
+    portmanteau_reason : str | None
+        Why there is no ``Q̃``: the series has no statistics, every lag
+        reads fewer than 4 pairs, or no lag of 4 pairs or more has a
+        product other than 0, as of constant values.
     degrees_of_freedom : int
-        The lags in the sum of ``Q̃``.
+        The lags in the sum of ``Q̃``: those of 4 pairs or more with a
+        product other than 0.
     p_value : float | None
         The p-value of ``Q̃`` under the reference, with one draw.
     draw_p_values : DrawPValues | None
@@ -547,7 +558,9 @@ class SeriesStatistics(ResultModel):
     max_lag: int
     correlations: list[float | None]
     pairs: list[int]
+    few_pairs: list[tuple[int, int]]
     portmanteau: float | None
+    portmanteau_reason: str | None
     degrees_of_freedom: int
     p_value: float | None
     draw_p_values: DrawPValues | None
@@ -565,7 +578,9 @@ class SeriesStatistics(ResultModel):
             max_lag=raw.max_lag,
             correlations=raw.correlations,
             pairs=raw.pairs,
+            few_pairs=raw.few_pairs,
             portmanteau=raw.portmanteau,
+            portmanteau_reason=raw.portmanteau_reason,
             degrees_of_freedom=raw.degrees_of_freedom,
             p_value=raw.p_value,
             draw_p_values=_draw_p_values(raw.draw_p_values),

@@ -4225,7 +4225,11 @@ lag.</p>
 </tr>
 <tr>
 <td><code>portmanteau</code></td>
-<td>The robust portmanteau <code>Q̃ = Σ_k (Σ e_t e_{t−k})² / Σ e_t² e_{t−k}²</code> of the values centered per series, the diagonal form of the statistic of Dalla, Giraitis and Phillips (2022): <code>χ²</code> of <code>degrees_of_freedom</code> lags under independence, also when the size of the noise varies along the series</td>
+<td>The robust portmanteau <code>Q̃ = Σ_k (Σ e_t e_{t−k})² / Σ e_t² e_{t−k}²</code> of the values centered per series, the diagonal form of the statistic of Dalla, Giraitis and Phillips (2022): <code>χ²</code> of <code>degrees_of_freedom</code> lags under independence, also when the size of the noise varies along the series; <code>None</code>, with the <code>portmanteau_reason</code>, when no lag enters its sum</td>
+</tr>
+<tr>
+<td><code>few_pairs</code></td>
+<td>Each lag of fewer than 4 pairs, as <code>(lag, pairs)</code>: it keeps its correlation and is left out of <code>Q̃</code> and of <code>degrees_of_freedom</code></td>
 </tr>
 <tr>
 <td><code>p_value</code></td>
@@ -4251,12 +4255,30 @@ not read it: its sum stops where the sequence of Geyer stops.</p>
 <p>A series has no statistics, with the <code>reason</code>, when two of its observations
 share one position (give one of them a label of its own), a position is off
 its grid, such as 0, 2, 3 and 4.5, or its grid has more than 10 points per
-value, as when one position lies close to another. A lag with a single
-pair adds 1 to <code>Q̃</code> whatever the values, so a <code>max_lag</code> near the length of a
-short series makes the test conservative. <code>τ</code> is undefined, with the <code>tau_reason</code>,
-for fewer than 4 values, constant values, or an estimate not above 0, which
-comes from a negative correlation at the first lags; an undefined <code>τ</code> reads
-as below its band.</p>
+value, as when one position lies close to another. <code>τ</code> is undefined, with
+the <code>tau_reason</code>, for fewer than 4 values, constant values, or an estimate
+not above 0, which comes from a negative correlation at the first lags; an
+undefined <code>τ</code> reads as below its band.</p>
+<p>A lag of few pairs adds a term bounded by its pairs, of mean near 1 but
+with less spread than the <code>χ²(1)</code> it counts as: a lag of one pair adds 1
+whatever the values. So <code>Q̃</code> sums only the lags of 4 pairs or more, and
+<code>few_pairs</code> names the others: a <code>max_lag</code> near the length of the series
+leaves out its last lags, and a gap the lags it breaks. Over 3000 sets of
+independent values each, with <code>max_lag</code> at the last lag of 12 positions,
+of 19 positions on a grid of 35 and of 14 on a grid of 24, <code>Q̃</code> rejects at
+5 % in 4.3 % of them, and in 3.1 % with every lag in its sum
+(<code>tests/uncertainty/test_dependence_coverage.py</code>).</p>
+<p>A lag of 4 pairs or more still pulls the rate down, less the more pairs
+it reads: one lag of 4 independent pairs alone rejects at 5 % in 0.2 % of
+the sets, of 6 in 1.2 %, of 10 in 3.1 % and of 20 in 4.4 %. So a short
+series, or one whose gaps leave few pairs at every lag, stays
+conservative: <code>"auto"</code> gives 5 values one lag of 4 pairs (0.2 %), 6
+values 1.0 % and 8 values 2.0 %. Many lags make the test liberal: 6.2 %
+at <code>max_lag=11</code> and 7.5 % at 17 with 35 values, 8.1 % at 33 with 100;
+<code>"auto"</code> reads at most 10 lags and a fifth of the values. A series whose
+every lag reads fewer than 4 pairs, such as one of 4 values, has no <code>Q̃</code>:
+<code>portmanteau</code> and <code>p_value</code> are <code>None</code>, and the <code>portmanteau_reason</code> says
+so.</p>
 <h2 id="the-series-together">The series together<a class="headerlink" href="#the-series-together" title="Permanent link">&para;</a></h2>
 <p>Two series can share a shock at the same position, which no series shows
 alone. Over the series standardized by their own spread, <code>z</code>, the <code>problem</code>
