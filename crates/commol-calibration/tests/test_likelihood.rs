@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 
 use commol_calibration::{
     Argument, CalibrationParameter, CalibrationParameterType, CalibrationProblem, Center,
-    DiscrepancyConfig, LossConfig, Noise, ObservationModel, ObservedDataPoint,
+    DerivativesError, DiscrepancyConfig, LossConfig, Noise, ObservationModel, ObservedDataPoint,
     OptimizationObjective, ReplicateSummary, Replicates, Tails, Violation, Workspace,
 };
 use commol_core::{ModelValue, SimulationEngine, SimulationError, ValuePlan};
@@ -919,8 +919,11 @@ fn terms_skip_a_weight_of_zero_and_name_a_mean_outside_their_model() {
         .unwrap_err();
     assert_eq!(
         error,
-        "Observation 'x' at 0 has a mean of a part outside the means its observation model \
-         allows (its prediction is -1)"
+        DerivativesError::Invalid(
+            "Observation 'x' at 0 has a mean of a part outside the means its observation \
+             model allows (its prediction is -1)"
+                .to_string()
+        )
     );
 
     let rmse = self::problem(
@@ -932,7 +935,10 @@ fn terms_skip_a_weight_of_zero_and_name_a_mean_outside_their_model() {
     let error = rmse
         .term_derivatives(&[0.0, 0.0], &[1.0, 2.0], &[1.0, 2.0])
         .unwrap_err();
-    assert!(error.contains("no derivative at a perfect fit"), "{error}");
+    assert!(
+        error.to_string().contains("no derivative at a perfect fit"),
+        "{error}"
+    );
 }
 
 /// `actual` within `tolerance` of `expected`, relative; exactly 0 where

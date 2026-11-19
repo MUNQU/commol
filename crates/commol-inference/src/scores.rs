@@ -16,7 +16,7 @@
 
 use commol_calibration::likelihood::parts_of;
 use commol_calibration::{
-    CalibrationProblem, ObservedDataPoint, SeriesIndex, Tails, weighted_crps,
+    CalibrationProblem, EvaluationError, ObservedDataPoint, SeriesIndex, Tails, weighted_crps,
 };
 use commol_core::{CONFIDENCE_LEVEL, SimulationEngine};
 use commol_random::Generator;
@@ -280,7 +280,9 @@ pub fn quantile_residual(tails: &Tails, v: f64) -> f64 {
 /// Returns an error, before any run, when the sample's parameters are not
 /// the problem's, an observation names a series with no model, or an
 /// observed value is outside the support of its model; and when an
-/// observation names an unknown output or factor, or a draw has no run.
+/// observation names an unknown output or factor, a draw has no run, or the
+/// exact sum of an observation does not end at a draw
+/// ([`commol_calibration::UnendedSum`]).
 pub fn observation_bounds<E>(
     problem: &CalibrationProblem<E>,
     sample: &ParameterSample,
@@ -300,18 +302,24 @@ where
     let tails = runs
         .par_iter()
         .zip(sample.values())
-        .map(|(replicates, values)| {
+        .enumerate()
+        .map(|(draw, (replicates, values))| {
             let share = 1.0 / replicates.len() as f64;
             let mut mixed = vec![Tails::default(); observations.len()];
             for means in replicates {
-                let tails = likelihood.tails_of(observations, &terms, values, &means.parts);
+                let tails = likelihood
+                    .tails_of(observations, &terms, values, &means.parts)
+                    .map_err(|message| PredictiveError::Draw {
+                        draw,
+                        error: EvaluationError::Failed(message),
+                    })?;
                 for (sum, tails) in mixed.iter_mut().zip(tails) {
                     sum.add_weighted(share, tails);
                 }
             }
-            mixed
+            Ok(mixed)
         })
-        .collect();
+        .collect::<Result<_, PredictiveError>>()?;
     Ok(ObservationBounds {
         tails,
         weights: sample.weights().to_vec(),
@@ -334,7 +342,8 @@ where
 ///
 /// Returns an error when the sample's parameters are not the problem's, an
 /// observation names an unknown output or factor or a series with no model,
-/// or a draw has no run.
+/// a draw has no run, or the exact sum of an observation does not end at a
+/// draw ([`commol_calibration::UnendedSum`]).
 pub fn log_score<E>(
     problem: &CalibrationProblem<E>,
     sample: &ParameterSample,
@@ -354,35 +363,54 @@ where
         .terms(observations)
         .expect("checked by the noise");
     let runs = observe_sets(problem.forward(), sample.values(), observations, Some(seed))?;
-    // Each draw: the log of its share of the weight, its parameter values and
-    // the means of the parts of each observation.
-    type Draw<'a> = (f64, &'a [f64], Vec<&'a [f64]>);
+    // Each replicate of a draw: the index of the draw, the log of its share
+    // of the weight, its parameter values and the means of the parts of each
+    // observation.
+    type Draw<'a> = (usize, f64, &'a [f64], Vec<&'a [f64]>);
     let mut draws: Vec<Draw> = Vec::new();
-    for ((replicates, &weight), values) in runs.iter().zip(sample.weights()).zip(sample.values()) {
+    for (draw, ((replicates, &weight), values)) in runs
+        .iter()
+        .zip(sample.weights())
+        .zip(sample.values())
+        .enumerate()
+    {
         let share = libm::log(weight / replicates.len() as f64);
         for means in replicates {
-            draws.push((share, values, parts_of(&terms, &means.parts).collect()));
+            draws.push((
+                draw,
+                share,
+                values,
+                parts_of(&terms, &means.parts).collect(),
+            ));
         }
     }
-    Ok(observations
+    observations
         .iter()
         .zip(&terms)
         .enumerate()
         .map(|(i, (obs, &term))| {
             let logs: Vec<f64> = draws
                 .iter()
-                .map(|(share, values, parts)| {
+                .map(|&(draw, share, values, ref parts)| {
                     let model = likelihood.noise(term, values);
                     let nearest: Vec<f64> = parts[i]
                         .iter()
                         .map(|&mean| model.nearest_mean(mean))
                         .collect();
-                    share + model.sum_log_density(obs.value, &nearest)
+                    model
+                        .sum_log_density(obs.value, &nearest)
+                        .map(|log_density| share + log_density)
+                        .map_err(|error| PredictiveError::Draw {
+                            draw,
+                            error: EvaluationError::Failed(
+                                error.message(&obs.label, obs.at, obs.value, obs.parts),
+                            ),
+                        })
                 })
-                .collect();
-            log_sum_exp(&logs)
+                .collect::<Result<_, _>>()?;
+            Ok(log_sum_exp(&logs))
         })
-        .collect())
+        .collect()
 }
 
 /// The mean of `values` per series, named by `labels`, in the order each

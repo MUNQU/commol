@@ -217,6 +217,7 @@ nav:
               - Engines: codebase/decisions/engines.md
               - Calibration: codebase/decisions/calibration.md
               - Observations: codebase/decisions/observations.md
+              - Sums of Parts: codebase/decisions/sums-of-parts.md
               - Settings: codebase/decisions/settings.md
               - Optimizers: codebase/decisions/optimizers.md
               - Uncertainty: codebase/decisions/uncertainty.md

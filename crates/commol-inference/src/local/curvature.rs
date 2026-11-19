@@ -17,7 +17,7 @@
 
 use std::cell::RefCell;
 
-use commol_calibration::{CalibrationProblem, TermDerivatives, Workspace};
+use commol_calibration::{CalibrationProblem, DerivativesError, TermDerivatives, Workspace};
 use commol_core::SimulationEngine;
 use finitediff::vec::hessian::central_hessian_nograd_error_vec;
 
@@ -68,7 +68,10 @@ impl Curvature {
         let parts = &sensitivities.parts;
         let terms = problem
             .term_derivatives(fit, &sensitivities.predictions, &parts.means)
-            .map_err(MethodError::Invalid)?;
+            .map_err(|error| match error {
+                DerivativesError::Invalid(message) => MethodError::Invalid(message),
+                DerivativesError::Failed(message) => MethodError::Failed(message),
+            })?;
         let p = fit.len();
         let mut matrix = Matrix::zeros(p, p);
         let mut errors = Matrix::zeros(p, p);

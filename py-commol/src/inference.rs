@@ -607,8 +607,8 @@ impl PyCalibrationProblem {
     /// The weighted log density of each observation at `values`
     ///
     /// Raises:
-    ///     ValueError: If the problem has a loss, or the values give no
-    ///         prediction
+    ///     ValueError: If the problem has a loss, the values give no
+    ///         prediction, or the exact sum of an observation does not end
     fn pointwise_log_likelihood(&self, values: Vec<f64>) -> PyResult<Vec<f64>> {
         self.inner
             .pointwise_log_likelihood(&values, &mut Workspace::default())

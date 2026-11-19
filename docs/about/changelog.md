@@ -47,7 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `NegativeBinomialObservations(sum="exact" | "moments")` as the exact
   convolution of the parts or the negative binomial of its mean and
   variance. A negative binomial series with parts needs `sum`, and one
-  without parts refuses it; the other models refuse parts. The draws of
+  without parts refuses it; the other models refuse parts. `"exact"`
+  computes at most 100 000 counts: a total at that count, or a tail or an
+  information with no negligible term below it, as at a large
+  `overdispersion`, raises a `RuntimeError` that names the observation, its
+  total, the mean of the total, `φ` and the counts, and points to
+  `sum="moments"`; it never switches on its own. The draws of
   `DistributionNoise()` and `ParametricBootstrap`, the log score, the
   gradients and the expected information read the sum as its model does. See
   [Parts of a window](../guide/calibration-observations.md#parts-of-a-window)

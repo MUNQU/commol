@@ -568,6 +568,7 @@ fn draws_of_a_sum_have_the_distribution_of_their_reading() {
             sum: Some(sum),
         }
         .sum_log_density(0.0, &parts)
+        .unwrap()
         .exp()
     };
     let error = |p: f64| 4.0 * (p * (1.0 - p) / count as f64).sqrt();

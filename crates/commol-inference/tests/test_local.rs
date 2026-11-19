@@ -1137,8 +1137,9 @@ fn the_gradient_of_a_sum_is_that_of_its_density() {
             point.push(0.4);
         }
         for y in [0.0, 3.0, 8.0, 21.0] {
-            let log_density = |point: &[f64]| noise_of(point).sum_log_density(y, &point[..4]);
-            let scores = noise_of(&point).sum_scores(y, &parts);
+            let log_density =
+                |point: &[f64]| noise_of(point).sum_log_density(y, &point[..4]).unwrap();
+            let scores = noise_of(&point).sum_scores(y, &parts).unwrap();
             assert_eq!(scores.len(), point.len(), "{name}");
             for (index, score) in scores.iter().enumerate() {
                 let expected = central(&log_density, &point, index);
@@ -1215,7 +1216,8 @@ fn the_information_of_a_sum_is_that_of_its_density() {
         let mut expected = vec![0.0; size * size];
         for y in 0..200 {
             let y = f64::from(y);
-            let log_density = |point: &[f64]| noise_of(point).sum_log_density(y, &point[..3]);
+            let log_density =
+                |point: &[f64]| noise_of(point).sum_log_density(y, &point[..3]).unwrap();
             let probability = log_density(&point).exp();
             let scores: Vec<f64> = (0..size)
                 .map(|index| central(&log_density, &point, index))
@@ -1226,7 +1228,7 @@ fn the_information_of_a_sum_is_that_of_its_density() {
                 }
             }
         }
-        let information = noise_of(&point).sum_information(&parts);
+        let information = noise_of(&point).sum_information(&parts).unwrap();
         for a in 0..size {
             for b in 0..size {
                 let scale = (expected[a * size + a] * expected[b * size + b]).sqrt();
@@ -1239,7 +1241,9 @@ fn the_information_of_a_sum_is_that_of_its_density() {
         }
     }
     // A normal sum: the information of N(M, K sd²) over (μ₁, μ₂, sd).
-    let information = Noise::Normal { sd: 2.0 }.sum_information(&[1.0, 3.0]);
+    let information = Noise::Normal { sd: 2.0 }
+        .sum_information(&[1.0, 3.0])
+        .unwrap();
     let mean = 1.0 / 8.0;
     let expected = [mean, mean, 0.0, mean, mean, 0.0, 0.0, 0.0, 0.5];
     for (actual, expected) in information.iter().zip(expected) {

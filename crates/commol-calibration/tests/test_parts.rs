@@ -3,8 +3,9 @@
 //! their sum under each observation model.
 
 use commol_calibration::{
-    Argument, CalibrationParameter, CalibrationProblem, DiscrepancyConfig, EvaluationError, Noise,
-    ObservationModel, ObservedDataPoint, Sum, Violation, Workspace,
+    Argument, CalibrationParameter, CalibrationProblem, DerivativesError, DiscrepancyConfig,
+    EvaluationError, MAX_COUNTS, Noise, ObservationModel, ObservedDataPoint, Sum, UnendedSum,
+    Violation, Workspace,
 };
 use commol_core::{Model, SimulationEngine};
 use commol_difference::DifferenceEquations;
@@ -227,7 +228,7 @@ fn the_exact_sum_is_the_convolution_of_its_parts() {
         };
         let expected = convolution(parts, phi, last);
         for (n, expected) in expected.iter().enumerate() {
-            let actual = exact.sum_log_density(n as f64, parts);
+            let actual = exact.sum_log_density(n as f64, parts).unwrap();
             assert!(
                 relative(actual, *expected) < 1e-12,
                 "φ = {phi}, n = {n}: {actual} against {expected}"
@@ -236,7 +237,7 @@ fn the_exact_sum_is_the_convolution_of_its_parts() {
         if phi == 0.0 {
             for n in 0..=last {
                 let poisson = Noise::Poisson.log_density(n as f64, mean);
-                let actual = exact.sum_log_density(n as f64, parts);
+                let actual = exact.sum_log_density(n as f64, parts).unwrap();
                 assert!(relative(actual, poisson) < 1e-12, "{n}");
             }
         }
@@ -245,7 +246,7 @@ fn the_exact_sum_is_the_convolution_of_its_parts() {
         overdispersion: 1e-3,
         sum: Some(Sum::Exact),
     };
-    assert!(exact.sum_log_density(0.0, &[300.0, 300.0, 300.0]) < -745.0);
+    assert!(exact.sum_log_density(0.0, &[300.0, 300.0, 300.0]).unwrap() < -745.0);
 }
 
 #[test]
@@ -266,7 +267,7 @@ fn the_tails_of_a_sum() {
             sum: Some(Sum::Exact),
         };
         for y in [0usize, 4, 21, 60, 150] {
-            let tails = exact.sum_tails(y as f64, &parts);
+            let tails = exact.sum_tails(y as f64, &parts).unwrap();
             let below: f64 = probabilities[..y].iter().sum();
             let above: f64 = probabilities[y + 1..].iter().sum();
             let case = format!("φ = {phi}, y = {y}: {tails:?}");
@@ -290,19 +291,25 @@ fn the_tails_of_a_sum() {
         sum: Some(Sum::Moments),
     };
     for y in [0.0, 4.0, 21.0, 60.0] {
-        assert_eq!(moments.sum_tails(y, &parts), matched.tails(y, mean));
         assert_eq!(
-            Noise::Poisson.sum_tails(y, &parts),
+            moments.sum_tails(y, &parts).unwrap(),
+            matched.tails(y, mean)
+        );
+        assert_eq!(
+            Noise::Poisson.sum_tails(y, &parts).unwrap(),
             Noise::Poisson.tails(y, mean)
         );
         // N(M, K sd²), K = 4 parts: the sd doubles.
         assert_eq!(
-            Noise::Normal { sd: 1.5 }.sum_tails(y, &parts),
+            Noise::Normal { sd: 1.5 }.sum_tails(y, &parts).unwrap(),
             Noise::Normal { sd: 3.0 }.tails(y, mean)
         );
     }
     // One part is the model itself.
-    assert_eq!(moments.sum_tails(4.0, &[5.0]), moments.tails(4.0, 5.0));
+    assert_eq!(
+        moments.sum_tails(4.0, &[5.0]).unwrap(),
+        moments.tails(4.0, 5.0)
+    );
 }
 
 #[test]
@@ -319,15 +326,15 @@ fn the_moments_of_a_sum() {
     let (mean, squares) = (21.0, 9.0 + 100.0 + 56.25 + 0.25);
     for y in [0.0, 4.0, 21.0, 60.0] {
         let expected = single(0.8 * squares / (mean * mean)).log_density(y, mean);
-        assert!(relative(moments(0.8).sum_log_density(y, &parts), expected) < 1e-14);
+        assert!(relative(moments(0.8).sum_log_density(y, &parts).unwrap(), expected) < 1e-14);
         // Equal means: NB(Kμ, φ/K).
-        let equal = moments(0.8).sum_log_density(y, &[5.0; 4]);
+        let equal = moments(0.8).sum_log_density(y, &[5.0; 4]).unwrap();
         assert!(relative(equal, single(0.2).log_density(y, 20.0)) < 1e-14);
     }
     // With no mean the share is 1: the sum has no mass above 0.
-    assert_eq!(moments(0.8).sum_log_density(0.0, &[0.0, 0.0]), 0.0);
+    assert_eq!(moments(0.8).sum_log_density(0.0, &[0.0, 0.0]).unwrap(), 0.0);
     assert_eq!(
-        moments(0.8).sum_log_density(1.0, &[0.0, 0.0]),
+        moments(0.8).sum_log_density(1.0, &[0.0, 0.0]).unwrap(),
         f64::NEG_INFINITY
     );
 }
@@ -338,13 +345,13 @@ fn poisson_and_normal_sums_are_exact() {
     let mean: f64 = parts.iter().sum();
     for y in [0.0, 5.0, 21.0, 40.0] {
         let expected = Noise::Poisson.log_density(y, mean);
-        assert_eq!(Noise::Poisson.sum_log_density(y, &parts), expected);
+        assert_eq!(Noise::Poisson.sum_log_density(y, &parts).unwrap(), expected);
         // The density of N(M, K sd²), K = 4 parts.
         let sd = 1.5;
         let variance = 4.0 * sd * sd;
         let normal = -0.5 * (2.0 * std::f64::consts::PI * variance).ln()
             - (y - mean) * (y - mean) / (2.0 * variance);
-        let actual = Noise::Normal { sd }.sum_log_density(y, &parts);
+        let actual = Noise::Normal { sd }.sum_log_density(y, &parts).unwrap();
         assert!(relative(actual, normal) < 1e-14, "{actual} {normal}");
     }
 
@@ -374,6 +381,112 @@ fn poisson_and_normal_sums_are_exact() {
 }
 
 #[test]
+fn an_exact_sum_that_does_not_end_fails() {
+    let exact = |phi: f64| Noise::NegativeBinomial {
+        overdispersion: phi,
+        sum: Some(Sum::Exact),
+    };
+    let unended = |mean: f64, phi: f64| UnendedSum {
+        mean,
+        overdispersion: phi,
+    };
+    // At φ = 10⁶ the mass spreads over counts far above the mean: the tail
+    // above 0 and the information do not reach a negligible term within the
+    // counts, and fail at once.
+    let heavy = [2.0; 7];
+    assert_eq!(exact(1e6).sum_information(&heavy), Err(unended(14.0, 1e6)));
+    assert_eq!(exact(1e6).sum_tails(0.0, &heavy), Err(unended(14.0, 1e6)));
+    // A mean at the counts leaves no count above it.
+    let large = [2e4; 7];
+    assert_eq!(
+        exact(0.01).sum_information(&large),
+        Err(unended(1.4e5, 0.01))
+    );
+    // A total at the counts.
+    let y = MAX_COUNTS as f64;
+    let parts = [1.0, 2.0];
+    assert_eq!(
+        exact(0.5).sum_log_density(y, &parts),
+        Err(unended(3.0, 0.5))
+    );
+    assert_eq!(exact(0.5).sum_scores(y, &parts), Err(unended(3.0, 0.5)));
+    assert_eq!(exact(0.5).sum_tails(y, &parts), Err(unended(3.0, 0.5)));
+    // The moments read the same sums.
+    let moments = Noise::NegativeBinomial {
+        overdispersion: 1e6,
+        sum: Some(Sum::Moments),
+    };
+    assert!(moments.sum_tails(0.0, &heavy).is_ok());
+    assert!(moments.sum_log_density(y, &parts).is_ok());
+
+    // Through a problem, the error names the observation, its total, φ and
+    // the counts, and points to the moments; it is a failure, which stops a
+    // fit, and the reason the terms have no derivatives.
+    let model = |value: f64| {
+        CalibrationProblem::new(
+            difference(),
+            vec![split("B", 5.0, 5.0, 5, value)],
+            vec![CalibrationParameter::new("k".to_string(), 0.0, 1.0)],
+            None,
+            vec![],
+            DiscrepancyConfig::Likelihood(vec![(
+                "B".to_string(),
+                ObservationModel::NegativeBinomial {
+                    overdispersion: Argument::Value(1e6),
+                    sum: Some(Sum::Exact),
+                },
+            )]),
+        )
+        .unwrap()
+    };
+    let says_why = |message: &str, total: &str| {
+        for part in [
+            &format!("Observation 'B' at 5 has the total {total} in 5 parts")[..],
+            "sum=\"exact\"",
+            "the overdispersion 1000000",
+            &format!("does not end within {MAX_COUNTS} counts"),
+            "Read the sum with sum=\"moments\"",
+        ] {
+            assert!(message.contains(part), "{part:?} in {message}");
+        }
+    };
+    let problem = model(200.0);
+    assert!(problem.evaluate(&[0.1], &mut Workspace::default()).is_ok());
+    let (predictions, parts) = means(&problem, 0.1);
+    let Err(DerivativesError::Failed(error)) =
+        problem.term_derivatives(&[0.1], &predictions, &parts)
+    else {
+        panic!("an information that does not end fails");
+    };
+    says_why(&error, "200");
+    let mean: f64 = parts.iter().sum();
+    assert!(
+        error.contains(&format!("the mean {mean} of the total")),
+        "{error}"
+    );
+
+    let problem = model(y);
+    let Err(EvaluationError::Failed(error)) = problem.evaluate(&[0.1], &mut Workspace::default())
+    else {
+        panic!("a total at the counts fails");
+    };
+    says_why(&error, "100000");
+    let Err(EvaluationError::Failed(error)) =
+        problem.pointwise_log_likelihood(&[0.1], &mut Workspace::default())
+    else {
+        panic!("a total at the counts fails");
+    };
+    says_why(&error, "100000");
+    let tails = problem
+        .discrepancy()
+        .likelihood()
+        .unwrap()
+        .tails(problem.observed_data(), &[0.1], &parts)
+        .unwrap_err();
+    says_why(&tails, "100000");
+}
+
+#[test]
 fn a_sum_of_no_mean_or_no_dispersion_has_finite_information() {
     let nb = |phi: f64, sum: Sum| Noise::NegativeBinomial {
         overdispersion: phi,
@@ -382,21 +495,21 @@ fn a_sum_of_no_mean_or_no_dispersion_has_finite_information() {
     for sum in [Sum::Exact, Sum::Moments] {
         // Parts of mean 0: the mass at 0, whose scores are −1 for each mean
         // and 0 for φ.
-        let information = nb(0.5, sum).sum_information(&[0.0, 0.0]);
+        let information = nb(0.5, sum).sum_information(&[0.0, 0.0]).unwrap();
         assert_eq!(
             information,
             vec![1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0],
             "{sum:?}"
         );
         assert_eq!(
-            nb(0.5, sum).sum_scores(0.0, &[0.0, 0.0]),
+            nb(0.5, sum).sum_scores(0.0, &[0.0, 0.0]).unwrap(),
             vec![-1.0, -1.0, 0.0]
         );
 
         // At φ = 0 the sum is Poisson(M): 1/M for each pair of means, and
         // for φ the variance of its score, (Σμ²)²/(2M²).
         let parts = [1.0, 2.0];
-        let information = nb(0.0, sum).sum_information(&parts);
+        let information = nb(0.0, sum).sum_information(&parts).unwrap();
         for entry in [0, 1, 3, 4] {
             assert!(
                 relative(information[entry], 1.0 / 3.0) < 1e-9,

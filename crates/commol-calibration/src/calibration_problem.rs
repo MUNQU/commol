@@ -11,7 +11,7 @@
 
 use commol_core::SimulationEngine;
 
-use crate::discrepancy::{Discrepancy, DiscrepancyConfig, TermError};
+use crate::discrepancy::{DerivativesError, Discrepancy, DiscrepancyConfig, TermError};
 use crate::feasibility::{EvaluationError, Feasibility, Violation, constraint_positions};
 use crate::forward::{ForwardModel, Workspace, schedule_of, the_engine};
 use crate::likelihood::TermDerivatives;
@@ -441,8 +441,8 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     ///
     /// # Errors
     ///
-    /// A violation when the point is not feasible; a failure when the engine
-    /// or a constraint cannot be evaluated.
+    /// A violation when the point is not feasible; a failure when the engine,
+    /// a constraint or an observation model cannot be evaluated.
     pub fn evaluate(
         &self,
         values: &[f64],
@@ -492,7 +492,7 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
             )
         })?;
         self.predict_once(values, None, workspace)?;
-        Ok(likelihood.pointwise(values, &workspace.parts)?)
+        likelihood.pointwise(values, &workspace.parts)
     }
 
     /// The predicted observations of one run at `values`, which are inside
@@ -531,26 +531,29 @@ impl<E: SimulationEngine> CalibrationProblem<E> {
     ///
     /// # Errors
     ///
-    /// Returns a message for a loss with no curvature, or that names the
-    /// observation the mean of one of whose parts lies outside its
-    /// observation model.
+    /// [`DerivativesError::Invalid`] with a message for a loss with no
+    /// curvature, or that names the observation the mean of one of whose
+    /// parts lies outside its observation model;
+    /// [`DerivativesError::Failed`] with the message of an observation whose
+    /// exact sum does not end ([`crate::UnendedSum`]).
     pub fn term_derivatives(
         &self,
         values: &[f64],
         predictions: &[f64],
         parts: &[f64],
-    ) -> Result<Vec<TermDerivatives>, String> {
+    ) -> Result<Vec<TermDerivatives>, DerivativesError> {
         self.discrepancy
             .term_derivatives(values, predictions, parts)
             .map_err(|error| match error {
-                TermError::NoCurvature(message) => message,
+                TermError::NoCurvature(message) => DerivativesError::Invalid(message),
+                TermError::Failed(message) => DerivativesError::Failed(message),
                 TermError::MeanOutside(index) => {
                     let obs = &self.observed_data[index];
-                    format!(
+                    DerivativesError::Invalid(format!(
                         "Observation '{}' at {} has a mean of a part outside the means its \
                          observation model allows (its prediction is {})",
                         obs.label, obs.at, predictions[index]
-                    )
+                    ))
                 }
             })
     }

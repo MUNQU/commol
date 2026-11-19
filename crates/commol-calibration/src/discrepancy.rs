@@ -6,7 +6,7 @@
 //! weights, the per-series normalization of a loss, and the summary of the
 //! replicates of a stochastic engine. It never runs an engine.
 
-use crate::feasibility::Violation;
+use crate::feasibility::EvaluationError;
 use crate::likelihood::{Likelihood, ObservationModel, TermDerivatives, unnamed_noise};
 use crate::series::SeriesIndex;
 use crate::types::{
@@ -36,6 +36,30 @@ pub enum TermError {
     NoCurvature(String),
     /// The mean of this observation lies outside its observation model.
     MeanOutside(usize),
+    /// The model of an observation could not be read there; the message
+    /// says why, as an exact sum that does not end
+    /// ([`crate::UnendedSum`]).
+    Failed(String),
+}
+
+/// Why a problem has no derivatives of its terms at a point, in words, by
+/// the kind of a method error: the input does not fit, or the computation
+/// failed ([`crate::CalibrationProblem::term_derivatives`]).
+#[derive(Debug, Clone, PartialEq)]
+pub enum DerivativesError {
+    /// The discrepancy has no derivatives there: a loss with no curvature,
+    /// or a mean outside its observation model.
+    Invalid(String),
+    /// The model of an observation could not be read there.
+    Failed(String),
+}
+
+impl std::fmt::Display for DerivativesError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Invalid(message) | Self::Failed(message) => f.write_str(message),
+        }
+    }
 }
 
 /// The measure of a discrepancy.
@@ -212,14 +236,15 @@ impl Discrepancy {
     ///
     /// # Errors
     ///
-    /// [`Violation::MeanOutsideModel`] when the mean of a part lies outside
-    /// the means its observation model allows.
+    /// As [`crate::Likelihood::pointwise`]: [`crate::Violation::MeanOutsideModel`]
+    /// when the mean of a part lies outside the means its observation model
+    /// allows, a failure when an exact sum does not end.
     pub fn of_run(
         &self,
         values: &[f64],
         predictions: &[f64],
         parts: &[f64],
-    ) -> Result<f64, Violation> {
+    ) -> Result<f64, EvaluationError> {
         match &self.measure {
             Measure::Loss(loss) => Ok(loss.aggregate(
                 self.observed
@@ -250,7 +275,7 @@ impl Discrepancy {
         values: &[f64],
         predictions: &mut [f64],
         parts: &[f64],
-    ) -> Result<f64, Violation> {
+    ) -> Result<f64, EvaluationError> {
         let n = self.observed.len();
         match (self.summary, &self.measure) {
             (Some(summary), Measure::Loss(loss)) => {
@@ -294,7 +319,8 @@ impl Discrepancy {
     ///
     /// [`TermError::NoCurvature`] for the mean absolute error, and for the
     /// root mean squared error of a perfect fit; [`TermError::MeanOutside`]
-    /// when a mean lies outside its observation model.
+    /// when a mean lies outside its observation model; [`TermError::Failed`]
+    /// when an exact sum does not end.
     pub fn term_derivatives(
         &self,
         values: &[f64],
@@ -303,9 +329,7 @@ impl Discrepancy {
     ) -> Result<Vec<TermDerivatives>, TermError> {
         let loss = match &self.measure {
             Measure::Likelihood(likelihood) => {
-                return likelihood
-                    .term_derivatives(values, parts)
-                    .map_err(TermError::MeanOutside);
+                return likelihood.term_derivatives(values, parts);
             }
             Measure::Loss(loss) => *loss,
         };
