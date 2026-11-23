@@ -4161,7 +4161,7 @@ reads them only through a trace, so it needs two blocks, not more than <code>p</
 </table>
 <p><strong>Guards:</strong> <code>tests/uncertainty/test_local.py::TestSandwich</code>,
 <code>tests/uncertainty/test_coverage.py::TestSandwich</code>,
-<code>tests/uncertainty/test_local.py::TestInformationMatching</code>.</p>
+<code>tests/uncertainty/test_information_matching.py::TestInformationMatching</code>.</p>
 <h2 id="information-matching-reads-the-meat-through-a-trace">Information matching reads the meat through a trace<a class="headerlink" href="#information-matching-reads-the-meat-through-a-trace" title="Permanent link">&para;</a></h2>
 <p><code>information_matching_eta</code> (<code>smc/gibbs.rs</code>) gives <code>η = p / tr(J⁻¹ I)</code>, the
 magnitude adjustment of a composite likelihood (Pauli, Racugno and Ventura
@@ -4248,7 +4248,19 @@ the first row exact) gives the median of <code>η</code> over its value:</p>
 </table>
 <p>With few degrees of freedom <code>η</code> still varies, which the posterior does not
 hold: 90 % intervals of the line cover about 87 % in 8 blocks of 3 (<code>ν ≈ 5</code>;
-CR1 81 %) and 84 % in 3 blocks of 8 (CR1 62 %).</p>
+CR1 81 %) and 83 % in 3 blocks of 8 (CR1 62 %). The result gives <code>ν</code>
+(<code>GibbsResult.degrees_of_freedom</code>), and below <code>FEW_DEGREES_OF_FREEDOM = 10</code>,
+within a relative rounding of <code>1e-9</code>, <code>InformationCalibration::few_coverage</code>
+gives the coverage to expect of 90 % intervals (<code>FEW_COVERAGE_LEVEL</code>), which
+the runner words in a note of <code>diagnostics.notes</code> and logs as a warning. The
+trace is about <code>(p − L)/η · χ²_ν/ν</code>, independent of the fit, so the coverage
+is <code>P(|t_ν| ≤ z √(ν / median(χ²_ν)))</code>: 75 % at <code>ν = 1</code>, 86 % at 5, 88 % at 10
+and 89 % at 20. At 10 it is 2 points below the level. The numpy simulation of
+one constant agrees within 1 point at <code>ν</code> of 1, 2, 3, 5 and 10, and the
+lines, whose blocks share the curvature unevenly, cover up to 4 points more.
+<code>ν</code> counts the scores of the parameters and the blocks as independent, so it
+is no guarantee: noise shared between series, a scale per series, or blocks
+shorter than the dependence undercover at a large <code>ν</code>, which the guide says.</p>
 <table>
 <thead>
 <tr>
@@ -4274,8 +4286,28 @@ CR1 81 %) and 84 % in 3 blocks of 8 (CR1 62 %).</p>
 <td>Too large a trace: a median <code>η</code> of 0.43 to 0.77 times its value for a line in few blocks.</td>
 </tr>
 <tr>
-<td>A warning below a number of degrees of freedom</td>
-<td>It leaves <code>η</code> too large; the guide states the coverage with few degrees of freedom instead.</td>
+<td>A warning below a number of degrees of freedom in place of the correction</td>
+<td>It leaves <code>η</code> too large. The warning is on top of it.</td>
+</tr>
+<tr>
+<td>A warning by the number of blocks</td>
+<td>With independent series the coverage follows <code>ν</code>, not the count: 2 blocks of 10 constants read 10. With noise shared between series few blocks do undercover (15 constants that share 90 % of the variance: 80 % in 3 blocks, 86 % in 9), but <code>G</code> does not say whether they share it.</td>
+</tr>
+<tr>
+<td>Another threshold, or none</td>
+<td>A threshold of 5 is silent at 86 %; above 10 the loss is below 2 points, inside the error of the formula with uneven blocks. <code>ν</code> is in the result whatever its size.</td>
+</tr>
+<tr>
+<td>A setting of the level, or the level asked for later</td>
+<td>The note is written before any interval is asked for; the guide gives 50 %, 90 % and 95 %, and the formula.</td>
+</tr>
+<tr>
+<td>The threshold and the wording in Python</td>
+<td>The engine holds the rule and the numbers; the runner words them, as for the size of a sample (<code>FEW_DRAWS_PER_PARAMETER</code>).</td>
+</tr>
+<tr>
+<td>An error below a number of degrees of freedom</td>
+<td>The posterior is usable with its coverage known, and a problem of few positions may have no more to read.</td>
 </tr>
 <tr>
 <td><code>η</code> scaled so the intervals of a level hold <code>t_ν</code></td>
@@ -4284,7 +4316,8 @@ CR1 81 %) and 84 % in 3 blocks of 8 (CR1 62 %).</p>
 </tbody>
 </table>
 <p><strong>Guards:</strong> <code>crates/commol-inference/tests/test_smc.rs::information_matching_gives_eta_near_its_value_with_few_blocks_per_parameter</code>, <code>crates/commol-inference/tests/test_smc.rs::information_matching_gives_eta_near_its_value_with_blocks_of_uneven_curvature</code>, <code>crates/commol-inference/tests/test_smc.rs::information_matching_reads_the_degrees_of_freedom_of_its_blocks</code>,
-<code>crates/commol-inference/tests/test_smc.rs::information_matching_needs_two_blocks_and_scores_that_are_not_all_0</code>, <code>tests/uncertainty/test_local.py::TestInformationMatching</code>, <code>tests/uncertainty/test_coverage.py::TestInformationMatching</code>.</p>
+<code>crates/commol-inference/tests/test_smc.rs::information_matching_gives_its_degrees_of_freedom</code>,
+<code>crates/commol-inference/tests/test_smc.rs::information_matching_needs_two_blocks_and_scores_that_are_not_all_0</code>, <code>tests/uncertainty/test_information_matching.py::TestInformationMatching</code>, <code>tests/uncertainty/test_coverage.py::TestInformationMatching</code>.</p>
 <h2 id="the-laplace-approximation-needs-observation-models">The Laplace approximation needs observation models<a class="headerlink" href="#the-laplace-approximation-needs-observation-models" title="Permanent link">&para;</a></h2>
 <p><code>laplace_approximation</code> (<code>local/approximation.rs</code>) refuses a loss: a loss has
 no noise scale, so its curvature is no inverse variance. The message names

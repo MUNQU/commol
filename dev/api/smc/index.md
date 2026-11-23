@@ -140,7 +140,7 @@ Bases: `RangeChecked`
 
 Calibrate `η` by information matching: `η = p / tr(J⁻¹ I)` at the fit, for `p` parameters, with `J` the Gauss–Newton curvature of the objective and `I` the variance of the scores of its terms, summed over blocks of positions as the meat of `Sandwich`: the magnitude adjustment of a composite likelihood (Pauli, Racugno and Ventura 2011). For the sum of squares of a model with Gaussian noise of variance `σ²` it estimates `1/(2σ²)`; for a correct observation model, 1.
 
-It needs `loss_function="sse"` or observation models, and a deterministic engine, and is cheap and local. The variance sums the scores over blocks of positions, so it holds under dependence inside a block, and enters only through a trace, so it takes two blocks or more, also fewer blocks than parameters. The trace is corrected by the share of the curvature each block holds, and `η` by the degrees of freedom the blocks read, so that its median over data sets is its value also with blocks that share the curvature unevenly; with few degrees of freedom one data set still gives an `η` far from it, and intervals that cover less than their level.
+It needs `loss_function="sse"` or observation models, and a deterministic engine, and is cheap and local. The variance sums the scores over blocks of positions, so it holds under dependence inside a block, and enters only through a trace, so it takes two blocks or more, also fewer blocks than parameters. The trace is corrected by the share of the curvature each block holds, and `η` by the degrees of freedom the blocks read, so that its median over data sets is its value also with blocks that share the curvature unevenly; with few degrees of freedom one data set still gives an `η` far from it, and intervals of a high level that cover less than it. `GibbsResult.degrees_of_freedom` gives them, and a note of its diagnostics the coverage to expect when they are below 10.
 
 Attributes:
 
@@ -170,8 +170,10 @@ class InformationMatchingEta(RangeChecked):
     of the curvature each block holds, and `η` by the degrees of freedom the
     blocks read, so that its median over data sets is its value also with
     blocks that share the curvature unevenly; with few degrees of freedom
-    one data set still gives an `η` far from it, and intervals that cover
-    less than their level.
+    one data set still gives an `η` far from it, and intervals of a high
+    level that cover less than it. `GibbsResult.degrees_of_freedom` gives
+    them, and a note of its diagnostics the coverage to expect when they are
+    below 10.
 
     Attributes
     ----------
@@ -477,6 +479,7 @@ Attributes:
 | `failed`                 | `list[str]`         | With BootstrapCoverageEta, each replicate whose sampler failed: "Replicate <index> failed: <reason>", also logged as a warning. Empty otherwise. |
 | `block_length`           | \`int               | None\`                                                                                                                                           |
 | `block_length_estimates` | \`dict[str, float]  | None\`                                                                                                                                           |
+| `degrees_of_freedom`     | \`float             | None\`                                                                                                                                           |
 
 Source code in `commol/smc/results.py`
 
@@ -505,6 +508,12 @@ class GibbsResult(SMCResult):
     block_length_estimates : dict[str, float] | None
         With a calibration of `η` and ``block_length="auto"``, the estimate
         of each series, by label; otherwise None.
+    degrees_of_freedom : float | None
+        With `InformationMatchingEta`, the degrees of freedom `ν` that `η`
+        reads from its blocks, with the blocks and the parameters counted as
+        independent; otherwise None. Below 10 a note of ``diagnostics.notes``,
+        also logged as a warning, gives the coverage to expect of 90 %
+        intervals.
     """
 
     eta: float
@@ -512,6 +521,7 @@ class GibbsResult(SMCResult):
     coverage: float | None
     block_length: int | None
     block_length_estimates: dict[str, float] | None
+    degrees_of_freedom: float | None
     failed: list[str] = Field(default_factory=list)
 ```
 

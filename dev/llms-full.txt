@@ -6149,7 +6149,7 @@ None of them has a default: each sets the cost and the accuracy of the run.
 
 ## Gibbs posterior
 
-`GibbsPosterior` samples `π(θ) ∝ prior(θ) · exp(−η · loss(θ))`, where `loss` is the problem's loss with its weights and normalization. It returns a `GibbsResult`: the sample at temperature 1, the temperatures, the log of `∫ prior(θ) exp(−η loss(θ)) dθ`, the diagnostics, the `η` it ran with, the fit a calibration of `η` read (`fit`), the coverage of a bootstrap calibration (`coverage`), each replicate of a bootstrap calibration whose sampler failed, `"Replicate <index> failed: <reason>"`, also logged as a warning (`failed`), and the block length of a calibration with the estimate of each series of the automatic length (`block_length`, `block_length_estimates`).
+`GibbsPosterior` samples `π(θ) ∝ prior(θ) · exp(−η · loss(θ))`, where `loss` is the problem's loss with its weights and normalization. It returns a `GibbsResult`: the sample at temperature 1, the temperatures, the log of `∫ prior(θ) exp(−η loss(θ)) dθ`, the diagnostics, the `η` it ran with, the fit a calibration of `η` read (`fit`), the coverage of a bootstrap calibration (`coverage`), each replicate of a bootstrap calibration whose sampler failed, `"Replicate <index> failed: <reason>"`, also logged as a warning (`failed`), the block length of a calibration with the estimate of each series of the automatic length (`block_length`, `block_length_estimates`), and the degrees of freedom of information matching (`degrees_of_freedom`).
 
 ### What `η` means
 
@@ -6167,7 +6167,27 @@ Both take `block_length="auto"`, the automatic length of [Blocks and their lengt
 
 Information matching is cheap and local; it needs a sum of smooth terms, so `"rmse"` (a square root of a sum), `"mae"` (no curvature) and a stochastic engine raise a `ValueError` that points to the other choices. `J` and `I` are the curvature and the meat of the [sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich): `I` sums the scores over blocks, so it holds when the noise depends on its neighbours inside a block, and `block_length` has no default: `block_length=1` gives the independent version, every observation its own block. `I` enters only through a trace, so `η` needs no inverse of `I`: it takes two blocks or more, also fewer blocks than parameters, and blocks can be long enough to hold the dependence.
 
-The blocks read at most `p(G − 1)` degrees of freedom `ν` about the scale, for `G` blocks, and fewer when they share the curvature `J` unevenly: a slope, whose curvature sits at the ends of the series, a parameter that the data read in one part of the series only, or a short last block. Information matching corrects for both, with `J_b` the curvature of block `b`: the trace by `p / (p − Σ_b tr((J⁻¹ J_b)²))`, the leverage of the blocks, which is `G/(G − 1)` when each block holds `1/G` of `J`; and `η` by `median(χ²_ν)/ν`, with `ν` the Satterthwaite degrees of freedom of the trace, because `η` is the reciprocal of the trace and comes out too large more often than too small. Its median over data sets is then its value: with noise of sd 1, exactly `1/(2σ²)` for one constant at 24 positions in 2 blocks (`ν = 1`) and 1.02 times it for a line at 24 positions in 3 blocks (`ν ≈ 1.5`), where the trace alone gives 2.2 and 3.7 times. With few degrees of freedom one data set still gives an `η` far from its value, and the intervals cover less than their level: for that line in 8 blocks of 3 (`ν ≈ 5`), 90 % intervals cover about 87 %, and in 3 blocks about 84 %. Blocks that each hold several positions of every parameter, with `p(G − 1)` of about 10 or more, keep them near their level. Bootstrap coverage runs one tempered sampler per replicate to a large `η`, reads the posterior of every smaller `η` by reweighting, so its search runs no model, and finds for each replicate and parameter the `η` where the interval stops holding the fit. `η` is the one quantile of commol of the log thresholds at `1 − c` (with equal weights, as [`weighted_quantiles`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-one-quantile) reads them), which interpolates between two of them; it needs at least `1/(2(1 − c))` replicates times parameters, so that the level is not below the smallest threshold.
+The blocks read at most `p(G − 1)` degrees of freedom `ν` about the scale, for `G` blocks, and fewer when they share the curvature `J` unevenly: a slope, whose curvature sits at the ends of the series, a parameter that the data read in one part of the series only, or a short last block. Information matching corrects for both, with `J_b` the curvature of block `b`: the trace by `p / (p − Σ_b tr((J⁻¹ J_b)²))`, the leverage of the blocks, which is `G/(G − 1)` when each block holds `1/G` of `J`; and `η` by `median(χ²_ν)/ν`, with `ν` the Satterthwaite degrees of freedom of the trace, because `η` is the reciprocal of the trace and comes out too large more often than too small. Its median over data sets is then its value: with noise of sd 1, exactly `1/(2σ²)` for one constant at 24 positions in 2 blocks (`ν = 1`) and 1.02 times it for a line at 24 positions in 3 blocks (`ν ≈ 1.5`), where the trace alone gives 2.2 and 3.7 times.
+
+With few degrees of freedom one data set still gives an `η` far from its value, and the intervals of a high level cover less than it. `GibbsResult.degrees_of_freedom` gives `ν`, `None` for a number `η` and for bootstrap coverage. Below `ν = 10` a note in `diagnostics.notes`, also logged as a warning, gives `ν` and the coverage to expect of 90 % intervals. The loss grows with the level:
+
+| Level | `ν = 1` | 2    | 3    | 5    | 7    | 10   | 20   |
+| ----- | ------- | ---- | ---- | ---- | ---- | ---- | ---- |
+| 50 %  | 50 %    | 50 % | 50 % | 50 % | 50 % | 50 % | 50 % |
+| 90 %  | 75 %    | 81 % | 84 % | 86 % | 87 % | 88 % | 89 % |
+| 95 %  | 79 %    | 86 % | 89 % | 91 % | 92 % | 93 % | 94 % |
+
+The expected coverage is `P(|t_ν| ≤ z √(ν / median(χ²_ν)))`, with `t_ν` a Student t and `z` the normal quantile of the level. It is exact for flat priors away from the bounds, a model linear in its parameters, independent Gaussian noise of one scale, and blocks that share the curvature evenly. Blocks that share it unevenly cover more at the same `ν`: the line above covers about 83 % in 3 blocks of 8 (`ν ≈ 1.5`, 79 % expected) and 87 % in 8 blocks of 3 (`ν ≈ 5`). An informative prior or a bound near the fit also changes it.
+
+Shorter blocks usually give more degrees of freedom, but must still hold the dependence of the residuals: blocks too short for it undercover with any `ν`, and no note. More positions give more only when they add curvature to more blocks, which the later positions of a fast growth do not.
+
+`ν` says how well the data fix one scale, with the scores of the blocks and of the parameters counted as independent. Many degrees of freedom, and no note, do not mean that the intervals cover. They do not when:
+
+- **The series share their noise**, as when one misfit shows in all of them: `ν` counts each parameter apart. With 15 constant flows whose noise shares 90 % of its variance, 35 positions in 3 blocks read `ν = 30` and 90 % intervals cover about 80 %; in 9 blocks, 86 %.
+- **Each series has a noise of another scale**, or an observation model wrong by another factor: one `η` leaves the intervals of some parameters too narrow and of others too wide. With 15 constant flows, one of them of three times the sd, its intervals cover about 50 %.
+- **The blocks are shorter than the dependence**, or the noise is far from Gaussian on few observations.
+
+Bootstrap coverage runs one tempered sampler per replicate to a large `η`, reads the posterior of every smaller `η` by reweighting, so its search runs no model, and finds for each replicate and parameter the `η` where the interval stops holding the fit. `η` is the one quantile of commol of the log thresholds at `1 − c` (with equal weights, as [`weighted_quantiles`](https://munqu.github.io/commol/latest/guide/uncertainty/#the-one-quantile) reads them), which interpolates between two of them; it needs at least `1/(2(1 − c))` replicates times parameters, so that the level is not below the smallest threshold.
 
 With a stochastic engine the loss reads the problem's `replicates` with common random numbers, as the optimizers do, so it is a function of the parameters.
 
@@ -6202,17 +6222,18 @@ print(sum(kept))  # 40
 
 ## Reading the diagnostics
 
-| Field                          | One entry per | What to look for                                                               |
-| ------------------------------ | ------------- | ------------------------------------------------------------------------------ |
-| `levels`                       | Step          | A Gibbs posterior ends at 1; an ABC run lists its falling tolerances           |
-| `diagnostics.effective_sizes`  | Step          | Kish's effective size after reweighting; near `target_cess` of the particles   |
-| `diagnostics.resampled`        | Step          | Whether the step resampled                                                     |
-| `diagnostics.acceptance_rates` | Step          | The share of the first move's proposals accepted; a small one means many moves |
-| `diagnostics.move_counts`      | Step          | How many times each particle moved; it grows as the acceptance falls           |
-| `diagnostics.evaluations`      | Run           | The number of model runs                                                       |
-| `diagnostics.stop_reason`      | Run           | Why the run stopped before its last level, or None                             |
-| `log_evidence`                 | Run           | The log of the product of the mean incremental weights                         |
-| `kept`                         | Particle      | The loss or distance each particle keeps                                       |
+| Field                          | One entry per | What to look for                                                                                |
+| ------------------------------ | ------------- | ----------------------------------------------------------------------------------------------- |
+| `levels`                       | Step          | A Gibbs posterior ends at 1; an ABC run lists its falling tolerances                            |
+| `diagnostics.effective_sizes`  | Step          | Kish's effective size after reweighting; near `target_cess` of the particles                    |
+| `diagnostics.resampled`        | Step          | Whether the step resampled                                                                      |
+| `diagnostics.acceptance_rates` | Step          | The share of the first move's proposals accepted; a small one means many moves                  |
+| `diagnostics.move_counts`      | Step          | How many times each particle moved; it grows as the acceptance falls                            |
+| `diagnostics.evaluations`      | Run           | The number of model runs                                                                        |
+| `diagnostics.stop_reason`      | Run           | Why the run stopped before its last level, or None                                              |
+| `diagnostics.notes`            | Run           | Settings that do not apply, and the coverage to expect when `η` rests on few degrees of freedom |
+| `log_evidence`                 | Run           | The log of the product of the mean incremental weights                                          |
+| `kept`                         | Particle      | The loss or distance each particle keeps                                                        |
 
 ```python
 print(gibbs.levels[-1])  # 1.0
@@ -6225,7 +6246,7 @@ A step whose acceptance rate is small moves each particle many times, and the ru
 
 - [ ] Each calibrated parameter has a prior you can defend, on bounds that fit it.
 - [ ] `η` is a number you can justify, or one of its calibrations.
-- [ ] Information matching has `p(G − 1)` of about 10 or more, for `p` parameters and `G` blocks, each holding several positions of every parameter.
+- [ ] Information matching has `degrees_of_freedom` of about 10 or more, blocks that hold the dependence of the residuals, and series that neither share their noise nor need another scale each.
 - [ ] A Gibbs posterior ends at temperature 1; an ABC run says why it stopped.
 - [ ] With a stochastic engine, ABC reads one replicate per particle, not the problem's summary.
 
@@ -6943,13 +6964,13 @@ print(holm({s.label: s.p_value for s in together.series}))  # {'south': 1.0, 'no
 
 ## The methods that read dependence
 
-| Method                                           | How it reads dependence                                                                                                                                                                                                                                                                                                                                   |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The bootstraps and the jackknife                 | `block_length`: dependence inside a block is kept ([Blocks and their length](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#blocks-and-their-length))                                                                                                                                                                                |
-| `Sandwich`                                       | Scores summed over blocks ([Sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich))                                                                                                                                                                                                                                           |
-| `InformationMatchingEta`, `BootstrapCoverageEta` | The scale `η` of a Gibbs posterior from blocks of scores or of data. Information matching corrects `η` for blocks that share the curvature unevenly and for the degrees of freedom they read; with few blocks its intervals still cover less than their level ([What `η` means](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means)) |
-| `EnbPI`                                          | Prediction intervals of a series with dependent errors ([EnbPI](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#enbpi))                                                                                                                                                                                                                |
-| `Laplace`, `BayesianPosterior`, `block_length=1` | Each observation independent: an information factor above 1 says their intervals are too narrow                                                                                                                                                                                                                                                           |
+| Method                                           | How it reads dependence                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The bootstraps and the jackknife                 | `block_length`: dependence inside a block is kept ([Blocks and their length](https://munqu.github.io/commol/latest/guide/uncertainty/resampling/#blocks-and-their-length))                                                                                                                                                                                                             |
+| `Sandwich`                                       | Scores summed over blocks ([Sandwich](https://munqu.github.io/commol/latest/guide/uncertainty/local/#sandwich))                                                                                                                                                                                                                                                                        |
+| `InformationMatchingEta`, `BootstrapCoverageEta` | The scale `η` of a Gibbs posterior from blocks of scores or of data. Information matching corrects `η` for blocks that share the curvature unevenly and for the degrees of freedom they read; with few its intervals of a high level still cover less than it, and a note says by how much ([What `η` means](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means)) |
+| `EnbPI`                                          | Prediction intervals of a series with dependent errors ([EnbPI](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#enbpi))                                                                                                                                                                                                                                             |
+| `Laplace`, `BayesianPosterior`, `block_length=1` | Each observation independent: an information factor above 1 says their intervals are too narrow                                                                                                                                                                                                                                                                                        |
 
 ## Errors
 
@@ -36008,7 +36029,7 @@ Bases: `RangeChecked`
 
 Calibrate `η` by information matching: `η = p / tr(J⁻¹ I)` at the fit, for `p` parameters, with `J` the Gauss–Newton curvature of the objective and `I` the variance of the scores of its terms, summed over blocks of positions as the meat of `Sandwich`: the magnitude adjustment of a composite likelihood (Pauli, Racugno and Ventura 2011). For the sum of squares of a model with Gaussian noise of variance `σ²` it estimates `1/(2σ²)`; for a correct observation model, 1.
 
-It needs `loss_function="sse"` or observation models, and a deterministic engine, and is cheap and local. The variance sums the scores over blocks of positions, so it holds under dependence inside a block, and enters only through a trace, so it takes two blocks or more, also fewer blocks than parameters. The trace is corrected by the share of the curvature each block holds, and `η` by the degrees of freedom the blocks read, so that its median over data sets is its value also with blocks that share the curvature unevenly; with few degrees of freedom one data set still gives an `η` far from it, and intervals that cover less than their level.
+It needs `loss_function="sse"` or observation models, and a deterministic engine, and is cheap and local. The variance sums the scores over blocks of positions, so it holds under dependence inside a block, and enters only through a trace, so it takes two blocks or more, also fewer blocks than parameters. The trace is corrected by the share of the curvature each block holds, and `η` by the degrees of freedom the blocks read, so that its median over data sets is its value also with blocks that share the curvature unevenly; with few degrees of freedom one data set still gives an `η` far from it, and intervals of a high level that cover less than it. `GibbsResult.degrees_of_freedom` gives them, and a note of its diagnostics the coverage to expect when they are below 10.
 
 Attributes:
 
@@ -36038,8 +36059,10 @@ class InformationMatchingEta(RangeChecked):
     of the curvature each block holds, and `η` by the degrees of freedom the
     blocks read, so that its median over data sets is its value also with
     blocks that share the curvature unevenly; with few degrees of freedom
-    one data set still gives an `η` far from it, and intervals that cover
-    less than their level.
+    one data set still gives an `η` far from it, and intervals of a high
+    level that cover less than it. `GibbsResult.degrees_of_freedom` gives
+    them, and a note of its diagnostics the coverage to expect when they are
+    below 10.
 
     Attributes
     ----------
@@ -36345,6 +36368,7 @@ Attributes:
 | `failed`                 | `list[str]`         | With BootstrapCoverageEta, each replicate whose sampler failed: "Replicate <index> failed: <reason>", also logged as a warning. Empty otherwise. |
 | `block_length`           | \`int               | None\`                                                                                                                                           |
 | `block_length_estimates` | \`dict[str, float]  | None\`                                                                                                                                           |
+| `degrees_of_freedom`     | \`float             | None\`                                                                                                                                           |
 
 Source code in `commol/smc/results.py`
 
@@ -36373,6 +36397,12 @@ class GibbsResult(SMCResult):
     block_length_estimates : dict[str, float] | None
         With a calibration of `η` and ``block_length="auto"``, the estimate
         of each series, by label; otherwise None.
+    degrees_of_freedom : float | None
+        With `InformationMatchingEta`, the degrees of freedom `ν` that `η`
+        reads from its blocks, with the blocks and the parameters counted as
+        independent; otherwise None. Below 10 a note of ``diagnostics.notes``,
+        also logged as a warning, gives the coverage to expect of 90 %
+        intervals.
     """
 
     eta: float
@@ -36380,6 +36410,7 @@ class GibbsResult(SMCResult):
     coverage: float | None
     block_length: int | None
     block_length_estimates: dict[str, float] | None
+    degrees_of_freedom: float | None
     failed: list[str] = Field(default_factory=list)
 ```
 
@@ -40725,6 +40756,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `ModelBuilder.add_matrix(id, stratification, values, unit, description)` adds a matrix between the categories of a stratification, and a transition rate reads it with `matrix_sum(M, e)`: in a compartment of category `i`, `Σ_j M[i, j] · e_j`, with each bin of `e` read as its amount in category `j` and `total` as the total of `j`. Every engine runs it. A rate or a formula parameter reads the entries as `M_<i>_<j>` and the spectral radius of the matrix as `M_radius`. The unit check, the equations and `Model.describe` read the matrix. See [Matrix sums](https://munqu.github.io/commol/latest/guide/mathematical-expressions/#matrix-sums).
 - `ModelBuilder.add_matrix(row_scales=..., column_scales=...)`: a constant or a parameter to calibrate multiplies the row or the column of a category, so the model reads `diag(a) · values · diag(b)`. A calibration constraint reads `M_<i>_<j>` and `M_radius` of the scaled matrix at the values of each point, so a bound such as `2 - k * M_radius` is one constraint; a rate reads them at the values of its run. See [Constraints](https://munqu.github.io/commol/latest/guide/calibration-constraints/#a-bound-on-a-matrix).
 - `GibbsResult` and `ConformalResult` give `block_length` and `block_length_estimates`, as the bootstraps, the jackknife and the sandwich do: the length a method ran with, and with `block_length="auto"` the estimate of each series, by label. `GibbsResult` gives them for `InformationMatchingEta` and `BootstrapCoverageEta`, and `None` for a number `η`; `ConformalResult` for `JackknifePlus` and `EnbPI`, and `None` for the variants without blocks. See [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means) and [Conformal Prediction Intervals](https://munqu.github.io/commol/latest/guide/uncertainty/conformal/#results-plots-and-reports).
+- `GibbsResult.degrees_of_freedom`: the degrees of freedom `ν` that `InformationMatchingEta` reads from its blocks, `None` for a number `η` and for `BootstrapCoverageEta`. Below 10, a note in `diagnostics.notes`, also logged as a warning, gives `ν` and the coverage to expect of 90 % intervals. In Rust, `InformationCalibration::few_coverage`, `smc::FEW_DEGREES_OF_FREEDOM`, `smc::FEW_COVERAGE_LEVEL` and `special::student_t_two_sided_tail` are new. See [Sequential Monte Carlo](https://munqu.github.io/commol/latest/guide/uncertainty/smc/#what-means).
 - `ProfileIdentifiability(result=profiles)` in `commol.identifiability`: the identifiability report of the verdicts of a `ProfileResult`, run through `Calibrator.identifiability` as every identifiability method. It runs no model, and it refuses the profiles of another problem with a `ValueError` that names the parameters of both. See [Profile Likelihood](https://munqu.github.io/commol/latest/guide/uncertainty/profiles/#verdicts-and-the-identifiability-report).
 - The fractions of a stratification can differ by the category of a stratification declared before it: `stratification_fractions={"type": {"by": "group", "g1": {"t1": 0.25, "t2": 0.75}, "g2": {"t1": 0.5, "t2": 0.5}}}`. The stratifications stay apart, so a rate reads `A_g1` and a condition names `g1`. The engine checks that `by` is declared before, that every compartment of the stratification has a category of it, and each split, with a message that names the stratification and the category. See [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#fractions-that-differ-by-category).
 - `StratificationCondition(categories=[...])`: a condition of a stratification or of a stratified rate matches any category of a set, such as `StratificationCondition(stratification="group", categories=["g3", "g4"])`. A stratification then splits only some categories of an earlier one, and one stratification keeps the categories that a matrix couples, so `matrix_sum`, `M_radius` and a split by category work in a model where only some groups have a later stratification. A set counts as one condition when the most specific stratified rate wins. The engine refuses a condition with both `category` and `categories`, an empty set, a category twice, a category its stratification does not have, or `to` with a set. `Aggregate.subgroup_total` reads the categories of one stratification as a set, and the description writes `where group in {g3, g4}`. See [Building Models](https://munqu.github.io/commol/latest/guide/building-models/#a-condition-on-a-set-of-categories).

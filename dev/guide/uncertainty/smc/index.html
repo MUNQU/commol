@@ -4314,8 +4314,9 @@ is the problem's loss with its weights and normalization. It returns a
 a calibration of <code>η</code> read (<code>fit</code>), the coverage of a bootstrap calibration
 (<code>coverage</code>), each replicate of a bootstrap calibration whose sampler
 failed, <code>"Replicate &lt;index&gt; failed: &lt;reason&gt;"</code>, also logged as a warning
-(<code>failed</code>), and the block length of a calibration with the estimate of each
-series of the automatic length (<code>block_length</code>, <code>block_length_estimates</code>).</p>
+(<code>failed</code>), the block length of a calibration with the estimate of each
+series of the automatic length (<code>block_length</code>, <code>block_length_estimates</code>), and
+the degrees of freedom of information matching (<code>degrees_of_freedom</code>).</p>
 <h3 id="what-means">What <code>η</code> means<a class="headerlink" href="#what-means" title="Permanent link">&para;</a></h3>
 <p><code>η</code> weighs the data against the priors. The loss has no scale of its own, so
 <code>η</code> has no default: with <code>η</code> too large the posterior is too narrow, with <code>η</code>
@@ -4382,13 +4383,87 @@ because <code>η</code> is the reciprocal of the trace and comes out too large m
 than too small. Its median over data sets is then its value: with noise of
 sd 1, exactly <code>1/(2σ²)</code> for one constant at 24 positions in 2 blocks
 (<code>ν = 1</code>) and 1.02 times it for a line at 24 positions in 3 blocks
-(<code>ν ≈ 1.5</code>), where the trace alone gives 2.2 and 3.7 times. With few degrees of freedom
-one data set still gives an <code>η</code> far from its value, and the intervals cover
-less than their level: for that line in 8 blocks of 3 (<code>ν ≈ 5</code>), 90 %
-intervals cover about 87 %, and in 3 blocks about 84 %. Blocks that each
-hold several positions of every parameter, with <code>p(G − 1)</code> of about 10 or
-more, keep them near their level. Bootstrap
-coverage runs one tempered sampler per replicate to a large <code>η</code>, reads the
+(<code>ν ≈ 1.5</code>), where the trace alone gives 2.2 and 3.7 times.</p>
+<p>With few degrees of freedom one data set still gives an <code>η</code> far from its
+value, and the intervals of a high level cover less than it.
+<code>GibbsResult.degrees_of_freedom</code> gives <code>ν</code>, <code>None</code> for a number <code>η</code> and for
+bootstrap coverage. Below <code>ν = 10</code> a note in <code>diagnostics.notes</code>, also logged
+as a warning, gives <code>ν</code> and the coverage to expect of 90 % intervals. The
+loss grows with the level:</p>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th><code>ν = 1</code></th>
+<th>2</th>
+<th>3</th>
+<th>5</th>
+<th>7</th>
+<th>10</th>
+<th>20</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>50 %</td>
+<td>50 %</td>
+<td>50 %</td>
+<td>50 %</td>
+<td>50 %</td>
+<td>50 %</td>
+<td>50 %</td>
+<td>50 %</td>
+</tr>
+<tr>
+<td>90 %</td>
+<td>75 %</td>
+<td>81 %</td>
+<td>84 %</td>
+<td>86 %</td>
+<td>87 %</td>
+<td>88 %</td>
+<td>89 %</td>
+</tr>
+<tr>
+<td>95 %</td>
+<td>79 %</td>
+<td>86 %</td>
+<td>89 %</td>
+<td>91 %</td>
+<td>92 %</td>
+<td>93 %</td>
+<td>94 %</td>
+</tr>
+</tbody>
+</table>
+<p>The expected coverage is <code>P(|t_ν| ≤ z √(ν / median(χ²_ν)))</code>, with <code>t_ν</code> a
+Student t and <code>z</code> the normal quantile of the level. It is exact for flat
+priors away from the bounds, a model linear in its parameters, independent
+Gaussian noise of one scale, and blocks that share the curvature evenly.
+Blocks that share it unevenly cover more at the same <code>ν</code>: the line above
+covers about 83 % in 3 blocks of 8 (<code>ν ≈ 1.5</code>, 79 % expected) and 87 % in 8
+blocks of 3 (<code>ν ≈ 5</code>). An informative prior or a bound near the fit also
+changes it.</p>
+<p>Shorter blocks usually give more degrees of freedom, but must still hold the
+dependence of the residuals: blocks too short for it undercover with any
+<code>ν</code>, and no note. More positions give more only when they add curvature to
+more blocks, which the later positions of a fast growth do not.</p>
+<p><code>ν</code> says how well the data fix one scale, with the scores of the blocks and
+of the parameters counted as independent. Many degrees of freedom, and no
+note, do not mean that the intervals cover. They do not when:</p>
+<ul>
+<li><strong>The series share their noise</strong>, as when one misfit shows in all of them:
+  <code>ν</code> counts each parameter apart. With 15 constant flows whose noise shares
+  90 % of its variance, 35 positions in 3 blocks read <code>ν = 30</code> and 90 %
+  intervals cover about 80 %; in 9 blocks, 86 %.</li>
+<li><strong>Each series has a noise of another scale</strong>, or an observation model wrong
+  by another factor: one <code>η</code> leaves the intervals of some parameters too
+  narrow and of others too wide. With 15 constant flows, one of them of
+  three times the sd, its intervals cover about 50 %.</li>
+<li><strong>The blocks are shorter than the dependence</strong>, or the noise is far from
+  Gaussian on few observations.</li>
+</ul>
+<p>Bootstrap coverage runs one tempered sampler per replicate to a large <code>η</code>, reads the
 posterior of every smaller <code>η</code> by reweighting, so its search runs no model,
 and finds for each replicate and parameter the <code>η</code> where the interval stops
 holding the fit. <code>η</code> is the one quantile of commol of the log thresholds at
@@ -4502,6 +4577,11 @@ code with no move: it draws from the priors and keeps the closest share
 <td>Why the run stopped before its last level, or None</td>
 </tr>
 <tr>
+<td><code>diagnostics.notes</code></td>
+<td>Run</td>
+<td>Settings that do not apply, and the coverage to expect when <code>η</code> rests on few degrees of freedom</td>
+</tr>
+<tr>
 <td><code>log_evidence</code></td>
 <td>Run</td>
 <td>The log of the product of the mean incremental weights</td>
@@ -4524,7 +4604,7 @@ Monte Carlo error.</p>
 <ul>
 <li>[ ] Each calibrated parameter has a prior you can defend, on bounds that fit it.</li>
 <li>[ ] <code>η</code> is a number you can justify, or one of its calibrations.</li>
-<li>[ ] Information matching has <code>p(G − 1)</code> of about 10 or more, for <code>p</code> parameters and <code>G</code> blocks, each holding several positions of every parameter.</li>
+<li>[ ] Information matching has <code>degrees_of_freedom</code> of about 10 or more, blocks that hold the dependence of the residuals, and series that neither share their noise nor need another scale each.</li>
 <li>[ ] A Gibbs posterior ends at temperature 1; an ABC run says why it stopped.</li>
 <li>[ ] With a stochastic engine, ABC reads one replicate per particle, not the problem's summary.</li>
 </ul>

@@ -5584,6 +5584,14 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
   for the variants without blocks. See
   <a href="../../guide/uncertainty/smc/#what-means">Sequential Monte Carlo</a> and
   <a href="../../guide/uncertainty/conformal/#results-plots-and-reports">Conformal Prediction Intervals</a>.</li>
+<li><code>GibbsResult.degrees_of_freedom</code>: the degrees of freedom <code>ν</code> that
+  <code>InformationMatchingEta</code> reads from its blocks, <code>None</code> for a number <code>η</code> and
+  for <code>BootstrapCoverageEta</code>. Below 10, a note in <code>diagnostics.notes</code>, also
+  logged as a warning, gives <code>ν</code> and the coverage to expect of 90 %
+  intervals. In Rust, <code>InformationCalibration::few_coverage</code>,
+  <code>smc::FEW_DEGREES_OF_FREEDOM</code>, <code>smc::FEW_COVERAGE_LEVEL</code> and
+  <code>special::student_t_two_sided_tail</code> are new. See
+  <a href="../../guide/uncertainty/smc/#what-means">Sequential Monte Carlo</a>.</li>
 <li><code>ProfileIdentifiability(result=profiles)</code> in <code>commol.identifiability</code>: the
   identifiability report of the verdicts of a <code>ProfileResult</code>, run through
   <code>Calibrator.identifiability</code> as every identifiability method. It runs no
