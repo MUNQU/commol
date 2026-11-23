@@ -16,7 +16,7 @@ use commol_inference::smc::{
 };
 use commol_inference::{Distribution, Family, MethodError, Priors};
 use commol_random::Generator;
-use commol_statistics::special::chi_square_quantile;
+use commol_statistics::special::{chi_square_quantile, normal_quantile};
 use std::sync::Mutex;
 
 /// A prior of independent distributions and a kernel `exp(−level · v)`,
@@ -1134,6 +1134,63 @@ fn information_matching_gives_eta_near_its_value_with_blocks_of_uneven_curvature
             "line {n}/{block_length}: {eta}"
         );
     }
+}
+
+#[test]
+fn information_matching_gives_its_degrees_of_freedom() {
+    // One constant in `G` blocks of one size reads `ν = G − 1`.
+    let problem = |count: usize| {
+        let values = (0..count).map(|t| (t * t % 7) as f64).collect();
+        means_problem(&[values])
+    };
+    let calibration = |count: usize| {
+        let (problem, fit) = problem(count);
+        information_matching_eta(&problem, &fit, Some(1)).unwrap()
+    };
+    let z = normal_quantile(0.95);
+
+    // `ν = 1`: `P(|t₁| ≤ t) = (2/π) atan t`, and `ν = 2`:
+    // `P(|t₂| ≤ t) = t/√(2 + t²)`, at `t = z √(ν / median(χ²_ν))`.
+    let one = calibration(2);
+    assert!((one.degrees_of_freedom - 1.0).abs() < 1e-9);
+    let t = z / chi_square_quantile(1.0, 0.5).sqrt();
+    let expected = std::f64::consts::FRAC_2_PI * t.atan();
+    assert!((one.few_coverage().unwrap() - expected).abs() < 1e-8);
+
+    let two = calibration(3);
+    assert!((two.degrees_of_freedom - 2.0).abs() < 1e-9);
+    let t = z * (2.0 / chi_square_quantile(2.0, 0.5)).sqrt();
+    let expected = t / (2.0 + t * t).sqrt();
+    assert!((two.few_coverage().unwrap() - expected).abs() < 1e-8);
+
+    // The coverage rises with the degrees of freedom, and enough give none.
+    let mut last = two.few_coverage().unwrap();
+    for count in 4..=10 {
+        let coverage = calibration(count).few_coverage().unwrap();
+        assert!(last < coverage && coverage < 0.9, "{count}: {coverage}");
+        last = coverage;
+    }
+
+    // 10 is enough, on whichever side of it the sums round: one constant in
+    // 11 blocks and ten in 2. `ν = 9` is few and `ν = 11` is not.
+    assert!(calibration(10).few_coverage().is_some());
+    assert!(calibration(11).few_coverage().is_none());
+    assert!(calibration(12).few_coverage().is_none());
+    let series: Vec<Vec<f64>> = (0..10)
+        .map(|i| (0..10).map(|t| ((i + t * t) % 7) as f64).collect())
+        .collect();
+    let (problem, fit) = means_problem(&series);
+    let ten = information_matching_eta(&problem, &fit, Some(5)).unwrap();
+    assert!((ten.degrees_of_freedom - 10.0).abs() < 1e-9);
+    assert!(ten.few_coverage().is_none());
+
+    // A line at 24 positions in 3 blocks of 8 reads `ν = 1.479`, of which
+    // the integral of the normal coverage over `χ²_ν` is 0.789.
+    let values: Vec<f64> = (0..24).map(|t| (t * t % 7) as f64).collect();
+    let (problem, fit) = line_problem(&values);
+    let line = information_matching_eta(&problem, &fit, Some(8)).unwrap();
+    assert!((line.degrees_of_freedom - 1.479).abs() < 1e-3);
+    assert!((line.few_coverage().unwrap() - 0.789).abs() < 1e-3);
 }
 
 #[test]

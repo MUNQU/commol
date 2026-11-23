@@ -21,7 +21,7 @@ use nalgebra::DMatrix;
 
 use super::check_numbers;
 use crate::error::MethodError;
-use commol_statistics::special::beta_i;
+use commol_statistics::special::student_t_two_sided_tail;
 
 /// The PRCC of every input for every quantity.
 #[derive(Debug, Clone, PartialEq)]
@@ -198,8 +198,7 @@ fn p_value(r: f64, freedom: f64) -> f64 {
     if rest <= 0.0 {
         return 0.0;
     }
-    let t_squared = r * r * freedom / rest;
-    beta_i(freedom / 2.0, 0.5, freedom / (freedom + t_squared))
+    student_t_two_sided_tail(r * r * freedom / rest, freedom)
 }
 
 #[cfg(test)]

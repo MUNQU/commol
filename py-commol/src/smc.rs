@@ -164,6 +164,11 @@ pub struct PyEtaCalibration {
     block_length: Option<usize>,
     /// With the automatic length, the estimate of each series by label
     block_length_estimates: Option<Vec<(String, f64)>>,
+    /// The degrees of freedom `η` reads, for information matching
+    degrees_of_freedom: Option<f64>,
+    /// The coverage expected of intervals of `FEW_COVERAGE_LEVEL`, when the
+    /// degrees of freedom are few
+    few_coverage: Option<f64>,
 }
 
 /// The sampler of the settings of a method. The reader of the settings
@@ -220,6 +225,8 @@ fn calibrated_eta(
                     coverage: None,
                     failed: Vec::new(),
                     block_length: Some(found.block_length),
+                    degrees_of_freedom: Some(found.degrees_of_freedom),
+                    few_coverage: found.few_coverage(),
                     block_length_estimates: found.estimates,
                 },
             ))
@@ -257,6 +264,8 @@ fn calibrated_eta(
                     failed: FitUnit::Replicate.entries(&found.failed),
                     block_length: Some(blocks.length()),
                     block_length_estimates: blocks.estimates().map(<[_]>::to_vec),
+                    degrees_of_freedom: None,
+                    few_coverage: None,
                 },
             ))
         }
@@ -300,6 +309,8 @@ fn gibbs_posterior(
                 failed: Vec::new(),
                 block_length: None,
                 block_length_estimates: None,
+                degrees_of_freedom: None,
+                few_coverage: None,
             },
         ),
         Eta::Calibrated(calibration) => {
@@ -440,6 +451,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDistribution>()?;
     m.add_class::<PySmcRun>()?;
     m.add_class::<PyEtaCalibration>()?;
+    m.add("FEW_COVERAGE_LEVEL", smc::FEW_COVERAGE_LEVEL)?;
     m.add_function(wrap_pyfunction!(gibbs_posterior, m)?)?;
     m.add_function(wrap_pyfunction!(bayesian_posterior, m)?)?;
     m.add_function(wrap_pyfunction!(abc_smc, m)?)?;

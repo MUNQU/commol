@@ -11,6 +11,7 @@ PredictiveProtocol
 CalibrationProblemProtocol
 ParameterSampleProtocol
 SampleAnalysisProtocol
+EtaCalibrationProtocol
 CalibrationResultProtocol
 ObservationDrawsProtocol
 ObservationBoundsProtocol

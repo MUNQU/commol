@@ -26,8 +26,8 @@ use commol_random::Generator;
 
 pub use abc::{AbcTarget, Distance, SeriesMetric};
 pub use gibbs::{
-    CoverageCalibration, GibbsRun, GibbsTarget, InformationCalibration, bootstrap_coverage_eta,
-    gibbs_posterior, information_matching_eta,
+    CoverageCalibration, FEW_COVERAGE_LEVEL, FEW_DEGREES_OF_FREEDOM, GibbsRun, GibbsTarget,
+    InformationCalibration, bootstrap_coverage_eta, gibbs_posterior, information_matching_eta,
 };
 pub use kernel::{Kernel, RandomWalk};
 pub use likelihood::{LikelihoodTarget, bayesian_posterior};

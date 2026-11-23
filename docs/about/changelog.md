@@ -161,6 +161,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for the variants without blocks. See
   [Sequential Monte Carlo](../guide/uncertainty/smc.md#what-means) and
   [Conformal Prediction Intervals](../guide/uncertainty/conformal.md#results-plots-and-reports).
+- `GibbsResult.degrees_of_freedom`: the degrees of freedom `ν` that
+  `InformationMatchingEta` reads from its blocks, `None` for a number `η` and
+  for `BootstrapCoverageEta`. Below 10, a note in `diagnostics.notes`, also
+  logged as a warning, gives `ν` and the coverage to expect of 90 %
+  intervals. In Rust, `InformationCalibration::few_coverage`,
+  `smc::FEW_DEGREES_OF_FREEDOM`, `smc::FEW_COVERAGE_LEVEL` and
+  `special::student_t_two_sided_tail` are new. See
+  [Sequential Monte Carlo](../guide/uncertainty/smc.md#what-means).
 - `ProfileIdentifiability(result=profiles)` in `commol.identifiability`: the
   identifiability report of the verdicts of a `ProfileResult`, run through
   `Calibrator.identifiability` as every identifiability method. It runs no

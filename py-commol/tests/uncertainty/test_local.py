@@ -21,7 +21,6 @@ from commol import (
     CalibrationProblem,
     Calibrator,
     NelderMeadConfig,
-    ObservedDataPoint,
     Simulation,
 )
 from commol._calibration.method import UncertaintyMethod
@@ -41,8 +40,7 @@ from commol.local.results import (
     LaplaceResult,
     SandwichResult,
 )
-from commol.observations import NegativeBinomialObservations, NormalObservations
-from commol.smc import GibbsPosterior, InformationMatchingEta
+from commol.observations import NormalObservations
 from commol.uncertainty import Predictive
 from commol.uncertainty.predictive import by_output
 from tests.support import (
@@ -51,19 +49,11 @@ from tests.support import (
     bounded,
     build,
     build_ode,
-    decay_part_means,
-    fan_calibrator,
     flow_calibrator,
     flow_observations,
-    line_calibrator,
-    sum_calibrator,
     two_wells_calibrator,
+    normal_values,
 )
-
-
-def _normal_data(count: int, seed: int, sd: float, level: float = 10.0) -> list[float]:
-    rng = np.random.default_rng(seed)
-    return (level + rng.normal(0.0, sd, count)).tolist()
 
 
 def _square_calibrator(values: list[float], low: float, high: float) -> Calibrator:
@@ -106,7 +96,7 @@ class TestCurvature:
     def test_the_hessian_of_a_correct_normal_model_is_its_information(self) -> None:
         # With a known sd, −log L is quadratic in c: its Hessian is n / sd².
         calibrator = flow_calibrator(
-            _normal_data(8, 7, sd=1.0),
+            normal_values(8, 7, sd=1.0),
             windowed=True,
             observation_models={"B": NormalObservations(sd=1.0)},
         )
@@ -312,7 +302,7 @@ class TestSandwich:
     def test_sandwich_equals_laplace_under_gaussian_noise(self) -> None:
         count = 200
         calibrator = flow_calibrator(
-            _normal_data(count, 3, sd=1.0),
+            normal_values(count, 3, sd=1.0),
             windowed=True,
             observation_models={"B": NormalObservations(sd=1.0)},
         )
@@ -330,7 +320,7 @@ class TestSandwich:
     def test_a_sandwich_band_reads_a_t_of_its_blocks(self) -> None:
         # Four blocks: the band is the prediction ± t₃(0.95) times its
         # standard deviation, J Σ Jᵀ with J = t · dc/du at position t.
-        calibrator = flow_calibrator(_normal_data(8, 10, sd=1.0), windowed=True)
+        calibrator = flow_calibrator(normal_values(8, 10, sd=1.0), windowed=True)
         result = calibrator.uncertainty(Sandwich(block_length=2, draws=10))
         c = result.fit.best_parameters["c"]
         derivative = c * (50.0 - c) / 50.0
@@ -343,7 +333,7 @@ class TestSandwich:
         assert band.upper["B"][0] - band.center["B"][0] == pytest.approx(half, rel=1e-6)
 
     def test_sandwich_refuses_too_few_blocks(self) -> None:
-        calibrator = flow_calibrator(_normal_data(6, 4, sd=1.0), windowed=True)
+        calibrator = flow_calibrator(normal_values(6, 4, sd=1.0), windowed=True)
 
         with pytest.raises(
             ValueError, match=r"block_length 6 makes 1 block for 1 parameter.*shorter"
@@ -357,7 +347,9 @@ class TestSandwich:
             )
         )
         problem = CalibrationProblem(
-            observed_data=flow_observations(_normal_data(10, 5, sd=1.0), windowed=True),
+            observed_data=flow_observations(
+                normal_values(10, 5, sd=1.0), windowed=True
+            ),
             parameters=[bounded("c", 0.0, 50.0, initial_guess=25.0)],
             loss_function="mae",
             optimization_config=NelderMeadConfig(max_iterations=500),
@@ -397,7 +389,7 @@ class TestResults:
     def test_each_method_returns_its_result(
         self, method: UncertaintyMethod[BaseModel], result_type: type[BaseModel]
     ) -> None:
-        data = _normal_data(12, 6, sd=1.0)
+        data = normal_values(12, 6, sd=1.0)
         models = (
             None
             if isinstance(method, LaplaceMixture)
@@ -457,7 +449,7 @@ class TestStarts:
 
     def test_a_laplace_mixture_fits_from_one_start_by_default(self) -> None:
         calibrator = flow_calibrator(
-            _normal_data(12, 6, sd=1.0),
+            normal_values(12, 6, sd=1.0),
             windowed=True,
             observation_models={"B": NormalObservations(sd=1.0)},
         )
@@ -469,130 +461,3 @@ class TestStarts:
 
         assert len(result.fit.starts) == 1
         assert result.fit == calibrator.run()
-
-
-def _matching(block_length: int) -> GibbsPosterior:
-    return GibbsPosterior(
-        priors=Priors.uniform_on_bounds(),
-        eta=InformationMatchingEta(block_length=block_length),
-        particles=50,
-        target_cess=0.5,
-        resample_threshold=0.5,
-        stay_probability=0.05,
-    )
-
-
-class TestInformationMatching:
-    def test_information_matching_of_a_correct_likelihood_is_one(self) -> None:
-        count = 200
-        calibrator = flow_calibrator(
-            _normal_data(count, 8, sd=2.0),
-            windowed=True,
-            observation_models={"B": NormalObservations(sd=2.0)},
-        )
-
-        result = calibrator.uncertainty(_matching(block_length=1))
-
-        # η = n sd² / Σ r²: its relative error is about √(2/n).
-        assert result.eta == pytest.approx(1.0, rel=3 * math.sqrt(2 / count))
-
-    def test_a_correct_model_with_sums_gives_one(self) -> None:
-        # A decay A → B whose windows of two steps are each the sum of two
-        # negative binomial parts of dispersion φ: the exact sum is the
-        # correct model of the data, of the rate and of φ.
-        k, phi, count, parts = 0.01, 0.5, 150, 2
-        ends = [parts * (index + 1) for index in range(count)]
-        means = np.array(decay_part_means(k, ends, parts))
-        size = 1 / phi
-        values = np.random.default_rng(21).negative_binomial(
-            size, size / (size + means)
-        )
-        observations = [
-            ObservedDataPoint(
-                at=end, output="B", value=float(value), window=parts, parts=parts
-            )
-            for end, value in zip(ends, values.sum(axis=1), strict=True)
-        ]
-        calibrator = sum_calibrator(
-            observations,
-            {"B": NegativeBinomialObservations(overdispersion="phi", sum="exact")},
-            noise=[bounded("phi", 0.01, 3.0, kind="noise")],
-        )
-
-        result = calibrator.uncertainty(_matching(block_length=1))
-
-        # Across seeds of the data, η spreads by about 0.1 around one.
-        assert result.eta == pytest.approx(1.0, rel=0.25)
-
-    def test_information_matching_takes_a_likelihood(self) -> None:
-        # The noise parameter sd adds its own information, 2n / sd², and the
-        # variance of its scores.
-        count = 200
-        calibrator = flow_calibrator(
-            _normal_data(count, 9, sd=2.0),
-            windowed=True,
-            observation_models={"B": NormalObservations(sd="sd")},
-            noise=[bounded("sd", 0.1, 10.0, kind="noise")],
-        )
-
-        result = calibrator.uncertainty(_matching(block_length=4))
-
-        assert result.fit is not None
-        assert result.eta == pytest.approx(1.0, rel=6 * math.sqrt(2 / count))
-
-    def test_few_blocks_per_parameter_give_eta_near_its_value(self) -> None:
-        # 10 constant flows at 35 positions with noise of sd 1: the sum of
-        # squares has η = 1/(2σ²) = 0.5. Blocks of 3 and 7 positions make 12
-        # and 5 blocks for 10 parameters.
-        rng = np.random.default_rng(4)
-        calibrator = fan_calibrator((5.0 + rng.normal(size=(10, 35))).tolist())
-
-        for block_length in (3, 7):
-            result = calibrator.uncertainty(_matching(block_length))
-
-            assert result.eta == pytest.approx(0.5, rel=0.1), block_length
-
-    def test_uneven_blocks_give_eta_near_its_value(self) -> None:
-        # A line at 24 positions in 3 blocks of 8, whose outer blocks hold
-        # most of the curvature of the slope: η corrects the trace by the
-        # leverage of the blocks and by median(χ²_ν)/ν. The median of η over
-        # data sets is checked in test_smc.rs; here, its closed form.
-        positions = np.arange(1.0, 25.0)
-        values = 10 + 2 * positions + np.random.default_rng(3).normal(size=24)
-        calibrator = line_calibrator(values.tolist())
-
-        eta = calibrator.uncertainty(_matching(block_length=8)).eta
-
-        design = np.column_stack([positions, np.ones_like(positions)])
-        curvature = 2 * design.T @ design
-        inverse = np.linalg.inv(curvature)
-        fit = np.linalg.lstsq(design, values)[0]
-        gradients = -2 * (values - design @ fit)[:, None] * design
-        blocks = [slice(start, start + 8) for start in (0, 8, 16)]
-        shares = [inverse @ (2 * design[b].T @ design[b]) for b in blocks]
-        trace = sum(g @ inverse @ g for g in (gradients[b].sum(axis=0) for b in blocks))
-        squares = sum(np.trace(a @ a) for a in shares)
-        spread = squares - 2 * sum(np.trace(a @ a @ a) for a in shares)
-        spread += np.trace(np.linalg.matrix_power(sum(a @ a for a in shares), 2))
-        nu = (2 - squares) ** 2 / spread
-        expected = (2 - squares) * _chi_square_median(nu) / nu / trace
-        assert nu == pytest.approx(1.48, abs=0.01)
-        assert eta == pytest.approx(expected, rel=1e-6)
-
-
-def _chi_square_median(nu: float) -> float:
-    """The median of χ²_ν, by bisection on the series of ``P(ν/2, x/2)``."""
-
-    def cdf(x: float) -> float:
-        a, y = nu / 2, x / 2
-        term = total = n = 1.0
-        while term > 1e-17 * total:
-            term, n = term * y / (a + n), n + 1
-            total += term
-        return math.exp(a * math.log(y) - y - math.lgamma(a + 1)) * total
-
-    low, high = 0.0, 2 * nu + 2
-    for _ in range(100):
-        middle = (low + high) / 2
-        low, high = (middle, high) if cdf(middle) < 0.5 else (low, middle)
-    return (low + high) / 2

@@ -177,6 +177,7 @@ class TestGibbsPosterior:
         assert result.fit is None
         assert result.block_length is None
         assert result.block_length_estimates is None
+        assert result.degrees_of_freedom is None
 
     def test_information_matching_recovers_eta(self) -> None:
         count = 200
@@ -288,6 +289,7 @@ class TestGibbsPosterior:
         # The bootstrap spread of a mean is that of its posterior: η is near
         # 1/(2σ²).
         assert 0.25 < result.eta * 2 * NOISE**2 < 4.0
+        assert result.degrees_of_freedom is None
 
 
 @pytest.mark.parametrize(

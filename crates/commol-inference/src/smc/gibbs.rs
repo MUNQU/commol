@@ -9,7 +9,7 @@
 use commol_calibration::{CalibrationProblem, LossConfig, Workspace};
 use commol_core::{CONFIDENCE_LEVEL, SimulationEngine, Steps};
 use commol_random::Generator;
-use commol_statistics::special::chi_square_quantile;
+use commol_statistics::special::{chi_square_quantile, normal_quantile, student_t_two_sided_tail};
 use commol_statistics::statistics::{interval_levels, normalized_weights, quantiles};
 
 use super::TemperedTarget;
@@ -30,6 +30,17 @@ const ETA_GROWTH: f64 = 4.0;
 const MAX_GROWTHS: usize = 30;
 /// Bisection steps of the calibration by coverage, on `log η`.
 const BISECTION_STEPS: usize = 100;
+
+/// Degrees of freedom of information matching below which they are few
+/// ([`InformationCalibration::few_coverage`]): at 10, 90 % intervals are
+/// expected to cover 88 %.
+pub const FEW_DEGREES_OF_FREEDOM: f64 = 10.0;
+/// The level of the intervals whose coverage
+/// [`InformationCalibration::few_coverage`] gives.
+pub const FEW_COVERAGE_LEVEL: f64 = 0.9;
+/// The relative rounding of the degrees of freedom: blocks that read exactly
+/// `ν` give it within a few units in the last place, on either side.
+const FREEDOM_ROUNDING: f64 = 1e-9;
 
 /// The Gibbs posterior of a problem with priors and a scale `η`.
 pub struct GibbsTarget<'a, E: SimulationEngine> {
@@ -325,6 +336,30 @@ pub struct InformationCalibration {
     pub block_length: usize,
     /// With the automatic length, the estimate of each series by label.
     pub estimates: Option<Estimates>,
+}
+
+impl InformationCalibration {
+    /// The coverage expected of the Gibbs intervals of
+    /// [`FEW_COVERAGE_LEVEL`], when the degrees of freedom are below
+    /// [`FEW_DEGREES_OF_FREEDOM`]; None otherwise, also within a relative
+    /// rounding of `1e-9` below it.
+    ///
+    /// The trace is about `(p − L)/η · χ²_ν/ν`, independent of the fit, so a
+    /// normal interval of half-width `z` sd at the true `η` has the
+    /// half-width `z √(χ²_ν / median(χ²_ν))` sd at the calibrated one, and
+    /// holds the parameter with the probability
+    /// `P(|t_ν| ≤ z √(ν / median(χ²_ν)))`. It is exact for flat priors away
+    /// from the bounds, a model linear in its parameters, independent
+    /// Gaussian noise of one scale, and blocks that each hold the same share
+    /// of the curvature.
+    pub fn few_coverage(&self) -> Option<f64> {
+        let nu = self.degrees_of_freedom;
+        (nu < FEW_DEGREES_OF_FREEDOM * (1.0 - FREEDOM_ROUNDING)).then(|| {
+            let z = normal_quantile(0.5 * (1.0 + FEW_COVERAGE_LEVEL));
+            let t_squared = z * z * nu / chi_square_quantile(nu, 0.5);
+            1.0 - student_t_two_sided_tail(t_squared, nu)
+        })
+    }
 }
 
 /// The outcome of [`bootstrap_coverage_eta`].

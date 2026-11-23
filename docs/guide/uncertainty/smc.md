@@ -172,8 +172,9 @@ is the problem's loss with its weights and normalization. It returns a
 a calibration of `η` read (`fit`), the coverage of a bootstrap calibration
 (`coverage`), each replicate of a bootstrap calibration whose sampler
 failed, `"Replicate <index> failed: <reason>"`, also logged as a warning
-(`failed`), and the block length of a calibration with the estimate of each
-series of the automatic length (`block_length`, `block_length_estimates`).
+(`failed`), the block length of a calibration with the estimate of each
+series of the automatic length (`block_length`, `block_length_estimates`), and
+the degrees of freedom of information matching (`degrees_of_freedom`).
 
 ### What `η` means
 
@@ -222,13 +223,51 @@ because `η` is the reciprocal of the trace and comes out too large more often
 than too small. Its median over data sets is then its value: with noise of
 sd 1, exactly `1/(2σ²)` for one constant at 24 positions in 2 blocks
 (`ν = 1`) and 1.02 times it for a line at 24 positions in 3 blocks
-(`ν ≈ 1.5`), where the trace alone gives 2.2 and 3.7 times. With few degrees of freedom
-one data set still gives an `η` far from its value, and the intervals cover
-less than their level: for that line in 8 blocks of 3 (`ν ≈ 5`), 90 %
-intervals cover about 87 %, and in 3 blocks about 84 %. Blocks that each
-hold several positions of every parameter, with `p(G − 1)` of about 10 or
-more, keep them near their level. Bootstrap
-coverage runs one tempered sampler per replicate to a large `η`, reads the
+(`ν ≈ 1.5`), where the trace alone gives 2.2 and 3.7 times.
+
+With few degrees of freedom one data set still gives an `η` far from its
+value, and the intervals of a high level cover less than it.
+`GibbsResult.degrees_of_freedom` gives `ν`, `None` for a number `η` and for
+bootstrap coverage. Below `ν = 10` a note in `diagnostics.notes`, also logged
+as a warning, gives `ν` and the coverage to expect of 90 % intervals. The
+loss grows with the level:
+
+| Level | `ν = 1` | 2 | 3 | 5 | 7 | 10 | 20 |
+|---|---|---|---|---|---|---|---|
+| 50 % | 50 % | 50 % | 50 % | 50 % | 50 % | 50 % | 50 % |
+| 90 % | 75 % | 81 % | 84 % | 86 % | 87 % | 88 % | 89 % |
+| 95 % | 79 % | 86 % | 89 % | 91 % | 92 % | 93 % | 94 % |
+
+The expected coverage is `P(|t_ν| ≤ z √(ν / median(χ²_ν)))`, with `t_ν` a
+Student t and `z` the normal quantile of the level. It is exact for flat
+priors away from the bounds, a model linear in its parameters, independent
+Gaussian noise of one scale, and blocks that share the curvature evenly.
+Blocks that share it unevenly cover more at the same `ν`: the line above
+covers about 83 % in 3 blocks of 8 (`ν ≈ 1.5`, 79 % expected) and 87 % in 8
+blocks of 3 (`ν ≈ 5`). An informative prior or a bound near the fit also
+changes it.
+
+Shorter blocks usually give more degrees of freedom, but must still hold the
+dependence of the residuals: blocks too short for it undercover with any
+`ν`, and no note. More positions give more only when they add curvature to
+more blocks, which the later positions of a fast growth do not.
+
+`ν` says how well the data fix one scale, with the scores of the blocks and
+of the parameters counted as independent. Many degrees of freedom, and no
+note, do not mean that the intervals cover. They do not when:
+
+- **The series share their noise**, as when one misfit shows in all of them:
+  `ν` counts each parameter apart. With 15 constant flows whose noise shares
+  90 % of its variance, 35 positions in 3 blocks read `ν = 30` and 90 %
+  intervals cover about 80 %; in 9 blocks, 86 %.
+- **Each series has a noise of another scale**, or an observation model wrong
+  by another factor: one `η` leaves the intervals of some parameters too
+  narrow and of others too wide. With 15 constant flows, one of them of
+  three times the sd, its intervals cover about 50 %.
+- **The blocks are shorter than the dependence**, or the noise is far from
+  Gaussian on few observations.
+
+Bootstrap coverage runs one tempered sampler per replicate to a large `η`, reads the
 posterior of every smaller `η` by reweighting, so its search runs no model,
 and finds for each replicate and parameter the `η` where the interval stops
 holding the fit. `η` is the one quantile of commol of the log thresholds at
@@ -304,6 +343,7 @@ print(sum(kept))  # 40
 | `diagnostics.move_counts` | Step | How many times each particle moved; it grows as the acceptance falls |
 | `diagnostics.evaluations` | Run | The number of model runs |
 | `diagnostics.stop_reason` | Run | Why the run stopped before its last level, or None |
+| `diagnostics.notes` | Run | Settings that do not apply, and the coverage to expect when `η` rests on few degrees of freedom |
 | `log_evidence` | Run | The log of the product of the mean incremental weights |
 | `kept` | Particle | The loss or distance each particle keeps |
 
@@ -321,7 +361,7 @@ Monte Carlo error.
 
 - [ ] Each calibrated parameter has a prior you can defend, on bounds that fit it.
 - [ ] `η` is a number you can justify, or one of its calibrations.
-- [ ] Information matching has `p(G − 1)` of about 10 or more, for `p` parameters and `G` blocks, each holding several positions of every parameter.
+- [ ] Information matching has `degrees_of_freedom` of about 10 or more, blocks that hold the dependence of the residuals, and series that neither share their noise nor need another scale each.
 - [ ] A Gibbs posterior ends at temperature 1; an ABC run says why it stopped.
 - [ ] With a stochastic engine, ABC reads one replicate per particle, not the problem's summary.
 

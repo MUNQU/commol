@@ -2,6 +2,8 @@
 
 from collections.abc import Iterable, Mapping, Sequence
 
+import numpy as np
+
 from commol import (
     Aggregate,
     CalibrationParameter,
@@ -109,6 +111,11 @@ def flow_observations(
         )
         for index, value in enumerate(values)
     ]
+
+
+def normal_values(count: int, seed: int, sd: float) -> list[float]:
+    """`count` independent normal values of mean 10 and `sd`, from `seed`."""
+    return (10.0 + np.random.default_rng(seed).normal(0.0, sd, count)).tolist()
 
 
 def flow_calibrator(

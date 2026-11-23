@@ -18,7 +18,7 @@ from commol.smc.results import GibbsResult, SMCDiagnostics, SMCResult
 from commol.uncertainty.sample import ParameterSample, SampleMethod
 
 if TYPE_CHECKING:
-    from commol.commol_rs._commol_rs import SMCRunProtocol
+    from commol.commol_rs._commol_rs import EtaCalibrationProtocol, SMCRunProtocol
     from commol.smc.methods import (
         ABCSMC,
         ABCRejection,
@@ -62,6 +62,30 @@ def _diagnostics(run: "SMCRunProtocol", notes: list[str]) -> SMCDiagnostics:
     )
 
 
+def _eta_notes(eta: "EtaCalibrationProtocol") -> list[str]:
+    """The notes of a calibration of `η`, logged as warnings: few degrees of
+    freedom."""
+    if eta.few_coverage is None:
+        return []
+    level = commol_rs.inference.FEW_COVERAGE_LEVEL
+    length = str(eta.block_length)
+    if eta.block_length_estimates is not None:
+        length += ', from "auto"'
+    note = (
+        f"η rests on few degrees of freedom, ν = {eta.degrees_of_freedom:.3g} "
+        f"(block_length {length}): {level:.0%} intervals are expected to cover "
+        f"about {eta.few_coverage:.0%}, with flat priors and noise of one scale "
+        "that is independent between blocks and between series."
+    )
+    if eta.block_length != 1:
+        note += (
+            " Shorter blocks can give more, but must still hold the dependence "
+            "of the residuals."
+        )
+    logger.warning(note)
+    return [note]
+
+
 def run_gibbs_posterior(
     calibrator: CalibrationPort, method: "GibbsPosterior"
 ) -> GibbsResult:
@@ -79,8 +103,8 @@ def run_gibbs_posterior(
     -------
     GibbsResult
         The sample, the levels, the log evidence, the diagnostics, `η`
-        and, with a calibration of `η`, its block length and the estimates
-        of the automatic length.
+        and, with a calibration of `η`, its block length, the estimates
+        of the automatic length and the degrees of freedom of `η`.
     """
     starts, run, eta = commol_rs.inference.gibbs_posterior(
         calibrator._engine_problem, engine_json(method), logger
@@ -99,13 +123,14 @@ def run_gibbs_posterior(
         levels=run.levels,
         kept=run.kept,
         log_evidence=run.log_evidence,
-        diagnostics=_diagnostics(run, []),
+        diagnostics=_diagnostics(run, _eta_notes(eta)),
         eta=eta.eta,
         fit=fit,
         coverage=eta.coverage,
         failed=log_failed(eta.failed, logger),
         block_length=eta.block_length,
         block_length_estimates=block_length_estimates(eta.block_length_estimates),
+        degrees_of_freedom=eta.degrees_of_freedom,
     )
 
 

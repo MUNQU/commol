@@ -263,6 +263,12 @@ pub fn student_t_quantile(p: f64, df: f64) -> f64 {
     bisect(|t| -upper_tail(t), -(1.0 - p), 1.0)
 }
 
+/// The two-sided tail `P(T² > t²)` of the Student t with `df > 0` degrees of
+/// freedom, at `t_squared = t² ≥ 0`.
+pub fn student_t_two_sided_tail(t_squared: f64, df: f64) -> f64 {
+    beta_i(0.5 * df, 0.5, df / (df + t_squared))
+}
+
 /// The regularized lower incomplete gamma function `P(a, x)`, `a > 0`.
 pub fn gamma_p(a: f64, x: f64) -> f64 {
     if x <= 0.0 {
@@ -442,6 +448,20 @@ mod tests {
             assert!((student_t_quantile(p, 2.0) - two).abs() < 1e-12, "{p}");
         }
         assert!((student_t_quantile(0.95, 1e6) - normal_quantile(0.95)).abs() < 1e-5);
+    }
+
+    #[test]
+    fn student_t_two_sided_tails_have_their_closed_forms() {
+        for t in [0.0_f64, 0.5, 2.0, 30.0] {
+            let cauchy = 1.0 - std::f64::consts::FRAC_2_PI * t.atan();
+            let tail = student_t_two_sided_tail(t * t, 1.0);
+            assert!((tail - cauchy).abs() < 1e-12, "{t}");
+            let two = 1.0 - t / (2.0 + t * t).sqrt();
+            assert!(
+                (student_t_two_sided_tail(t * t, 2.0) - two).abs() < 1e-12,
+                "{t}"
+            );
+        }
     }
 
     #[test]

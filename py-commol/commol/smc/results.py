@@ -103,6 +103,12 @@ class GibbsResult(SMCResult):
     block_length_estimates : dict[str, float] | None
         With a calibration of `η` and ``block_length="auto"``, the estimate
         of each series, by label; otherwise None.
+    degrees_of_freedom : float | None
+        With `InformationMatchingEta`, the degrees of freedom `ν` that `η`
+        reads from its blocks, with the blocks and the parameters counted as
+        independent; otherwise None. Below 10 a note of ``diagnostics.notes``,
+        also logged as a warning, gives the coverage to expect of 90 %
+        intervals.
     """
 
     eta: float
@@ -110,4 +116,5 @@ class GibbsResult(SMCResult):
     coverage: float | None
     block_length: int | None
     block_length_estimates: dict[str, float] | None
+    degrees_of_freedom: float | None
     failed: list[str] = Field(default_factory=list)
