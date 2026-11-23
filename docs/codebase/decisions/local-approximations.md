@@ -91,7 +91,7 @@ reads them only through a trace, so it needs two blocks, not more than `p`
 
 **Guards:** `tests/uncertainty/test_local.py::TestSandwich`,
 `tests/uncertainty/test_coverage.py::TestSandwich`,
-`tests/uncertainty/test_local.py::TestInformationMatching`.
+`tests/uncertainty/test_information_matching.py::TestInformationMatching`.
 
 ## Information matching reads the meat through a trace
 
@@ -130,7 +130,19 @@ the first row exact) gives the median of `η` over its value:
 
 With few degrees of freedom `η` still varies, which the posterior does not
 hold: 90 % intervals of the line cover about 87 % in 8 blocks of 3 (`ν ≈ 5`;
-CR1 81 %) and 84 % in 3 blocks of 8 (CR1 62 %).
+CR1 81 %) and 83 % in 3 blocks of 8 (CR1 62 %). The result gives `ν`
+(`GibbsResult.degrees_of_freedom`), and below `FEW_DEGREES_OF_FREEDOM = 10`,
+within a relative rounding of `1e-9`, `InformationCalibration::few_coverage`
+gives the coverage to expect of 90 % intervals (`FEW_COVERAGE_LEVEL`), which
+the runner words in a note of `diagnostics.notes` and logs as a warning. The
+trace is about `(p − L)/η · χ²_ν/ν`, independent of the fit, so the coverage
+is `P(|t_ν| ≤ z √(ν / median(χ²_ν)))`: 75 % at `ν = 1`, 86 % at 5, 88 % at 10
+and 89 % at 20. At 10 it is 2 points below the level. The numpy simulation of
+one constant agrees within 1 point at `ν` of 1, 2, 3, 5 and 10, and the
+lines, whose blocks share the curvature unevenly, cover up to 4 points more.
+`ν` counts the scores of the parameters and the blocks as independent, so it
+is no guarantee: noise shared between series, a scale per series, or blocks
+shorter than the dependence undercover at a large `ν`, which the guide says.
 
 | Alternative | Why not |
 |---|---|
@@ -138,11 +150,17 @@ CR1 81 %) and 84 % in 3 blocks of 8 (CR1 62 %).
 | Correct the inverse by `(G − p − 2)/(G − 1)` | It still needs `G > p + 2`, so blocks short enough for that are too short for the dependence. |
 | The leverage alone, or CR2, `(I − A_b)^{-1/2}` on each block score (Bell and McCaffrey 2002) | The trace has its mean (0.94 of it under the AR(1) noise), but `η`, its reciprocal, a median 1.4 to 2.2 times its value below about 3 degrees of freedom; CR2 also needs a matrix root per block and is infinite for a block that holds all the curvature of a parameter. |
 | CR3, `(I − A_b)^{-1}`, the jackknife | Too large a trace: a median `η` of 0.43 to 0.77 times its value for a line in few blocks. |
-| A warning below a number of degrees of freedom | It leaves `η` too large; the guide states the coverage with few degrees of freedom instead. |
+| A warning below a number of degrees of freedom in place of the correction | It leaves `η` too large. The warning is on top of it. |
+| A warning by the number of blocks | With independent series the coverage follows `ν`, not the count: 2 blocks of 10 constants read 10. With noise shared between series few blocks do undercover (15 constants that share 90 % of the variance: 80 % in 3 blocks, 86 % in 9), but `G` does not say whether they share it. |
+| Another threshold, or none | A threshold of 5 is silent at 86 %; above 10 the loss is below 2 points, inside the error of the formula with uneven blocks. `ν` is in the result whatever its size. |
+| A setting of the level, or the level asked for later | The note is written before any interval is asked for; the guide gives 50 %, 90 % and 95 %, and the formula. |
+| The threshold and the wording in Python | The engine holds the rule and the numbers; the runner words them, as for the size of a sample (`FEW_DRAWS_PER_PARAMETER`). |
+| An error below a number of degrees of freedom | The posterior is usable with its coverage known, and a problem of few positions may have no more to read. |
 | `η` scaled so the intervals of a level hold `t_ν` | `η` would depend on the level of the intervals asked for later, and its median would be far below its value. |
 
 **Guards:** `crates/commol-inference/tests/test_smc.rs::information_matching_gives_eta_near_its_value_with_few_blocks_per_parameter`, `crates/commol-inference/tests/test_smc.rs::information_matching_gives_eta_near_its_value_with_blocks_of_uneven_curvature`, `crates/commol-inference/tests/test_smc.rs::information_matching_reads_the_degrees_of_freedom_of_its_blocks`,
-`crates/commol-inference/tests/test_smc.rs::information_matching_needs_two_blocks_and_scores_that_are_not_all_0`, `tests/uncertainty/test_local.py::TestInformationMatching`, `tests/uncertainty/test_coverage.py::TestInformationMatching`.
+`crates/commol-inference/tests/test_smc.rs::information_matching_gives_its_degrees_of_freedom`,
+`crates/commol-inference/tests/test_smc.rs::information_matching_needs_two_blocks_and_scores_that_are_not_all_0`, `tests/uncertainty/test_information_matching.py::TestInformationMatching`, `tests/uncertainty/test_coverage.py::TestInformationMatching`.
 
 ## The Laplace approximation needs observation models
 

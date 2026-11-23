@@ -645,6 +645,10 @@ class EtaCalibrationProtocol(Protocol):
     def block_length(self) -> int | None: ...
     @property
     def block_length_estimates(self) -> list[tuple[str, float]] | None: ...
+    @property
+    def degrees_of_freedom(self) -> float | None: ...
+    @property
+    def few_coverage(self) -> float | None: ...
 
 type EngineHandle = ParameterSampleProtocol | str | None
 """A field of a method that crosses as its handle (``engine_handles``): a
@@ -755,6 +759,7 @@ class ForwardAnalysisProtocol(Protocol):
     def check_observations(self, observations: str) -> None: ...
 
 class InferenceModule(Protocol):
+    FEW_COVERAGE_LEVEL: float
     FEW_DRAWS_PER_PARAMETER: float
     CalibrationProblem: type[CalibrationProblemProtocol]
     ParameterSample: type[ParameterSampleProtocol]

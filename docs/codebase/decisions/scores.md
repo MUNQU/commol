@@ -57,7 +57,7 @@ singular.
 `crates/commol-calibration/tests/test_likelihood.rs::scores_equal_the_differences_of_the_terms`,
 `crates/commol-inference/tests/test_local.rs::the_gradient_of_a_sum_is_that_of_its_density`,
 `crates/commol-inference/tests/test_local.rs::the_information_of_a_sum_is_that_of_its_density`,
-`tests/uncertainty/test_local.py::TestInformationMatching::test_a_correct_model_with_sums_gives_one`.
+`tests/uncertainty/test_information_matching.py::TestInformationMatching::test_a_correct_model_with_sums_gives_one`.
 
 ## Distribution functions live in commol-calibration
 

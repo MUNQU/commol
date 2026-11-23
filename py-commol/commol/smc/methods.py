@@ -44,8 +44,10 @@ class InformationMatchingEta(RangeChecked):
     of the curvature each block holds, and `η` by the degrees of freedom the
     blocks read, so that its median over data sets is its value also with
     blocks that share the curvature unevenly; with few degrees of freedom
-    one data set still gives an `η` far from it, and intervals that cover
-    less than their level.
+    one data set still gives an `η` far from it, and intervals of a high
+    level that cover less than it. `GibbsResult.degrees_of_freedom` gives
+    them, and a note of its diagnostics the coverage to expect when they are
+    below 10.
 
     Attributes
     ----------

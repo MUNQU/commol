@@ -8,8 +8,9 @@ and a flat prior, so the posterior of ``θ`` is ``N(θ̂, σ²/Σx²)`` with
 covers ``θ`` in 90 % of the data sets. The Gibbs posterior fits a constant
 flow with Gaussian noise (``flow_calibrator``), and, with information
 matching, six constant flows (``fan_calibrator``) with fewer blocks than
-parameters, under independent and AR(1) noise; ABC fits the probability of a
-chain binomial from the units that moved in one step.
+parameters, under independent and AR(1) noise, and the constant flow in few
+blocks, whose intervals cover as their degrees of freedom say; ABC fits the
+probability of a chain binomial from the units that moved in one step.
 
 The Laplace approximation fits the same flow with a normal model of known
 ``sd``, whose likelihood is exactly normal in ``c``. The sandwich fits a line
@@ -205,6 +206,42 @@ class TestInformationMatching:
         study = coverage_study(
             interval, {"c": 2.0, "B": 10.0}, LEVEL, data_sets=200, seed=7
         )
+
+        assert study.calibrated(), study
+
+    @pytest.mark.parametrize(
+        ("block_length", "expected"),
+        [(12, 0.752), (8, 0.813), (4, 0.862)],
+    )
+    def test_few_degrees_of_freedom_cover_as_the_note_says(
+        self, block_length: int, expected: float
+    ) -> None:
+        # One constant flow at 24 positions in G = 24 / block_length blocks
+        # reads ν = G − 1 degrees of freedom, and its 90 % intervals cover
+        # P(|t_ν| ≤ z √(ν / median(χ²_ν))), the coverage of the note. 4000
+        # data sets see an error of 3 points in most studies.
+        method = GibbsPosterior(
+            priors=Priors.uniform_on_bounds(),
+            eta=InformationMatchingEta(block_length=block_length),
+            particles=400,
+            target_cess=0.5,
+            resample_threshold=0.5,
+            stay_probability=0.05,
+        )
+        degrees_of_freedom = 24 // block_length - 1
+        said = f"cover about {expected:.0%}"
+
+        def interval(index: int, rng: np.random.Generator) -> dict[str, Interval]:
+            values = (FLOW + rng.normal(size=24)).tolist()
+            result = flow_calibrator(values, windowed=True, seed=index).uncertainty(
+                method
+            )
+            assert result.degrees_of_freedom == pytest.approx(degrees_of_freedom)
+            (note,) = result.diagnostics.notes
+            assert said in note
+            return {"c": result.sample.interval(LEVEL)["c"]}
+
+        study = coverage_study(interval, {"c": FLOW}, expected, data_sets=4000, seed=9)
 
         assert study.calibrated(), study
 
